@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/elfldltl/diagnostics.h>
+#include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/posix.h>
 #include <lib/elfldltl/testing/diagnostics.h>
 
@@ -44,7 +45,8 @@ TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
   decltype(auto) retval =
       report(kStringViewArg, kValue32, "bar", kValue64, elfldltl::FileOffset{kOffset32},
              elfldltl::FileOffset{kOffset64}, elfldltl::FileAddress{kAddress32},
-             elfldltl::FileAddress{kAddress64});
+             elfldltl::FileAddress{kAddress64}, " field32", elfldltl::Elf32<>::Addr{kValue32},
+             " field64", elfldltl::Elf64<>::Addr{kValue64});
 
   static_assert(std::is_same_v<decltype(retval), bool>);
   EXPECT_TRUE(retval);
@@ -53,7 +55,8 @@ TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
   EXPECT_STREQ(
       "prefix 42: foo 123bar 456"
       " at file offset 0x123 at file offset 0x456"
-      " at relative address 0x1234 at relative address 0x4567",
+      " at relative address 0x1234 at relative address 0x4567"
+      " field32 123 field64 456",
       buffer.data());
 }
 

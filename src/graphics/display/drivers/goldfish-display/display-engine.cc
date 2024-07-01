@@ -110,8 +110,6 @@ zx::result<> DisplayEngine::Initialize() {
 
 void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* interface) {
-  std::vector<added_display_args_t> args;
-
   const int32_t width = primary_display_device_.width_px;
   const int32_t height = primary_display_device_.height_px;
   const int32_t refresh_rate_hz = primary_display_device_.refresh_rate_hz;
@@ -137,21 +135,23 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
       .pixel_repetition = 0,
   };
 
-  const added_display_args_t display = {
+  const display_mode_t banjo_display_mode = display::ToBanjoDisplayMode(timing);
+
+  const raw_display_info_t banjo_display_info = {
       .display_id = display::ToBanjoDisplayId(kPrimaryDisplayId),
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
-      .panel =
-          {
-              .mode = display::ToBanjoDisplayMode(timing),
-          },
-      .pixel_format_list = kPixelFormats,
-      .pixel_format_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
+      .preferred_modes_list = &banjo_display_mode,
+      .preferred_modes_count = 1,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = kPixelFormats,
+      .pixel_formats_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
   };
 
   {
     fbl::AutoLock lock(&flush_lock_);
     dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(interface);
-    dc_intf_.OnDisplayAdded(&display);
+    dc_intf_.OnDisplayAdded(&banjo_display_info);
   }
 }
 

@@ -1127,6 +1127,9 @@ enum class ReceiveTokenType : uint8_t {
   kUndocumented = 0b000,         // Undocumented token
 };
 
+// Descriptor for logging and debugging.
+const char* ReceiveTokenTypeToString(ReceiveTokenType receive_token_type);
+
 // Factory for transmit tokens used by the FIFOS register.
 //
 // Rev 5 datasheet: Table 41 page 28

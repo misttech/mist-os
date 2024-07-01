@@ -612,7 +612,10 @@ async fn serve_failing_blobfs(
             }
             fio::DirectoryRequest::Open2 { path, protocols, object_request, control_handle: _ } => {
                 let _ = object_request;
-                todo!("https://fxbug.dev/42157659: path={} protocols={:?}", path, protocols);
+                todo!("https://fxbug.dev/293947862: path={} protocols={:?}", path, protocols);
+            }
+            fio::DirectoryRequest::Open3 { .. } => {
+                todo!("https://fxbug.dev/348698584");
             }
             fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {
                 responder.send(Err(zx::Status::IO.into_raw())).context("failing unlink")?

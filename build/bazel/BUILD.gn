@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/developer_overrides.gni")
 import("//build/assembly/sshd_config.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
@@ -247,6 +248,14 @@ action("remote_services_bazelrc") {
            rebase_path(_output, root_build_dir),
            "--cfgs",
          ] + rebase_path(_configs, root_build_dir)
+}
+
+# Pass the map of which developer overrides to use with which assembly label to
+# Bazel.
+generated_file("assembly_developer_overrides") {
+  outputs = [ "${root_gen_dir}/assembly_developer_overrides.json" ]
+  contents = product_assembly_overrides
+  output_conversion = "json"
 }
 
 group("tests") {

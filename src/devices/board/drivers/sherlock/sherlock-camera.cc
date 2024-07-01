@@ -232,8 +232,8 @@ static const fpbus::Node sensor_dev_sherlock = []() {
 // design and layout details.
 zx_status_t Sherlock::CameraInit() {
   // Set GPIO alternate functions.
-  gpio_init_steps_.push_back({T931_GPIOAO(10), GpioSetAltFunction(kClk24MAltFunc)});
-  gpio_init_steps_.push_back({T931_GPIOAO(10), GpioSetDriveStrength(kClkGpioDriveStrengthUa)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOAO(10), kClk24MAltFunc));
+  gpio_init_steps_.push_back(GpioSetDriveStrength(T931_GPIOAO(10), kClkGpioDriveStrengthUa));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('CAME');

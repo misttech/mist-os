@@ -36,6 +36,12 @@ pub struct MemoryCommand {
 
     #[argh(
         switch,
+        description = "displays the detailed view of only the undigested memory (memory not part of any bucket) instead of the full memory."
+    )]
+    pub undigested: bool,
+
+    #[argh(
+        switch,
         description = "outputs csv that for every process shows the device uptime in seconds, the process koid, the process name, and the private, scale, and total memory usage. This option is not supported with other output options like --machine."
     )]
     pub csv: bool,

@@ -5,17 +5,21 @@
 use anyhow::{bail, Context, Error};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
-use futures::StreamExt;
+use futures::future::OptionFuture;
+use futures::{FutureExt, StreamExt};
 use ieee80211::{Bssid, MacAddrBytes};
 use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable};
 use netlink_packet_generic::GenlMessage;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
 use tracing::{error, info, warn};
+use wlan_common::bss::BssDescription;
 use wlan_common::channel::{Cbw, Channel};
+use wlan_telemetry::{self, TelemetryEvent, TelemetrySender};
 use {
-    fidl_fuchsia_wlan_sme as fidl_sme, fidl_fuchsia_wlan_wlanix as fidl_wlanix,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync, fuchsia_inspect,
+    fuchsia_zircon as zx,
 };
 
 mod bss_scorer;
@@ -366,8 +370,11 @@ struct SupplicantStaIfaceState {
 
 struct ConnectionContext {
     stream: fidl_sme::ConnectTransactionEventStream,
-    ssid: Vec<u8>,
-    bssid: Bssid,
+    original_bss_desc: Box<BssDescription>,
+    most_recent_connect_time: fasync::Time,
+    current_rssi_dbm: i8,
+    current_snr_db: i8,
+    current_channel: Channel,
 }
 
 fn send_disconnect_event<C: ClientIface>(
@@ -388,7 +395,7 @@ fn send_disconnect_event<C: ClientIface>(
         }
     };
     let disconnected_event = fidl_wlanix::SupplicantStaIfaceCallbackOnDisconnectedRequest {
-        bssid: Some(ctx.bssid.to_array()),
+        bssid: Some(ctx.original_bss_desc.bssid.to_array()),
         locally_generated: Some(locally_generated),
         reason_code: Some(reason_code),
         ..Default::default()
@@ -400,10 +407,10 @@ fn send_disconnect_event<C: ClientIface>(
     );
     let state_changed_event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
         new_state: Some(fidl_wlanix::StaIfaceCallbackState::Disconnected),
-        bssid: Some(ctx.bssid.to_array()),
+        bssid: Some(ctx.original_bss_desc.bssid.to_array()),
         // TODO(b/316034688): do we need to keep track of actual id?
         id: Some(1),
-        ssid: Some(ctx.ssid.clone()),
+        ssid: Some(ctx.original_bss_desc.ssid.to_vec()),
         ..Default::default()
     };
     run_callbacks(
@@ -418,7 +425,7 @@ fn send_disconnect_event<C: ClientIface>(
                 Nl80211Cmd::Disconnect,
                 vec![
                     Nl80211Attr::IfaceIndex(iface_id.into()),
-                    Nl80211Attr::Mac(ctx.bssid.to_array()),
+                    Nl80211Attr::Mac(ctx.original_bss_desc.bssid.to_array()),
                 ],
             )),
             ..Default::default()
@@ -436,6 +443,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
     mut ctx: ConnectionContext,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
     wifi_state: Arc<Mutex<WifiState>>,
+    telemetry_sender: TelemetrySender,
     iface: Arc<C>,
     iface_id: u16,
 ) {
@@ -454,6 +462,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                 match (disconnect_with_ongoing_reconnect.as_ref(), result.is_reconnect) {
                     (Some(info), true) => {
                         if result.code == fidl_fuchsia_wlan_ieee80211::StatusCode::Success {
+                            ctx.most_recent_connect_time = fasync::Time::now();
                             info!("Successfully reconnected after disconnect");
                         } else {
                             send_disconnect_event(
@@ -478,11 +487,26 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                 }
             }
             Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
+                let connected_duration = fasync::Time::now() - ctx.most_recent_connect_time;
+                telemetry_sender.send(TelemetryEvent::Disconnect {
+                    info: wlan_telemetry::DisconnectInfo {
+                        connected_duration: connected_duration,
+                        is_sme_reconnecting: info.is_sme_reconnecting,
+                        disconnect_source: info.disconnect_source,
+                        original_bss_desc: ctx.original_bss_desc.clone(),
+                        current_rssi_dbm: ctx.current_rssi_dbm,
+                        current_snr_db: ctx.current_snr_db,
+                        current_channel: ctx.current_channel,
+                    },
+                });
                 if info.is_sme_reconnecting {
                     info!("Connection interrupted, awaiting reconnect: {:?}", info);
                     disconnect_with_ongoing_reconnect = Some(info.disconnect_source);
                 } else {
-                    info!("Connection terminated by disconnect: {:?}", info);
+                    info!(
+                        "Connection terminated by disconnect, lasted {:?}: {:?}",
+                        connected_duration, info
+                    );
                     send_disconnect_event(
                         &info.disconnect_source,
                         &ctx,
@@ -495,9 +519,12 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                 }
             }
             Ok(fidl_sme::ConnectTransactionEvent::OnSignalReport { ind }) => {
+                ctx.current_rssi_dbm = ind.rssi_dbm;
+                ctx.current_snr_db = ind.snr_db;
                 iface.on_signal_report(ind);
             }
             Ok(fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info }) => {
+                ctx.current_channel.primary = info.new_channel;
                 info!("Connection switching to channel {}", info.new_channel);
             }
             Err(e) => {
@@ -508,6 +535,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
 }
 
 async fn handle_supplicant_sta_network_request<C: ClientIface>(
+    telemetry_sender: TelemetrySender,
     req: fidl_wlanix::SupplicantStaNetworkRequest,
     sta_network_state: Arc<Mutex<SupplicantStaNetworkState>>,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
@@ -548,12 +576,16 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                 Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase, bssid).await {
                     Ok(ConnectResult::Success(connected)) => {
                         info!("Connected to requested network");
+                        telemetry_sender.send(TelemetryEvent::ConnectResult {
+                            result: fidl_ieee80211::StatusCode::Success,
+                            bss: connected.bss.clone(),
+                        });
                         let event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
                             new_state: Some(fidl_wlanix::StaIfaceCallbackState::Completed),
-                            bssid: Some(connected.bssid.to_array()),
+                            bssid: Some(connected.bss.bssid.to_array()),
                             // TODO(b/316034688): do we need to keep track of actual id?
                             id: Some(1),
-                            ssid: Some(connected.ssid.clone()),
+                            ssid: Some(connected.bss.ssid.clone().into()),
                             ..Default::default()
                         };
                         run_callbacks(
@@ -565,17 +597,24 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             Ok(()),
                             Some(ConnectionContext {
                                 stream: connected.transaction_stream,
-                                ssid: connected.ssid,
-                                bssid: connected.bssid,
+                                original_bss_desc: connected.bss.clone(),
+                                most_recent_connect_time: fasync::Time::now(),
+                                current_rssi_dbm: connected.bss.rssi_dbm,
+                                current_snr_db: connected.bss.snr_db,
+                                current_channel: connected.bss.channel.clone(),
                             }),
                         )
                     }
                     Ok(ConnectResult::Fail(fail)) => {
                         warn!("Connection failed with status code: {:?}", fail.status_code);
+                        telemetry_sender.send(TelemetryEvent::ConnectResult {
+                            result: fail.status_code,
+                            bss: fail.bss.clone(),
+                        });
                         let event =
                             fidl_wlanix::SupplicantStaIfaceCallbackOnAssociationRejectedRequest {
-                                ssid: Some(fail.ssid),
-                                bssid: Some(fail.bssid.to_array()),
+                                ssid: Some(fail.bss.ssid.to_vec()),
+                                bssid: Some(fail.bss.bssid.to_array()),
                                 status_code: Some(fail.status_code),
                                 timed_out: Some(fail.timed_out),
                                 ..Default::default()
@@ -626,6 +665,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                     ctx,
                     Arc::clone(&sta_iface_state),
                     Arc::clone(&state),
+                    telemetry_sender,
                     Arc::clone(&iface),
                     iface_id,
                 )
@@ -640,6 +680,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
 }
 
 async fn serve_supplicant_sta_network<C: ClientIface>(
+    telemetry_sender: TelemetrySender,
     reqs: fidl_wlanix::SupplicantStaNetworkRequestStream,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
     state: Arc<Mutex<WifiState>>,
@@ -651,6 +692,7 @@ async fn serve_supplicant_sta_network<C: ClientIface>(
         match req {
             Ok(req) => {
                 if let Err(e) = handle_supplicant_sta_network_request(
+                    telemetry_sender.clone(),
                     req,
                     Arc::clone(&sta_network_state),
                     Arc::clone(&sta_iface_state),
@@ -672,6 +714,7 @@ async fn serve_supplicant_sta_network<C: ClientIface>(
 }
 
 async fn handle_supplicant_sta_iface_request<C: ClientIface>(
+    telemetry_sender: TelemetrySender,
     req: fidl_wlanix::SupplicantStaIfaceRequest,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
     state: Arc<Mutex<WifiState>>,
@@ -693,6 +736,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
                     .context("create SupplicantStaNetwork stream")?;
                 // TODO(b/316035436): Should we return NetworkAdded event?
                 serve_supplicant_sta_network(
+                    telemetry_sender,
                     supplicant_sta_network_stream,
                     sta_iface_state,
                     state,
@@ -719,6 +763,7 @@ async fn handle_supplicant_sta_iface_request<C: ClientIface>(
 }
 
 async fn serve_supplicant_sta_iface<C: ClientIface>(
+    telemetry_sender: TelemetrySender,
     reqs: fidl_wlanix::SupplicantStaIfaceRequestStream,
     state: Arc<Mutex<WifiState>>,
     iface: Arc<C>,
@@ -729,6 +774,7 @@ async fn serve_supplicant_sta_iface<C: ClientIface>(
         match req {
             Ok(req) => {
                 if let Err(e) = handle_supplicant_sta_iface_request(
+                    telemetry_sender.clone(),
                     req,
                     Arc::clone(&sta_iface_state),
                     Arc::clone(&state),
@@ -751,6 +797,7 @@ async fn serve_supplicant_sta_iface<C: ClientIface>(
 async fn handle_supplicant_request<I: IfaceManager>(
     req: fidl_wlanix::SupplicantRequest,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
     state: Arc<Mutex<WifiState>>,
 ) -> Result<(), Error> {
     match req {
@@ -767,6 +814,7 @@ async fn handle_supplicant_request<I: IfaceManager>(
                         .into_stream()
                         .context("create SupplicantStaIface stream")?;
                     serve_supplicant_sta_iface(
+                        telemetry_sender,
                         supplicant_sta_iface_stream,
                         state,
                         client_iface,
@@ -786,14 +834,19 @@ async fn handle_supplicant_request<I: IfaceManager>(
 async fn serve_supplicant<I: IfaceManager>(
     reqs: fidl_wlanix::SupplicantRequestStream,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
     state: Arc<Mutex<WifiState>>,
 ) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) =
-                    handle_supplicant_request(req, Arc::clone(&iface_manager), Arc::clone(&state))
-                        .await
+                if let Err(e) = handle_supplicant_request(
+                    req,
+                    Arc::clone(&iface_manager),
+                    telemetry_sender.clone(),
+                    Arc::clone(&state),
+                )
+                .await
                 {
                     warn!("Failed to handle SupplicantRequest: {}", e);
                 }
@@ -1257,6 +1310,7 @@ async fn handle_wlanix_request<I: IfaceManager>(
     req: fidl_wlanix::WlanixRequest,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::WlanixRequest::GetWifi { payload, .. } => {
@@ -1271,8 +1325,13 @@ async fn handle_wlanix_request<I: IfaceManager>(
             if let Some(supplicant) = payload.supplicant {
                 let supplicant_stream =
                     supplicant.into_stream().context("create Supplicant stream")?;
-                serve_supplicant(supplicant_stream, Arc::clone(&iface_manager), Arc::clone(&state))
-                    .await;
+                serve_supplicant(
+                    supplicant_stream,
+                    Arc::clone(&iface_manager),
+                    telemetry_sender,
+                    Arc::clone(&state),
+                )
+                .await;
             }
         }
         fidl_wlanix::WlanixRequest::GetNl80211 { payload, .. } => {
@@ -1293,12 +1352,18 @@ async fn serve_wlanix<I: IfaceManager>(
     reqs: fidl_wlanix::WlanixRequestStream,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
 ) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) =
-                    handle_wlanix_request(req, Arc::clone(&state), Arc::clone(&iface_manager)).await
+                if let Err(e) = handle_wlanix_request(
+                    req,
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender.clone(),
+                )
+                .await
                 {
                     warn!("Failed to handle WlanixRequest: {}", e);
                 }
@@ -1311,11 +1376,14 @@ async fn serve_wlanix<I: IfaceManager>(
     .await;
 }
 
-async fn serve_fidl<I: IfaceManager>(iface_manager: Arc<I>) -> Result<(), Error> {
+async fn serve_fidl<I: IfaceManager>(
+    iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
+) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     let state = Arc::new(Mutex::new(WifiState::default()));
     let _ = fs.dir("svc").add_fidl_service(move |reqs| {
-        serve_wlanix(reqs, Arc::clone(&state), Arc::clone(&iface_manager))
+        serve_wlanix(reqs, Arc::clone(&state), Arc::clone(&iface_manager), telemetry_sender.clone())
     });
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |t| async { t.await }).await;
@@ -1331,10 +1399,40 @@ async fn main() {
     )
     .expect("Failed to initialize wlanix logs");
     info!("Starting Wlanix");
+
     let iface_manager = ifaces::DeviceMonitorIfaceManager::new()
         .expect("Failed to connect wlanix to wlandevicemonitor");
-    match serve_fidl(Arc::new(iface_manager)).await {
-        Ok(()) => info!("Wlanix exiting cleanly"),
+
+    // Setup telemetry module
+    let cobalt_logger = wlan_telemetry::setup_cobalt_proxy().await.unwrap_or_else(|err| {
+        error!("Cobalt service unavailable, will discard all metrics: {}", err);
+        // This will only happen if Cobalt is very broken in some way. Using the disconnected
+        // proxy will result in log spam as metrics fail to send, but it's preferable to run rather
+        // than panicking, so the user still has the option of wireless connectivity (e.g. to OTA).
+        wlan_telemetry::setup_disconnected_cobalt_proxy()
+            .expect("Failed to create any FIDL channels, panicking")
+    });
+    let (persistence_sender, persistence_fut) = wlan_telemetry::setup_persistence_req_sender()
+        .map(|(sender, future)| (sender, OptionFuture::from(Some(future))))
+        .unwrap_or_else(|err| {
+            error!("Inspect data will not persist across reboot: {}", err);
+            // To keep the code paths identical, create an empty OptionFuture that can run in the
+            // `try_join!()`.
+            (wlan_telemetry::setup_disconnected_persistence_req_sender(), OptionFuture::from(None))
+        });
+    let (telemetry_sender, serve_telemetry_fut) = wlan_telemetry::serve_telemetry(
+        cobalt_logger,
+        fuchsia_inspect::component::inspector().root().create_child("client_stats"),
+        persistence_sender,
+    );
+
+    let res = futures::try_join!(
+        serve_telemetry_fut,
+        persistence_fut.map(Ok),
+        serve_fidl(Arc::new(iface_manager), telemetry_sender)
+    );
+    match res {
+        Ok(_) => info!("Wlanix exiting cleanly"),
         Err(e) => error!("Wlanix exiting with error: {}", e),
     }
 }
@@ -1343,9 +1441,12 @@ async fn main() {
 mod tests {
     use super::*;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy};
+    use futures::channel::mpsc;
     use futures::task::Poll;
     use futures::Future;
+    use ieee80211::Ssid;
     use ifaces::test_utils::{ClientIfaceCall, TestIfaceManager};
+    use rand::Rng as _;
     use std::pin::{pin, Pin};
     use test_case::test_case;
     use wlan_common::assert_variant;
@@ -1618,6 +1719,7 @@ mod tests {
         wifi_proxy: fidl_wlanix::WifiProxy,
         wifi_chip_proxy: fidl_wlanix::WifiChipProxy,
         wifi_sta_iface_proxy: fidl_wlanix::WifiStaIfaceProxy,
+        _telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         iface_manager: Arc<TestIfaceManager>,
 
         // Note: keep the executor field last in the struct so it gets dropped last.
@@ -1661,7 +1763,13 @@ mod tests {
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
-        let test_fut = serve_wlanix(wlanix_stream, wifi_state, Arc::clone(&iface_manager));
+        let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let test_fut = serve_wlanix(
+            wlanix_stream,
+            wifi_state,
+            Arc::clone(&iface_manager),
+            TelemetrySender::new(telemetry_sender),
+        );
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -1673,6 +1781,7 @@ mod tests {
             wifi_proxy,
             wifi_chip_proxy,
             wifi_sta_iface_proxy,
+            _telemetry_receiver: telemetry_receiver,
             iface_manager,
             exec,
         };
@@ -1738,6 +1847,15 @@ mod tests {
 
         let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
+
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ConnectResult { result, bss })) => {
+                assert_eq!(result, fidl_ieee80211::StatusCode::Success);
+                assert_eq!(bss.ssid, Ssid::try_from("foo").unwrap());
+                assert_eq!(bss.bssid, Bssid::from([42, 42, 42, 42, 42, 42]));
+            }
+        );
     }
 
     #[test]
@@ -1970,18 +2088,27 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
 
         establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
+        // Metrics: for this test, we don't care about the contents of the ConnectResult
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ConnectResult { result: _, bss: _ }))
+        );
+
+        let connection_length_nanos: u16 = rand::thread_rng().gen();
+        test_helper.exec.set_fake_time(fasync::Time::from_nanos(connection_length_nanos.into()));
 
         let mocked_disconnect_source = fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
             mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
             reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
         });
+        let mocked_is_sme_reconnecting = false;
         {
             let client_iface = test_helper.iface_manager.get_client_iface();
             let transaction_handle = client_iface.transaction_handle.lock();
             let control_handle = transaction_handle.as_ref().expect("No control handle found");
             control_handle
                 .send_on_disconnect(&fidl_sme::DisconnectInfo {
-                    is_sme_reconnecting: false,
+                    is_sme_reconnecting: mocked_is_sme_reconnecting,
                     disconnect_source: mocked_disconnect_source.clone(),
                 })
                 .expect("Failed to send OnDisconnect");
@@ -2018,6 +2145,17 @@ mod tests {
             ClientIfaceCall::OnDisconnect { info } => info
         );
         assert_eq!(disconnect_info, mocked_disconnect_source);
+
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::Disconnect { info })) => {
+                assert_eq!(info.connected_duration, zx::Duration::from_nanos(connection_length_nanos.into()));
+                assert_eq!(info.is_sme_reconnecting, mocked_is_sme_reconnecting);
+                assert_eq!(info.disconnect_source, mocked_disconnect_source);
+                assert_eq!(info.original_bss_desc.ssid, Ssid::try_from("foo").unwrap());
+                assert_eq!(info.original_bss_desc.bssid, Bssid::from([42, 42, 42, 42, 42, 42]));
+            }
+        );
     }
 
     #[test_case(fidl_sme::ConnectResult {
@@ -2043,18 +2181,27 @@ mod tests {
         let mut mcast_stream = get_nl80211_mcast(&test_helper.nl80211_proxy, "mlme");
 
         establish_open_connection(&mut test_helper, &mut test_fut, &mut mcast_stream);
+        // Metrics: for this test, we don't care about the contents of the ConnectResult
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ConnectResult { result: _, bss: _ }))
+        );
+
+        let connection_length_nanos: u16 = rand::thread_rng().gen();
+        test_helper.exec.set_fake_time(fasync::Time::from_nanos(connection_length_nanos.into()));
 
         let mocked_disconnect_source = fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
             mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
             reason_code: fidl_fuchsia_wlan_ieee80211::ReasonCode::ReasonInactivity,
         });
+        let mocked_is_sme_reconnecting = true;
         {
             let client_iface = test_helper.iface_manager.get_client_iface();
             let transaction_handle = client_iface.transaction_handle.lock();
             let control_handle = transaction_handle.as_ref().expect("No control handle found");
             control_handle
                 .send_on_disconnect(&fidl_sme::DisconnectInfo {
-                    is_sme_reconnecting: true,
+                    is_sme_reconnecting: mocked_is_sme_reconnecting,
                     disconnect_source: mocked_disconnect_source.clone(),
                 })
                 .expect("Failed to send OnDisconnect");
@@ -2067,6 +2214,18 @@ mod tests {
         let next_mcast = next_mcast_message(&mut mcast_stream);
         let mut next_mcast = pin!(next_mcast);
         assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
+
+        // We should always log a disconnect to the metrics module, even if reconnect is pending
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::Disconnect { info })) => {
+                assert_eq!(info.connected_duration, zx::Duration::from_nanos(connection_length_nanos.into()));
+                assert_eq!(info.is_sme_reconnecting, mocked_is_sme_reconnecting);
+                assert_eq!(info.disconnect_source, mocked_disconnect_source);
+                assert_eq!(info.original_bss_desc.ssid, Ssid::try_from("foo").unwrap());
+                assert_eq!(info.original_bss_desc.bssid, Bssid::from([42, 42, 42, 42, 42, 42]));
+            }
+        );
 
         // Send and process the reconnect result.
         let client_iface = test_helper.iface_manager.get_client_iface();
@@ -2111,6 +2270,9 @@ mod tests {
             );
             assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Pending);
         }
+
+        // Metrics: no further messages expected, regardless of if reconnect is successful
+        assert_variant!(test_helper.telemetry_receiver.try_next(), Err(_));
     }
 
     #[test]
@@ -2148,6 +2310,7 @@ mod tests {
         nl80211_proxy: fidl_wlanix::Nl80211Proxy,
         supplicant_sta_network_proxy: fidl_wlanix::SupplicantStaNetworkProxy,
         supplicant_sta_iface_callback_stream: fidl_wlanix::SupplicantStaIfaceCallbackRequestStream,
+        telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         iface_manager: Arc<TestIfaceManager>,
 
         // Note: keep the executor field last in the struct so it gets dropped last.
@@ -2212,7 +2375,13 @@ mod tests {
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new_with_client());
-        let test_fut = serve_wlanix(wlanix_stream, wifi_state, Arc::clone(&iface_manager));
+        let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let test_fut = serve_wlanix(
+            wlanix_stream,
+            wifi_state,
+            Arc::clone(&iface_manager),
+            TelemetrySender::new(telemetry_sender),
+        );
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -2223,6 +2392,7 @@ mod tests {
             nl80211_proxy,
             supplicant_sta_network_proxy,
             supplicant_sta_iface_callback_stream,
+            telemetry_receiver,
             iface_manager,
             exec,
         };
@@ -2266,7 +2436,9 @@ mod tests {
             .expect("Failed to get proxy and req stream");
         let state = Arc::new(Mutex::new(WifiState::default()));
         let iface_manager = Arc::new(TestIfaceManager::new());
-        let wlanix_fut = serve_wlanix(stream, state, iface_manager);
+        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let wlanix_fut =
+            serve_wlanix(stream, state, iface_manager, TelemetrySender::new(telemetry_sender));
         let mut wlanix_fut = pin!(wlanix_fut);
         let (nl_proxy, nl_server) =
             create_proxy::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");

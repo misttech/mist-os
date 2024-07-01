@@ -20,7 +20,7 @@
 #include "logging.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
-namespace btintel {
+namespace bt_hci_intel {
 
 using ::bt::BufferView;
 using ::bt::PacketView;
@@ -188,4 +188,4 @@ FirmwareLoader::LoadStatus FirmwareLoader::LoadSfi(const void* firmware, const s
   return LoadStatus::kComplete;
 }
 
-}  // namespace btintel
+}  // namespace bt_hci_intel

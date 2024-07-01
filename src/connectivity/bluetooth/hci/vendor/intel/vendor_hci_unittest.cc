@@ -4,19 +4,59 @@
 
 #include "vendor_hci.h"
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/logging/cpp/logger.h>
+
 #include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 
-namespace btintel {
+namespace bt_hci_intel {
 
 namespace {
+
+class VendorHciTest : public ::testing::Test {
+ public:
+  // There's no driver instance for this unittest, so create a driver logger for this test.
+  VendorHciTest() {
+    loop_ = std::make_unique<::async::Loop>(&kAsyncLoopConfigNeverAttachToThread);
+    ZX_ASSERT(ZX_OK == loop_->StartThread(std::string("vendor-hci-worker").c_str(), nullptr));
+
+    std::vector<fuchsia_component_runner::ComponentNamespaceEntry> entries;
+    zx::result open_result = component::OpenServiceRoot();
+    ZX_ASSERT(open_result.is_ok());
+
+    ::fidl::ClientEnd<::fuchsia_io::Directory> svc = std::move(*open_result);
+    entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{{
+        .path = "/svc",
+        .directory = std::move(svc),
+    }});
+
+    // Create Namespace object from the entries.
+    auto ns = fdf::Namespace::Create(entries);
+    ZX_ASSERT(ns.is_ok());
+
+    // Create Logger with dispatcher and namespace.
+    auto logger = fdf::Logger::Create(*ns, loop_->dispatcher(), "vendor-hci-logger");
+    ZX_ASSERT(logger.is_ok());
+
+    logger_ = std::move(logger.value());
+
+    fdf::Logger::SetGlobalInstance(logger_.get());
+  }
+
+  ~VendorHciTest() { fdf::Logger::SetGlobalInstance(nullptr); }
+
+ private:
+  std::unique_ptr<async::Loop> loop_;
+  std::unique_ptr<fdf::Logger> logger_;
+};
 
 //////////////////////////////////////////////////////////////////////////////////////
 //
 // Test cases for fetch_tlv_value()
 //
 
-TEST(VendorHciTest, NormalCase) {
+TEST_F(VendorHciTest, NormalCase) {
   const uint8_t tlv[] = {
       0x01,  // type
       0x02,  // length
@@ -31,13 +71,13 @@ TEST(VendorHciTest, NormalCase) {
 // Test cases for parse_tlv_version_return_params()
 //
 
-TEST(VendorHciTest, CornerCaseZeroByte) {
+TEST_F(VendorHciTest, CornerCaseZeroByte) {
   const uint8_t tlvs[] = {};
   auto parsed = parse_tlv_version_return_params(tlvs, sizeof(tlvs));
   EXPECT_EQ(parsed.status, pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE);
 }
 
-TEST(VendorHciTest, CornerCaseOnlyStatusCode) {
+TEST_F(VendorHciTest, CornerCaseOnlyStatusCode) {
   const uint8_t tlvs[] = {
       0x00,  // StatusCode: OK
   };
@@ -45,7 +85,7 @@ TEST(VendorHciTest, CornerCaseOnlyStatusCode) {
   EXPECT_EQ(parsed.status, pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE);
 }
 
-TEST(VendorHciTest, CornerCaseOnlyType) {
+TEST_F(VendorHciTest, CornerCaseOnlyType) {
   const uint8_t tlvs[] = {
       0x00,  // StatusCode: OK
       0x00,  // type
@@ -54,7 +94,7 @@ TEST(VendorHciTest, CornerCaseOnlyType) {
   EXPECT_EQ(parsed.status, pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE);
 }
 
-TEST(VendorHciTest, CornerCaseShortValue) {
+TEST_F(VendorHciTest, CornerCaseShortValue) {
   const uint8_t tlvs[] = {
       0x00,  // StatusCode: OK
       0x00,  // type
@@ -65,7 +105,7 @@ TEST(VendorHciTest, CornerCaseShortValue) {
   EXPECT_EQ(parsed.status, pw::bluetooth::emboss::StatusCode::PARAMETER_OUT_OF_MANDATORY_RANGE);
 }
 
-TEST(VendorHciTest, CornerCaseOnlyEndOfRecord) {
+TEST_F(VendorHciTest, CornerCaseOnlyEndOfRecord) {
   const uint8_t tlvs[] = {
       0x00,  // StatusCode: OK
       0x00,  // type: end of the TLV record.
@@ -75,7 +115,7 @@ TEST(VendorHciTest, CornerCaseOnlyEndOfRecord) {
   EXPECT_EQ(parsed.status, pw::bluetooth::emboss::StatusCode::SUCCESS);
 }
 
-TEST(VendorHciTest, NormalCases) {
+TEST_F(VendorHciTest, NormalCases) {
   const uint8_t tlvs[] = {
       0x00,  // StatusCode: OK
 
@@ -168,4 +208,4 @@ TEST(VendorHciTest, NormalCases) {
 
 }  // anonymous namespace
 
-}  // namespace btintel
+}  // namespace bt_hci_intel

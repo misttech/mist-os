@@ -60,7 +60,7 @@ impl Kernels {
             connect_to_protocol::<fcomponent::RealmMarker>().expect("Failed to connect to realm.");
         let (kernel, on_stop) =
             StarnixKernel::create(realm, KERNEL_URL, start_info, controller).await?;
-        self.memory_update_publisher.on_update(attribution_info_for_kernel(&kernel)).unwrap();
+        self.memory_update_publisher.on_update(attribution_info_for_kernel(&kernel));
         let name = kernel.name().to_string();
         self.kernels.lock().insert(name.clone(), Arc::new(kernel));
         let kernels = self.kernels.clone();
@@ -69,16 +69,9 @@ impl Kernels {
             on_stop.await;
             if let Some(kernel) = kernels.lock().remove(&name) {
                 _ = kernel.destroy().await.inspect_err(|e| tracing::error!("{e:?}"));
-                on_removed_publisher
-                    .on_update(vec![fattribution::AttributionUpdate::Remove(
-                        fattribution::Identifier::Component(
-                            kernel
-                                .component_instance()
-                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                                .unwrap(),
-                        ),
-                    )])
-                    .unwrap();
+                on_removed_publisher.on_update(vec![fattribution::AttributionUpdate::Remove(
+                    kernel.component_instance().get_koid().unwrap().raw_koid(),
+                )]);
             }
         });
         Ok(())
@@ -116,10 +109,11 @@ fn get_attribution(
 
 fn attribution_info_for_kernel(kernel: &StarnixKernel) -> Vec<fattribution::AttributionUpdate> {
     let new_principal = fattribution::NewPrincipal {
-        identifier: Some(fattribution::Identifier::Component(
+        identifier: Some(kernel.component_instance().get_koid().unwrap().raw_koid()),
+        description: Some(fattribution::Description::Component(
             kernel.component_instance().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         )),
-        type_: Some(fattribution::Type::Runnable),
+        principal_type: Some(fattribution::PrincipalType::Runnable),
         detailed_attribution: kernel
             .connect_to_protocol::<fattribution::ProviderMarker>()
             .inspect_err(|e|
@@ -130,12 +124,12 @@ fn attribution_info_for_kernel(kernel: &StarnixKernel) -> Vec<fattribution::Attr
         ..Default::default()
     };
     let attribution = fattribution::UpdatedPrincipal {
-        identifier: Some(fattribution::Identifier::Component(
-            kernel.component_instance().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-        )),
-        resources: Some(fattribution::Resources::Data(vec![fattribution::Resource::KernelObject(
-            kernel.job().basic_info().unwrap().koid.raw_koid(),
-        )])),
+        identifier: Some(kernel.component_instance().get_koid().unwrap().raw_koid()),
+        resources: Some(fattribution::Resources::Data(fattribution::Data {
+            resources: vec![fattribution::Resource::KernelObject(
+                kernel.job().basic_info().unwrap().koid.raw_koid(),
+            )],
+        })),
         ..Default::default()
     };
     vec![

@@ -10,7 +10,6 @@
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/cpp/completion.h>
@@ -109,8 +108,6 @@ class AmlGpu final : public fdf::DriverBase,
   aml_gpu_block_t* gpu_block_;
   std::optional<fdf::MmioBuffer> hiu_dev_;
   int32_t current_clk_source_ = -1;
-  inspect::Inspector inspector_;
-  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
   // bootstrap/driver_manager:root/aml-gpu
   inspect::Node root_;
   // Signaled when the loop is shutdown.

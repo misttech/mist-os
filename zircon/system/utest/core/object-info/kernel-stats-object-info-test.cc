@@ -398,8 +398,8 @@ TEST_F(KernelStatsGetInfoTest, CpuStatsNullBuffer) {
   ASSERT_OK(result.status_value());
   zx::resource info_resource = std::move(result.value());
 
-  ASSERT_OK(zx_object_get_info(info_resource.get(), ZX_INFO_CPU_STATS, nullptr,
-                               sizeof(zx_info_kmem_stats_t), &actual, &avail));
+  ASSERT_OK(
+      zx_object_get_info(info_resource.get(), ZX_INFO_CPU_STATS, nullptr, 0, &actual, &avail));
   EXPECT_EQ(actual, 0);
   EXPECT_EQ(avail, num_cpus_);
 }

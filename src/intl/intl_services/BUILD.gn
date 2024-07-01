@@ -104,13 +104,3 @@ icu_fuchsia_package("pkg_small") {
   package_name = "intl-services-small"
   icu_deps = [ ":component_small" ]
 }
-
-# TODO: https://fxbug.dev/42069176 - Remove these targets, they are not needed anymore.
-group("intl_services_shard") {
-}
-
-group("intl_services_small_shard") {
-}
-
-group("intl_services_small_timezones_shard") {
-}

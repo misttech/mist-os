@@ -55,7 +55,7 @@ impl<T: StructuredDict> StructuredDictMap<T> {
     }
 
     pub fn get(&self, key: &Name) -> Option<T> {
-        self.inner.get(key).map(|cap| {
+        self.inner.get(key).expect("structured map entry must be cloneable").map(|cap| {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
             };
@@ -120,19 +120,20 @@ impl ComponentInput {
     ///
     /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
     /// underlying data.
-    pub fn shallow_copy(&self) -> Self {
+    pub fn shallow_copy(&self) -> Result<Self, ()> {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
         let dict = Dict::new();
-        dict.insert(PARENT.clone(), self.capabilities().shallow_copy().into()).ok();
-        dict.insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy().into()).ok();
-        Self(dict)
+        dict.insert(PARENT.clone(), self.capabilities().shallow_copy()?.into()).ok();
+        dict.insert(ENVIRONMENT.clone(), Dict::from(self.environment()).shallow_copy()?.into())
+            .ok();
+        Ok(Self(dict))
     }
 
     /// Returns the sub-dictionary containing capabilities routed by the component's parent.
     pub fn capabilities(&self) -> Dict {
-        let cap = self.0.get(&*PARENT).unwrap();
+        let cap = self.0.get(&*PARENT).expect("capabilities must be cloneable").unwrap();
         let Capability::Dictionary(dict) = cap else {
             unreachable!("parent entry must be a dict: {cap:?}");
         };
@@ -141,7 +142,7 @@ impl ComponentInput {
 
     /// Returns the sub-dictionary containing capabilities routed by the component's environment.
     pub fn environment(&self) -> ComponentEnvironment {
-        let cap = self.0.get(&*ENVIRONMENT).unwrap();
+        let cap = self.0.get(&*ENVIRONMENT).expect("environment must be cloneable").unwrap();
         let Capability::Dictionary(dict) = cap else {
             unreachable!("environment entry must be a dict: {cap:?}");
         };
@@ -189,20 +190,20 @@ impl ComponentEnvironment {
 
     /// Capabilities listed in the `debug_capabilities` portion of its environment.
     pub fn debug(&self) -> Dict {
-        let cap = self.0.get(&*DEBUG).unwrap();
+        let cap = self.0.get(&*DEBUG).expect("debug must be cloneable").unwrap();
         let Capability::Dictionary(dict) = cap else {
             unreachable!("debug entry must be a dict: {cap:?}");
         };
         dict.clone()
     }
 
-    pub fn shallow_copy(&self) -> Self {
+    pub fn shallow_copy(&self) -> Result<Self, ()> {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
         let dict = Dict::new();
-        dict.insert(DEBUG.clone(), self.debug().shallow_copy().into()).ok();
-        Self(dict)
+        dict.insert(DEBUG.clone(), self.debug().shallow_copy()?.into()).ok();
+        Ok(Self(dict))
     }
 }
 
@@ -252,17 +253,17 @@ mod tests {
         assert!(map.insert(name1.clone(), dict1).is_ok());
         let d = map.get(&name1).unwrap();
         let key = DictKey::new("a").unwrap();
-        assert!(d.get(&key).is_some());
+        assert_matches!(d.get(&key), Ok(Some(_)));
 
         assert!(map.insert(name2.clone(), dict2).is_ok());
         let d = map.remove(&name2).unwrap();
         assert_matches!(map.remove(&name2), None);
         let key = DictKey::new("b").unwrap();
-        assert!(d.get(&key).is_some());
+        assert_matches!(d.get(&key), Ok(Some(_)));
 
         assert!(map.insert(name2.clone(), dict2_alt).is_ok());
         let d = map.get(&name2).unwrap();
         let key = DictKey::new("c").unwrap();
-        assert!(d.get(&key).is_some());
+        assert_matches!(d.get(&key), Ok(Some(_)));
     }
 }

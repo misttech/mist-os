@@ -12,7 +12,7 @@ namespace wlan::brcmfmac {
 
 class WmmStatusInterface : public SimInterface {
  public:
-  void OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+  void OnWmmStatusResp(OnWmmStatusRespRequestView request,
                        OnWmmStatusRespCompleter::Sync& completer) override;
 
   bool on_wmm_status_resp_called_ = false;
@@ -31,7 +31,7 @@ void WmmStatusTest::Init() {
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_), ZX_OK);
 }
 
-void WmmStatusInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+void WmmStatusInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request,
                                          OnWmmStatusRespCompleter::Sync& completer) {
   ASSERT_EQ(request->status, ZX_OK);
   auto* resp = &request->wmm_params;
@@ -63,7 +63,7 @@ void WmmStatusInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf
   EXPECT_TRUE(resp->ac_vo_params.acm);
 
   on_wmm_status_resp_called_ = true;
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 TEST_F(WmmStatusTest, WmmStatus) {
@@ -71,6 +71,7 @@ TEST_F(WmmStatusTest, WmmStatus) {
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->WmmStatusReq();
   EXPECT_TRUE(client_ifc_.on_wmm_status_resp_called_);
+  EXPECT_OK(result);
 }
 
 }  // namespace wlan::brcmfmac

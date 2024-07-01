@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{Capability, RemoteError};
 use fidl::handle::{AsHandleRef, EventPair, Signals};
+use fidl::HandleRef;
 use fuchsia_async as fasync;
 use fuchsia_zircon::Koid;
 use futures::FutureExt;
@@ -11,10 +13,20 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Mutex;
 
-use crate::Capability;
-
 lazy_static! {
     static ref REGISTRY: Mutex<Registry> = Mutex::new(Registry::default());
+}
+
+/// Given a reference to a handle, returns a copy of a capability from the registry that was added
+/// with the handle's koid.
+///
+/// Returns [RemoteError::Unregistered] if the capability is not in the registry.
+pub(crate) fn try_from_handle_in_registry<'a>(
+    handle_ref: HandleRef<'_>,
+) -> Result<Capability, RemoteError> {
+    let koid = handle_ref.get_koid().unwrap();
+    let capability = get(koid).ok_or(RemoteError::Unregistered)?;
+    Ok(capability)
 }
 
 /// Registers a capability with a task.
@@ -60,7 +72,9 @@ pub(crate) fn insert_token(capability: Capability) -> EventPair {
 /// Get a capability from the global registry and returns it, if it exists.
 pub(crate) fn get(koid: Koid) -> Option<Capability> {
     let registry = REGISTRY.lock().unwrap();
-    registry.get(koid).map(|entry| entry.capability.clone())
+    registry.get(koid).map(|entry| {
+        entry.capability.try_clone().expect("capabilities in the registry must be cloneable")
+    })
 }
 
 pub struct Entry {
@@ -120,7 +134,7 @@ mod tests {
 
         // Get a capability with the same koid. It should be a Unit.
         let entry = registry.get(koid).unwrap();
-        let got_unit = entry.capability.clone();
+        let got_unit = entry.capability.try_clone().unwrap();
         assert_matches!(got_unit, Capability::Unit(_));
 
         // Remove a capability with the same koid. It should be a Unit.

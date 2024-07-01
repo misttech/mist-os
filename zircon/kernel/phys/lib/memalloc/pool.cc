@@ -597,6 +597,27 @@ fit::result<fit::failed> Pool::UpdateFreeRamSubranges(Type type, uint64_t addr, 
   return fit::ok();
 }
 
+void Pool::RestrictTotalRam(uint64_t new_capacity_bytes) {
+  // Iterate to where the new capacity is satisfied, possibly truncating the
+  // last of those ranges.
+  mutable_iterator it = ranges_.begin();
+  for (; it != ranges_.end() && new_capacity_bytes > 0; ++it) {
+    if (IsRamType(it->type)) {
+      it->size = std::min(it->size, new_capacity_bytes);
+      new_capacity_bytes -= it->size;
+    }
+  }
+
+  // Now drop the remaining RAM.
+  for (mutable_iterator next = ranges_.end(); it != ranges_.end(); it = next) {
+    // Be mindful of iterator invalidation; capture the would-be next first.
+    next = std::next(it);
+    if (IsRamType(it->type)) {
+      RemoveNodeAt(it);
+    }
+  }
+}
+
 fit::result<fit::failed, Pool::mutable_iterator> Pool::InsertSubrange(
     const Range& range, std::optional<mutable_iterator> parent_it) {
   auto it = parent_it.value_or(FindContainingRange(range.addr, range.size));

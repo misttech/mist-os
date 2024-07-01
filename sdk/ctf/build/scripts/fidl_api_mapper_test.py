@@ -88,7 +88,12 @@ class DwarfdumpStreamingParserTest(unittest.TestCase):
             ),
         ]
     )
-    def test_parse_line(self, name, dwarfdump_lines, expected_subprograms_dict):
+    def test_parse_line(
+        self,
+        name: str,
+        dwarfdump_lines: list[str],
+        expected_subprograms_dict: dict[str, dict[str, str]],
+    ) -> None:
         parser = fidl_api_mapper.DwarfdumpStreamingParser()
         for line in dwarfdump_lines:
             parser.parse_line(line)
@@ -233,8 +238,12 @@ class FidlApiResolverTest(unittest.TestCase):
         ]
     )
     def test_add_new_mappings(
-        self, name, subprograms_dict, input_mapping_dict, expect_mapping_dict
-    ):
+        self,
+        name: str,
+        subprograms_dict: dict[str, dict[str, str]],
+        input_mapping_dict: dict[str, str],
+        expect_mapping_dict: dict[str, str],
+    ) -> None:
         resolver = fidl_api_mapper.FidlApiResolver(
             subprograms_dict, input_mapping_dict
         )
@@ -245,7 +254,7 @@ class FidlApiResolverTest(unittest.TestCase):
             resolver.add_new_mappings()
         self.assertEqual(input_mapping_dict, expect_mapping_dict)
 
-    def test_add_new_mappings_snapshot_fidl_file(self):
+    def test_add_new_mappings_snapshot_fidl_file(self) -> None:
         # This testcase differs from "test_add_new_mappings" in that it uses
         # a real generated FIDL binding header file snapshotted at a particular
         # revision. So there's no need to mock the content of the file and we
@@ -261,7 +270,7 @@ class FidlApiResolverTest(unittest.TestCase):
         expect_mapping_dict = {
             "mangled_name": "fuchsia.diagnostics.stream/Source.RetireBuffer"
         }
-        mapping_dict = {}
+        mapping_dict: dict[str, str] = {}
 
         resolver = fidl_api_mapper.FidlApiResolver(
             subprograms_dict, mapping_dict
@@ -269,7 +278,7 @@ class FidlApiResolverTest(unittest.TestCase):
         resolver.add_new_mappings()
         self.assertEqual(mapping_dict, expect_mapping_dict)
 
-    def test_add_new_mappings_generated_fidl_file(self):
+    def test_add_new_mappings_generated_fidl_file(self) -> None:
         # Test against generated fidl headers from the current build.
         # Since the line of function declaration can change, we can just
         # the following assertions:
@@ -280,7 +289,7 @@ class FidlApiResolverTest(unittest.TestCase):
         num_lines = len(open(testdata_path).readlines())
 
         subprograms_dict = {}
-        mapping_dict = {}
+        mapping_dict: dict[str, str] = {}
         for line_num in range(1, num_lines + 1):
             subprograms_dict = {
                 "0x1": {

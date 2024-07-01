@@ -88,12 +88,6 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
             async_dispatcher_t* shared_fidl_dispatcher, thrd_t shared_fidl_thread,
             StreamProcessorParams params,
             fidl::InterfaceRequest<fuchsia::media::StreamProcessor> request);
-  // deprecated; clients should use the other constructor above
-  CodecImpl(fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem,
-            std::unique_ptr<CodecAdmission> codec_admission,
-            async_dispatcher_t* shared_fidl_dispatcher, thrd_t shared_fidl_thread,
-            StreamProcessorParams params,
-            fidl::InterfaceRequest<fuchsia::media::StreamProcessor> request);
 
   ~CodecImpl();
 
@@ -1042,16 +1036,10 @@ class CodecImpl : public fuchsia::media::StreamProcessor,
   void CoreCodecSetSecureMemoryMode(
       CodecPort port, fuchsia::mediacodec::SecureMemoryMode secure_memory_mode) override;
 
-  fuchsia::sysmem::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints(
-      CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
-      const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
   fuchsia_sysmem2::BufferCollectionConstraints CoreCodecGetBufferCollectionConstraints2(
       CodecPort port, const fuchsia::media::StreamBufferConstraints& stream_buffer_constraints,
       const fuchsia::media::StreamBufferPartialSettings& partial_settings) override;
 
-  void CoreCodecSetBufferCollectionInfo(
-      CodecPort port,
-      const fuchsia::sysmem::BufferCollectionInfo_2& buffer_collection_info) override;
   void CoreCodecSetBufferCollectionInfo(
       CodecPort port, const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) override;
 

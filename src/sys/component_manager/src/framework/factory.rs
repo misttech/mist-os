@@ -8,10 +8,10 @@ use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_types::Name;
 use cm_util::TaskGroup;
-use fidl::endpoints::{self, ClientEnd, DiscoverableProtocolMarker, ServerEnd};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon::{self as zx};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use router_error::Explain;
@@ -59,21 +59,6 @@ impl FactoryCapabilityProvider {
 
     async fn handle_request(&self, request: fsandbox::FactoryRequest) -> Result<(), fidl::Error> {
         match request {
-            fsandbox::FactoryRequest::TakeHandle { capability, responder } => {
-                match sandbox::Capability::try_from(fsandbox::Capability::Handle(capability)) {
-                    Ok(capability) => match capability {
-                        sandbox::Capability::OneShotHandle(handle) => {
-                            responder.send(
-                                handle.take().ok_or_else(|| fsandbox::FactoryError::Unavailable),
-                            )?;
-                        }
-                        _ => unreachable!(),
-                    },
-                    Err(err) => {
-                        warn!("Error converting token to capability: {err:?}");
-                    }
-                }
-            }
             fsandbox::FactoryRequest::OpenConnector {
                 capability,
                 server_end,
@@ -94,23 +79,22 @@ impl FactoryCapabilityProvider {
                 let sender = self.create_connector(receiver);
                 responder.send(sender)?;
             }
-            fsandbox::FactoryRequest::CreateOneShotHandle { handle, responder } => {
-                let handle = self.create_one_shot_handle(handle);
-                responder.send(handle)?;
-            }
             fsandbox::FactoryRequest::CreateDictionary { responder } => {
-                let client_end = self.create_dictionary();
-                responder.send(client_end)?;
+                let token = self.create_dictionary();
+                responder.send(token)?;
+            }
+            fsandbox::FactoryRequest::OpenDictionary {
+                dictionary,
+                server_end,
+                control_handle: _,
+            } => {
+                self.open_dictionary(dictionary, server_end);
             }
             fsandbox::FactoryRequest::_UnknownMethod { ordinal, .. } => {
                 warn!(%ordinal, "fuchsia.component.sandbox/Factory received unknown method");
             }
         }
         Ok(())
-    }
-
-    fn create_one_shot_handle(&self, handle: zx::Handle) -> fsandbox::OneShotHandle {
-        fsandbox::OneShotHandle::from(sandbox::OneShotHandle::new(handle))
     }
 
     fn create_connector(
@@ -124,12 +108,19 @@ impl FactoryCapabilityProvider {
         fsandbox::Connector::from(sender)
     }
 
-    fn create_dictionary(&self) -> ClientEnd<fsandbox::DictionaryMarker> {
-        let (client_end, server_end) = endpoints::create_endpoints();
-        let dict = Dict::new();
-        let client_end_koid = server_end.basic_info().unwrap().related_koid;
-        dict.serve_and_register(server_end.into_stream().unwrap(), client_end_koid);
-        client_end
+    fn create_dictionary(&self) -> fsandbox::DictionaryRef {
+        fsandbox::DictionaryRef::from(Dict::new())
+    }
+
+    fn open_dictionary(
+        &self,
+        dictionary: fsandbox::DictionaryRef,
+        server_end: ServerEnd<fsandbox::DictionaryMarker>,
+    ) {
+        let Ok(dict) = Dict::try_from(dictionary) else {
+            return;
+        };
+        dict.serve(server_end.into_stream().unwrap());
     }
 }
 
@@ -165,9 +156,9 @@ mod tests {
     use crate::model::component::ComponentInstance;
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
-    use assert_matches::assert_matches;
+    use fidl::endpoints;
     use fidl_fuchsia_component_sandbox as fsandbox;
-    use fuchsia_zircon::{self as zx, HandleBased};
+    use fuchsia_zircon::{self as zx, AsHandleRef};
     use std::sync::{Arc, Weak};
 
     async fn new_root() -> Arc<ComponentInstance> {
@@ -185,30 +176,6 @@ mod tests {
         let (proxy, server) = endpoints::create_proxy::<fsandbox::FactoryMarker>().unwrap();
         capability::open_framework(&host, instance, server.into()).await.unwrap();
         (proxy, host)
-    }
-
-    #[fuchsia::test]
-    async fn create_one_shot_handle() {
-        let root = new_root().await;
-        let (factory_proxy, _host) = factory(&root).await;
-
-        let event = zx::Event::create();
-        let expected_koid = event.get_koid().unwrap();
-
-        let one_shot = factory_proxy.create_one_shot_handle(event.into()).await.unwrap();
-        let one_shot2 = fsandbox::OneShotHandle {
-            token: one_shot.token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-        };
-        assert_matches!(
-            factory_proxy.take_handle(one_shot).await.unwrap(),
-            Ok(handle) if handle.get_koid().unwrap() == expected_koid
-        );
-        assert_matches!(
-            factory_proxy.take_handle(one_shot2).await.unwrap(),
-            Err(fsandbox::FactoryError::Unavailable)
-        );
-
-        drop(factory_proxy);
     }
 
     #[fuchsia::test]
@@ -232,12 +199,13 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn create_dictionary() {
+    async fn create_and_open_dictionary() {
         let root = new_root().await;
         let (factory_proxy, _host) = factory(&root).await;
 
-        let dict = factory_proxy.create_dictionary().await.unwrap();
-        let dict = dict.into_proxy().unwrap();
+        let dict_ref = factory_proxy.create_dictionary().await.unwrap();
+        let (dict, server) = endpoints::create_proxy().unwrap();
+        factory_proxy.open_dictionary(dict_ref, server).unwrap();
 
         // The dictionary is empty.
         let (iterator, server_end) = endpoints::create_proxy().unwrap();

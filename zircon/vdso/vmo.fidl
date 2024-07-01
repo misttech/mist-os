@@ -379,8 +379,8 @@ closed protocol Vmo {
     /// ## Description
     ///
     /// `zx_vmo_get_stream_size()` returns the current stream size of the virtual memory object (VMO).
-    /// The stream size specified when creating a VMO (e.g. with ['zx_vmo_create()']) or resizing a VMO
-    /// (e.g. with [`zx_vmo_set_stream_size()`])) will not be rounded up to the next system page size
+    /// The stream size specified when creating a VMO (e.g. with [`zx_vmo_create()`]) or resizing a VMO
+    /// (e.g. with [`zx_vmo_set_stream_size()`]) will not be rounded up to the next system page size
     /// boundary. So, unlike the VMO size, the value returned by `zx_vmo_get_stream_size()` will not
     /// necessarily be page-aligned.
     ///
@@ -568,7 +568,7 @@ closed protocol Vmo {
     /// [`zx_vmo_create()`]: vmo_create.md
     /// [`zx_vmo_get_size()`]: vmo_get_size.md
     /// [`zx_vmo_get_stream_size()`]: vmo_get_size.md
-    /// [`zx_vmo_get_size()`]: vmo_set_size.md
+    /// [`zx_vmo_set_size()`]: vmo_set_size.md
     /// [`zx_vmo_op_range()`]: vmo_op_range.md
     /// [`zx_vmo_read()`]: vmo_read.md
     /// [`zx_vmo_write()`]: vmo_write.md
@@ -623,7 +623,7 @@ closed protocol Vmo {
     ///
     /// `ZX_VMO_OP_ZERO` - Resets the range of bytes in the VMO from *offset* to *offset*+*size* to
     /// 0. This is semantically equivalent to writing 0's with
-    /// [`zx_vmo_write()`](/docs/reference/syscalls/vmo_write.md), except that it is able to be done more
+    /// [`zx_vmo_write()`](/reference/syscalls/vmo_write.md), except that it is able to be done more
     /// efficiently and save memory by de-duping to shared zero pages. Requires the `ZX_RIGHT_WRITE` right.
     ///
     /// `ZX_VMO_OP_LOCK` - Locks a range of pages in a VMO created with `ZX_VMO_DISCARDABLE`, preventing
@@ -694,7 +694,7 @@ closed protocol Vmo {
     ///
     /// `ZX_VMO_OP_DONT_NEED` - Hints that pages in the specified range are not needed anymore and should
     /// be considered for memory reclamation. Intended to be used with VMOs created with
-    /// [`zx_pager_create_vmo()`](/docs/reference/syscalls/pager_create_vmo.md); trivially succeeds for
+    /// [`zx_pager_create_vmo()`](/reference/syscalls/pager_create_vmo.md); trivially succeeds for
     /// other VMOs.
     ///
     /// This only applies to pages in the given range that are already committed, i.e. no new pages will be
@@ -705,7 +705,7 @@ closed protocol Vmo {
     /// protected from memory reclamation. The kernel may decide to override this hint when the system is
     /// under extreme memory pressure. This hint also does not prevent pages from being freed by means other
     /// than memory reclamation (e.g. a decommit, VMO resize, or VMO destruction). Intended to be used with
-    /// VMOs created with [`zx_pager_create_vmo()`](/docs/reference/syscalls/pager_create_vmo.md); trivially
+    /// VMOs created with [`zx_pager_create_vmo()`](/reference/syscalls/pager_create_vmo.md); trivially
     /// succeeds for other VMOs.
     ///
     /// This may commit pages in the given range where applicable, e.g. if the VMO is directly backed by a

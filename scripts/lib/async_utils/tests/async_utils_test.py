@@ -11,8 +11,8 @@ import stat
 import tempfile
 import unittest
 
-from async_utils import command
 import async_utils.signals
+from async_utils import command
 
 
 class TestCommand(unittest.IsolatedAsyncioTestCase):

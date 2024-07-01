@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
@@ -27,8 +28,6 @@
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
 
 namespace amlogic_display {
 
@@ -169,7 +168,6 @@ class RdmaEngine {
   //
   // `video_input_unit_node` must outlive the RdmaEngine instance.
   static zx::result<std::unique_ptr<RdmaEngine>> Create(
-      display::DispatcherFactory& dispatcher_factory,
       fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
       inspect::Node* video_input_unit_node);
 
@@ -188,7 +186,7 @@ class RdmaEngine {
   //
   // `node` must outlive the RdmaEngine.
   RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt rdma_done_interrupt,
-             std::unique_ptr<display::Dispatcher> irq_handler_dispatcher, inspect::Node* node);
+             fdf::SynchronizedDispatcher irq_handler_dispatcher, inspect::Node* node);
 
   // This must be called before any other methods.
   zx_status_t SetupRdma();
@@ -237,7 +235,7 @@ class RdmaEngine {
   // RDMA IRQ handle used for diagnostic purposes.
   zx::interrupt rdma_irq_;
 
-  std::unique_ptr<display::Dispatcher> rdma_irq_handler_dispatcher_;
+  fdf::SynchronizedDispatcher rdma_irq_handler_dispatcher_;
   async::IrqMethod<RdmaEngine, &RdmaEngine::InterruptHandler> rdma_irq_handler_{this};
 
   fbl::Mutex rdma_lock_;

@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 // Tests `GlobalPolicyChecker` methods for `ComponentInstance`s.
 #[derive(Default)]
+#[allow(dead_code)]
 struct GlobalPolicyCheckerTestForCm {}
 
 #[async_trait]

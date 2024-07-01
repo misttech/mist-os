@@ -260,11 +260,13 @@ TEST_F(AmlG12TdmDaiTest, InitializePcmOut) {
   metadata::AmlConfig metadata = GetDefaultMetadata();
   metadata.ring_buffer.number_of_channels = 1;
   metadata.lanes_enable_mask[0] = 1;
-  metadata.dai.type = metadata::DaiType::Tdm1;
+  metadata.dai.type = metadata::DaiType::Custom;
   metadata.dai.number_of_channels = 1;
   metadata.dai.bits_per_sample = 16;
   metadata.dai.bits_per_slot = 16;
-  metadata.dai.sclk_on_raising = true;
+  metadata.dai.custom_sclk_on_raising = true;
+  metadata.dai.custom_frame_sync_sclks_offset = 1;
+  metadata.dai.custom_frame_sync_size = 1;
   fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
 
   zx::result pdev = StartPDev();

@@ -10,10 +10,11 @@
 #include <cassert>
 #include <cstdarg>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
-namespace ld {
+namespace [[gnu::visibility("hidden")]] ld {
 
 // This is declared in the OS-specific header (posix.h or zircon.h).
 struct StartupData;
@@ -39,6 +40,9 @@ class DiagnosticsReport : public ModuleDiagnosticsPrintfReportBase<DiagnosticsRe
   // ModuleDiagnosticsPrintfReportBase calls this like it's printf.
   void Printf(const char* format, ...) const;
 
+  // That's just the varargs wrapper for this.
+  void Printf(const char* format, va_list args) const;
+
   // StartupModule is a typedef in the OS-specific header, so each one defines
   // the one explicit specialization that will be used.  This can't just use a
   // simple non-template forward declaration (as with StartupData) because
@@ -47,17 +51,27 @@ class DiagnosticsReport : public ModuleDiagnosticsPrintfReportBase<DiagnosticsRe
   void ReportModuleLoaded(const StartupModule& module) const;
 
  private:
-  void Printf(const char* format, va_list args) const;
-
   StartupData& startup_;
 };
 
 // This is the main Diagnostics object for the startup dynamic linker.  It
 // holds only the current-module state, so it can be constructed ephemerally.
-struct Diagnostics : elfldltl::Diagnostics<DiagnosticsReport, StartupDiagnosticsFlags> {
+struct Diagnostics : public elfldltl::Diagnostics<DiagnosticsReport, StartupDiagnosticsFlags> {
+ public:
   using Base = elfldltl::Diagnostics<DiagnosticsReport, StartupDiagnosticsFlags>;
 
-  constexpr explicit Diagnostics(StartupData& startup) : Base{DiagnosticsReport{startup}} {}
+#if __has_feature(undefined_behavior_sanitizer) || LD_UBSAN
+  static DiagnosticsReport* gReport_;
+#else
+  static constexpr auto gReport_ = std::ignore;
+#endif
+
+  Diagnostics(const Diagnostics&) = delete;
+  Diagnostics(Diagnostics&&) = delete;
+
+  constexpr explicit Diagnostics(StartupData& startup) : Base{DiagnosticsReport{startup}} {
+    gReport_ = &report();
+  }
 };
 
 // This is called before proceeding from loading to relocation / linking, and

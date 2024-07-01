@@ -162,15 +162,13 @@ impl IfaceManager for DeviceMonitorIfaceManager {
 }
 
 pub(crate) struct ConnectSuccess {
-    pub ssid: Vec<u8>,
-    pub bssid: Bssid,
+    pub bss: Box<BssDescription>,
     pub transaction_stream: fidl_sme::ConnectTransactionEventStream,
 }
 
 #[derive(Debug)]
 pub(crate) struct ConnectFail {
-    pub ssid: Vec<u8>,
-    pub bssid: Bssid,
+    pub bss: Box<BssDescription>,
     pub status_code: fidl_ieee80211::StatusCode,
     pub timed_out: bool,
 }
@@ -183,7 +181,7 @@ pub(crate) enum ConnectResult {
 
 impl std::fmt::Debug for ConnectSuccess {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "ConnectSuccess {{ ssid: {:?}, bssid: {:?} }}", self.ssid, self.bssid)
+        write!(f, "ConnectSuccess {{ ssid: {:?}, bssid: {:?} }}", self.bss.ssid, self.bss.bssid)
     }
 }
 
@@ -315,7 +313,7 @@ impl ClientIface for SmeClientIface {
         let bssid = bss_description.bssid;
         let connect_req = fidl_sme::ConnectRequest {
             ssid: bss_description.ssid.clone().into(),
-            bss_description: bss_description.into(),
+            bss_description: bss_description.clone().into(),
             multiple_bss_candidates: false,
             authentication: authenticator.into(),
             deprecated_scan_type: fidl_common::ScanType::Passive,
@@ -342,15 +340,13 @@ impl ClientIface for SmeClientIface {
         info!("Received connect result from SME: {:?}", sme_result);
         if sme_result.code == fidl_ieee80211::StatusCode::Success {
             Ok(ConnectResult::Success(ConnectSuccess {
-                ssid: ssid.to_vec(),
-                bssid,
+                bss: Box::new(bss_description),
                 transaction_stream: stream,
             }))
         } else {
             self.bss_scorer.report_connect_failure(bssid, &sme_result);
             Ok(ConnectResult::Fail(ConnectFail {
-                ssid: ssid.to_vec(),
-                bssid,
+                bss: Box::new(bss_description),
                 status_code: sme_result.code,
                 timed_out,
             }))
@@ -420,6 +416,9 @@ fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static
 pub mod test_utils {
     use super::*;
     use fidl_fuchsia_wlan_internal as fidl_internal;
+    use ieee80211::{MacAddrBytes, Ssid};
+    use rand::Rng as _;
+    use wlan_common::random_bss_description;
 
     pub static FAKE_IFACE_RESPONSE: fidl_device_service::QueryIfaceResponse =
         fidl_device_service::QueryIfaceResponse {
@@ -519,14 +518,18 @@ pub mod test_utils {
                     .expect("Failed to get connect transaction control handle");
                 *self.transaction_handle.lock() = Some(handle);
                 Ok(ConnectResult::Success(ConnectSuccess {
-                    ssid: ssid.to_vec(),
-                    bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
+                    bss: Box::new(random_bss_description!(
+                        ssid: Ssid::try_from(ssid).unwrap(),
+                        bssid: bssid.map(|b| b.to_array()).unwrap_or([42, 42, 42, 42, 42, 42]),
+                    )),
                     transaction_stream: proxy.take_event_stream(),
                 }))
             } else {
                 Ok(ConnectResult::Fail(ConnectFail {
-                    ssid: ssid.to_vec(),
-                    bssid: bssid.unwrap_or([42, 42, 42, 42, 42, 42].into()),
+                    bss: Box::new(random_bss_description!(
+                        ssid: Ssid::try_from(ssid).unwrap(),
+                        bssid: bssid.map(|b| b.to_array()).unwrap_or([42, 42, 42, 42, 42, 42]),
+                    )),
                     status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                     timed_out: false,
                 }))
@@ -1047,8 +1050,8 @@ mod tests {
         let connect_result =
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
         let connected_result = assert_variant!(connect_result, Ok(ConnectResult::Success(r)) => r);
-        assert_eq!(connected_result.ssid, vec![b'f', b'o', b'o']);
-        assert_eq!(connected_result.bssid, Bssid::from([1, 2, 3, 4, 5, 6]));
+        assert_eq!(connected_result.bss.ssid, Ssid::try_from("foo").unwrap());
+        assert_eq!(connected_result.bss.bssid, Bssid::from([1, 2, 3, 4, 5, 6]));
     }
 
     #[test_case(

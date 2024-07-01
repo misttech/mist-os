@@ -84,7 +84,7 @@ fn write_complete_digest<W: Write>(
     bucketize: bool,
 ) -> Result<()> {
     if bucketize {
-        write_csv_buckets(w, &digest.buckets, digest.time)
+        write_csv_buckets(w, &digest.buckets.unwrap(), digest.time)
     } else {
         write_short_processes_digest(
             w,
@@ -118,7 +118,7 @@ mod tests {
         ProcessDigest(ProcessesMemoryUsage {
             capture_time: 123000111222,
             process_data: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,
@@ -190,7 +190,7 @@ mod tests {
             total_committed_bytes_in_vmos: 0,
             kernel: Kernel::default(),
             processes: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,
@@ -205,7 +205,8 @@ mod tests {
                 vmos: HashSet::new(),
             }],
             vmos: vec![],
-            buckets: vec![],
+            buckets: None,
+            total_undigested: None,
         })
     }
 
@@ -225,10 +226,11 @@ mod tests {
             kernel: Kernel::default(),
             processes: vec![],
             vmos: vec![],
-            buckets: vec![
+            buckets: Some(vec![
                 Bucket { name: "Bucket0".to_string(), size: 42, vmos: HashSet::new() },
                 Bucket { name: "Bucket1".to_string(), size: 43, vmos: HashSet::new() },
-            ],
+            ]),
+            total_undigested: None,
         })
     }
 

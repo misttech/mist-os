@@ -93,6 +93,8 @@ pub fn mlme_device_info_from_softmac(
         role: required(query_response.mac_role, "mac_role")?,
         bands: required(band_caps, "band_caps")?,
         qos_capable: false,
+        // TODO(https://fxbug.dev/349155104): This seems to only be required for an AP MLME and should not
+        // be enforced for clients.
         softmac_hardware_capability: required(
             query_response.hardware_capability,
             "hardware_capability",

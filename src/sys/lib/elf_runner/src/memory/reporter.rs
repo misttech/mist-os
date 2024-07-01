@@ -4,13 +4,12 @@
 
 use attribution::{AttributionServer, AttributionServerHandle};
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker, RequestStream};
-use fuchsia_zircon::{self as zx, HandleBased};
 use futures::TryStreamExt;
 use std::sync::Arc;
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 use crate::component::ElfComponentInfo;
@@ -37,16 +36,12 @@ impl MemoryReporter {
         let deleted_component_publisher = server.new_publisher();
         components.set_callbacks(
             Some(Box::new(move |info| {
-                new_component_publisher.on_update(Self::build_new_attribution(info)).unwrap();
+                new_component_publisher.on_update(Self::build_new_attribution(info));
             })),
             Some(Box::new(move |token| {
-                deleted_component_publisher
-                    .on_update(vec![fattribution::AttributionUpdate::Remove(
-                        fattribution::Identifier::Component(
-                            token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-                        ),
-                    )])
-                    .unwrap();
+                deleted_component_publisher.on_update(vec![
+                    fattribution::AttributionUpdate::Remove(token.get_koid().unwrap().raw_koid()),
+                ]);
             })),
         );
         MemoryReporter { server, components }
@@ -84,11 +79,12 @@ impl MemoryReporter {
     }
 
     fn build_new_attribution(component: &ElfComponentInfo) -> Vec<fattribution::AttributionUpdate> {
+        let instance_token = component.copy_instance_token().unwrap();
+        let instance_token_koid = instance_token.get_koid().unwrap().raw_koid();
         let new_principal = fattribution::NewPrincipal {
-            identifier: Some(fattribution::Identifier::Component(
-                component.copy_instance_token().unwrap(),
-            )),
-            type_: Some(fattribution::Type::Runnable),
+            identifier: Some(instance_token_koid),
+            description: Some(fattribution::Description::Component(instance_token)),
+            principal_type: Some(fattribution::PrincipalType::Runnable),
             detailed_attribution: component.get_outgoing_directory().and_then(
                 |outgoing_directory| {
                     let (server, client) = fidl::Channel::create();
@@ -107,14 +103,12 @@ impl MemoryReporter {
             ..Default::default()
         };
         let attribution = fattribution::UpdatedPrincipal {
-            identifier: Some(fattribution::Identifier::Component(
-                component.copy_instance_token().unwrap(),
-            )),
-            resources: Some(fattribution::Resources::Data(vec![
-                fattribution::Resource::KernelObject(
+            identifier: Some(instance_token_koid),
+            resources: Some(fattribution::Resources::Data(fattribution::Data {
+                resources: vec![fattribution::Resource::KernelObject(
                     component.copy_job().proc().get_koid().unwrap().raw_koid(),
-                ),
-            ])),
+                )],
+            })),
             ..Default::default()
         };
         vec![
@@ -171,7 +165,7 @@ mod tests {
         let fattribution::AttributionUpdate::Add(added_principal) = new_attrib else {
             panic!("Not a new principal");
         };
-        assert_eq!(added_principal.type_, Some(fattribution::Type::Runnable));
+        assert_eq!(added_principal.principal_type, Some(fattribution::PrincipalType::Runnable));
 
         // Its resource is a single job.
         let update_attrib = attributions_vec.get(1).unwrap();

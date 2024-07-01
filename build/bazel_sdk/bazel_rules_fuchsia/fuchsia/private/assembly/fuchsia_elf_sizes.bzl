@@ -5,7 +5,7 @@
 """Rule for creating a ELF sizes summary file for a Fuchsia image."""
 
 load(":providers.bzl", "FuchsiaProductImageInfo")
-load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_elf_sizes_impl(ctx):
     images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out

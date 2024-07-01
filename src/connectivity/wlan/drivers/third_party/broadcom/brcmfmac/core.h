@@ -197,7 +197,7 @@ using reassoc_context_t = struct {
 };
 
 constexpr size_t kConnectReqBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest,
+    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest,
                            fidl::MessageDirection::kSending>();
 /**
  * struct brcmf_if - interface control information.
@@ -234,7 +234,7 @@ struct brcmf_if {
   int32_t bsscfgidx;
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
-  fuchsia_wlan_fullmac::WlanFullmacImplBaseConnectRequest connect_req;
+  fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest connect_req;
   // SSID of Successfully started SoftAP.
   fuchsia_wlan_ieee80211::wire::CSsid saved_softap_ssid;
   reassoc_context_t reassoc_context;
@@ -283,7 +283,7 @@ struct net_device {
   uint32_t scan_num_results;
   std::mutex scan_sync_id_mutex;  // Used to ensure that sync_id is stored before processing results
   std::shared_mutex if_proto_lock;  // Used as RW-lock for if_proto.
-  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> if_proto;
+  fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc> if_proto;
   uint8_t dev_addr[ETH_ALEN];
   char name[NET_DEVICE_NAME_MAX_LEN];
   void* priv;

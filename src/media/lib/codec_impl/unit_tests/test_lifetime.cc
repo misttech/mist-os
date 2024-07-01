@@ -60,7 +60,10 @@ class CodecImplLifetime : public gtest::RealLoopFixture {
   void Create(bool bind = true, bool delete_async = false,
               CodecImpl::StreamProcessorParams params = CreateDecoderParams()) {
     // Just hold onto the server end and never connect it to anything, for now.
-    sysmem_request_ = sysmem_client_.NewRequest();
+    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
+    ZX_ASSERT(sysmem_endpoints.is_ok());
+    sysmem_client_ = std::move(sysmem_endpoints->client);
+    sysmem_request_ = std::move(sysmem_endpoints->server);
     codec_request_ = codec_client_handle_.NewRequest();
     ZX_DEBUG_ASSERT(!delete_async || bind);
     std::unique_ptr<CodecImpl> codec_impl;
@@ -110,8 +113,8 @@ class CodecImplLifetime : public gtest::RealLoopFixture {
   CodecAdmissionControl admission_control_;
 
   // The server end isn't connected to anything, for now.
-  fidl::InterfaceHandle<fuchsia::sysmem::Allocator> sysmem_client_;
-  fidl::InterfaceRequest<fuchsia::sysmem::Allocator> sysmem_request_;
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client_;
+  fidl::ServerEnd<fuchsia_sysmem2::Allocator> sysmem_request_;
 
   // Tests that don't intend to process any received messages use
   // InterfaceHandle while those that do intend to process received messages
@@ -135,10 +138,13 @@ TEST_F(CodecImplLifetime, CreateDelete) {
 }
 
 TEST_F(CodecImplLifetime, CreateBindDelete) {
-  Create();
-  codec_impl_ = nullptr;
-  RunLoopUntilIdle();
-  EXPECT_FALSE(error_handler_ran_);
+  // This exercises BindAsync vs. ~CodecImpl, so run several times.
+  for (uint32_t i = 0; i < 200; ++i) {
+    Create();
+    codec_impl_ = nullptr;
+    RunLoopUntilIdle();
+    EXPECT_FALSE(error_handler_ran_);
+  }
 }
 
 TEST_F(CodecImplLifetime, CreateBindChannelClose) {
@@ -196,15 +202,21 @@ TEST_F(CodecImplLifetime, CreateBindChannelCloseDeleteAsyncWithOngoingSyncs) {
 }
 
 TEST_F(CodecImplLifetime, CreateBindDeleteEncoder) {
-  Create(true, false, CreateEncoderParams());
-  codec_impl_ = nullptr;
-  RunLoopUntilIdle();
-  EXPECT_FALSE(error_handler_ran_);
+  // This exercises BindAsync vs. ~CodecImpl, so run several times.
+  for (uint32_t i = 0; i < 200; ++i) {
+    Create(true, false, CreateEncoderParams());
+    codec_impl_ = nullptr;
+    RunLoopUntilIdle();
+    EXPECT_FALSE(error_handler_ran_);
+  }
 }
 
 TEST_F(CodecImplLifetime, CreateBindDeleteDecryptor) {
-  Create(true, false, CreateDecryptorParams());
-  codec_impl_ = nullptr;
-  RunLoopUntilIdle();
-  EXPECT_FALSE(error_handler_ran_);
+  // This exercises BindAsync vs. ~CodecImpl, so run several times.
+  for (uint32_t i = 0; i < 200; ++i) {
+    Create(true, false, CreateDecryptorParams());
+    codec_impl_ = nullptr;
+    RunLoopUntilIdle();
+    EXPECT_FALSE(error_handler_ran_);
+  }
 }

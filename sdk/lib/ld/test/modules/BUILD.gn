@@ -406,13 +406,36 @@ group("test-module.deps") {
   visibility = [ ":*" ]
   testonly = true
 
+  deps = [ ":test-ubsan" ]
+
   # When llvm-profdata instrumentation is in use, it may generate calls to
   # functions that are supplied by the runtime.  Even though the modules aren't
   # actually using the runtime to extract their data (yet, anyway), they link
   # in the runtime to make sure any such references are satisfied at link time.
   if (toolchain_variant.tags + [ "llvm-profdata" ] - [ "llvm-profdata" ] !=
       toolchain_variant.tags) {
-    deps = [ "//src/lib/llvm-profdata" ]
+    deps += [ "//src/lib/llvm-profdata" ]
+  }
+}
+
+source_set("test-ubsan") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  if (is_ubsan) {
+    sources = [
+      "test-ubsan.cc",
+      "test-ubsan.h",
+    ]
+    deps = [
+      "//src/lib/ubsan-custom:handlers",
+      "//zircon/system/ulib/c/stdio/printf_core:wrapper",
+    ]
+    if (is_fuchsia) {
+      sources += [ "test-ubsan-zircon.cc" ]
+    } else {
+      sources += [ "test-ubsan-posix.cc" ]
+    }
   }
 }
 
@@ -695,6 +718,9 @@ test_executable("tls-exec-only") {
     "../..",
     "//src/lib/elfldltl",
   ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs = [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 test_executable("tls-shlib-only") {
@@ -850,6 +876,9 @@ test_executable("relro") {
 test_executable("fixed-load-address") {
   sources = [ "fixed-load-address.cc" ]
   deps = [ "//src/lib/elfldltl" ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs = [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 test_executable("second-session") {

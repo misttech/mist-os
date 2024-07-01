@@ -27,6 +27,10 @@ class HoneydewError(Exception):
         _LOGGER.debug(repr(self), exc_info=True)
 
 
+class HostCmdError(HoneydewError):
+    """Exception for reporting host command failures."""
+
+
 class TransportError(HoneydewError):
     """Exception for errors raised by Honeydew transports."""
 

@@ -231,10 +231,6 @@ impl BuiltinEnvironmentBuilder {
     /// whose scheme no resolver is registered through `add_resolver` by the time `build()` is
     /// is called. This includes:
     ///   - A fuchsia-boot resolver if /boot is available.
-    ///   - A fuchsia-pkg resolver, if /svc/fuchsia.sys.Loader is present.
-    ///       - This resolver implementation proxies to that protocol (which is the v1 resolver
-    ///         equivalent). This is used for tests or other scenarios where component_manager runs
-    ///         as a v1 component.
     pub fn include_namespace_resolvers(mut self) -> Self {
         self.add_environment_resolvers = true;
         self

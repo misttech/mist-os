@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 pub enum MonikerError {
     #[error("invalid moniker: {}", rep)]
     InvalidMoniker { rep: String },
-    #[error(transparent)]
+    #[error("invalid moniker part: {_0}")]
     InvalidMonikerPart(#[from] cm_types::ParseError),
     #[error("moniker {} does not have prefix {}", moniker, prefix)]
     MonikerDoesNotHavePrefix { moniker: String, prefix: String },

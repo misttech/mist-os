@@ -70,7 +70,7 @@ zx::result<> PowerIntegrationBoard::Start() {
         .child_level = 1,
         .parent_level = 1,
     }}};
-    dep.strength() = fuchsia_hardware_power::RequirementType::kActive;
+    dep.strength() = fuchsia_hardware_power::RequirementType::kAssertive;
     config.dependencies() = std::vector<fuchsia_hardware_power::PowerDependency>{dep};
 
     std::vector<fuchsia_hardware_power::PowerElementConfiguration> power_config =

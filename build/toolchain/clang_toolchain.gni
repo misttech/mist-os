@@ -185,7 +185,7 @@ template("clang_toolchain") {
       prefix = invoker.prefix
     }
 
-    if (link_rbe_enable) {
+    if (_link_rbe_enable) {
       _link_rbe_exec_strategy_flags =
           RBE_EXEC_STRATEGY_MAP[link_rbe_exec_strategy]
     }
@@ -560,7 +560,7 @@ template("clang_toolchain") {
           ]
           if (rust_rbe_enable) {
             _exec_strategy_flags = []
-            if (rust_rbe_check == "") {
+            if (rust_rbe_check == "none") {
               _exec_strategy_flags = _rust_rbe_exec_strategy_flags
             }
             rust_link_remote_strip_prefix =
@@ -617,7 +617,7 @@ template("clang_toolchain") {
           }
           if (rust_rbe_enable) {
             _exec_strategy_flags = []
-            if (rust_rbe_check == "") {
+            if (rust_rbe_check == "none") {
               _exec_strategy_flags = _rust_rbe_exec_strategy_flags
             }
             rust_link_remote_dump_syms_prefix =
@@ -1059,6 +1059,7 @@ template("clang_toolchain") {
         } else if (link_rbe_check == "consistency") {
           _linker_prefix_list += [ "--compare" ]
         } else if (link_rbe_check == "none") {
+          _linker_prefix_list += _link_rbe_exec_strategy_flags
           _link_concurrent_jobs = concurrent_jobs.remote
         }
         _linker_prefix_list += [

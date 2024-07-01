@@ -23,6 +23,12 @@ executable("bin") {
   output_name = "driver_host2"
   sources = [ "driver_host.cc" ]
   deps = [ ":entry_point" ]
+
+  # The user.basic environment doesn't use toolchain-provided instrumentation
+  # runtimes that wouldn't be compatible.  But it supports variants like ubsan
+  # that require plumbing a custom runtime, which isn't handled for this
+  # experimental test stub binary.
+  exclude_toolchain_tags = [ "custom-runtime" ]
 }
 
 user_basic_redirect("modules.basic") {

@@ -20,7 +20,6 @@
 #include <zxtest/zxtest.h>
 
 #include "lib/syslog/cpp/log_settings.h"
-#include "lib/syslog/cpp/logging_backend.h"
 #include "lib/syslog/logger.h"
 #include "zircon/system/ulib/syslog/helpers.h"
 

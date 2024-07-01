@@ -30,10 +30,10 @@ zbi_input("example-board-dtb") {
   sources = [ "$target_out_dir/example-board.dtb" ]
 }
 
-bazel_input_resource("test-dtb") {
-  deps = [ ":example-board" ]
-  sources = [ "$target_out_dir/example-board.dtb" ]
-  outputs = [ "{{source_file_part}}" ]
+bazel_input_file("test-dtb") {
+  generator = ":example-board"
+  outputs = [ "$target_out_dir/example-board.dtb" ]
+  gn_targets_name = "test-dtb"
 }
 
 bazel_fuchsia_test_package("example-board-test-package") {

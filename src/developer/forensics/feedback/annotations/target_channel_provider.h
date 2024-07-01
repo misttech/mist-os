@@ -17,7 +17,8 @@ struct TargetChannelToAnnotations {
   Annotations operator()(Error error);
 };
 
-// Responsible for collecting annotations for fuchsia.hwinfo/Board.
+// Responsible for collecting annotations for
+// fuchsia.update.channelcontrol/ChannelControl::GetTarget.
 class TargetChannelProvider
     : public DynamicSingleFidlMethodAnnotationProvider<
           fuchsia::update::channelcontrol::ChannelControl,

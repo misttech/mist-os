@@ -59,7 +59,7 @@ async fn open_per_package_source(source: PackageSource) {
     assert_open_content_file(&source, "dir", "dir/file").await;
 }
 
-const ALL_FLAGS: [fio::OpenFlags; 14] = [
+const ALL_FLAGS: [fio::OpenFlags; 15] = [
     fio::OpenFlags::empty(),
     fio::OpenFlags::RIGHT_READABLE,
     fio::OpenFlags::RIGHT_WRITABLE,
@@ -74,11 +74,7 @@ const ALL_FLAGS: [fio::OpenFlags; 14] = [
     fio::OpenFlags::POSIX_WRITABLE,
     fio::OpenFlags::POSIX_EXECUTABLE,
     fio::OpenFlags::NOT_DIRECTORY,
-    // TODO(https://fxbug.dev/327633753): `APPEND` only affects how a file is written and not
-    // whether it can be opened. POSIX, the rust VFS, and the C++ vfs all allow read-only files
-    // and connections without `RIGHT_WRITABLE` to be opened with `APPEND`. It's only MetaFile
-    // and MetaAsFile that disallow `APPEND`.
-    // fio::OpenFlags::APPEND,
+    fio::OpenFlags::APPEND,
 ];
 
 async fn assert_open_root_directory(
@@ -332,6 +328,7 @@ async fn assert_open_meta_as_directory_and_file(
         fio::OpenFlags::POSIX_WRITABLE,
         fio::OpenFlags::POSIX_EXECUTABLE,
         fio::OpenFlags::NOT_DIRECTORY,
+        fio::OpenFlags::APPEND,
     ];
 
     let file_child_paths = generate_valid_file_paths(child_base_path);
@@ -416,6 +413,7 @@ async fn assert_open_meta_file(source: &PackageSource, parent_path: &str, child_
         fio::OpenFlags::POSIX_WRITABLE,
         fio::OpenFlags::POSIX_EXECUTABLE,
         fio::OpenFlags::NOT_DIRECTORY,
+        fio::OpenFlags::APPEND,
     ];
 
     let child_paths = generate_valid_file_paths(child_base_path);

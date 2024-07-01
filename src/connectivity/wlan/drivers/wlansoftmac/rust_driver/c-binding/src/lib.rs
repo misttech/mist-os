@@ -11,6 +11,7 @@ use std::sync::Once;
 use wlan_ffi_transport::{
     BufferProvider, EthernetRx, FfiBufferProvider, FfiEthernetRx, FfiWlanTx, WlanTx,
 };
+use wlan_mlme::completers::StartCompleter;
 use wlan_mlme::device::Device;
 use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx};
 
@@ -19,49 +20,55 @@ static LOGGER_ONCE: Once = Once::new();
 /// Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server.
 ///
 /// The driver is "bridged" in the sense that it requires a bridge to a Fuchsia driver to
-/// communicate with other Fuchsia drivers over the FDF transport. When initialization of the
-/// bridged driver completes, `run_init_completer` will be called.
+/// communicate with other Fuchsia drivers over the FDF transport. After the bridged
+/// driver starts successfully, `run_start_completer` will be called with `start_completer`.
+/// If the bridged driver does not start successfully, this function will return a
+/// non-`ZX_OK` status.
+///
+/// This function returns `ZX_OK` only if shutdown completes successfully. A successful
+/// shutdown only occurs if the bridged driver receives a
+/// `fuchsia.wlan.softmac/WlanSoftmacIfcBridge.StopBridgedDriver` message and the subsequent
+/// teardown of the hosted server succeeds.
+///
+/// In all other scenarios, e.g., failure during startup, while running, or during shutdown,
+/// this function will return a non-`ZX_OK` value.
 ///
 /// # Safety
 ///
-/// There are two layers of safety documentation for this function. The first layer is for this
-/// function itself, and the second is for the `run_init_completer` function.
-///
-/// ## For this function itself
-///
 /// This function is unsafe for the following reasons:
 ///
-///   - This function cannot guarantee `run_init_completer` is thread-safe, i.e., that it's safe to
-///     to call at any time from any thread.
-///   - This function cannot guarantee `init_completer` points to a valid object when
-///     `run_init_completer` is called.
+///   - This function cannot guarantee `run_start_completer` is thread-safe.
+///   - This function cannot guarantee `start_completer` points to a valid object when
+///     `run_start_completer` is called.
 ///   - This function cannot guarantee `wlan_softmac_bridge_client_handle` is a valid handle.
 ///
 /// By calling this function, the caller promises the following:
 ///
-///   - The `run_init_completer` function is thread-safe.
-///   - The `init_completer` pointer will point to a valid object at least until
-///     `run_init_completer` is called.
+///   - The `run_start_completer` function is thread-safe.
+///   - The `start_completer` pointer will point to a valid object at least until
+///     `run_start_completer` is called.
 ///   - The `wlan_softmac_bridge_client_handle` is a valid handle.
-///
-/// ## For `run_init_completer`
-///
-/// The `run_init_completer` function is unsafe because it cannot guarantee the `init_completer`
-/// argument will be the same `init_completer` passed to `start_and_run_bridged_wlansoftmac`, and
-/// cannot guarantee it will be called exactly once.
-///
-/// The caller of `run_init_completer` must promise to pass the same `init_completer` from
-/// `start_and_run_bridged_wlansoftmac` to `run_init_completer` and call `run_init_completer`
-/// exactly once.
 #[no_mangle]
 pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
-    init_completer: *mut c_void,
-    run_init_completer: unsafe extern "C" fn(init_completer: *mut c_void, status: zx::zx_status_t),
+    start_completer: *mut c_void,
+    run_start_completer: unsafe extern "C" fn(
+        start_completer: *mut c_void,
+        status: zx::zx_status_t,
+    ),
     ethernet_rx: FfiEthernetRx,
     wlan_tx: FfiWlanTx,
     buffer_provider: FfiBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
+    let start_completer = StartCompleter::new(move |status| {
+        // Safety: This is safe because the caller of this function promised
+        // `run_start_completer` is thread-safe and `start_completer` is valid until
+        // its called.
+        unsafe {
+            run_start_completer(start_completer, status);
+        }
+    });
+
     let mut executor = LocalExecutor::new();
 
     // The Fuchsia syslog must not be initialized from Rust more than once per process. In the case
@@ -88,24 +95,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
         Device::new(wlan_softmac_bridge_proxy, EthernetRx::new(ethernet_rx), WlanTx::new(wlan_tx));
 
     let result = executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(
-        move |result: Result<(), zx::Status>| match result {
-            Ok(()) => {
-                // Safety: This is safe because the caller of this function promised
-                // `run_init_completer` is thread-safe and `init_completer` is valid until
-                // its called.
-                unsafe {
-                    run_init_completer(init_completer, zx::Status::OK.into_raw());
-                }
-            }
-            Err(status) => {
-                // Safety: This is safe because the caller of this function promised
-                // `run_init_completer` is thread-safe and `init_completer` is valid until
-                // its called.
-                unsafe {
-                    run_init_completer(init_completer, status.into_raw());
-                }
-            }
-        },
+        start_completer,
         device,
         BufferProvider::new(buffer_provider),
     ));

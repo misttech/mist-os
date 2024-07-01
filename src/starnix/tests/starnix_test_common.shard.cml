@@ -72,6 +72,7 @@
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: [
+                "#fake-hrtimer",
                 "#kernel",
                 "#system-activity-governor",
             ],

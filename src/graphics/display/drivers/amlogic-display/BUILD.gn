@@ -8,14 +8,6 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
-declare_args() {
-  # If true, the driver component `fuchsia://fuchsia.com/amlogic-display#
-  # meta/amlogic-display.cm` will be the DFv2 version of the driver component
-  # (`:amlogic-display-dfv2`). Otherwise, it will be the DFv1 version of the
-  # driver component (`:amlogic-display-dfv1`).
-  amlogic_display_is_dfv2 = true
-}
-
 driver_bind_rules("amlogic_display_bind") {
   rules = "amlogic-display.bind"
   bind_output = "amlogic-display.bindbc"
@@ -109,6 +101,8 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/incoming/cpp",
     "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/devices/lib/mmio",
@@ -118,8 +112,6 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/device-protocol-display",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter",
-    "//src/graphics/display/lib/driver-framework-migration-utils/namespace",
     "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
@@ -127,6 +119,7 @@ source_set("common_srcs") {
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/zx",
   ]
@@ -139,30 +132,11 @@ source_set("common_srcs") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-fuchsia_driver("amlogic-display-dfv1-driver") {
-  output_name = "amlogic-display-dfv1"
+fuchsia_driver("amlogic-display-driver") {
+  output_name = "amlogic-display"
   sources = [
-    "display-device-driver-dfv1.cc",
-    "display-device-driver-dfv1.h",
-  ]
-  deps = [
-    ":amlogic_display_bind",
-    ":common_srcs",
-    "//src/devices/lib/driver",
-    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:loop-backed-dispatcher",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv1",
-    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv1",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-  ]
-}
-
-fuchsia_driver("amlogic-display-dfv2-driver") {
-  output_name = "amlogic-display-dfv2"
-  sources = [
-    "display-device-driver-dfv2.cc",
-    "display-device-driver-dfv2.h",
+    "display-device-driver.cc",
+    "display-device-driver.h",
   ]
   deps = [
     ":amlogic_display_bind",
@@ -171,45 +145,24 @@ fuchsia_driver("amlogic-display-dfv2-driver") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:logging",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/incoming/cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
-    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:driver-runtime-backed-dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv2",
-    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv2",
   ]
 }
 
-fuchsia_driver_component("amlogic-display-dfv1") {
-  if (amlogic_display_is_dfv2) {
-    component_name = "amlogic-display-dfv1-unused"
-  } else {
-    component_name = "amlogic-display"
-  }
+fuchsia_driver_component("amlogic-display") {
+  component_name = "amlogic-display"
   info = "amlogic-display-info.json"
-  deps = [ ":amlogic-display-dfv1-driver" ]
-  manifest = "meta/amlogic-display-dfv1.cml"
-}
-
-fuchsia_driver_component("amlogic-display-dfv2") {
-  if (amlogic_display_is_dfv2) {
-    component_name = "amlogic-display"
-  } else {
-    component_name = "amlogic-display-dfv2-unused"
-  }
-  info = "amlogic-display-info.json"
-  deps = [ ":amlogic-display-dfv2-driver" ]
-  manifest = "meta/amlogic-display-dfv2.cml"
+  deps = [ ":amlogic-display-driver" ]
+  manifest = "meta/amlogic-display.cml"
 }
 
 fuchsia_driver_package("package") {
   package_name = "amlogic-display"
-  if (amlogic_display_is_dfv2) {
-    driver_components = [ ":amlogic-display-dfv2" ]
-  } else {
-    driver_components = [ ":amlogic-display-dfv1" ]
-  }
+  driver_components = [ ":amlogic-display" ]
 }
 
 test("amlogic-display-test") {
@@ -229,18 +182,20 @@ test("amlogic-display-test") {
   ]
   deps = [
     ":common_srcs",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/incoming/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-range",
-    "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher:loop-backed-dispatcher",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
-    "//src/graphics/display/lib/driver-framework-migration-utils/metadata:metadata-getter-dfv1",
-    "//src/graphics/display/lib/driver-framework-migration-utils/namespace:namespace-dfv1",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

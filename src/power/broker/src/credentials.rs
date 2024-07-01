@@ -172,24 +172,25 @@ mod tests {
     #[fuchsia::test]
     fn test_no_permissions() {
         let none = Permissions::empty();
-        assert_eq!(none.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), false);
-        assert_eq!(none.contains(Permissions::MODIFY_PASSIVE_DEPENDENT), false);
+        assert_eq!(none.contains(Permissions::MODIFY_ASSERTIVE_DEPENDENT), false);
+        assert_eq!(none.contains(Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT), false);
         assert_eq!(none.contains(Permissions::MODIFY_DEPENDENCY), false);
     }
 
     #[fuchsia::test]
     fn test_all_permissions() {
         let all = Permissions::all();
-        assert_eq!(all.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), true);
-        assert_eq!(all.contains(Permissions::MODIFY_PASSIVE_DEPENDENT), true);
+        assert_eq!(all.contains(Permissions::MODIFY_ASSERTIVE_DEPENDENT), true);
+        assert_eq!(all.contains(Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT), true);
         assert_eq!(all.contains(Permissions::MODIFY_DEPENDENCY), true);
     }
 
     #[fuchsia::test]
     fn test_some_permissions() {
-        let some = Permissions::MODIFY_ACTIVE_DEPENDENT | Permissions::MODIFY_PASSIVE_DEPENDENT;
-        assert_eq!(some.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), true);
-        assert_eq!(some.contains(Permissions::MODIFY_PASSIVE_DEPENDENT), true);
+        let some =
+            Permissions::MODIFY_ASSERTIVE_DEPENDENT | Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT;
+        assert_eq!(some.contains(Permissions::MODIFY_ASSERTIVE_DEPENDENT), true);
+        assert_eq!(some.contains(Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT), true);
         assert_eq!(some.contains(Permissions::MODIFY_DEPENDENCY), false);
     }
 
@@ -198,10 +199,10 @@ mod tests {
         let gold_credential = Credential {
             element: "Gold".into(),
             id: DependencyToken::create().get_koid().expect("get_koid failed"),
-            permissions: Permissions::MODIFY_ACTIVE_DEPENDENT,
+            permissions: Permissions::MODIFY_ASSERTIVE_DEPENDENT,
         };
         assert_eq!(
-            gold_credential.authorizes(&"Gold".into(), Permissions::MODIFY_ACTIVE_DEPENDENT),
+            gold_credential.authorizes(&"Gold".into(), Permissions::MODIFY_ASSERTIVE_DEPENDENT),
             true
         );
         assert_eq!(
@@ -220,7 +221,7 @@ mod tests {
                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                 .expect("dup failed")
                 .into(),
-            permissions: Permissions::MODIFY_ACTIVE_DEPENDENT,
+            permissions: Permissions::MODIFY_ASSERTIVE_DEPENDENT,
         };
         registry.register(&element_kryptonite, credential_to_register).expect("register failed");
         use fuchsia_zircon::HandleBased;
@@ -229,7 +230,7 @@ mod tests {
         let credential = registry.lookup(&token_kryptonite_dup.into()).unwrap();
         assert_eq!(credential.id, token_kryptonite.basic_info().expect("basic_info failed").koid);
         assert_eq!(credential.element, element_kryptonite);
-        assert_eq!(credential.permissions.contains(Permissions::MODIFY_ACTIVE_DEPENDENT), true);
+        assert_eq!(credential.permissions.contains(Permissions::MODIFY_ASSERTIVE_DEPENDENT), true);
         assert_eq!(credential.permissions.contains(Permissions::MODIFY_DEPENDENCY), false);
 
         let unregistered = registry.unregister(&credential);

@@ -62,7 +62,7 @@ constexpr auto kDisplayHeightPhysicalPixels = 800;
 constexpr float kLowResolutionDisplayPixelDensity = 4.1668f;
 
 // Base realm urls.
-constexpr auto kScenicOnlyUrl = "#meta/scenic_only.cm";
+constexpr auto kScenicOnlyUrl = "#meta/scenic_no_config.cm";
 constexpr auto kSceneManagerSceneUrl = "#meta/scene_manager_scene.cm";
 
 // System component urls.
@@ -320,10 +320,48 @@ void UITestRealm::ConfigureAccessibility() {
 
 void UITestRealm::ConfigureScenic() {
   // Load default config for Scenic.
-  realm_builder_.InitMutableConfigFromPackage(kScenicName);
-  realm_builder_.SetConfigValue(kScenicName, "display_composition", ConfigValue::Bool(false));
-  realm_builder_.SetConfigValue(kScenicName, "display_rotation",
-                                ConfigValue::Uint64(config_.display_rotation));
+
+  // Configure scenic's configuration.
+  realm_builder_.AddChild("config", "#meta/config.cm", {});
+  realm_builder_.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{
+                  .name = "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs"},
+              component_testing::Config{.name = "fuchsia.scenic.ICanHazDisplayId"},
+              component_testing::Config{.name = "fuchsia.scenic.ICanHazDisplayMode"},
+              component_testing::Config{.name = "fuchsia.scenic.MaxDisplayHorizontalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.MaxDisplayRefreshRateMillihertz"},
+              component_testing::Config{.name = "fuchsia.scenic.MaxDisplayVerticalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.MinDisplayHorizontalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.MinDisplayRefreshRateMillihertz"},
+              component_testing::Config{.name = "fuchsia.scenic.MinDisplayVerticalResolutionPx"},
+              component_testing::Config{.name = "fuchsia.scenic.PointerAutoFocus"},
+              component_testing::Config{.name = "fuchsia.scenic.Renderer"},
+          },
+      .source = component_testing::ChildRef{"config"},
+      .targets = {component_testing::ChildRef{kScenicName}},
+  });
+
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.scenic.DisplayComposition",
+      .value = ConfigValue::Bool(false),
+  });
+  configurations.push_back({
+      .name = "fuchsia.scenic.DisplayRotation",
+      .value = ConfigValue::Uint64(config_.display_rotation),
+  });
+  realm_builder_.AddConfiguration(std::move(configurations));
+  realm_builder_.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.scenic.DisplayComposition"},
+              component_testing::Config{.name = "fuchsia.scenic.DisplayRotation"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{kScenicName}},
+  });
 }
 
 void UITestRealm::ConfigureSceneOwner() {

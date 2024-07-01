@@ -24,6 +24,7 @@
 #include "src/developer/debug/zxdb/client/target_observer.h"
 #include "src/developer/debug/zxdb/client/thread_observer.h"
 #include "src/developer/debug/zxdb/console/command.h"
+#include "src/developer/debug/zxdb/console/test_failure_stack_matcher.h"
 #include "src/developer/debug/zxdb/symbols/module_symbol_status.h"
 
 namespace zxdb {
@@ -111,9 +112,12 @@ class ConsoleContext : public ProcessObserver,
   void SetSourceAffinityForThread(const Thread* thread, SourceAffinity source_affinity);
 
   // Returns/output to the console information on the given stopped thread with the given reasons
-  // for stopping.
-  OutputBuffer GetThreadContext(const Thread* thread, const StopInfo& info) const;
-  void OutputThreadContext(const Thread* thread, const StopInfo& info) const;
+  // for stopping. If |override_show_exception_info| is true, then exception information will not be
+  // printed.
+  OutputBuffer GetThreadContext(const Thread* thread, const StopInfo& info,
+                                bool override_show_exception_info = false) const;
+  void OutputThreadContext(const Thread* thread, const StopInfo& info,
+                           bool override_show_exception_info = false) const;
 
   // Schedules evaluation and subsequent display of the "display" expressions. These are the things
   // printed out for every thread stop.
@@ -271,6 +275,8 @@ class ConsoleContext : public ProcessObserver,
   int active_breakpoint_id_ = 0;
   int active_filter_id_ = 0;
   int active_symbol_server_id_ = 0;
+
+  TestFailureStackMatcher test_failure_stack_matcher_;
 
   // A separate thread that handles the console UI while symbols are being loaded and indexed. A new
   // thread is spawned that will take more than a few seconds to process. Once

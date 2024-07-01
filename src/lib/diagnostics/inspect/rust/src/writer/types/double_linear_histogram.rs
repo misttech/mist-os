@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::writer::{
-    ArithmeticArrayProperty, ArrayProperty, DoubleArrayProperty, HistogramProperty, Node,
-    StringReference,
+    ArithmeticArrayProperty, ArrayProperty, DoubleArrayProperty, HistogramProperty, InspectType,
+    Node, StringReference,
 };
 use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
 use inspect_format::constants;
@@ -18,6 +18,8 @@ pub struct DoubleLinearHistogramProperty {
     slots: usize,
     step_size: f64,
 }
+
+impl InspectType for DoubleLinearHistogramProperty {}
 
 impl DoubleLinearHistogramProperty {
     pub(crate) fn new(

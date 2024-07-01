@@ -10,9 +10,9 @@ import logging
 from typing import Sequence
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
+from trace_processing.metrics import suspend as suspend_metrics
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-_EVENT_CATEGORY = "power"
 _LOAD_GEN = "load_generator"
 _SAG = "system-activity-governor"
 
@@ -186,10 +186,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             else suspend_power_metrics.to_fuchsiaperf_results(tag="_suspend")
         )
 
-        return (
-            power_metrics.to_fuchsiaperf_results(tag="_by_model")
-            + suspend_results
-        )
+        return power_metrics.to_fuchsiaperf_results() + suspend_results
 
 
 def _find_test_start(model: trace_model.Model) -> trace_time.TimePoint | None:
@@ -268,12 +265,7 @@ def _find_suspend_windows(
     suspend_windows: list[trace_time.Window] = []
     events = filter(
         lambda e: e.pid == system_activity_governor.pid,
-        trace_utils.filter_events(
-            model.all_events(),
-            category=_EVENT_CATEGORY,
-            name="suspend",
-            type=trace_model.DurationEvent,
-        ),
+        suspend_metrics.filter_events(model),
     )
     for suspend in events:
         if suspend.duration is None:

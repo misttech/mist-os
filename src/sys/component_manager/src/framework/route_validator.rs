@@ -8,7 +8,7 @@ use crate::capability::{
 use crate::model::component::instance::ResolvedInstanceState;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::model::Model;
-use crate::model::routing::router_ext::WeakComponentTokenExt;
+use crate::model::routing::router_ext::WeakInstanceTokenExt;
 use crate::model::routing::service::AnonymizedServiceRoute;
 use crate::model::routing::{
     self, BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
@@ -373,7 +373,7 @@ impl RouteRequest {
         .await;
         let (router, request) = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
         router.route(request).await.map(|capability| {
-            if let sandbox::Capability::Component(source) = capability {
+            if let sandbox::Capability::Instance(source) = capability {
                 (Some(source.moniker()), None)
             } else {
                 warn!(target=%instance.moniker, "router did not return source info");

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/result.h>
 
 #include <memory>
@@ -36,10 +35,6 @@ class AmlCanvasDriver : public fdf::DriverBase {
   void Stop() override;
 
  private:
-  // Creates a ComponentInspector that serves its Inspect data to the
-  // driver component's Inspect sink.
-  zx::result<std::unique_ptr<inspect::ComponentInspector>> CreateComponentInspector();
-
   // Creates an AmlCanvas using the resources provided by the driver component
   // and adds the [`fuchsia.hardware.amlogiccanvas/Service`] it serves to the
   // driver component's outgoing directory.
@@ -58,7 +53,6 @@ class AmlCanvasDriver : public fdf::DriverBase {
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChildNode(
       compat::SyncInitializedDeviceServer* compat_server);
 
-  std::unique_ptr<inspect::ComponentInspector> component_inspector_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 

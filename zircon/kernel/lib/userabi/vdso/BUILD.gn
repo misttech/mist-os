@@ -41,6 +41,9 @@ if (toolchain_environment == "user.basic") {
 
       # The vDSO cannot have a writable segment.
       "needs-writable-globals",
+
+      # The vDSO can't usefully wire up a custom runtime.
+      "custom-runtime",
     ]
 
     sources = [

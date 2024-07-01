@@ -23,8 +23,9 @@ constexpr std::string_view kUuidPattern =
 // http(s) urls
 constexpr std::string_view kUrlPattern = R"(https?://[^"',!<> ]*)";
 
-// Long hex strings
-constexpr std::string_view kHexPattern = R"((\b[0-9a-fA-F]{32}\b))";
+// Hex strings
+constexpr std::string_view k16HexPattern = R"((\b[0-9a-fA-F]{16}\b))";
+constexpr std::string_view k32HexPattern = R"((\b[0-9a-fA-F]{32}\b))";
 
 // Obfuscated gaia ids
 constexpr std::string_view kGaiaPattern = R"((\b1[0-9]{20}\b))";
@@ -49,6 +50,7 @@ MAC_mixed: de.ad-BE:EF.42-5a,
 SSID: <ssid-666F6F>,
 HTTP: http://fuchsia.dev/fuchsia/testing?q=Test,
 HTTPS: https://fuchsia.dev/fuchsia/testing?q=Test,
+HEX: 1234567890abcdef,
 HEX: 1234567890abcdefABCDEF0123456789,
 v4Current: 0.1.2.3,
 v4Loopback: 127.1.2.3,
@@ -84,6 +86,7 @@ MAC_mixed: de.ad-BE:<REDACTED-MAC: 13>,
 SSID: <REDACTED-SSID: 14>,
 HTTP: <REDACTED-URL>,
 HTTPS: <REDACTED-URL>,
+HEX: <REDACTED-HEX: 16>,
 HEX: <REDACTED-HEX: 15>,
 v4Current: 0.1.2.3,
 v4Loopback: 127.1.2.3,
@@ -97,7 +100,7 @@ v6TrailingZeroes: <REDACTED-IPV6: 10>,
 v6LinkLocal: feB2:<REDACTED-IPV6-LL: 11>,
 v6LocalMulticast: ff72:111:222:333:444:555:666:777,
 v6Multicast: ff77:<REDACTED-IPV6-MULTI: 12>,
-obfuscatedGaiaId: <REDACTED-OBFUSCATED-GAIA-ID: 16>)";
+obfuscatedGaiaId: <REDACTED-OBFUSCATED-GAIA-ID: 17>)";
 
 }  // namespace
 
@@ -118,7 +121,17 @@ Redactor::Redactor(const int starting_id, inspect::UintProperty cache_size,
       .AddTextReplacer(kUrlPattern, "<REDACTED-URL>")
       .AddTextReplacer(kEmailPattern, "<REDACTED-EMAIL>")
       .AddTextReplacer(kUuidPattern, "<REDACTED-UUID>")
-      .AddIdReplacer(kHexPattern, "<REDACTED-HEX: %d>")
+      // TODO(https://fxbug.dev/350092691): k32HexPattern must be applied before k16HexPattern for
+      // now. Consider logs such as the following:
+      //
+      // INFO: Device id: 1234567890abcdef
+      // INFO: Long device id: 1234567890abcdefABCDEF0123456789
+      //
+      // If k16HexPattern is applied first, replacer.cc will replace
+      // 1234567890abcdefABCDEF0123456789 with <REDACTED-HEX: 1>ABCDEF0123456789 instead of just
+      // <REDACTED-HEX: 2>.
+      .AddIdReplacer(k32HexPattern, "<REDACTED-HEX: %d>")
+      .AddIdReplacer(k16HexPattern, "<REDACTED-HEX: %d>")
       .AddIdReplacer(kGaiaPattern, "<REDACTED-OBFUSCATED-GAIA-ID: %d>");
 }
 

@@ -17,9 +17,9 @@ group("tests") {
   deps = []
 }
 
-# This is the zx library used by internal FIDL backends. For the library
-# imported by `using zx;` in regular FIDL libraries, see
-# //zircon/vdso/zx/BUILD.gn.
+# This is the zx library used by internal FIDL backends to generate syscall
+# definitions. For the library imported by `using zx;` in regular FIDL
+# libraries, see //zircon/vdso/zx/BUILD.gn.
 fidl("zx") {
   visibility = [
     ":*",

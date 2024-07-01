@@ -12,9 +12,6 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.typing import bluetooth
 
-BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
-BluetoothConnectionType = bluetooth.BluetoothConnectionType
-
 
 class Sl4fMethods(StrEnum):
     SET_DISCOVERABLE = "bt_sys_facade.BluetoothSetDiscoverable"
@@ -69,8 +66,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
 
     def accept_pairing(
         self,
-        input_mode: BluetoothAcceptPairing,
-        output_mode: BluetoothAcceptPairing,
+        input_mode: bluetooth.BluetoothAcceptPairing,
+        output_mode: bluetooth.BluetoothAcceptPairing,
     ) -> None:
         """Sets device to accept Bluetooth pairing.
 
@@ -87,7 +84,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         )
 
     def connect_device(
-        self, identifier: str, connection_type: BluetoothConnectionType
+        self,
+        identifier: str,
+        connection_type: bluetooth.BluetoothConnectionType,
     ) -> None:
         """Connect device to target remote device via Bluetooth.
 
@@ -170,7 +169,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         return known_devices["result"]
 
     def pair_device(
-        self, identifier: str, connection_type: BluetoothConnectionType
+        self,
+        identifier: str,
+        connection_type: bluetooth.BluetoothConnectionType,
     ) -> None:
         """Pair device to target remote device via Bluetooth.
 

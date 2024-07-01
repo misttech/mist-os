@@ -260,9 +260,9 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	// requested image in the product bundle, which is ok. Since the error message
 	// is confusing, we'll discard the output and only return an error if a
 	// required image is missing.
+	origStdout := t.ffx.Stdout()
+	origStderr := t.ffx.Stderr()
 	resetStdoutStderr := func() {
-		origStdout := t.ffx.Stdout()
-		origStderr := t.ffx.Stderr()
 		t.ffx.SetStdoutStderr(origStdout, origStderr)
 	}
 	t.ffx.SetStdoutStderr(io.Discard, io.Discard)
@@ -503,7 +503,10 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 			FVM:      t.config.FVMTool,
 			ZBI:      t.config.ZBITool,
 		}
-		cmd, err = t.ffx.EmuStartConsole(ctx, cwd, DefaultQEMUNodename, t.isQEMU, absConfigFile, tools)
+		startArgs := ffxutil.EmuStartArgs{
+			Config: absConfigFile,
+		}
+		cmd, err = t.ffx.EmuStartConsole(ctx, cwd, DefaultQEMUNodename, t.isQEMU, tools, startArgs)
 		if err != nil {
 			return err
 		}

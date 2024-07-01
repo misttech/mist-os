@@ -116,11 +116,4 @@ pub(crate) mod testutil {
             std::task::Poll::Ready(None)
         }
     }
-
-    pub(crate) struct FakeSenderReceiverProvider;
-
-    impl SenderReceiverProvider for FakeSenderReceiverProvider {
-        type Sender<M: Clone + NetlinkSerializable + Send + Sync + 'static> = FakeSender<M>;
-        type Receiver<M: Send + 'static> = FakeReceiver<M>;
-    }
 }

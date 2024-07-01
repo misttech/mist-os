@@ -36,6 +36,7 @@ use std::pin::pin;
 use test_case::test_case;
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn log_packets<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // Modify debug netstack args so that it does not log packets.
@@ -93,6 +94,7 @@ async fn log_packets<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn disable_interface_loopback<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -163,6 +165,7 @@ async fn disable_interface_loopback<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn reject_multicast_mac_address<N: Netstack>(name: &str) {
     const BAD_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("CF:AA:BB:CC:DD:EE");
     assert_eq!(net_types::UnicastAddr::new(BAD_MAC_ADDRESS), None);
@@ -234,6 +237,7 @@ fn test_forwarding_v6(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     "v4_none_forward_icmp_v4",
     test_forwarding_v4(

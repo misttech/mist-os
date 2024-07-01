@@ -19,10 +19,10 @@ pub mod testutil;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display};
 
-use async_utils::fold;
+use async_utils::{fold, stream};
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
-use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet};
+use futures::{Future, Stream, TryStreamExt as _};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, UnicastAddress, Witness as _};
 use thiserror::Error;
 use {
@@ -487,14 +487,10 @@ impl<I: Ip> TryFrom<Route<I>> for fnet_stack::ForwardingEntry {
             RouteAction::Forward(target) => target,
         };
 
-        let IpInvariant(next_hop) = I::map_ip(
+        let next_hop = I::map_ip_in(
             next_hop,
-            |next_hop| {
-                IpInvariant(next_hop.map(|addr| fnet::IpAddress::Ipv4(addr.get().into_ext())))
-            },
-            |next_hop| {
-                IpInvariant(next_hop.map(|addr| fnet::IpAddress::Ipv6(addr.get().into_ext())))
-            },
+            |next_hop| next_hop.map(|addr| fnet::IpAddress::Ipv4(addr.get().into_ext())),
+            |next_hop| next_hop.map(|addr| fnet::IpAddress::Ipv6(addr.get().into_ext())),
         );
 
         Ok(fnet_stack::ForwardingEntry {
@@ -762,6 +758,45 @@ impl FidlRouteIpExt for Ipv6 {
     type Route = fnet_routes::RouteV6;
 }
 
+/// Abstracts over AddRoute and RemoveRoute RouteSet method responders.
+pub trait Responder: fidl::endpoints::Responder + Debug + Send {
+    /// The payload of the response.
+    type Payload;
+
+    /// Sends a FIDL response.
+    fn send(self, result: Self::Payload) -> Result<(), fidl::Error>;
+}
+
+/// A trait for responding with a slice of objects.
+///
+/// This is similar to [`Responder`], but it allows the sender to send a slice
+/// of objects.
+// These two traits can be merged into one with GATs.
+pub trait SliceResponder<Payload>: fidl::endpoints::Responder + Debug + Send {
+    /// Sends a FIDL response.
+    fn send(self, payload: &[Payload]) -> Result<(), fidl::Error>;
+}
+
+macro_rules! impl_responder {
+    ($resp:ty, &[$payload:ty] $(,)?) => {
+        impl $crate::SliceResponder<$payload> for $resp {
+            fn send(self, result: &[$payload]) -> Result<(), fidl::Error> {
+                <$resp>::send(self, result)
+            }
+        }
+    };
+    ($resp:ty, $payload:ty $(,)?) => {
+        impl $crate::Responder for $resp {
+            type Payload = $payload;
+
+            fn send(self, result: Self::Payload) -> Result<(), fidl::Error> {
+                <$resp>::send(self, result)
+            }
+        }
+    };
+}
+pub(crate) use impl_responder;
+
 /// Options for getting a route watcher.
 #[derive(Default, Clone)]
 pub struct WatcherOptions {
@@ -812,13 +847,13 @@ pub fn get_watcher<I: FidlRouteIpExt>(
         state_proxy: &'a <I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
         options: WatcherOptions,
     }
-    let IpInvariant(result) = I::map_ip::<GetWatcherInputs<'_, I>, _>(
+    let result = I::map_ip_in(
         GetWatcherInputs::<'_, I> { watcher_server_end, state_proxy, options },
         |GetWatcherInputs { watcher_server_end, state_proxy, options }| {
-            IpInvariant(state_proxy.get_watcher_v4(watcher_server_end, &options.into()))
+            state_proxy.get_watcher_v4(watcher_server_end, &options.into())
         },
         |GetWatcherInputs { watcher_server_end, state_proxy, options }| {
-            IpInvariant(state_proxy.get_watcher_v6(watcher_server_end, &options.into()))
+            state_proxy.get_watcher_v6(watcher_server_end, &options.into())
         },
     );
 
@@ -878,23 +913,21 @@ pub fn event_stream_from_state_with_options<I: FidlRouteIpExt>(
 pub fn event_stream_from_watcher<I: FidlRouteIpExt>(
     watcher: <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
 ) -> Result<impl Stream<Item = Result<Event<I>, WatchError>>, WatcherCreationError> {
-    Ok(futures::stream::try_unfold(watcher, |watcher| async {
-        let events_batch = watch::<I>(&watcher).await.map_err(WatchError::Fidl)?;
-        if events_batch.is_empty() {
-            return Err(WatchError::EmptyEventBatch);
-        }
-        // Convert the `I::WatchEvent` into an `Event<I>` and return any error.
-        let events_batch = events_batch
-            .into_iter()
-            .map(|event| event.try_into())
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(WatchError::Conversion)?;
-        // Below, `try_flatten` requires that the inner stream yields `Result`s.
-        let event_stream = futures::stream::iter(events_batch).map(Ok);
-        Ok(Some((event_stream, watcher)))
-    })
-    // Flatten the stream of event streams into a single event stream.
-    .try_flatten())
+    Ok(stream::ShortCircuit::new(
+        futures::stream::try_unfold(watcher, |watcher| async {
+            let events_batch = watch::<I>(&watcher).await.map_err(WatchError::Fidl)?;
+            if events_batch.is_empty() {
+                return Err(WatchError::EmptyEventBatch);
+            }
+            let events_batch = events_batch
+                .into_iter()
+                .map(|event| event.try_into().map_err(WatchError::Conversion));
+            let event_stream = futures::stream::iter(events_batch);
+            Ok(Some((event_stream, watcher)))
+        })
+        // Flatten the stream of event streams into a single event stream.
+        .try_flatten(),
+    ))
 }
 
 /// Errors returned by [`collect_routes_until_idle`].
@@ -1048,7 +1081,7 @@ mod tests {
     use super::*;
     use crate::testutil::internal as internal_testutil;
     use assert_matches::assert_matches;
-    use futures::FutureExt;
+    use futures::{FutureExt as _, StreamExt as _};
     use ip_test_macro::ip_test;
     use net_declare::{
         fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, net_ip_v4,

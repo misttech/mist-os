@@ -19,9 +19,10 @@ import cxx_link_remote_wrapper
 import cl_utils
 import fuchsia
 import cxx
+import linker
 import remote_action
 
-from typing import Any, Sequence, Collection
+from typing import Any, Iterable, Sequence, Collection
 
 
 class ImmediateExit(Exception):
@@ -414,6 +415,54 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
                 ],
             )
 
+    def test_clang_cxx_link_scandeps(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            fake_root = Path("/home/project")
+            fake_builddir = Path("out/really-not-default")
+            fake_cwd = fake_root / fake_builddir
+            compiler = Path("clang++")
+            source = Path("hello.o")
+            output = Path("hello.a")
+            target = "riscv64-apple-darwin19"
+            command = _strs(
+                [
+                    compiler,
+                    f"--target={target}",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+            c = cxx_link_remote_wrapper.CxxLinkRemoteAction(
+                ["--scandeps", "--", *command],
+                exec_root=fake_root,
+                working_dir=fake_cwd,
+                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+                auto_reproxy=False,
+            )
+            self.assertTrue(c.scandeps)
+
+            fake_scan_results = [Path("/path/to/usr/lib/libfoo.a")]
+            with mock.patch.object(
+                fuchsia, "remote_clang_linker_toolchain_inputs", return_value=[]
+            ):
+                with mock.patch.object(
+                    linker.LinkerInvocation,
+                    "expand_all",
+                    return_value=fake_scan_results,
+                ) as mock_scan:
+                    self.assertEqual(c.prepare(), 0)
+            self.assertEqual(
+                c.cxx_action.linker_inputs,
+                [source],
+            )
+            self.assertEqual(
+                set(c.remote_action.inputs_relative_to_working_dir),
+                set([source] + fake_scan_results),
+            )
+            mock_scan.assert_called_once_with()
+
 
 class MainTests(unittest.TestCase):
     def test_help_implicit(self) -> None:
@@ -465,6 +514,49 @@ class MainTests(unittest.TestCase):
                 )
         mock_relaunch.assert_called_once()
         mock_run.assert_called_with()
+
+    def test_scandeps_flag(self) -> None:
+        exit_code = 0
+        with mock.patch.object(
+            remote_action, "auto_relaunch_with_reproxy"
+        ) as mock_relaunch:
+            with mock.patch.object(
+                cxx_link_remote_wrapper.CxxLinkRemoteAction,
+                "_run_remote_action",
+                return_value=exit_code,
+            ) as mock_run:
+
+                def fake_scan_results() -> Iterable[Path]:
+                    yield from []
+
+                with mock.patch.object(
+                    cxx_link_remote_wrapper.CxxLinkRemoteAction,
+                    "scan_linker_inputs",
+                    side_effect=fake_scan_results,
+                ) as mock_scan:
+                    with mock.patch.object(
+                        fuchsia,
+                        "remote_clang_linker_toolchain_inputs",
+                        return_value=[],
+                    ):  # don't care about toolchain inputs
+                        self.assertEqual(
+                            cxx_link_remote_wrapper.main(
+                                [
+                                    "--",
+                                    "clang++",
+                                    "foo.o",
+                                    "-o",
+                                    "foo",
+                                    "--target=powerpc64-apple-darwin9",
+                                    # This gets sifted to the outer argparser.
+                                    "--remote-flag=--scandeps",
+                                ]
+                            ),
+                            exit_code,
+                        )
+        mock_relaunch.assert_called_once()
+        mock_run.assert_called_once_with()
+        mock_scan.assert_called_once_with()
 
     def test_auto_relaunched_with_reproxy(self) -> None:
         argv = ["--", "clang++", "foo.o", "-o", "foo"]

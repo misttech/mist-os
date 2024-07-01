@@ -14,7 +14,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import List
+from typing import Iterator, Any
 from unittest.mock import patch
 
 # Import the real devshell `fx publish` python implementation.
@@ -22,9 +22,11 @@ import publish
 
 
 @contextmanager
-def patch_cwd(path):
-    assert path and os.path.isdir(path), f"Expected {path} to be a directory."
-    path = Path(path)
+def patch_cwd(dir_path: str) -> Iterator[None]:
+    assert dir_path and os.path.isdir(
+        dir_path
+    ), f"Expected {dir_path} to be a directory."
+    path = Path(dir_path)
     cwd = os.getcwd()
 
     with TemporaryDirectory() as temp_dir:
@@ -49,13 +51,15 @@ def patch_cwd(path):
 
 
 class FxPublishTest(unittest.TestCase):
-    TEST_DIR = None
-    EXPECTED_CACHE_PACKAGES = []
+    TEST_DIR: str | None = None
+    EXPECTED_CACHE_PACKAGES: list[str] = []
 
     def setUp(self) -> None:
-        self.fx_commands = defaultdict(lambda: [])
+        self.fx_commands: defaultdict[str, list[tuple[str, ...]]] = defaultdict(
+            lambda: []
+        )
 
-    def fake_fx_command(self, subcommand: str, *args: str) -> List[str]:
+    def fake_fx_command(self, subcommand: str, *args: str) -> list[str]:
         self.fx_commands[subcommand].append(args)
         return ["true", subcommand, *args]
 
@@ -99,7 +103,8 @@ class FxPublishTest(unittest.TestCase):
                 )
 
     def test_publish_cache(self) -> None:
-        self._test_publish_cache(FxPublishTest.TEST_DIR)
+        self.assertIsNotNone(FxPublishTest.TEST_DIR)
+        self._test_publish_cache(FxPublishTest.TEST_DIR)  # type: ignore[arg-type]
 
 
 def main() -> None:

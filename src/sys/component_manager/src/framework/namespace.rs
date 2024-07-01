@@ -16,7 +16,10 @@ use sandbox::Capability;
 use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
 use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_component as fcomponent, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
+    fuchsia_zircon as zx,
+};
 
 lazy_static! {
     static ref CAPABILITY_NAME: Name = fcomponent::NamespaceMarker::PROTOCOL_NAME.parse().unwrap();
@@ -100,7 +103,11 @@ impl NamespaceCapabilityProvider {
                     break;
                 }
                 for item in items {
-                    let capability: Capability = item.value.try_into().unwrap();
+                    let fsandbox::DictionaryValueResult::Ok(value) = item.value else {
+                        // Capability was not cloneable
+                        return Err(fcomponent::NamespaceError::DictionaryRead);
+                    };
+                    let capability: Capability = value.try_into().unwrap();
                     let path = Path::new(format!("{}/{}", path, item.key))
                         .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
                     namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
@@ -209,6 +216,7 @@ mod tests {
         let (namespace_proxy, _host) = namespace(&root).await;
 
         let mut namespace_pairs = vec![];
+        let mut dicts = vec![];
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
             // Initialize the host and sender/receiver pair.
             let (receiver, sender) = Receiver::new();
@@ -224,7 +232,7 @@ mod tests {
             }));
 
             // Create a dictionary and add the Sender to it.
-            let mut dict = Dict::new();
+            let dict = Dict::new();
             dict.insert(
                 fecho::EchoMarker::DEBUG_NAME.parse().unwrap(),
                 Capability::Connector(sender),
@@ -233,9 +241,9 @@ mod tests {
 
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-            tasks.add(fasync::Task::spawn(async move {
-                dict.serve_dict(stream).await.unwrap();
-            }));
+            dict.serve(stream);
+            // We must do this to keep the dictionaries alive until the namespace is created.
+            dicts.push(dict);
 
             namespace_pairs.push(fcomponent::NamespaceInputEntry {
                 path: path.into(),
@@ -245,6 +253,7 @@ mod tests {
 
         // Convert the dictionaries to a namespace.
         let mut namespace_entries = namespace_proxy.create(namespace_pairs).await.unwrap().unwrap();
+        drop(dicts);
 
         // Confirm that the Sender in the dictionary was converted to a service node, and we
         // can access the Echo protocol (served by the Receiver) through this node.
@@ -272,6 +281,7 @@ mod tests {
 
         // Two entries with a shadowing path.
         let mut namespace_pairs = vec![];
+        let mut dicts = vec![];
         for path in ["/svc", "/svc/shadow"] {
             // Initialize the host and sender/receiver pair.
             let (receiver, sender) = Receiver::new();
@@ -286,7 +296,7 @@ mod tests {
             }));
 
             // Create a dictionary and add the Sender to it.
-            let mut dict = Dict::new();
+            let dict = Dict::new();
             dict.insert(
                 fecho::EchoMarker::DEBUG_NAME.parse().unwrap(),
                 Capability::Connector(sender),
@@ -295,9 +305,9 @@ mod tests {
 
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-            tasks.add(fasync::Task::spawn(async move {
-                dict.serve_dict(stream).await.unwrap();
-            }));
+            dict.serve(stream);
+            // We must do this to keep the dictionaries alive until the namespace is created.
+            dicts.push(dict);
 
             namespace_pairs.push(fcomponent::NamespaceInputEntry {
                 path: path.into(),

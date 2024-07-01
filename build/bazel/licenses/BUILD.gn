@@ -77,8 +77,6 @@ generated_licenses_spdx("all_bazel_inputs_licenses_spdx") {
   ignore_collection_errors = false
 }
 
-bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
-  deps = [ ":all_bazel_inputs_licenses_spdx" ]
-  sources = get_target_outputs(":all_bazel_inputs_licenses_spdx")
-  outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
+bazel_input_file("legacy_ninja_build_outputs_licenses_spdx") {
+  generator = ":all_bazel_inputs_licenses_spdx"
 }

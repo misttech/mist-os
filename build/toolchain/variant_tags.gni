@@ -25,6 +25,16 @@ all_variant_tags = [
   # the `instrumented` tag as well.
   "instrumentation-runtime",
 
+  # The `custom-runtime` tag is used in place of `instrumentation-runtime` when
+  # there is a toolchain-provided runtime library that can't be used in all
+  # environments, but it's also feasible for environments that can't use it to
+  # provide a custom runtime (such as //src/lib/ubsan-custom or the like).
+  # Those environments can exclude `instrumentation-runtime` while accepting
+  # `custom-runtime`, with the expectation that every binary linked in that
+  # environment will need to wire up a custom runtime (or exclude variants with
+  # `custom-runtime` as well).
+  "custom-runtime",
+
   # The `needs-compiler-abi` tag is used for variants with an instrumentation
   # runtime or similar that is built to rely on the Fuchsia Compiler ABI.  This
   # can be omitted if the runtime calls will never be made by non-buggy code.

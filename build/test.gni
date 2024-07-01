@@ -82,6 +82,12 @@ template("test") {
     output_name = _output_name
     testonly = true
 
+    # Exclude tests from tool_paths.json.
+    emit_tool_path = false
+
+    # Exclude tests from tool_paths.json.
+    emit_tool_path = false
+
     if (is_fuchsia || is_mistos) {
       metadata = {
         # Used by the distribution_manifest template.

@@ -3264,12 +3264,12 @@
   authors: ['claridge@google.com']
   file: '0250_power_topology.md'
   area: ['Power']
-  issue: ['']
+  issue: ['337855481']
   gerrit_change_id: ['1004754']
-  status: 'Draft'
+  status: 'Accepted'
   reviewers: ['kgong@google.com', 'mbrunson@google.com', 'jmatt@google.com', 'harshanv@google.com', 'andresoportus@google.com']
   submitted: '2024-03-09'
-  reviewed: ''
+  reviewed: '2024-06-03'
 
 - name: 'RFC-0251'
   title: 'No Root Access'

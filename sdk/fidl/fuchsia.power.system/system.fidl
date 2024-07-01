@@ -60,8 +60,8 @@
 ///
 /// # Usage
 ///
-/// To prevent system suspension, a component can create an active dependency
-/// using the `active_dependency_token` from `ApplicationActivity` or
+/// To prevent system suspension, a component can create an assertive dependency
+/// using the `assertive_dependency_token` from `ApplicationActivity` or
 /// `WakeHandling`. If the dependency causes the power level of
 /// `ApplicationActivity` and/or `WakeHandling` to be raised to
 /// [`fuchsia.power.system/ApplicationActivityPowerLevel.ACTIVE`] and/or
@@ -69,14 +69,14 @@
 /// will not trigger system suspension until their power levels drop to
 /// `INACTIVE`.
 ///
-/// To change the platform resume latency, a component can create an active
-/// dependency using the `active_dependency_token` from
+/// To change the platform resume latency, a component can create an assertive
+/// dependency using the `assertive_dependency_token` from
 /// `ExecutionResumeLatency`. If the dependency causes the power level of
 /// `ExecutionResumeLatency` to be raised, SAG will request a suspend state with
 /// an appropriate resume latency for that power level.
 ///
 /// If a component is managing a power element that requires the platform to be
-/// in a specific state, a passive dependency can be created on
+/// in a specific state, an opportunistic dependency can be created on
 /// `ExecutionState`. When `ExecutionState` changes its power level, all
 /// dependent power elements will power down first. Ideally, this forces the
 /// entire system into a configuration with a lower power consumption as the
@@ -89,23 +89,23 @@ using zx;
 
 /// Holds a token to the execution state power element.
 ///
-/// Power elements intentionally cannot take active dependencies on this power
+/// Power elements intentionally cannot take assertive dependencies on this power
 /// element. Elements that need to force the execution state to ACTIVE can use
 /// ApplicationActivity which provides more semantic meaning to the
 /// dependencies.
 ///
 /// [`fuchsia.power.system/ExecutionStateLevel`] defines the power levels supported by this power element.
 type ExecutionState = resource table {
-    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
+    1: opportunistic_dependency_token fuchsia.power.broker.DependencyToken;
 };
 
 /// Execution state power levels
 ///
-/// Elements should take a passive dependency on `ExecutionStateLevel::ACTIVE`
+/// Elements should take an opportunistic dependency on `ExecutionStateLevel::ACTIVE`
 /// to ensure that the element will be suspended when the rest of the system
 /// suspends.
 ///
-/// Drivers can take a passive dependency on either
+/// Drivers can take an opportunistic dependency on either
 /// `ExecutionStateLevel::WAKE_HANDLING` or `ExecutionStateLevel::ACTIVE` and
 /// request a persistent lease on this state to ensure that their element's
 /// power level is always activated when the system comes out of a suspend
@@ -128,8 +128,8 @@ type ExecutionStateLevel = flexible enum : uint8 {
 /// `resume_latencies` is represented by power level 0, the item at index 1 is
 /// represented by power level 1, and so on.
 type ExecutionResumeLatency = resource table {
-    1: passive_dependency_token fuchsia.power.broker.DependencyToken;
-    2: active_dependency_token fuchsia.power.broker.DependencyToken;
+    1: opportunistic_dependency_token fuchsia.power.broker.DependencyToken;
+    2: assertive_dependency_token fuchsia.power.broker.DependencyToken;
     3: resume_latencies vector<zx.Duration>:MAX;
 };
 
@@ -137,12 +137,12 @@ type ExecutionResumeLatency = resource table {
 ///
 /// [`fuchsia.power.system/FullWakeHandlingLevel`] defines the power levels supported by this power element.
 type FullWakeHandling = resource table {
-    1: active_dependency_token fuchsia.power.broker.DependencyToken;
+    1: assertive_dependency_token fuchsia.power.broker.DependencyToken;
 };
 
 /// Full wake handling power levels
 ///
-/// Driver power elements should take an active dependency on
+/// Driver power elements should take an assertive dependency on
 /// `FullWakeHandlingLevel::ACTIVE` if it expects the system to perform a full
 /// wakeup. While the drivers are handling a wake event, they should request a
 /// lease to pull the state to Active, and drop the release once the event is
@@ -156,12 +156,12 @@ type FullWakeHandlingLevel = flexible enum : uint8 {
 ///
 /// [`fuchsia.power.system/WakeHandlingLevel`] defines the power levels supported by this power element.
 type WakeHandling = resource table {
-    1: active_dependency_token fuchsia.power.broker.DependencyToken;
+    1: assertive_dependency_token fuchsia.power.broker.DependencyToken;
 };
 
 /// Wake handling power levels
 ///
-/// Driver power elements should take an active dependency on
+/// Driver power elements should take an assertive dependency on
 /// `WakeHandlingLevel::ACTIVE` if it does NOT expect the system to
 /// perform a full wakeup. While the drivers are handling a wake event, they
 /// should request a lease to pull the state to Active, and drop the release
@@ -175,12 +175,12 @@ type WakeHandlingLevel = flexible enum : uint8 {
 ///
 /// [`fuchsia.power.system/ApplicationActivityLevel`] defines the power levels supported by this power element.
 type ApplicationActivity = resource table {
-    1: active_dependency_token fuchsia.power.broker.DependencyToken;
+    1: assertive_dependency_token fuchsia.power.broker.DependencyToken;
 };
 
 /// Application activity power levels
 ///
-/// Elements that need to keep the system from suspending should take an active
+/// Elements that need to keep the system from suspending should take an assertive
 /// dependency on `ApplicationActivityLevel::ACTIVE`. When these components are
 /// performing work, they should request a lease to ensure the system remains
 /// active, and drop the lease when they are done.

@@ -44,7 +44,7 @@ use instance::{
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::{Capability, Dict, Open, Request, Routable, Router};
+use sandbox::{Capability, Dict, DirEntry, Request, Routable, Router};
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -206,6 +206,35 @@ pub struct IncomingCapabilities {
 impl Default for IncomingCapabilities {
     fn default() -> Self {
         Self { numbered_handles: Vec::new(), additional_namespace_entries: Vec::new(), dict: None }
+    }
+}
+
+impl TryFrom<fcomponent::StartChildArgs> for IncomingCapabilities {
+    type Error = fcomponent::Error;
+
+    fn try_from(mut args: fcomponent::StartChildArgs) -> Result<Self, Self::Error> {
+        let numbered_handles = args.numbered_handles.take().unwrap_or_default();
+
+        let namespace: namespace::Namespace = args
+            .namespace_entries
+            .take()
+            .unwrap_or_default()
+            .try_into()
+            .map_err(|_| fcomponent::Error::InvalidArguments)?;
+
+        let dict = if let Some(dict_ref) = args.dictionary {
+            let fidl_capability = fsandbox::Capability::Dictionary(dict_ref);
+            let cap = Capability::try_from(fidl_capability)
+                .map_err(|_| fcomponent::Error::InvalidArguments)?;
+            let Capability::Dictionary(dict) = cap else {
+                return Err(fcomponent::Error::InvalidArguments);
+            };
+            Some(dict)
+        } else {
+            None
+        };
+
+        Ok(Self { numbered_handles, additional_namespace_entries: namespace.into(), dict })
     }
 }
 
@@ -477,11 +506,12 @@ impl ComponentInstance {
             .collection_inputs
             .get(&Name::new(&collection_name).unwrap())
             .expect("dict missing for declared collection")
-            .shallow_copy();
+            .shallow_copy()
+            .map_err(|_| AddDynamicChildError::InvalidDictionary)?;
 
         // Merge `ChildArgs.dictionary` entries into the child sandbox.
-        if let Some(dictionary_client_end) = child_args.dictionary {
-            let fidl_capability = fsandbox::Capability::Dictionary(dictionary_client_end);
+        if let Some(dictionary_ref) = child_args.dictionary {
+            let fidl_capability = fsandbox::Capability::Dictionary(dictionary_ref);
             let any: Capability =
                 fidl_capability.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
             let dict = match any {
@@ -937,9 +967,10 @@ impl ComponentInstance {
         }
     }
 
-    /// Returns an [`Open`] representation of the outgoing directory of the component. It performs
-    /// the same checks as `open_outgoing`, but errors are surfaced at the server endpoint.
-    pub fn get_outgoing(self: &Arc<Self>) -> Open {
+    /// Returns a [sandbox::DirEntry] representation of the outgoing directory of the component. It
+    /// performs the same checks as `open_outgoing`, but errors are surfaced at the server
+    /// endpoint.
+    pub fn get_outgoing(self: &Arc<Self>) -> DirEntry {
         struct GetOutgoing {
             component: WeakComponentInstance,
         }
@@ -956,7 +987,7 @@ impl ComponentInstance {
             }
         }
 
-        Open::new(Arc::new(GetOutgoing { component: WeakComponentInstance::from(self) }))
+        DirEntry::new(Arc::new(GetOutgoing { component: WeakComponentInstance::from(self) }))
     }
 
     /// Obtains the program output dict.

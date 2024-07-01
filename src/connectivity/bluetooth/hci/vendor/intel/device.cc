@@ -5,10 +5,9 @@
 #include "device.h"
 
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
-#include <fuchsia/hardware/usb/c/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <fuchsia/hardware/usb/cpp/banjo.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/zx/vmo.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
@@ -21,7 +20,7 @@
 #include "firmware_loader.h"
 #include "logging.h"
 
-namespace btintel {
+namespace bt_hci_intel {
 
 // USB Product IDs that use the "secure" firmware method.
 static constexpr uint16_t sfi_product_ids[] = {
@@ -40,134 +39,203 @@ static constexpr uint16_t legacy_firmware_loading_ids[] = {
     0x0026,  // Harrison Peak (AX201)
 };
 
-Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, bool secure,
-               bool legacy_firmware_loading)
-    : DeviceType(device),
+Device::Device(fdf::DriverStartArgs start_args,
+               fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : DriverBase("bt-hci-intel", std::move(start_args), std::move(driver_dispatcher)),
       devfs_connector_(fit::bind_member<&Device::Connect>(this)),
-      hci_(hci),
-      secure_(secure),
-      firmware_loaded_(false),
-      legacy_firmware_loading_(legacy_firmware_loading) {}
+      node_(fidl::WireClient(std::move(node()), dispatcher())),
+      firmware_loaded_(false) {}
 
-zx_status_t Device::bt_intel_bind(void* ctx, zx_device_t* device) {
-  tracef("bind\n");
+void Device::Start(fdf::StartCompleter completer) {
+  zx::result<ddk::UsbProtocolClient> usb_client =
+      compat::ConnectBanjo<ddk::UsbProtocolClient>(incoming());
 
-  usb_protocol_t usb;
-  zx_status_t result = device_get_protocol(device, ZX_PROTOCOL_USB, &usb);
-  if (result != ZX_OK) {
-    errorf("couldn't get USB protocol: %s\n", zx_status_get_string(result));
-    return result;
+  if (usb_client.is_error()) {
+    errorf("Failed to connect usb client: %s", usb_client.status_string());
+    completer(zx::error(usb_client.status_value()));
+    return;
   }
+  ddk::UsbProtocolClient usb = *usb_client;
 
   usb_device_descriptor_t dev_desc;
-  usb_get_device_descriptor(&usb, &dev_desc);
+  usb.GetDeviceDescriptor(&dev_desc);
 
   // Whether this device uses the "secure" firmware method.
-  bool secure = false;
   for (uint16_t id : sfi_product_ids) {
     if (dev_desc.id_product == id) {
-      secure = true;
+      secure_ = true;
       break;
     }
   }
 
   // Whether this device uses the "legacy" firmware loading method.
-  bool legacy_firmware_loading = false;
   for (uint16_t id : legacy_firmware_loading_ids) {
     if (dev_desc.id_product == id) {
-      legacy_firmware_loading = true;
+      legacy_firmware_loading_ = true;
       break;
     }
   }
 
-  bt_hci_protocol_t hci;
-  result = device_get_protocol(device, ZX_PROTOCOL_BT_HCI, &hci);
-  if (result != ZX_OK) {
-    errorf("couldn't get BT_HCI protocol: %s\n", zx_status_get_string(result));
-    return result;
+  zx::result<ddk::BtHciProtocolClient> hci_client =
+      compat::ConnectBanjo<ddk::BtHciProtocolClient>(incoming());
+
+  if (hci_client.is_error()) {
+    errorf("Failed to connect hci client: %s", hci_client.status_string());
+    completer(zx::error(hci_client.status_value()));
+    return;
+  }
+  hci_ = *hci_client;
+
+  if (zx_status_t status = Init(secure_); status != ZX_OK) {
+    errorf("Initialization failed: %s", zx_status_get_string(status));
+    completer(zx::error(status));
+    return;
   }
 
-  auto btdev = new btintel::Device(device, &hci, secure, legacy_firmware_loading);
-  result = btdev->Bind();
-  if (result != ZX_OK) {
-    errorf("failed binding device: %s\n", zx_status_get_string(result));
-    delete btdev;
-    return result;
+  completer(zx::ok());
+}
+
+void Device::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
+
+zx_status_t Device::AddNode() {
+  zx::result connector = devfs_connector_.Bind(dispatcher());
+  if (connector.is_error()) {
+    errorf("Failed to bind devfs connecter to dispatcher: %s", connector.status_string());
+    return connector.error_value();
   }
-  // Bind succeeded and devmgr is now responsible for releasing |btdev|
-  // The device's init hook will load the firmware.
+
+  fidl::Arena args_arena;
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(args_arena)
+                   .connector(std::move(connector.value()))
+                   .class_name("bt-hci")
+                   .Build();
+
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
+                  .name("bt-hci-intel")
+                  .devfs_args(devfs)
+                  .Build();
+
+  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (controller_endpoints.is_error()) {
+    errorf("Create node controller end points failed: %s",
+           zx_status_get_string(controller_endpoints.error_value()));
+    return controller_endpoints.error_value();
+  }
+
+  // Create the endpoints of fuchsia_driver_framework::Node protocol for the child node, and hold
+  // the client end of it, because no driver will bind to the child node.
+  auto child_node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  if (child_node_endpoints.is_error()) {
+    errorf("Create child node end points failed: %s",
+           zx_status_get_string(child_node_endpoints.error_value()));
+    return child_node_endpoints.error_value();
+  }
+
+  auto result = node_.sync()->AddChild(args, std::move(controller_endpoints->server),
+                                       std::move(child_node_endpoints->server));
+
+  if (!result.ok()) {
+    errorf("Failed to add bt-hci-intel node, FIDL error: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    errorf("Failed to add bt-hci-intel node: %u", static_cast<uint32_t>(result->error_value()));
+    return ZX_ERR_INTERNAL;
+  }
+
+  child_node_.Bind(std::move(child_node_endpoints->client), dispatcher(), this);
+  node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
   return ZX_OK;
 }
 
-zx_status_t Device::Bind() {
-  ddk::DeviceAddArgs args("bt-hci-intel");
-  args.set_flags(DEVICE_ADD_NON_BINDABLE);
-  return DdkAdd(args);
-}
-
-void Device::DdkInit(ddk::InitTxn init_txn) {
-  init_thread_ = std::thread(
-      [this, txn = std::move(init_txn)]() mutable { LoadFirmware(std::move(txn), secure_); });
-}
-
-zx_status_t Device::LoadFirmware(ddk::InitTxn init_txn, bool secure) {
-  infof("LoadFirmware(secure: %s, firmware_loading: %s)", (secure ? "yes" : "no"),
+zx_status_t Device::Init(bool secure) {
+  infof("Init(secure: %s, firmware_loading: %s)", (secure_ ? "yes" : "no"),
         (legacy_firmware_loading_ ? "legacy" : "new"));
 
   // TODO(armansito): Track metrics for initialization failures.
 
   zx_status_t status;
-  zx::channel our_cmd, their_cmd, our_acl, their_acl;
-  status = zx::channel::create(0, &our_cmd, &their_cmd);
+  zx::channel their_cmd, their_acl;
+  status = zx::channel::create(0, &cmd_, &their_cmd);
   if (status != ZX_OK) {
-    return InitFailed(std::move(init_txn), status, "failed to create command channel");
+    return InitFailed(status, "failed to create command channel");
   }
-  status = zx::channel::create(0, &our_acl, &their_acl);
+  status = zx::channel::create(0, &acl_, &their_acl);
   if (status != ZX_OK) {
-    return InitFailed(std::move(init_txn), status, "failed to create ACL channel");
+    return InitFailed(status, "failed to create ACL channel");
   }
 
   // Get the channels
   status = BtHciOpenCommandChannel(std::move(their_cmd));
   if (status != ZX_OK) {
-    return InitFailed(std::move(init_txn), status, "failed to bind command channel");
+    return InitFailed(status, "failed to bind command channel");
   }
 
   status = BtHciOpenAclDataChannel(std::move(their_acl));
   if (status != ZX_OK) {
-    return InitFailed(std::move(init_txn), status, "failed to bind ACL channel");
+    return InitFailed(status, "failed to bind ACL channel");
   }
 
-  if (secure) {
-    status = LoadSecureFirmware(&our_cmd, &our_acl);
+  if (secure_) {
+    status = LoadSecureFirmware();
   } else {
-    status = LoadLegacyFirmware(&our_cmd, &our_acl);
+    status = LoadLegacyFirmware();
   }
 
   if (status != ZX_OK) {
-    return InitFailed(std::move(init_txn), status, "failed to initialize controller");
+    return InitFailed(status, "failed to initialize controller");
   }
 
   firmware_loaded_ = true;
-  init_txn.Reply(ZX_OK);  // This will make the device visible and able to be unbound.
-  return ZX_OK;
+
+  return AddNode();
 }
 
-zx_status_t Device::InitFailed(ddk::InitTxn init_txn, zx_status_t status, const char* note) {
+zx_status_t Device::InitFailed(zx_status_t status, const char* note) {
   errorf("%s: %s", note, zx_status_get_string(status));
-  init_txn.Reply(status);
   return status;
 }
+
+constexpr auto kOpenFlags =
+    fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kNotDirectory;
 
 zx_handle_t Device::MapFirmware(const char* name, uintptr_t* fw_addr, size_t* fw_size) {
   zx_handle_t vmo = ZX_HANDLE_INVALID;
   size_t size;
-  zx_status_t status = load_firmware(zxdev(), name, &vmo, &size);
-  if (status != ZX_OK) {
-    errorf("failed to load firmware '%s': %s", name, zx_status_get_string(status));
+  std::string fw_path = "/pkg/lib/firmware/";
+  fw_path.append(name);
+  auto client = incoming()->Open<fuchsia_io::File>(fw_path.c_str(), kOpenFlags);
+  if (client.is_error()) {
+    warnf("Open firmware file failed: %s", zx_status_get_string(client.error_value()));
     return ZX_HANDLE_INVALID;
   }
-  status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, fw_addr);
+
+  fidl::WireResult backing_memory_result =
+      fidl::WireCall(*client)->GetBackingMemory(fuchsia_io::wire::VmoFlags::kRead);
+  if (!backing_memory_result.ok()) {
+    if (backing_memory_result.is_peer_closed()) {
+      warnf("Failed to get backing memory: Peer closed");
+      return ZX_HANDLE_INVALID;
+    }
+    warnf("Failed to get backing memory: %s", zx_status_get_string(backing_memory_result.status()));
+    return ZX_HANDLE_INVALID;
+  }
+
+  const auto* backing_memory = backing_memory_result.Unwrap();
+  if (backing_memory->is_error()) {
+    warnf("Failed to get backing memory: %s", zx_status_get_string(backing_memory->error_value()));
+    return ZX_HANDLE_INVALID;
+  }
+
+  zx::vmo& backing_vmo = backing_memory->value()->vmo;
+  if (zx_status_t status = backing_vmo.get_prop_content_size(&size); status != ZX_OK) {
+    warnf("Failed to get vmo size: %s", zx_status_get_string(status));
+    return ZX_HANDLE_INVALID;
+  }
+  vmo = backing_vmo.release();
+
+  zx_status_t status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, fw_addr);
   if (status != ZX_OK) {
     errorf("firmware map failed: %s", zx_status_get_string(status));
     return ZX_HANDLE_INVALID;
@@ -176,35 +244,11 @@ zx_handle_t Device::MapFirmware(const char* name, uintptr_t* fw_addr, size_t* fw
   return vmo;
 }
 
-void Device::DdkUnbind(ddk::UnbindTxn txn) {
-  tracef("unbind");
-  txn.Reply();
-}
-
-void Device::DdkRelease() {
-  if (init_thread_.joinable()) {
-    init_thread_.join();
-  }
-  delete this;
-}
-
-zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
-  if (proto_id != ZX_PROTOCOL_BT_HCI) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  bt_hci_protocol_t* hci_proto = static_cast<bt_hci_protocol_t*>(out_proto);
-
-  // Forward the underlying bt-transport ops.
-  hci_.GetProto(hci_proto);
-
-  return ZX_OK;
-}
-
 void Device::OpenCommandChannel(OpenCommandChannelRequestView request,
                                 OpenCommandChannelCompleter::Sync& completer) {
   if (zx_status_t status = BtHciOpenCommandChannel(std::move(request->channel)); status != ZX_OK) {
     completer.ReplyError(status);
+    return;
   }
   completer.ReplySuccess();
 }
@@ -212,6 +256,7 @@ void Device::OpenAclDataChannel(OpenAclDataChannelRequestView request,
                                 OpenAclDataChannelCompleter::Sync& completer) {
   if (zx_status_t status = BtHciOpenAclDataChannel(std::move(request->channel)); status != ZX_OK) {
     completer.ReplyError(status);
+    return;
   }
   completer.ReplySuccess();
 }
@@ -237,13 +282,14 @@ void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
                               OpenSnoopChannelCompleter::Sync& completer) {
   if (zx_status_t status = BtHciOpenSnoopChannel(std::move(request->channel)); status != ZX_OK) {
     completer.ReplyError(status);
+    return;
   }
   completer.ReplySuccess();
 }
 void Device::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  zxlogf(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  errorf("Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -254,7 +300,7 @@ void Device::EncodeCommand(EncodeCommandRequestView request,
 void Device::OpenHci(OpenHciCompleter::Sync& completer) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
   if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
+    errorf("Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
     completer.ReplyError(endpoints.error_value());
     return;
   }
@@ -266,7 +312,7 @@ void Device::OpenHci(OpenHciCompleter::Sync& completer) {
 void Device::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  zxlogf(ERROR, "Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
+  errorf("Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -283,16 +329,16 @@ void Device::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request
         fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
 
         if (status.status() != ZX_OK) {
-          zxlogf(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
+          errorf("Failed to send vendor features to bt-host: %s", status.status_string());
         }
       });
 }
 
-zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
-  ZX_DEBUG_ASSERT(cmd);
-  ZX_DEBUG_ASSERT(acl);
+zx_status_t Device::LoadSecureFirmware() {
+  ZX_DEBUG_ASSERT(cmd_.is_valid());
+  ZX_DEBUG_ASSERT(acl_.is_valid());
 
-  VendorHci hci(cmd);
+  VendorHci hci(&cmd_);
 
   // Bring the controller to a well-defined default state.
   // Send an initial reset. If the controller sends a "command not supported"
@@ -309,9 +355,9 @@ zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
   // Newer Intel controllers that use the "secure send" method can send HCI
   // events over the bulk endpoint. Enable this before sending the initial
   // ReadVersion command.
-  hci.enable_events_on_bulk(acl);
+  hci.enable_events_on_bulk(&acl_);
 
-  btintel::SecureBootEngineType engine_type = btintel::SecureBootEngineType::kRSA;
+  bt_hci_intel::SecureBootEngineType engine_type = bt_hci_intel::SecureBootEngineType::kRSA;
 
   fbl::String fw_filename;
   if (legacy_firmware_loading_) {
@@ -344,8 +390,9 @@ zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
   } else {
     ReadVersionReturnParamsTlv version = hci.SendReadVersionTlv();
 
-    engine_type = (version.secure_boot_engine_type == 0x01) ? btintel::SecureBootEngineType::kECDSA
-                                                            : btintel::SecureBootEngineType::kRSA;
+    engine_type = (version.secure_boot_engine_type == 0x01)
+                      ? bt_hci_intel::SecureBootEngineType::kECDSA
+                      : bt_hci_intel::SecureBootEngineType::kRSA;
 
     // If we're already in firmware mode, we're done.
     if (version.current_mode_of_operation == kCurrentModeOfOperationOperationalFirmware) {
@@ -365,7 +412,7 @@ zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  FirmwareLoader loader(cmd, acl);
+  FirmwareLoader loader(&cmd_, &acl_);
 
   // The boot addr differs for different firmware.  Save it for later.
   uint32_t boot_addr = 0x00000000;
@@ -383,11 +430,11 @@ zx_status_t Device::LoadSecureFirmware(zx::channel* cmd, zx::channel* acl) {
   return ZX_OK;
 }
 
-zx_status_t Device::LoadLegacyFirmware(zx::channel* cmd, zx::channel* acl) {
-  ZX_DEBUG_ASSERT(cmd);
-  ZX_DEBUG_ASSERT(acl);
+zx_status_t Device::LoadLegacyFirmware() {
+  ZX_DEBUG_ASSERT(cmd_.is_valid());
+  ZX_DEBUG_ASSERT(acl_.is_valid());
 
-  VendorHci hci(cmd);
+  VendorHci hci(&cmd_);
 
   // Bring the controller to a well-defined default state.
   auto hci_status = hci.SendHciReset();
@@ -430,7 +477,7 @@ zx_status_t Device::LoadLegacyFirmware(zx::channel* cmd, zx::channel* acl) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  FirmwareLoader loader(cmd, acl);
+  FirmwareLoader loader(&cmd_, &acl_);
   hci.EnterManufacturerMode();
   auto result = loader.LoadBseq(reinterpret_cast<void*>(fw_addr), fw_size);
   hci.ExitManufacturerMode(result == FirmwareLoader::LoadStatus::kPatched
@@ -475,13 +522,6 @@ zx_status_t Device::BtHciOpenSnoopChannel(zx::channel in) {
   return hci_.OpenSnoopChannel(std::move(in));
 }
 
-static constexpr zx_driver_ops_t btintel_driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = btintel::Device::bt_intel_bind;
-  return ops;
-}();
+}  // namespace bt_hci_intel
 
-}  // namespace btintel
-
-ZIRCON_DRIVER(bt_hci_intel, btintel::btintel_driver_ops, "fuchsia", "0.1");
+FUCHSIA_DRIVER_EXPORT(bt_hci_intel::Device);

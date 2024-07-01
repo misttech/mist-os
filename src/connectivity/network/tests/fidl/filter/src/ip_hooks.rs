@@ -20,7 +20,7 @@ use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use heck::SnakeCase as _;
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6};
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::SpecifiedAddr;
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
@@ -46,6 +46,7 @@ use crate::matchers::{
 macro_rules! __generate_test_cases_for_all_matchers_inner {
     ($test:item) => {
         #[netstack_test]
+        #[variant(I, Ip)]
         #[test_case(AllTraffic; "all traffic")]
         #[test_case(InterfaceId; "incoming interface id")]
         #[test_case(InterfaceName; "incoming interface name")]
@@ -77,7 +78,7 @@ macro_rules! generate_test_cases_for_all_matchers {
     ($test:ident) => {
         paste::paste! {
             __generate_test_cases_for_all_matchers_inner! {
-                async fn [<$test _>]<I: net_types::ip::Ip + TestIpExt + RouterTestIpExt, M: Matcher>(
+                async fn [<$test _>]<I: TestIpExt + RouterTestIpExt, M: Matcher>(
                     name: &str,
                     matcher: M,
                 ) {
@@ -91,7 +92,7 @@ macro_rules! generate_test_cases_for_all_matchers {
     ($test:ident, $hook:expr, $suffix:ident) => {
         paste::paste! {
             __generate_test_cases_for_all_matchers_inner! {
-                async fn [<$test _ $suffix>]<I: net_types::ip::Ip + TestIpExt + RouterTestIpExt, M: Matcher>(
+                async fn [<$test _ $suffix>]<I: TestIpExt + RouterTestIpExt, M: Matcher>(
                     name: &str,
                     matcher: M,
                 ) {
@@ -626,14 +627,14 @@ struct SockAddrsIpSpecific<I: ping::IpExt> {
 
 impl<I: ping::IpExt> From<SockAddrs> for SockAddrsIpSpecific<I> {
     fn from(sock_addrs: SockAddrs) -> Self {
-        I::map_ip(
-            IpInvariant(sock_addrs),
-            |IpInvariant(SockAddrs { client, server })| {
+        I::map_ip_out(
+            sock_addrs,
+            |SockAddrs { client, server }| {
                 let client = assert_matches!(client, std::net::SocketAddr::V4(addr) => addr);
                 let server = assert_matches!(server, std::net::SocketAddr::V4(addr) => addr);
                 SockAddrsIpSpecific { client, server }
             },
-            |IpInvariant(SockAddrs { client, server })| {
+            |SockAddrs { client, server }| {
                 let client = assert_matches!(client, std::net::SocketAddr::V6(addr) => addr);
                 let server = assert_matches!(server, std::net::SocketAddr::V6(addr) => addr);
                 SockAddrsIpSpecific { client, server }
@@ -1009,11 +1010,7 @@ enum IncomingHook {
     LocalIngress,
 }
 
-async fn drop_incoming<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
-    name: &str,
-    hook: IncomingHook,
-    matcher: M,
-) {
+async fn drop_incoming<I: TestIpExt, M: Matcher>(name: &str, hook: IncomingHook, matcher: M) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
@@ -1124,11 +1121,7 @@ enum OutgoingHook {
     Egress,
 }
 
-async fn drop_outgoing<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
-    name: &str,
-    hook: OutgoingHook,
-    matcher: M,
-) {
+async fn drop_outgoing<I: TestIpExt, M: Matcher>(name: &str, hook: OutgoingHook, matcher: M) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
@@ -1686,10 +1679,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
     }
 }
 
-async fn forwarded_traffic_skips_local_ingress<
-    I: net_types::ip::Ip + RouterTestIpExt,
-    M: Matcher,
->(
+async fn forwarded_traffic_skips_local_ingress<I: RouterTestIpExt, M: Matcher>(
     name: &str,
     hook: IncomingHook,
     matcher: M,
@@ -1767,10 +1757,7 @@ generate_test_cases_for_all_matchers!(
     local_ingress
 );
 
-async fn forwarded_traffic_skips_local_egress<
-    I: net_types::ip::Ip + RouterTestIpExt,
-    M: Matcher,
->(
+async fn forwarded_traffic_skips_local_egress<I: RouterTestIpExt, M: Matcher>(
     name: &str,
     hook: OutgoingHook,
     matcher: M,
@@ -1849,10 +1836,7 @@ generate_test_cases_for_all_matchers!(
     egress
 );
 
-async fn drop_forwarded<I: net_types::ip::Ip + RouterTestIpExt, M: Matcher>(
-    name: &str,
-    matcher: M,
-) {
+async fn drop_forwarded<I: RouterTestIpExt, M: Matcher>(name: &str, matcher: M) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
 
@@ -1896,10 +1880,7 @@ async fn drop_forwarded<I: net_types::ip::Ip + RouterTestIpExt, M: Matcher>(
 
 generate_test_cases_for_all_matchers!(drop_forwarded);
 
-async fn local_traffic_skips_forwarding<I: net_types::ip::Ip + RouterTestIpExt, M: Matcher>(
-    name: &str,
-    matcher: M,
-) {
+async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &str, matcher: M) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
 

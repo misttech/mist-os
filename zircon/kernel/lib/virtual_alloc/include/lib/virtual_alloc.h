@@ -58,6 +58,11 @@ class VirtualAlloc {
   // FreePages(X + PAGE_SIZE, 1).
   void FreePages(vaddr_t vaddr, size_t pages);
 
+  // Returns whether or not the allocator will attempt to optimize large allocations with
+  // contiguous allocations and mappings that can get promoted to large pages. It does not guarantee
+  // that it will succeed at doing this though.
+  bool CanAttemptContiguousMappings() const;
+
   // Returns the number of pages allocated to provide the bitmap for tracking allocations. Exposed
   // as a debug named function as there is no promise that it has to be a bitmap for tracking and
   // this interface is likely to change and should only be used for debugging.

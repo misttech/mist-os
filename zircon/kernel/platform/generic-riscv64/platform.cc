@@ -14,7 +14,6 @@
 #include <lib/crashlog.h>
 #include <lib/debuglog.h>
 #include <lib/jtrace/jtrace.h>
-#include <lib/memory_limit.h>
 #include <lib/persistent-debuglog.h>
 #include <lib/system-topology.h>
 #include <lib/zbi-format/memory.h>
@@ -499,32 +498,8 @@ void platform_early_init() {
           ramdisk_end_phys - 1);
   boot_reserve_add_range(ramdisk_start_phys, ramdisk_end_phys - ramdisk_start_phys);
 
-  // check if a memory limit was passed in via kernel.memory-limit-mb and
-  // find memory ranges to use if one is found.
-  zx_status_t status = memory_limit_init();
-  bool have_limit = (status == ZX_OK);
   for (size_t i = 0; i < arena_count; i++) {
-    if (have_limit) {
-      // Figure out and add arenas based on the memory limit and our range of DRAM
-      status = memory_limit_add_range(mem_arena[i].base, mem_arena[i].size, mem_arena[i]);
-    }
-
-    // If no memory limit was found, or adding arenas from the range failed, then add
-    // the existing global arena.
-    if (!have_limit || status != ZX_OK) {
-      // Init returns not supported if no limit exists
-      if (status != ZX_ERR_NOT_SUPPORTED) {
-        dprintf(INFO, "memory limit lib returned an error (%d), falling back to defaults\n",
-                status);
-      }
-      pmm_add_arena(&mem_arena[i]);
-    }
-  }
-
-  // add any pending memory arenas the memory limit library has pending
-  if (have_limit) {
-    status = memory_limit_add_arenas(mem_arena[0]);
-    DEBUG_ASSERT(status == ZX_OK);
+    pmm_add_arena(&mem_arena[i]);
   }
 
   // tell the boot allocator to mark ranges we've reserved as off limits

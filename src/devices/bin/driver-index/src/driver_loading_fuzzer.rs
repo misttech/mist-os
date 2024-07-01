@@ -100,7 +100,7 @@ mod tests {
         )
         .unwrap();
         ResolvedDriver {
-            component_url: url::Url::parse(
+            component_url: cm_types::Url::new(
                 &format!("fuchsia-boot:///#meta/{}.cm", name).to_owned(),
             )
             .unwrap(),

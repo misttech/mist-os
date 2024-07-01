@@ -4,7 +4,8 @@
 
 //! Declare types related to the per-socket filters of raw IP sockets.
 
-use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use core::fmt::{self, Display};
+use net_types::ip::{GenericOverIp, Ip, IpVersion, IpVersionMarker};
 use packet_formats::icmp::IcmpIpExt;
 
 /// An ICMP filter installed on a raw IP socket.
@@ -49,9 +50,45 @@ impl<I: IcmpIpExt> RawIpSocketIcmpFilter<I> {
         let byte: u8 = message_type / 8;
         let bit: u8 = message_type % 8;
         // NB: message_type has a max value of 255 (u8::MAX); once divided by 8
-        // it's maximum value becomes 31, so `byte` cannot exceed the array
+        // its maximum value becomes 31, so `byte` cannot exceed the array
         // bounds on `self.filter`, which has a length of 32.
         (self.filter[usize::from(byte)] & (1 << bit)) == 0
+    }
+
+    /// Set whether the given message type is allowed.
+    #[cfg(test)]
+    fn set_type(&mut self, message_type: u8, allow: bool) {
+        let byte: u8 = message_type / 8;
+        let bit: u8 = message_type % 8;
+        // NB: message_type has a max value of 255 (u8::MAX); once divided by 8
+        // its maximum value becomes 31, so `byte` cannot exceed the array
+        // bounds on `self.filter`, which has a length of 32.
+        match allow {
+            true => self.filter[usize::from(byte)] &= !(1 << bit),
+            false => self.filter[usize::from(byte)] |= 1 << bit,
+        }
+    }
+}
+
+impl<I: IcmpIpExt> Display for RawIpSocketIcmpFilter<I> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let iter = (0..=u8::MAX).filter_map(|i| {
+            let message_type = I::IcmpMessageType::try_from(i).ok()?;
+            self.allows_type(message_type).then_some(message_type)
+        });
+
+        match I::VERSION {
+            IpVersion::V4 => write!(f, "AllowedIcmpMessageTypes [")?,
+            IpVersion::V6 => write!(f, "AllowedIcmpv6MessageTypes [")?,
+        }
+        for (i, message_type) in iter.enumerate() {
+            if i == 0 {
+                write!(f, "\"{message_type:?}\"")?;
+            } else {
+                write!(f, ", \"{message_type:?}\"")?;
+            }
+        }
+        write!(f, "]")
     }
 }
 
@@ -59,8 +96,12 @@ impl<I: IcmpIpExt> RawIpSocketIcmpFilter<I> {
 mod tests {
     use super::*;
 
+    use alloc::string::{String, ToString as _};
+    use alloc::vec::Vec;
+    use alloc::{format, vec};
     use ip_test_macro::ip_test;
     use net_types::ip::{Ipv4, Ipv6};
+    use packet_formats::icmp::{Icmpv4MessageType, Icmpv6MessageType};
     use test_case::test_case;
 
     /// Builds a filter to precisely allow/disallow a given message type.
@@ -72,10 +113,12 @@ mod tests {
         message_type: u8,
         allow: bool,
     ) -> RawIpSocketIcmpFilter<I> {
-        let fill_byte: u8 = allow.then_some(u8::MAX).unwrap_or(0);
-        let mut raw_filter = [fill_byte; 32];
-        raw_filter[usize::from(message_type / 8)] = fill_byte ^ (1 << (message_type % 8));
-        RawIpSocketIcmpFilter::new(raw_filter)
+        let mut filter = match allow {
+            true => RawIpSocketIcmpFilter::<I>::DENY_ALL,
+            false => RawIpSocketIcmpFilter::<I>::ALLOW_ALL,
+        };
+        filter.set_type(message_type, allow);
+        filter
     }
 
     // NB: the test helper is complex enough to warrant a test of it's own.
@@ -98,7 +141,7 @@ mod tests {
 
     #[ip_test(I)]
     fn icmp_filter_allows_type<I: IcmpIpExt>() {
-        for i in 0..u8::MAX {
+        for i in 0..=u8::MAX {
             match I::IcmpMessageType::try_from(i) {
                 // This isn't a valid message type; skip testing it.
                 Err(_) => continue,
@@ -110,5 +153,33 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test_case(vec![] => "AllowedIcmpMessageTypes []".to_string(); "deny_all")]
+    #[test_case(vec![Icmpv4MessageType::EchoRequest] =>
+        "AllowedIcmpMessageTypes [\"Echo Request\"]".to_string(); "allow_echo_request")]
+    #[test_case(vec![Icmpv4MessageType::EchoReply, Icmpv4MessageType::EchoRequest] =>
+        "AllowedIcmpMessageTypes [\"Echo Reply\", \"Echo Request\"]".to_string();
+        "allow_echo_request_and_reply")]
+    fn icmpv4_filter_display(allowed_types: Vec<Icmpv4MessageType>) -> String {
+        let mut filter = RawIpSocketIcmpFilter::<Ipv4>::DENY_ALL;
+        for allowed_type in allowed_types {
+            filter.set_type(allowed_type.into(), true);
+        }
+        format!("{filter}")
+    }
+
+    #[test_case(vec![] => "AllowedIcmpv6MessageTypes []".to_string(); "deny_all")]
+    #[test_case(vec![Icmpv6MessageType::EchoRequest] =>
+        "AllowedIcmpv6MessageTypes [\"Echo Request\"]".to_string(); "allow_echo_request")]
+    #[test_case(vec![Icmpv6MessageType::EchoRequest, Icmpv6MessageType::EchoReply] =>
+        "AllowedIcmpv6MessageTypes [\"Echo Request\", \"Echo Reply\"]".to_string();
+        "allow_echo_request_and_reply")]
+    fn icmpv6_filter_display(allowed_types: Vec<Icmpv6MessageType>) -> String {
+        let mut filter = RawIpSocketIcmpFilter::<Ipv6>::DENY_ALL;
+        for allowed_type in allowed_types {
+            filter.set_type(allowed_type.into(), true);
+        }
+        format!("{filter}")
     }
 }

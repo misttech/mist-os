@@ -74,7 +74,7 @@ type StartChildArgs = resource table {
 
     /// A dictionary that contains extra capabilities for the component instance.
     @available(added=HEAD)
-    3: dictionary client_end:fuchsia.component.sandbox.Dictionary;
+    3: dictionary fuchsia.component.sandbox.DictionaryRef;
 };
 
 @available(added=14, replaced=18)

@@ -62,11 +62,6 @@ struct Errno {
 zx_status_t fdio_wait(const fdio_ptr& io, uint32_t events, zx::time deadline,
                       uint32_t* out_pending);
 
-// Possibly return an owned fdio_t corresponding to either the root,
-// the cwd, or, for the ...at variants, dirfd. In the absolute path
-// case, in_out_path is also adjusted.
-fdio_ptr fdio_iodir(int dirfd, std::string_view& in_out_path);
-
 // Validates a |path| argument.
 //
 // Returns ZX_OK if |path| is non-null and less than |PATH_MAX| in length
@@ -167,8 +162,8 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   // |ioflag| contains mutable properties of this object, shared by
   // different transports. Possible values are |IOFLAG_*| in private.h.
   //
-  // TODO(https://fxbug.dev/42155608): The value of this field is not preserved when fdio_fd_transfer
-  // is used.
+  // TODO(https://fxbug.dev/42155608): The value of this field is not preserved when
+  // fdio_fd_transfer is used.
   uint32_t& ioflag() { return ioflag_; }
 
   // The zxio object, if the zxio transport is selected in |ops|.

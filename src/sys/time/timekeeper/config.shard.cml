@@ -69,5 +69,8 @@
         // If set, Timekeeper will serve test-only protocols such as
         // `fuchsia.time.test/RTC`.
         serve_test_protocols: { type: "bool" },
+
+        // Set if the underlying board has a real time clock (RTC) device.
+        has_real_time_clock: { type: "bool" },
     },
 }

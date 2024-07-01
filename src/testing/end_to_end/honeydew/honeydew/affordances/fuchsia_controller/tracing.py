@@ -290,7 +290,7 @@ class Tracing(tracing.Tracing):
             terminate_result = controller_terminate_tracing_response["result"]
             provider_stats = terminate_result.provider_stats
             for p in provider_stats:
-                if p.records_dropped < 0:
+                if p.records_dropped and p.records_dropped > 0:
                     _LOGGER.warning(
                         "%s records were dropped for %s!",
                         p.records_dropped,

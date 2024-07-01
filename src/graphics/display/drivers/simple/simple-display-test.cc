@@ -10,7 +10,8 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/fit/defer.h>
 #include <lib/zx/object.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -26,6 +27,8 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
+
+namespace simple_display {
 
 namespace {
 
@@ -147,7 +150,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    zxlogf(ERROR, "%s not implemented", name.c_str());
+    FDF_LOG(ERROR, "%s not implemented", name.c_str());
     EXPECT_TRUE(false);
   }
 
@@ -229,6 +232,18 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
+class SimpleDisplayTest : public ::testing::Test {
+ public:
+  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
+  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
+
+ private:
+  // TODO(https://fxbug.dev/348954412): Create a logger that connects to the
+  // component LogSink service.
+  fdf::Logger logger_{"test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>{}};
+};
+
 void ExpectHandlesArePaired(zx_handle_t lhs, zx_handle_t rhs) {
   auto [lhs_koid, lhs_related_koid] = fsl::GetKoids(lhs);
   auto [rhs_koid, rhs_related_koid] = fsl::GetKoids(rhs);
@@ -247,7 +262,7 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
   return ExpectHandlesArePaired(lhs->get(), rhs->get());
 }
 
-TEST(SimpleDisplay, ImportBufferCollection) {
+TEST_F(SimpleDisplayTest, ImportBufferCollection) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{}, 0);
   FakeMmio fake_mmio;
@@ -260,14 +275,19 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   ASSERT_TRUE(sysmem_client_result.is_ok());
   auto& sysmem_client = sysmem_client_result.value();
 
-  constexpr uint32_t kWidth = 800;
-  constexpr uint32_t kHeight = 600;
-  constexpr uint32_t kStride = 800;
+  constexpr int32_t kWidthPx = 800;
+  constexpr int32_t kHeightPx = 600;
+  constexpr int32_t kStridePx = 800;
   constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
+  constexpr DisplayProperties kDisplayProperties = {
+      .width_px = kWidthPx,
+      .height_px = kHeightPx,
+      .row_stride_px = kStridePx,
+      .pixel_format = kPixelFormat,
+  };
 
-  SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(hardware_sysmem_client)),
-                        std::move(sysmem_client), fake_mmio.MmioBuffer(), kWidth, kHeight, kStride,
-                        kPixelFormat);
+  SimpleDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
+                        std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
 
   auto token1_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
@@ -325,14 +345,22 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   loop.Shutdown();
 }
 
-TEST(SimpleDisplay, ImportKernelFramebufferImage) {
-  constexpr uint32_t kWidth = 800;
-  constexpr uint32_t kHeight = 600;
-  constexpr uint32_t kStride = 800;
+TEST_F(SimpleDisplayTest, ImportKernelFramebufferImage) {
+  // TODO(https://fxbug.dev/348954412): Create a logger that connects to the
+  // component LogSink service.
+  fdf::Logger logger("test", FUCHSIA_LOG_DEBUG, zx::socket{},
+                     fidl::WireClient<fuchsia_logger::LogSink>{});
+  fdf::Logger::SetGlobalInstance(&logger);
+  fit::deferred_action unset_global_instance =
+      fit::defer([&] { fdf::Logger::SetGlobalInstance(nullptr); });
+
+  constexpr int32_t kWidthPx = 800;
+  constexpr int32_t kHeightPx = 600;
+  constexpr int32_t kStridePx = 800;
   constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
   constexpr size_t kBytesPerPixel = 4;
   const uint64_t kBanjoCollectionId = 1u;
-  constexpr size_t kImageBytes = uint64_t{kStride} * kHeight * kBytesPerPixel;
+  constexpr size_t kImageBytes = uint64_t{kStridePx} * kHeightPx * kBytesPerPixel;
 
   // `framebuffer_vmo` must outlive `fake_sysmem`.
   zx::vmo framebuffer_vmo;
@@ -352,9 +380,15 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   ASSERT_TRUE(sysmem_client_result.is_ok());
   auto& sysmem_client = sysmem_client_result.value();
 
-  SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(hardware_sysmem_client)),
-                        std::move(sysmem_client), fake_mmio.MmioBuffer(), kWidth, kHeight, kStride,
-                        kPixelFormat);
+  constexpr DisplayProperties kDisplayProperties = {
+      .width_px = kWidthPx,
+      .height_px = kHeightPx,
+      .row_stride_px = kStridePx,
+      .pixel_format = kPixelFormat,
+  };
+
+  SimpleDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
+                        std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
 
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
@@ -387,8 +421,8 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
 
   // Invalid import: bad collection id
   static constexpr image_metadata_t kDisplayImageMetadata = {
-      .width = kWidth,
-      .height = kHeight,
+      .width = kWidthPx,
+      .height = kHeightPx,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   uint64_t kBanjoInvalidCollectionId = 100;
@@ -406,8 +440,8 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
 
   // Invalid import: bad width
   static constexpr image_metadata_t kImageMetadataWithIncorrectWidth = {
-      .width = kWidth * 2,
-      .height = kHeight,
+      .width = kWidthPx * 2,
+      .height = kHeightPx,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   image_handle = 0;
@@ -418,8 +452,8 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
 
   // Invalid import: bad height
   static constexpr image_metadata_t kImageMetadataWithIncorrectHeight = {
-      .width = kWidth,
-      .height = kHeight * 2,
+      .width = kWidthPx,
+      .height = kHeightPx * 2,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   image_handle = 0;
@@ -445,3 +479,5 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
 }
 
 }  // namespace
+
+}  // namespace simple_display

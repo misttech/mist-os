@@ -296,10 +296,7 @@ zx_status_t VirtualAlloc::AllocMapPages(vaddr_t vaddr, size_t num_pages) {
     pmm_free(&alloc_pages);
   });
 
-  // Ideally we would like to create the chance of using large pages with aligned allocations and
-  // MapContiguous, but we can only do this if we can later safely unmap without enlarging the
-  // range.
-  if (VmAspace::kernel_aspace()->arch_aspace().UnmapOnlyEnlargeOnOom()) {
+  if (CanAttemptContiguousMappings()) {
     const size_t align_pages = 1ul << (align_log2_ - PAGE_SIZE_SHIFT);
     if (align_pages > 1) {
       while (mapped_count + align_pages <= num_pages) {
@@ -413,6 +410,13 @@ void VirtualAlloc::Destroy() {
   // Release the pages backing the bitmap.
   UnmapFreePages(alloc_base_, bitmap_pages);
   alloc_base_ = 0;
+}
+
+bool VirtualAlloc::CanAttemptContiguousMappings() const {
+  // Ideally we would like to create the chance of using large pages with aligned allocations and
+  // MapContiguous, but we can only do this if we can later safely unmap without enlarging the
+  // range.
+  return VmAspace::kernel_aspace()->arch_aspace().UnmapOnlyEnlargeOnOom();
 }
 
 void VirtualAlloc::DebugFreeAllAllocations() {

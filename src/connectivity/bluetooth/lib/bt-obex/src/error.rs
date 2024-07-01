@@ -4,6 +4,7 @@
 
 use anyhow::format_err;
 use fuchsia_zircon as zx;
+use objects::ObexObjectError;
 use thiserror::Error;
 
 use crate::header::HeaderIdentifier;
@@ -20,6 +21,8 @@ pub enum Error {
     IncompatibleHeaders(HeaderIdentifier, HeaderIdentifier),
     #[error("Encountered an IO Error: {}", .0)]
     IOError(#[from] zx::Status),
+    #[error("Invalid OBEX object: {:?}", .0)]
+    Object(#[from] ObexObjectError),
     #[error("Operation is already in progress")]
     OperationInProgress,
     #[error("Internal error during {:?}: {:?}", .operation, .msg)]

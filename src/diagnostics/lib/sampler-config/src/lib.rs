@@ -98,6 +98,8 @@ pub struct MetricConfig {
     /// Cobalt metric. Note: Order matters, and
     /// must match the order of the defined dimensions
     /// in the Cobalt metric file.
+    /// Missing field means the same as empty list.
+    #[serde(default)]
     pub event_codes: Vec<u32>,
     /// Optional boolean specifying whether to upload
     /// the specified metric only once, the first time
@@ -110,8 +112,7 @@ pub struct MetricConfig {
 }
 
 /// Configuration for a single FIRE metric template to map from an Inspect property
-/// to a cobalt metric. Unlike MetricConfig, selectors aren't parsed, and event_codes is
-/// optional.
+/// to a cobalt metric. Unlike MetricConfig, selectors aren't parsed.
 #[derive(Clone, Deserialize, Debug, PartialEq)]
 struct MetricTemplate {
     /// Selector identifying the metric to
@@ -748,6 +749,32 @@ mod tests {
         assert_eq!(config.as_ref().unwrap().project_configs.len(), 2);
         assert_eq!(config.as_ref().unwrap().project_configs[0].customer_id(), 1);
         assert_eq!(config.as_ref().unwrap().project_configs[1].customer_id(), 6);
+    }
+
+    #[fuchsia::test]
+    fn missing_event_codes_ok() {
+        let dir = tempfile::tempdir().unwrap();
+        let load_path = dir.path();
+        let config_path = load_path.join("config");
+        fs::create_dir(&config_path).unwrap();
+        fs::write(config_path.join("default.json"), r#"{
+  "project_id": 5,
+  "poll_rate_sec": 60,
+  "metrics": [
+    {
+      "selector": "bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests",
+      "metric_id": 1,
+      "metric_type": "Occurrence",
+    }
+  ]
+}
+"#).unwrap();
+        let config = SamplerConfigBuilder::default()
+            .minimum_sample_rate_sec(10)
+            .sampler_dir(&load_path)
+            .load();
+        assert!(config.is_ok());
+        assert_eq!(config.as_ref().unwrap().project_configs[0].metrics[0].event_codes, vec![]);
     }
 
     #[fuchsia::test]

@@ -62,6 +62,12 @@ void AmlG12TdmDai::InitDaiFormats() {
       dai_format_.frame_format.set_frame_format_standard(
           ::fuchsia::hardware::audio::DaiFrameFormatStandard::TDM3);
       break;
+    case metadata::DaiType::Custom:
+      dai_format_.frame_format.set_frame_format_custom(
+          ::fuchsia::hardware::audio::DaiFrameFormatCustom{
+              true, metadata_.dai.custom_sclk_on_raising,
+              metadata_.dai.custom_frame_sync_sclks_offset, metadata_.dai.custom_frame_sync_size});
+      break;
   }
 }
 
@@ -315,6 +321,11 @@ void AmlG12TdmDai::GetDaiFormats(GetDaiFormatsCallback callback) {
     case metadata::DaiType::Tdm1:
       frame_format.set_frame_format_standard(
           ::fuchsia::hardware::audio::DaiFrameFormatStandard::TDM1);
+      break;
+    case metadata::DaiType::Custom:
+      frame_format.set_frame_format_custom(::fuchsia::hardware::audio::DaiFrameFormatCustom{
+          true, metadata_.dai.custom_sclk_on_raising, metadata_.dai.custom_frame_sync_sclks_offset,
+          metadata_.dai.custom_frame_sync_size});
       break;
     default:
       ZX_ASSERT(0);  // Not supported.

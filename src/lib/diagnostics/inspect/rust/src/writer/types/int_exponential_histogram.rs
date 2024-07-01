@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{
-    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, IntArrayProperty, Node,
+    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, IntArrayProperty, Node,
     StringReference,
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams};
@@ -19,6 +19,8 @@ pub struct IntExponentialHistogramProperty {
     step_multiplier: i64,
     slots: usize,
 }
+
+impl InspectType for IntExponentialHistogramProperty {}
 
 impl IntExponentialHistogramProperty {
     pub(crate) fn new(

@@ -139,7 +139,7 @@ impl SuspendResumeManager {
             .context("cannot get Activity Governor element from SAG")?;
         if let Some(Some(application_activity_token)) = power_elements
             .application_activity
-            .map(|application_activity| application_activity.active_dependency_token)
+            .map(|application_activity| application_activity.assertive_dependency_token)
         {
             // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
             let power_levels: Vec<u8> = (0..=STARNIX_POWER_ON_LEVEL).collect();
@@ -159,7 +159,7 @@ impl SuspendResumeManager {
                         initial_current_level: Some(STARNIX_POWER_ON_LEVEL),
                         valid_levels: Some(power_levels),
                         dependencies: Some(vec![fbroker::LevelDependency {
-                            dependency_type: fbroker::DependencyType::Active,
+                            dependency_type: fbroker::DependencyType::Assertive,
                             dependent_level: STARNIX_POWER_ON_LEVEL,
                             requires_token: application_activity_token,
                             requires_level_by_preference: vec![
@@ -494,7 +494,7 @@ impl WakeLease {
                 })?;
             let Some(active_wake_token) = power_elements
                 .wake_handling
-                .and_then(|wake_handling| wake_handling.active_dependency_token)
+                .and_then(|wake_handling| wake_handling.assertive_dependency_token)
             else {
                 return Err(errno!(EINVAL, "No active dependency token in SAG Wake Handling PE"));
             };
@@ -510,7 +510,7 @@ impl WakeLease {
                         ),
                         valid_levels: Some(power_levels),
                         dependencies: Some(vec![fbroker::LevelDependency {
-                            dependency_type: fbroker::DependencyType::Active,
+                            dependency_type: fbroker::DependencyType::Assertive,
                             dependent_level: fbroker::BinaryPowerLevel::On.into_primitive(),
                             requires_token: active_wake_token,
                             requires_level_by_preference: vec![

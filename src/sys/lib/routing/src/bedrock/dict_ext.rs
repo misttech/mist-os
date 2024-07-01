@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_types::IterablePath;
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -43,13 +44,16 @@ impl DictExt for Dict {
             match segments.next() {
                 Some(next_name) => {
                     // Lifetimes are weird here with the MutexGuard, so we do this in two steps
-                    let sub_dict =
-                        current_dict.get(current_name).and_then(|value| value.to_dictionary())?;
+                    let sub_dict = current_dict
+                        .get(current_name)
+                        .ok()
+                        .flatten()
+                        .and_then(|value| value.to_dictionary())?;
                     current_dict = sub_dict;
 
                     current_name = next_name;
                 }
-                None => return current_dict.get(current_name),
+                None => return current_dict.get(current_name).ok().flatten(),
             }
         }
     }
@@ -67,12 +71,18 @@ impl DictExt for Dict {
                 Some(next_name) => {
                     let sub_dict = {
                         match current_dict.get(current_name) {
-                            Some(cap) => cap.to_dictionary().unwrap(),
-                            None => {
-                                let cap = Capability::Dictionary(Dict::new());
-                                current_dict.insert(current_name.clone(), cap.clone())?;
-                                cap.to_dictionary().unwrap()
+                            Ok(Some(cap)) => {
+                                cap.to_dictionary().ok_or(fsandbox::DictionaryError::NotFound)?
                             }
+                            Ok(None) => {
+                                let dict = Dict::new();
+                                current_dict.insert(
+                                    current_name.clone(),
+                                    Capability::Dictionary(dict.clone()),
+                                )?;
+                                dict
+                            }
+                            Err(_) => return Err(fsandbox::DictionaryError::NotFound),
                         }
                     };
                     current_dict = sub_dict;
@@ -95,7 +105,9 @@ impl DictExt for Dict {
                 Some(next_name) => {
                     let sub_dict = current_dict
                         .get(current_name)
-                        .and_then(|value| value.clone().to_dictionary());
+                        .ok()
+                        .flatten()
+                        .and_then(|value| value.to_dictionary());
                     if sub_dict.is_none() {
                         // The capability doesn't exist, there's nothing to remove.
                         return;
@@ -122,7 +134,8 @@ impl DictExt for Dict {
             let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
             // Get the capability.
-            let capability = current_dict.get(next_name);
+            let capability =
+                current_dict.get(next_name).map_err(|_| RoutingError::BedrockNotCloneable)?;
 
             // The capability doesn't exist.
             let Some(capability) = capability else { return Ok(None) };

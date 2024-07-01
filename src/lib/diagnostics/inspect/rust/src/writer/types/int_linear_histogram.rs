@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{
-    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, IntArrayProperty, Node,
+    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, IntArrayProperty, Node,
     StringReference,
 };
 use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
@@ -18,6 +18,8 @@ pub struct IntLinearHistogramProperty {
     slots: usize,
     step_size: i64,
 }
+
+impl InspectType for IntLinearHistogramProperty {}
 
 impl IntLinearHistogramProperty {
     pub(crate) fn new(

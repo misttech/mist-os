@@ -4,7 +4,7 @@
 
 //! Bucketting related functionality.
 
-use crate::processed::{Process, Vmo};
+use crate::processed::{Process, Vmo, VmoKoid};
 use crate::raw::BucketDefinition;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -17,7 +17,7 @@ pub struct Bucket {
     /// Sum of the committed bytes of the VMOs that are in this bucket.
     pub size: u64,
     /// List of koids of VMOs matching this bucket
-    pub vmos: HashSet<u64>,
+    pub vmos: HashSet<VmoKoid>,
 }
 
 /// If `regex_str` is empty, returns the ".*" regex.
@@ -45,11 +45,12 @@ fn regex_that_matches_everything_if_string_empty(regex_str: &String) -> regex::R
 /// A VMO will be attributed to the first bucket it matches.
 /// A VMO will match a given bucket if the bucket's `process` regex matches a process
 /// that references the VMO *and* if the bucket's `vmo` regex matches the name of the VMO.
+/// Returns the list of buckets, and the list of koids of VMOs not in any bucket.
 pub fn compute_buckets(
     buckets_definitions: &Vec<BucketDefinition>,
     processes: &Vec<Process>,
-    koid_to_vmo: &HashMap<u64, Vmo>,
-) -> Vec<Bucket> {
+    koid_to_vmo: &HashMap<VmoKoid, Vmo>,
+) -> (Vec<Bucket>, HashSet<VmoKoid>) {
     let mut buckets: Vec<Bucket> = vec![];
     let mut digested_vmos = HashSet::new();
 
@@ -85,13 +86,13 @@ pub fn compute_buckets(
             vmos: bucket_vmos,
         });
     }
-    buckets
+    (buckets, koid_to_vmo.keys().filter(|&k| !digested_vmos.contains(k)).copied().collect())
 }
 
 #[cfg(test)]
 mod tests {
     use crate::bucket::{compute_buckets, Bucket, Process};
-    use crate::processed::{RetainedMemory, Vmo};
+    use crate::processed::{ProcessKoid, RetainedMemory, Vmo, VmoKoid};
     use crate::raw::BucketDefinition;
     use std::collections::{HashMap, HashSet};
 
@@ -102,28 +103,28 @@ mod tests {
         #[derive(Clone)]
         struct VmoForTest {
             pub vmo_name: &'static str,
-            pub vmo_koid: u64,
+            pub vmo_koid: VmoKoid,
             pub bytes: u64,
         }
         struct ProcessForTest {
             pub process_name: &'static str,
-            pub process_koid: u64,
+            pub process_koid: ProcessKoid,
             pub vmos: Vec<VmoForTest>,
         }
         let vmos_defs = vec![
-            VmoForTest { vmo_name: "vmo_A", vmo_koid: 0, bytes: 10 },
-            VmoForTest { vmo_name: "vmo_B", vmo_koid: 1, bytes: 11 },
-            VmoForTest { vmo_name: "vmo_C", vmo_koid: 2, bytes: 12 },
+            VmoForTest { vmo_name: "vmo_A", vmo_koid: VmoKoid::new(0), bytes: 10 },
+            VmoForTest { vmo_name: "vmo_B", vmo_koid: VmoKoid::new(1), bytes: 11 },
+            VmoForTest { vmo_name: "vmo_C", vmo_koid: VmoKoid::new(2), bytes: 12 },
         ];
         let processes_defs = vec![
             ProcessForTest {
                 process_name: "process1",
-                process_koid: 100,
+                process_koid: ProcessKoid::new(100),
                 vmos: vec![vmos_defs[0].clone(), vmos_defs[1].clone(), vmos_defs[2].clone()],
             },
             ProcessForTest {
                 process_name: "process2",
-                process_koid: 101,
+                process_koid: ProcessKoid::new(101),
                 vmos: vec![vmos_defs[2].clone()],
             },
         ];
@@ -197,7 +198,7 @@ mod tests {
                 Vmo {
                     koid: vmo_def.vmo_koid,
                     name: vmo_def.vmo_name.to_string(),
-                    parent_koid: 999999,
+                    parent_koid: VmoKoid::new(999999),
                     committed_bytes: vmo_def.bytes,
                     allocated_bytes: 0,
                     populated_bytes: None,
@@ -207,7 +208,7 @@ mod tests {
 
         // Step 3/3:
         // Run `compute_buckets`, and check the output.
-        let buckets = compute_buckets(&buckets_definitions, &processes, &koid_to_vmo);
+        let (buckets, undigested) = compute_buckets(&buckets_definitions, &processes, &koid_to_vmo);
         pretty_assertions::assert_eq!(
             buckets[0],
             Bucket { name: "bucket0".to_string(), size: 0, vmos: HashSet::new() }
@@ -225,7 +226,7 @@ mod tests {
             Bucket {
                 name: "bucket3".to_string(),
                 size: vmos_defs[0].bytes + vmos_defs[1].bytes,
-                vmos: HashSet::from([0, 1])
+                vmos: HashSet::from([VmoKoid::new(0), VmoKoid::new(1)])
             }
         );
         pretty_assertions::assert_eq!(
@@ -237,9 +238,10 @@ mod tests {
             Bucket {
                 name: "bucket5".to_string(),
                 size: vmos_defs[2].bytes,
-                vmos: HashSet::from([2])
+                vmos: HashSet::from([VmoKoid::new(2)])
             }
         );
         pretty_assertions::assert_eq!(buckets.len(), 6);
+        pretty_assertions::assert_eq!(undigested, Default::default());
     }
 }

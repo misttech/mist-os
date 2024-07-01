@@ -44,7 +44,7 @@ TEST(SetRLimitTest, ZeroFSizeOnRegularFiles) {
     ASSERT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0)
         << "setrlimit failed" << std::strerror(errno) << '\n';
 
-    test_helper::ScopedFD fd(creat(file_path.c_str(), 0666));
+    fbl::unique_fd fd(creat(file_path.c_str(), 0666));
     ASSERT_TRUE(fd.is_valid()) << "failed to create file" << std::strerror(errno) << '\n';
 
     uint8_t buf[0x20] = {0};
@@ -73,7 +73,7 @@ TEST(SetRLimitTest, ZeroFSizeOnMemFd) {
     ASSERT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0)
         << "setrlimit failed" << std::strerror(errno) << '\n';
 
-    test_helper::ScopedFD fd(test_helper::MemFdCreate("memfd", 0));
+    fbl::unique_fd fd(test_helper::MemFdCreate("memfd", 0));
     ASSERT_TRUE(fd.is_valid()) << "failed to create file" << std::strerror(errno) << '\n';
 
     uint8_t buf[0x20] = {0};
@@ -101,7 +101,7 @@ TEST(SetRLimitTest, OneFSize) {
     ASSERT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0)
         << "setrlimit failed" << std::strerror(errno) << '\n';
 
-    test_helper::ScopedFD fd(test_helper::MemFdCreate("memfd", 0));
+    fbl::unique_fd fd(test_helper::MemFdCreate("memfd", 0));
     ASSERT_TRUE(fd.is_valid()) << "failed to create file" << std::strerror(errno) << '\n';
 
     uint8_t buf[0x1] = {0};
@@ -172,7 +172,7 @@ TEST(SetRLimitTest, ZeroFSizeOnFIFO) {
         << "failed to create fifo" << std::strerror(errno) << '\n';
 
     std::thread reader([file_path]() {
-      test_helper::ScopedFD fd(open(file_path.c_str(), O_RDONLY));
+      fbl::unique_fd fd(open(file_path.c_str(), O_RDONLY));
       ASSERT_TRUE(fd.is_valid()) << "failed to open file for reading" << std::strerror(errno)
                                  << '\n';
 
@@ -181,7 +181,7 @@ TEST(SetRLimitTest, ZeroFSizeOnFIFO) {
           << "read failed" << std::strerror(errno) << '\n';
     });
 
-    test_helper::ScopedFD fd(open(file_path.c_str(), O_WRONLY));
+    fbl::unique_fd fd(open(file_path.c_str(), O_WRONLY));
     ASSERT_TRUE(fd.is_valid()) << "failed to file for writing" << std::strerror(errno) << '\n';
 
     uint8_t buf[0x1] = {0};

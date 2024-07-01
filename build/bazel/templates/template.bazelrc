@@ -63,6 +63,9 @@ common:exec_log --remote_build_event_upload=all
 # Prevent repository downloads with custom downloader config file.
 common --experimental_downloader_config={config_file}
 
+# Pass local developer overrides for assembly to Bazel
+common --@fuchsia_sdk//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
+
 # TODO(http://b/319377689#comment5): Remove this flag when the linked issue is
 # fixed upstream.
 build --sandbox_add_mount_pair=/tmp

@@ -102,7 +102,7 @@ TestFixture::TestFixture() {
   });
   ASSERT_NO_FATAL_FAILURE();
   mock_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                               std::move(outgoing_endpoints.client));
+                               std::move(outgoing_endpoints.client), "pdev");
 }
 
 void TestFixture::SetUp() { stuck_reset_test_ = false; }

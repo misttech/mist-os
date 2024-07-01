@@ -15,12 +15,12 @@ closed protocol TestController {
     /// of SME on binding.
     ///
     /// The user should expect to receive a call to
-    /// WlanFullmacImplBridge::Start shortly after calling this.
+    /// WlanFullmacImpl::Start shortly after calling this.
     ///
     /// Returns an |id| that uniquely identifies the new instance of the Fullmac driver,
     /// which can be used to delete the driver instance later.
     strict CreateFullmac(resource struct {
-        bridge_client client_end:fuchsia.wlan.fullmac.WlanFullmacImplBridge;
+        bridge_client client_end:fuchsia.wlan.fullmac.WlanFullmacImpl;
     }) -> (resource struct {
         id FullmacId;
     }) error zx.Status;

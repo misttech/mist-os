@@ -6,13 +6,13 @@
 import argparse
 import json
 import os
-import subprocess
 import shlex
+import subprocess
 import sys
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
+from typing import Any
 
 from terminal import Terminal
 
@@ -26,12 +26,12 @@ tool.
 
 @dataclass
 class PackageDiffs:
-    added: List[str]
-    modified: List[str]
-    removed: List[str]
+    added: list[str]
+    modified: list[str]
+    removed: list[str]
 
     @classmethod
-    def snapshot(cls, repo: Path) -> Dict[str, str]:
+    def snapshot(cls, repo: Path) -> dict[str, str]:
         repo_targets = repo / "repository" / "targets.json"
         # New empty repositories do not have targets.json.
         if not repo_targets.is_file():
@@ -45,7 +45,7 @@ class PackageDiffs:
         }
 
     @classmethod
-    def diff(cls, old: Dict[str, str], new: Dict[str, str]) -> "PackageDiffs":
+    def diff(cls, old: dict[str, str], new: dict[str, str]) -> "PackageDiffs":
         return cls(
             added=[package for package in new if package not in old],
             modified=[
@@ -63,16 +63,16 @@ class PackageDiffs:
         return len(self) > 0
 
 
-def run(*command: str, failure_message: str, **kwargs) -> None:
-    command = shlex.join([str(part) for part in command])
+def run(*command: str, failure_message: str, **kwargs: Any) -> None:
+    str_command = shlex.join([str(part) for part in command])
     try:
-        subprocess.check_call(command, shell=True, **kwargs)
+        subprocess.check_call(str_command, shell=True, **kwargs)
     except subprocess.SubprocessError as e:
-        Terminal.error(f"Command failed: {command}")
+        Terminal.error(f"Command failed: {str_command}")
         Terminal.fatal(failure_message)
 
 
-def fx_command(*command: str) -> List[str]:
+def fx_command(*command: str) -> list[str]:
     return [
         "bash",
         "-c",
@@ -151,13 +151,13 @@ def main() -> int:
     # Publish the packages.
     initial = PackageDiffs.snapshot(repo)
     run(
-        package_tool,
+        str(package_tool),
         "repository",
         "publish",
         repo,
         *publish_tool_opts,
         *[
-            arg
+            str(arg)
             for package_list in packages_to_publish
             for arg in ["--package-list", package_list]
         ],

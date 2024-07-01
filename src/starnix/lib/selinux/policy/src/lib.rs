@@ -54,6 +54,10 @@ pub struct SensitivityId(NonZeroU32);
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, PartialOrd)]
 pub struct CategoryId(NonZeroU32);
 
+/// Identifies a class within a policy.
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct ClassId(NonZeroU32);
+
 /// The set of permissions that may be granted to sources accessing targets of a particular class,
 /// as defined in an SELinux policy.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]

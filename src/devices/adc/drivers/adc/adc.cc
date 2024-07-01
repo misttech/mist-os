@@ -8,9 +8,12 @@
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 
 #include <bind/fuchsia/adc/cpp/bind.h>
 #include <fbl/alloc_checker.h>
+
+#include "src/devices/adc/metadata/metadata.h"
 
 namespace adc {
 
@@ -143,11 +146,14 @@ zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
 
 zx::result<> Adc::Start() {
   // Get metadata.
-  auto metadata =
-      compat::GetMetadata<fuchsia_hardware_adcimpl::Metadata>(incoming(), DEVICE_METADATA_ADC);
+  zx::result metadata = fdf_metadata::GetMetadata<fuchsia_hardware_adcimpl::Metadata>(incoming());
   if (metadata.is_error()) {
-    FDF_LOG(ERROR, "Failed to get metadata  %s", metadata.status_string());
+    FDF_SLOG(ERROR, "Failed to get metadata.", KV("status", metadata.status_string()));
     return metadata.take_error();
+  }
+  if (!metadata->channels().has_value()) {
+    FDF_LOG(ERROR, "Metadata is missing its channels property");
+    return zx::error(ZX_ERR_INTERNAL);
   }
   auto channels = std::move(*metadata->channels());
 

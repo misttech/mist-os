@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 
+#include <lib/ddk/io-buffer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/scsi/controller-dfv1.h>
 #include <lib/scsi/disk-dfv1.h>

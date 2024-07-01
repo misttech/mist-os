@@ -39,36 +39,11 @@ FuchsiaBoardInputBundleInfo = provider(
     },
 )
 
-def _board_config_info_init(*, board_config):
-    if not board_config:
-        fail("board_config may not be empty")
-    return {"board_config": board_config}
-
-FuchsiaBoardConfigInfo, _new_board_config_info = provider(
-    doc = "A board-info used to containing only the board_config.json",
+FuchsiaBoardConfigInfo = provider(
+    doc = "A board info used to containing the board_configuration.json and its associated files",
     fields = {
-        "board_config": "The JSON board configuration file.",
-    },
-    init = _board_config_info_init,
-)
-
-def _board_config_directory_info_init(*, config_directory):
-    if not config_directory:
-        fail("config_directory may not be empty")
-    return {"config_directory": config_directory}
-
-FuchsiaBoardConfigDirectoryInfo, _new_board_config_directory_info = provider(
-    doc = "A prebuilt board configuration in a directory, containing the board_config.json and deps",
-    fields = {
-        "config_directory": "The directory containing the board_config file and the main HardwareSupportBundle",
-    },
-    init = _board_config_directory_info_init,
-)
-
-FuchsiaAssemblyConfigInfo = provider(
-    doc = "Private provider that includes a single JSON configuration file.",
-    fields = {
-        "config": "JSON configuration file",
+        "files": "A list of files consisting the board config.",
+        "config": "The JSON board configuration file.",
     },
 )
 
@@ -90,11 +65,27 @@ FuchsiaVirtualDeviceInfo = provider(
     },
 )
 
-FuchsiaProductAssemblyBundleInfo = provider(
-    doc = """A bundle of files used by product assembly.""",
+FuchsiaPlatformArtifactsInfo = provider(
+    doc = """A set of platform artifacts used by product assembly.""",
     fields = {
         "root": "The root directory for these artifacts",
         "files": "All files contained in the bundle",
+    },
+)
+
+FuchsiaLegacyBundleInfo = provider(
+    doc = """A legacy AIB used by product assembly.""",
+    fields = {
+        "root": "The root directory for these artifacts",
+        "files": "All files contained in the bundle",
+    },
+)
+
+FuchsiaPartitionsConfigInfo = provider(
+    doc = "The partitions configuration files and manifest.",
+    fields = {
+        "files": "A list of files consisting the partitions config.",
+        "config": "The partitions config json manifest.",
     },
 )
 

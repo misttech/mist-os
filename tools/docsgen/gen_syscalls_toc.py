@@ -70,7 +70,7 @@ README_SECTIONS = [
 ]
 
 
-def gen_readme_and_toc(data, reference_root):
+def gen_readme_and_toc(data: list[dict[str, str]], reference_root: str) -> None:
     readme = io.StringIO()
     toc = io.StringIO()
     print(README_HEADER, file=readme)
@@ -110,7 +110,7 @@ def gen_readme_and_toc(data, reference_root):
     return (readme.getvalue(), toc.getvalue())
 
 
-def get_topic(filename):
+def get_topic(filename: str) -> str:
     topic = filename.split("_")[0]
 
     # There are some special cases
@@ -152,7 +152,7 @@ def get_topic(filename):
     return topic
 
 
-def read_summary(input):
+def read_summary(input: bytes) -> str:
     """Read the first line of the Summary section."""
     lines = input.decode().splitlines()
     saw_summary = False
@@ -164,7 +164,7 @@ def read_summary(input):
     return ""
 
 
-def gen_toc_readme(inzip, outzip, reference_root):
+def gen_toc_readme(inzip: str, outzip: str, reference_root: str) -> None:
     """Generates _toc.yaml and README.md for the files in inzip."""
 
     # Copy the zip
@@ -189,7 +189,7 @@ def gen_toc_readme(inzip, outzip, reference_root):
         zf.writestr("_toc.yaml", toc_contents)
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__,  # Prepend helpdoc with this file's docstring.
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -216,6 +216,8 @@ def main():
     args = parser.parse_args()
 
     gen_toc_readme(args.input, args.output, args.reference_root)
+
+    return 0
 
 
 if __name__ == "__main__":

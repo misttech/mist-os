@@ -7,7 +7,6 @@
 import json
 import logging
 import subprocess
-import time
 
 from mobly import asserts
 from mobly import test_runner
@@ -52,7 +51,9 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
     def test_target_echo_repeat(self) -> None:
         """Test `ffx target echo --repeat` is resilient to daemon failure."""
         with self.dut.ffx.popen(
-            ["target", "echo", "--repeat"], stdout=subprocess.PIPE
+            ["target", "echo", "--repeat"],
+            stdout=subprocess.PIPE,
+            text=False,
         ) as process:
             try:
                 line = process.stdout.readline()
@@ -134,6 +135,49 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         # Make sure the daemon hadn't started running
         with asserts.assert_raises(honeydew.errors.FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
+
+    def run_ffx(self, args: list[str]) -> str:
+        """Run ffx in the specific way we need, not the standard Honeydew way"""
+        config = self.dut.ffx.config
+        cmd = [
+            config.binary_path,
+            "--isolate-dir",
+            config.isolate_dir.directory(),
+        ] + args
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
+
+    def test_local_discovery(self) -> None:
+        """Test that we can resolve a target locally"""
+        # Let's make sure the CLI believes that discovery is turned off,
+        # by setting ffx.isolated=true
+        cmd = [
+            "-c",
+            "ffx.isolated=true",
+            "-t",
+            f"{self.dut.ffx._target}",
+            "target",
+            "echo",
+        ]
+        output = self.run_ffx(cmd)
+        # Unfortunately we're not checking _that_ this is being resolved locally.
+        # To do that we'd probably want to run a test in which the daemon isn't
+        # running, but honeydew isn't set up for that.
+        asserts.assert_equal(output, 'SUCCESS: received "Ffx"\n')
+
+    def test_wait_with_local_discovery(self) -> None:
+        """Test that we can wait for a target when daemon discovery is disabled"""
+        # Let's make sure the CLI believes that discovery is turned off,
+        # by setting ffx.isolated=true
+        cmd = [
+            "-c",
+            "ffx.isolated=true",
+            "-t",
+            f"{self.dut.ffx._target}",
+            "target",
+            "wait",
+        ]
+        output = self.run_ffx(cmd)
+        asserts.assert_equal(output, "")
 
 
 if __name__ == "__main__":

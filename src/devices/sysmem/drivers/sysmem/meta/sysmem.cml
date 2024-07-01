@@ -119,11 +119,5 @@
         // disabled (for debugging purposes). The default is false. Disabling this will also prevent
         // any protected pages from being decommitted (aka loaned) back to zircon.
         protected_ranges_disable_dynamic: { type: "bool" },
-
-        // TODO(b/322009732): remove
-        deprecated_contiguous_memory_size_override: { type: "int64" },
-
-        // TODO(b/322009732): remove
-        deprecated_protected_memory_size_override: { type: "int64" },
     },
 }

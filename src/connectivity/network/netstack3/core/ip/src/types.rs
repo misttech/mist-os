@@ -278,9 +278,6 @@ pub enum EntryEither<D> {
 
 impl<A: IpAddress, D> From<Entry<A, D>> for EntryEither<D> {
     fn from(entry: Entry<A, D>) -> EntryEither<D> {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct EntryHolder<I: Ip, D>(Entry<I::Addr, D>);
         A::Version::map_ip(entry, EntryEither::V4, EntryEither::V6)
     }
 }

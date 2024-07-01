@@ -18,13 +18,13 @@ class TouchStandbyTest : public ::testing::Test {
       GTEST_SKIP() << "Can only be run as root.";
     }
 
-    touch_standby_fd_ = test_helper::ScopedFD(open("/dev/touch_standby", O_RDWR));
+    touch_standby_fd_ = fbl::unique_fd(open("/dev/touch_standby", O_RDWR));
     ASSERT_TRUE(touch_standby_fd_.is_valid())
         << "open(\"/dev/touch_standby_fd_\") failed: " << strerror(errno) << "(" << errno << ")";
   }
 
  protected:
-  test_helper::ScopedFD touch_standby_fd_;
+  fbl::unique_fd touch_standby_fd_;
 };
 
 TEST_F(TouchStandbyTest, WriteTouchStandbyState) {

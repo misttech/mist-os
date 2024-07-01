@@ -9,6 +9,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fdf/dispatcher.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -241,30 +242,47 @@ zx_status_t ClockInitDevice::ConfigureClocks(
   // Stop processing the list if any call returns an error so that clocks are not accidentally
   // enabled in an unknown state.
   for (const auto& step : metadata.steps) {
-    if (step.call.is_enable()) {
-      if (zx_status_t status = clock.Enable(step.id); status != ZX_OK) {
-        zxlogf(ERROR, "Enable() failed for %u: %s", step.id, zx_status_get_string(status));
+    if (!step.has_call()) {
+      zxlogf(ERROR, "Clock Metadata init step is missing a call field");
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    // Delay doesn't apply to any particular clock ID so we enforce that the ID field is
+    // unset. Every other type of init call requires an ID so we enforce that ID is set.
+    if (step.call().is_delay() && step.has_id()) {
+      zxlogf(ERROR, "Clock Init Delay calls must not have an ID, id = %u", step.id());
+      return ZX_ERR_INVALID_ARGS;
+    }
+    if (!step.call().is_delay() && !step.has_id()) {
+      zxlogf(ERROR, "Clock init calls must have an ID");
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    if (step.call().is_enable()) {
+      if (zx_status_t status = clock.Enable(step.id()); status != ZX_OK) {
+        zxlogf(ERROR, "Enable() failed for %u: %s", step.id(), zx_status_get_string(status));
         return status;
       }
-    } else if (step.call.is_disable()) {
-      if (zx_status_t status = clock.Disable(step.id); status != ZX_OK) {
-        zxlogf(ERROR, "Disable() failed for %u: %s", step.id, zx_status_get_string(status));
+    } else if (step.call().is_disable()) {
+      if (zx_status_t status = clock.Disable(step.id()); status != ZX_OK) {
+        zxlogf(ERROR, "Disable() failed for %u: %s", step.id(), zx_status_get_string(status));
         return status;
       }
-    } else if (step.call.is_rate_hz()) {
-      if (zx_status_t status = clock.SetRate(step.id, step.call.rate_hz()); status != ZX_OK) {
-        zxlogf(ERROR, "SetRate(%lu) failed for %u: %s", step.call.rate_hz(), step.id,
+    } else if (step.call().is_rate_hz()) {
+      if (zx_status_t status = clock.SetRate(step.id(), step.call().rate_hz()); status != ZX_OK) {
+        zxlogf(ERROR, "SetRate(%lu) failed for %u: %s", step.call().rate_hz(), step.id(),
                zx_status_get_string(status));
         return status;
       }
-    } else if (step.call.is_input_idx()) {
-      if (zx_status_t status = clock.SetInput(step.id, step.call.input_idx()); status != ZX_OK) {
-        zxlogf(ERROR, "SetInput(%u) failed for %u: %s", step.call.input_idx(), step.id,
+    } else if (step.call().is_input_idx()) {
+      if (zx_status_t status = clock.SetInput(step.id(), step.call().input_idx());
+          status != ZX_OK) {
+        zxlogf(ERROR, "SetInput(%u) failed for %u: %s", step.call().input_idx(), step.id(),
                zx_status_get_string(status));
         return status;
       }
-    } else if (step.call.is_delay()) {
-      zx::nanosleep(zx::deadline_after(zx::duration(step.call.delay())));
+    } else if (step.call().is_delay()) {
+      zx::nanosleep(zx::deadline_after(zx::duration(step.call().delay())));
     }
   }
 

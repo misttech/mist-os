@@ -61,15 +61,26 @@ group("test_realms") {
 
   deps = [
     ":scene_manager_scene",
-    ":scenic_only",
+    ":scenic_no_config",
+    ":scenic_with_config",
   ]
 }
 
-fuchsia_component("scenic_only") {
+fuchsia_component("scenic_with_config") {
   testonly = true
 
-  component_name = "scenic_only"
-  manifest = "meta/scenic_only.cml"
+  component_name = "scenic_with_config"
+  manifest = "meta/scenic_with_config.cml"
+  deps = [
+    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    "//src/graphics/display/testing/fake-coordinator-connector:child-component",
+    "//src/ui/scenic:scenic_with_default_config",
+  ]
+}
+
+fuchsia_component("scenic_no_config") {
+  testonly = true
+  manifest = "meta/scenic_no_config.cml"
   deps = [
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/graphics/display/testing/fake-coordinator-connector:child-component",

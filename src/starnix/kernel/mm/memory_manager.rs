@@ -2563,7 +2563,7 @@ pub struct MemoryManager {
     ///
     /// Instead of mapping memory directly in this VMAR, we map the memory in
     /// `state.user_vmar`.
-    root_vmar: zx::Vmar,
+    pub root_vmar: zx::Vmar,
 
     /// The base address of the root_vmar.
     pub base_addr: UserAddress,

@@ -308,7 +308,7 @@ SinkPolicyEngineState SinkPolicyEngineStateMachine::ProcessMessageInReady() {
 
   if (message_type == usb_pd::MessageType::kSourceCapabilities) {
     // The message will be read when entering this state.
-    ForceStateTransition(SinkPolicyEngineState::kWaitForCapabilities);
+    return SinkPolicyEngineState::kWaitForCapabilities;
   }
 
   // The MacBookPro M1 USB-C ports issue a Hard Reset if this isn't handled.

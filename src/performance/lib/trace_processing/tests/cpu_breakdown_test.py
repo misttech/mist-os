@@ -177,6 +177,80 @@ class CpuBreakdownTest(unittest.TestCase):
         model.scheduling_records = {2: records_2, 3: records_3, 5: records_5}
         return model
 
+    def construct_trace_model_with_skips(self) -> trace_model.Model:
+        model = trace_model.Model()
+        model.processes = [
+            trace_model.Process(
+                1000,
+                "process",
+                [
+                    trace_model.Thread(1, "thread-1"),
+                    trace_model.Thread(2, "thread-2"),
+                    trace_model.Thread(3, "thread-3"),
+                ],
+            )
+        ]
+        model.scheduling_records = {
+            2: [
+                # "thread-1" is active from 0 - 1500 ms, 1500 total duration.
+                trace_model.ContextSwitch(
+                    trace_time.TimePoint(0),
+                    1,
+                    100,
+                    612,
+                    612,
+                    trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                    {},
+                ),
+                trace_model.ContextSwitch(
+                    trace_time.TimePoint(1500000000),
+                    100,
+                    1,
+                    612,
+                    612,
+                    trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                    {},
+                ),
+                trace_model.Waking(
+                    trace_time.TimePoint(3000000000), 2, 612, {}
+                ),
+                # Missing transition from thread 1 to 2. Log this skip of 1500 ms.
+                trace_model.ContextSwitch(
+                    trace_time.TimePoint(3000000000),
+                    1,
+                    2,
+                    612,
+                    612,
+                    trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                    {},
+                ),
+                trace_model.Waking(
+                    trace_time.TimePoint(4000000000), 3, 612, {}
+                ),
+                # Missing transition from thread 3 to 2. Log this skip of 1000 ms.
+                trace_model.ContextSwitch(
+                    trace_time.TimePoint(4000000000),
+                    3,
+                    2,
+                    612,
+                    612,
+                    trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                    {},
+                ),
+                # Correct transition from thread 2 to 3, 1000 total duration.
+                trace_model.ContextSwitch(
+                    trace_time.TimePoint(5000000000),
+                    70,
+                    3,
+                    612,
+                    612,
+                    trace_model.ThreadState.ZX_THREAD_STATE_BLOCKED,
+                    {},
+                ),
+            ]
+        }
+        return model
+
     def test_process_metrics(self) -> None:
         model = self.construct_trace_model()
 
@@ -285,5 +359,52 @@ class CpuBreakdownTest(unittest.TestCase):
                     "percent": 6.25,
                     "duration": 500.0,
                 },
+            ],
+        )
+
+    def test_process_metrics_with_skips(self) -> None:
+        model = self.construct_trace_model_with_skips()
+
+        self.assertEqual(model.processes[0].name, "process")
+        self.assertEqual(len(model.processes[0].threads), 3)
+
+        # Keep logs for skipped records logging.
+        with self.assertLogs(
+            "CpuBreakdownMetricsProcessor", level="WARNING"
+        ) as context_manager:
+            processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
+            breakdown = processor.process_metrics()
+
+        self.assertEqual(len(breakdown), 2)
+
+        # Each process: thread has the correct numbers for each CPU.
+        self.assertEqual(
+            breakdown,
+            [
+                {
+                    "process_name": "process",
+                    "thread_name": "thread-1",
+                    "tid": 1,
+                    "cpu": 2,
+                    "percent": 30.0,
+                    "duration": 1500.0,
+                },
+                {
+                    "process_name": "process",
+                    "thread_name": "thread-3",
+                    "tid": 3,
+                    "cpu": 2,
+                    "percent": 20.0,
+                    "duration": 1000.0,
+                },
+            ],
+        )
+
+        # Skipped records are logged.
+        self.assertEqual(
+            context_manager.output,
+            [
+                "WARNING:CpuBreakdownMetricsProcessor:Possibly missing ContextSwitch "
+                "record(s) in trace for these CPUs and durations: {2: 2500.0}"
             ],
         )

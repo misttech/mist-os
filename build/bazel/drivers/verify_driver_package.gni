@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/components.gni")
 
@@ -57,7 +57,7 @@ template("verify_driver_package") {
     # The bazel driver package provided by the user
     bazel_driver_package_target_name = invoker.bazel_driver_package_target
 
-    # The bazel_action to build the bazel package
+    # The bazel_build_action to build the bazel package
     bazel_action_target_name = "${target_name}.bazel_package"
 
     # The main target
@@ -84,15 +84,14 @@ template("verify_driver_package") {
   }
 
   # Build out driver package with bazel
-  bazel_action(labels.bazel_action_target_name) {
+  bazel_build_action(labels.bazel_action_target_name) {
     forward_variables_from(invoker,
                            [
                              "deps",
                              "testonly",
                            ])
     visibility = [ ":${labels.main_target_name}" ]
-    command = "build"
-    bazel_targets = [ labels.bazel_driver_package_target_name ]
+    bazel_target = labels.bazel_driver_package_target_name
     copy_outputs = [
       {
         bazel = files.bazel_built_package_manifest

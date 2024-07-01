@@ -31,6 +31,8 @@ rustc_binary("wlanix_bin") {
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/ieee80211",
+    "//src/connectivity/wlan/lib/telemetry:wlan-telemetry",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
@@ -54,6 +56,7 @@ rustc_binary("wlanix_bin") {
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",
   ]
 

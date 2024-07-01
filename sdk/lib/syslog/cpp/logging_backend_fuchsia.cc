@@ -6,15 +6,17 @@
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/async/default.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/stdcompat/variant.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/log_level.h>
-#include <lib/syslog/cpp/logging_backend.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/logging_backend_fuchsia_globals.h>
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/zx/channel.h>
@@ -30,47 +32,7 @@
 
 namespace syslog_runtime {
 
-bool HasStructuredBackend() { return true; }
-
 using log_word_t = uint64_t;
-
-zx_koid_t GetKoid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  // We need to use _zx_object_get_info to avoid breaking the driver ABI.
-  // fake_ddk can fake out this method, which results in us deadlocking
-  // when used in certain drivers because the fake doesn't properly pass-through
-  // to the real syscall in this case.
-  zx_status_t status =
-      _zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
-}
-
-static zx_koid_t pid = GetKoid(zx_process_self());
-static thread_local zx_koid_t tid = FuchsiaLogGetCurrentThreadKoid();
-
-struct RecordState {
-  // Message string -- valid if severity is FATAL. For FATAL
-  // logs the caller is responsible for ensuring the string
-  // is valid for the duration of the call (which our macros
-  // will ensure for current users). This must be a
-  // const char* as the type has to be trivially destructable.
-  // This will leak on usage, as the process will crash shortly afterwards.
-  const char* maybe_fatal_string;
-
-  fuchsia_syslog::LogBuffer buffer;
-  zx_handle_t socket;
-  FuchsiaLogSeverity raw_severity;
-  static RecordState* CreatePtr(LogBuffer* buffer) {
-    return reinterpret_cast<RecordState*>(&buffer->record_state);
-  }
-};
-static_assert(sizeof(RecordState) <= sizeof(LogBuffer::record_state) + sizeof(LogBuffer::data));
-static_assert(offsetof(LogBuffer, data) ==
-              offsetof(LogBuffer, record_state) + sizeof(LogBuffer::record_state));
-static_assert(std::alignment_of<RecordState>() == sizeof(uint64_t));
-
-const size_t kMaxTags = 4;  // Legacy from ulib/syslog. Might be worth rethinking.
-const char kTagFieldName[] = "tag";
 
 class GlobalStateLock;
 class LogState {
@@ -78,16 +40,10 @@ class LogState {
   static void Set(const fuchsia_logging::LogSettings& settings, const GlobalStateLock& lock);
   static void Set(const fuchsia_logging::LogSettings& settings,
                   const std::initializer_list<std::string>& tags, const GlobalStateLock& lock);
-  void set_severity_handler(void (*callback)(void* context, fuchsia_logging::LogSeverity severity),
-                            void* context) {
-    handler_ = callback;
-    handler_context_ = context;
-  }
 
   fuchsia_logging::LogSeverity min_severity() const { return min_severity_; }
 
-  const std::string* tags() const { return tags_; }
-  size_t tag_count() const { return num_tags_; }
+  const std::vector<std::string>& tags() const { return tags_; }
 
   // Allowed to be const because descriptor_ is mutable
   cpp17::variant<zx::socket, std::ofstream>& descriptor() const { return logsink_socket_; }
@@ -103,14 +59,13 @@ class LogState {
   void HandleInterest(fuchsia_diagnostics::wire::Interest interest);
 
   fidl::WireSharedClient<fuchsia_logger::LogSink> log_sink_;
-  void (*handler_)(void* context, fuchsia_logging::LogSeverity severity);
-  void* handler_context_;
-  async::Loop loop_;
+  void (*on_severity_changed_)(fuchsia_logging::LogSeverity severity);
+  // TODO(b/b/299996898): Remove this once everyone has been migrated.
+  async::Loop deprecated_loop_;
   std::atomic<fuchsia_logging::LogSeverity> min_severity_;
   const fuchsia_logging::LogSeverity default_severity_;
   mutable cpp17::variant<zx::socket, std::ofstream> logsink_socket_ = zx::socket();
-  std::string tags_[kMaxTags];
-  size_t num_tags_ = 0;
+  std::vector<std::string> tags_;
   async_dispatcher_t* interest_listener_dispatcher_;
   fuchsia_logging::InterestListenerBehavior interest_listener_config_;
   // Handle to a fuchsia.logger.LogSink instance.
@@ -142,8 +97,9 @@ class GlobalStateLock {
 
   ~GlobalStateLock() { FuchsiaLogReleaseState(); }
 };
+namespace {
 
-static fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::Severity severity) {
+fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::Severity severity) {
   switch (severity) {
     case fuchsia_diagnostics::Severity::kTrace:
       return fuchsia_logging::LOG_TRACE;
@@ -166,79 +122,20 @@ static fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::S
   }
 }
 
-void LogState::PollInterest() {
-  log_sink_->WaitForInterestChange().Then(
-      [=](fidl::WireUnownedResult<fuchsia_logger::LogSink::WaitForInterestChange>&
-              interest_result) {
-        // FIDL can cancel the operation if the logger is being reconfigured
-        // which results in an error.
-        if (!interest_result.ok()) {
-          return;
-        }
-        HandleInterest(interest_result->value()->data);
-        handler_(handler_context_, min_severity_);
-        PollInterest();
-      });
+zx_koid_t GetKoid(zx_handle_t handle) {
+  zx_info_handle_basic_t info;
+  // We need to use _zx_object_get_info to avoid breaking the driver ABI.
+  // fake_ddk can fake out this method, which results in us deadlocking
+  // when used in certain drivers because the fake doesn't properly pass-through
+  // to the real syscall in this case.
+  zx_status_t status =
+      _zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-void LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
-  if (!interest.has_min_severity()) {
-    min_severity_ = default_severity_;
-  } else {
-    min_severity_ = IntoLogSeverity(interest.min_severity());
-  }
-}
-
-void LogState::Connect() {
-  if (interest_listener_config_ != fuchsia_logging::Disabled) {
-    if (!interest_listener_dispatcher_) {
-      loop_.StartThread("log-interest-listener-thread");
-    }
-    handler_ = [](void* ctx, fuchsia_logging::LogSeverity severity) {};
-  }
-  // Regardless of whether or not we need to do anything async, FIDL async bindings
-  // require a valid dispatcher or they panic.
-  if (!interest_listener_dispatcher_) {
-    interest_listener_dispatcher_ = loop_.dispatcher();
-  }
-  fidl::ClientEnd<fuchsia_logger::LogSink> client_end;
-  if (!provided_log_sink_.has_value()) {
-    auto connect_result = component::Connect<fuchsia_logger::LogSink>();
-    if (connect_result.is_error()) {
-      return;
-    }
-    client_end = std::move(connect_result.value());
-  } else {
-    client_end = std::move(*provided_log_sink_);
-  }
-  log_sink_.Bind(std::move(client_end), interest_listener_dispatcher_);
-  if (interest_listener_config_ == fuchsia_logging::Enabled) {
-    auto interest_result = log_sink_.sync()->WaitForInterestChange();
-    if (interest_result->is_ok()) {
-      HandleInterest(interest_result->value()->data);
-    }
-    handler_(handler_context_, min_severity_);
-  }
-
-  zx::socket local, remote;
-  if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
-    return;
-  }
-  if (!log_sink_->ConnectStructured(std::move(remote)).ok()) {
-    return;
-  }
-  if (interest_listener_config_ != fuchsia_logging::Disabled) {
-    PollInterest();
-  }
-  logsink_socket_ = std::move(local);
-}
-
-void SetInterestChangedListener(void (*callback)(void* context,
-                                                 fuchsia_logging::LogSeverity severity),
-                                void* context) {
-  GlobalStateLock log_state;
-  log_state->set_severity_handler(callback, context);
-}
+zx_koid_t pid = GetKoid(zx_process_self());
+thread_local zx_koid_t tid = FuchsiaLogGetCurrentThreadKoid();
+const char kTagFieldName[] = "tag";
 
 void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
                          cpp17::optional<cpp17::string_view> file_name, unsigned int line,
@@ -267,22 +164,17 @@ void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severit
       msg = modified_msg->data();
     }
   }
-  auto* state = RecordState::CreatePtr(buffer);
-  // Invoke the constructor of RecordState to construct a valid RecordState
-  // inside the LogBuffer.
-  new (state) RecordState;
-  state->raw_severity = severity;
+  buffer->raw_severity = severity;
   if (socket == ZX_HANDLE_INVALID) {
     socket = std::get<0>(log_state->descriptor()).get();
   }
-  state->socket = socket;
   if (severity == fuchsia_logging::LOG_FATAL) {
-    state->maybe_fatal_string = msg->data();
+    buffer->maybe_fatal_string = msg->data();
   }
-  state->buffer.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
+  buffer->inner.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
                             tid);
-  for (size_t i = 0; i < log_state->tag_count(); i++) {
-    state->buffer.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
+  for (size_t i = 0; i < log_state->tags().size(); i++) {
+    buffer->inner.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
   }
 }
 
@@ -297,60 +189,122 @@ void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity sever
   BeginRecordInternal(buffer, severity, file_name, line, msg, condition, socket);
 }
 
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
+void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
+  GlobalStateLock lock(false);
+  LogState::Set(settings, lock);
 }
 
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
+void SetLogSettings(const fuchsia_logging::LogSettings& settings,
+                    const std::initializer_list<std::string>& tags) {
+  GlobalStateLock lock(false);
+  LogState::Set(settings, tags, lock);
 }
 
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
+fuchsia_logging::LogSeverity GetMinLogSeverity() {
+  GlobalStateLock lock;
+  return lock->min_severity();
+}
+}  // namespace
+
+void LogState::PollInterest() {
+  log_sink_->WaitForInterestChange().Then(
+      [=](fidl::WireUnownedResult<fuchsia_logger::LogSink::WaitForInterestChange>&
+              interest_result) {
+        // FIDL can cancel the operation if the logger is being reconfigured
+        // which results in an error.
+        if (!interest_result.ok()) {
+          return;
+        }
+        HandleInterest(interest_result->value()->data);
+        on_severity_changed_(min_severity_);
+        PollInterest();
+      });
 }
 
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
+void LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
+  if (!interest.has_min_severity()) {
+    min_severity_ = default_severity_;
+  } else {
+    min_severity_ = IntoLogSeverity(interest.min_severity());
+  }
 }
 
-void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value) {
-  auto* state = RecordState::CreatePtr(buffer);
-  state->buffer.WriteKeyValue(key, value);
+void LogState::Connect() {
+  auto default_dispatcher = async_get_default_dispatcher();
+  if (interest_listener_config_ != fuchsia_logging::Disabled) {
+    if (!interest_listener_dispatcher_ && !default_dispatcher) {
+      deprecated_loop_.StartThread("log-interest-listener-thread");
+    }
+  }
+  // Regardless of whether or not we need to do anything async, FIDL async bindings
+  // require a valid dispatcher or they panic.
+  if (!interest_listener_dispatcher_) {
+    if (default_dispatcher) {
+      interest_listener_dispatcher_ = default_dispatcher;
+    } else {
+      interest_listener_dispatcher_ = deprecated_loop_.dispatcher();
+    }
+  }
+  fidl::ClientEnd<fuchsia_logger::LogSink> client_end;
+  if (!provided_log_sink_.has_value()) {
+    auto connect_result = component::Connect<fuchsia_logger::LogSink>();
+    if (connect_result.is_error()) {
+      return;
+    }
+    client_end = std::move(connect_result.value());
+  } else {
+    client_end = std::move(*provided_log_sink_);
+  }
+  log_sink_.Bind(std::move(client_end), interest_listener_dispatcher_);
+  if (interest_listener_config_ == fuchsia_logging::Enabled) {
+    auto interest_result = log_sink_.sync()->WaitForInterestChange();
+    if (interest_result->is_ok()) {
+      HandleInterest(interest_result->value()->data);
+    }
+    on_severity_changed_(min_severity_);
+  }
+
+  zx::socket local, remote;
+  if (zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote) != ZX_OK) {
+    return;
+  }
+  if (!log_sink_->ConnectStructured(std::move(remote)).ok()) {
+    return;
+  }
+  if (interest_listener_config_ != fuchsia_logging::Disabled) {
+    PollInterest();
+  }
+  logsink_socket_ = std::move(local);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
-  syslog_runtime::WriteKeyValue(this, key, value);
+  inner.WriteKeyValue(key, value);
 }
 
 bool LogBuffer::Flush() {
   GlobalStateLock log_state;
-  auto* state = RecordState::CreatePtr(this);
-  if (state->raw_severity < log_state->min_severity()) {
+  if (raw_severity < log_state->min_severity()) {
     return true;
   }
-  auto ret = state->buffer.FlushRecord();
-  if (state->raw_severity == fuchsia_logging::LOG_FATAL) {
-    std::cerr << state->maybe_fatal_string << std::endl;
+  auto ret = inner.FlushRecord();
+  if (raw_severity == fuchsia_logging::LOG_FATAL) {
+    std::cerr << *maybe_fatal_string << std::endl;
     abort();
   }
   return ret;
@@ -371,7 +325,7 @@ void LogState::Set(const fuchsia_logging::LogSettings& settings,
 
 LogState::LogState(const fuchsia_logging::LogSettings& settings,
                    const std::initializer_list<std::string>& tags)
-    : loop_(&kAsyncLoopConfigNeverAttachToThread),
+    : deprecated_loop_(&kAsyncLoopConfigNeverAttachToThread),
       min_severity_(settings.min_log_level),
       default_severity_(settings.min_log_level) {
   interest_listener_dispatcher_ =
@@ -381,28 +335,28 @@ LogState::LogState(const fuchsia_logging::LogSettings& settings,
   if (settings.log_sink) {
     provided_log_sink_ = fidl::ClientEnd<fuchsia_logger::LogSink>(zx::channel(settings.log_sink));
   }
+  on_severity_changed_ = settings.severity_change_callback;
+  if (!on_severity_changed_) {
+    on_severity_changed_ = [](fuchsia_logging::LogSeverity severity) {};
+  }
   for (auto& tag : tags) {
-    tags_[num_tags_++] = tag;
-    if (num_tags_ >= kMaxTags)
-      break;
+    tags_.push_back(tag);
   }
   Connect();
 }
 
-void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
-  GlobalStateLock lock(false);
-  LogState::Set(settings, lock);
-}
-
-void SetLogSettings(const fuchsia_logging::LogSettings& settings,
-                    const std::initializer_list<std::string>& tags) {
-  GlobalStateLock lock(false);
-  LogState::Set(settings, tags, lock);
-}
-
-fuchsia_logging::LogSeverity GetMinLogSeverity() {
-  GlobalStateLock lock;
-  return lock->min_severity();
+LogBuffer LogBufferBuilder::Build() {
+  LogBuffer buffer;
+  if (socket_) {
+    BeginRecordWithSocket(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_),
+                          line_, NullSafeStringView::CreateFromOptional(msg_),
+                          NullSafeStringView::CreateFromOptional(condition_), socket_);
+  } else {
+    BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
+                NullSafeStringView::CreateFromOptional(msg_),
+                NullSafeStringView::CreateFromOptional(condition_));
+  }
+  return buffer;
 }
 
 }  // namespace syslog_runtime
@@ -429,6 +383,12 @@ LogSettingsBuilder& LogSettingsBuilder::DisableWaitForInitialInterest() {
   if (settings_.interest_listener_config_ == fuchsia_logging::Enabled) {
     WithInterestListenerConfiguration(fuchsia_logging::EnabledNonBlocking);
   }
+  return *this;
+}
+
+LogSettingsBuilder& LogSettingsBuilder::WithSeverityChangedListener(
+    void (*callback)(fuchsia_logging::LogSeverity severity)) {
+  settings_.severity_change_callback = callback;
   return *this;
 }
 

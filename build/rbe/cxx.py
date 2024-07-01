@@ -291,6 +291,15 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         help="linking search paths",
     )
     parser.add_argument(
+        "-l",
+        type=str,
+        dest="libs",
+        action="append",
+        default=[],
+        metavar="LIBNAME",
+        help="explicitly named libs to link",
+    )
+    parser.add_argument(
         "-U",
         type=str,
         dest="undefines",
@@ -437,7 +446,7 @@ _LINKER_DRIVER_PARSER = _linker_driver_arg_parser()
 
 # These are flags that are joined with their arguments with
 # no separator (no '=' or space).
-_CPP_FUSED_FLAGS = ["-I", "-D", "-L", "-U", "-isystem"]
+_CPP_FUSED_FLAGS = ["-I", "-D", "-L", "-l", "-U", "-isystem"]
 
 
 def expand_forwarded_driver_flags(args: Iterable[str]) -> Iterable[str]:
@@ -646,7 +655,11 @@ class CxxAction(object):
 
     @property
     def libdirs(self) -> Sequence[Path]:
-        return self._attributes.libdirs
+        return self._cpp_attributes.libdirs
+
+    @property
+    def libs(self) -> Sequence[str]:
+        return self._cpp_attributes.libs
 
     @property
     def uninterpreted_args(self) -> Sequence[str]:

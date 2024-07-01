@@ -42,7 +42,7 @@ class LoopTest : public ::testing::Test {
     if (skip_loop_tests) {
       GTEST_SKIP() << "Permission denied for /dev/loop-control, skipping suite.";
     }
-    loop_control_ = test_helper::ScopedFD(open("/dev/loop-control", O_RDWR));
+    loop_control_ = fbl::unique_fd(open("/dev/loop-control", O_RDWR));
     ASSERT_TRUE(loop_control_.is_valid());
   }
 
@@ -59,17 +59,17 @@ class LoopTest : public ::testing::Test {
   }
 
  private:
-  test_helper::ScopedFD loop_control_;
+  fbl::unique_fd loop_control_;
 };
 
 #define ASSERT_SUCCESS(call) ASSERT_THAT((call), SyscallSucceeds())
 
 TEST_F(LoopTest, ReopeningDevicePreservesOffset) {
   std::string loop_device_path = "/dev/loop" + std::to_string(GetFreeLoopDeviceNumber());
-  test_helper::ScopedFD free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
+  fbl::unique_fd free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
   ASSERT_TRUE(free_loop_device.is_valid());
 
-  test_helper::ScopedFD backing_file(open("data/hello_world.txt", O_RDONLY, 0644));
+  fbl::unique_fd backing_file(open("data/hello_world.txt", O_RDONLY, 0644));
   ASSERT_TRUE(backing_file.is_valid());
 
   // Configure an offset that we'll check for after re-opening the device.
@@ -83,7 +83,7 @@ TEST_F(LoopTest, ReopeningDevicePreservesOffset) {
 
   // Close the loop device fd and reopen it, confirming that the offset and other configuration are
   // the same and preserved even when there are no open files to the device.
-  free_loop_device = test_helper::ScopedFD(open(loop_device_path.c_str(), O_RDONLY, 0644));
+  free_loop_device = fbl::unique_fd(open(loop_device_path.c_str(), O_RDONLY, 0644));
   loop_info64 second_observed_info;
   ASSERT_SUCCESS(ioctl(free_loop_device.get(), LOOP_GET_STATUS64, &second_observed_info));
   EXPECT_EQ(first_observed_info.lo_offset, second_observed_info.lo_offset);

@@ -28,7 +28,7 @@ pub enum DriverPackageType {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResolvedDriver {
-    pub component_url: url::Url,
+    pub component_url: cm_types::Url,
     pub bind_rules: DecodedRules,
     pub bind_bytecode: Vec<u8>,
     pub colocate: bool,
@@ -48,7 +48,7 @@ impl std::fmt::Display for ResolvedDriver {
 
 impl ResolvedDriver {
     pub async fn resolve(
-        component_url: url::Url,
+        component_url: cm_types::Url,
         resolver: &fresolution::ResolverProxy,
         package_type: DriverPackageType,
     ) -> Result<ResolvedDriver, fuchsia_zircon::Status> {
@@ -150,7 +150,7 @@ impl ResolvedDriver {
 
 // Load the driver information from its resolved component's decl and package.
 pub async fn load_driver(
-    component_url: url::Url,
+    component_url: cm_types::Url,
     component: fdecl::Component,
     package_dir: PackageDirectory,
     package_type: DriverPackageType,

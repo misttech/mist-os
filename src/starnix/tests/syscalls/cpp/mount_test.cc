@@ -266,17 +266,17 @@ TEST_F(MountTest, Ext4ReadOnlySmokeTest) {
   EXPECT_TRUE(files::ReadFileToString("data/hello_world.txt", &expected_contents));
 
   // TODO(https://fxbug.dev/42080815) remove explicit loopback discovery and binding once unneeded
-  test_helper::ScopedFD loop_control(open("/dev/loop-control", O_RDWR, 0777));
+  fbl::unique_fd loop_control(open("/dev/loop-control", O_RDWR, 0777));
   ASSERT_TRUE(loop_control.is_valid());
 
   int free_loop_device_num(ioctl(loop_control.get(), LOOP_CTL_GET_FREE, nullptr));
   ASSERT_TRUE(free_loop_device_num >= 0);
 
   std::string loop_device_path = "/dev/loop" + std::to_string(free_loop_device_num);
-  test_helper::ScopedFD free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
+  fbl::unique_fd free_loop_device(open(loop_device_path.c_str(), O_RDONLY, 0644));
   ASSERT_TRUE(free_loop_device.is_valid());
 
-  test_helper::ScopedFD ext_image(open("data/simple_ext4.img", O_RDONLY, 0644));
+  fbl::unique_fd ext_image(open("data/simple_ext4.img", O_RDONLY, 0644));
   ASSERT_TRUE(ext_image.is_valid());
 
   ASSERT_SUCCESS(ioctl(free_loop_device.get(), LOOP_SET_FD, ext_image.get()));

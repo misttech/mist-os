@@ -14,6 +14,144 @@ type DirectoryInfo = table {
 // TODO(https://fxbug.dev/42056856): Use a generated constant.
 const DIRECTORY_PROTOCOL_NAME string = "fuchsia.io/Directory";
 
+/// Flags used to specify how a node should be opened. Note that ranges of bits are reserved
+/// for specific use cases:
+///  * Bits  1-16: Permission flags `PERM_*` (e.g. [`Flags.PERM_READ`]).
+///  * Bits 17-32: POSIX compatibile `O_*` flags (e.g. [`Flags.FILE_TRUNCATE`] or `O_TRUNC`).
+///  * Bits 33-64: Fuchsia-specific flags.
+@available(added=HEAD)
+type Flags = flexible bits : uint64 {
+    //
+    // Permissions
+    //
+    // Permissions can only be granted if the current connection has them. If a permission is
+    // requested but not available, the request will fail with `ZX_ERR_ACCESS_DENIED`.
+    // Note that the `PERM_INHERIT_*` flags can be used to request permissions that the
+    // connection may lack without failing the request. Callers should not expect that these
+    // permissions are available if the request succeeds.
+
+    /// Allows opening child nodes with [`PROTOCOL_SERVICE`].
+    PERM_CONNECT = 0x0001;
+    /// Read byte contents of a file.
+    PERM_READ = 0x0002;
+    /// Write byte contents to a file.
+    PERM_WRITE = 0x0004;
+    /// Execute byte contents of a file.
+    PERM_EXECUTE = 0x0008;
+    /// Get/query attributes of a node.
+    PERM_GET_ATTRIBUTES = 0x0010;
+    /// Set/update attributes of a node.
+    PERM_SET_ATTRIBUTES = 0x0020;
+    /// Enumerate (list) directory entries.
+    PERM_ENUMERATE = 0x0040;
+    /// Allow opening a child node with a node protocol. Must be specified with PERM_ENUMERATE
+    /// otherwise requests will fail with `ZX_ERR_INVALID_ARGS`.
+    PERM_TRAVERSE = 0x0080;
+    /// Modify directory entries (create/rename/link/unlink). Must be specified with PERM_ENUMERATE
+    /// otherwise requests will fail with `ZX_ERR_INVALID_ARGS`.
+    PERM_MODIFY = 0x0100;
+    /// Inherit write permissions when available (PERM_WRITE, PERM_SET_ATTRIBUTES, PERM_MODIFY,
+    /// PERM_ENUMERATE). Servers must ensure this flag is removed if the parent connection lacks any
+    /// of these rights. See [`INHERITED_WRITE_PERMISSIONS`] for the exact set of permissions that
+    /// will be inherited.
+    PERM_INHERIT_WRITE = 0x2000;
+    /// Inherit execute permission when available (PERM_EXECUTE).
+    /// Servers must ensure this flag is removed if the parent connection lacks PERM_EXECUTE.
+    PERM_INHERIT_EXECUTE = 0x4000;
+
+    //
+    // Protocols
+    //
+    // If several protocols are specified, the caller must be prepared to accept any protocol.
+    // If no protocols are specified, the server will negotiate a node protocol for the caller
+    // based on the protocols the target object supports. Caller can request an event with
+    // [`FLAG_SEND_REPRESENTATION`] to determine which protocol was negotiated.
+    //
+    // If the target node is not compatible with any specified protocols, the request will fail
+    // with the following precedence of errors:
+    //
+    //  * `ZX_ERR_NOT_DIR` if [`PROTOCOL_DIRECTORY`] was specified but no other protocol was
+    //     negotiated
+    //  * `ZX_ERR_NOT_FILE` if [`PROTOCOL_FILE`]` was specified but no other protocol was negotiated
+    //  * `ZX_ERR_WRONG_TYPE` for all other cases
+
+    /// Connect to the underlying protocol if this is a service node. The caller must determine the
+    /// correct protocol to use (e.g. based on path). Unless used with [`PROTOCOL_NODE`], specifying
+    /// other flags with the request will fail with `ZX_ERR_INVALID_ARGS`.
+    PROTOCOL_SERVICE = 0x000100000000;
+    /// Connect to the underlying node. Takes precedence over other protocols. If other `PROTOCOL_*`
+    /// are specified, they will be used to validate the target node type. Requests will fail with
+    /// `ZX_ERR_INVALID_ARGS` if flags other than `PROTOCOL_*` and [`FLAG_SEND_REPRESENTATION`] are
+    /// specified. Equivalent to POSIX `O_PATH`.
+    PROTOCOL_NODE = 0x00400000;
+    /// Caller accepts [`fuchsia.io/Directory`] protocol. Equivalent to POSIX `O_DIRECTORY`.
+    PROTOCOL_DIRECTORY = 0x00080000;
+    /// Caller accepts [`fuchsia.io/File`] protocol.
+    PROTOCOL_FILE = 0x000200000000;
+    /// Caller accepts [`fuchsia.io/Symlink`] protocol.
+    PROTOCOL_SYMLINK = 0x000400000000;
+
+    //
+    // Options
+    //
+
+    /// Caller requests a [`fuchsia.io/Node.OnRepresentation`] event on success.
+    FLAG_SEND_REPRESENTATION = 0x010000000000;
+    /// Create a new object if one doesn't exist, otherwise open an existing object. If set, a
+    /// single `PROTOCOL_*` flag must be set indicating the type of object to create. Equivalent
+    /// to POSIX `O_CREAT`.
+    FLAG_MAYBE_CREATE = 0x00010000;
+    /// Create a new object if one doesn't exist, otherwise fail the request with
+    /// `ZX_ERR_ALREADY_EXISTS`. If set, a single `PROTOCOL_*` flag must be set indicating the type
+    /// of object to create. Takes precedence over [`FLAG_CREATE`]. Equivalent to POSIX `O_EXCL`.
+    FLAG_MUST_CREATE = 0x00020000;
+
+    //
+    // File-Specific Options
+    //
+
+    /// Open the file in append mode. The seek pointer will be moved to end-of-file (EOF)
+    /// before all writes. Equivalent to POSIX `O_APPEND`.
+    FILE_APPEND = 0x00100000;
+    /// Truncate the file to zero length upon opening it. Equivalent to POSIX `O_TRUNC`.
+    FILE_TRUNCATE = 0x00040000;
+};
+
+
+@available(added=HEAD)
+const MASK_PERMISSION_FLAGS uint64 = 0x000000000000FFFF;
+
+@available(added=HEAD)
+const MASK_POSIX_FLAGS uint64 = 0x00000000FFFFFFFF;
+
+@available(added=HEAD)
+const MASK_KNOWN_PERMISSIONS Flags
+        = Flags.PERM_READ | Flags.PERM_WRITE | Flags.PERM_EXECUTE | Flags.PERM_SET_ATTRIBUTES | Flags.PERM_ENUMERATE | Flags.PERM_MODIFY | Flags.PERM_CONNECT | Flags.PERM_GET_ATTRIBUTES | Flags.PERM_TRAVERSE | Flags.PERM_INHERIT_WRITE | Flags.PERM_INHERIT_EXECUTE;
+
+@available(added=HEAD)
+const MASK_KNOWN_PROTOCOLS Flags
+        = Flags.PROTOCOL_DIRECTORY | Flags.PROTOCOL_FILE | Flags.PROTOCOL_NODE | Flags.PROTOCOL_SYMLINK | Flags.PROTOCOL_SERVICE;
+
+/// Set of rights that [`Flags.PERM_INHERIT_WRITE`] will inherit from the parent connection if
+/// specified. Note that if any of these permissions are missing from the connection, none of these
+/// permissions will be inherited.
+@available(added=HEAD)
+const INHERITED_WRITE_PERMISSIONS Operations
+        = Operations.WRITE_BYTES | Operations.ENUMERATE | Operations.MODIFY_DIRECTORY | Operations.UPDATE_ATTRIBUTES;
+
+/// Options which can be used with Open3. Unlike [`Flags`], these options are designed for specific
+/// use cases (e.g. to reduce round-trip latency when requesting attributes).
+@available(added=HEAD)
+type Options = table {
+    /// Request a set of attributes to be sent with the OnRepresentation response. Has no effect
+    /// if `Flags.FLAG_SEND_REPRESENTATION` is not set.
+    1: attributes NodeAttributesQuery;
+    /// Request a set of attributes to be set atomically when creating a new object. Has no effect
+    /// if neither `Flags.FLAG_MAYBE_CREATE` nor `Flags.FLAG_MUST_CREATE` are set, or if an object
+    /// already exists.
+    2: create_attributes MutableNodeAttributes;
+};
+
 /// Options used when opening a node.
 type NodeOptions = table {
     1: flags @generated_name("NodeFlags") flexible bits : uint64 {
@@ -192,6 +330,22 @@ closed protocol Directory2 {
         /// send messages on the corresponding client end right away.
         object_request zx.Handle:CHANNEL;
     });
+
+    /// Open (or create) a node relative to this directory. Any errors are communicated via an
+    /// epitaph sent on the `object` channel.
+    ///
+    /// Errors:
+    /// * `ZX_ERR_BAD_PATH` if `path` is invalid
+    /// * See [`Flags`] for other errors which may be communicated based on `flags`
+    @selector("fuchsia.io/Directory.Open3")
+    @available(added=HEAD)
+    strict Open3(resource struct {
+        path Path;
+        flags Flags;
+        options Options;
+        object zx.Handle:CHANNEL;
+    });
+
 
     /// Removes a child node from the this directory's list of entries.
     ///

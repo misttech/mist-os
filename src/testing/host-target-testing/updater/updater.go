@@ -362,10 +362,12 @@ func (u *SystemUpdater) Update(
 
 	logger.Infof(ctx, "Reboot complete in %s", time.Now().Sub(startTime))
 
+	startTime = time.Now()
 	cmd = []string{"/bin/update", "wait-for-commit"}
 	if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
 		logger.Warningf(ctx, "update wait-for-commit failed: %v", err)
 	}
+	logger.Infof(ctx, "Commit successful in %s", time.Now().Sub(startTime))
 
 	return nil
 }

@@ -58,6 +58,12 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         default=False,
         help="Expect the main output of linking to be executable.  If true, set the executable bit on the main output's download stub if needed.  See (b/285030257).",
     )
+    group.add_argument(
+        "--scandeps",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="""If enabled, scan for linker inputs recursively for.  This should only be needed as a potential workaround for cases not handled by reclient.""",
+    )
     return parser
 
 
@@ -253,20 +259,7 @@ class CxxLinkRemoteAction(object):
             *self.command_line_output_files,
         ]
 
-    @property
-    def _sysroot_is_outside_exec_root(self) -> bool:
-        sysroot_dir = self.sysroot
-        if not sysroot_dir:
-            return False  # not applicable
-
-        if not sysroot_dir.is_absolute():
-            # C sysroot is relative to the working directory
-            return False
-
-        # Check all absolute path parents.
-        return self.exec_root not in sysroot_dir.parents
-
-    def _sysroot_files(self) -> Iterable[Path]:
+    def _expand_sysroot_paths(self) -> Iterable[Path]:
         # sysroot files
         if not self.target:
             return
@@ -282,35 +275,75 @@ class CxxLinkRemoteAction(object):
         if sysroot_dir:
             # Some sysroot files are linker scripts to be expanded.
             if sysroot_triple:
-                search_paths = [
-                    sysroot_dir / "usr/lib" / sysroot_triple,
-                    sysroot_dir / "lib" / sysroot_triple,
-                ]
+                yield sysroot_dir / "usr/lib" / sysroot_triple
+                yield sysroot_dir / "lib" / sysroot_triple
             else:
-                search_paths = [sysroot_dir / "lib"]
+                yield sysroot_dir / "lib"
 
-            link = linker.LinkerInvocation(
-                working_dir_abs=self.working_dir, search_paths=search_paths
-            )
+    def _linker_invocation(self) -> linker.LinkerInvocation:
+        """Creates a model linker invocation, for dep-scanning."""
+        l_libs = self.cxx_action.libs
+        search_paths = list(self.cxx_action.libdirs)
+        search_paths.extend(self._expand_sysroot_paths())
+        return linker.LinkerInvocation(
+            working_dir_abs=self.working_dir,
+            search_paths=search_paths,
+            l_libs=self.cxx_action.libs,
+            sysroot=self.sysroot,
+        )
 
-            lld = self.host_compiler.parent / self.linker_executable
+    def scan_linker_inputs(self) -> Iterable[Path]:
+        link = self._linker_invocation()
+        yield from self.yield_verbose(
+            "scanned linker inputs", link.expand_all()
+        )
 
-            def linker_script_expander(paths: Sequence[Path]) -> Iterable[Path]:
-                if lld.exists():
-                    yield from link.expand_using_lld(lld=lld, inputs=paths)
-                else:
-                    for path in paths:
-                        yield from link.expand_possible_linker_script(path)
+    @property
+    def _sysroot_is_outside_exec_root(self) -> bool:
+        sysroot_dir = self.sysroot
+        if not sysroot_dir:
+            return False  # not applicable
 
-            yield from self.yield_verbose(
-                "C sysroot files",
-                fuchsia.c_sysroot_files(
-                    sysroot_dir=sysroot_dir,
-                    sysroot_triple=sysroot_triple,
-                    with_libgcc=False,
-                    linker_script_expander=linker_script_expander,
-                ),
-            )
+        if not sysroot_dir.is_absolute():
+            # C sysroot is relative to the working directory
+            return False
+
+        # Check all absolute path parents.
+        return self.exec_root not in sysroot_dir.parents
+
+    def _sysroot_files(self) -> Iterable[Path]:
+        sysroot_dir = self.sysroot
+        if not sysroot_dir:
+            return
+
+        sysroot_paths = list(self._expand_sysroot_paths())
+        if not sysroot_paths:
+            return
+
+        link = linker.LinkerInvocation(
+            working_dir_abs=self.working_dir,
+            search_paths=sysroot_paths,
+        )
+
+        lld = self.host_compiler.parent / self.linker_executable
+
+        def linker_script_expander(paths: Sequence[Path]) -> Iterable[Path]:
+            if lld.exists():
+                yield from link.expand_using_lld(lld=lld, inputs=paths)
+            else:
+                for path in paths:
+                    yield from link.expand_possible_linker_script(path)
+
+        sysroot_triple = fuchsia.clang_target_to_sysroot_triple(self.target)
+        yield from self.yield_verbose(
+            "C sysroot files",
+            fuchsia.c_sysroot_files(
+                sysroot_dir=sysroot_dir,
+                sysroot_triple=sysroot_triple,
+                with_libgcc=False,
+                linker_script_expander=linker_script_expander,
+            ),
+        )
 
     def prepare(self) -> int:
         """Setup everything ahead of remote execution.
@@ -378,6 +411,10 @@ class CxxLinkRemoteAction(object):
         # like:
         #   remote_inputs.extend(self._sysroot_files())
         # See b/306499345.
+
+        if self.scandeps:
+            # workaround b/349448459: find some missing linker inputs
+            remote_inputs.extend(self.scan_linker_inputs())
 
         remote_inputs += self.command_line_inputs
 
@@ -535,6 +572,10 @@ class CxxLinkRemoteAction(object):
     @property
     def label(self) -> Optional[str]:
         return self._main_args.label
+
+    @property
+    def scandeps(self) -> bool:
+        return self._main_args.scandeps
 
     @property
     def local_only(self) -> bool:

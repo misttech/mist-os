@@ -12,6 +12,7 @@
 #include <regex>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/designware/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 
@@ -111,6 +112,13 @@ zx::result<> UsbPhyVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
         bind_fuchsia::PLATFORM_DEV_DID, bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2));
     bind_properties.emplace_back(fdf::MakeProperty(
         bind_fuchsia::PLATFORM_DEV_DID, bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2));
+  } else if (phy_name == "dwc3-phy") {
+    bind_rules.emplace_back(
+        fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                                bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3));
+    bind_properties.emplace_back(
+        fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                          bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3));
   } else {
     FDF_LOG(ERROR, "Node '%s' has invalid phy-name '%s'.", child.name().c_str(),
             std::string(phy_name).c_str());

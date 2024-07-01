@@ -12,7 +12,10 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "iso",
-    srcs = ["iso_stream_manager.cc"],
+    srcs = [
+        "iso_stream.cc",
+        "iso_stream_manager.cc",
+    ],
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/common",
@@ -30,6 +33,7 @@ fuchsia_cc_test(
     death_unittest = True,
     visibility = ["//visibility:public"],
     deps = [
+        ":iso",
         "//src/connectivity/bluetooth/core/bt-host/testing",
         "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
     ],

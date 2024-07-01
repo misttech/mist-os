@@ -147,6 +147,8 @@ rustc_library("starnix_core") {
     "fs/functionfs.rs",
     "fs/layeredfs.rs",
     "fs/mod.rs",
+    "fs/nmfs/fs.rs",
+    "fs/nmfs/mod.rs",
     "fs/overlayfs.rs",
     "fs/proc/fs.rs",
     "fs/proc/mod.rs",
@@ -171,6 +173,7 @@ rustc_library("starnix_core") {
     "lib.rs",
     "loader.rs",
     "memory_attribution/mod.rs",
+    "memory_attribution/sync.rs",
     "mm/futex_table.rs",
     "mm/memory_manager.rs",
     "mm/mod.rs",
@@ -418,6 +421,7 @@ rustc_library("starnix_core") {
   ]
 
   test_deps = [
+    "//src/connectivity/lib/net-declare",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",

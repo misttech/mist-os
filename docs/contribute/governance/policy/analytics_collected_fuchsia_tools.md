@@ -7,7 +7,7 @@ could include Google's examination of the collected data in aggregate to help
 improve these tools, other Fuchsia tools, and the Fuchsia SDK.
 
 The tools include `ffx` (and all its subtools), `zxdb`, `fidlcat`,
-`symbolizer`, `foxtrot` and the Fuchsia extension for VS Code. If you disable
+`symbolizer`, and the Fuchsia extension for VS Code. If you disable
 analytics, an opt-out event is sent and after that no further analytics will be
 sent by the tools to Google until analytics is enabled again. Otherwise, if
 analytics is enabled, invocations and usage of these tools will result in data

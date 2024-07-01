@@ -365,7 +365,7 @@ pub trait IcmpMessage<I: IcmpIpExt>:
 ///
 /// `IcmpMessageType` is implemented by `Icmpv4MessageType` and
 /// `Icmpv6MessageType`.
-pub trait IcmpMessageType: TryFrom<u8> + Into<u8> + Copy {
+pub trait IcmpMessageType: TryFrom<u8> + Into<u8> + Copy + Debug {
     /// Is this an error message?
     ///
     /// For ICMP, this is true for the Destination Unreachable, Redirect, Source

@@ -5,7 +5,7 @@
 use fidl::endpoints::ControlHandle;
 use fidl::Error::ClientChannelClosed;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::AsHandleRef;
+use measure_tape_for_attribution::Measurable;
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
@@ -23,12 +23,8 @@ pub enum AttributionServerObservationError {
     GetUpdateAlreadyPending,
 }
 
-/// Error types that may be used when sending an attribution update.
-#[derive(Error, Debug)]
-pub enum AttributionServerPublishError {
-    #[error("the update is malformed")]
-    MalformedUpdate,
-}
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct PrincipalIdentifier(u64);
 
 /// Main structure for the memory attribution hanging get server.
 ///
@@ -92,10 +88,7 @@ impl Publisher {
     /// Registers an update to the state observed.
     ///
     /// `partial_state` is a function that returns the update.
-    pub fn on_update(
-        &self,
-        updates: Vec<fattribution::AttributionUpdate>,
-    ) -> Result<(), AttributionServerPublishError> {
+    pub fn on_update(&self, updates: Vec<fattribution::AttributionUpdate>) {
         // [update_generator] is a `Fn` and not an `FnOnce` in order to be called multiple times,
         // once for each [Observer].
         self.inner.lock().on_update(updates)
@@ -117,14 +110,10 @@ impl AttributionServer {
         }
     }
 
-    pub fn on_update(
-        &mut self,
-        updates: Vec<fattribution::AttributionUpdate>,
-    ) -> Result<(), AttributionServerPublishError> {
+    pub fn on_update(&mut self, updates: Vec<fattribution::AttributionUpdate>) {
         if let Some(consumer) = &mut self.consumer {
             return consumer.update_and_notify(updates);
         }
-        Ok(())
     }
 
     /// Get the next attribution state.
@@ -152,40 +141,6 @@ impl AttributionServer {
     /// as another observer is already registered.
     pub fn unregister(&mut self) {
         self.consumer = None;
-    }
-}
-
-/// Principal holds the identification for a principal.
-#[derive(PartialEq, Eq, Hash, Clone)]
-enum Principal {
-    Self_(),
-    Koid(zx::Koid),
-    Part(String),
-}
-
-impl TryFrom<&fattribution::AttributionUpdate> for Principal {
-    type Error = AttributionServerPublishError;
-
-    fn try_from(value: &fattribution::AttributionUpdate) -> Result<Self, Self::Error> {
-        let identifier = match value {
-            fattribution::AttributionUpdate::Add(u) => u.identifier.as_ref().unwrap(),
-            fattribution::AttributionUpdate::Update(u) => u.identifier.as_ref().unwrap(),
-            fattribution::AttributionUpdate::Remove(u) => u,
-            fattribution::AttributionUpdateUnknown!() => {
-                return Err(AttributionServerPublishError::MalformedUpdate);
-            }
-        };
-        match identifier {
-            fattribution::Identifier::Self_(_) => Ok(Principal::Self_()),
-            fattribution::Identifier::Component(component) => component
-                .get_koid()
-                .or(Err(AttributionServerPublishError::MalformedUpdate))
-                .map(|k| Principal::Koid(k)),
-            fattribution::Identifier::Part(part) => Ok(Principal::Part(part.to_owned())),
-            fattribution::IdentifierUnknown!() => {
-                return Err(AttributionServerPublishError::MalformedUpdate);
-            }
-        }
     }
 }
 
@@ -243,6 +198,26 @@ impl CoalescedUpdate {
         }
         result
     }
+
+    pub fn size(&self) -> (usize, usize) {
+        let (mut bytes, mut handles) = (0, 0);
+        if let Some(u) = &self.add {
+            let m = u.measure();
+            bytes += m.num_bytes;
+            handles += m.num_handles;
+        }
+        if let Some(u) = &self.update {
+            let m = u.measure();
+            bytes += m.num_bytes;
+            handles += m.num_handles;
+        }
+        if let Some(u) = &self.remove {
+            let m = u.measure();
+            bytes += m.num_bytes;
+            handles += m.num_handles;
+        }
+        (bytes, handles)
+    }
 }
 
 /// AttributionConsumer tracks pending updates and observation requests for a given id.
@@ -251,7 +226,7 @@ struct AttributionConsumer {
     first: bool,
 
     /// Pending updates waiting to be sent.
-    pending: HashMap<Principal, CoalescedUpdate>,
+    pending: HashMap<PrincipalIdentifier, CoalescedUpdate>,
 
     /// Control handle for the FIDL connection.
     observer_control_handle: fattribution::ProviderControlHandle,
@@ -288,7 +263,8 @@ impl AttributionConsumer {
         if self.first {
             self.first = false;
             self.pending.clear();
-            Self::send_update(gen_state(), responder);
+            self.responder = Some(responder);
+            self.update_and_notify(gen_state());
             return;
         }
         self.responder = Some(responder);
@@ -296,12 +272,22 @@ impl AttributionConsumer {
     }
 
     /// Take in new memory attribution updates.
-    pub fn update_and_notify(
-        &mut self,
-        updated_state: Vec<fattribution::AttributionUpdate>,
-    ) -> Result<(), AttributionServerPublishError> {
+    pub fn update_and_notify(&mut self, updated_state: Vec<fattribution::AttributionUpdate>) {
         for update in updated_state {
-            let principal: Principal = (&update).try_into()?;
+            let principal: PrincipalIdentifier = match &update {
+                fattribution::AttributionUpdate::Add(added_attribution) => {
+                    PrincipalIdentifier(added_attribution.identifier.unwrap())
+                }
+                fattribution::AttributionUpdate::Update(update_attribution) => {
+                    PrincipalIdentifier(update_attribution.identifier.unwrap())
+                }
+                fattribution::AttributionUpdate::Remove(remove_attribution) => {
+                    PrincipalIdentifier(*remove_attribution)
+                }
+                &fattribution::AttributionUpdateUnknown!() => {
+                    unimplemented!()
+                }
+            };
             if self.pending.entry(principal.clone()).or_insert(Default::default()).update(update)
                 == ShouldKeepUpdate::DISCARD
             {
@@ -309,7 +295,6 @@ impl AttributionConsumer {
             }
         }
         self.maybe_notify();
-        Ok(())
     }
 
     /// Notify of the pending updates if a responder is available.
@@ -319,10 +304,30 @@ impl AttributionConsumer {
         }
 
         match self.responder.take() {
-            Some(observer) => Self::send_update(
-                self.pending.drain().map(|(_, v)| v.get_updates()).flatten().collect(),
-                observer,
-            ),
+            Some(observer) => {
+                let mut iterator = self.pending.drain().peekable();
+                let mut current_size: usize = 32;
+                let mut current_handles: usize = 0;
+                let mut update = Vec::new();
+                while let Some((_, next)) = iterator.peek() {
+                    let (update_size, update_handles) = next.size();
+
+                    if current_size + update_size > zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize {
+                        break;
+                    }
+                    if current_handles + update_handles
+                        > zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize
+                    {
+                        break;
+                    }
+                    current_size += update_size;
+                    current_handles += update_handles;
+                    update.extend(iterator.next().unwrap().1.get_updates().into_iter());
+                }
+
+                self.pending = iterator.collect();
+                Self::send_update(update, observer)
+            }
             None => {}
         }
     }
@@ -364,9 +369,11 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let server = AttributionServer::new(Box::new(|| {
             let new_principal = fattribution::NewPrincipal {
-                identifier: Some(fattribution::Identifier::Self_(fattribution::Self_)),
-                type_: Some(fattribution::Type::Runnable),
-                ..Default::default()
+                identifier: Some(0),
+                description: Some(fattribution::Description::Part("part".to_owned())),
+                principal_type: Some(fattribution::PrincipalType::Runnable),
+                detailed_attribution: None,
+                __source_breaking: fidl::marker::SourceBreaking,
             };
             vec![fattribution::AttributionUpdate::Add(new_principal)]
         }));
@@ -390,21 +397,12 @@ mod tests {
         let fattribution::AttributionUpdate::Add(added_principal) = new_attrib else {
             panic!("Not a new principal");
         };
-        assert_eq!(
-            added_principal.identifier,
-            Some(fattribution::Identifier::Self_(fattribution::Self_))
-        );
-        assert_eq!(added_principal.type_, Some(fattribution::Type::Runnable));
+        assert_eq!(added_principal.identifier, Some(0));
+        assert_eq!(added_principal.principal_type, Some(fattribution::PrincipalType::Runnable));
 
-        server
-            .new_publisher()
-            .on_update(vec![fattribution::AttributionUpdate::Update(
-                fattribution::UpdatedPrincipal {
-                    identifier: Some(fattribution::Identifier::Self_(fattribution::Self_)),
-                    ..Default::default()
-                },
-            )])
-            .expect("Error sending the update");
+        server.new_publisher().on_update(vec![fattribution::AttributionUpdate::Update(
+            fattribution::UpdatedPrincipal { identifier: Some(0), ..Default::default() },
+        )]);
         let attributions =
             exec.run_singlethreaded(snapshot_provider.get()).unwrap().unwrap().attributions;
         assert!(attributions.is_some());
@@ -416,10 +414,7 @@ mod tests {
         let fattribution::AttributionUpdate::Update(updated_principal) = updated_attrib else {
             panic!("Not an updated principal");
         };
-        assert_eq!(
-            updated_principal.identifier,
-            Some(fattribution::Identifier::Self_(fattribution::Self_))
-        );
+        assert_eq!(updated_principal.identifier, Some(0));
     }
 
     pub async fn serve(
@@ -463,7 +458,14 @@ mod tests {
     #[test]
     fn test_disconnect_on_two_pending_gets() {
         let mut exec = fasync::TestExecutor::new();
-        let server = AttributionServer::new(Box::new(|| vec![]));
+        let server = AttributionServer::new(Box::new(|| {
+            let new_principal = fattribution::NewPrincipal {
+                identifier: Some(0),
+                principal_type: Some(fattribution::PrincipalType::Runnable),
+                ..Default::default()
+            };
+            vec![fattribution::AttributionUpdate::Add(new_principal)]
+        }));
         let (snapshot_provider, snapshot_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
 
@@ -498,8 +500,8 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let server = AttributionServer::new(Box::new(|| {
             let new_principal = fattribution::NewPrincipal {
-                identifier: Some(fattribution::Identifier::Self_(fattribution::Self_)),
-                type_: Some(fattribution::Type::Runnable),
+                identifier: Some(0),
+                principal_type: Some(fattribution::PrincipalType::Runnable),
                 ..Default::default()
             };
             vec![fattribution::AttributionUpdate::Add(new_principal)]
@@ -513,15 +515,9 @@ mod tests {
         })
         .detach();
 
-        server
-            .new_publisher()
-            .on_update(vec![fattribution::AttributionUpdate::Update(
-                fattribution::UpdatedPrincipal {
-                    identifier: Some(fattribution::Identifier::Self_(fattribution::Self_)),
-                    ..Default::default()
-                },
-            )])
-            .expect("Error sending the update");
+        server.new_publisher().on_update(vec![fattribution::AttributionUpdate::Update(
+            fattribution::UpdatedPrincipal { identifier: Some(0), ..Default::default() },
+        )]);
 
         // As this is the first call, we should get the full state, not the update.
         let attributions =
@@ -535,10 +531,7 @@ mod tests {
         let fattribution::AttributionUpdate::Add(added_principal) = new_attrib else {
             panic!("Not a new principal");
         };
-        assert_eq!(
-            added_principal.identifier,
-            Some(fattribution::Identifier::Self_(fattribution::Self_))
-        );
-        assert_eq!(added_principal.type_, Some(fattribution::Type::Runnable));
+        assert_eq!(added_principal.identifier, Some(0));
+        assert_eq!(added_principal.principal_type, Some(fattribution::PrincipalType::Runnable));
     }
 }

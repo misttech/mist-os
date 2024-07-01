@@ -58,7 +58,6 @@ common_deps = [
   "//src/lib/trace/rust:trace-provider",
   "//src/lib/zircon/rust:fuchsia-zircon",
   "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
-  "//third_party/rust_crates:argh",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:derivative",
   "//third_party/rust_crates:either",
@@ -113,6 +112,7 @@ common_sources = [
   "src/bindings/routes.rs",
   "src/bindings/routes/admin.rs",
   "src/bindings/routes/rules_admin.rs",
+  "src/bindings/routes/rules_state.rs",
   "src/bindings/routes/state.rs",
   "src/bindings/routes/watcher.rs",
   "src/bindings/routes/witness.rs",
@@ -257,7 +257,7 @@ template("ns3_test_component") {
 ns3_test_component("component-debug") {
   component_name = "netstack3-debug"
   manifest = "meta/netstack3_debug.cml"
-  config_values_source = "config/test.json5"
+  config_values_source = "config/test-debug.json5"
   deps = [ ":bin-instrumented" ]
 }
 
@@ -272,7 +272,7 @@ ns3_test_component("component-dropin") {
 ns3_test_component("component-debug-dropin") {
   component_name = "netstack-debug"
   manifest = "meta/netstack3_debug.cml"
-  config_values_source = "config/test.json5"
+  config_values_source = "config/test-debug.json5"
   deps = [ ":bin-instrumented" ]
 }
 

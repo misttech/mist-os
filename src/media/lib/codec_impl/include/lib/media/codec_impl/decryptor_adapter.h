@@ -103,18 +103,11 @@ class DecryptorAdapter : public CodecAdapter {
                                                              CodecPacket* output_packet) = 0;
 
  protected:
-  // GetSecureOutputMemoryConstraints
+  // GetSecureOutputMemoryConstraints2
   //
   // If the specialized Decryptor supports working with secure memory, it should override one of
   // these methods (preferably GetSecureOutputMemoryConstraints2) to provide the proper coherency
   // and permitted heaps that it can support.
-  //
-  // TODO(b/306258175): Finish removing GetSecureOutputMemoryConstraints when all sub-classes have
-  // moved to GetSecureOutputMemoryConstraints2.
-  //
-  // GetSecureOutputMemoryConstraints is deprecated; prefer GetSecureOutputMemoryConstraints2.
-  virtual fuchsia::sysmem::BufferMemoryConstraints GetSecureOutputMemoryConstraints() const;
-  // Prefer to override this method, not GetSecureOutputMemoryConstraints.
   virtual fuchsia_sysmem2::BufferMemoryConstraints GetSecureOutputMemoryConstraints2() const;
 
   // SetProcessingSchedulerProfile

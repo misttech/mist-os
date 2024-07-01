@@ -95,7 +95,7 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
     loop_.StartThread("SystemStateTransitionLoop");
 
     // Set up a power element that keeps the system awake during reboots and shutdowns.
-    // The new power element, shutdown_control, has an active dependency on
+    // The new power element, shutdown_control, has an assertive dependency on
     // SAG's WakeHandling power element when its power level is
     // ShutdownControlLevel::kActive.
 
@@ -121,7 +121,7 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
     }
 
     auto wake_handling = std::move(get_resp.value().wake_handling());
-    if (!wake_handling.has_active_dependency_token()) {
+    if (!wake_handling.has_assertive_dependency_token()) {
       fprintf(stderr, "[shutdown-shim]: wake_handling dependency token not available\n");
       return;
     }
@@ -136,14 +136,14 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
 
     fidl::WireSyncClient topology_client{std::move(topology.value())};
 
-    // Use the WakeHandling dependency token to set up an active dependency
+    // Use the WakeHandling dependency token to set up an assertive dependency
     // between shutdown-shim's new power element and system-activity-governor's
     // WakeHandling power element.
-    auto requires_token = std::move(wake_handling.active_dependency_token());
+    auto requires_token = std::move(wake_handling.assertive_dependency_token());
     auto requires_level_by_preference = std::vector<uint8_t>(
         1, static_cast<uint8_t>(system_fidl::wire::WakeHandlingLevel::kActive));
     auto wake_handling_dep = broker_fidl::wire::LevelDependency{
-        .dependency_type = broker_fidl::wire::DependencyType::kActive,
+        .dependency_type = broker_fidl::wire::DependencyType::kAssertive,
         .dependent_level = static_cast<uint8_t>(ShutdownControlLevel::kActive),
         .requires_token = std::move(requires_token),
         .requires_level_by_preference =

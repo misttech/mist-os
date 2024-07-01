@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/hw/reg.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/virtio/backends/pci.h>
 
 #include <cstdint>
 
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "../include/lib/virtio/backends/pci.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace {
 

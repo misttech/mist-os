@@ -34,6 +34,8 @@ pub async fn create_client(
             .expect("creating proxy")
     });
 
+    // TODO(https://fxbug.dev/338700293): Consider looping with a backoff delay if the device is not found
+    // on the first try.
     let results = futures::stream::iter(devices).filter_map(|netdev_device| async move {
         let (device_proxy, device_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::DeviceMarker>()

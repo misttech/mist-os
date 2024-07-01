@@ -5,14 +5,14 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_IFC_BRIDGE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_SOFTMAC_IFC_BRIDGE_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/driver/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl_driver/cpp/transport.h>
 #include <lib/operation/ethernet.h>
+#include <lib/trace-engine/types.h>
 #include <lib/zx/result.h>
-
-#include <wlan/drivers/log.h>
 
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
@@ -21,6 +21,7 @@ namespace wlan::drivers::wlansoftmac {
 class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
+      fidl::SharedClient<fuchsia_driver_framework::Node> node_client,
       const ethernet_tx_t* ethernet_tx, const wlan_rx_t* wlan_rx,
       fdf::ServerEnd<fuchsia_wlan_softmac::WlanSoftmacIfc>&& server_endpoint,
       fidl::ClientEnd<fuchsia_wlan_softmac::WlanSoftmacIfcBridge>&& bridge_client_endpoint);
@@ -33,7 +34,7 @@ class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc
                       ReportTxResultCompleter::Sync& completer) override;
   void NotifyScanComplete(NotifyScanCompleteRequest& request,
                           NotifyScanCompleteCompleter::Sync& completer) override;
-  void StopBridgedDriver(std::unique_ptr<fit::callback<void()>> stop_completer);
+  void StopBridgedDriver(fit::callback<void()> stop_completer);
 
  private:
   explicit SoftmacIfcBridge(const ethernet_tx_t* ethernet_tx, const wlan_rx_t* wlan_rx)

@@ -37,20 +37,12 @@ class InternalBuffer {
       const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
       const zx::unowned_bti& bti, size_t size, bool is_secure, bool is_writable,
       bool is_mapping_needed);
-  // deprecated; use sysmem2 overload above instead
-  static fpromise::result<InternalBuffer, zx_status_t> Create(
-      const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, const zx::unowned_bti& bti,
-      size_t size, bool is_secure, bool is_writable, bool is_mapping_needed);
 
   // Same as above, but alignment is the byte multiple to align the buffer to.
   static fpromise::result<InternalBuffer, zx_status_t> CreateAligned(
       const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,
       const zx::unowned_bti& bti, size_t size, size_t alignment, bool is_secure, bool is_writable,
       bool is_mapping_needed);
-  // deprecated; use sysmem2 overload above instead
-  static fpromise::result<InternalBuffer, zx_status_t> CreateAligned(
-      const char* name, fuchsia::sysmem::AllocatorSyncPtr* sysmem, const zx::unowned_bti& bti,
-      size_t size, size_t alignment, bool is_secure, bool is_writable, bool is_mapping_needed);
 
   ~InternalBuffer();
 

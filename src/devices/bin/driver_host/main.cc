@@ -25,7 +25,9 @@ using namespace fuchsia_driver_framework;
 }  // namespace fdf
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"driver_host", "driver"});
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(loop.dispatcher()).BuildAndInitializeWithTags({"driver_host", "driver"});
   driver_logger::GetLogger().AddTag("driver_host").AddTag("driver");
   // TODO(https://fxbug.dev/42108351): Lock down job.
   zx_status_t status = StdoutToDebuglog::Init();
@@ -39,7 +41,6 @@ int main(int argc, char** argv) {
     return status;
   }
 
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
 
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());

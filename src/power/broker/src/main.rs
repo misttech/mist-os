@@ -4,7 +4,8 @@
 
 use anyhow::{Context as _, Error};
 use async_utils::event::Event;
-use fidl::endpoints::{create_request_stream, ServerEnd};
+use fidl::endpoints::{create_request_stream, ControlHandle, RequestStream, ServerEnd};
+use fidl::Status;
 use fidl_fuchsia_power_broker::{
     self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlMarker,
     ElementControlRequest, ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
@@ -17,6 +18,7 @@ use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
+use fuchsia_zircon::sys::ZX_ERR_ALREADY_EXISTS;
 use futures::prelude::*;
 use futures::select;
 use std::cell::RefCell;
@@ -238,6 +240,7 @@ impl BrokerSvc {
             Vec<credentials::Token>,
             Option<fpb::LevelControlChannels>,
             Option<ServerEnd<fpb::LessorMarker>>,
+            Option<ServerEnd<fpb::ElementControlMarker>>,
         ),
         fpb::AddElementError,
     > {
@@ -251,14 +254,14 @@ impl BrokerSvc {
             return Err(fpb::AddElementError::Invalid);
         };
         let level_dependencies = payload.dependencies.unwrap_or(vec![]);
-        let active_dependency_tokens: Vec<credentials::Token> = payload
-            .active_dependency_tokens_to_register
+        let assertive_dependency_tokens: Vec<credentials::Token> = payload
+            .assertive_dependency_tokens_to_register
             .unwrap_or(vec![])
             .into_iter()
             .map(|d| d.into())
             .collect();
-        let passive_dependency_tokens: Vec<credentials::Token> = payload
-            .passive_dependency_tokens_to_register
+        let opportunistic_dependency_tokens: Vec<credentials::Token> = payload
+            .opportunistic_dependency_tokens_to_register
             .unwrap_or(vec![])
             .into_iter()
             .map(|d| d.into())
@@ -268,10 +271,11 @@ impl BrokerSvc {
             initial_current_level,
             valid_levels,
             level_dependencies,
-            active_dependency_tokens,
-            passive_dependency_tokens,
+            assertive_dependency_tokens,
+            opportunistic_dependency_tokens,
             payload.level_control_channels,
             payload.lessor_channel,
+            payload.element_control,
         ))
     }
 
@@ -287,10 +291,11 @@ impl BrokerSvc {
                             initial_current_level,
                             valid_levels,
                             level_dependencies,
-                            active_dependency_tokens,
-                            passive_dependency_tokens,
+                            assertive_dependency_tokens,
+                            opportunistic_dependency_tokens,
                             level_control_channels,
                             lessor_channel,
+                            element_control,
                         )) = Self::validate_and_unpack_add_element_payload(payload)
                         else {
                             return responder
@@ -304,8 +309,8 @@ impl BrokerSvc {
                                 initial_current_level,
                                 valid_levels,
                                 level_dependencies,
-                                active_dependency_tokens,
-                                passive_dependency_tokens,
+                                assertive_dependency_tokens,
+                                opportunistic_dependency_tokens,
                             )
                         };
                         tracing::debug!("AddElement add_element = {:?}", res);
@@ -335,8 +340,26 @@ impl BrokerSvc {
                                             e.required = Some(required);
                                         });
                                 }
-                                let (element_control_client, element_control_stream) =
+                                let (element_control_client, element_control_stream_from_server) =
                                     create_request_stream::<ElementControlMarker>()?;
+                                // Check whether the client provided its own element_control
+                                // channel.
+                                let element_control_stream = match element_control {
+                                    None => element_control_stream_from_server,
+                                    Some(element_control) => {
+                                        // Server-created RequestStream should no longer be used,
+                                        // since the client has provided its own ElementControl
+                                        // channel. Use that client-created channel instead.
+                                        element_control_stream_from_server
+                                            .control_handle()
+                                            .shutdown_with_epitaph(Status::from_raw(
+                                                ZX_ERR_ALREADY_EXISTS,
+                                            ));
+                                        // Close request stream, responders, and control_handles.
+                                        std::mem::drop(element_control_stream_from_server);
+                                        element_control.into_stream()?
+                                    }
+                                };
                                 tracing::debug!(
                                     "Spawning element control task for {:?}",
                                     &element_id

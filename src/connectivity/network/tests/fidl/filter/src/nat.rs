@@ -24,12 +24,10 @@ use crate::matchers::{Matcher, Tcp, Udp};
 // TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
 // correctly.
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(Tcp)]
 #[test_case(Udp)]
-async fn redirect_ingress_no_assigned_address<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
-    name: &str,
-    matcher: M,
-) {
+async fn redirect_ingress_no_assigned_address<I: TestIpExt, M: Matcher>(name: &str, matcher: M) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
@@ -94,15 +92,12 @@ fn different_ephemeral_port(port: u16) -> u16 {
 // TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
 // correctly.
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(Tcp, false; "tcp")]
 #[test_case(Udp, false; "udp")]
 #[test_case(Tcp, true; "tcp to local port")]
 #[test_case(Udp, true; "udp to local port")]
-async fn redirect_ingress<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
-    name: &str,
-    matcher: M,
-    change_dst_port: bool,
-) {
+async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, change_dst_port: bool) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", format!("{matcher:?}").to_snake_case());
@@ -204,11 +199,12 @@ async fn redirect_ingress<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
 // TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
 // correctly.
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(Tcp, false; "tcp")]
 #[test_case(Udp, false; "udp")]
 #[test_case(Tcp, true; "tcp to local port")]
 #[test_case(Udp, true; "udp to local port")]
-async fn redirect_local_egress<I: net_types::ip::Ip + TestIpExt, M: Matcher>(
+async fn redirect_local_egress<I: TestIpExt, M: Matcher>(
     name: &str,
     matcher: M,
     change_dst_port: bool,

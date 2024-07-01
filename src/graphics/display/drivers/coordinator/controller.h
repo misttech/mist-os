@@ -104,7 +104,7 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   void Stop();
 
   // fuchsia.hardware.display.controller/DisplayControllerInterface:
-  void DisplayControllerInterfaceOnDisplayAdded(const added_display_args_t* added_display);
+  void DisplayControllerInterfaceOnDisplayAdded(const raw_display_info_t* banjo_display_info);
   void DisplayControllerInterfaceOnDisplayRemoved(uint64_t display_id);
   void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
                                                 const config_stamp_t* config_stamp);
@@ -186,7 +186,7 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
   void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
-  zx::result<> AddDisplay(const added_display_args_t& banjo_added_display_args);
+  zx::result<> AddDisplay(const raw_display_info_t& banjo_display_info);
   zx::result<> RemoveDisplay(DisplayId display_id);
 
   inspect::Inspector inspector_;

@@ -14,6 +14,7 @@ rustc_library("client") {
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
@@ -22,7 +23,6 @@ rustc_library("client") {
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
   ]
 }
 
@@ -32,5 +32,8 @@ fuchsia_unittest_package("power_broker_client_lib_unittests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":power_broker_client_lib_unittests" ]
+  deps = [
+    ":power_broker_client_lib_unittests",
+    "tests/integration:tests",
+  ]
 }

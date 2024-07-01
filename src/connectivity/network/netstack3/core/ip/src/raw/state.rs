@@ -9,6 +9,7 @@ use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use netstack3_base::sync::RwLock;
 use netstack3_base::WeakDeviceIdentifier;
 
+use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::RawIpSocketsBindingsTypes;
@@ -46,8 +47,10 @@ pub struct RawIpSocketState<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsB
     ///
     /// This field is specified at creation time and never changes.
     protocol: RawIpSocketProtocol<I>,
-    // The locked socket state, accessible via the [`RawIpSocketStateContext`].
+    /// The locked socket state, accessible via the [`RawIpSocketStateContext`].
     locked_state: RwLock<RawIpSocketLockedState<I, D>>,
+    /// The counters for this socket.
+    counters: RawIpSocketCounters<I>,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSocketState<I, D, BT> {
@@ -55,7 +58,12 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSock
         protocol: RawIpSocketProtocol<I>,
         external_state: BT::RawIpSocketState<I>,
     ) -> RawIpSocketState<I, D, BT> {
-        RawIpSocketState { external_state, protocol, locked_state: Default::default() }
+        RawIpSocketState {
+            external_state,
+            protocol,
+            locked_state: Default::default(),
+            counters: Default::default(),
+        }
     }
     pub(super) fn protocol(&self) -> &RawIpSocketProtocol<I> {
         &self.protocol
@@ -64,9 +72,15 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSock
         &self.external_state
     }
     pub(super) fn into_external_state(self) -> BT::RawIpSocketState<I> {
-        let RawIpSocketState { protocol: _, locked_state: _, external_state } = self;
+        let RawIpSocketState { protocol: _, locked_state: _, counters: _, external_state } = self;
         external_state
     }
+
+    /// Get the counters for this socket.
+    pub fn counters(&self) -> &RawIpSocketCounters<I> {
+        &self.counters
+    }
+
     /// Helper function to circumvent lock ordering, for tests.
     #[cfg(test)]
     pub(super) fn locked_state(&self) -> &RwLock<RawIpSocketLockedState<I, D>> {

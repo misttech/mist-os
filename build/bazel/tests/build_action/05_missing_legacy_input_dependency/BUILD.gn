@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/bazel_inputs.gni")
 
 # See README.txt for details
@@ -21,12 +21,11 @@ group("test") {
 
 # The target being tested, which will fail because it does *not* list
 # :bazel_inputs in its `bazel_inputs` list.
-bazel_action("test_must_fail") {
-  command = "build"
-  bazel_targets = [ ":copy_input" ]
+bazel_build_action("test_must_fail") {
+  bazel_target = ":copy_input"
 
   # COMMENTED OUT ON PURPOSE
-  # bazel_inputs = [ ":bazel_input" ]
+  # deps = [ ":bazel_input" ]
 
   copy_outputs = [
     {

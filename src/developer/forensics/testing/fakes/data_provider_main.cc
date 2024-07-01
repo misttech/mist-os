@@ -13,11 +13,11 @@
 #include "src/developer/forensics/testing/fakes/data_provider.h"
 
 int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::SetTags({"forensics", "test"});
 
   FX_LOGS(INFO) << "Starting FakeDataProvider";
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
 
   ::forensics::fakes::DataProvider data_provider;

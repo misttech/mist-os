@@ -17,8 +17,8 @@ fn log_error(err: anyhow::Error) -> anyhow::Error {
 pub async fn load_boot_drivers(
     boot_drivers: &Vec<String>,
     resolver: &fresolution::ResolverProxy,
-    eager_drivers: &HashSet<url::Url>,
-    disabled_drivers: &HashSet<url::Url>,
+    eager_drivers: &HashSet<cm_types::Url>,
+    disabled_drivers: &HashSet<cm_types::Url>,
 ) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
     let resolved_drivers = load_drivers(
         boot_drivers,
@@ -37,8 +37,8 @@ pub async fn load_base_drivers(
     indexer: Rc<Indexer>,
     base_drivers: &Vec<String>,
     resolver: &fresolution::ResolverProxy,
-    eager_drivers: &HashSet<url::Url>,
-    disabled_drivers: &HashSet<url::Url>,
+    eager_drivers: &HashSet<cm_types::Url>,
+    disabled_drivers: &HashSet<cm_types::Url>,
 ) -> Result<(), anyhow::Error> {
     let resolved_drivers = load_drivers(
         &base_drivers,
@@ -61,13 +61,13 @@ pub async fn load_base_drivers(
 pub async fn load_drivers(
     drivers: &Vec<String>,
     resolver: &fresolution::ResolverProxy,
-    eager_drivers: &HashSet<url::Url>,
-    disabled_drivers: &HashSet<url::Url>,
+    eager_drivers: &HashSet<cm_types::Url>,
+    disabled_drivers: &HashSet<cm_types::Url>,
     package_type: DriverPackageType,
 ) -> Result<Vec<ResolvedDriver>, anyhow::Error> {
     let mut resolved_drivers = std::vec::Vec::new();
     for driver_url in drivers {
-        let url = match url::Url::parse(&driver_url) {
+        let url = match cm_types::Url::new(driver_url) {
             Ok(u) => u,
             Err(e) => {
                 tracing::error!("Found bad driver url: {}: error: {}", driver_url, e);
@@ -102,7 +102,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_load_fallback_driver() {
         const DRIVER_URL: &str = "fuchsia-boot:///#meta/test-fallback-component.cm";
-        let driver_url = url::Url::parse(&DRIVER_URL).unwrap();
+        let driver_url = cm_types::Url::new(DRIVER_URL).unwrap();
         let pkg = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
             .unwrap();
         let manifest = fuchsia_fs::directory::open_file(

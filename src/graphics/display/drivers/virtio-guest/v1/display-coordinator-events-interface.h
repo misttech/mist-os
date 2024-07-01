@@ -36,7 +36,7 @@ class DisplayCoordinatorEventsInterface {
   DisplayCoordinatorEventsInterface& operator=(DisplayCoordinatorEventsInterface&&) = delete;
 
   // TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
-  virtual void OnDisplayAdded(const added_display_args_t& added_display_args) = 0;
+  virtual void OnDisplayAdded(const raw_display_info_t& display_info) = 0;
 
   virtual void OnDisplayRemoved(display::DisplayId display_id) = 0;
 

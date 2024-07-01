@@ -4,64 +4,44 @@
 
 """Rules for wrapping prebuilt platform artifacts."""
 
-load(":providers.bzl", "FuchsiaProductAssemblyBundleInfo")
-
-def _get_directory(ctx, rule_name):
-    for file in ctx.files.files:
-        if file.basename == "assembly_config.json":
-            return file.dirname
-
-    fail("\n\n" +
-         "When calling {}:\n".format(rule_name) +
-         "Could not find assembly_config.json from {}\n".format(ctx.attr.files) +
-         "Use the 'directory' attribute to specify the proper directory.\n\n")
+load("@bazel_skylib//lib:paths.bzl", "paths")
+load(":providers.bzl", "FuchsiaPlatformArtifactsInfo")
+load(":utils.bzl", "select_multiple_files")
 
 def _fuchsia_platform_artifacts_impl(ctx):
     if ctx.file.directory:
-        directory = ctx.file.directory.path
+        root_dir = ctx.file.directory.path
     else:
-        directory = _get_directory(ctx, "fuchsia_platform_artifacts")
+        aib_manifests = select_multiple_files(
+            ctx.files.files,
+            "assembly_config.json",
+            "If it's not possible to provide any `assembly_config.json` files directly as inputs, try specifying `directory` manually.",
+        )
 
-    return [FuchsiaProductAssemblyBundleInfo(
-        root = directory,
+        # Compute dirname(<platform_artifacts_dir>/aib_dir/assembly_config.json).
+        aib_directories = [aib_manifest.dirname for aib_manifest in aib_manifests]
+
+        # Compute set(dirname(<platform_artifacts_dir>/aib_dir)).
+        platform_artifacts_dirs = {paths.dirname(aib_dir): None for aib_dir in aib_directories}.keys()
+        if len(platform_artifacts_dirs) > 1:
+            fail(
+                """The platform artifacts directory cannot be determined due to ambiguity: %s.
+If it's not possible to limit the files passed into `files`, try specifying `directory` manually.""" % platform_artifacts_dirs,
+            )
+        root_dir = platform_artifacts_dirs[0]
+
+    return [FuchsiaPlatformArtifactsInfo(
+        root = root_dir,
         files = ctx.files.files,
     )]
 
 fuchsia_platform_artifacts = rule(
     doc = """Wraps a directory of prebuilt platform artifacts.""",
     implementation = _fuchsia_platform_artifacts_impl,
-    provides = [FuchsiaProductAssemblyBundleInfo],
+    provides = [FuchsiaPlatformArtifactsInfo],
     attrs = {
         "directory": attr.label(
             doc = "The directory of prebuilt platform artifacts.",
-            allow_single_file = True,
-        ),
-        "files": attr.label(
-            doc = "A filegroup including all files of this prebuilt AIB.",
-            mandatory = True,
-            allow_files = True,
-        ),
-    },
-)
-
-def _fuchsia_legacy_bundle_impl(ctx):
-    if ctx.file.directory:
-        directory = ctx.file.directory.path
-    else:
-        directory = _get_directory(ctx, "fuchsia_legacy_bundle")
-
-    return [FuchsiaProductAssemblyBundleInfo(
-        root = directory,
-        files = ctx.files.files,
-    )]
-
-fuchsia_legacy_bundle = rule(
-    doc = """Declares a target to wrap a prebuilt Assembly Input Bundle (AIB).""",
-    implementation = _fuchsia_legacy_bundle_impl,
-    provides = [FuchsiaProductAssemblyBundleInfo],
-    attrs = {
-        "directory": attr.label(
-            doc = "The directory of the prebuilt legacy bundle.",
             allow_single_file = True,
         ),
         "files": attr.label(

@@ -7,4 +7,5 @@
     // TODO(https://fxbug.dev/316616750): Update this default once
     // multithreading is stabilized.
     num_threads: 1,
+    debug_logs: false,
 }

@@ -30,6 +30,11 @@ _platform_configuration_base = {
     snoop = "lazy"
   }
 
+  # Include sl4f on all core products until tests transition to other APIs.
+  development_support = {
+    include_sl4f = true
+  }
+
   input_groups = {
     group1 = true
   }

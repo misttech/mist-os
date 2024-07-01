@@ -8,9 +8,10 @@ import enum
 import logging
 import os
 import platform
-import subprocess
 
+from honeydew import errors
 from honeydew.interfaces.auxiliary_devices import power_switch
+from honeydew.utils import host_shell
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -114,42 +115,20 @@ class PowerSwitchDmc(power_switch.PowerSwitch):
 
     def _run(
         self, command: list[str], timeout: float = _TIMEOUTS["COMMAND_RESPONSE"]
-    ) -> str:
+    ) -> None:
         """Helper method to run a command and returns the output.
 
         Args:
             command: Command to run.
             timeout: How long in sec to wait for command to complete.
 
-        Returns:
-            Command output.
-
         Raises:
             PowerSwitchError: In case of failure.
         """
         try:
-            _LOGGER.debug("Running the command: '%s'...", command)
-
-            output: str = subprocess.check_output(
-                command, timeout=timeout
-            ).decode()
-
-            _LOGGER.debug(
-                "Output returned by command '%s' is: '%s'",
-                command,
-                output,
+            host_shell.run(
+                cmd=command,
+                timeout=timeout,
             )
-            return output
-        except subprocess.CalledProcessError as err:
-            message: str = (
-                f"Command '{command}' failed. returncode = {err.returncode}"
-            )
-            if err.stdout:
-                message += f", stdout = {err.stdout}"
-            if err.stderr:
-                message += f", stderr = {err.stderr}."
-            _LOGGER.debug(message)
-
-            raise power_switch.PowerSwitchError(err) from err
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HostCmdError as err:
             raise power_switch.PowerSwitchError(err) from err

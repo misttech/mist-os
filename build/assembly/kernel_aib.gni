@@ -107,6 +107,7 @@ template("kernel_assembly_input_bundle") {
     assembly_input_bundle_archive = "${target_name}.tgz"
 
     bazel_inputs = "${target_name}_bazel_inputs"
+    gn_targets_name = target_name
 
     kernel_image_metadata = "${target_name}_kernel_image_metadata"
   }
@@ -235,15 +236,15 @@ template("kernel_assembly_input_bundle") {
   }
 
   # Make generated AIBs available to Bazel builds.
-  bazel_input_resource_directory(labels.bazel_inputs) {
+  bazel_input_directory(labels.bazel_inputs) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    source_dir = files.assembly_input_bundle_dir
-    dest_dir = rebase_path(files.assembly_input_bundle_dir, root_out_dir)
-    deps = [ ":${labels.assembly_input_bundle}" ]
+    generator = ":${labels.assembly_input_bundle}"
+    output_directory = files.assembly_input_bundle_dir
+    gn_targets_name = labels.gn_targets_name
   }
 
   group(target_name) {

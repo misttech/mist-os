@@ -58,7 +58,7 @@ zx_status_t SimInterface::Init(simulation::Environment* env, wlan_common::WlanMa
 
 void SimInterface::Reset() {
   libsync::Completion destroy_binding_completion;
-  async::PostTask(fdf_dispatcher_get_async_dispatcher(server_dispatcher_), [&]() {
+  async::PostTask(server_dispatcher_, [&]() {
     server_binding_.reset();
     destroy_binding_completion.Signal();
   });
@@ -69,12 +69,12 @@ void SimInterface::Reset() {
   }
 }
 
-zx_status_t SimInterface::Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end,
-                                  fdf_dispatcher_t* server_dispatcher) {
-  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client(std::move(client_end));
+zx_status_t SimInterface::Connect(fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end,
+                                  async_dispatcher_t* server_dispatcher) {
+  fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client(std::move(client_end));
 
   // Establish the FIDL connection on the oppsite direction.
-  auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
   if (endpoints.is_error()) {
     BRCMF_ERR("Failed to create endpoints: %s", endpoints.status_string());
     return endpoints.status_value();
@@ -83,14 +83,12 @@ zx_status_t SimInterface::Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullm
   // Synchronously bind the server to the given dispatcher.
   server_dispatcher_ = server_dispatcher;
   libsync::Completion create_binding_completion;
-  async::PostTask(
-      fdf_dispatcher_get_async_dispatcher(server_dispatcher),
-      [&, server_end = std::move(endpoints->server)]() mutable {
-        server_binding_ =
-            std::make_unique<fdf::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfc>>(
-                server_dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
-        create_binding_completion.Signal();
-      });
+  async::PostTask(server_dispatcher, [&, server_end = std::move(endpoints->server)]() mutable {
+    server_binding_ =
+        std::make_unique<fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfc>>(
+            server_dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+    create_binding_completion.Signal();
+  });
 
   create_binding_completion.Wait();
 
@@ -118,7 +116,7 @@ zx_status_t SimInterface::Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullm
   return ZX_OK;
 }
 
-void SimInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+void SimInterface::OnScanResult(OnScanResultRequestView request,
                                 OnScanResultCompleter::Sync& completer) {
   auto& copy = request->result;
 
@@ -135,11 +133,10 @@ void SimInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& are
   scan_results_ies_.push_back(ies);
   copy.bss.ies = fidl::VectorView<uint8_t>::FromExternal(*(scan_results_ies_.rbegin()));
   results->second.result_list.push_back(copy);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                             OnScanEndCompleter::Sync& completer) {
+void SimInterface::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
   auto& end = request->end;
   auto results = scan_results_.find(end.txn_id);
 
@@ -150,10 +147,10 @@ void SimInterface::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
   ZX_ASSERT(!results->second.result_code);
 
   results->second.result_code = end.code;
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+void SimInterface::ConnectConf(ConnectConfRequestView request,
                                ConnectConfCompleter::Sync& completer) {
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociating);
   auto& resp = request->resp;
@@ -165,11 +162,10 @@ void SimInterface::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena
   } else {
     assoc_ctx_.state = AssocContext::kNone;
   }
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::RoamConf(RoamConfRequestView request, fdf::Arena& arena,
-                            RoamConfCompleter::Sync& completer) {
+void SimInterface::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) {
   auto& resp = request->resp;
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
 
@@ -179,19 +175,17 @@ void SimInterface::RoamConf(RoamConfRequestView request, fdf::Arena& arena,
   } else {
     assoc_ctx_.state = AssocContext::kNone;
   }
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::AuthInd(AuthIndRequestView request, fdf::Arena& arena,
-                           AuthIndCompleter::Sync& completer) {
+void SimInterface::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) {
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
   stats_.auth_indications.push_back(request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
-                              DeauthConfCompleter::Sync& completer) {
-  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest::Builder(test_arena_);
+void SimInterface::DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) {
+  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(test_arena_);
   if (request->has_peer_sta_address()) {
     builder.peer_sta_address(request->peer_sta_address());
     const auto& peer_sta_address = request->peer_sta_address().data();
@@ -200,94 +194,87 @@ void SimInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
     }
   }
   stats_.deauth_results.emplace_back(builder.Build());
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                             DeauthIndCompleter::Sync& completer) {
+void SimInterface::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) {
   stats_.deauth_indications.push_back(request->ind);
   const auto& peer_sta_address = request->ind.peer_sta_address.data();
   if (memcmp(assoc_ctx_.bssid.byte, peer_sta_address, ETH_ALEN) == 0) {
     assoc_ctx_.state = AssocContext::kNone;
   }
 
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                            AssocIndCompleter::Sync& completer) {
+void SimInterface::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
   stats_.assoc_indications.push_back(request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+void SimInterface::DisassocConf(DisassocConfRequestView request,
                                 DisassocConfCompleter::Sync& completer) {
-  const auto disassoc_conf = wlan_fullmac_wire::WlanFullmacImplIfcBaseDisassocConfRequest{
+  const auto disassoc_conf = wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest{
       .resp = {.status = request->resp.status}};
   stats_.disassoc_results.emplace_back(disassoc_conf);
   assoc_ctx_.state = AssocContext::kNone;
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+void SimInterface::DisassocInd(DisassocIndRequestView request,
                                DisassocIndCompleter::Sync& completer) {
   stats_.disassoc_indications.push_back(request->ind);
   assoc_ctx_.state = AssocContext::kNone;
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::StartConf(StartConfRequestView request, fdf::Arena& arena,
-                             StartConfCompleter::Sync& completer) {
+void SimInterface::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
   stats_.start_confirmations.push_back(request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::StopConf(StopConfRequestView request, fdf::Arena& arena,
-                            StopConfCompleter::Sync& completer) {
+void SimInterface::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
   stats_.stop_confirmations.push_back(request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::EapolConf(EapolConfRequestView request, fdf::Arena& arena,
-                             EapolConfCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
+void SimInterface::EapolConf(EapolConfRequestView request, EapolConfCompleter::Sync& completer) {
+  completer.Reply();
 }
 
-void SimInterface::OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+void SimInterface::OnChannelSwitch(OnChannelSwitchRequestView request,
                                    OnChannelSwitchCompleter::Sync& completer) {
   stats_.csa_indications.push_back(request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+void SimInterface::SignalReport(SignalReportRequestView request,
                                 SignalReportCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::EapolInd(EapolIndRequestView request, fdf::Arena& arena,
-                            EapolIndCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
+void SimInterface::EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) {
+  completer.Reply();
 }
 
-void SimInterface::OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
+void SimInterface::OnPmkAvailable(OnPmkAvailableRequestView request,
                                   OnPmkAvailableCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::SaeHandshakeInd(SaeHandshakeIndRequestView request, fdf::Arena& arena,
+void SimInterface::SaeHandshakeInd(SaeHandshakeIndRequestView request,
                                    SaeHandshakeIndCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
-void SimInterface::SaeFrameRx(SaeFrameRxRequestView request, fdf::Arena& arena,
-                              SaeFrameRxCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
+void SimInterface::SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter::Sync& completer) {
+  completer.Reply();
 }
 
-void SimInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+void SimInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request,
                                    OnWmmStatusRespCompleter::Sync& completer) {
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 void SimInterface::StopInterface() {
@@ -354,7 +341,7 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
   assoc_ctx_.channel = channel;
 
   // Send connect request
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseConnectRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   memcpy(bss.bssid.data(), bssid.byte, ETH_ALEN);
   auto ies =
@@ -391,7 +378,7 @@ void SimInterface::DisassociateFrom(const common::MacAddr& bssid,
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseDisassocRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplDisassocRequest::Builder(test_arena_);
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), bssid.byte, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -406,7 +393,7 @@ void SimInterface::DeauthenticateFrom(const common::MacAddr& bssid,
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseDeauthRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplDeauthRequest::Builder(test_arena_);
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), bssid.byte, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -424,7 +411,7 @@ void SimInterface::StartScan(uint64_t txn_id, bool active,
   const std::vector<uint8_t> channels =
       channels_arg.has_value() ? channels_arg.value() : kDefaultScanChannels;
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(test_arena_);
 
   builder.txn_id(txn_id);
   builder.scan_type(scan_type);
@@ -466,7 +453,7 @@ void SimInterface::StartSoftAp(const wlan_ieee80211::CSsid& ssid,
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartBssRequest::Builder(test_arena_)
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
                      .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
                      .beacon_period(beacon_period)
                      .dtim_period(dtim_period)
@@ -487,7 +474,7 @@ void SimInterface::StopSoftAp() {
   // This should only be performed on an AP interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kAp);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStopBssRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
   // Use the ssid from the last call to StartSoftAp
   builder.ssid(soft_ap_ctx_.ssid);
 
@@ -646,11 +633,12 @@ zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface*
                                   : "brcmfmac-wlan-fullmac-ap";
 
   zx::result driver_connect_result =
-      fdf::internal::DriverTransportConnect<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>(
+      component::ConnectAtMember<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>(
           CreateDriverSvcClient(), instance_name);
   EXPECT_EQ(ZX_OK, driver_connect_result.status_value());
 
-  status = sim_ifc->Connect(std::move(driver_connect_result.value()), df_env_dispatcher_->get());
+  status = sim_ifc->Connect(std::move(driver_connect_result.value()),
+                            df_env_dispatcher_->async_dispatcher());
   if (status != ZX_OK) {
     BRCMF_ERR("Failed to establish FIDL connection with WlanInterface: %s",
               zx_status_get_string(status));
@@ -659,7 +647,7 @@ zx_status_t SimTest::StartInterface(wlan_common::WlanMacRole role, SimInterface*
 
   // check that fullmac device count is expected.
   auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
-                                                bind_fuchsia_wlan_fullmac::SERVICE_DRIVERTRANSPORT);
+                                                bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
   EXPECT_EQ(ifaces_.size(), DeviceCountWithProperty(fullmac_service_prop));
 
   return ZX_OK;
@@ -679,7 +667,7 @@ zx_status_t SimTest::InterfaceDestroyed(SimInterface* ifc) {
   ifaces_.erase(iter);
 
   auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
-                                                bind_fuchsia_wlan_fullmac::SERVICE_DRIVERTRANSPORT);
+                                                bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
   WaitForDeviceCountWithProperty(fullmac_service_prop, ifaces_.size());
 
   // Wait until reset is complete. This has to happen on this thread, not the driver dispatcher.
@@ -757,7 +745,7 @@ zx_status_t SimTest::DeleteInterface(SimInterface* ifc) {
   ifaces_.erase(iter);
 
   auto fullmac_service_prop = fdf::MakeProperty(bind_fuchsia_wlan_fullmac::SERVICE,
-                                                bind_fuchsia_wlan_fullmac::SERVICE_DRIVERTRANSPORT);
+                                                bind_fuchsia_wlan_fullmac::SERVICE_ZIRCONTRANSPORT);
   WaitForDeviceCountWithProperty(fullmac_service_prop, ifaces_.size());
 
   return ZX_OK;

@@ -34,7 +34,7 @@ async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fpb::{CurrentLevelMarker, RequiredLevelMarker};
+    use fpb::{CurrentLevelMarker, ElementControlMarker, LessorMarker, RequiredLevelMarker};
 
     #[test]
     fn test_direct() -> Result<()> {
@@ -47,26 +47,31 @@ mod tests {
         let parent_token = zx::Event::create();
         let (parent_current, parent_current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (parent_required, parent_required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let parent_element_control = executor.run_singlethreaded(async {
-            topology
+        let (parent_element_control, parent_element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("P".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![parent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: parent_current_server,
                         required: parent_required_server,
                     }),
+                    element_control: Some(parent_element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(parent_element_control
+                .register_dependency_token(
+                    parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
         });
-        let parent_element_control = parent_element_control.into_proxy()?;
         let parent_status = {
             let (client, server) = create_proxy::<StatusMarker>()?;
             parent_element_control.open_status_channel(server)?;
@@ -74,15 +79,17 @@ mod tests {
         };
         let (child_current, child_current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (child_required, child_required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (child_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let child_element_control = executor.run_singlethreaded(async {
-            topology
+        let (child_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (child_element_control, child_element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("C".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -94,13 +101,12 @@ mod tests {
                         required: child_required_server,
                     }),
                     lessor_channel: Some(lessor_server),
+                    element_control: Some(child_element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
-        let child_element_control = child_element_control.into_proxy()?;
         let child_status = {
             let (client, server) = create_proxy::<StatusMarker>()?;
             child_element_control.open_status_channel(server)?;
@@ -261,26 +267,31 @@ mod tests {
         let element_a_token = zx::Event::create();
         let (element_a_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_a_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let element_a_element_control = executor.run_singlethreaded(async {
-            topology
+        let (element_a_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("A".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![element_a_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(element_a_element_control
+                .register_dependency_token(
+                    element_a_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
         });
-        let element_a_element_control = element_a_element_control.into_proxy()?;
         let element_a_status = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_a_element_control.open_status_channel(server)?;
@@ -289,34 +300,39 @@ mod tests {
         let element_b_token = zx::Event::create();
         let (element_b_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_b_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let element_b_element_control = executor.run_singlethreaded(async {
-            topology
+        let (element_b_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("B".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: element_a_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![element_b_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(element_b_element_control
+                .register_dependency_token(
+                    element_b_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
         });
-        let element_b_element_control = element_b_element_control.into_proxy()?;
         let element_b_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_b_element_control.open_status_channel(server)?;
@@ -324,15 +340,17 @@ mod tests {
         };
         let (element_c_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_c_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_c_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let element_c_element_control = executor.run_singlethreaded(async {
-            topology
+        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (element_c_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("C".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: element_b_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -344,13 +362,12 @@ mod tests {
                         required: required_server,
                     }),
                     lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
-        let element_c_element_control = element_c_element_control.into_proxy()?;
         let element_c_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_c_element_control.open_status_channel(server)?;
@@ -358,8 +375,10 @@ mod tests {
         };
         let (element_d_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (element_d_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let element_d_element_control = executor.run_singlethreaded(async {
-            topology
+        let (element_d_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("D".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
@@ -368,13 +387,12 @@ mod tests {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
-        let element_d_element_control = element_d_element_control.into_proxy()?;
         let element_d_status: fpb::StatusProxy = {
             let (client, server) = create_endpoints::<StatusMarker>();
             element_d_element_control.open_status_channel(server)?;
@@ -569,37 +587,47 @@ mod tests {
         let grandparent_token = zx::Event::create();
         let (grandparent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (grandparent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let _grandparent_element_control = executor.run_singlethreaded(async {
-            topology
+        let (grandparent_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("GP".into()),
                     initial_current_level: Some(10),
                     valid_levels: Some(vec![10, 90, 200]),
-                    active_dependency_tokens_to_register: Some(vec![grandparent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(grandparent_element_control
+                .register_dependency_token(
+                    grandparent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
         });
         let parent_token = zx::Event::create();
         let (parent_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (parent_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let _parent_element_control = executor.run_singlethreaded(async {
-            topology
+        let (parent_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("P".into()),
                     initial_current_level: Some(0),
                     valid_levels: Some(vec![0, 30, 50]),
                     dependencies: Some(vec![
                         LevelDependency {
-                            dependency_type: DependencyType::Active,
+                            dependency_type: DependencyType::Assertive,
                             dependent_level: 50,
                             requires_token: grandparent_token
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -607,7 +635,7 @@ mod tests {
                             requires_level_by_preference: vec![200],
                         },
                         LevelDependency {
-                            dependency_type: DependencyType::Active,
+                            dependency_type: DependencyType::Assertive,
                             dependent_level: 30,
                             requires_token: grandparent_token
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -615,30 +643,36 @@ mod tests {
                             requires_level_by_preference: vec![90],
                         },
                     ]),
-                    active_dependency_tokens_to_register: Some(vec![parent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed")]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(parent_element_control
+                .register_dependency_token(
+                    parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
         });
         let (child1_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (child1_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (child1_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let _child1_element_control = executor.run_singlethreaded(async {
-            topology
+        let (child1_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (_child1_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("C1".into()),
                     initial_current_level: Some(0),
                     valid_levels: Some(vec![0, 5]),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 5,
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -650,23 +684,25 @@ mod tests {
                         required: required_server,
                     }),
                     lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
         let (child2_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (child2_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (child2_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let _child2_element_control = executor.run_singlethreaded(async {
-            topology
+        let (child2_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (_child2_element_control, element_control_server) =
+            create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("C2".into()),
                     initial_current_level: Some(0),
                     valid_levels: Some(vec![0, 3]),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: 3,
                         requires_token: parent_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -678,11 +714,11 @@ mod tests {
                         required: required_server,
                     }),
                     lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
 
         // GP should have a initial required level of 10
@@ -900,11 +936,11 @@ mod tests {
     }
 
     #[test]
-    fn test_passive() -> Result<()> {
-        // B has an active dependency on A.
-        // C has a passive dependency on B (and transitively, a passive dependency on A)
-        //   and an active dependency on E.
-        // D has an active dependency on B (and transitively, an active dependency on A).
+    fn test_opportunistic() -> Result<()> {
+        // B has an assertive dependency on A.
+        // C has an opportunistic dependency on B (and transitively, an opportunistic dependency on A)
+        //   and an assertive dependency on E.
+        // D has an assertive dependency on B (and transitively, an assertive dependency on A).
         //  A     B     C     D     E
         // ON <= ON
         //       ON <- ON =======> ON
@@ -916,93 +952,119 @@ mod tests {
         let token_a = zx::Event::create();
         let (current_a, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_a, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let _element_a_control = executor.run_singlethreaded(async {
-            topology
+        let (element_control_a, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("A".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![token_a
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .unwrap()]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(element_control_a
+                .register_dependency_token(
+                    token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
         });
-        let token_b_active = zx::Event::create();
-        let token_b_passive = zx::Event::create();
+        let token_b_assertive = zx::Event::create();
+        let token_b_opportunistic = zx::Event::create();
         let (current_b, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_b, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let _element_b_control = executor.run_singlethreaded(async {
-            topology
+        let (element_control_b, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("B".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![token_b_active
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .unwrap()]),
-                    passive_dependency_tokens_to_register: Some(vec![token_b_passive
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .unwrap()]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(element_control_b
+                .register_dependency_token(
+                    token_b_assertive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+            assert!(element_control_b
+                .register_dependency_token(
+                    token_b_opportunistic
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Opportunistic,
+                )
+                .await
+                .is_ok());
         });
-        let token_e_active = zx::Event::create();
+        let token_e_assertive = zx::Event::create();
         let (current_e, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_e, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let _element_e_control = executor.run_singlethreaded(async {
-            topology
+        let (element_control_e, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("E".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                    active_dependency_tokens_to_register: Some(vec![token_e_active
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .unwrap()]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_server,
                         required: required_server,
                     }),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
+            assert!(element_control_e
+                .register_dependency_token(
+                    token_e_assertive
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
         });
         let (current_c, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_c, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_c_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let _element_c_control = executor.run_singlethreaded(async {
-            topology
+        let (element_c_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (_element_control_c, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("C".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![
                         LevelDependency {
-                            dependency_type: DependencyType::Passive,
+                            dependency_type: DependencyType::Opportunistic,
                             dependent_level: BinaryPowerLevel::On.into_primitive(),
-                            requires_token: token_b_passive
+                            requires_token: token_b_opportunistic
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .unwrap(),
                             requires_level_by_preference: vec![
@@ -1010,9 +1072,9 @@ mod tests {
                             ],
                         },
                         LevelDependency {
-                            dependency_type: DependencyType::Active,
+                            dependency_type: DependencyType::Assertive,
                             dependent_level: BinaryPowerLevel::On.into_primitive(),
-                            requires_token: token_e_active
+                            requires_token: token_e_assertive
                                 .duplicate_handle(zx::Rights::SAME_RIGHTS)
                                 .unwrap(),
                             requires_level_by_preference: vec![
@@ -1025,25 +1087,26 @@ mod tests {
                         required: required_server,
                     }),
                     lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
         let (current_d, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (required_d, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (element_d_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let _element_d_control = executor.run_singlethreaded(async {
-            topology
+        let (element_d_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (_element_control_d, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("D".into()),
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
-                        requires_token: token_b_active
+                        requires_token: token_b_assertive
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .unwrap(),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
@@ -1053,11 +1116,11 @@ mod tests {
                         required: required_server,
                     }),
                     lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
 
         // Initial required level for all elements should be OFF.
@@ -1084,13 +1147,13 @@ mod tests {
         let mut required_e_fut = required_e.watch();
 
         // Lease C.
-        // A & B's required level should remain OFF because C's passive claim
+        // A & B's required level should remain OFF because C's opportunistic claim
         // does not raise the level of A or B.
         // C's required level should remain OFF because its lease is still pending.
         // D's required level should remain OFF.
-        // E's required level should remain OFF because C's passive claim on B
-        // has no other active claims to satisfy it (the lease is contingent)
-        // and hence its active claim on E should remain pending and should not
+        // E's required level should remain OFF because C's opportunistic claim on B
+        // has no other assertive claims to satisfy it (the lease is contingent)
+        // and hence its assertive claim on E should remain pending and should not
         // raise the level of E.
         // Lease C should be Pending.
         let lease_c = executor.run_singlethreaded(async {
@@ -1114,12 +1177,12 @@ mod tests {
         });
 
         // Lease D.
-        // A's required level should become ON because of D's transitive active claim.
+        // A's required level should become ON because of D's transitive assertive claim.
         // B's required level should remain OFF because A is not yet ON.
         // C's required level should remain OFF because B and E are not yet ON.
         // D's required level should remain OFF because B is not yet ON.
         // E's required level should become ON because it C's lease is no longer
-        // contingent on an active claim that would satisfy its passive claim.
+        // contingent on an assertive claim that would satisfy its opportunistic claim.
         // Lease C & D should be pending.
         let lease_d = executor.run_singlethreaded(async {
             element_d_lessor
@@ -1153,7 +1216,7 @@ mod tests {
 
         // Update A's current level to ON.
         // A's required level should remain ON.
-        // B's required level should become ON because of D's active claim and
+        // B's required level should become ON because of D's assertive claim and
         // its dependency on A being satisfied.
         // C's required level should remain OFF because B and E are not yet ON.
         // D's required level should remain OFF because B is not yet ON.
@@ -1328,21 +1391,24 @@ mod tests {
 
         // Create a root element
         let earth_token = zx::Event::create();
-        let earth_element_control = topology
+        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        assert!(topology
             .add_element(ElementSchema {
                 element_name: Some("Earth".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                 valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
-                active_dependency_tokens_to_register: Some(vec![
-                    earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
-                ]),
+                element_control: Some(element_control_server),
                 ..Default::default()
             })
-            .await?
-            .expect("add_element failed");
-        let _earth_element_control = earth_element_control.into_proxy()?;
-
-        let water_token = zx::Event::create();
+            .await
+            .is_ok());
+        assert!(element_control
+            .register_dependency_token(
+                earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                DependencyType::Assertive,
+            )
+            .await
+            .is_ok());
 
         // Using an unauthorized dependency token yields AddElementError::NotAuthorized.
         assert_matches!(
@@ -1352,14 +1418,11 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: zx::Event::create(),
                         requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![
-                        water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
-                    ]),
                     ..Default::default()
                 })
                 .await,
@@ -1374,16 +1437,13 @@ mod tests {
                     initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                     valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                     dependencies: Some(vec![LevelDependency {
-                        dependency_type: DependencyType::Active,
+                        dependency_type: DependencyType::Assertive,
                         dependent_level: BinaryPowerLevel::On.into_primitive(),
                         requires_token: earth_token
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("dup failed"),
                         requires_level_by_preference: vec![2],
                     }]),
-                    active_dependency_tokens_to_register: Some(vec![
-                        water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
-                    ]),
                     ..Default::default()
                 })
                 .await,
@@ -1391,26 +1451,23 @@ mod tests {
         );
 
         // Using the correct dependency token succeeds.
-        let _ = topology
+        assert!(topology
             .add_element(ElementSchema {
                 element_name: Some("Fire".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                 valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
                 dependencies: Some(vec![LevelDependency {
-                    dependency_type: DependencyType::Active,
+                    dependency_type: DependencyType::Assertive,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
                     requires_token: earth_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
                     requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
                 }]),
-                active_dependency_tokens_to_register: Some(vec![
-                    water_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?
-                ]),
                 ..Default::default()
             })
-            .await?
-            .expect("add_element failed");
+            .await
+            .is_ok());
 
         Ok(())
     }
@@ -1420,16 +1477,17 @@ mod tests {
         let realm = build_power_broker_realm().await?;
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
 
-        let element_control = topology
+        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        assert!(topology
             .add_element(ElementSchema {
                 element_name: Some("Fire".into()),
                 initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
                 valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                element_control: Some(element_control_server),
                 ..Default::default()
             })
-            .await?
-            .expect("add_element failed");
-        let element_control = element_control.into_proxy()?;
+            .await
+            .is_ok());
 
         // Confirm the element has been removed and Status channels have been
         // closed.
@@ -1453,9 +1511,10 @@ mod tests {
         let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
         let (current, current_server) = create_proxy::<CurrentLevelMarker>()?;
         let (_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (_lessor, lessor_server) = create_proxy::<fpb::LessorMarker>()?;
-        let element_control = executor.run_singlethreaded(async {
-            topology
+        let (_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        executor.run_singlethreaded(async {
+            assert!(topology
                 .add_element(ElementSchema {
                     element_name: Some("E".into()),
                     initial_current_level: Some(0),
@@ -1465,13 +1524,12 @@ mod tests {
                         required: required_server,
                     }),
                     lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
                     ..Default::default()
                 })
                 .await
-                .unwrap()
-                .expect("add_element failed")
+                .is_ok());
         });
-        let element_control = element_control.into_proxy()?;
         let status = {
             let (client, server) = create_proxy::<StatusMarker>()?;
             element_control.open_status_channel(server)?;
@@ -1498,6 +1556,41 @@ mod tests {
 
         // Ensure there are no more current levels in the queue.
         assert!(executor.run_until_stalled(&mut status.watch_power_level()).is_pending());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_element_control_in_element_schema_closes_returned_channel() -> Result<()> {
+        let mut executor = fasync::TestExecutor::new();
+        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
+
+        // Create a topology with only one element:
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let (_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
+        let (_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
+        let (_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
+        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
+        let element_control_from_server = executor.run_singlethreaded(async {
+            topology
+                .add_element(ElementSchema {
+                    element_name: Some("E".into()),
+                    initial_current_level: Some(0),
+                    valid_levels: Some(vec![0, 1, 2]),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    lessor_channel: Some(lessor_server),
+                    element_control: Some(element_control_server),
+                    ..Default::default()
+                })
+                .await
+                .unwrap()
+                .expect("add_element failed")
+        });
+        assert!(element_control_from_server.into_proxy()?.is_closed());
+        assert!(!element_control.is_closed());
 
         Ok(())
     }

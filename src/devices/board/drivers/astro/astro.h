@@ -107,21 +107,54 @@ class Astro : public AstroType {
   zx_status_t EnableWifi32K(void);
   zx_status_t SdEmmcConfigurePortB(void);
 
-  static fuchsia_hardware_gpioimpl::wire::InitCall GpioConfigIn(
-      fuchsia_hardware_gpio::GpioFlags flags) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithInputFlags(flags);
+  fuchsia_hardware_gpioimpl::wire::InitStep GpioConfigIn(uint32_t index,
+                                                         fuchsia_hardware_gpio::GpioFlags flags) {
+    return fuchsia_hardware_gpioimpl::wire::InitStep::Builder(init_arena_)
+        .index(index)
+        .call(fuchsia_hardware_gpioimpl::wire::InitCall::WithInputFlags(flags))
+        .Build();
   }
 
-  static fuchsia_hardware_gpioimpl::wire::InitCall GpioConfigOut(uint8_t initial_value) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(initial_value);
+  fuchsia_hardware_gpioimpl::wire::InitStep GpioConfigOut(uint32_t index, uint8_t initial_value) {
+    return fuchsia_hardware_gpioimpl::wire::InitStep::Builder(init_arena_)
+        .index(index)
+        .call(fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(initial_value))
+        .Build();
   }
 
-  fuchsia_hardware_gpioimpl::wire::InitCall GpioSetAltFunction(uint64_t function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(init_arena_, function);
+  fuchsia_hardware_gpioimpl::wire::InitStep GpioSetAltFunction(uint32_t index, uint64_t function) {
+    return fuchsia_hardware_gpioimpl::wire::InitStep::Builder(init_arena_)
+        .index(index)
+        .call(fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(init_arena_, function))
+        .Build();
   }
 
-  fuchsia_hardware_gpioimpl::wire::InitCall GpioSetDriveStrength(uint64_t ds_ua) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(init_arena_, ds_ua);
+  fuchsia_hardware_gpioimpl::wire::InitStep GpioSetDriveStrength(uint32_t index, uint64_t ds_ua) {
+    return fuchsia_hardware_gpioimpl::wire::InitStep::Builder(init_arena_)
+        .index(index)
+        .call(fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(init_arena_, ds_ua))
+        .Build();
+  }
+
+  fuchsia_hardware_clockimpl::wire::InitStep ClockDisable(uint32_t id) {
+    return fuchsia_hardware_clockimpl::wire::InitStep::Builder(init_arena_)
+        .id(id)
+        .call(fuchsia_hardware_clockimpl::wire::InitCall::WithDisable({}))
+        .Build();
+  }
+
+  fuchsia_hardware_clockimpl::wire::InitStep ClockEnable(uint32_t id) {
+    return fuchsia_hardware_clockimpl::wire::InitStep::Builder(init_arena_)
+        .id(id)
+        .call(fuchsia_hardware_clockimpl::wire::InitCall::WithEnable({}))
+        .Build();
+  }
+
+  fuchsia_hardware_clockimpl::wire::InitStep ClockSetRate(uint32_t id, uint64_t rate_hz) {
+    return fuchsia_hardware_clockimpl::wire::InitStep::Builder(init_arena_)
+        .id(id)
+        .call(fuchsia_hardware_clockimpl::wire::InitCall::WithRateHz(init_arena_, rate_hz))
+        .Build();
   }
 
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;

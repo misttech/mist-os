@@ -48,6 +48,7 @@ const uint8_t kTxOffTxToken = 0xfe;
 // Tokens from Table 42 "Tokens used in RxFIFO" on page 29 of the Rev 5
 // datasheet.
 constexpr uint8_t kSopRxToken = 0b1110'0000;
+constexpr uint8_t kSopPrimeRxToken = 0b1100'0000;
 
 class Fusb302FifosTest : public zxtest::Test {
  public:
@@ -265,6 +266,16 @@ TEST_F(Fusb302FifosTest, RedReceivedMessageDecodingforDataMessageWithMultipleObj
   EXPECT_EQ(0x0002d12c, result->data_objects()[1]);
   EXPECT_EQ(0x0004b12c, result->data_objects()[2]);
   EXPECT_EQ(0x00064145, result->data_objects()[3]);
+}
+
+TEST_F(Fusb302FifosTest, ReadReceivedMessageNonSopToken) {
+  MockReceiveFifoNotEmpty();
+  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({kSopPrimeRxToken, 0x61, 0x05});
+  mock_i2c_.ExpectWrite({kFifosAddress}).ExpectReadStop({0xcd, 0xcd, 0xcd, 0xcd});
+
+  zx::result<std::optional<usb_pd::Message>> result = fifos_->ReadReceivedMessage();
+  ASSERT_OK(result);
+  EXPECT_FALSE(result.value().has_value());
 }
 
 }  // namespace

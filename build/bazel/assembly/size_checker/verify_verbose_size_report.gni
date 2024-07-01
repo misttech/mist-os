@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/bazel_workspace.gni")
 
 # Compares a GN generated verbose size report with a Bazel generated one.
@@ -46,7 +46,7 @@ template("verify_verbose_size_report") {
   _bazel_verbose_size_report_output =
       "${target_name}/bazel_verbose_size_report.json"
 
-  bazel_action(_bazel_verbose_size_report_target) {
+  bazel_build_action(_bazel_verbose_size_report_target) {
     forward_variables_from(invoker,
                            [
                              "bazel_inputs",
@@ -54,8 +54,7 @@ template("verify_verbose_size_report") {
                              "testonly",
                            ])
     visibility = [ ":${invoker.target_name}" ]
-    command = "build"
-    bazel_targets = [ invoker.bazel_size_checker_target + "_aggregator" ]
+    bazel_target = invoker.bazel_size_checker_target + "_aggregator"
 
     copy_outputs = [
       {

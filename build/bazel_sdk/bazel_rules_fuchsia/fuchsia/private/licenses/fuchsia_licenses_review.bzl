@@ -38,7 +38,7 @@ def _fuchsia_licenses_review(ctx):
 
 fuchsia_licenses_review = rule(
     doc = """
-Produces a zip file with [name] containing license review material.
+Produces a zip file with \\[name\\] containing license review material.
 
 The file contains:
 

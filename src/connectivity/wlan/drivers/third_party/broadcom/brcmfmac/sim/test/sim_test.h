@@ -31,7 +31,7 @@ namespace wlan::brcmfmac {
 
 // This class represents an interface created on a simulated device, collecting all of the
 // attributes related to that interface.
-class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
+class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
  public:
   // Track state of association
   struct AssocContext {
@@ -57,8 +57,8 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
     std::list<wlan_fullmac_wire::WlanFullmacConnectConfirm> connect_results;
     std::list<wlan_fullmac_wire::WlanFullmacAssocInd> assoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacAuthInd> auth_indications;
-    std::list<wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest> deauth_results;
-    std::list<wlan_fullmac_wire::WlanFullmacImplIfcBaseDisassocConfRequest> disassoc_results;
+    std::list<wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest> deauth_results;
+    std::list<wlan_fullmac_wire::WlanFullmacImplIfcDisassocConfRequest> disassoc_results;
     std::list<wlan_fullmac_wire::WlanFullmacDeauthIndication> deauth_indications;
     std::list<wlan_fullmac_wire::WlanFullmacDisassocIndication> disassoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacChannelSwitchInfo> csa_indications;
@@ -89,50 +89,37 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   void Reset();
 
   // This function establish connection between this object and WlanInterface instance.
-  zx_status_t Connect(fdf::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end,
-                      fdf_dispatcher_t* server_dispatcher);
+  zx_status_t Connect(fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> client_end,
+                      async_dispatcher_t* server_dispatcher);
 
   // Default SME Callbacks
   // Implementation of wlan_fullmac_wire::WlanFullmacImplIfc.
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override;
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override;
-  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
-                   ConnectConfCompleter::Sync& completer) override;
-  void RoamConf(RoamConfRequestView request, fdf::Arena& arena,
-                RoamConfCompleter::Sync& completer) override;
-  void AuthInd(AuthIndRequestView request, fdf::Arena& arena,
-               AuthIndCompleter::Sync& completer) override;
-  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
-                  DeauthConfCompleter::Sync& completer) override;
-  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                 DeauthIndCompleter::Sync& completer) override;
-  void AssocInd(AssocIndRequestView request, fdf::Arena& arena,
-                AssocIndCompleter::Sync& completer) override;
-  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override;
+  void RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) override;
+  void AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) override;
+  void DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;
+  void AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request,
                     DisassocConfCompleter::Sync& completer) override;
-  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
-                   DisassocIndCompleter::Sync& completer) override;
-  void StartConf(StartConfRequestView request, fdf::Arena& arena,
-                 StartConfCompleter::Sync& completer) override;
-  void StopConf(StopConfRequestView request, fdf::Arena& arena,
-                StopConfCompleter::Sync& completer) override;
-  void EapolConf(EapolConfRequestView request, fdf::Arena& arena,
-                 EapolConfCompleter::Sync& completer) override;
-  void OnChannelSwitch(OnChannelSwitchRequestView request, fdf::Arena& arena,
+  void DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) override;
+  void StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) override;
+  void EapolConf(EapolConfRequestView request, EapolConfCompleter::Sync& completer) override;
+  void OnChannelSwitch(OnChannelSwitchRequestView request,
                        OnChannelSwitchCompleter::Sync& completer) override;
-  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+  void SignalReport(SignalReportRequestView request,
                     SignalReportCompleter::Sync& completer) override;
-  void EapolInd(EapolIndRequestView request, fdf::Arena& arena,
-                EapolIndCompleter::Sync& completer) override;
-  void OnPmkAvailable(OnPmkAvailableRequestView request, fdf::Arena& arena,
+  void EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) override;
+  void OnPmkAvailable(OnPmkAvailableRequestView request,
                       OnPmkAvailableCompleter::Sync& completer) override;
-  void SaeHandshakeInd(SaeHandshakeIndRequestView request, fdf::Arena& arena,
+  void SaeHandshakeInd(SaeHandshakeIndRequestView request,
                        SaeHandshakeIndCompleter::Sync& completer) override;
-  void SaeFrameRx(SaeFrameRxRequestView request, fdf::Arena& arena,
-                  SaeFrameRxCompleter::Sync& completer) override;
-  void OnWmmStatusResp(OnWmmStatusRespRequestView request, fdf::Arena& arena,
+  void SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter::Sync& completer) override;
+  void OnWmmStatusResp(OnWmmStatusRespRequestView request,
                        OnWmmStatusRespCompleter::Sync& completer) override;
 
   // Query an interface
@@ -182,7 +169,7 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
 
   simulation::Environment* env_;
 
-  fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
+  fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
 
   // Unique identifier provided by the driver
   uint16_t iface_id_;
@@ -204,9 +191,9 @@ class SimInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImp
   fdf::Arena test_arena_;
 
  private:
-  fdf_dispatcher_t* server_dispatcher_ = nullptr;
+  async_dispatcher_t* server_dispatcher_ = nullptr;
 
-  std::unique_ptr<fdf::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfc>> server_binding_ =
+  std::unique_ptr<fidl::ServerBinding<fuchsia_wlan_fullmac::WlanFullmacImplIfc>> server_binding_ =
       nullptr;
 
   wlan_common::WlanMacRole role_;

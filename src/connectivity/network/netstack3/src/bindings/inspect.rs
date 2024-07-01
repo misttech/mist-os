@@ -75,6 +75,8 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     ctx.api().udp::<Ipv6>().inspect(&mut bindings_inspector);
     ctx.api().icmp_echo::<Ipv4>().inspect(&mut bindings_inspector);
     ctx.api().icmp_echo::<Ipv6>().inspect(&mut bindings_inspector);
+    ctx.api().raw_ip_socket::<Ipv4>().inspect(&mut bindings_inspector);
+    ctx.api().raw_ip_socket::<Ipv6>().inspect(&mut bindings_inspector);
     inspector
 }
 

@@ -64,11 +64,11 @@ class StreamBuffer {
   Writer* writer_ = nullptr;
 
   // Read buffer in a sequence of ordered buffers. Read at the front, add data at the back.
-  std::deque<const std::vector<char>> read_buffer_;
+  std::deque<std::vector<char>> read_buffer_;
   size_t first_read_buffer_offset_ = 0;  // Position of read_buffer_[0].
 
   // Write buffer.
-  std::deque<const std::vector<char>> write_buffer_;
+  std::deque<std::vector<char>> write_buffer_;
   bool can_write_ = true;
   size_t first_write_buffer_offset_ = 0;  // Position of write_buffer_[0].
 };

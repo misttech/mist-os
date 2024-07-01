@@ -9,11 +9,12 @@ use ip_test_macro::ip_test;
 use loom::sync::Arc;
 use net_types::ZonedAddr;
 use netstack3_core::device::LoopbackDevice;
+use netstack3_core::socket::ShutdownType;
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx};
 use netstack3_core::types::WorkQueueReport;
 use netstack3_core::{CtxPair, IpExt};
 use netstack3_tcp::testutil::{ProvidedBuffers, WriteBackClientBuffers};
-use test_case::test_case;
+use test_case::test_matrix;
 
 use super::{loom_model, loom_spawn, low_preemption_bound_model};
 
@@ -23,11 +24,19 @@ enum ServerOrClient {
     Client,
 }
 
+#[derive(Debug, Copy, Clone)]
+enum CloseOrShutdown {
+    Close,
+    Shutdown,
+}
+
 #[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test(I)]
-#[test_case(ServerOrClient::Server; "server")]
-#[test_case(ServerOrClient::Client; "client")]
-fn race_connect_close<I: IpExt>(close_which: ServerOrClient) {
+#[test_matrix(
+    [ServerOrClient::Server, ServerOrClient::Client],
+    [CloseOrShutdown::Close, CloseOrShutdown::Shutdown]
+)]
+fn race_connect_close<I: IpExt>(which: ServerOrClient, close_or_shutdown: CloseOrShutdown) {
     loom_model(low_preemption_bound_model(), move || {
         const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
         const BACKLOG: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
@@ -44,24 +53,60 @@ fn race_connect_close<I: IpExt>(close_which: ServerOrClient) {
             .connect(&client, ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into(), SERVER_PORT)
             .unwrap();
 
-        let (close_socket, keep_socket) = match close_which {
-            ServerOrClient::Server => (server, client),
-            ServerOrClient::Client => (client, server),
-        };
-
         // The client's initial SYN is sitting in the loopback rx queue.
         //
         // Race two operations:
         //
-        // 1. Closing the one of the sockets.
+        // 1. Closing or shutting down one of the sockets.
         // 2. Operating the loopback queue, which will advance the server
         //    state-machine and potentially send a SYN-ACK back.
 
-        let thread_vars = (ctx.clone(), close_socket);
-        let t_close = loom_spawn(move || {
-            let (mut ctx, close_socket) = thread_vars;
-            ctx.core_api().tcp::<I>().close(close_socket);
-        });
+        let (action_socket, other_socket) = match which {
+            ServerOrClient::Server => (server, client),
+            ServerOrClient::Client => (client, server),
+        };
+
+        let (racy_action, cleanup): (Box<dyn FnOnce() + Send + Sync>, Box<dyn FnOnce()>) =
+            match close_or_shutdown {
+                CloseOrShutdown::Close => {
+                    let thread_vars = (ctx.clone(), action_socket);
+                    let racy = move || {
+                        let (mut ctx, socket) = thread_vars;
+                        ctx.core_api().tcp::<I>().close(socket);
+                    };
+                    let mut ctx = ctx.clone();
+                    let cleanup = move || {
+                        ctx.core_api().tcp::<I>().close(other_socket);
+                    };
+                    (Box::new(racy), Box::new(cleanup))
+                }
+                CloseOrShutdown::Shutdown => {
+                    let thread_vars = (ctx.clone(), action_socket.clone());
+                    let racy = move || {
+                        let (mut ctx, socket) = thread_vars;
+                        // The return of shutdown is different for listening and
+                        // connected sockets.
+                        let expect_shutdown = match which {
+                            ServerOrClient::Server => false,
+                            ServerOrClient::Client => true,
+                        };
+                        assert_eq!(
+                            ctx.core_api()
+                                .tcp::<I>()
+                                .shutdown(&socket, ShutdownType::SendAndReceive),
+                            Ok(expect_shutdown)
+                        );
+                    };
+                    let mut ctx = ctx.clone();
+                    let cleanup = move || {
+                        ctx.core_api().tcp::<I>().close(action_socket);
+                        ctx.core_api().tcp::<I>().close(other_socket);
+                    };
+                    (Box::new(racy), Box::new(cleanup))
+                }
+            };
+
+        let t_action = loom_spawn(racy_action);
         let thread_vars = (ctx.clone(), lo.clone());
         let t_recv = loom_spawn(move || {
             let (mut ctx, lo) = thread_vars;
@@ -76,12 +121,17 @@ fn race_connect_close<I: IpExt>(close_which: ServerOrClient) {
             }
         });
 
-        t_close.join().unwrap();
+        t_action.join().unwrap();
         t_recv.join().unwrap();
 
         // Clean up all resources.
-        ctx.core_api().tcp::<I>().close(keep_socket);
-        ctx.bindings_ctx.state_mut().rx_available.clear();
+        cleanup();
+        {
+            let mut state = ctx.bindings_ctx.state_mut();
+            state.rx_available.clear();
+            // Ensure that all the deferred resource removals have completed.
+            state.deferred_receivers.iter().for_each(|r| r.assert_signalled());
+        }
         ctx.test_api().clear_routes_and_remove_device(lo);
     })
 }

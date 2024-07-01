@@ -8,8 +8,7 @@ use crate::vfs::socket::iptables_utils::{self, write_string_to_ascii_buffer};
 use crate::vfs::socket::{SocketDomain, SocketHandle, SocketType};
 use fidl_fuchsia_net_filter_ext::sync::Controller;
 use fidl_fuchsia_net_filter_ext::{
-    Change, CommitError, ControllerCreationError, ControllerId, Namespace, PushChangesError,
-    Resource, ResourceId, Routine,
+    CommitError, ControllerCreationError, ControllerId, PushChangesError,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use itertools::Itertools;
@@ -281,25 +280,6 @@ impl IpTables {
         }
     }
 
-    fn create_changes(
-        namespace: Namespace,
-        routines: Vec<Routine>,
-    ) -> impl Iterator<Item = Change> {
-        let namespace_changes = [
-            // Firstly, remove the existing table, along with all of its routines and rules.
-            // We will call Commit with idempotent=true so that this would succeed even if
-            // the table does not exist.
-            Change::Remove(ResourceId::Namespace(namespace.id.clone())),
-            // Recreate the table.
-            Change::Create(Resource::Namespace(namespace)),
-        ]
-        .into_iter();
-
-        let routine_changes = routines.into_iter().map(Resource::Routine).map(Change::Create);
-
-        namespace_changes.chain(routine_changes)
-    }
-
     fn replace_ipv4_table(&mut self, bytes: Vec<u8>) -> Result<(), Errno> {
         let table = match iptables_utils::IpTable::from_ipt_replace(bytes) {
             Ok(table) => table,
@@ -308,7 +288,21 @@ impl IpTables {
                 return error!(EINVAL);
             }
         };
-        let changes = Self::create_changes(table.namespace, table.routines);
+        let entries = table.parser.entries_bytes().to_vec();
+        let replace_info = table.parser.replace_info.clone();
+        let mut name: IpTablesName = [0; 32usize];
+        write_string_to_ascii_buffer(replace_info.name, &mut name).map_err(|_| errno!(EINVAL))?;
+        let iptable_entry = IpTable {
+            num_entries: replace_info.num_entries as u32,
+            size: replace_info.size as u32,
+            entries,
+            num_counters: replace_info.num_counters,
+            valid_hooks: replace_info.valid_hooks,
+            hook_entry: replace_info.hook_entry,
+            underflow: replace_info.underflow,
+            counters: vec![],
+        };
+        let changes = table.into_changes();
 
         match self.get_controller() {
             Err(e) => {
@@ -368,24 +362,7 @@ impl IpTables {
             }
         };
 
-        let entries = table.parser.entries_bytes().to_vec();
-        let replace_info = table.parser.replace_info;
-        let mut name: IpTablesName = [0; 32usize];
-        write_string_to_ascii_buffer(replace_info.name, &mut name).map_err(|_| errno!(EINVAL))?;
-
-        self.ipv4.insert(
-            name,
-            IpTable {
-                num_entries: replace_info.num_entries as u32,
-                size: replace_info.size as u32,
-                entries,
-                num_counters: replace_info.num_counters,
-                valid_hooks: replace_info.valid_hooks,
-                hook_entry: replace_info.hook_entry,
-                underflow: replace_info.underflow,
-                counters: vec![],
-            },
-        );
+        self.ipv4.insert(name, iptable_entry);
 
         Ok(())
     }

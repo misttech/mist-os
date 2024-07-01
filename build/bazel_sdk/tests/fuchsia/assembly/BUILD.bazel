@@ -53,9 +53,14 @@ fuchsia_board_input_bundle(
     cpu_manager_config = "test_data/config_data.json",
 )
 
+filegroup(
+    name = "empty_bib_files",
+    srcs = glob(["test_data/empty_bib/**"]),
+)
+
 fuchsia_prebuilt_board_input_bundle(
     name = "testing_prebuilt_board_input_bundle",
-    config = "test_data/board_input_bundle.json",
+    files = ":empty_bib_files",
 )
 
 fuchsia_board_input_bundle_test(

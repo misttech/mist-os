@@ -131,24 +131,24 @@ TEST_F(LifecycleTest, FullmacStartMultipleCallsFails) {
 
   {
     zx::result driver_connect_result =
-        fdf::internal::DriverTransportConnect<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>(
+        component::ConnectAtMember<fuchsia_wlan_fullmac::Service::WlanFullmacImpl>(
             CreateDriverSvcClient(), "brcmfmac-wlan-fullmac-client");
     EXPECT_EQ(ZX_OK, driver_connect_result.status_value());
 
-    auto fullmac_client = fdf::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(
+    auto fullmac_client = fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImpl>(
         std::move(driver_connect_result.value()));
 
     {
       // first call to start succeeds
-      auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
+      auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
       auto result = fullmac_client.buffer(test_arena_)->Start(std::move(endpoints->client));
       ASSERT_TRUE(result.ok() && !result->is_error());
     }
 
     {
       // second call to start fails
-      auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
-      auto result = fullmac_client.buffer(test_arena_)->Start(std::move(endpoints->client));
+      auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
+      auto result = fullmac_client->Start(std::move(endpoints->client));
       ASSERT_TRUE(result.ok());
       ASSERT_TRUE(result->is_error());
       ASSERT_EQ(result->error_value(), ZX_ERR_ALREADY_BOUND);

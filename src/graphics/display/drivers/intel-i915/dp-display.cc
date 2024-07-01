@@ -2260,8 +2260,8 @@ zx::result<> DpDisplay::SetBacklightState(bool power, double brightness) {
   return zx::success();
 }
 
-zx::result<FidlBacklight::wire::State> DpDisplay::GetBacklightState() {
-  return zx::success(FidlBacklight::wire::State{
+zx::result<fuchsia_hardware_backlight::wire::State> DpDisplay::GetBacklightState() {
+  return zx::success(fuchsia_hardware_backlight::wire::State{
       .backlight_on = IsBacklightOn(),
       .brightness = GetBacklightBrightness(),
   });

@@ -13,6 +13,9 @@ fidl("fuchsia.inspect") {
     "inspect_sink.fidl",
     "tree.fidl",
   ]
-  public_deps = [ "//sdk/fidl/fuchsia.mem" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.mem",
+    "//zircon/vdso/zx",
+  ]
   enable_hlcpp = true
 }

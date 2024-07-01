@@ -19,10 +19,8 @@ class ScanAndApStartTest;
 
 class ScanTestIfc : public SimInterface {
  public:
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override;
-  void StartConf(StartConfRequestView request, fdf::Arena& arena,
-                 StartConfCompleter::Sync& completer) override;
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
+  void StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) override;
 
   ScanAndApStartTest* test_;
 };
@@ -51,23 +49,21 @@ class ScanAndApStartTest : public SimTest {
   enum { NOT_STARTED, STARTED, DONE } ap_start_progress_ = NOT_STARTED;
 };
 
-void ScanTestIfc::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                            OnScanEndCompleter::Sync& completer) {
+void ScanTestIfc::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
   // Notify test
   test_->OnScanEnd();
 
   // Notify test interface framework
-  SimInterface::OnScanEnd(request, arena, completer);
+  SimInterface::OnScanEnd(request, completer);
 }
 
 // When we receive confirmation that the AP start operation has completed, let the test know
-void ScanTestIfc::StartConf(StartConfRequestView request, fdf::Arena& arena,
-                            StartConfCompleter::Sync& completer) {
+void ScanTestIfc::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
   // Notify test
   test_->OnStartConf();
 
   // Notify test interface framework
-  SimInterface::StartConf(request, arena, completer);
+  SimInterface::StartConf(request, completer);
 }
 
 void ScanAndApStartTest::Init() {

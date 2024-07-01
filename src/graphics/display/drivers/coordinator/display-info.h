@@ -36,7 +36,7 @@ namespace display {
 class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
                     public fbl::RefCounted<DisplayInfo> {
  public:
-  static zx::result<fbl::RefPtr<DisplayInfo>> Create(const added_display_args_t& info);
+  static zx::result<fbl::RefPtr<DisplayInfo>> Create(const raw_display_info_t& banjo_display_info);
 
   DisplayInfo(const DisplayInfo&) = delete;
   DisplayInfo(DisplayInfo&&) = delete;

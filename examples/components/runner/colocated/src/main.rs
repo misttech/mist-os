@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use zx::AsHandleRef;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_memory_attribution as fattribution, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -127,19 +128,18 @@ fn get_attribution(resource_tracker: Arc<ResourceTracker>) -> Vec<fattribution::
     let mut children = vec![];
     for (_, (token, koid)) in resource_tracker.resources.lock().iter() {
         children.push(fattribution::AttributionUpdate::Add(fattribution::NewPrincipal {
-            identifier: Some(fattribution::Identifier::Component(
+            identifier: Some(token.get_koid().unwrap().raw_koid()),
+            description: Some(fattribution::Description::Component(
                 token.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
             )),
             detailed_attribution: None,
             ..Default::default()
         }));
         children.push(fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
-            identifier: Some(fattribution::Identifier::Component(
-                token.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
-            )),
-            resources: Some(fattribution::Resources::Data(vec![
-                fattribution::Resource::KernelObject(koid.raw_koid()),
-            ])),
+            identifier: Some(token.get_koid().unwrap().raw_koid()),
+            resources: Some(fattribution::Resources::Data(fattribution::Data {
+                resources: vec![fattribution::Resource::KernelObject(koid.raw_koid())],
+            })),
             ..Default::default()
         }));
     }
@@ -180,22 +180,21 @@ fn start(
 
     let mut updates = vec![];
     updates.push(fattribution::AttributionUpdate::Add(fattribution::NewPrincipal {
-        identifier: Some(fattribution::Identifier::Component(
+        identifier: Some(instance_token.get_koid().unwrap().raw_koid()),
+        description: Some(fattribution::Description::Component(
             instance_token.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
         )),
         detailed_attribution: None,
         ..Default::default()
     }));
     updates.push(fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
-        identifier: Some(fattribution::Identifier::Component(
-            instance_token.duplicate_handle(fidl::Rights::SAME_RIGHTS).unwrap(),
-        )),
-        resources: Some(fattribution::Resources::Data(vec![fattribution::Resource::KernelObject(
-            vmo_koid,
-        )])),
+        identifier: Some(instance_token.get_koid().unwrap().raw_koid()),
+        resources: Some(fattribution::Resources::Data(fattribution::Data {
+            resources: vec![fattribution::Resource::KernelObject(vmo_koid)],
+        })),
         ..Default::default()
     }));
-    publisher.on_update(updates).unwrap();
+    publisher.on_update(updates);
     let termination = program.wait_for_termination();
     let termination_clone = program.wait_for_termination();
     // Remove this VMO when the program has terminated.
@@ -203,11 +202,9 @@ fn start(
     fasync::Task::spawn(async move {
         termination_clone.await;
         if let Some((token, _)) = tracker.resources.lock().remove(&id) {
-            publisher
-                .on_update(vec![fattribution::AttributionUpdate::Remove(
-                    fattribution::Identifier::Component(token),
-                )])
-                .unwrap();
+            publisher.on_update(vec![fattribution::AttributionUpdate::Remove(
+                token.get_koid().unwrap().raw_koid(),
+            )]);
         }
     })
     .detach();

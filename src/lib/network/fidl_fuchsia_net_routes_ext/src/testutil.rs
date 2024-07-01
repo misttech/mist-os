@@ -12,7 +12,7 @@ use crate::FidlRouteIpExt;
 
 use fidl_fuchsia_net_routes as fnet_routes;
 use futures::{Future, Stream, StreamExt as _};
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
 // Responds to the given `Watch` request with the given batch of events.
 fn handle_watch<I: FidlRouteIpExt>(
@@ -26,7 +26,7 @@ fn handle_watch<I: FidlRouteIpExt>(
             <<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as Stream>::Item,
         event_batch: Vec<I::WatchEvent>,
     }
-    I::map_ip::<HandleInputs<I>, ()>(
+    I::map_ip_in(
         HandleInputs { request, event_batch },
         |HandleInputs { request, event_batch }| match request
             .expect("failed to receive `Watch` request")
@@ -79,11 +79,11 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
         // Use `Box<dyn>` here because `event_stream` needs to have a know size.
         event_stream: Box<dyn Stream<Item = Vec<I::WatchEvent>> + 'a>,
     }
-    let IpInvariant(watcher_fut) = I::map_ip::<
-        GetWatcherInputs<'a, I>,
+    I::map_ip_in::<
+        _,
         // Use `Box<dyn>` here because `event_stream` needs to have a know size.
         // `Pin` ensures that `watcher_fut` implements `Future`.
-        IpInvariant<std::pin::Pin<Box<dyn Future<Output = ()> + 'a>>>,
+        std::pin::Pin<Box<dyn Future<Output = ()> + 'a>>,
     >(
         GetWatcherInputs { request, event_stream: Box::new(event_stream) },
         |GetWatcherInputs { request, event_stream }| match request
@@ -93,10 +93,7 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
                 options: _,
                 watcher,
                 control_handle: _,
-            } => IpInvariant(Box::pin(fake_watcher_impl::<Ipv4>(
-                Box::into_pin(event_stream),
-                watcher,
-            ))),
+            } => Box::pin(fake_watcher_impl::<Ipv4>(Box::into_pin(event_stream), watcher)),
             fnet_routes::StateV4Request::GetRuleWatcherV4 {
                 options: _,
                 watcher: _,
@@ -110,18 +107,15 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
                 options: _,
                 watcher,
                 control_handle: _,
-            } => IpInvariant(Box::pin(fake_watcher_impl::<Ipv6>(
-                Box::into_pin(event_stream),
-                watcher,
-            ))),
+            } => Box::pin(fake_watcher_impl::<Ipv6>(Box::into_pin(event_stream), watcher)),
             fnet_routes::StateV6Request::GetRuleWatcherV6 {
                 options: _,
                 watcher: _,
                 control_handle: _,
             } => todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher"),
         },
-    );
-    watcher_fut.await
+    )
+    .await
 }
 
 /// Provides a stream of watcher events such that the stack appears to contain
@@ -149,7 +143,8 @@ pub mod admin {
     use futures::{Stream, StreamExt as _};
     use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
-    use crate::admin::{FidlRouteAdminIpExt, Responder, RouteSetRequest};
+    use crate::admin::{FidlRouteAdminIpExt, RouteSetRequest};
+    use crate::Responder;
 
     /// Provides a RouteTable implementation that provides one RouteSet and
     /// then panics on subsequent invocations. Returns the request stream for
@@ -348,9 +343,9 @@ pub(crate) mod internal {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct BuildEventOutput<I: FidlRouteIpExt>(I::WatchEvent);
-        let BuildEventOutput(event) = I::map_ip(
-            IpInvariant(seed),
-            |IpInvariant(seed)| {
+        let BuildEventOutput(event) = I::map_ip_out(
+            seed,
+            |seed| {
                 BuildEventOutput(fnet_routes::EventV4::Added(fnet_routes::InstalledRouteV4 {
                     route: Some(fnet_routes::RouteV4 {
                         destination: fidl_ip_v4_with_prefix!("192.168.0.0/24"),
@@ -374,7 +369,7 @@ pub(crate) mod internal {
                     ..Default::default()
                 }))
             },
-            |IpInvariant(seed)| {
+            |seed| {
                 BuildEventOutput(fnet_routes::EventV6::Added(fnet_routes::InstalledRouteV6 {
                     route: Some(fnet_routes::RouteV6 {
                         destination: fidl_ip_v6_with_prefix!("fe80::0/64"),

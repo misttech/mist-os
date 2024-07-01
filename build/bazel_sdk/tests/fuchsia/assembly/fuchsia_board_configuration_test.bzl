@@ -7,7 +7,7 @@ load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaBoardConfig
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_board_configuration_test_impl(ctx):
-    board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config
+    board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].config
     golden_file = ctx.file.golden_file
     return [create_validation_script_provider(ctx, board_config_file, golden_file)]
 

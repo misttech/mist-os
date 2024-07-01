@@ -28,6 +28,9 @@ class Interrupter {
     if (thread_.joinable()) {
       thread_.join();
     }
+    if (irq_.is_valid()) {
+      irq_.destroy();
+    }
   }
 
   zx_status_t Init(uint16_t interrupter, size_t page_size, fdf::MmioBuffer* buffer,

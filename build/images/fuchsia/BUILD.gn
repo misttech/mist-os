@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_assembly_inputs.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/assembly/update_package.gni")
 import("//build/board.gni")
@@ -52,44 +51,6 @@ if (is_fuchsia) {
   ##################################################
   # Shared parameters across assemblies in this file
   ##################################################
-
-  files = {
-    assembly_inputs = "$target_out_dir/fuchsia/assembly_inputs.json"
-    platform_aib_dir = get_label_info("//bundles/assembly", "target_out_dir")
-
-    # Outputs of assembly.
-    outdir = target_out_dir + "/fuchsia"
-    zbi = "${outdir}/fuchsia.zbi"
-    zbi_signed = "${outdir}/fuchsia.zbi.signed"
-    vbmeta = "${outdir}/fuchsia.vbmeta"
-    blobfs = "${outdir}/blob.blk"
-    fvm = "${outdir}/fvm.blk"
-    fvm_sparse = "${outdir}/fvm.sparse.blk"
-    fvm_fastboot = "${outdir}/fvm.fastboot.blk"
-    fxfs = "${outdir}/fxfs.blk"
-    fxfs_sparse = "${outdir}/fxfs.sparse.blk"
-    packages_json = "${outdir}/packages.json"
-    images_json = "${outdir}/images.json"
-
-    # Outputs of recovery.
-    recovery_name = get_label_info(recovery_label, "name")
-    recovery_outdir =
-        get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
-    recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
-    recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
-    recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
-    recovery_blobfs = "${recovery_outdir}/blob.blk"
-    recovery_fvm = "${recovery_outdir}/fvm.blk"
-    recovery_fvm_sparse = "${recovery_outdir}/fvm.sparse.blk"
-    recovery_fvm_fastboot = "${recovery_outdir}/fvm.fastboot.blk"
-    recovery_fxfs = "${recovery_outdir}/fxfs.blk"
-    recovery_fxfs_sparse = "${recovery_outdir}/fxfs.sparse.blk"
-    recovery_images_json = "${recovery_outdir}/images.json"
-
-    esp_image_path = "${root_build_dir}/fuchsia.esp.blk"
-
-    qemu_kernel = qemu_boot_shim.path
-  }
 
   # A scope of dependencies that serves to transition deps from the
   # legacy_assembly_input_bundle.gni mechanism to the new platform
@@ -192,7 +153,6 @@ if (is_fuchsia) {
 
     if (!use_bazel_images_only) {
       public_deps += [
-        ":assembly_inputs",
         ":fuchsia_assembly",
         ":product_bundle",
         ":update",
@@ -229,11 +189,49 @@ if (is_fuchsia) {
 
     image_metadata_overrides = legacy_fuchsia_image_metadata_overrides
     must_exist_deps = must_exist
+    include_assembly_inputs = true
   }
 
   # Bazel assembly builds a product bundle, so we don't need to build product
   # bundle and update packages in GN.
   if (!use_bazel_images_only) {
+    files = {
+      platform_aib_dir = get_label_info("//bundles/assembly", "target_out_dir")
+
+      # Outputs of assembly.
+      outdir = target_out_dir + "/fuchsia"
+      zbi = "${outdir}/fuchsia.zbi"
+      zbi_signed = "${outdir}/fuchsia.zbi.signed"
+      vbmeta = "${outdir}/fuchsia.vbmeta"
+      blobfs = "${outdir}/blob.blk"
+      fvm = "${outdir}/fvm.blk"
+      fvm_sparse = "${outdir}/fvm.sparse.blk"
+      fvm_fastboot = "${outdir}/fvm.fastboot.blk"
+      fxfs = "${outdir}/fxfs.blk"
+      fxfs_sparse = "${outdir}/fxfs.sparse.blk"
+      packages_json = "${outdir}/packages.json"
+      images_json = "${outdir}/images.json"
+
+      # Outputs of recovery.
+      recovery_name = get_label_info(recovery_label, "name")
+      recovery_outdir =
+          get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
+      recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
+      recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
+      recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
+      recovery_blobfs = "${recovery_outdir}/blob.blk"
+      recovery_fvm = "${recovery_outdir}/fvm.blk"
+      recovery_fvm_sparse = "${recovery_outdir}/fvm.sparse.blk"
+      recovery_fvm_fastboot = "${recovery_outdir}/fvm.fastboot.blk"
+      recovery_fxfs = "${recovery_outdir}/fxfs.blk"
+      recovery_fxfs_sparse = "${recovery_outdir}/fxfs.sparse.blk"
+      recovery_images_json = "${recovery_outdir}/images.json"
+
+      esp_image_path = "${root_build_dir}/fuchsia.esp.blk"
+
+      qemu_kernel = qemu_boot_shim.path
+    }
+
     _partitions_config = "//boards/partitions:default"
     if (has_board) {
       assert(partitions_config_label != false,
@@ -354,23 +352,9 @@ if (is_fuchsia) {
     }
   }
 
-  generated_assembly_inputs("assembly_inputs") {
+  group("assembly_inputs") {
     testonly = fuchsia_zbi_testonly
-    output_path = files.assembly_inputs
-
-    # Add the legacy AIB for the assemblies. The platform AIBs are added
-    # automatically from the build_api_module("assembly_input_archives")
-    sources = [ "${files.outdir}/legacy" ]
-
-    deps = [ ":fuchsia.legacy_input_bundle" ]
-
-    metadata = {
-      assembly_inputs = [
-        {
-          path = rebase_path(files.assembly_inputs, root_build_dir)
-        },
-      ]
-    }
+    public_deps = [ ":fuchsia.legacy_input_bundle_assembly_inputs.json" ]
   }
 
   scrutiny_x_smoke_test("scrutiny_x_smoke_test") {

@@ -14,8 +14,8 @@ load(
 )
 load(
     "//fuchsia/private/assembly:fuchsia_assembly_developer_overrides.bzl",
-    _fuchsia_assembly_developer_overrides = "fuchsia_assembly_developer_overrides",
     _fuchsia_assembly_developer_overrides_list = "fuchsia_assembly_developer_overrides_list",
+    _fuchsia_prebuilt_assembly_developer_overrides = "fuchsia_prebuilt_assembly_developer_overrides",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
@@ -40,6 +40,10 @@ load(
     _fuchsia_elf_sizes = "fuchsia_elf_sizes",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_legacy_bundle.bzl",
+    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_package_directory.bzl",
     _fuchsia_package_directory = "fuchsia_package_directory",
 )
@@ -60,14 +64,12 @@ load(
 )
 load(
     "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
-    _fuchsia_legacy_bundle = "fuchsia_legacy_bundle",
     _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product.bzl",
     _PACKAGE_MODE = "PACKAGE_MODE",
     _fuchsia_product = "fuchsia_product",
-    _fuchsia_product_assembly = "fuchsia_product_assembly",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_bundle.bzl",
@@ -114,19 +116,12 @@ load(
     _fuchsia_virtual_device = "fuchsia_virtual_device",
 )
 load(
-    "//fuchsia/private/assembly:providers.bzl",
-    _FuchsiaProductAssemblyBundleInfo = "FuchsiaProductAssemblyBundleInfo",
-    _FuchsiaProductAssemblyInfo = "FuchsiaProductAssemblyInfo",
-    _FuchsiaProductImageInfo = "FuchsiaProductImageInfo",
-    _FuchsiaScrutinyConfigInfo = "FuchsiaScrutinyConfigInfo",
-)
-load(
     "//fuchsia/private/workflows:fuchsia_task_flash.bzl",
     _fuchsia_task_flash = "fuchsia_task_flash",
 )
 
 # Rules
-fuchsia_assembly_developer_overrides = _fuchsia_assembly_developer_overrides
+fuchsia_prebuilt_assembly_developer_overrides = _fuchsia_prebuilt_assembly_developer_overrides
 fuchsia_assembly_developer_overrides_list = _fuchsia_assembly_developer_overrides_list
 fuchsia_legacy_bundle = _fuchsia_legacy_bundle
 fuchsia_platform_artifacts = _fuchsia_platform_artifacts
@@ -142,7 +137,6 @@ fuchsia_board_input_bundle = _fuchsia_board_input_bundle
 fuchsia_prebuilt_board_input_bundle = _fuchsia_prebuilt_board_input_bundle
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
 fuchsia_product = _fuchsia_product
-fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_prebuilt_partitions_configuration = _fuchsia_prebuilt_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle
@@ -163,12 +157,6 @@ fuchsia_product_image = _fuchsia_product
 fuchsia_bootstrap_partition = _fuchsia_bootstrap_partition
 fuchsia_bootloader_partition = _fuchsia_bootloader_partition
 fuchsia_partition = _fuchsia_partition
-
-# Providers
-FuchsiaProductImageInfo = _FuchsiaProductImageInfo
-FuchsiaProductAssemblyBundleInfo = _FuchsiaProductAssemblyBundleInfo
-FuchsiaScrutinyConfigInfo = _FuchsiaScrutinyConfigInfo
-FuchsiaProductAssemblyInfo = _FuchsiaProductAssemblyInfo
 
 # constants
 BUILD_TYPES = _BUILD_TYPES

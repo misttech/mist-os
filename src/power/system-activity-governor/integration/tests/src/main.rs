@@ -71,26 +71,26 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
 
-    let es_token = power_elements.execution_state.unwrap().passive_dependency_token.unwrap();
+    let es_token = power_elements.execution_state.unwrap().opportunistic_dependency_token.unwrap();
     assert!(!es_token.is_invalid_handle());
 
     let aa_element = power_elements.application_activity.unwrap();
-    let aa_active_token = aa_element.active_dependency_token.unwrap();
-    assert!(!aa_active_token.is_invalid_handle());
+    let aa_assertive_token = aa_element.assertive_dependency_token.unwrap();
+    assert!(!aa_assertive_token.is_invalid_handle());
 
     let wh_element = power_elements.wake_handling.unwrap();
-    let wh_active_token = wh_element.active_dependency_token.unwrap();
-    assert!(!wh_active_token.is_invalid_handle());
+    let wh_assertive_token = wh_element.assertive_dependency_token.unwrap();
+    assert!(!wh_assertive_token.is_invalid_handle());
 
     let fwh_element = power_elements.full_wake_handling.unwrap();
-    let fwh_active_token = fwh_element.active_dependency_token.unwrap();
-    assert!(!fwh_active_token.is_invalid_handle());
+    let fwh_assertive_token = fwh_element.assertive_dependency_token.unwrap();
+    assert!(!fwh_assertive_token.is_invalid_handle());
 
     let erl_element = power_elements.execution_resume_latency.unwrap();
-    let erl_passive_token = erl_element.passive_dependency_token.unwrap();
-    assert!(!erl_passive_token.is_invalid_handle());
-    let erl_active_token = erl_element.active_dependency_token.unwrap();
-    assert!(!erl_active_token.is_invalid_handle());
+    let erl_opportunistic_token = erl_element.opportunistic_dependency_token.unwrap();
+    assert!(!erl_opportunistic_token.is_invalid_handle());
+    let erl_assertive_token = erl_element.assertive_dependency_token.unwrap();
+    assert!(!erl_assertive_token.is_invalid_handle());
 
     Ok(())
 }
@@ -99,11 +99,11 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElemen
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
-    let aa_token = power_elements.application_activity.unwrap().active_dependency_token.unwrap();
+    let aa_token = power_elements.application_activity.unwrap().assertive_dependency_token.unwrap();
 
     let suspend_controller = PowerElementContext::builder(&topology, "suspend_controller", &[0, 1])
         .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Active,
+            dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: 1,
             requires_token: aa_token,
             requires_level_by_preference: vec![1],
@@ -118,11 +118,11 @@ async fn create_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementCo
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
-    let wh_token = power_elements.wake_handling.unwrap().active_dependency_token.unwrap();
+    let wh_token = power_elements.wake_handling.unwrap().assertive_dependency_token.unwrap();
 
     let wake_controller = PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
         .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Active,
+            dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: 1,
             requires_token: wh_token,
             requires_level_by_preference: vec![1],
@@ -137,12 +137,12 @@ async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElem
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
-    let fwh_token = power_elements.full_wake_handling.unwrap().active_dependency_token.unwrap();
+    let fwh_token = power_elements.full_wake_handling.unwrap().assertive_dependency_token.unwrap();
 
     let full_wake_controller =
         PowerElementContext::builder(&topology, "full_wake_controller", &[0, 1])
             .dependencies(vec![fbroker::LevelDependency {
-                dependency_type: fbroker::DependencyType::Active,
+                dependency_type: fbroker::DependencyType::Assertive,
                 dependent_level: 1,
                 requires_token: fwh_token,
                 requires_level_by_preference: vec![1],
@@ -162,7 +162,7 @@ async fn create_latency_topology(
     let power_elements = activity_governor.get_power_elements().await?;
 
     let erl = power_elements.execution_resume_latency.unwrap();
-    let erl_token = erl.active_dependency_token.unwrap();
+    let erl_token = erl.assertive_dependency_token.unwrap();
     assert_eq!(*expected_latencies, erl.resume_latencies.unwrap());
 
     let levels = Vec::from_iter(0..expected_latencies.len().try_into().unwrap());
@@ -172,7 +172,7 @@ async fn create_latency_topology(
             levels
                 .iter()
                 .map(|level| fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Active,
+                    dependency_type: fbroker::DependencyType::Assertive,
                     dependent_level: *level,
                     requires_token: erl_token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                     requires_level_by_preference: vec![*level],

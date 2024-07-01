@@ -59,8 +59,8 @@ type LevelTuple = table {
 };
 
 type RequirementType = strict enum {
-    ACTIVE = 1;
-    PASSIVE = 2;
+    ASSERTIVE = 1;
+    OPPORTUNISTIC = 2;
 };
 
 /// Describes the relationship between the `PowerLevel`s of two

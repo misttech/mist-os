@@ -258,7 +258,7 @@ class TestBuildFileMatcher(unittest.TestCase):
                         "my-test-package", matcher
                     )
                 ],
-                [("my-test-package", "--with //src:my-test-package")],
+                [("my-test-package", "--with-test //src:my-test-package")],
             )
 
             self.assertEqual(
@@ -268,7 +268,7 @@ class TestBuildFileMatcher(unittest.TestCase):
                         "other-real-name", matcher
                     )
                 ],
-                [("other-real-name", "--with //src:other-package")],
+                [("other-real-name", "--with-test //src:other-package")],
             )
 
             self.assertEqual(
@@ -278,7 +278,12 @@ class TestBuildFileMatcher(unittest.TestCase):
                         "yet-another-real-name", matcher
                     )
                 ],
-                [("yet-another-real-name", "--with //src:yet-another-package")],
+                [
+                    (
+                        "yet-another-real-name",
+                        "--with-test //src:yet-another-package",
+                    )
+                ],
             )
 
     def test_simple_labels(self) -> None:
@@ -306,11 +311,11 @@ class TestBuildFileMatcher(unittest.TestCase):
                     for val in build_matcher.find_matches("//src", matcher)
                 ],
                 [
-                    ("my-test-package", "--with //src:my-test-package"),
-                    ("other-real-name", "--with //src:other-package"),
+                    ("my-test-package", "--with-test //src:my-test-package"),
+                    ("other-real-name", "--with-test //src:other-package"),
                     (
                         "yet-another-real-name",
-                        "--with //src:yet-another-package",
+                        "--with-test //src:yet-another-package",
                     ),
                 ],
             )
@@ -342,7 +347,12 @@ class TestBuildFileMatcher(unittest.TestCase):
                         "my_test_component", matcher
                     )
                 ],
-                [("my-test-component", "--with //src/nested:test-package")],
+                [
+                    (
+                        "my-test-component",
+                        "--with-test //src/nested:test-package",
+                    )
+                ],
             )
 
             self.assertEqual(
@@ -352,7 +362,12 @@ class TestBuildFileMatcher(unittest.TestCase):
                         "component_real_name", matcher
                     )
                 ],
-                [("component-real-name", "--with //src/nested:test-package")],
+                [
+                    (
+                        "component-real-name",
+                        "--with-test //src/nested:test-package",
+                    )
+                ],
             )
 
     def test_custom_package_name(self) -> None:
@@ -381,7 +396,7 @@ class TestBuildFileMatcher(unittest.TestCase):
                         "my-test-package", matcher
                     )
                 ],
-                [("my-test-package", "--with //src:my-test-package")],
+                [("my-test-package", "--with-test //src:my-test-package")],
             )
 
             self.assertEqual(
@@ -498,7 +513,7 @@ foo-test-component (100.00% similar)
             self.stdout.getvalue().strip(),
             """
 kernel-tests (90.00% similar)
-    --with //src:tests
+    --with-test //src:tests
 """.strip(),
         )
 
@@ -513,9 +528,9 @@ kernel-tests (90.00% similar)
 foo-test-component (67.41% similar)
     Build includes: fuchsia-pkg://fuchsia.com/foo-tests#meta/foo-test-component.cm
 kernel-tests (62.42% similar)
-    --with //src:tests
+    --with-test //src:tests
 integration-tests (59.22% similar)
-    --with //src:integration-tests
+    --with-test //src:integration-tests
 (3 more matches not shown)
 """.strip(),
         )

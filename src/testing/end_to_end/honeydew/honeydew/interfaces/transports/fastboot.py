@@ -5,7 +5,6 @@
 """ABC with methods for Host-(Fuchsia)Target interactions via Fastboot."""
 
 import abc
-from collections.abc import Iterable
 
 from honeydew.utils import properties
 
@@ -35,7 +34,7 @@ class Fastboot(abc.ABC):
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FastbootCommandError: Failed to boot the device to fastboot
+            errors.FuchsiaDeviceError: Failed to boot the device to fastboot
                 mode.
         """
 
@@ -45,7 +44,7 @@ class Fastboot(abc.ABC):
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FastbootCommandError: Failed to boot the device to fuchsia
+            errors.FuchsiaDeviceError: Failed to boot the device to fuchsia
                 mode.
         """
 
@@ -55,9 +54,6 @@ class Fastboot(abc.ABC):
 
         Returns:
             True if in fastboot mode, False otherwise.
-
-        Raises:
-            errors.FastbootCommandError: If failed to check the fastboot mode.
         """
 
     @abc.abstractmethod
@@ -65,21 +61,19 @@ class Fastboot(abc.ABC):
         self,
         cmd: list[str],
         timeout: float = TIMEOUTS["FASTBOOT_CLI"],
-        exceptions_to_skip: Iterable[type[Exception]] | None = None,
     ) -> list[str]:
         """Executes and returns the output of `fastboot -s {node} {cmd}`.
 
         Args:
             cmd: Fastboot command to run.
             timeout: Timeout to wait for the fastboot command to return.
-            exceptions_to_skip: Any non fatal exceptions to be ignored.
 
         Returns:
             Output of `fastboot -s {node} {cmd}`.
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            subprocess.TimeoutExpired: Timeout running a fastboot command.
+            errors.HoneydewTimeoutError: Timeout running a fastboot command.
             errors.FastbootCommandError: In case of failure.
         """
 

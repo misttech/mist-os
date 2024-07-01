@@ -7,6 +7,7 @@ use cm_rust::{ComponentDecl, FidlIntoNative};
 use fidl::endpoints::{
     create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
 };
+use fidl::Rights;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
@@ -435,8 +436,12 @@ async fn start_with_dict() {
     let connector_client =
         factory.create_connector(receiver_client).await.expect("failed to call CreateOpen");
 
-    let dictionary_client = factory.create_dictionary().await.unwrap();
-    let dictionary_client = dictionary_client.into_proxy().unwrap();
+    let dictionary_ref = factory.create_dictionary().await.unwrap();
+    let (dictionary_client, server) = fidl::endpoints::create_proxy().unwrap();
+    let dictionary_ref2 = fsandbox::DictionaryRef {
+        token: dictionary_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap(),
+    };
+    factory.open_dictionary(dictionary_ref, server).unwrap();
     dictionary_client
         .insert(
             "fidl.examples.routing.echo.Echo",
@@ -451,10 +456,7 @@ async fn start_with_dict() {
     spawned_child
         .controller_proxy
         .start(
-            fcomponent::StartChildArgs {
-                dictionary: Some(dictionary_client.into_client_end().unwrap()),
-                ..Default::default()
-            },
+            fcomponent::StartChildArgs { dictionary: Some(dictionary_ref2), ..Default::default() },
             execution_controller_server_end,
         )
         .await
@@ -609,5 +611,5 @@ async fn get_exposed_dictionary() {
     // opaque token, there's not much we can do with the capability in this test. But once we
     // switch over exposed dictionary to use a different capability to represent protocols, we can
     // update this test to exercise the capability.
-    assert_matches!(echo_cap, fsandbox::Capability::Open(_));
+    assert_matches!(echo_cap, fsandbox::Capability::DirEntry(_));
 }

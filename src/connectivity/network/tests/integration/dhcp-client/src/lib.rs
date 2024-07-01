@@ -206,6 +206,7 @@ async fn create_test_realm<'a, N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
     let DhcpTestRealm { client_realm, client_iface, server_realm: _, server_iface: _, _network: _ } =
@@ -264,6 +265,7 @@ async fn client_provider_two_overlapping_clients_on_same_interface<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn client_provider_two_non_overlapping_clients_on_same_interface<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 
@@ -313,6 +315,7 @@ async fn client_provider_two_non_overlapping_clients_on_same_interface<N: Netsta
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn client_provider_double_watch<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 
@@ -357,6 +360,7 @@ async fn client_provider_double_watch<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn client_provider_shutdown<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
 
@@ -459,6 +463,7 @@ async fn assert_client_shutdown(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
     let test_realm @ DhcpTestRealm {
@@ -508,6 +513,7 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
     let test_realm @ DhcpTestRealm {
@@ -590,6 +596,7 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
     let test_realm @ DhcpTestRealm {
@@ -722,6 +729,7 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
 const DEBUG_PRINT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) {
     let sandbox: netemul::TestSandbox = netemul::TestSandbox::new().unwrap();
     let DhcpTestRealm {
@@ -800,6 +808,7 @@ async fn watch_configuration_handles_interface_removal<N: Netstack>(name: &str) 
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     Some(fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned),
     None;

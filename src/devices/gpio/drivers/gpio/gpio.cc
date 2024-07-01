@@ -477,59 +477,76 @@ zx_status_t GpioInitDevice::ConfigureGpios(
   for (const auto& step : metadata.steps) {
     fdf::Arena arena('GPIO');
 
-    if (step.call.is_input_flags()) {
-      auto result = gpio.sync().buffer(arena)->ConfigIn(step.index, step.call.input_flags());
+    if (!step.has_call()) {
+      FDF_LOG(ERROR, "GPIO Init Metadata step is missing a call field");
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    // Delay doesn't apply to any particular gpio ID so we enforce that the ID field is
+    // unset. Every other type of init call requires an ID so we enforce that ID is set.
+    if (step.call().is_delay() && step.has_index()) {
+      FDF_LOG(ERROR, "GPIO Init Delay calls must not have an ID, id = %u", step.index());
+      return ZX_ERR_INVALID_ARGS;
+    }
+    if (!step.call().is_delay() && !step.has_index()) {
+      FDF_LOG(ERROR, "GPIO init calls must have an ID");
+      return ZX_ERR_INVALID_ARGS;
+    }
+
+    if (step.call().is_input_flags()) {
+      auto result = gpio.sync().buffer(arena)->ConfigIn(step.index(), step.call().input_flags());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to ConfigIn failed: %s", result.status_string());
         return result.status();
       }
       if (result->is_error()) {
         FDF_LOG(ERROR, "ConfigIn(%u) failed for %u: %s",
-                static_cast<uint32_t>(step.call.input_flags()), step.index,
+                static_cast<uint32_t>(step.call().input_flags()), step.index(),
                 zx_status_get_string(result->error_value()));
         return result->error_value();
       }
-    } else if (step.call.is_output_value()) {
-      auto result = gpio.sync().buffer(arena)->ConfigOut(step.index, step.call.output_value());
+    } else if (step.call().is_output_value()) {
+      auto result = gpio.sync().buffer(arena)->ConfigOut(step.index(), step.call().output_value());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to ConfigOut failed: %s", result.status_string());
         return result.status();
       }
       if (result->is_error()) {
-        FDF_LOG(ERROR, "ConfigOut(%u) failed for %u: %s", step.call.output_value(), step.index,
+        FDF_LOG(ERROR, "ConfigOut(%u) failed for %u: %s", step.call().output_value(), step.index(),
                 zx_status_get_string(result->error_value()));
         return result->error_value();
       }
-    } else if (step.call.is_alt_function()) {
-      auto result = gpio.sync().buffer(arena)->SetAltFunction(step.index, step.call.alt_function());
+    } else if (step.call().is_alt_function()) {
+      auto result =
+          gpio.sync().buffer(arena)->SetAltFunction(step.index(), step.call().alt_function());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to SetAltFunction failed: %s", result.status_string());
         return result.status();
       }
       if (result->is_error()) {
-        FDF_LOG(ERROR, "SetAltFunction(%lu) failed for %u: %s", step.call.alt_function(),
-                step.index, zx_status_get_string(result->error_value()));
+        FDF_LOG(ERROR, "SetAltFunction(%lu) failed for %u: %s", step.call().alt_function(),
+                step.index(), zx_status_get_string(result->error_value()));
         return result->error_value();
       }
-    } else if (step.call.is_drive_strength_ua()) {
-      auto result =
-          gpio.sync().buffer(arena)->SetDriveStrength(step.index, step.call.drive_strength_ua());
+    } else if (step.call().is_drive_strength_ua()) {
+      auto result = gpio.sync().buffer(arena)->SetDriveStrength(step.index(),
+                                                                step.call().drive_strength_ua());
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to SetDriveStrength failed: %s", result.status_string());
         return result.status();
       }
       if (result->is_error()) {
-        FDF_LOG(ERROR, "SetDriveStrength(%lu) failed for %u: %s", step.call.drive_strength_ua(),
-                step.index, zx_status_get_string(result->error_value()));
+        FDF_LOG(ERROR, "SetDriveStrength(%lu) failed for %u: %s", step.call().drive_strength_ua(),
+                step.index(), zx_status_get_string(result->error_value()));
         return result->error_value();
       }
-      if (result->value()->actual_ds_ua != step.call.drive_strength_ua()) {
+      if (result->value()->actual_ds_ua != step.call().drive_strength_ua()) {
         FDF_LOG(WARNING, "Actual drive strength (%lu) doesn't match expected (%lu) for %u",
-                result->value()->actual_ds_ua, step.call.drive_strength_ua(), step.index);
+                result->value()->actual_ds_ua, step.call().drive_strength_ua(), step.index());
         return ZX_ERR_BAD_STATE;
       }
-    } else if (step.call.is_delay()) {
-      zx::nanosleep(zx::deadline_after(zx::duration(step.call.delay())));
+    } else if (step.call().is_delay()) {
+      zx::nanosleep(zx::deadline_after(zx::duration(step.call().delay())));
     }
   }
 

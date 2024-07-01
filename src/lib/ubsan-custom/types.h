@@ -122,6 +122,11 @@ struct UnreachableData {
   SourceLocation Loc;
 };
 
+struct VLABoundData {
+  SourceLocation Loc;
+  const TypeDescriptor& Type;
+};
+
 struct AlignmentAssumptionData {
   SourceLocation Loc;
   SourceLocation AssumptionLoc;

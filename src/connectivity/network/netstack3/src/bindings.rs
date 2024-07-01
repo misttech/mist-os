@@ -1198,8 +1198,7 @@ impl NetstackSeed {
             }),
         );
 
-        let (route_update_dispatcher_v4, route_update_dispatcher_v6) =
-            routes_change_runner.route_update_dispatchers();
+        let (dispatchers_v4, dispatchers_v6) = routes_change_runner.update_dispatchers();
 
         // Start executing routes changes.
         let routes_change_task = NamedTask::spawn("routes_changes", {
@@ -1391,10 +1390,10 @@ impl NetstackSeed {
                             routes::state::serve_state(rs, netstack.ctx.clone()).await
                         }
                         Service::RoutesStateV4(rs) => {
-                            routes::state::serve_state_v4(rs, &route_update_dispatcher_v4).await
+                            routes::state::serve_state_v4(rs, &dispatchers_v4).await
                         }
                         Service::RoutesStateV6(rs) => {
-                            routes::state::serve_state_v6(rs, &route_update_dispatcher_v6).await
+                            routes::state::serve_state_v6(rs, &dispatchers_v6).await
                         }
                         Service::RoutesAdminV4(rs) => routes::admin::serve_route_table::<
                             Ipv4,

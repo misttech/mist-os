@@ -15,7 +15,7 @@ from command_runner import run_command
 from params import Params
 
 
-def handle_stdout(line: bytes):
+def handle_stdout(line: bytes) -> None:
     """Print output to stdout
 
     Args:
@@ -24,7 +24,7 @@ def handle_stdout(line: bytes):
     print(line)
 
 
-def handle_stderr(line: bytes):
+def handle_stderr(line: bytes) -> None:
     """Print error to stderr
 
     Args:
@@ -33,13 +33,13 @@ def handle_stderr(line: bytes):
     print(line, file=sys.stderr)
 
 
-def main():
-    params = Params.initialize(os.environ)
+def main() -> int:
+    params = Params.initialize(dict(os.environ))
     command = Command.initialize(params)
     with tempfile.TemporaryDirectory() as iso_dir:
         cmd = command.get_command(iso_dir)
-        return_code = run_command(cmd, handle_stdout, handle_stderr)
-        return return_code
+        return run_command(cmd, handle_stdout, handle_stderr)
+    return 1
 
 
 if __name__ == "__main__":

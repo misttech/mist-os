@@ -77,7 +77,7 @@ if (is_fuchsia) {
     testonly = true
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = "//:INVALID_UNUSED_TARGET"
-    bazel_product_image_target = "//build/images/updates/tests:fake"
+    bazel_product_image_target = "//build/images/updates/tests:fake_product"
     bazel_inputs_from_gn = [ ":fx_publish_test.gn_assembly.bazel_legacy_aib" ]
   }
 
@@ -118,6 +118,7 @@ if (is_host) {
   import("//src/sys/pkg/repositories/devhost/devhost.gni")
 
   python_binary("populate_fx_publish_working_dir") {
+    enable_mypy = true
     main_source = "populate_fx_publish_working_dir.py"
   }
 
@@ -223,6 +224,7 @@ if (is_host) {
   }
 
   python_host_test("fx_publish_gn_assembled_test") {
+    enable_mypy = true
     main_source = "//tools/devshell/tests/subcommands/fx_publish_test.py"
     sources = [
       "//tools/devshell/contrib/__init__.py",
@@ -246,6 +248,7 @@ if (is_host) {
   }
 
   python_host_test("fx_publish_bazel_assembled_test") {
+    enable_mypy = true
     main_source = "//tools/devshell/tests/subcommands/fx_publish_test.py"
     sources = [
       "//tools/devshell/contrib/__init__.py",

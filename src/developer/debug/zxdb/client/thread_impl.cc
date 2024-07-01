@@ -258,14 +258,16 @@ const Stack& ThreadImpl::GetStack() const { return stack_; }
 
 Stack& ThreadImpl::GetStack() { return stack_; }
 
-void ThreadImpl::SetMetadata(const debug_ipc::ThreadRecord& record) {
+void ThreadImpl::SetMetadata(const debug_ipc::ThreadRecord& record, bool skip_frames) {
   FX_DCHECK(koid_ == record.id.thread);
 
   name_ = record.name;
   state_ = record.state;
   blocked_reason_ = record.blocked_reason;
 
-  stack_.SetFrames(record.stack_amount, record.frames);
+  if (!skip_frames) {
+    stack_.SetFrames(record.stack_amount, record.frames);
+  }
 }
 
 void ThreadImpl::OnException(const StopInfo& info) {
@@ -525,7 +527,8 @@ void ThreadImpl::RunNextPostStopTaskOrNotify(const StopInfo& info, bool should_s
   // processing these post-stop tasks and we shouldn't continue it. This needs extra logic to
   // detect.
   //
-  // TODO(https://fxbug.dev/42160760) don't automatically continue if the user has stopped the thread.
+  // TODO(https://fxbug.dev/42160760) don't automatically continue if the user has stopped the
+  // thread.
   if (state_ == debug_ipc::ThreadRecord::State::kRunning) {
     post_stop_tasks_.clear();
     return;

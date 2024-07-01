@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 use home::home_dir;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use std::env::VarError;
 use std::path::PathBuf;
 
 pub fn get_os() -> String {
@@ -38,6 +41,7 @@ const TEST_ENV_VAR: &'static str = "FUCHSIA_TEST_OUTDIR";
 const ANALYTICS_DISABLED_ENV_VAR: &'static str = "FUCHSIA_ANALYTICS_DISABLED";
 
 // To detect certain bot environmments that run as USER "builder"
+#[cfg(not(test))]
 const USER: &'static str = "USER";
 const BUILDER: &'static str = "builder";
 
@@ -60,6 +64,13 @@ const BOT_ENV_VARS: &'static [&'static str] = &[
     "BUILD_NUMBER",       // android-ci
 ];
 
+#[allow(dead_code)]
+const C_GOOGLERS_DOMAIN_NAME: &str = r"c.googlers.com$";
+#[allow(dead_code)]
+const CORP_GOOGLERS_DOMAIN_NAME: &str = r"corp.google.com$";
+#[allow(dead_code)]
+const USER_REDACTED: &str = "$USER";
+
 pub fn is_test_env() -> bool {
     std::env::var(TEST_ENV_VAR).is_ok()
 }
@@ -73,7 +84,7 @@ pub fn is_running_in_ci_bot_env() -> bool {
 }
 
 pub fn is_user_a_bot() -> bool {
-    std::env::var(USER).is_ok_and(|v| v == BUILDER)
+    get_username_from_env().is_ok_and(|v| v == BUILDER)
 }
 
 pub fn is_analytics_disabled_by_env() -> bool {
@@ -81,6 +92,33 @@ pub fn is_analytics_disabled_by_env() -> bool {
         || is_fuchsia_analytics_disabled_set()
         || is_running_in_ci_bot_env()
         || is_user_a_bot()
+}
+
+#[allow(dead_code)]
+pub fn is_googler_host_domain(domain: &str) -> bool {
+    static C_GOOGLERS_DOMAIN_RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(C_GOOGLERS_DOMAIN_NAME).unwrap());
+    static CORP_GOOGLERS_DOMAIN_RE: Lazy<Regex> =
+        Lazy::new(|| Regex::new(CORP_GOOGLERS_DOMAIN_NAME).unwrap());
+    C_GOOGLERS_DOMAIN_RE.is_match(domain) || CORP_GOOGLERS_DOMAIN_RE.is_match(domain)
+}
+
+#[allow(dead_code)]
+pub fn redact_user_name_from(parameter: &str) -> String {
+    match get_username_from_env() {
+        Ok(user_value) => parameter.replace(user_value.as_str(), USER_REDACTED),
+        _ => parameter.to_string(),
+    }
+}
+
+#[cfg(not(test))]
+pub fn get_username_from_env() -> Result<String, VarError> {
+    std::env::var(USER)
+}
+
+#[cfg(test)]
+pub fn get_username_from_env() -> Result<String, VarError> {
+    Ok("player1".to_string())
 }
 
 #[cfg(test)]
@@ -125,5 +163,38 @@ mod test {
     #[test]
     pub fn test_arch_macos_conversion() {
         assert_eq!("Darwin", convert_macos_to_darwin("macos"))
+    }
+
+    #[test]
+    pub fn test_is_googler_host_domain() {
+        assert_eq!(true, is_googler_host_domain("c.googlers.com"));
+        assert_eq!(true, is_googler_host_domain("corp.google.com"));
+        assert_eq!(true, is_googler_host_domain("ldpa1.c.googlers.com"));
+        assert_eq!(true, is_googler_host_domain("ldap2.mtv.corp.google.com"));
+    }
+
+    #[test]
+    pub fn test_not_is_googler_host_domain() {
+        assert_eq!(false, is_googler_host_domain(""));
+        assert_eq!(false, is_googler_host_domain("c"));
+        assert_eq!(false, is_googler_host_domain("c.googlers"));
+        assert_eq!(false, is_googler_host_domain("google.com"));
+        assert_eq!(false, is_googler_host_domain("c.googlers.com.edu"));
+        assert_eq!(false, is_googler_host_domain("corp.google.com.edu"));
+        assert_eq!(false, is_googler_host_domain("ldpa1.c.googlers.com.edu"));
+    }
+
+    #[test]
+    pub fn test_redact_user_value() {
+        let parameter = "hello player1";
+        let result = redact_user_name_from(parameter);
+        assert_eq!("hello $USER", result);
+    }
+
+    #[test]
+    pub fn test_redact_user_value_no_match() {
+        let parameter = "hello world";
+        let result = redact_user_name_from(parameter);
+        assert_eq!("hello world", result);
     }
 }

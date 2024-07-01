@@ -3,14 +3,14 @@
 # found in the LICENSE file.
 """Suspend trace metrics."""
 
-from typing import Iterable, Sequence
+from typing import Iterator, Sequence
 
-from trace_processing import (
-    trace_metrics,
-    trace_model,
-    trace_time,
-    trace_utils,
-)
+from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
+
+_EVENT_CATEGORY = "power"
+# LINT.IfChange
+_EVENT_NAME = "system-activity-governor:suspend"
+# LINT.ThenChange(//src/power/system-activity-governor/src/system_activity_governor.rs)
 
 
 class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
@@ -22,20 +22,13 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
         """Calculate suspend/resume metrics.
 
         Args:
-            model: In-memory representation of a merged power and system trace.
+            model: In-memory representation of a system trace.
 
         Returns:
             Set of metrics results for this test case.
         """
 
-        suspend_events: Iterable[
-            trace_model.DurationEvent
-        ] = trace_utils.filter_events(
-            model.all_events(),
-            category="power",
-            name="suspend",
-            type=trace_model.DurationEvent,
-        )
+        suspend_events = filter_events(model)
         suspend_time = trace_time.TimeDelta(0)
         for se in suspend_events:
             if se.duration is not None:
@@ -61,3 +54,43 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                 values=[(suspend_time / total_time) * 100],
             ),
         ]
+
+
+def filter_events(
+    model: trace_model.Model,
+) -> Iterator[trace_model.DurationEvent]:
+    """Extract suspend duration events from the provided trace model.
+
+    Args:
+        model: In-memory representation of a system trace.
+
+    Returns:
+        Iterator of suspend duration events emitted by the power subsystem.
+
+    """
+    return trace_utils.filter_events(
+        model.all_events(),
+        category=_EVENT_CATEGORY,
+        name=_EVENT_NAME,
+        type=trace_model.DurationEvent,
+    )
+
+
+def make_synthetic_event(
+    timestamp_usec: int, pid: int, tid: int, duration_usec: int
+) -> trace_model.DurationEvent:
+    """Build a synthetic suspend DurationEvent.
+
+    Providing this function enables building fake traces for unittests while
+    preventing the event category and name from leaking outside this module.
+    """
+    return trace_model.DurationEvent.from_dict(
+        {
+            "cat": _EVENT_CATEGORY,
+            "name": _EVENT_NAME,
+            "ts": timestamp_usec,
+            "pid": pid,
+            "tid": tid,
+            "dur": duration_usec,
+        }
+    )

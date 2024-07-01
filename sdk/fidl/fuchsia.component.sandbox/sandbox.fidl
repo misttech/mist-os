@@ -9,20 +9,13 @@ using fuchsia.io;
 /// Maximum number of bytes in a [Data].
 const MAX_DATA_LENGTH uint32 = 8192;
 
-/// Maximum number of items returned by [DictionaryItemIterator].
-const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
-
-/// Maximum number of items returned by [DictionaryKeyIterator].
-const MAX_DICTIONARY_KEYS_CHUNK uint32 = 128;
-
 /// A token represents a bedrock object. Tokens are reference counted, dropping
 /// all counts of the token removes the object.
 alias Token = zx.Handle:EVENTPAIR;
 
+/// Maximum number of items returned by dictionary iterator.
 @available(added=HEAD)
-type OneShotHandle = resource struct {
-    token Token;
-};
+const MAX_DICTIONARY_ITERATOR_CHUNK uint32 = 128;
 
 @available(added=HEAD)
 type Data = flexible union {
@@ -38,20 +31,25 @@ type Connector = resource struct {
 };
 
 @available(added=HEAD)
-type Open = resource struct {
+type DirEntry = resource struct {
+    token Token;
+};
+
+@available(added=HEAD)
+type DictionaryRef = resource struct {
     token Token;
 };
 
 @available(added=HEAD)
 type Capability = flexible resource union {
     1: unit @generated_name("Unit") struct {};
-    2: handle OneShotHandle;
+    2: handle zx.Handle;
     3: data Data;
-    4: dictionary client_end:Dictionary;
+    4: dictionary DictionaryRef;
     5: connector Connector;
     6: directory client_end:fuchsia.io.Directory;
     7: router client_end:Router;
-    8: open Open;
+    8: dir_entry DirEntry;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
@@ -69,6 +67,17 @@ alias DictionaryKey = string:MAX_NAME_LENGTH;
 type DictionaryItem = resource struct {
     key DictionaryKey;
     value Capability;
+};
+
+/// A key-value pair in a [`Dictionary`], where the value may be an error. This is useful for APIs
+/// that wish to selectively report errors for particular items.
+@available(added=HEAD)
+type DictionaryFallibleItem = resource struct {
+    key DictionaryKey;
+    value @generated_name("DictionaryValueResult") strict resource union {
+        1: ok Capability;
+        2: error DictionaryError;
+    };
 };
 
 /// Error returned from methods in [`Dictionary`].
@@ -90,6 +99,10 @@ type DictionaryError = flexible enum {
     /// The key is invalid. The constraints for valid keys are documented at
     /// https://fuchsia.dev/reference/cml#names.
     INVALID_KEY = 4;
+
+    /// A capability that needed to be cloned to perform this operation could
+    /// not be cloned.
+    NOT_CLONEABLE = 5;
 };
 
 @discoverable
@@ -105,6 +118,7 @@ open protocol Dictionary {
     /// Get a clone of a capability from this dictionary.
     ///
     /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
+    /// * error `DictionaryError.NOT_CLONEABLE` if the capability could not be cloned.
     @available(added=HEAD)
     flexible Get(struct {
         key DictionaryKey;
@@ -122,37 +136,33 @@ open protocol Dictionary {
         capability Capability;
     }) error DictionaryError;
 
-    /// Creates a new connection to the same underlying dictionary.
-    ///
-    /// Use `Copy` to a new dictionary with clones of all the exiting entries.
-    @available(added=HEAD)
-    flexible Clone() -> (resource struct {
-        dictionary client_end:Dictionary;
-    });
-
     /// Create a new dictionary that contains a clone of all the entries in
     /// this dictionary.
     ///
     /// For example, if this dictionary contains nested dictionaries, the newly
     /// created dictionary will contain references to those same nested
     /// dictionaries because the entries are cloned rather than copied.
+    ///
+    /// * error `DictionaryError.NOT_CLONEABLE` if one of the capabilities in the
+    ///   dictionary could not be cloned.
     @available(added=HEAD)
     flexible Copy() -> (resource struct {
-        dictionary client_end:Dictionary;
-    });
+        dictionary DictionaryRef;
+    }) error DictionaryError;
 
     /// Enumerates the items in this dictionary.
     ///
-    /// Creates a clone of each item during enumeration.
+    /// Creates a clone of each item during enumeration. If a capability was not cloneable,
+    /// the value will be null.
     @available(added=HEAD)
     flexible Enumerate(resource struct {
-        iterator server_end:DictionaryItemIterator;
+        iterator server_end:DictionaryEnumerateIterator;
     });
 
     /// Enumerates the keys in this dictionary.
     @available(added=HEAD)
     flexible Keys(resource struct {
-        iterator server_end:DictionaryKeyIterator;
+        iterator server_end:DictionaryKeysIterator;
     });
 
 
@@ -162,27 +172,35 @@ open protocol Dictionary {
     /// enumerating them.
     @available(added=HEAD)
     flexible Drain(resource struct {
-        iterator server_end:<DictionaryItemIterator, optional>;
+        iterator server_end:<DictionaryDrainIterator, optional>;
     });
 };
 
 @available(added=HEAD)
-open protocol DictionaryItemIterator {
+open protocol DictionaryEnumerateIterator {
     flexible GetNext() -> (resource struct {
-        items vector<DictionaryItem>:MAX_DICTIONARY_ITEMS_CHUNK;
+        items vector<DictionaryFallibleItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
     });
 };
 
 @available(added=HEAD)
-open protocol DictionaryKeyIterator {
+open protocol DictionaryKeysIterator {
     flexible GetNext() -> (resource struct {
-        keys vector<DictionaryKey>:MAX_DICTIONARY_KEYS_CHUNK;
+        keys vector<DictionaryKey>:MAX_DICTIONARY_ITERATOR_CHUNK;
     });
 };
 
-/// This represents a component within the framework.
 @available(added=HEAD)
-type ComponentToken = resource struct {
+open protocol DictionaryDrainIterator {
+    flexible GetNext() -> (resource struct {
+        items vector<DictionaryItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
+    });
+};
+
+/// Represents an instance in the component tree, either a component
+/// instance or component manager's instance.
+@available(added=HEAD)
+type InstanceToken = resource struct {
     token Token;
 };
 
@@ -192,7 +210,7 @@ type RouteRequest = resource table {
     /// The requested availability for this capability.
     1: availability Availability;
     /// The component that is requesting the capability.
-    2: requesting ComponentToken;
+    2: requesting InstanceToken;
 };
 
 @available(added=HEAD)
@@ -256,18 +274,6 @@ open protocol Factory {
         server_end zx.Handle:CHANNEL;
     });
 
-    /// Extract the handle owned by the underlying `capability`, if it wasn't taken already.
-    ///
-    /// Errors:
-    ///
-    /// - `INVALID_ARGS`: `capability` does not contain a recognized [OneShotHandle] token.
-    /// - `UNAVAILABLE`: The underlying handle was already taken.h
-    flexible TakeHandle(resource struct {
-        capability OneShotHandle;
-    }) -> (resource struct {
-        handle zx.Handle;
-    }) error FactoryError;
-
     /// Creates a `Connector` from a client served `Receiver`.
     flexible CreateConnector(resource struct {
         receiver client_end:Receiver;
@@ -275,15 +281,15 @@ open protocol Factory {
         capability Connector;
     });
 
-    /// Creates a `OneShotHandle` from the provided `handle`.
-    flexible CreateOneShotHandle(resource struct {
-        handle zx.Handle;
-    }) -> (resource struct {
-        capability OneShotHandle;
-    });
-
     /// Creates a new empty [`Dictionary`].
     flexible CreateDictionary() -> (resource struct {
-        dictionary client_end:Dictionary;
+        dictionary DictionaryRef;
+    });
+
+    /// Binds a fuchsia.component.sandbox/Dictionary channel to a `dictionary`
+    /// token.
+    flexible OpenDictionary(resource struct {
+        dictionary DictionaryRef;
+        server_end server_end:Dictionary;
     });
 };

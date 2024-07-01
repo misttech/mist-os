@@ -59,32 +59,34 @@ constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedPixelFormats[] = {
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
+
 // Arbitrary dimensions - the same as sherlock.
-constexpr uint32_t kWidth = 1280;
-constexpr uint32_t kHeight = 800;
+constexpr int32_t kWidth = 1280;
+constexpr int32_t kHeight = 800;
 
 constexpr display::DisplayId kDisplayId(1);
 
-constexpr uint32_t kRefreshRateFps = 60;
+constexpr int32_t kRefreshRateFps = 60;
+
 // Arbitrary slowdown for testing purposes
 // TODO(payamm): Randomizing the delay value is more value
-constexpr uint64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
+constexpr int64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
 
-added_display_args_t CreateAddedDisplayArgs() {
-  const int32_t pixel_clock_hz = kWidth * kHeight * kRefreshRateFps;
-  ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
-  ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
+display_mode_t CreateBanjoDisplayMode() {
+  static constexpr int64_t kPixelClockFrequencyHz = int64_t{kWidth} * kHeight * kRefreshRateFps;
+  static_assert(kPixelClockFrequencyHz >= 0);
+  static_assert(kPixelClockFrequencyHz <= display::kMaxPixelClockHz);
 
-  const display::DisplayTiming timing = {
-      .horizontal_active_px = static_cast<int32_t>(kWidth),
+  static constexpr display::DisplayTiming kDisplayTiming = {
+      .horizontal_active_px = kWidth,
       .horizontal_front_porch_px = 0,
       .horizontal_sync_width_px = 0,
       .horizontal_back_porch_px = 0,
-      .vertical_active_lines = static_cast<int32_t>(kHeight),
+      .vertical_active_lines = kHeight,
       .vertical_front_porch_lines = 0,
       .vertical_sync_width_lines = 0,
       .vertical_back_porch_lines = 0,
-      .pixel_clock_frequency_hz = pixel_clock_hz,
+      .pixel_clock_frequency_hz = kPixelClockFrequencyHz,
       .fields_per_frame = display::FieldsPerFrame::kProgressive,
       .hsync_polarity = display::SyncPolarity::kNegative,
       .vsync_polarity = display::SyncPolarity::kNegative,
@@ -92,15 +94,20 @@ added_display_args_t CreateAddedDisplayArgs() {
       .pixel_repetition = 0,
   };
 
-  added_display_args_t args = {
+  return display::ToBanjoDisplayMode(kDisplayTiming);
+}
+
+// `banjo_display_mode` must outlive the returned value.
+raw_display_info_t CreateRawDisplayInfo(const display_mode_t* banjo_display_mode) {
+  raw_display_info_t args = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
-      .panel =
-          {
-              .mode = display::ToBanjoDisplayMode(timing),
-          },
-      .pixel_format_list = kSupportedPixelFormats,
-      .pixel_format_count = std::size(kSupportedPixelFormats),
+      .preferred_modes_list = banjo_display_mode,
+      .preferred_modes_count = 1,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = kSupportedPixelFormats,
+      .pixel_formats_count = std::size(kSupportedPixelFormats),
   };
   return args;
 }
@@ -142,8 +149,10 @@ void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   fbl::AutoLock interface_lock(&interface_mutex_);
   controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
-  const added_display_args_t added_display_args = CreateAddedDisplayArgs();
-  controller_interface_client_.OnDisplayAdded(&added_display_args);
+
+  const display_mode_t banjo_display_mode = CreateBanjoDisplayMode();
+  const raw_display_info_t banjo_display_info = CreateRawDisplayInfo(&banjo_display_mode);
+  controller_interface_client_.OnDisplayAdded(&banjo_display_info);
 }
 
 void FakeDisplay::DisplayControllerImplResetDisplayControllerInterface() {

@@ -103,6 +103,8 @@ python_library("honeydew_no_testonly") {
     "typing/wlan.py",
     "utils/__init__.py",
     "utils/common.py",
+    "utils/decorators.py",
+    "utils/host_shell.py",
     "utils/http_utils.py",
     "utils/properties.py",
   ]

@@ -1094,7 +1094,8 @@ impl ComputationContext {
     fn jump_with_offset(&self, offset: i16, parent: Option<Arc<Self>>) -> Result<Self, String> {
         let pc = self
             .pc
-            .checked_add_signed((offset + 1).into())
+            .checked_add_signed(offset.into())
+            .and_then(|v| v.checked_add_signed(1))
             .ok_or_else(|| format!("jump outside of program at pc {}", self.pc))?;
         let result = Self {
             pc,

@@ -73,8 +73,7 @@ DsiHost::DsiHost(uint32_t panel_type, const PanelConfig* panel_config,
 }
 
 // static
-zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(display::Namespace& incoming,
-                                                     uint32_t panel_type,
+zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, uint32_t panel_type,
                                                      const PanelConfig* panel_config) {
   ZX_DEBUG_ASSERT(panel_config != nullptr);
 

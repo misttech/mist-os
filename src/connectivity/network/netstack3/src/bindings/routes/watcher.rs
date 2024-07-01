@@ -15,7 +15,7 @@ use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_routes as fnet_routes;
 use futures::channel::mpsc;
 use futures::future::FusedFuture as _;
-use futures::{FutureExt, StreamExt as _, TryStream, TryStreamExt as _};
+use futures::{FutureExt, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use log::{debug, error, warn};
 use netstack3_core::sync::Mutex;
@@ -105,14 +105,22 @@ pub(crate) trait WatcherEvent: From<Update<Self>> + Debug + Clone {
     /// E.g. [`fnet_routes_ext::InstalledRoute`] for [`fnet_routes_ext::Event`].
     type Resource: Hash + PartialEq + Eq + Clone + Debug;
 
-    /// The maximum pending events before closing the client.
-    const MAX_PENDING_EVENTS: usize;
+    /// The maximum number of events that can be returned by one watch.
+    const MAX_EVENTS: usize;
 
     /// The idle event.
     const IDLE: Self;
 
     /// Turn the installed type into an existing event.
     fn existing(installed: Self::Resource) -> Self;
+}
+
+const fn max_pending_events<E: WatcherEvent>() -> usize {
+    // The maximum number of events for the fidl watcher client is allowed
+    // to have queued. Clients will be dropped if they exceed this limit.
+    // Keep this a multiple of `fnet_routes::MAX_EVENTS` (5 is somewhat
+    // arbitrary) so we don't artificially truncate the allowed batch size.
+    E::MAX_EVENTS * 5
 }
 
 /// The trait that abstracts the FIDL behavior of a [`WatcherEvent`].
@@ -122,7 +130,7 @@ pub(crate) trait FidlWatcherEvent: WatcherEvent {
 
     /// Responds to the FIDL `watch` request.
     fn respond_to_watch_request(
-        req: <<Self::WatcherMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
+        req: fidl::endpoints::Request<Self::WatcherMarker>,
         events: Vec<Self>,
     ) -> Result<(), fidl::Error>;
 }
@@ -247,7 +255,7 @@ impl<E: WatcherEvent, WI: WatcherInterest<E>> WatcherSink<E, WI> {
                     warn!(
                         "too many unconsumed events (the client may not be \
                         calling Watch frequently enough): {}",
-                        E::MAX_PENDING_EVENTS
+                        max_pending_events::<E>(),
                     )
                 }
             } else {
@@ -282,7 +290,7 @@ impl<E: WatcherEvent> Watcher<E> {
         installed: R,
         client_interest: WI,
     ) -> (Self, WatcherSink<E, WI>) {
-        let (sender, receiver) = mpsc::channel(E::MAX_PENDING_EVENTS);
+        let (sender, receiver) = mpsc::channel(max_pending_events::<E>());
         let cancel = Event::new();
         (
             Watcher {
@@ -449,8 +457,7 @@ mod tests {
         // a sender).
         const EXCESS: usize = 2;
         const TOO_MANY_EVENTS: usize =
-            <fnet_routes_ext::Event<net_types::ip::Ipv4> as WatcherEvent>::MAX_PENDING_EVENTS
-                + EXCESS;
+            max_pending_events::<fnet_routes_ext::Event<net_types::ip::Ipv4>>() + EXCESS;
         for i in 0..TOO_MANY_EVENTS {
             let route = arbitrary_route_on_interface::<I>(i.try_into().unwrap());
             dispatcher.notify(Update::Added(route)).expect("failed to notify");

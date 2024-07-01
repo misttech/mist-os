@@ -18,7 +18,7 @@ with `.` or `-`.
 
 ### Paths {#paths}
 
-Paths are sequences of [names]{#names} delimited by the `/` character. A path
+Paths are sequences of [names](#names) delimited by the `/` character. A path
 must not exceed 4095 characters in length. Throughout the document,
 
 - Relative paths cannot start with the `/` character.
@@ -42,7 +42,7 @@ A reference string takes the form of `#<name>`, where `<name>` refers to the nam
 [doc-runners]: /docs/concepts/components/v2/capabilities/runner.md
 [doc-event]: /docs/concepts/components/v2/capabilities/event.md
 [doc-service]: /docs/concepts/components/v2/capabilities/service.md
-[doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory#directory-capability-rights
+[doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory.md#directory-capability-rights
 
 ## Top-level keys {#document}
 
@@ -562,7 +562,6 @@ This supports the following capability keys. Exactly one of these must be set:
 #### Additional fields
 
 This supports the following additional fields:
-[fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
 [glossary.namespace]: /docs/glossary/README.md#namespace
 
 - `from`: (_optional `string`_) The source of the capability. Defaults to `parent`.  One of:
@@ -575,6 +574,8 @@ This supports the following additional fields:
         requested capability is derived.
     - `#<child-name>`: A [reference](#references) to a child component
         instance.
+
+    [fidl-environment-decl]: /reference/fidl/fuchsia.component.decl#Environment
 - `path`: (_optional `string`_) The path at which to install the capability in the component's namespace. For protocols,
     defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
     disallowed for declarations with arrays of capability names and for runner capabilities.
@@ -608,7 +609,7 @@ This supports the following additional fields:
     This property is disallowed for runner capabilities, which are always `required`.
 
     For more information, see the
-    [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
+    [availability](/docs/concepts/components/v2/capabilities/availability.md) documentation.
 - `key`: (_optional `string`_) (`config` only) The configuration key in the component's `config` block that this capability
     will set.
 - `type`: (_optional `string`_) (`config` only) The type of configuration, one of:
@@ -739,7 +740,7 @@ This supports the following additional fields:
         only to avoid validation errors during transitional periods of multi-step code changes.
 
     For more information, see the
-    [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
+    [availability](/docs/concepts/components/v2/capabilities/availability.md) documentation.
 - `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. One of:
     - `required` (default): the source (`from`) must be defined in this manifest.
     - `unknown`: the source of this offer will be rewritten to `void` if its source (`from`)
@@ -824,7 +825,7 @@ This supports the following additional fields:
     - `void`: The source is intentionally omitted. Only valid when `availability` is
         `optional` or `transitional`.
 - `to`: (_`string or array of strings`_) Capability target(s). One of:
-    - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
+    - `#<target-name>` or \[`#name1`, ...\]: A [reference](#references) to a child or collection,
       or an array of references.
     - `all`: Short-hand for an `offer` clause containing all child [references](#references).
 - `as`: (_optional `string`_) An explicit [name](#name) for the capability as it will be known by the target. If omitted,
@@ -861,7 +862,7 @@ This supports the following additional fields:
         only to avoid validation errors during transitional periods of multi-step code changes.
 
     For more information, see the
-    [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
+    [availability](/docs/concepts/components/v2/capabilities/availability.md) documentation.
 - `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. One of:
     - `required` (default): the source (`from`) must be defined in this manifest.
     - `unknown`: the source of this offer will be rewritten to `void` if its source (`from`)

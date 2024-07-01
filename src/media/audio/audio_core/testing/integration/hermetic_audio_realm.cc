@@ -52,6 +52,14 @@ class InspectSinkMock : public component_testing::LocalComponentImpl,
     *tree_ = {inspect::testing::TreeClient(std::move(request->tree()), dispatcher_)};
   }
 
+  void FetchEscrow(FetchEscrowRequestView request, FetchEscrowCompleter::Sync& completer) override {
+    FX_CHECK(false) << "Unexpected call to InspectSink/Escrow";
+  }
+
+  void Escrow(EscrowRequestView request, EscrowCompleter::Sync& completer) override {
+    FX_CHECK(false) << "Unexpected call to InspectSink/FetchEscrow";
+  }
+
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_inspect::InspectSink> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
     FX_CHECK(false) << "Unexpected unknown method call on InspectSink";

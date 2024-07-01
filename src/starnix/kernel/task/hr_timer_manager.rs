@@ -4,6 +4,7 @@
 
 use fidl_fuchsia_hardware_hrtimer as fhrtimer;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef};
+use starnix_logging::{log_error, log_info};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
@@ -13,6 +14,7 @@ use std::sync::Arc;
 
 use crate::fs::fuchsia::TimerOps;
 use crate::task::{CurrentTask, HandleWaitCanceler, WaitCanceler};
+use crate::vfs::FileObject;
 
 const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
 const HRTIMER_DEFAULT_ID: u64 = 6;
@@ -96,6 +98,18 @@ impl HrTimerManager {
         self.device_proxy.as_ref().ok_or(errno!(EINVAL, "No connection to HrTimer driver"))
     }
 
+    fn resolution_nsecs(&self) -> Result<i64, Errno> {
+        match self.resolution {
+            fhrtimer::Resolution::Duration(r) => Ok(r),
+            _ => {
+                return Err(errno!(
+                    EINVAL,
+                    "No correct Resolution::Duration enum in the hrtimer properties"
+                ));
+            }
+        }
+    }
+
     #[cfg(test)]
     fn current_deadline(&self) -> Option<zx::Time> {
         self.lock().current_deadline.clone()
@@ -110,46 +124,61 @@ impl HrTimerManager {
     ///
     /// When a timer is removed from the heap, the `start_next` method is called again if it is the
     /// first timer in the `timer_heap`. This ensures that the next timer in the heap is started.
-    fn start_next(&self, guard: &mut MutexGuard<'_, HrTimerManagerState>) -> Result<(), Errno> {
-        let device_proxy = self.check_connection()?;
+    fn start_next(
+        self: &HrTimerManagerHandle,
+        current_task: &CurrentTask,
+        file_object: Option<&FileObject>,
+        guard: &mut MutexGuard<'_, HrTimerManagerState>,
+    ) -> Result<(), Errno> {
+        let _ = self.check_connection()?;
+        let resolution_nsecs = self.resolution_nsecs()?;
         if let Some(node) = guard.timer_heap.peek() {
             let new_deadline = node.deadline;
             // Only restart the HrTimer device when the deadline is different from the running one.
             if guard.current_deadline != Some(new_deadline) {
-                if let fhrtimer::Resolution::Duration(resolution_nsecs) = self.resolution {
-                    device_proxy
-                        .set_event(HRTIMER_DEFAULT_ID, node.hr_timer.event(), zx::Time::INFINITE)
-                        .map_err(|e| errno!(EINVAL, format!("HrTimer::SetEvent fidl failed {e}")))?
-                        .map_err(|e| {
-                            errno!(EINVAL, format!("HrTimer::SetEvent driver failed {e:?}"))
-                        })?;
-                    // If the deadline is in the past, set the `ticks` as 0 to trigger event right
-                    // away.
-                    let ticks =
-                        std::cmp::max(0, (new_deadline - zx::Time::get_monotonic()).into_nanos())
-                            / resolution_nsecs;
-                    device_proxy
-                        .start(
+                let hrtimer_ref = node.hr_timer.clone();
+                let self_ref = self.clone();
+                let weak_file_handle = file_object.and_then(|f| Some(f.weak_handle.clone()));
+                self.stop(guard)?;
+                current_task.kernel().kthreads.spawn(move |_, current_task| {
+                    if let Ok(device_proxy) = self_ref.check_connection() {
+                        // If the deadline is in the past, set the `ticks` as 0 to trigger event right
+                        // away.
+                        let ticks = std::cmp::max(
+                            0,
+                            (new_deadline - zx::Time::get_monotonic()).into_nanos(),
+                        ) / resolution_nsecs;
+                        match device_proxy.start_and_wait(
                             HRTIMER_DEFAULT_ID,
                             &fhrtimer::Resolution::Duration(resolution_nsecs),
                             // TODO(https://fxbug.dev/339070144): Use the new API to start the timer
                             // with the target deadline
                             ticks as u64,
                             zx::Time::INFINITE,
-                        )
-                        .map_err(|e| errno!(EINVAL, format!("HrTimer::Start fidl error: {e}")))?
-                        .map_err(|e| {
-                            errno!(EINVAL, format!("HrTimer::Start driver error: {e:?}"))
-                        })?;
-                } else {
-                    return Err(errno!(
-                        EINVAL,
-                        "No correct Resolution::Duration enum in the hrtimer properties"
-                    ));
-                }
+                        ) {
+                            Ok(Ok(lease)) => {
+                                let _ = hrtimer_ref
+                                    .event
+                                    .as_handle_ref()
+                                    .signal(zx::Signals::NONE, zx::Signals::TIMER_SIGNALED);
+                                if let Some(file_handle) =
+                                    weak_file_handle.and_then(|f| f.upgrade())
+                                {
+                                    let lease_channel = lease.into_channel();
+                                    file_handle.on_wake(current_task, &lease_channel);
+                                    // Drop the baton lease after wake leases in associated epfd
+                                    // are activated.
+                                    drop(lease_channel);
+                                }
+                                // TODO(https://fxbug.dev/340234109): wait on the timer expired
+                                // signal to start the next timer in the heap.
+                            }
+                            Ok(Err(e)) => log_info!("HrTimer::Start driver error: {e:?}"),
+                            Err(e) => log_error!("HrTimer::Start fidl error: {e}"),
+                        }
+                    }
+                });
                 guard.current_deadline = Some(new_deadline);
-                // TODO(https://fxbug.dev/340234109): wait on the timer expired signal to start
-                // the next timer in the heap.
             }
         } else {
             // Heap is empty now.
@@ -158,7 +187,10 @@ impl HrTimerManager {
         Ok(())
     }
 
-    fn stop(&self, guard: &mut MutexGuard<'_, HrTimerManagerState>) -> Result<(), Errno> {
+    fn stop(
+        self: &HrTimerManagerHandle,
+        guard: &mut MutexGuard<'_, HrTimerManagerState>,
+    ) -> Result<(), Errno> {
         guard.current_deadline = None;
         self.check_connection()?
             .stop(HRTIMER_DEFAULT_ID, zx::Time::INFINITE)
@@ -169,7 +201,13 @@ impl HrTimerManager {
     }
 
     /// Add a new timer into the heap.
-    pub fn add_timer(&self, new_timer: &HrTimerHandle, deadline: zx::Time) -> Result<(), Errno> {
+    pub fn add_timer(
+        self: &HrTimerManagerHandle,
+        current_task: &CurrentTask,
+        file_object: Option<&FileObject>,
+        new_timer: &HrTimerHandle,
+        deadline: zx::Time,
+    ) -> Result<(), Errno> {
         let mut guard = self.lock();
         let new_timer_node = HrTimerNode::new(deadline, new_timer.clone());
         // If the deadline of a timer changes, this function will be called to update the order of
@@ -183,19 +221,24 @@ impl HrTimerManager {
             // If the new timer is in front, it has a sooner deadline. (Re)Start the HrTimer device
             // with the new deadline.
             if Arc::ptr_eq(&running_timer.hr_timer, new_timer) {
-                return self.start_next(&mut guard);
+                return self.start_next(current_task, file_object, &mut guard);
             }
         }
         Ok(())
     }
 
     /// Remove a timer from the heap.
-    pub fn remove_timer(&self, timer: &HrTimerHandle) -> Result<(), Errno> {
+    pub fn remove_timer(
+        self: &HrTimerManagerHandle,
+        current_task: &CurrentTask,
+        file_object: Option<&FileObject>,
+        timer: &HrTimerHandle,
+    ) -> Result<(), Errno> {
         let mut guard = self.lock();
         if let Some(running_timer_node) = guard.timer_heap.peek() {
             if Arc::ptr_eq(&running_timer_node.hr_timer, timer) {
                 guard.timer_heap.pop();
-                self.start_next(&mut guard)?;
+                self.start_next(current_task, file_object, &mut guard)?;
                 return Ok(());
             }
         }
@@ -225,23 +268,37 @@ impl HrTimer {
 }
 
 impl TimerOps for HrTimerHandle {
-    fn start(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
+    fn start(
+        &self,
+        current_task: &CurrentTask,
+        file_object: &FileObject,
+        deadline: zx::Time,
+    ) -> Result<(), Errno> {
         // Before (re)starting the timer, ensure the signal is cleared.
         self.event
             .as_handle_ref()
-            .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::NONE)
+            .signal(zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
             .map_err(|status| from_status_like_fdio!(status))?;
-        current_task.kernel().hrtimer_manager.add_timer(self, deadline)?;
+        current_task.kernel().hrtimer_manager.add_timer(
+            current_task,
+            Some(file_object),
+            self,
+            deadline,
+        )?;
         Ok(())
     }
 
-    fn stop(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    fn stop(&self, current_task: &CurrentTask, file_object: &FileObject) -> Result<(), Errno> {
         // Clear the signal when stopping the hrtimer.
         self.event
             .as_handle_ref()
-            .signal(zx::Signals::EVENT_SIGNALED, zx::Signals::NONE)
+            .signal(zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
             .map_err(|status| from_status_like_fdio!(status))?;
-        Ok(current_task.kernel().hrtimer_manager.remove_timer(self)?)
+        Ok(current_task.kernel().hrtimer_manager.remove_timer(
+            current_task,
+            Some(file_object),
+            self,
+        )?)
     }
 
     fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler {
@@ -299,6 +356,8 @@ mod tests {
     use futures::StreamExt;
     use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
+    use crate::testing::create_kernel_and_task;
+
     use super::*;
 
     /// Returns a mocked HrTimer::Device client sync proxy and its server running in a spawned
@@ -342,27 +401,32 @@ mod tests {
         hrtimer
     }
 
-    fn init_hr_timer_manager() -> HrTimerManager {
+    fn init_hr_timer_manager() -> HrTimerManagerHandle {
         let proxy = mock_hrtimer_connection();
-        HrTimerManager {
+        Arc::new(HrTimerManager {
             device_proxy: Some(proxy),
             resolution: fhrtimer::Resolution::Duration(10000),
             state: Default::default(),
-        }
+        })
     }
 
     #[fuchsia::test(threads = 2)]
     async fn hr_timer_manager_add_timers() {
         let hrtimer_manager = init_hr_timer_manager();
+        let (_, current_task) = create_kernel_and_task();
         let soonest_deadline = zx::Time::from_nanos(1);
         let timer1 = HrTimer::new();
         let timer2 = HrTimer::new();
         let timer3 = HrTimer::new();
 
         // Add three timers into the heap.
-        assert!(hrtimer_manager.add_timer(&timer3, zx::Time::from_nanos(3)).is_ok());
-        assert!(hrtimer_manager.add_timer(&timer2, zx::Time::from_nanos(2)).is_ok());
-        assert!(hrtimer_manager.add_timer(&timer1, soonest_deadline).is_ok());
+        assert!(hrtimer_manager
+            .add_timer(&current_task, None, &timer3, zx::Time::from_nanos(3))
+            .is_ok());
+        assert!(hrtimer_manager
+            .add_timer(&current_task, None, &timer2, zx::Time::from_nanos(2))
+            .is_ok());
+        assert!(hrtimer_manager.add_timer(&current_task, None, &timer1, soonest_deadline).is_ok());
 
         // Make sure the deadline of the current running timer is the soonest.
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == soonest_deadline));
@@ -371,15 +435,16 @@ mod tests {
     #[fuchsia::test(threads = 2)]
     async fn hr_timer_manager_add_duplicate_timers() {
         let hrtimer_manager = init_hr_timer_manager();
+        let (_, current_task) = create_kernel_and_task();
 
         let timer1 = HrTimer::new();
         let sooner_deadline = zx::Time::after(zx::Duration::from_seconds(1));
-        assert!(hrtimer_manager.add_timer(&timer1, sooner_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(&current_task, None, &timer1, sooner_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));
 
         let later_deadline = zx::Time::after(zx::Duration::from_seconds(1));
         assert!(later_deadline > sooner_deadline);
-        assert!(hrtimer_manager.add_timer(&timer1, later_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(&current_task, None, &timer1, later_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
         // Make sure no duplicate timers.
         assert_eq!(hrtimer_manager.lock().timer_heap.len(), 1);
@@ -388,6 +453,7 @@ mod tests {
     #[fuchsia::test(threads = 2)]
     async fn hr_timer_manager_remove_timers() {
         let hrtimer_manager = init_hr_timer_manager();
+        let (_, current_task) = create_kernel_and_task();
 
         let timer1 = HrTimer::new();
         let timer2 = HrTimer::new();
@@ -395,41 +461,43 @@ mod tests {
         let timer3 = HrTimer::new();
         let timer3_deadline = zx::Time::after(zx::Duration::from_seconds(3));
 
-        assert!(hrtimer_manager.add_timer(&timer3, timer3_deadline).is_ok());
-        assert!(hrtimer_manager.add_timer(&timer2, timer2_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(&current_task, None, &timer3, timer3_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(&current_task, None, &timer2, timer2_deadline).is_ok());
         assert!(hrtimer_manager
-            .add_timer(&timer1, zx::Time::after(zx::Duration::from_seconds(1)))
+            .add_timer(&current_task, None, &timer1, zx::Time::after(zx::Duration::from_seconds(1)))
             .is_ok());
 
-        assert!(hrtimer_manager.remove_timer(&timer1).is_ok());
+        assert!(hrtimer_manager.remove_timer(&current_task, None, &timer1).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer2_deadline));
 
-        assert!(hrtimer_manager.remove_timer(&timer2).is_ok());
+        assert!(hrtimer_manager.remove_timer(&current_task, None, &timer2).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer3_deadline));
     }
 
     #[fuchsia::test(threads = 2)]
     async fn hr_timer_manager_clear_heap() {
         let hrtimer_manager = init_hr_timer_manager();
+        let (_, current_task) = create_kernel_and_task();
         let timer = HrTimer::new();
         assert!(hrtimer_manager
-            .add_timer(&timer, zx::Time::after(zx::Duration::from_seconds(1)))
+            .add_timer(&current_task, None, &timer, zx::Time::after(zx::Duration::from_seconds(1)))
             .is_ok());
-        assert!(hrtimer_manager.remove_timer(&timer).is_ok());
+        assert!(hrtimer_manager.remove_timer(&current_task, None, &timer).is_ok());
         assert!(hrtimer_manager.current_deadline().is_none());
     }
 
     #[fuchsia::test(threads = 2)]
     async fn hr_timer_manager_update_deadline() {
         let hrtimer_manager = init_hr_timer_manager();
+        let (_, current_task) = create_kernel_and_task();
 
         let timer = HrTimer::new();
         let sooner_deadline = zx::Time::after(zx::Duration::from_seconds(1));
         let later_deadline = zx::Time::after(zx::Duration::from_seconds(2));
 
-        assert!(hrtimer_manager.add_timer(&timer, later_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(&current_task, None, &timer, later_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
-        assert!(hrtimer_manager.add_timer(&timer, sooner_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(&current_task, None, &timer, sooner_deadline).is_ok());
         // Make sure no duplicate timers.
         assert_eq!(hrtimer_manager.lock().timer_heap.len(), 1);
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));

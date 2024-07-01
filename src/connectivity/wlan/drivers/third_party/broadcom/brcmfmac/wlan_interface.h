@@ -46,7 +46,7 @@ namespace brcmfmac {
 
 class WlanInterface;
 
-class WlanInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacImpl>,
+class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacImpl>,
                       public fidl::WireAsyncEventHandler<fdf::NodeController>,
                       public wlan::drivers::components::NetworkPort,
                       public wlan::drivers::components::NetworkPort::Callbacks {
@@ -65,8 +65,8 @@ class WlanInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   std::string GetName() { return name_; }
 
   // Serves the WlanFullmacImpl protocol on `server_end`.
-  void ServiceConnectHandler(fdf_dispatcher_t* dispatcher,
-                             fdf::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end);
+  void ServiceConnectHandler(async_dispatcher_t* dispatcher,
+                             fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end);
   fuchsia_wlan_common_wire::WlanMacRole Role() { return role_; }
 
   static zx_status_t GetSupportedMacRoles(
@@ -81,52 +81,35 @@ class WlanInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   static zx_status_t ClearCountry(brcmf_pub* drvr);
 
   // WlanFullmacImpl implementations, dispatching FIDL requests from higher layers.
-  void Start(StartRequestView request, fdf::Arena& arena, StartCompleter::Sync& completer) override;
-  void Stop(fdf::Arena& arena, StopCompleter::Sync& completer) override;
-  void Query(fdf::Arena& arena, QueryCompleter::Sync& completer) override;
-  void QueryMacSublayerSupport(fdf::Arena& arena,
-                               QueryMacSublayerSupportCompleter::Sync& completer) override;
-  void QuerySecuritySupport(fdf::Arena& arena,
-                            QuerySecuritySupportCompleter::Sync& completer) override;
+  void Start(StartRequestView request, StartCompleter::Sync& completer) override;
+  void Stop(StopCompleter::Sync& completer) override;
+  void Query(QueryCompleter::Sync& completer) override;
+  void QueryMacSublayerSupport(QueryMacSublayerSupportCompleter::Sync& completer) override;
+  void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override;
   void QuerySpectrumManagementSupport(
-      fdf::Arena& arena, QuerySpectrumManagementSupportCompleter::Sync& completer) override;
-  void StartScan(StartScanRequestView request, fdf::Arena& arena,
-                 StartScanCompleter::Sync& completer) override;
-  void Connect(ConnectRequestView request, fdf::Arena& arena,
-               ConnectCompleter::Sync& completer) override;
-  void Reconnect(ReconnectRequestView request, fdf::Arena& arena,
-                 ReconnectCompleter::Sync& completer) override;
-  void AuthResp(AuthRespRequestView request, fdf::Arena& arena,
-                AuthRespCompleter::Sync& completer) override;
-  void Deauth(DeauthRequestView request, fdf::Arena& arena,
-              DeauthCompleter::Sync& completer) override;
-  void AssocResp(AssocRespRequestView request, fdf::Arena& arena,
-                 AssocRespCompleter::Sync& completer) override;
-  void Disassoc(DisassocRequestView request, fdf::Arena& arena,
-                DisassocCompleter::Sync& completer) override;
-  void Reset(ResetRequestView request, fdf::Arena& arena, ResetCompleter::Sync& completer) override;
-  void StartBss(StartBssRequestView request, fdf::Arena& arena,
-                StartBssCompleter::Sync& completer) override;
-  void StopBss(StopBssRequestView request, fdf::Arena& arena,
-               StopBssCompleter ::Sync& completer) override;
-  void SetKeysReq(SetKeysReqRequestView request, fdf::Arena& arena,
-                  SetKeysReqCompleter::Sync& completer) override;
-  void DelKeysReq(DelKeysReqRequestView request, fdf::Arena& arena,
-                  DelKeysReqCompleter::Sync& completer) override;
-  void EapolTx(EapolTxRequestView request, fdf::Arena& arena,
-               EapolTxCompleter::Sync& completer) override;
-  void GetIfaceCounterStats(fdf::Arena& arena,
-                            GetIfaceCounterStatsCompleter::Sync& completer) override;
-  void GetIfaceHistogramStats(fdf::Arena& arena,
-                              GetIfaceHistogramStatsCompleter::Sync& completer) override;
-  void SetMulticastPromisc(SetMulticastPromiscRequestView request, fdf::Arena& arena,
+      QuerySpectrumManagementSupportCompleter::Sync& completer) override;
+  void StartScan(StartScanRequestView request, StartScanCompleter::Sync& completer) override;
+  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
+  void Reconnect(ReconnectRequestView request, ReconnectCompleter::Sync& completer) override;
+  void AuthResp(AuthRespRequestView request, AuthRespCompleter::Sync& completer) override;
+  void Deauth(DeauthRequestView request, DeauthCompleter::Sync& completer) override;
+  void AssocResp(AssocRespRequestView request, AssocRespCompleter::Sync& completer) override;
+  void Disassoc(DisassocRequestView request, DisassocCompleter::Sync& completer) override;
+  void Reset(ResetRequestView request, ResetCompleter::Sync& completer) override;
+  void StartBss(StartBssRequestView request, StartBssCompleter::Sync& completer) override;
+  void StopBss(StopBssRequestView request, StopBssCompleter ::Sync& completer) override;
+  void SetKeysReq(SetKeysReqRequestView request, SetKeysReqCompleter::Sync& completer) override;
+  void DelKeysReq(DelKeysReqRequestView request, DelKeysReqCompleter::Sync& completer) override;
+  void EapolTx(EapolTxRequestView request, EapolTxCompleter::Sync& completer) override;
+  void GetIfaceCounterStats(GetIfaceCounterStatsCompleter::Sync& completer) override;
+  void GetIfaceHistogramStats(GetIfaceHistogramStatsCompleter::Sync& completer) override;
+  void SetMulticastPromisc(SetMulticastPromiscRequestView request,
                            SetMulticastPromiscCompleter::Sync& completer) override;
-  void SaeHandshakeResp(SaeHandshakeRespRequestView request, fdf::Arena& arena,
+  void SaeHandshakeResp(SaeHandshakeRespRequestView request,
                         SaeHandshakeRespCompleter::Sync& completer) override;
-  void SaeFrameTx(SaeFrameTxRequestView request, fdf::Arena& arena,
-                  SaeFrameTxCompleter::Sync& completer) override;
-  void WmmStatusReq(fdf::Arena& arena, WmmStatusReqCompleter::Sync& completer) override;
-  void OnLinkStateChanged(OnLinkStateChangedRequestView request, fdf::Arena& arena,
+  void SaeFrameTx(SaeFrameTxRequestView request, SaeFrameTxCompleter::Sync& completer) override;
+  void WmmStatusReq(WmmStatusReqCompleter::Sync& completer) override;
+  void OnLinkStateChanged(OnLinkStateChangedRequestView request,
                           OnLinkStateChangedCompleter::Sync& completer) override;
 
   void on_fidl_error(fidl::UnbindInfo error) override {
@@ -162,7 +145,7 @@ class WlanInterface : public fdf::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   std::string name_;
   // This is the interface ID used by the Device object, not the port ID or firmware ID.
   uint16_t iface_id_;
-  fdf::ServerBindingGroup<fuchsia_wlan_fullmac::WlanFullmacImpl> bindings_;
+  fidl::ServerBindingGroup<fuchsia_wlan_fullmac::WlanFullmacImpl> bindings_;
   fidl::WireClient<fdf::NodeController> wlanfullmac_controller_;
 };
 }  // namespace brcmfmac

@@ -20,20 +20,20 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Error, Clone)]
 pub enum ComponentInstanceError {
-    #[error("component instance {} not found", moniker)]
+    #[error("could not find `{moniker}`")]
     InstanceNotFound { moniker: Moniker },
     #[error("component manager instance unavailable")]
     ComponentManagerInstanceUnavailable {},
     #[error("expected a component instance, but got component manager's instance")]
     ComponentManagerInstanceUnexpected {},
-    #[error("malformed url {} for component instance {}", url, moniker)]
+    #[error("malformed url `{url}` for `{moniker}`")]
     MalformedUrl { url: String, moniker: Moniker },
-    #[error("url {} for component {} does not resolve to an absolute url", url, moniker)]
+    #[error("url `{url}` for `{moniker}` does not resolve to an absolute url")]
     NoAbsoluteUrl { url: String, moniker: Moniker },
     // The capability routing static analyzer never produces this error subtype, so we don't need
     // to serialize it.
     #[cfg_attr(feature = "serde", serde(skip))]
-    #[error("Failed to resolve `{}`: {}", moniker, err)]
+    #[error("failed to resolve `{moniker}`:\n\t{err}")]
     ResolveFailed {
         moniker: Moniker,
         #[source]
@@ -92,10 +92,7 @@ impl PartialEq for ComponentInstanceError {
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum RoutingError {
     #[error(
-        "Backing directory `{}` was not exposed to `{}` from child `#{}`.",
-        capability_id,
-        moniker,
-        child_moniker
+        "backing directory `{capability_id}` was not exposed to `{moniker}` from `#{child_moniker}`"
     )]
     StorageFromChildExposeNotFound {
         child_moniker: ChildName,
@@ -104,28 +101,28 @@ pub enum RoutingError {
     },
 
     #[error(
-        "`{}` tried to use a storage capability from `{}` but it is not in the component id index. \
-        See: https://fuchsia.dev/go/components/instance-id.",
-        target_moniker, source_moniker
+        "`{target_moniker}` tried to use a storage capability from `{source_moniker}` but it is \
+        not in the component id index.\n\t\
+        See: https://fuchsia.dev/go/components/instance-id"
     )]
     ComponentNotInIdIndex { source_moniker: Moniker, target_moniker: Moniker },
 
-    #[error("`{}` is not a built-in capability.", capability_id)]
+    #[error("`{capability_id}` is not a built-in capability")]
     UseFromComponentManagerNotFound { capability_id: String },
 
-    #[error("`{}` is not a built-in capability.", capability_id)]
+    #[error("`{capability_id}` is not a built-in capability")]
     RegisterFromComponentManagerNotFound { capability_id: String },
 
-    #[error("`{}` is not a built-in capability.", capability_id)]
+    #[error("`{capability_id}` is not a built-in capability")]
     OfferFromComponentManagerNotFound { capability_id: String },
 
-    #[error("`{}` was not offered to `{}` by parent.", capability_id, moniker)]
+    #[error("`{capability_id}` was not offered to `{moniker}` by parent")]
     UseFromParentNotFound { moniker: Moniker, capability_id: String },
 
-    #[error("`{}` was not declared as a capability by `{}`.", capability_id, moniker)]
+    #[error("`{capability_id}` was not declared as a capability by `{moniker}`")]
     UseFromSelfNotFound { moniker: Moniker, capability_id: String },
 
-    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
+    #[error("`{moniker}` does not have child `#{child_moniker}`")]
     UseFromChildInstanceNotFound {
         child_moniker: ChildName,
         moniker: Moniker,
@@ -133,18 +130,12 @@ pub enum RoutingError {
     },
 
     #[error(
-        "{} `{}` was not registered in environment of `{}`.",
-        capability_type,
-        capability_name,
-        moniker
+        "{capability_type} `{capability_name}` was not registered in environment of `{moniker}`"
     )]
     UseFromEnvironmentNotFound { moniker: Moniker, capability_type: String, capability_name: Name },
 
     #[error(
-        "`{}` tried to use {} `{}` from the root environment. This is not allowed.",
-        moniker,
-        capability_type,
-        capability_name
+        "`{moniker}` tried to use {capability_type} `{capability_name}` from the root environment"
     )]
     UseFromRootEnvironmentNotAllowed {
         moniker: Moniker,
@@ -152,19 +143,14 @@ pub enum RoutingError {
         capability_name: Name,
     },
 
-    #[error("`{}` was not offered to `{}` by parent.", capability_name, moniker)]
+    #[error("{capability_type} `{capability_name}` was not offered to `{moniker}` by parent")]
     EnvironmentFromParentNotFound {
         moniker: Moniker,
         capability_type: String,
         capability_name: Name,
     },
 
-    #[error(
-        "`{}` was not exposed to `{}` from child `#{}`.",
-        capability_name,
-        moniker,
-        child_moniker
-    )]
+    #[error("`{capability_name}` was not exposed to `{moniker}` from `#{child_moniker}`")]
     EnvironmentFromChildExposeNotFound {
         child_moniker: ChildName,
         moniker: Moniker,
@@ -172,7 +158,7 @@ pub enum RoutingError {
         capability_name: Name,
     },
 
-    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
+    #[error("`{moniker}` does not have child `#{child_moniker}`")]
     EnvironmentFromChildInstanceNotFound {
         child_moniker: ChildName,
         moniker: Moniker,
@@ -180,43 +166,28 @@ pub enum RoutingError {
         capability_type: String,
     },
 
-    #[error(
-        "`{}` was not offered to `{}` by parent. For more, run `ffx component doctor {moniker}`.",
-        capability_id,
-        moniker
-    )]
+    #[error("`{capability_id}` was not offered to `{moniker}` by parent")]
     OfferFromParentNotFound { moniker: Moniker, capability_id: String },
 
     #[error(
-        "Unable to offer `{}` because was not declared as a capability by `{}`. For more, run `ffx component doctor {moniker}`.",
-        capability_id,
-        moniker
+        "cannot offer `{capability_id}` because was not declared as a capability by `{moniker}`"
     )]
     OfferFromSelfNotFound { moniker: Moniker, capability_id: String },
 
-    #[error(
-        "`{}` was not offered to `{}` by parent. For more, run `ffx component doctor {moniker}`.",
-        capability_id,
-        moniker
-    )]
+    #[error("`{capability_id}` was not offered to `{moniker}` by parent")]
     StorageFromParentNotFound { moniker: Moniker, capability_id: String },
 
-    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
+    #[error("`{moniker}` does not have child `#{child_moniker}`")]
     OfferFromChildInstanceNotFound {
         child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
 
-    #[error("`{}` does not have collection `#{}`.", moniker, collection)]
+    #[error("`{moniker}` does not have collection `#{collection}`")]
     OfferFromCollectionNotFound { collection: String, moniker: Moniker, capability: Name },
 
-    #[error(
-        "`{}` was not exposed to `{}` from child `#{}`. For more, run `ffx component doctor {moniker}`.",
-        capability_id,
-        moniker,
-        child_moniker
-    )]
+    #[error("`{capability_id}` was not exposed to `{moniker}` from `#{child_moniker}`")]
     OfferFromChildExposeNotFound {
         child_moniker: ChildName,
         moniker: Moniker,
@@ -224,43 +195,34 @@ pub enum RoutingError {
     },
 
     // TODO: Could this be distinguished by use/offer/expose?
-    #[error("`{}` is not a framework capability.", capability_id)]
+    #[error("`{capability_id}` is not a framework capability")]
     CapabilityFromFrameworkNotFound { moniker: Moniker, capability_id: String },
 
     #[error(
-        "A capability was sourced to a base capability `{}` from `{}`, but this is unsupported.",
-        capability_id,
-        moniker
+        "A capability was sourced to a base capability `{capability_id}` from `{moniker}`, but this is unsupported",
     )]
     CapabilityFromCapabilityNotFound { moniker: Moniker, capability_id: String },
 
     // TODO: Could this be distinguished by use/offer/expose?
-    #[error("`{}` is not a framework capability.", capability_id)]
+    #[error("`{capability_id}` is not a framework capability")]
     CapabilityFromComponentManagerNotFound { capability_id: String },
 
     #[error(
-        "Unable to expose `{}` because it was not declared as a capability by `{}`.",
-        capability_id,
-        moniker
+        "unable to expose `{capability_id}` because it was not declared as a capability by `{moniker}`"
     )]
     ExposeFromSelfNotFound { moniker: Moniker, capability_id: String },
 
-    #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
+    #[error("`{moniker}` does not have child `#{child_moniker}`")]
     ExposeFromChildInstanceNotFound {
         child_moniker: ChildName,
         moniker: Moniker,
         capability_id: String,
     },
 
-    #[error("`{}` does not have collection `#{}`.", moniker, collection)]
+    #[error("`{moniker}` does not have collection `#{collection}`")]
     ExposeFromCollectionNotFound { collection: String, moniker: Moniker, capability: Name },
 
-    #[error(
-        "`{}` was not exposed to `{}` from child `#{}`. For more, run `ffx component doctor {moniker}`.",
-        capability_id,
-        moniker,
-        child_moniker
-    )]
+    #[error("`{capability_id}` was not exposed to `{moniker}` from `#{child_moniker}`")]
     ExposeFromChildExposeNotFound {
         child_moniker: ChildName,
         moniker: Moniker,
@@ -268,47 +230,43 @@ pub enum RoutingError {
     },
 
     #[error(
-        "`{}` tried to expose `{}` from the framework, but no such framework capability was found.",
-        moniker,
-        capability_id
+        "`{moniker}` tried to expose `{capability_id}` from the framework, but no such framework capability was found"
     )]
     ExposeFromFrameworkNotFound { moniker: Moniker, capability_id: String },
 
-    #[error(
-        "`{}` was not exposed to `{}` from child `#{}`. For more, run `ffx component doctor {moniker}`.",
-        capability_id,
-        moniker,
-        child_moniker
-    )]
+    #[error("`{capability_id}` was not exposed to `{moniker}` from `#{child_moniker}`")]
     UseFromChildExposeNotFound { child_moniker: ChildName, moniker: Moniker, capability_id: String },
 
-    #[error("Routing a capability from an unsupported source type: {}.", source_type)]
+    #[error("routing a capability from an unsupported source type: {source_type}")]
     UnsupportedRouteSource { source_type: String },
 
-    #[error("Routing a capability of an unsupported type: {}", type_name)]
+    #[error("routing a capability of an unsupported type: {type_name}")]
     UnsupportedCapabilityType { type_name: CapabilityTypeName },
 
-    #[error("Dictionaries are not yet supported for {cap_type} capabilities")]
+    #[error("dictionaries are not yet supported for {cap_type} capabilities")]
     DictionariesNotSupported { cap_type: CapabilityTypeName },
 
-    #[error("The capability does not support member access")]
+    #[error("the capability does not support member access")]
     BedrockMemberAccessUnsupported,
 
-    #[error("Item {name} is not present in dictionary")]
+    #[error("item `{name}` is not present in dictionary")]
     BedrockNotPresentInDictionary { name: String },
 
-    #[error("Routed capability was the wrong type. Was: {actual}, expected: {expected}")]
+    #[error("routed capability was the wrong type. Was: {actual}, expected: {expected}")]
     BedrockWrongCapabilityType { actual: String, expected: String },
 
-    #[error("There was an error remoting a capability")]
+    #[error("there was an error remoting a capability")]
     BedrockRemoteCapability,
 
-    #[error("Source dictionary was not found in child's exposes")]
+    #[error("source dictionary was not found in child's exposes")]
     BedrockSourceDictionaryExposeNotFound,
 
+    #[error("Some capability in the routing chain could not be cloned.")]
+    BedrockNotCloneable,
+
     #[error(
-        "A capability in a dictionary extended from a source dictionary collides with \
-    a capability in the source dictionary that has the same key"
+        "a capability in a dictionary extended from a source dictionary collides with \
+        a capability in the source dictionary that has the same key"
     )]
     BedrockSourceDictionaryCollision,
 
@@ -332,8 +290,8 @@ pub enum RoutingError {
 
     #[error(
         "source capability is void. \
-    If the offer/expose declaration has `source_availability` set to `unknown`, \
-    the source component instance likely isn't defined in the component declaration"
+        If the offer/expose declaration has `source_availability` set to `unknown`, \
+        the source component instance likely isn't defined in the component declaration"
     )]
     SourceCapabilityIsVoid,
 }
@@ -378,6 +336,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
+            | RoutingError::BedrockNotCloneable { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
@@ -602,20 +561,20 @@ impl RoutingError {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum EventsRoutingError {
-    #[error("Filter is not a subset")]
+    #[error("filter is not a subset")]
     InvalidFilter,
 
-    #[error("Event routes must end at source with a filter declaration")]
+    #[error("event routes must end at source with a filter declaration")]
     MissingFilter,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum RightsRoutingError {
-    #[error("Requested rights ({requested}) greater than provided rights ({provided})")]
+    #[error("requested rights ({requested}) greater than provided rights ({provided})")]
     Invalid { requested: Rights, provided: Rights },
 
-    #[error("Directory routes must end at source with a rights declaration")]
+    #[error("directory routes must end at source with a rights declaration")]
     MissingRightsSource,
 }
 
@@ -633,15 +592,15 @@ impl RightsRoutingError {
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum AvailabilityRoutingError {
     #[error(
-        "Availability requested by the target has stronger guarantees than what \
-    is being provided at the source."
+        "availability requested by the target has stronger guarantees than what \
+    is being provided at the source"
     )]
     TargetHasStrongerAvailability,
 
-    #[error("Offer uses void source, but target requires the capability")]
+    #[error("offer uses void source, but target requires the capability")]
     OfferFromVoidToRequiredTarget,
 
-    #[error("Expose uses void source, but target requires the capability")]
+    #[error("expose uses void source, but target requires the capability")]
     ExposeFromVoidToRequiredTarget,
 }
 

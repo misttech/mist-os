@@ -21,7 +21,7 @@ class AmlTdmConfigDevice {
   zx_status_t InitHW(const metadata::AmlConfig& config, uint64_t channels_to_use,
                      uint32_t frame_rate);
   static zx_status_t Normalize(metadata::AmlConfig& config);
-  static std::vector<uint32_t> GetSupportedNumberOfChannels() { return {2}; }
+  static std::vector<uint32_t> GetSupportedNumberOfChannels() { return {1, 2}; }
   static std::vector<uint32_t> GetSupportedFrameRates() {
     return {8'000, 16'000, 32'000, 48'000, 96'000};
   }
@@ -29,6 +29,8 @@ class AmlTdmConfigDevice {
   static std::vector<uint8_t> GetSupportedRingBufferBytesPerSlot() { return {2}; }
   static std::vector<uint8_t> GetSupportedBitsPerSlot() { return {16, 32}; }
   static std::vector<uint8_t> GetSupportedBitsPerSample() { return {16, 32}; }
+  static uint8_t GetSupportedCustomFrameSyncSclksOffset() { return 1; }
+  static uint8_t GetSupportedCustomFrameSyncSize() { return 1; }
   static std::vector<fuchsia_hardware_audio::DaiFrameFormat> GetFidlSupportedFrameFormats() {
     return {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                 fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
@@ -39,7 +41,11 @@ class AmlTdmConfigDevice {
             fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                 fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm3),
             fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-                fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft)};
+                fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft),
+            fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                fuchsia_hardware_audio::DaiFrameFormatCustom(true, true, 1, 1)),
+            fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                fuchsia_hardware_audio::DaiFrameFormatCustom(true, false, 1, 1))};
   }
   static std::vector<fuchsia_hardware_audio::DaiSampleFormat> GetFidlSupportedSampleFormats() {
     return {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned};

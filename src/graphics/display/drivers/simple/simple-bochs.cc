@@ -2,16 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
 
-#include "simple-display.h"
+#include <fbl/alloc_checker.h>
+
+#include "src/graphics/display/drivers/simple/bochs-vbe-registers.h"
+#include "src/graphics/display/drivers/simple/simple-display-driver.h"
+#include "src/graphics/display/drivers/simple/simple-display.h"
+
+namespace simple_display {
 
 namespace {
 
@@ -20,87 +25,220 @@ constexpr int kDisplayHeight = 768;
 constexpr auto kDisplayFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
 constexpr int kBitsPerPixel = 32;
 
-}  // namespace
+zx::result<> SetUpBochsDisplayEngine(fdf::MmioView mmio_space, int width, int height,
+                                     int bits_per_pixel) {
+  static constexpr uint16_t kDriverSupportedDisplayEngineApiVersion =
+      bochs_vbe::DisplayEngineApiVersion::kVersion5;
 
-inline uint16_t bochs_vbe_dispi_read(MMIO_PTR void* base, uint32_t reg) {
-  return MmioRead16(reinterpret_cast<MMIO_PTR uint16_t*>(reinterpret_cast<MMIO_PTR uint8_t*>(base) +
-                                                         (0x500 + (reg << 1))));
-}
+  // Enabling linear framebuffer requires an API version of kVersion2 or higher.
+  // Setting up virtual display requires an API version of kVersion1 or higher.
+  static constexpr uint16_t kDriverRequiredDisplayEngineApiVersion =
+      std::max(bochs_vbe::DisplayEngineApiVersion::kVersion2,
+               bochs_vbe::kMinimumSupportedDisplayEngineApiVersion);
 
-inline void bochs_vbe_dispi_write(MMIO_PTR void* base, uint32_t reg, uint16_t val) {
-  MmioWrite16(val, reinterpret_cast<MMIO_PTR uint16_t*>(reinterpret_cast<MMIO_PTR uint8_t*>(base) +
-                                                        (0x500 + (reg << 1))));
-}
+  // The Bochs VBE Display API states that the emulator expects the driver
+  // ("bios") to write its supported API version before reading the version
+  // supported by the hardware ("display code").
+  bochs_vbe::DisplayEngineApiVersion::Get()
+      .FromValue(kDriverSupportedDisplayEngineApiVersion)
+      .WriteTo(&mmio_space);
+  const uint16_t hardware_supported_display_engine_api_version =
+      bochs_vbe::DisplayEngineApiVersion::Get().ReadFrom(&mmio_space).version();
 
-#define BOCHS_VBE_DISPI_ID 0x0
-#define BOCHS_VBE_DISPI_XRES 0x1
-#define BOCHS_VBE_DISPI_YRES 0x2
-#define BOCHS_VBE_DISPI_BPP 0x3
-#define BOCHS_VBE_DISPI_ENABLE 0x4
-#define BOCHS_VBE_DISPI_BANK 0x5
-#define BOCHS_VBE_DISPI_VIRT_WIDTH 0x6
-#define BOCHS_VBE_DISPI_VIRT_HEIGHT 0x7
-#define BOCHS_VBE_DISPI_X_OFFSET 0x8
-#define BOCHS_VBE_DISPI_Y_OFFSET 0x9
-#define BOCHS_VBE_DISPI_VIDEO_MEMORY_64K 0xa
-
-#define BOCHS_VBE_DISPI_ENABLED 0x01
-#define BOCHS_VBE_DISPI_LFB_ENABLED 0x40
-
-static void set_hw_mode(MMIO_PTR void* regs, uint16_t width, uint16_t height,
-                        uint16_t bits_per_pixel) {
-  zxlogf(TRACE, "id: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
-
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_ENABLE, 0);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_BPP, bits_per_pixel);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_XRES, width);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_YRES, height);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_BANK, 0);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_VIRT_WIDTH, width);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_VIRT_HEIGHT, height);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_X_OFFSET, 0);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_Y_OFFSET, 0);
-  bochs_vbe_dispi_write(regs, BOCHS_VBE_DISPI_ENABLE,
-                        BOCHS_VBE_DISPI_ENABLED | BOCHS_VBE_DISPI_LFB_ENABLED);
-
-  zxlogf(TRACE, "bochs_vbe_set_hw_mode:");
-  zxlogf(TRACE, "     ID: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ID));
-  zxlogf(TRACE, "   XRES: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_XRES));
-  zxlogf(TRACE, "   YRES: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_YRES));
-  zxlogf(TRACE, "    BPP: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_BPP));
-  zxlogf(TRACE, " ENABLE: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_ENABLE));
-  zxlogf(TRACE, "   BANK: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_BANK));
-  zxlogf(TRACE, "VWIDTH: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIRT_WIDTH));
-  zxlogf(TRACE, "VHEIGHT: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIRT_HEIGHT));
-  zxlogf(TRACE, "   XOFF: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_X_OFFSET));
-  zxlogf(TRACE, "   YOFF: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_Y_OFFSET));
-  zxlogf(TRACE, "    64K: 0x%x", bochs_vbe_dispi_read(regs, BOCHS_VBE_DISPI_VIDEO_MEMORY_64K));
-}
-
-static zx_status_t bochs_vbe_bind(void* ctx, zx_device_t* dev) {
-  ddk::Pci pci(dev, "pci");
-  if (!pci.is_valid()) {
-    printf("bochs-vbe: failed to get pci protocol\n");
-    return ZX_ERR_INTERNAL;
+  if (hardware_supported_display_engine_api_version < kDriverRequiredDisplayEngineApiVersion) {
+    FDF_LOG(
+        ERROR,
+        "Hardware supported display engine API version (0x%04x) is too low. Driver requires API version 0x%04x",
+        hardware_supported_display_engine_api_version, kDriverRequiredDisplayEngineApiVersion);
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  std::optional<fdf::MmioBuffer> mmio;
-  // map register window
-  zx_status_t status = pci.MapMmio(2u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
-  if (status != ZX_OK) {
-    printf("bochs-vbe: failed to map pci config: %d\n", status);
-    return status;
-  }
+  bochs_vbe::DisplayFeatureControl display_feature_control =
+      bochs_vbe::DisplayFeatureControl::Get().FromValue(0);
+  display_feature_control.set_display_engine_enabled(false).WriteTo(&mmio_space);
 
-  set_hw_mode(mmio->get(), kDisplayWidth, kDisplayHeight, kBitsPerPixel);
+  bochs_vbe::DisplayBitsPerPixel::Get()
+      .FromValue(0)
+      .set_bits_per_pixel(bits_per_pixel)
+      .WriteTo(&mmio_space);
+  bochs_vbe::DisplayHorizontalResolution::Get().FromValue(0).set_pixels(width).WriteTo(&mmio_space);
+  bochs_vbe::DisplayVerticalResolution::Get().FromValue(0).set_pixels(height).WriteTo(&mmio_space);
+  bochs_vbe::VideoMemoryBankIndex::Get().FromValue(0).set_bank_index(0).WriteTo(&mmio_space);
 
-  return bind_simple_pci_display(dev, "bochs_vbe", 0u, kDisplayWidth, kDisplayHeight,
-                                 /*stride=*/kDisplayWidth, kDisplayFormat);
+  bochs_vbe::VirtualDisplayWidth::Get().FromValue(0).set_pixels(width).WriteTo(&mmio_space);
+  bochs_vbe::VirtualDisplayHeight::Get().FromValue(0).set_pixels(height).WriteTo(&mmio_space);
+  bochs_vbe::VirtualDisplayHorizontalOffset::Get().FromValue(0).set_pixels(0).WriteTo(&mmio_space);
+  bochs_vbe::VirtualDisplayVerticalOffset::Get().FromValue(0).set_pixels(0).WriteTo(&mmio_space);
+
+  display_feature_control.set_linear_frame_buffer_enabled(true)
+      .set_display_engine_enabled(true)
+      .WriteTo(&mmio_space);
+
+  return zx::ok();
 }
 
-static zx_driver_ops_t bochs_vbe_driver_ops = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = bochs_vbe_bind,
+void LogBochsDisplayEngineRegisters(fdf::MmioView mmio_space) {
+  FDF_LOG(INFO, "Bochs display engine current state:");
+  FDF_LOG(INFO, "%30s: 0x%04x", "Hardware supported API version",
+          bochs_vbe::DisplayEngineApiVersion::Get().ReadFrom(&mmio_space).version());
+  FDF_LOG(INFO, "%30s: %d x %d", "Physical resolution (px)",
+          bochs_vbe::DisplayHorizontalResolution::Get().ReadFrom(&mmio_space).pixels(),
+          bochs_vbe::DisplayVerticalResolution::Get().ReadFrom(&mmio_space).pixels());
+  FDF_LOG(INFO, "%30s: %d", "Color depth",
+          bochs_vbe::DisplayBitsPerPixel::Get().ReadFrom(&mmio_space).bits_per_pixel());
+
+  bochs_vbe::DisplayFeatureControl display_feature_control =
+      bochs_vbe::DisplayFeatureControl::Get().ReadFrom(&mmio_space);
+  FDF_LOG(INFO, "%30s: %s", "Video memory preserved on enable",
+          display_feature_control.video_memory_preserved_on_enable() ? "true" : "false");
+  FDF_LOG(INFO, "%30s: %s", "Linear frame buffer",
+          display_feature_control.linear_frame_buffer_enabled() ? "enabled" : "disabled");
+  FDF_LOG(INFO, "%30s: %s", "Pallete DAC mode",
+          display_feature_control.palette_dac_in_8bit_mode() ? "8-bit" : "6-bit");
+  FDF_LOG(INFO, "%30s: %s", "Read display capabilities",
+          display_feature_control.read_display_capabilities() ? "true" : "false");
+  FDF_LOG(INFO, "%30s: %s", "Display engine",
+          display_feature_control.display_engine_enabled() ? "enabled" : "disabled");
+
+  FDF_LOG(INFO, "%30s: %" PRIu16, "Video memory bank index",
+          bochs_vbe::VideoMemoryBankIndex::Get().ReadFrom(&mmio_space).bank_index());
+  FDF_LOG(INFO, "%30s: %d", "Virtual display width",
+          bochs_vbe::VirtualDisplayWidth::Get().ReadFrom(&mmio_space).pixels());
+  FDF_LOG(INFO, "%30s: %d", "Virtual display height",
+          bochs_vbe::VirtualDisplayHeight::Get().ReadFrom(&mmio_space).pixels());
+  FDF_LOG(INFO, "%30s: (%d, %d)", "Virtual display offset",
+          bochs_vbe::VirtualDisplayHorizontalOffset::Get().ReadFrom(&mmio_space).pixels(),
+          bochs_vbe::VirtualDisplayVerticalOffset::Get().ReadFrom(&mmio_space).pixels());
+  FDF_LOG(INFO, "%30s: %" PRId64, "Video memory size (bytes)",
+          bochs_vbe::VideoMemorySize::Get().ReadFrom(&mmio_space).GetVideoMemorySizeBytes());
+}
+
+// Driver for the QEMU Bochs-compatible display engine.
+class SimpleBochsDisplayDriver final : public SimpleDisplayDriver {
+ public:
+  explicit SimpleBochsDisplayDriver(fdf::DriverStartArgs start_args,
+                                    fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+
+  SimpleBochsDisplayDriver(const SimpleBochsDisplayDriver&) = delete;
+  SimpleBochsDisplayDriver(SimpleBochsDisplayDriver&&) = delete;
+  SimpleBochsDisplayDriver& operator=(const SimpleBochsDisplayDriver&) = delete;
+  SimpleBochsDisplayDriver& operator=(SimpleBochsDisplayDriver&&) = delete;
+
+  ~SimpleBochsDisplayDriver() override;
+
+  // SimpleDisplayDriver:
+  zx::result<> ConfigureHardware() override;
+  zx::result<fdf::MmioBuffer> GetFrameBufferMmioBuffer() override;
+  zx::result<DisplayProperties> GetDisplayProperties() override;
+
+ private:
+  zx::result<ddk::Pci> GetPciClient();
 };
 
-ZIRCON_DRIVER(bochs_vbe, bochs_vbe_driver_ops, "zircon", "0.1");
+SimpleBochsDisplayDriver::SimpleBochsDisplayDriver(
+    fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : SimpleDisplayDriver("bochs-vbe", std::move(start_args), std::move(driver_dispatcher)) {}
+
+SimpleBochsDisplayDriver::~SimpleBochsDisplayDriver() = default;
+
+zx::result<ddk::Pci> SimpleBochsDisplayDriver::GetPciClient() {
+  zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
+      incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
+  if (pci_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to PCI protocol: %s", pci_result.status_string());
+    return pci_result.take_error();
+  }
+  ddk::Pci pci(std::move(pci_result).value());
+  ZX_DEBUG_ASSERT(pci.is_valid());
+  return zx::ok(std::move(pci));
+}
+
+zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
+  zx::result<ddk::Pci> pci_result = GetPciClient();
+  if (pci_result.is_error()) {
+    return pci_result.take_error();
+  }
+  ddk::Pci pci = std::move(pci_result).value();
+
+  std::optional<fdf::MmioBuffer> mmio;
+
+  // The MMIO PCI BAR (base address register).
+  //
+  // The QEMU team, QEMU Standard VGA specs, section "PCI spec", version 9.0.0,
+  // Apr 2024.
+  // https://qemu.readthedocs.io/en/v9.0.0/specs/standard-vga.html#pci-spec
+  static constexpr uint32_t kQemuBochsRegisterMmioPciBarIndex = 2;
+  zx_status_t status =
+      pci.MapMmio(kQemuBochsRegisterMmioPciBarIndex, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to map PCI config: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  // QEMU Bochs-compatible display engine register MMIO addresses
+  //
+  // The Bochs VBE display API only specifies port IO (using
+  // `VBE_DISPI_IOPORT_INDEX` and `VBE_DISPI_IOPORT_DATA`) to read / write device
+  // registers.
+  //
+  // The QEMU Bochs VBE display implementation also supports memory-mapped IO
+  // for Bochs registers. The MMIO area 0x0500 - 0x0515 is used for Bochs
+  // registers.
+  //
+  // The QEMU team, QEMU Standard VGA specs, section "PCI spec", version 9.0.0,
+  // Apr 2024.
+  // https://qemu.readthedocs.io/en/v9.0.0/specs/standard-vga.html#pci-spec
+  static constexpr uint64_t kQemuBochsRegisterOffset = 0x500;
+  static constexpr size_t kQemuBochsRegisterSizeBytes = 0x16;
+
+  fdf::MmioView bochs_registers = mmio->View(kQemuBochsRegisterOffset, kQemuBochsRegisterSizeBytes);
+
+  zx::result<> setup_result =
+      SetUpBochsDisplayEngine(bochs_registers, kDisplayWidth, kDisplayHeight, kBitsPerPixel);
+  LogBochsDisplayEngineRegisters(bochs_registers);
+
+  return setup_result;
+}
+
+zx::result<fdf::MmioBuffer> SimpleBochsDisplayDriver::GetFrameBufferMmioBuffer() {
+  zx::result<ddk::Pci> pci_result = GetPciClient();
+  if (pci_result.is_error()) {
+    return pci_result.take_error();
+  }
+  ddk::Pci pci = std::move(pci_result).value();
+
+  std::optional<fdf::MmioBuffer> framebuffer_mmio;
+
+  // The framebuffer memory PCI BAR (base address register).
+  //
+  // The QEMU team, QEMU Standard VGA specs, section "PCI spec", version 9.0.0,
+  // Apr 2024.
+  // https://qemu.readthedocs.io/en/v9.0.0/specs/standard-vga.html#pci-spec
+  static constexpr uint32_t kFramebufferPciBarIndex = 0;
+  zx_status_t status =
+      pci.MapMmio(kFramebufferPciBarIndex, ZX_CACHE_POLICY_WRITE_COMBINING, &framebuffer_mmio);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to map PCI bar %" PRIu32 ": %s", kFramebufferPciBarIndex,
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  ZX_DEBUG_ASSERT(framebuffer_mmio.has_value());
+  return zx::ok(std::move(framebuffer_mmio).value());
+}
+
+zx::result<DisplayProperties> SimpleBochsDisplayDriver::GetDisplayProperties() {
+  static constexpr DisplayProperties kDisplayProperties = {
+      .width_px = kDisplayWidth,
+      .height_px = kDisplayHeight,
+      .row_stride_px = kDisplayWidth,
+      .pixel_format = kDisplayFormat,
+  };
+  return zx::ok(kDisplayProperties);
+}
+
+}  // namespace
+
+}  // namespace simple_display
+
+FUCHSIA_DRIVER_EXPORT(simple_display::SimpleBochsDisplayDriver);

@@ -89,18 +89,20 @@ void DisplayEngine::OnCoordinatorConnected() {
       .pixel_repetition = 0,
   };
 
-  const added_display_args_t added_display_args = {
+  const display_mode_t banjo_display_mode = display::ToBanjoDisplayMode(timing);
+
+  const raw_display_info_t banjo_display_info = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
-      .panel =
-          {
-              .mode = display::ToBanjoDisplayMode(timing),
-          },
-      .pixel_format_list = kSupportedFormats.data(),
-      .pixel_format_count = kSupportedFormats.size(),
+      .preferred_modes_list = &banjo_display_mode,
+      .preferred_modes_count = 1,
+      .edid_bytes_list = nullptr,
+      .edid_bytes_count = 0,
+      .eddc_client = {.ops = nullptr, .ctx = nullptr},
+      .pixel_formats_list = kSupportedFormats.data(),
+      .pixel_formats_count = kSupportedFormats.size(),
   };
 
-  coordinator_events_.OnDisplayAdded(added_display_args);
+  coordinator_events_.OnDisplayAdded(banjo_display_info);
 }
 
 zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForImage(
@@ -435,7 +437,7 @@ DisplayEngine::DisplayEngine(zx_device_t* bus_device,
   ZX_DEBUG_ASSERT(gpu_device_);
 }
 
-DisplayEngine::~DisplayEngine() { io_buffer_release(&gpu_req_); }
+DisplayEngine::~DisplayEngine() = default;
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
@@ -615,17 +617,6 @@ zx_status_t DisplayEngine::Init() {
     zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
     return set_debug_status.error().status();
   }
-
-  // Allocate a GPU request
-  zx_status_t status = io_buffer_init(&gpu_req_, gpu_device_->bti().get(),
-                                      zx_system_get_page_size(), IO_BUFFER_RW | IO_BUFFER_CONTIG);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate command buffers: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  zxlogf(TRACE, "Allocated command buffer at virtual address %p, physical address 0x%016" PRIx64,
-         io_buffer_virt(&gpu_req_), io_buffer_phys(&gpu_req_));
 
   return ZX_OK;
 }

@@ -5,17 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_
 
-#include <lib/ddk/driver.h>
-#include <zircon/compiler.h>
-#include <zircon/errors.h>
-
-#include <fbl/mutex.h>
-
-#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-
-#if __cplusplus
-
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -29,29 +18,38 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
 
 #include <atomic>
 #include <memory>
 
-#include <ddktl/device.h>
+#include <fbl/mutex.h>
+
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+
+namespace simple_display {
+
+struct DisplayProperties {
+  int32_t width_px;
+  int32_t height_px;
+  int32_t row_stride_px;
+  fuchsia_images2::wire::PixelFormat pixel_format;
+};
 
 class SimpleDisplay;
-using DeviceType = ddk::Device<SimpleDisplay>;
 using HeapServer = fidl::WireServer<fuchsia_hardware_sysmem::Heap>;
 using BufferKey = std::pair<uint64_t, uint32_t>;
-class SimpleDisplay : public DeviceType,
-                      public HeapServer,
-                      public ddk::DisplayControllerImplProtocol<SimpleDisplay, ddk::base_protocol> {
+class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtocol<SimpleDisplay> {
  public:
-  SimpleDisplay(zx_device_t* parent,
-                fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
+  SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                 fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                fdf::MmioBuffer framebuffer_mmio, uint32_t width, uint32_t height, uint32_t stride,
-                fuchsia_images2::wire::PixelFormat format);
+                fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties);
   ~SimpleDisplay() = default;
 
-  void DdkRelease();
-  zx_status_t Bind(const char* name, std::unique_ptr<SimpleDisplay>* controller_ptr);
+  // Initialization logic not suitable in the constructor.
+  zx::result<> Initialize();
 
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
   void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
@@ -63,7 +61,7 @@ class SimpleDisplay : public DeviceType,
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
       uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
+  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* banjo_image_metadata,
                                                uint64_t banjo_driver_buffer_collection_id,
                                                uint32_t index, uint64_t* out_image_handle);
   zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
@@ -102,7 +100,11 @@ class SimpleDisplay : public DeviceType,
     return buffer_collections_;
   }
 
+  display_controller_impl_protocol_t GetProtocol();
+
  private:
+  bool IsBanjoDisplayConfigSupported(const display_config_t& banjo_display_config);
+
   void OnPeriodicVSync();
 
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem_;
@@ -130,10 +132,7 @@ class SimpleDisplay : public DeviceType,
   display::ConfigStamp config_stamp_ TA_GUARDED(mtx_) = display::kInvalidConfigStamp;
 
   const fdf::MmioBuffer framebuffer_mmio_;
-  const uint32_t width_;
-  const uint32_t height_;
-  const uint32_t stride_;
-  const fuchsia_images2::wire::PixelFormat format_;
+  const DisplayProperties properties_;
 
   const fuchsia_images2::wire::PixelFormatModifier kFormatModifier =
       fuchsia_images2::wire::PixelFormatModifier::kLinear;
@@ -143,19 +142,6 @@ class SimpleDisplay : public DeviceType,
   ddk::DisplayControllerInterfaceProtocolClient intf_;
 };
 
-#endif  // __cplusplus
-
-__BEGIN_CDECLS
-zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
-                                    uint32_t width, uint32_t height, uint32_t stride,
-                                    fuchsia_images2::wire::PixelFormat format);
-
-zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uint32_t bar,
-                                         uint32_t width, uint32_t height, uint32_t stride,
-                                         fuchsia_images2::wire::PixelFormat format);
-
-zx_status_t bind_simple_pci_display_bootloader(zx_device_t* dev, const char* name, uint32_t bar,
-                                               bool use_fidl);
-__END_CDECLS
+}  // namespace simple_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_

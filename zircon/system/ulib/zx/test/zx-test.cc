@@ -16,6 +16,7 @@
 #include <lib/zx/port.h>
 #include <lib/zx/process.h>
 #include <lib/zx/profile.h>
+#include <lib/zx/result.h>
 #include <lib/zx/socket.h>
 #include <lib/zx/suspend_token.h>
 #include <lib/zx/thread.h>
@@ -56,7 +57,9 @@ TEST(ZxTestCase, HandleClose) {
   zx_handle_t raw_event;
   ASSERT_OK(zx_event_create(0u, &raw_event));
   ASSERT_OK(validate_handle(raw_event));
-  { zx::handle handle(raw_event); }
+  {
+    zx::handle handle(raw_event);
+  }
   // Make sure the handle was closed.
   ASSERT_EQ(validate_handle(raw_event), ZX_ERR_BAD_HANDLE);
 }
@@ -751,6 +754,54 @@ TEST(ZxTestCase, VmoContentSize) {
   EXPECT_EQ(retrieved_size, new_size);
 }
 
+class IobMapping {
+ public:
+  ~IobMapping() { Unmap(); }
+
+  IobMapping(const IobMapping&) = delete;
+  IobMapping& operator=(const IobMapping&) = delete;
+
+  IobMapping& operator=(IobMapping&& other) {
+    this->Unmap();
+    std::swap(addr_, other.addr_);
+    std::swap(region_len_, other.region_len_);
+    return *this;
+  }
+  IobMapping(IobMapping&& other) { *this = std::move(other); }
+
+  static zx::result<IobMapping> Create(zx_vm_option_t options, size_t vmar_offset,
+                                       const zx::iob& iob_handle, uint32_t region_index,
+                                       uint64_t region_offset, size_t region_len) {
+    zx_vaddr_t addr{0};
+    zx_status_t res = zx::vmar::root_self()->map_iob(options, vmar_offset, iob_handle, region_index,
+                                                     region_offset, region_len, &addr);
+    if (res != ZX_OK) {
+      return zx::error(res);
+    }
+
+    return zx::ok(IobMapping{addr, region_len});
+  }
+
+  zx_status_t Unmap() {
+    if (addr_ != 0) {
+      zx_status_t res = zx::vmar::root_self()->unmap(addr_, region_len_);
+      addr_ = 0;
+      region_len_ = 0;
+      return res;
+    }
+    return ZX_ERR_BAD_STATE;
+  }
+
+  zx_vaddr_t addr() const { return addr_; }
+  size_t region_len() const { return region_len_; }
+
+ private:
+  IobMapping(zx_vaddr_t addr, size_t region_len) : addr_(addr), region_len_(region_len) {}
+
+  zx_vaddr_t addr_{0};
+  size_t region_len_{0};
+};
+
 TEST(ZxTestCase, IobCreateAndMap) {
   zx::iob iob;
   zx_iob_region_t regions[2] = {
@@ -781,11 +832,12 @@ TEST(ZxTestCase, IobCreateAndMap) {
   ASSERT_OK(validate_handle(ep0.get()));
   ASSERT_OK(validate_handle(ep1.get()));
 
-  uintptr_t out;
-  ASSERT_OK(zx::vmar::root_self()->map_iob(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0u, ep0, 0, 0,
-                                           ZX_PAGE_SIZE, &out));
-  ASSERT_OK(zx::vmar::root_self()->map_iob(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0u, ep1, 1, 0,
-                                           ZX_PAGE_SIZE, &out));
+  zx::result<IobMapping> mapping0 =
+      IobMapping::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0u, ep0, 0, 0, ZX_PAGE_SIZE);
+  ASSERT_OK(mapping0.status_value());
+  zx::result<IobMapping> mapping1 =
+      IobMapping::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0u, ep1, 1, 0, ZX_PAGE_SIZE);
+  ASSERT_OK(mapping1.status_value());
 }
 
 }  // namespace

@@ -10,13 +10,13 @@ use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon_status as zx};
 /// The error type returned by bedrock operations.
 #[derive(Debug, Error, Clone)]
 pub enum RouterError {
-    #[error("could not find capability: {0}")]
+    #[error("{0}")]
     NotFound(Arc<dyn Explain>),
 
     #[error("invalid arguments")]
     InvalidArgs,
 
-    #[error("unknown error")]
+    #[error("unknown")]
     Unknown,
 }
 

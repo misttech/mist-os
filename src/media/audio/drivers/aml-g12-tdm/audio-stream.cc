@@ -83,6 +83,9 @@ void AmlG12TdmStream::InitDaiFormats() {
       case metadata::DaiType::Tdm3:
         dai_formats_[i].frame_format = FrameFormat::TDM3;
         break;
+      case metadata::DaiType::Custom:
+        ZX_ASSERT(0);  // Unsupported.
+        break;
     }
   }
 }
@@ -351,6 +354,9 @@ zx_status_t AmlG12TdmStream::Init() {
       break;
     case metadata::DaiType::Tdm3:
       tdm_type = "tdm3";
+      break;
+    case metadata::DaiType::Custom:
+      ZX_ASSERT(0);  // Unsupported.
       break;
   }
   snprintf(device_name_, sizeof(device_name_), "%s-audio-%s-%s", prod_name_, tdm_type, in_out);

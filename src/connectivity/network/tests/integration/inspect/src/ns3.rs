@@ -10,23 +10,24 @@ mod common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
-use std::num::NonZeroU64;
+use std::num::{NonZeroU16, NonZeroU64};
 use std::time::Duration;
 
 use assert_matches::assert_matches;
-use {
-    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_posix_socket as fposix_socket,
-};
-
+use const_unwrap::const_unwrap_option;
 use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
-use net_types::ip::{IpAddress, IpInvariant, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
 use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
+use packet_formats::ip::IpProto;
 use test_case::test_case;
+use {
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
+};
 
 enum TcpSocketState {
     Unbound,
@@ -36,11 +37,12 @@ enum TcpSocketState {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(TcpSocketState::Unbound; "unbound")]
 #[test_case(TcpSocketState::Bound; "bound")]
 #[test_case(TcpSocketState::Listener; "listener")]
 #[test_case(TcpSocketState::Connected; "connected")]
-async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: TcpSocketState) {
+async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
         sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
@@ -109,29 +111,24 @@ async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: Tcp
         TcpSocketState::Unbound | TcpSocketState::Bound => {}
         TcpSocketState::Listener => tcp_socket.listen(BACKLOG.try_into().unwrap()).expect("listen"),
         TcpSocketState::Connected => {
-            let IpInvariant((default_subnet, peer_addr)) = I::map_ip(
-                (),
-                |()| {
-                    IpInvariant((
-                        fidl_subnet!("0.0.0.0/0"),
-                        std::net::SocketAddr::from(std::net::SocketAddrV4::new(
-                            std_ip_v4!("192.0.2.2"),
-                            REMOTE_PORT,
-                        )),
-                    ))
-                },
-                |()| {
-                    IpInvariant((
-                        fidl_subnet!("::/0"),
-                        std::net::SocketAddr::from(std::net::SocketAddrV6::new(
-                            std_ip_v6!("2001:db8::2"),
-                            REMOTE_PORT,
-                            0,
-                            0,
-                        )),
-                    ))
-                },
-            );
+            let (default_subnet, peer_addr) = match I::VERSION {
+                IpVersion::V4 => (
+                    fidl_subnet!("0.0.0.0/0"),
+                    std::net::SocketAddr::from(std::net::SocketAddrV4::new(
+                        std_ip_v4!("192.0.2.2"),
+                        REMOTE_PORT,
+                    )),
+                ),
+                IpVersion::V6 => (
+                    fidl_subnet!("::/0"),
+                    std::net::SocketAddr::from(std::net::SocketAddrV6::new(
+                        std_ip_v6!("2001:db8::2"),
+                        REMOTE_PORT,
+                        0,
+                        0,
+                    )),
+                ),
+            };
             // Add a default route to the device, allowing the connection to
             // begin. Note that because there is no peer end to accept the
             // connection we setup the socket as non-blocking, and give a large
@@ -156,8 +153,7 @@ async fn inspect_tcp_sockets<I: net_types::ip::Ip>(name: &str, socket_state: Tcp
 
     // NB: The sockets are keyed by an opaque debug identifier; get that here.
     let sockets = data.get_child("Sockets").unwrap();
-    assert_eq!(sockets.children.len(), 1);
-    let sock_name = sockets.children[0].name.clone();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
 
     match (I::VERSION, socket_state) {
         (IpVersion::V4, TcpSocketState::Unbound) => {
@@ -291,6 +287,7 @@ impl TestIpExt for Ipv6 {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(
     fposix_socket::DatagramSocketProtocol::Udp, SocketState::Bound;
     "udp_bound"
@@ -307,7 +304,7 @@ impl TestIpExt for Ipv6 {
     fposix_socket::DatagramSocketProtocol::IcmpEcho, SocketState::Connected;
     "icmp_connected"
 )]
-async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
+async fn inspect_datagram_sockets<I: TestIpExt>(
     name: &str,
     proto: fposix_socket::DatagramSocketProtocol,
     socket_state: SocketState,
@@ -355,8 +352,7 @@ async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
     println!("Got inspect data: {:#?}", data);
     // NB: The sockets are keyed by an opaque debug identifier.
     let sockets = data.get_child("Sockets").unwrap();
-    assert_eq!(sockets.children.len(), 1);
-    let sock_name = sockets.children[0].name.clone();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         Sockets: {
             sock_name => {
@@ -364,6 +360,57 @@ async fn inspect_datagram_sockets<I: net_types::ip::Ip + TestIpExt>(
                 RemoteAddress: want_remote,
                 TransportProtocol: want_proto,
                 NetworkProtocol: I::NAME,
+            },
+        }
+    })
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
+    let _raw_socket = realm
+        .raw_socket(
+            I::DOMAIN,
+            fposix_socket_raw::ProtocolAssociation::Associated(u8::from(IpProto::Tcp)),
+        )
+        .await
+        .expect("create raw socket");
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    // NB: The sockets are keyed by an opaque debug identifier.
+    let sockets = data.get_child("Sockets").unwrap();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Sockets: {
+            sock_name => {
+                LocalAddress: "[NOT BOUND]",
+                RemoteAddress: "[NOT CONNECTED]",
+                TransportProtocol: "TCP",
+                NetworkProtocol: I::NAME,
+                BoundDevice: "None",
+                IcmpFilter: "None",
+                Counters: {
+                    Rx: {
+                        DeliveredPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                        IcmpPacketsFiltered: 0u64,
+                    },
+                    Tx: {
+                        SentPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                    },
+                },
             },
         }
     })
@@ -497,7 +544,11 @@ async fn inspect_devices(name: &str) {
                         "127.0.0.1/8": {
                             ValidUntil: "infinite",
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": false,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 IPv6: {
                     Addresses: {
@@ -507,7 +558,11 @@ async fn inspect_devices(name: &str) {
                             Deprecated: false,
                             Assigned: true,
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": false,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 Counters: {
                     Rx: {
@@ -545,7 +600,11 @@ async fn inspect_devices(name: &str) {
                         "192.168.0.1/24": {
                             ValidUntil: "infinite"
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": true,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 IPv6: {
                     "Addresses": {
@@ -557,7 +616,11 @@ async fn inspect_devices(name: &str) {
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,
                         }
-                    }
+                    },
+                    Configuration: {
+                        "GmpEnabled": true,
+                        "ForwardingEnabled": false,
+                    },
                 },
                 NetworkDevice: {
                     MacAddress: "02:00:00:00:00:01",
@@ -791,6 +854,30 @@ async fn inspect_counters(name: &str) {
                     CacheFull: 0u64,
                 },
             },
+            "RawIpSockets": {
+                "V4": {
+                    "Rx": {
+                        DeliveredPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                        IcmpPacketsFiltered: 0u64,
+                    },
+                    "Tx": {
+                        SentPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                    },
+                },
+                "V6": {
+                    "Rx": {
+                        DeliveredPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                        IcmpPacketsFiltered: 0u64,
+                    },
+                    "Tx": {
+                        SentPackets: 0u64,
+                        ChecksumErrors: 0u64,
+                    },
+                },
+            },
             "UDP": {
                 "V4": {
                     "Rx": {
@@ -915,8 +1002,8 @@ async fn inspect_counters(name: &str) {
 async fn inspect_filtering_state(name: &str) {
     use fnet_filter_ext::{
         Action, AddressMatcher, AddressMatcherType, Change, Controller, ControllerId, Domain,
-        InstalledIpRoutine, InterfaceMatcher, IpHook, Matchers, Namespace, NamespaceId,
-        PortMatcher, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
+        InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
+        NamespaceId, NatHook, PortMatcher, Resource, Routine, RoutineId, RoutineType, Rule, RuleId,
         TransportProtocolMatcher,
     };
 
@@ -940,20 +1027,36 @@ async fn inspect_filtering_state(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Filtering State": {
             "IPv4": {
-                "ingress": {
-                    "routines": 0u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 0u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
                 "uninstalled": {
                     "routines": 0u64,
@@ -963,23 +1066,39 @@ async fn inspect_filtering_state(name: &str) {
                     "table_limit_hits": 0u64,
                     "num_connections": 0u64,
                     "connections": {},
-                }
+                },
             },
             "IPv6": {
-                "ingress": {
-                    "routines": 0u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 0u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 0u64,
+                    },
                 },
                 "uninstalled": {
                     "routines": 0u64,
@@ -989,14 +1108,17 @@ async fn inspect_filtering_state(name: &str) {
                     "table_limit_hits": 0u64,
                     "num_connections": 0u64,
                     "connections": {},
-                }
+                },
             },
-        }
+        },
     });
+
+    const NONZERO_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
 
     let namespace = NamespaceId(String::from("test-namespace"));
     let ingress_routine = RoutineId { namespace: namespace.clone(), name: String::from("ingress") };
     let egress_routine = RoutineId { namespace: namespace.clone(), name: String::from("egress") };
+    let nat_routine = RoutineId { namespace: namespace.clone(), name: String::from("nat") };
     let target_routine_name = String::from("target");
     controller
         .push_changes(
@@ -1052,6 +1174,24 @@ async fn inspect_filtering_state(name: &str) {
                     },
                     action: Action::Jump(target_routine_name),
                 }),
+                Resource::Routine(Routine {
+                    id: nat_routine.clone(),
+                    routine_type: RoutineType::Nat(Some(InstalledNatRoutine {
+                        hook: NatHook::LocalEgress,
+                        priority: 0,
+                    })),
+                }),
+                Resource::Rule(Rule {
+                    id: RuleId { routine: nat_routine, index: 0 },
+                    matchers: Matchers {
+                        transport_protocol: Some(TransportProtocolMatcher::Udp {
+                            src_port: None,
+                            dst_port: None,
+                        }),
+                        ..Default::default()
+                    },
+                    action: Action::Redirect { dst_port: Some(NONZERO_PORT..=NONZERO_PORT) },
+                }),
             ]
             .into_iter()
             .map(Change::Create)
@@ -1070,52 +1210,81 @@ async fn inspect_filtering_state(name: &str) {
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Filtering State": {
             "IPv4": {
-                "ingress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 2u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 1u64,
                         "0": {
-                            "matchers": {
-                                "transport_protocol": "TransportProtocolMatcher { \
-                                    proto: TCP, \
-                                    src_port: None, \
-                                    dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
-                                }",
+                            "rules": 2u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: TCP, \
+                                        src_port: None, \
+                                        dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
+                                    }",
+                                },
+                                "action": "Drop",
                             },
-                            "action": "Drop",
+                            "1": {
+                                "matchers": {
+                                    "in_interface": "Id(1)",
+                                },
+                                "action": "Drop",
+                            },
                         },
-                        "1": {
-                            "matchers": {
-                                "in_interface": "Id(1)",
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 1u64,
+                        "0": {
+                            "rules": 1u64,
+                            "0": {
+                                // Note that this rule is only included in the IPv4 filtering state
+                                // because it has an address matcher with an IPv4 subnet.
+                                "matchers": {
+                                    "dst_address": "AddressMatcher { \
+                                        matcher: Subnet(127.0.0.0/8), \
+                                        invert: false \
+                                    }",
+                                },
+                                "action": "Jump(UninstalledRoutine(2))",
                             },
-                            "action": "Drop",
                         },
                     },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 1u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 1u64,
                         "0": {
-                            // Note that this rule is only included in the IPv4 filtering state
-                            // because it has an address matcher with an IPv4 subnet.
-                            "matchers": {
-                                "dst_address": "AddressMatcher { \
-                                    matcher: Subnet(127.0.0.0/8), \
-                                    invert: false \
-                                }",
+                            "rules": 1u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: UDP, \
+                                        src_port: None, \
+                                        dst_port: None \
+                                    }",
+                                },
+                                "action": "Redirect { dst_port: Some(8080..=8080) }",
                             },
-                            "action": "Jump(UninstalledRoutine(2))",
                         },
+                    },
+                    "egress": {
+                        "routines": 0u64,
                     },
                 },
                 // Because the uninstalled routine is only jumped to from an IPv4 routine, it
@@ -1134,41 +1303,70 @@ async fn inspect_filtering_state(name: &str) {
                 }
             },
             "IPv6": {
-                "ingress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 2u64,
+                "IP": {
+                    "ingress": {
+                        "routines": 1u64,
                         "0": {
-                            "matchers": {
-                                "transport_protocol": "TransportProtocolMatcher { \
-                                    proto: TCP, \
-                                    src_port: None, \
-                                    dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
-                                }",
+                            "rules": 2u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: TCP, \
+                                        src_port: None, \
+                                        dst_port: Some(PortMatcher { range: 22..=22, invert: false }) \
+                                    }",
+                                },
+                                "action": "Drop",
                             },
-                            "action": "Drop",
+                            "1": {
+                                "matchers": {
+                                    "in_interface": "Id(1)",
+                                },
+                                "action": "Drop",
+                            },
                         },
-                        "1": {
-                            "matchers": {
-                                "in_interface": "Id(1)",
-                            },
-                            "action": "Drop",
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "forwarding": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 0u64,
+                    },
+                    "egress": {
+                        "routines": 1u64,
+                        "0": {
+                            "rules": 0u64,
                         },
                     },
                 },
-                "local_ingress": {
-                    "routines": 0u64,
-                },
-                "forwarding": {
-                    "routines": 0u64,
-                },
-                "local_egress": {
-                    "routines": 0u64,
-                },
-                "egress": {
-                    "routines": 1u64,
-                    "0": {
-                        "rules": 0u64,
+                "NAT": {
+                    "ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_ingress": {
+                        "routines": 0u64,
+                    },
+                    "local_egress": {
+                        "routines": 1u64,
+                        "0": {
+                            "rules": 1u64,
+                            "0": {
+                                "matchers": {
+                                    "transport_protocol": "TransportProtocolMatcher { \
+                                        proto: UDP, \
+                                        src_port: None, \
+                                        dst_port: None \
+                                    }",
+                                },
+                                "action": "Redirect { dst_port: Some(8080..=8080) }",
+                            },
+                        },
+                    },
+                    "egress": {
+                        "routines": 0u64,
                     },
                 },
                 "uninstalled": {

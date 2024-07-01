@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_element as element;
 use fuchsia_component::client::connect_to_protocol;
-use tracing::{info, warn};
+use tracing::info;
 
 async fn propose_element(
     element_manager: element::ManagerProxy,
     config: element_launcher_config::Config,
-) {
-    element_manager
+) -> Result<(), Error> {
+    let r: Result<Result<(), element::ManagerError>, fidl::Error> = element_manager
         .propose_element(
             element::Spec {
                 component_url: Some(config.main_element_url),
@@ -25,23 +26,25 @@ async fn propose_element(
             },
             None,
         )
-        .await
-        .expect("Failed to call ProposeElement.")
-        .expect("Failed to propose element.");
+        .await;
+    match r {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => Err(anyhow!("manager error: {e:?}")),
+        Err(e) => Err(anyhow!("fidl error: {e}")),
+    }
 }
 
 #[fuchsia::main(logging = true)]
-async fn main() {
+async fn main() -> Result<(), Error> {
     info!("element_launcher is starting.");
     let config = element_launcher_config::Config::take_from_startup_handle();
     if config.main_element_url.is_empty() {
-        warn!("element_launcher was started without a main_element_url; quitting.");
-        return;
+        return Err(anyhow!("element_launcher was started without a main_element_url; quitting."));
     }
 
     let element_manager = connect_to_protocol::<element::ManagerMarker>()
-        .expect("failed to connect to fuchsia.element.Manager");
-    propose_element(element_manager, config).await;
+        .context("failed to connect to fuchsia.element.Manager")?;
+    propose_element(element_manager, config).await.context("failed to propose element")
 }
 
 #[cfg(test)]
@@ -68,7 +71,9 @@ mod tests {
                 }
             };
         };
-        let propose_fut = propose_element(element_manager, config);
+        let propose_fut = async {
+            propose_element(element_manager, config).await.unwrap();
+        };
         futures::join!(propose_fut, stream_fut);
     }
 }

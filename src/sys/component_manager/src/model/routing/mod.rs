@@ -179,9 +179,6 @@ pub(super) async fn delete_storage(routed_storage: RoutedStorage) -> Result<(), 
         .await
 }
 
-static ROUTE_ERROR_HELP: &'static str = "To learn more, see \
-https://fuchsia.dev/go/components/connect-errors";
-
 /// Sets an epitaph on `server_end` for a capability routing failure, and logs the error. Logs a
 /// failure to route a capability. Formats `err` as a `String`, but elides the type if the error is
 /// a `RoutingError`, the common case.
@@ -193,13 +190,14 @@ pub async fn report_routing_failure(
     target
         .with_logger_as_default(|| {
             let availability = request.availability().unwrap_or(Availability::Required);
+            let moniker = &target.moniker;
             match availability {
                 Availability::Required => {
                     // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
                     warn!(
-                    "{availability} {request} was not available for target component `{}`: {}\n{}",
-                    &target.moniker, &err, ROUTE_ERROR_HELP
-                );
+                        "{request} was not available for target `{moniker}`:\n\t\
+                        {err}\n\tFor more, run `ffx component doctor {moniker}`",
+                    );
                 }
                 Availability::Optional
                 | Availability::SameAsTarget
@@ -216,9 +214,9 @@ pub async fn report_routing_failure(
                     // `Required` capabilities to `error!()`, consider also
                     // changing this log for `Optional` to `warn!()`.
                     info!(
-                    "{availability} {request} was not available for target component `{}`: {}\n{}",
-                    &target.moniker, &err, ROUTE_ERROR_HELP
-                );
+                        "{availability} {request} was not available for target `{moniker}`:\n\t\
+                        {err}\n\tFor more, run `ffx component doctor {moniker}`",
+                    );
                 }
             }
         })

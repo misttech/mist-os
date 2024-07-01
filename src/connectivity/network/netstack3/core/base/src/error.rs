@@ -11,12 +11,12 @@ use thiserror::Error;
 /// Error when something is not supported.
 #[derive(Debug, PartialEq, Eq, Error, GenericOverIp)]
 #[generic_over_ip()]
-#[error("Not supported")]
+#[error("not supported")]
 pub struct NotSupportedError;
 
 /// Error when something exists unexpectedly.
 #[derive(Debug, Error, PartialEq, Eq)]
-#[error("Already exists")]
+#[error("already exists")]
 pub struct ExistsError;
 
 impl From<ExistsError> for SocketError {
@@ -28,7 +28,7 @@ impl From<ExistsError> for SocketError {
 /// Error when something unexpectedly doesn't exist, such as trying to
 /// remove an element when the element is not present.
 #[derive(Debug, Error, PartialEq, Eq)]
-#[error("Not found")]
+#[error("not found")]
 pub struct NotFoundError;
 
 /// Error type for errors common to local addresses.
@@ -48,19 +48,19 @@ pub enum LocalAddressError {
     AddressMismatch,
 
     /// The requested address/socket pair is in use.
-    #[error("Address in use")]
+    #[error("address in use")]
     AddressInUse,
 
     /// The address cannot be used because of its zone.
     ///
     /// TODO(https://fxbug.dev/42054471): Make this an IP socket error once UDP
     /// sockets contain IP sockets.
-    #[error("{}", _0)]
+    #[error(transparent)]
     Zone(#[from] ZonedAddressError),
 
     /// The requested address is mapped (i.e. an IPv4-mapped-IPv6 address), but
     /// the socket is not dual-stack enabled.
-    #[error("Address is mapped")]
+    #[error("address is mapped")]
     AddressUnexpectedlyMapped,
 }
 
@@ -87,18 +87,18 @@ pub enum RemoteAddressError {
 /// Error type for connection errors.
 #[derive(Error, Debug, PartialEq)]
 pub enum SocketError {
-    #[error("{}", _0)]
     /// Errors related to the local address.
+    #[error(transparent)]
     Local(#[from] LocalAddressError),
 
-    #[error("{}", _0)]
     /// Errors related to the remote address.
+    #[error(transparent)]
     Remote(RemoteAddressError),
 }
 
 /// Error when link address resolution failed for a neighbor.
 #[derive(Error, Debug, PartialEq)]
-#[error("Address resolution failed")]
+#[error("address resolution failed")]
 pub struct AddressResolutionFailed;
 
 /// An error and a serializer.

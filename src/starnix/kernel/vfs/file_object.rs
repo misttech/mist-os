@@ -18,7 +18,9 @@ use crate::vfs::{
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
-use starnix_logging::{impossible_error, trace_duration, track_stub, CATEGORY_STARNIX_MM};
+use starnix_logging::{
+    impossible_error, log_error, trace_duration, track_stub, CATEGORY_STARNIX_MM,
+};
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, FileOpsToHandle, LockBefore, LockEqualOrBefore, Locked, Mutex,
     Unlocked, WriteOps,
@@ -1677,6 +1679,22 @@ impl FileObject {
 
     pub fn unregister_epfd(&self, fd: FdNumber) {
         self.epoll_files.lock().remove(&fd);
+    }
+
+    /// Called when the underneath `FileOps` is waken up by the power framework.
+    pub fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel) {
+        // Activate associated wake leases in registered epfd.
+        for epfd in self.epoll_files.lock().iter() {
+            if let Ok(file) = current_task.files.get(*epfd) {
+                if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
+                    if let Some(weak_handle) = self.weak_handle.upgrade() {
+                        if let Err(e) = epoll_file.activate_lease(&weak_handle, baton_lease) {
+                            log_error!("Failed to activate wake lease in epoll control file: {e}");
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

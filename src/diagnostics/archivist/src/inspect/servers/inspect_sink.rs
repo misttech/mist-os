@@ -8,12 +8,12 @@ use crate::identity::ComponentIdentity;
 use crate::inspect::container::InspectHandle;
 use crate::inspect::repository::InspectRepository;
 use anyhow::Error;
-use fidl::endpoints::ControlHandle;
+use fidl::endpoints::{ControlHandle, Responder};
 use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 pub struct InspectSinkServer {
@@ -76,6 +76,14 @@ impl InspectSinkServer {
                     ..
                 } => {
                     debug!(name, %component, "InspectSink/Publish without a tree");
+                }
+                finspect::InspectSinkRequest::Escrow { control_handle, .. } => {
+                    error!("https://fxbug.dev/346589931: Escrowing inspect is not yet implemented");
+                    control_handle.shutdown();
+                }
+                finspect::InspectSinkRequest::FetchEscrow { responder, .. } => {
+                    error!("https://fxbug.dev/346589931: Escrowing inspect is not yet implemented");
+                    responder.control_handle().shutdown();
                 }
                 finspect::InspectSinkRequest::_UnknownMethod {
                     ordinal,
@@ -315,7 +323,7 @@ mod tests {
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -349,7 +357,7 @@ mod tests {
         test.assert(&identity, [koid0, koid1], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, ..} => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -358,7 +366,7 @@ mod tests {
 
             assert_matches!(
                 &handles[1],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        double: 1.24,
@@ -384,7 +392,7 @@ mod tests {
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -399,7 +407,7 @@ mod tests {
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, ..} => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -437,7 +445,7 @@ mod tests {
         test.assert(&identities[0], [koid_component_0], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        int: 0i64,
@@ -449,7 +457,7 @@ mod tests {
         test.assert(&identities[1], [koid_component_1], |handles| async move {
             assert_matches!(
                 &handles[0],
-                InspectHandle::Tree(tree, _) => {
+                InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
                        is_insp2: true,

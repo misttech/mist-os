@@ -133,7 +133,6 @@ package(
 )
 
 """
-        dir_names = []
         for bazel_name, entry in name_map.items():
             file_links = entry.get("output_files", [])
             for file in file_links:
@@ -169,6 +168,10 @@ filegroup(
     name = "{name}",
     srcs = glob(["{ninja_path}/**"], exclude_directories=1),
 )
+alias(
+    name = "{name}.directory",
+    actual = "{ninja_path}",
+)
 '''.format(label = entry["generator_label"], name = bazel_name, ninja_path = link_path)
 
                 # Create //_files/{ninja_path} as a symlink to the real path.
@@ -176,13 +179,6 @@ filegroup(
 
                 # Create //{gn_dir}/{bazel_name}.directory as a symlink to //_files/{ninja_path}
                 repo_ctx.symlink(link_path, "%s/%s.directory" % (bazel_package, bazel_name))
-                dir_names.append(bazel_name + ".directory")
-
-        if dir_names:
-            content += "exports_files([\n"
-            for dir in dir_names:
-                content += "   \"%s\",\n" % dir
-            content += "])\n"
 
         repo_ctx.file("%s/BUILD.bazel" % bazel_package, content, executable = False)
         repo_ctx.symlink(build_dir_name, "%s/_files" % bazel_package)

@@ -24,8 +24,8 @@ use crate::internal::device::config::{
     IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
 };
 use crate::internal::device::state::{
-    Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddressState,
-    Lifetime,
+    IpDeviceConfiguration, Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig,
+    Ipv6AddressState, Lifetime,
 };
 use crate::internal::device::{
     self, AddressRemovedReason, DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _,
@@ -302,7 +302,14 @@ where
                     });
                 }
             })
-        })
+        });
+        inspector.record_child("Configuration", |inspector| {
+            self.core_ctx().with_ip_device_configuration(device, |config, _core_ctx| {
+                let IpDeviceConfiguration { gmp_enabled, forwarding_enabled } = config.as_ref();
+                inspector.record_bool("GmpEnabled", *gmp_enabled);
+                inspector.record_bool("ForwardingEnabled", *forwarding_enabled);
+            })
+        });
     }
 }
 /// The device IP API interacting with all IP versions.
@@ -495,7 +502,7 @@ pub enum AddIpAddrSubnetError {
 #[derive(Error, Debug, PartialEq)]
 pub enum SetIpAddressPropertiesError {
     /// The address we tried to set properties on was not found.
-    #[error("{0}")]
+    #[error(transparent)]
     NotFound(#[from] NotFoundError),
 
     /// We tried to set properties on a non-manually-configured address.

@@ -36,8 +36,6 @@ toc:
     path: /reference/tools/sdk/bootserver.md
   - title: "fserve"
     path: /reference/tools/sdk/fserve.md
-  - title: "fssh"
-    path: /reference/tools/sdk/fssh.md
   - title: "funnel"
     path: /reference/tools/sdk/funnel.md
   - title: "minfs"

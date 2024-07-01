@@ -292,6 +292,10 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            fio::DirectoryRequest::Open3 { .. } => {
+                todo!()
+            }
         }
         Ok(ConnectionState::Alive)
     }

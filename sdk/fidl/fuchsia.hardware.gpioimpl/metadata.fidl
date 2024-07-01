@@ -23,11 +23,13 @@ type InitCall = flexible union {
 };
 
 /// A single init step to be performed by the GPIO core driver.
-type InitStep = struct {
+type InitStep = table {
     /// The platform-specific GPIO index that this step operates on.
-    index uint32;
-    /// A call to make on this GPIO.
-    call InitCall;
+    /// This must be unset if `InitCall` is `delay` and must be set otherwise.
+    1: index uint32;
+
+    /// A call to make on this GPIO. This must be set.
+    2: call InitCall;
 };
 
 /// Passed to the GPIO core driver in metadata as DEVICE_METADATA_GPIO_INIT. Steps are processed

@@ -4,10 +4,11 @@
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_RING_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_RING_H_
 
-#include <lib/ddk/debug.h>
 #include <lib/ddk/hw/arch_ops.h>
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <zircon/types.h>
+
+#include <memory>
 
 #include <virtio/virtio_ring.h>
 
@@ -32,9 +33,7 @@ class Ring {
   void SubmitChain(uint16_t desc_index);
   void Kick();
 
-  struct vring_desc* DescFromIndex(uint16_t index) {
-    return &ring_.desc[index];
-  }
+  struct vring_desc* DescFromIndex(uint16_t index) { return &ring_.desc[index]; }
 
   template <typename T>
   void IrqRingUpdate(T free_chain);
@@ -63,7 +62,7 @@ class Ring {
  private:
   Device* device_ = nullptr;
 
-  io_buffer_t ring_buf_;
+  std::unique_ptr<dma_buffer::ContiguousBuffer> ring_buffer_;
 
   uint16_t index_ = 0;
 
@@ -73,8 +72,11 @@ class Ring {
 // perform the main loop of finding free descriptor chains and passing it to a passed in function
 template <typename T>
 inline void Ring::IrqRingUpdate(T free_chain) {
-  zxlogf(TRACE, "used flags %#x idx %#x last_used %u", ring_.used->flags, ring_.used->idx,
-         ring_.last_used);
+  // TODO(https://fxbug.dev/349298661): Add back the trace logs below, once the
+  // library only supports DFv2 logging (FDF_LOG).
+  //
+  // TRACEF("used flags %#x idx %#x last_used %u", ring_.used->flags, ring_.used->idx,
+  //        ring_.last_used);
 
   // find a new free chain of descriptors
   uint16_t cur_idx = ring_.used->idx;

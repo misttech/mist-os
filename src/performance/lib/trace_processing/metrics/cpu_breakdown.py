@@ -38,6 +38,7 @@ class CpuBreakdownMetricsProcessor:
         self._tid_to_process_name: Dict[int, str] = {}
         # Map of CPU to total duration used (ms).
         self._cpu_to_total_duration: Dict[int, float] = {}
+        self._cpu_to_skipped_duration: Dict[int, float] = {}
         self._min_timestamp: float = sys.float_info.max
         self._max_timestamp: float = 0
 
@@ -59,6 +60,7 @@ class CpuBreakdownMetricsProcessor:
         if largest_timestamp > self._max_timestamp:
             self._max_timestamp = largest_timestamp
         total_duration = largest_timestamp - smallest_timestamp
+        skipped_duration = 0.0
         self._cpu_to_total_duration[cpu] = total_duration
 
         for prev_record, curr_record in itertools.pairwise(records):
@@ -67,10 +69,9 @@ class CpuBreakdownMetricsProcessor:
             # switched away from"). If so, there is a duration to calculate. Otherwise, it means
             # maybe there is skipped data or something.
             if prev_record.tid != curr_record.outgoing_tid:
-                # TODO(https://fxbug.dev/331458411): Record how often skipping happens.
-                _LOGGER.info(
-                    "Possibly missing a ContextSwitch record in trace."
-                )
+                start_ts = self._timestamp_ms(prev_record.start)
+                stop_ts = self._timestamp_ms(curr_record.start)
+                skipped_duration += stop_ts - start_ts
             # Purposely skip saving idle thread durations.
             elif prev_record.is_idle():
                 continue
@@ -87,6 +88,9 @@ class CpuBreakdownMetricsProcessor:
                     self._tid_to_durations[curr_record.outgoing_tid][
                         cpu
                     ] += duration
+
+        if skipped_duration > 0:
+            self._cpu_to_skipped_duration[cpu] = skipped_duration
 
     @staticmethod
     def _timestamp_ms(timestamp: trace_time.TimePoint) -> float:
@@ -153,6 +157,12 @@ class CpuBreakdownMetricsProcessor:
                             "duration": duration,
                         }
                         self._breakdown.append(metric)
+
+        if self._cpu_to_skipped_duration:
+            _LOGGER.warning(
+                "Possibly missing ContextSwitch record(s) in trace for these CPUs and durations: %s"
+                % self._cpu_to_skipped_duration
+            )
 
         # Sort metrics by CPU (desc) and percent (desc).
         self._breakdown = sorted(

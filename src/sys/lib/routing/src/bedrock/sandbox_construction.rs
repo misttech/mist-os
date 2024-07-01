@@ -155,12 +155,17 @@ pub fn build_component_sandbox(
                 collection_inputs.get(name).expect("collection input was just added").capabilities()
             }
             cm_rust::OfferTarget::Capability(name) => {
-                let dict = match declared_dictionaries.get(name) {
+                let dict = match declared_dictionaries
+                    .get(name)
+                    .expect("dictionaries must be cloneable")
+                {
                     Some(dict) => dict,
                     None => {
-                        let dict = Capability::Dictionary(Dict::new());
-                        declared_dictionaries.insert(name.clone(), dict.clone()).ok();
-                        dict
+                        let dict = Dict::new();
+                        declared_dictionaries
+                            .insert(name.clone(), Capability::Dictionary(dict.clone()))
+                            .ok();
+                        Capability::Dictionary(dict)
                     }
                 };
                 let Capability::Dictionary(dict) = dict else {
@@ -217,7 +222,11 @@ fn build_environment(
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
     if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
-        environment = component_input.environment().shallow_copy();
+        if let Ok(e) = component_input.environment().shallow_copy() {
+            environment = e;
+        } else {
+            warn!("failed to copy component_input.environment");
+        }
     }
     for debug_registration in &environment_decl.debug_capabilities {
         let cm_rust::DebugRegistration::Protocol(debug_protocol) = debug_registration;

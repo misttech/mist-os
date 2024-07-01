@@ -179,7 +179,7 @@ prost-build = "0.11.1"
 prost-types = "0.11.1"
 rand = { version = "0.8", features = ["small_rng"] }
 rand_xorshift = "0.3"
-rayon = "1.2.1"
+rayon = "1.5.3"
 ref-cast = "1.0.9"
 regex = "1.7.3"
 regex-syntax = "0.8.3"
@@ -347,6 +347,7 @@ backtrace = { path = "empty/backtrace" }
 cc = { path = "empty/cc" }
 crossterm_winapi = { path = "empty/crossterm_winapi" }
 ctor = { path = "empty/ctor" }
+hermit-abi = { path = "empty/hermit-abi" }
 iana-time-zone-haiku = { path = "empty/iana-time-zone-haiku" }
 js-sys = { path = "empty/js-sys" }
 miow = { path = "empty/miow" }
@@ -511,12 +512,6 @@ env_vars = ["OUT_DIR=../../../compat/crc"]
 [gn.package.crc32fast."1.2.0"]
 rustflags = ["--cfg=crc32fast_stdarchx86"]
 
-[gn.package.crossbeam-epoch."0.8.2"]
-# Has build script but no config needed.
-
-[gn.package.crossbeam-utils."0.7.2"]
-# Has build script but no config needed.
-
 [gn.package.crossbeam-utils."0.8.14"]
 rustflags = []
 
@@ -620,9 +615,6 @@ rustflags = ["--cfg=derive_copy", "--cfg=repr_transparent", "--cfg=native_uninit
 [gn.package.md-5."0.10.5"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "md5_visibility" }
 
-[gn.package.memoffset."0.5.3"]
-# Has build script but no config needed.
-
 [gn.package.memoffset."0.6.3"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
 
@@ -725,7 +717,14 @@ rustflags = ["--cfg=rustc_1_26"]
 [gn.package.rand_pcg."0.1.1"]
 rustflags = ["--cfg=rust_1_26"]
 
-[gn.package.rayon-core."1.7.1"]
+[gn.package.rayon."1.5.3"]
+rustflags = [
+  "--cfg=has_control_flow",
+  "--cfg=has_min_const_generics",
+  "--cfg=has_step_by_rev",
+]
+
+[gn.package.rayon-core."1.9.3"]
 # Has build script but no config needed.
 
 [gn.package.ref-cast."1.0.9"]
@@ -902,7 +901,7 @@ deps = [
   ":libc-v0_2_149",
   ":memchr-v2_7_1",
   ":mio-v0_8_9",
-  ":num_cpus-v1_13_0",
+  ":num_cpus-v1_16_0",
   ":signal-hook-registry-v1_4_1",
   ":socket2-v0_5_5",
 ]

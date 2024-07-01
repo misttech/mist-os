@@ -17,7 +17,7 @@ void SystemActivityGovernor::GetPowerElements(GetPowerElementsCompleter::Sync& c
   ASSERT_OK(zx::event::create(0, &event));
 
   fuchsia_power_system::ExecutionState execution_state;
-  execution_state.passive_dependency_token(std::move(event));
+  execution_state.opportunistic_dependency_token(std::move(event));
 
   fuchsia_power_system::PowerElements elements;
   elements.execution_state(std::move(execution_state));

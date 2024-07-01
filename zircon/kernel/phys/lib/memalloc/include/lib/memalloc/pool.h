@@ -236,15 +236,32 @@ class Pool {
   fit::result<fit::failed, uint64_t> Resize(const Range& original, uint64_t new_size,
                                             uint64_t min_alignment);
 
+  // Removes all accounting for RAM (free or allocated) past the provided
+  // capacity. This is used to simulate physical memory constraints of smaller
+  // devices. It is a destructive routine; removed memory can not be recovered
+  // or reallocated.
+  //
+  // It is always the tail of RAM that is removed. If allocations are removed,
+  // then that memory is simply forgotten about by the pool. This applies to
+  // bookkeeping to an extent as well: the tracking of bookkeeping allocation
+  // may be removed, but the pool might still have access to bookkeeping in
+  // forgotten ranges, possibly continuing to draw from it rather than allocate
+  // new tracked bookkeeping ranges. This is okay, as it is assumed that memory
+  // that the pool does not track will not be used by any program.
+  void RestrictTotalRam(uint64_t new_capacity_bytes);
+
   // Gives a custom, normalized view of all tracked ranges. `NormalizeTypeFn`
   // is a callable with signature `std::optional<Type>(Type)`: std::nullopt
   // indicates that ranges of this type should not be passed to the callback;
   // otherwise, the returned type is indicates how the input type should be
   // normalized. Adjacent ranges of the same normalized type are merged before
   // being passed to the callback.
+  //
+  // The callback itself is expected to return a boolean indicating whether it
+  // should continue to be called.
   template <typename RangeCallback, typename NormalizeTypeFn>
   void NormalizeRanges(RangeCallback&& cb, NormalizeTypeFn&& normalize_type) const {
-    static_assert(std::is_invocable_v<RangeCallback, const Range&>);
+    static_assert(std::is_invocable_r_v<bool, RangeCallback, const Range&>);
     static_assert(std::is_invocable_r_v<std::optional<Type>, NormalizeTypeFn, Type>);
 
     std::optional<Range> prev;
@@ -260,7 +277,9 @@ class Pool {
       } else if (prev->end() == normalized.addr && prev->type == normalized.type) {
         prev->size += normalized.size;
       } else {
-        cb(*prev);
+        if (!cb(*prev)) {
+          return;
+        }
         prev = normalized;
       }
     }
@@ -274,8 +293,7 @@ class Pool {
   template <typename RangeCallback>
   void NormalizeRam(RangeCallback&& cb) const {
     return NormalizeRanges(std::forward<RangeCallback>(cb), [](Type type) {
-      return (IsExtendedType(type) || type == Type::kFreeRam) ? std::make_optional(Type::kFreeRam)
-                                                              : std::nullopt;
+      return IsRamType(type) ? std::make_optional(Type::kFreeRam) : std::nullopt;
     });
   }
 

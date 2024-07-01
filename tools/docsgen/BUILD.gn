@@ -42,6 +42,7 @@ compiled_action("invoke_assemblydoc") {
 
 _fidldoc_transforms_script_target = "fidldoc_transforms"
 python_binary(_fidldoc_transforms_script_target) {
+  enable_mypy = true
   main_source = "//build/fidl/gen_fidldocs.py"
   output_name = "gen_fidldocs.pyz"
   sources = []
@@ -158,6 +159,7 @@ compiled_action("invoke_clidoc") {
 
 if (is_host && !is_asan) {
   python_host_test("clidoc_test") {
+    enable_mypy = true
     main_source = "clidoc_test.py"
     extra_args = [ rebase_path(clidoc_tarfile, root_build_dir) ]
     test_data_deps = [ ":invoke_clidoc" ]
@@ -167,6 +169,7 @@ if (is_host && !is_asan) {
 _helpdoc_script_target = "helpdoc_generation"
 helpdoc_tarfile = "helpdoc_out.tar.gz"
 python_binary(_helpdoc_script_target) {
+  enable_mypy = true
   main_source = "//tools/docsgen/gen_helpdocs.py"
   output_name = "gen_helpdocs.pyz"
   sources = []
@@ -175,6 +178,7 @@ python_binary(_helpdoc_script_target) {
 
 _docsgen_transforms_script_target = "docsgen_transforms"
 python_binary(_docsgen_transforms_script_target) {
+  enable_mypy = true
   main_source = "//tools/docsgen/docsgen_transforms.py"
   output_name = "docsgen_transforms.pyz"
   sources = []

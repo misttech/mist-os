@@ -30,9 +30,7 @@ sdk_source_set("cpp") {
 
   sources = [
     "log_level.h",
-    "log_settings.cc",
     "log_settings.h",
-    "logging_backend.h",
     "macros.cc",
     "macros.h",
   ]
@@ -50,18 +48,19 @@ sdk_source_set("cpp") {
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
-      "//sdk/lib/syslog/structured_backend",
       "//zircon/system/ulib/async:async-cpp",
+      "//zircon/system/ulib/async-default:async-default",
+      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/sync",
     ]
 
     public_deps += [
+      "//sdk/lib/syslog/structured_backend",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/zx",
     ]
   } else {
     sources += [
-      "host/encoder.cc",
       "host/encoder.h",
       "host/logging_backend.cc",
     ]

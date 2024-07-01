@@ -3,11 +3,11 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaAssemblyConfigInfo")
+load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaPartitionsConfigInfo")
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_partitions_configuration_test_impl(ctx):
-    partitions_config_file = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
+    partitions_config_file = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo].config
     golden_file = ctx.file.golden_file
     return [create_validation_script_provider(ctx, partitions_config_file, golden_file)]
 
@@ -18,7 +18,7 @@ fuchsia_partitions_configuration_test = rule(
     attrs = {
         "partitions_config": attr.label(
             doc = "Built partitions Config.",
-            providers = [FuchsiaAssemblyConfigInfo],
+            providers = [FuchsiaPartitionsConfigInfo],
             mandatory = True,
         ),
         "golden_file": attr.label(

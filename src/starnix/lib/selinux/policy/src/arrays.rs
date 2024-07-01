@@ -10,8 +10,8 @@ use super::extensible_bitmap::ExtensibleBitmap;
 use super::parser::ParseStrategy;
 use super::symbols::{MlsLevel, MlsRange};
 use super::{
-    array_type, array_type_validate_deref_both, Array, Counted, Parse, RoleId, TypeId, UserId,
-    Validate, ValidateArray,
+    array_type, array_type_validate_deref_both, Array, ClassId, Counted, Parse, RoleId, TypeId,
+    UserId, Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
@@ -201,8 +201,8 @@ impl<PS: ParseStrategy> AccessVector<PS> {
     /// Returns the target class id in this access vector. This id corresponds to the
     /// [`super::symbols::Class`] `id()` of some class in the same policy.
     /// Although the index is returned as a 32-bit value, the field itself is 16-bit
-    pub fn target_class(&self) -> le::U32 {
-        PS::deref(&self.metadata).class.into()
+    pub fn target_class(&self) -> ClassId {
+        ClassId(NonZeroU32::new(PS::deref(&self.metadata).class.into()).unwrap())
     }
 
     /// A bit mask that corresponds to the permissions in this access vector. Permission bits are
@@ -351,8 +351,8 @@ impl RoleTransition {
         TypeId(NonZeroU32::new(self.role_type.get()).unwrap())
     }
 
-    pub(crate) fn class(&self) -> le::U32 {
-        self.tclass
+    pub(crate) fn class(&self) -> ClassId {
+        ClassId(NonZeroU32::new(self.tclass.get()).unwrap())
     }
 
     pub(crate) fn new_role(&self) -> RoleId {
@@ -1149,8 +1149,8 @@ impl<PS: ParseStrategy> RangeTransition<PS> {
         TypeId(NonZeroU32::new(PS::deref(&self.metadata).target_type.get()).unwrap())
     }
 
-    pub fn target_class(&self) -> le::U32 {
-        PS::deref(&self.metadata).target_class
+    pub fn target_class(&self) -> ClassId {
+        ClassId(NonZeroU32::new(PS::deref(&self.metadata).target_class.get()).unwrap())
     }
 
     pub fn mls_range(&self) -> &MlsRange<PS> {

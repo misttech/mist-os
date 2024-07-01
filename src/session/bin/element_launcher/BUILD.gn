@@ -14,14 +14,13 @@ rustc_binary("element_launcher_bin") {
   deps = [
     ":element_launcher_config",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:tracing",
   ]
-  test_deps = [
-    "//src/lib/fidl/rust/fidl",
-    "//third_party/rust_crates:futures",
-  ]
+  test_deps = [ "//third_party/rust_crates:futures" ]
 
   sources = [ "src/main.rs" ]
 }

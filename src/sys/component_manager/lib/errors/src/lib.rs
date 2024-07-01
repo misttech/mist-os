@@ -24,24 +24,20 @@ use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zi
 pub enum ModelError {
     #[error("bad path")]
     BadPath,
-    #[error("Moniker error: {}", err)]
+    #[error(transparent)]
     MonikerError {
         #[from]
         err: MonikerError,
     },
     #[error("expected a component instance moniker")]
     UnexpectedComponentManagerMoniker,
-    #[error("Routing error: {}", err)]
+    #[error(transparent)]
     RoutingError {
         #[from]
         err: RoutingError,
     },
     #[error(
-        "Failed to open path `{}`, in storage directory for `{}` backed by `{}`: {}",
-        path,
-        moniker,
-        source_moniker,
-        err
+        "opening path `{path}`, in storage directory for `{moniker}` backed by `{source_moniker}`: {err}",
     )]
     OpenStorageFailed {
         source_moniker: ExtendedMoniker,
@@ -50,71 +46,71 @@ pub enum ModelError {
         #[source]
         err: zx::Status,
     },
-    #[error("storage error: {}", err)]
+    #[error(transparent)]
     StorageError {
         #[from]
         err: StorageError,
     },
-    #[error("component instance error: {}", err)]
+    #[error(transparent)]
     ComponentInstanceError {
         #[from]
         err: ComponentInstanceError,
     },
-    #[error("error in service dir VFS for component {moniker}: {err}")]
+    #[error("service dir VFS for component {moniker}:\n\t{err}")]
     ServiceDirError {
         moniker: Moniker,
 
         #[source]
         err: VfsError,
     },
-    #[error("failed to open directory '{}' for component '{}'", relative_path, moniker)]
+    #[error("opening directory `{relative_path}` for component `{moniker}` failed")]
     OpenDirectoryError { moniker: Moniker, relative_path: String },
-    #[error("events error: {}", err)]
+    #[error("events: {err}")]
     EventsError {
         #[from]
         err: EventsError,
     },
-    #[error("policy error: {}", err)]
+    #[error(transparent)]
     PolicyError {
         #[from]
         err: PolicyError,
     },
-    #[error("component id index error: {}", err)]
+    #[error("component id index: {err}")]
     ComponentIdIndexError {
         #[from]
         err: component_id_index::IndexError,
     },
-    #[error("error with action: {}", err)]
+    #[error(transparent)]
     ActionError {
         #[from]
         err: ActionError,
     },
-    #[error("error with resolve action: {err}")]
+    #[error("resolve: {err}")]
     ResolveActionError {
         #[from]
         err: ResolveActionError,
     },
-    #[error("{err}")]
+    #[error("start: {err}")]
     StartActionError {
         #[from]
         err: StartActionError,
     },
-    #[error("failed to open outgoing dir: {err}")]
+    #[error("open outgoing dir: {err}")]
     OpenOutgoingDirError {
         #[from]
         err: OpenOutgoingDirError,
     },
-    #[error(transparent)]
+    #[error("router: {err}")]
     RouterError {
         #[from]
         err: RouterError,
     },
-    #[error("error with capability provider: {err}")]
+    #[error("capability provider: {err}")]
     CapabilityProviderError {
         #[from]
         err: CapabilityProviderError,
     },
-    #[error("failed to open capability: {err}")]
+    #[error("open: {err}")]
     OpenError {
         #[from]
         err: OpenError,
@@ -151,35 +147,35 @@ impl Explain for ModelError {
 pub enum StructuredConfigError {
     #[error("component has a config schema but resolver did not provide values")]
     ConfigValuesMissing,
-    #[error("failed to resolve component's config: {_0}")]
+    #[error("failed to resolve component's config:\n\t{_0}")]
     ConfigResolutionFailed(#[source] config_encoder::ResolutionError),
     #[error("couldn't create vmo: {_0}")]
     VmoCreateFailed(#[source] zx::Status),
-    #[error("Failed to match values for key: {}", key)]
+    #[error("failed to match values for key `{key}`")]
     ValueMismatch { key: String },
-    #[error("Failed to find values for key: {}", key)]
+    #[error("failed to find values for key `{key}`")]
     KeyNotFound { key: String },
-    #[error("Failed to route structured config values: {_0}")]
+    #[error("failed to route structured config values:\n\t{_0}")]
     RoutingError(#[from] RoutingError),
 }
 
 #[derive(Clone, Debug, Error)]
 pub enum VfsError {
-    #[error("failed to add node \"{name}\": {status}")]
+    #[error("failed to add node `{name}`: {status}")]
     AddNodeError { name: String, status: zx::Status },
-    #[error("failed to remove node \"{name}\": {status}")]
+    #[error("failed to remove node `{name}`: {status}")]
     RemoveNodeError { name: String, status: zx::Status },
 }
 
 #[derive(Debug, Error)]
 pub enum RebootError {
-    #[error("failed to connect to admin protocol in root component's exposed dir: {0}")]
+    #[error("failed to connect to admin protocol in root component's exposed dir:\n\t{0}")]
     ConnectToAdminFailed(#[source] anyhow::Error),
-    #[error("StateControl Admin protocol encountered FIDL error: {0}")]
+    #[error("StateControl Admin FIDL:\n\t{0}")]
     FidlError(#[from] fidl::Error),
-    #[error("StateControl Admin responded with status: {0}")]
+    #[error("StateControl Admin: {0}")]
     AdminError(zx::Status),
-    #[error("failed to open root component's exposed dir: {0}")]
+    #[error("opening root component's exposed dir: {0}")]
     OpenRootExposedDirFailed(#[from] OpenExposedDirError),
 }
 
@@ -209,9 +205,9 @@ pub enum OpenOutgoingDirError {
     InstanceNotResolved,
     #[error("instance is non-executable")]
     InstanceNonExecutable,
-    #[error("open error: {0}")]
+    #[error("failed to open: {0}")]
     Open(#[from] zx::Status),
-    #[error("fidl IPC to protocol in outgoing directory failed: {0}")]
+    #[error("fidl IPC to protocol in outgoing directory:\n\t{0}")]
     Fidl(fidl::Error),
 }
 
@@ -245,17 +241,17 @@ impl From<OpenOutgoingDirError> for RouterError {
 
 #[derive(Debug, Error, Clone)]
 pub enum AddDynamicChildError {
-    #[error("component collection not found with name {}", name)]
+    #[error("component collection not found with name `{name}`")]
     CollectionNotFound { name: String },
     #[error(
         "numbered handles can only be provided when adding components to a single-run collection"
     )]
     NumberedHandleNotInSingleRunCollection,
-    #[error("name length is longer than the allowed max {}", max_len)]
+    #[error("name length is longer than the allowed max of {max_len}")]
     NameTooLong { max_len: usize },
-    #[error("collection {} does not allow dynamic offers", collection_name)]
+    #[error("collection `{collection_name}` does not allow dynamic offers")]
     DynamicOffersNotAllowed { collection_name: String },
-    #[error("action failed on child: {}", err)]
+    #[error(transparent)]
     ActionError {
         #[from]
         err: ActionError,
@@ -263,10 +259,10 @@ pub enum AddDynamicChildError {
     #[error("invalid dictionary")]
     InvalidDictionary,
     #[error(
-        "dictionary entry for capability '{capability_name}' conflicts with existing static route"
+        "dictionary entry for capability `{capability_name}` conflicts with existing static route"
     )]
     StaticRouteConflict { capability_name: Name },
-    #[error("failed to add child to parent: {}", err)]
+    #[error(transparent)]
     AddChildError {
         #[from]
         err: AddChildError,
@@ -342,14 +338,14 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
 
 #[derive(Debug, Error, Clone)]
 pub enum AddChildError {
-    #[error("component instance {} in realm {} already exists", child, moniker)]
+    #[error("component instance `{child}` in realm `{moniker}` already exists")]
     InstanceAlreadyExists { moniker: Moniker, child: ChildName },
-    #[error("dynamic offer error: {}", err)]
+    #[error(transparent)]
     DynamicCapabilityError {
         #[from]
         err: DynamicCapabilityError,
     },
-    #[error("child moniker not valid: {}", err)]
+    #[error("invalid child name: {err}")]
     ChildNameInvalid {
         #[from]
         err: MonikerError,
@@ -358,17 +354,17 @@ pub enum AddChildError {
 
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum DynamicCapabilityError {
-    #[error("a dynamic capability was not valid: {}", err)]
+    #[error("a dynamic capability was not valid:\n\t{err}")]
     Invalid {
         #[source]
         err: cm_fidl_validator::error::ErrorList,
     },
-    #[error("dynamic offer would create a cycle: {err}")]
+    #[error("dynamic offer would create a cycle:\n\t{err}")]
     Cycle {
         #[source]
         err: cm_fidl_validator::error::ErrorList,
     },
-    #[error("source for dynamic offer not found: {:?}", offer)]
+    #[error("source for dynamic offer not found:\n\t{:?}", offer)]
     SourceNotFound { offer: cm_rust::OfferDecl },
     #[error("unknown offer type in dynamic offers")]
     UnknownOfferType,
@@ -376,37 +372,37 @@ pub enum DynamicCapabilityError {
 
 #[derive(Debug, Clone, Error)]
 pub enum ActionError {
-    #[error("discover action error: {}", err)]
+    #[error("discover: {err}")]
     DiscoverError {
         #[from]
         err: DiscoverActionError,
     },
 
-    #[error("resolve action error: {}", err)]
+    #[error("resolve: {err}")]
     ResolveError {
         #[from]
         err: ResolveActionError,
     },
 
-    #[error("unresolve action error: {}", err)]
+    #[error("unresolve: {err}")]
     UnresolveError {
         #[from]
         err: UnresolveActionError,
     },
 
-    #[error("start action error: {}", err)]
+    #[error("start: {err}")]
     StartError {
         #[from]
         err: StartActionError,
     },
 
-    #[error("stop action error: {}", err)]
+    #[error("stop: {err}")]
     StopError {
         #[from]
         err: StopActionError,
     },
 
-    #[error("destroy action error: {}", err)]
+    #[error("destroy: {err}")]
     DestroyError {
         #[from]
         err: DestroyActionError,
@@ -492,40 +488,35 @@ impl From<ActionError> for fsys::DestroyError {
 
 #[derive(Debug, Clone, Error)]
 pub enum DiscoverActionError {
-    #[error("instance {moniker} was destroyed")]
+    #[error("`{moniker}` was destroyed")]
     InstanceDestroyed { moniker: Moniker },
 }
 
 #[derive(Debug, Clone, Error)]
 pub enum ResolveActionError {
-    #[error("discover action failed: {err}")]
+    #[error("discover during resolve: {err}")]
     DiscoverActionError {
         #[from]
         err: DiscoverActionError,
     },
-    #[error("instance {moniker} was shut down")]
+    #[error("`{moniker}` was shut down")]
     InstanceShutDown { moniker: Moniker },
-    #[error("instance {moniker} was destroyed")]
+    #[error("`{moniker}` was destroyed")]
     InstanceDestroyed { moniker: Moniker },
-    #[error(
-        "component address could not parsed for moniker '{}' at url '{}': {}",
-        moniker,
-        url,
-        err
-    )]
+    #[error("could not parse component address for `{url}` at `{moniker}`:\n\t{err}")]
     ComponentAddressParseError {
         url: Url,
         moniker: Moniker,
         #[source]
         err: ResolverError,
     },
-    #[error("resolver error for \"{}\": {}", url, err)]
+    #[error("resolve failed for `{url}`:\n\t{err}")]
     ResolverError {
         url: Url,
         #[source]
         err: ResolverError,
     },
-    #[error("error in expose dir VFS for component {moniker}: {err}")]
+    #[error("expose dir for `{moniker}`:\n\t{err}")]
     // TODO(https://fxbug.dev/42071713): Determine whether this is expected to fail.
     ExposeDirError {
         moniker: Moniker,
@@ -533,23 +524,23 @@ pub enum ResolveActionError {
         #[source]
         err: VfsError,
     },
-    #[error("could not add static child \"{}\": {}", child_name, err)]
+    #[error("adding static child `{child_name}`:\n\t{err}")]
     AddStaticChildError {
         child_name: String,
         #[source]
         err: AddChildError,
     },
-    #[error("structured config error: {}", err)]
+    #[error("structured config: {err}")]
     StructuredConfigError {
         #[from]
         err: StructuredConfigError,
     },
-    #[error("package dir proxy creation failed: {}", err)]
+    #[error("creating package dir proxy: {err}")]
     PackageDirProxyCreateError {
         #[source]
         err: fidl::Error,
     },
-    #[error("ABI compatibility check failed for {url}: {err}")]
+    #[error("ABI compatibility check for `{url}`: {err}")]
     AbiCompatibilityError {
         url: Url,
         #[source]
@@ -557,7 +548,7 @@ pub enum ResolveActionError {
     },
     #[error(transparent)]
     Policy(#[from] PolicyError),
-    #[error("Couldn't resolve `{moniker}` because the action was interrupted")]
+    #[error("`{moniker}` was interrupted")]
     Aborted { moniker: Moniker },
 }
 
@@ -637,7 +628,7 @@ impl Into<fsys::StartError> for ResolveActionError {
 pub enum PkgDirError {
     #[error("no pkg dir found for component")]
     NoPkgDir,
-    #[error("error opening pkg dir: {err}")]
+    #[error("opening pkg dir failed: {err}")]
     OpenFailed {
         #[from]
         err: zx::Status,
@@ -655,12 +646,12 @@ impl PkgDirError {
 
 #[derive(Debug, Clone, Error)]
 pub enum ComponentProviderError {
-    #[error("failed to start source instance: {err}")]
+    #[error("starting source instance:\n\t{err}")]
     SourceStartError {
         #[from]
         err: ActionError,
     },
-    #[error("failed to open source instance outgoing dir: {err}")]
+    #[error("opening source instance's outgoing dir:\n\t{err}")]
     OpenOutgoingDirError {
         #[from]
         err: OpenOutgoingDirError,
@@ -680,36 +671,36 @@ impl ComponentProviderError {
 pub enum CapabilityProviderError {
     #[error("bad path")]
     BadPath,
-    #[error("component instance")]
+    #[error(transparent)]
     ComponentInstanceError {
         #[from]
         err: ComponentInstanceError,
     },
-    #[error("error in pkg dir capability provider: {err}")]
+    #[error(transparent)]
     PkgDirError {
         #[from]
         err: PkgDirError,
     },
-    #[error("error in event source capability provider: {0}")]
+    #[error("event source: {0}")]
     EventSourceError(#[from] EventSourceError),
-    #[error("error in component capability provider: {err}")]
+    #[error(transparent)]
     ComponentProviderError {
         #[from]
         err: ComponentProviderError,
     },
-    #[error("error in component manager namespace capability provider: {err}")]
+    #[error("component_manager namespace: {err}")]
     CmNamespaceError {
         #[from]
         err: ClonableError,
     },
-    #[error(transparent)]
+    #[error("router: {err}")]
     RouterError {
         #[from]
         err: RouterError,
     },
-    #[error("could not route: {0}")]
+    #[error(transparent)]
     RoutingError(#[from] RoutingError),
-    #[error("vfs open error")]
+    #[error("opening vfs failed: {0}")]
     VfsOpenError(#[source] zx::Status),
 }
 
@@ -739,12 +730,12 @@ pub enum OpenError {
     },
     #[error("no capability provider found")]
     CapabilityProviderNotFound,
-    #[error("capability provider error: {err}")]
+    #[error("capability provider: {err}")]
     CapabilityProviderError {
         #[from]
         err: CapabilityProviderError,
     },
-    #[error("failed to open storage capability: {err}")]
+    #[error("opening storage capability: {err}")]
     OpenStorageError {
         // TODO(https://fxbug.dev/42068065): This will get fixed when we untangle ModelError
         #[source]
@@ -752,7 +743,7 @@ pub enum OpenError {
     },
     #[error("timed out opening capability")]
     Timeout,
-    #[error("the capability does not support opening: {0}")]
+    #[error("capability does not support opening: {0}")]
     DoesNotSupportOpen(ConversionError),
 }
 
@@ -777,54 +768,56 @@ impl From<OpenError> for RouterError {
 
 #[derive(Debug, Clone, Error)]
 pub enum StartActionError {
-    #[error("Couldn't start `{moniker}` because it has been destroyed")]
+    #[error("`{moniker}` was shut down")]
     InstanceShutDown { moniker: Moniker },
-    #[error("Couldn't start `{moniker}` because it has been destroyed")]
+    #[error("`{moniker}` was destroyed")]
     InstanceDestroyed { moniker: Moniker },
-    #[error("Couldn't start `{moniker}` because it couldn't resolve: {err}")]
+    #[error("`{moniker}` couldn't resolve during start: {err}")]
     ResolveActionError {
         moniker: Moniker,
         #[source]
         err: Box<ActionError>,
     },
-    #[error("Couldn't start `{moniker}` because the runner `{runner}` couldn't resolve: {err}")]
+    #[error("runner for `{moniker}` `{runner}` couldn't resolve: {err}")]
     ResolveRunnerError {
         moniker: Moniker,
         runner: Name,
         #[source]
         err: Box<RouterError>,
     },
-    #[error("Couldn't start `{moniker}` because it uses `\"on_terminate\": \"reboot\"` but is not allowed to by policy: {err}")]
+    #[error(
+        "`{moniker}` uses `\"on_terminate\": \"reboot\"` but is disallowed by policy:\n\t{err}"
+    )]
     RebootOnTerminateForbidden {
         moniker: Moniker,
         #[source]
         err: PolicyError,
     },
-    #[error("Couldn't start `{moniker}` because we failed to create its namespace: {err}")]
+    #[error("creating namespace for `{moniker}`: {err}")]
     CreateNamespaceError {
         moniker: Moniker,
         #[source]
         err: CreateNamespaceError,
     },
-    #[error("Couldn't start `{moniker}` because we failed to start its program: {err}")]
+    #[error("starting program for `{moniker}`: {err}")]
     StartProgramError {
         moniker: Moniker,
         #[source]
         err: StartError,
     },
-    #[error("Couldn't start `{moniker}` due to a structured configuration error: {err}")]
+    #[error("structured configuration for `{moniker}`: {err}")]
     StructuredConfigError {
         moniker: Moniker,
         #[source]
         err: StructuredConfigError,
     },
-    #[error("Couldn't start `{moniker}` because one of its eager children failed to start: {err}")]
+    #[error("starting eager child of `{moniker}`: {err}")]
     EagerStartError {
         moniker: Moniker,
         #[source]
         err: Box<ActionError>,
     },
-    #[error("Couldn't start `{moniker}` because it is interrupted by a stop request")]
+    #[error("`{moniker}` was interrupted")]
     Aborted { moniker: Moniker },
 }
 
@@ -873,7 +866,7 @@ impl Into<fcomponent::Error> for StartActionError {
 
 #[derive(Debug, Clone, Error)]
 pub enum StopActionError {
-    #[error("failed to stop program: {0}")]
+    #[error("stopping program: {0}")]
     ProgramStopError(#[source] StopError),
     #[error("failed to get top instance")]
     GetTopInstanceFailed,
@@ -881,12 +874,12 @@ pub enum StopActionError {
     GetParentFailed,
     #[error("failed to destroy dynamic children: {err}")]
     DestroyDynamicChildrenFailed { err: Box<ActionError> },
-    #[error("failed to resolve component: {err}")]
+    #[error("resolution during stop: {err}")]
     ResolveActionError {
         #[source]
         err: Box<ActionError>,
     },
-    #[error("a component started while shutdown was ongoing")]
+    #[error("started while shutdown was ongoing")]
     ComponentStartedDuringShutdown,
 }
 
@@ -925,19 +918,19 @@ impl PartialEq for StopActionError {
 
 #[derive(Debug, Clone, Error)]
 pub enum DestroyActionError {
-    #[error("failed to discover component: {}", err)]
+    #[error("discover during destroy: {}", err)]
     DiscoverActionError {
         #[from]
         err: DiscoverActionError,
     },
-    #[error("failed to shutdown component: {}", err)]
+    #[error("shutdown during destroy: {}", err)]
     ShutdownFailed {
         #[source]
         err: Box<ActionError>,
     },
-    #[error("could not find instance with moniker {}", moniker)]
+    #[error("could not find `{moniker}`")]
     InstanceNotFound { moniker: Moniker },
-    #[error("instance with moniker {} is not resolved", moniker)]
+    #[error("`{moniker}` is not resolved")]
     InstanceNotResolved { moniker: Moniker },
 }
 
@@ -966,14 +959,14 @@ impl Into<fsys::DestroyError> for DestroyActionError {
 
 #[derive(Debug, Clone, Error)]
 pub enum UnresolveActionError {
-    #[error("failed to shutdown component: {}", err)]
+    #[error("shutdown during unresolve: {err}")]
     ShutdownFailed {
         #[from]
         err: StopActionError,
     },
-    #[error("{moniker} cannot be unresolved while it is running")]
+    #[error("`{moniker}` cannot be unresolved while it is running")]
     InstanceRunning { moniker: Moniker },
-    #[error("{moniker} was destroyed")]
+    #[error("`{moniker}` was destroyed")]
     InstanceDestroyed { moniker: Moniker },
 }
 
@@ -991,14 +984,14 @@ impl Into<fsys::UnresolveError> for UnresolveActionError {
 
 #[derive(Debug, Clone, Error)]
 pub enum CreateNamespaceError {
-    #[error("failed to clone pkg dir: {0}")]
+    #[error("failed to clone pkg dir:\n\t{0}")]
     ClonePkgDirFailed(#[source] fuchsia_fs::node::CloneError),
 
-    #[error("use decl without path cannot be installed into the namespace: {0:?}")]
+    #[error("use decl without path cannot be installed into the namespace:\n\t{0:?}")]
     UseDeclWithoutPath(UseDecl),
 
-    #[error("{0}")]
-    InstanceNotInInstanceIdIndex(#[source] RoutingError),
+    #[error("instance not in index:\n\t{0}")]
+    InstanceNotInInstanceIdIndex(#[from] RoutingError),
 
     #[error(transparent)]
     BuildNamespaceError(#[from] serve_processargs::BuildNamespaceError),
@@ -1025,9 +1018,9 @@ impl CreateNamespaceError {
 
 #[derive(Debug, Clone, Error)]
 pub enum EventSourceError {
-    #[error("component instance error: {0}")]
+    #[error(transparent)]
     ComponentInstance(#[from] ComponentInstanceError),
-    #[error("model error: {0}")]
+    #[error(transparent)]
     // TODO(https://fxbug.dev/42068065): This will get fixed when we untangle ModelError
     Model(#[from] Box<ModelError>),
     #[error("event stream already consumed")]
@@ -1049,22 +1042,22 @@ pub enum EventsError {
     #[error("capability_requested event streams cannot be taken twice")]
     CapabilityRequestedStreamTaken,
 
-    #[error("Model not available")]
+    #[error("model not available")]
     ModelNotAvailable,
 
-    #[error("Instance shut down")]
+    #[error("instance shut down")]
     InstanceShutdown,
 
-    #[error("Instance destroyed")]
+    #[error("instance destroyed")]
     InstanceDestroyed,
 
-    #[error("Registry not found")]
+    #[error("registry not found")]
     RegistryNotFound,
 
-    #[error("Event {:?} appears more than once in a subscription request", event_name)]
+    #[error("event `{event_name}` appears more than once in a subscription request")]
     DuplicateEvent { event_name: Name },
 
-    #[error("Events not allowed for subscription {:?}", names)]
+    #[error("events not available for subscription: `{names:?}`")]
     NotAvailable { names: Vec<Name> },
 }
 
@@ -1081,7 +1074,7 @@ impl EventsError {
 /// Errors related to isolated storage.
 #[derive(Debug, Error, Clone)]
 pub enum StorageError {
-    #[error("failed to open {:?}'s directory {}: {} ", dir_source_moniker, dir_source_path, err)]
+    #[error("opening directory from `{dir_source_moniker:?}` at `{dir_source_path}`:\n\t{err}")]
     OpenRoot {
         dir_source_moniker: Option<Moniker>,
         dir_source_path: cm_types::Path,
@@ -1089,12 +1082,7 @@ pub enum StorageError {
         err: ClonableError,
     },
     #[error(
-        "failed to open isolated storage from {:?}'s directory {} for {} (instance_id={:?}): {} ",
-        dir_source_moniker,
-        dir_source_path,
-        moniker,
-        instance_id,
-        err
+        "opening isolated storage from `{dir_source_moniker:?}`'s for `{moniker}` at `{dir_source_path}` (instance_id={instance_id:?}):\n\t{err}",
     )]
     Open {
         dir_source_moniker: Option<Moniker>,
@@ -1105,11 +1093,7 @@ pub enum StorageError {
         err: ClonableError,
     },
     #[error(
-        "failed to open isolated storage from {:?}'s directory {} for {:?}: {} ",
-        dir_source_moniker,
-        dir_source_path,
-        instance_id,
-        err
+        "opening isolated storage from `{dir_source_moniker:?}` at `{dir_source_path}` for {instance_id}:\n\t{err}"
     )]
     OpenById {
         dir_source_moniker: Option<Moniker>,
@@ -1119,12 +1103,7 @@ pub enum StorageError {
         err: ClonableError,
     },
     #[error(
-        "failed to remove isolated storage from {:?}'s directory {} for {} (instance_id={:?}): {} ",
-        dir_source_moniker,
-        dir_source_path,
-        moniker,
-        instance_id,
-        err
+        "removing isolated storage from {dir_source_moniker:?} at `{dir_source_path}` for `{moniker}` (instance_id={instance_id:?}):n\t{err} "
     )]
     Remove {
         dir_source_moniker: Option<Moniker>,
@@ -1134,7 +1113,7 @@ pub enum StorageError {
         #[source]
         err: ClonableError,
     },
-    #[error("storage path for moniker={}, instance_id={:?} is invalid", moniker, instance_id)]
+    #[error("storage path for `{moniker}` (instance_id={instance_id:?}) is invalid")]
     InvalidStoragePath { moniker: Moniker, instance_id: Option<InstanceId> },
 }
 
@@ -1195,13 +1174,13 @@ impl StorageError {
 
 #[derive(Error, Debug, Clone)]
 pub enum StartError {
-    #[error("failed to serve namespace: {0}")]
+    #[error("serving namespace: {0}")]
     ServeNamespace(BuildNamespaceError),
 }
 
 #[derive(Error, Debug, Clone)]
 pub enum StopError {
     /// Internal errors are not meant to be meaningfully handled by the user.
-    #[error("internal error: {0}")]
+    #[error("internal: {0}")]
     Internal(fidl::Error),
 }

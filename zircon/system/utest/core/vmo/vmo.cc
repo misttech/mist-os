@@ -1842,35 +1842,37 @@ TEST(VmoTestCase, CacheFlush) {
 
   // Check all the valid the combinations.
   //
-  // TODO(https://fxbug.dev/42075218): zx_cache_flush is not yet implemented on riscv64.
+  // TODO(https://fxbug.dev/42075218): zx_cache_flush is not yet fully implemented on riscv64 and
+  // does not yet support ZX_CACHE_FLUSH_INSN
 #if defined(__riscv)
   constexpr zx_status_t expected = ZX_ERR_NOT_SUPPORTED;
 #else
   constexpr zx_status_t expected = ZX_OK;
 #endif
   EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_INSN), "rw flush insn");
-  EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA), "rw clean");
+  EXPECT_EQ(ZX_OK, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA), "rw clean");
   EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INSN),
             "rw clean w/ insn");
-  EXPECT_EQ(expected, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
+  EXPECT_EQ(ZX_OK, zx_cache_flush(prw, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
             "rw clean/invalidate");
   EXPECT_EQ(expected,
             zx_cache_flush(prw, size,
                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE | ZX_CACHE_FLUSH_INSN),
             "rw all");
 
+  // riscv64 does not permit clean operations against RO mappings
+#if !defined(__riscv)
   EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_INSN), "ro flush insn");
-  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA), "ro clean");
+  EXPECT_EQ(ZX_OK, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA), "ro clean");
   EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INSN),
             "ro clean w/ insn");
-  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
-            "ro clean/invalidate");
-  EXPECT_EQ(expected, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
+  EXPECT_EQ(ZX_OK, zx_cache_flush(pro, size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE),
             "ro clean/invalidate");
   EXPECT_EQ(expected,
             zx_cache_flush(pro, size,
                            ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE | ZX_CACHE_FLUSH_INSN),
             "ro all");
+#endif
 
   EXPECT_OK(zx::vmar::root_self()->unmap(ptr_rw, size));
   EXPECT_OK(zx::vmar::root_self()->unmap(ptr_ro, size));

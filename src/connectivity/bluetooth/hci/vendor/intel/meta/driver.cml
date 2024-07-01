@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/bt-hci-intel.so",
         bind: "meta/bind/bt_hci_intel_bind.bindbc",
         colocate: "true",
-        compat: "driver/bt-hci-intel.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

@@ -233,7 +233,7 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
       .child = "n/a",
       .parent = fuchsia_hardware_power::ParentElement::WithName(parent_name),
       .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -331,7 +331,7 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
       .child = "n/a",
       .parent = parent_name_first,
       .level_deps = {{one_to_one}},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   uint16_t dep_two_level = 3;
@@ -344,7 +344,7 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
       .child = "n/a",
       .parent = parent_name_second,
       .level_deps = {{three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -465,7 +465,7 @@ TEST_F(PowerLibTest, LevelDependencyWithSingleParent) {
       .child = "n/a",
       .parent = parent,
       .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -480,7 +480,7 @@ TEST_F(PowerLibTest, LevelDependencyWithSingleParent) {
 
   // Check that the translated dependencies match the ones we put in
   for (auto& dep : deps) {
-    ASSERT_EQ(dep.dependency_type(), fuchsia_power_broker::DependencyType::kActive);
+    ASSERT_EQ(dep.dependency_type(), fuchsia_power_broker::DependencyType::kAssertive);
     uint8_t parent_level =
         static_cast<uint8_t>(child_to_parent_levels.extract(dep.dependent_level()).mapped());
     ASSERT_EQ(dep.requires_level_by_preference().front(), parent_level);
@@ -507,7 +507,7 @@ TEST_F(PowerLibTest, ExtractPowerLevelsFromConfig) {
       .child = "n/a",
       .parent = parent,
       .level_deps = {},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -604,7 +604,7 @@ TEST_F(PowerLibTest, GetTokensOneDepOneLevel) {
               .parent_level = 2,
           }},
       }},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -684,7 +684,7 @@ TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
               .parent_level = 4,
           }},
       }},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -768,7 +768,7 @@ TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
               .parent_level = 2,
           }},
       }},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   // Create a dependency between a level on this element and a level on the
@@ -782,7 +782,7 @@ TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
               .parent_level = 4,
           }},
       }},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -872,7 +872,7 @@ TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
               .parent_level = 2,
           }},
       }},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   // Create a dependency between a level on this element and a level on the
@@ -886,7 +886,7 @@ TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
               .parent_level = 6,
           }},
       }},
-      .strength = fuchsia_hardware_power::RequirementType::kActive,
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -924,21 +924,21 @@ TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
 
 class SystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
  public:
-  SystemActivityGovernor(zx::event exec_state_passive, zx::event wake_handling_active)
-      : exec_state_passive_(std::move(exec_state_passive)),
-        wake_handling_active_(std::move(wake_handling_active)) {}
+  SystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
+      : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
+        wake_handling_assertive_(std::move(wake_handling_assertive)) {}
 
   void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
     fuchsia_power_system::PowerElements elements;
     zx::event execution_element, wake_handling_element;
-    exec_state_passive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
-    wake_handling_active_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
+    exec_state_opportunistic_.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_element);
+    wake_handling_assertive_.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_handling_element);
 
     fuchsia_power_system::ExecutionState exec_state = {
-        {.passive_dependency_token = std::move(execution_element)}};
+        {.opportunistic_dependency_token = std::move(execution_element)}};
 
     fuchsia_power_system::WakeHandling wake_handling = {
-        {.active_dependency_token = std::move(wake_handling_element)}};
+        {.assertive_dependency_token = std::move(wake_handling_element)}};
 
     elements = {
         {.execution_state = std::move(exec_state), .wake_handling = std::move(wake_handling)}};
@@ -953,8 +953,8 @@ class SystemActivityGovernor : public fidl::Server<fuchsia_power_system::Activit
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
  private:
-  zx::event exec_state_passive_;
-  zx::event wake_handling_active_;
+  zx::event exec_state_opportunistic_;
+  zx::event wake_handling_assertive_;
 };
 
 /// Test getting dependency tokens for an element that depends on SAG's power
@@ -963,14 +963,15 @@ TEST_F(PowerLibTest, TestSagElements) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
 
-  zx::event exec_passive, wake_active;
-  zx::event::create(0, &exec_passive);
-  zx::event::create(0, &wake_active);
-  zx::event exec_passive_dupe, wake_active_dupe;
-  exec_passive.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_passive_dupe);
-  wake_active.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_active_dupe);
+  zx::event exec_opportunistic, wake_assertive;
+  zx::event::create(0, &exec_opportunistic);
+  zx::event::create(0, &wake_assertive);
+  zx::event exec_opportunistic_dupe, wake_assertive_dupe;
+  exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe);
+  wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe);
 
-  SystemActivityGovernor sag_server(std::move(exec_passive_dupe), std::move(wake_active_dupe));
+  SystemActivityGovernor sag_server(std::move(exec_opportunistic_dupe),
+                                    std::move(wake_assertive_dupe));
 
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings;
   fbl::RefPtr<fs::Service> sag = fbl::MakeRefCounted<fs::Service>(
@@ -1016,7 +1017,7 @@ TEST_F(PowerLibTest, TestSagElements) {
       .child = "n/a",
       .parent = parent,
       .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kPassive,
+      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -1033,8 +1034,8 @@ TEST_F(PowerLibTest, TestSagElements) {
   fdf_power::TokenMap map = std::move(call_result.value());
   EXPECT_EQ(size_t(1), map.size());
   zx_info_handle_basic_t info1, info2;
-  exec_passive.get_info(ZX_INFO_HANDLE_BASIC, &info1, sizeof(zx_info_handle_basic_t), nullptr,
-                        nullptr);
+  exec_opportunistic.get_info(ZX_INFO_HANDLE_BASIC, &info1, sizeof(zx_info_handle_basic_t), nullptr,
+                              nullptr);
   map.at(parent).get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(zx_info_handle_basic_t), nullptr,
                           nullptr);
   EXPECT_EQ(info1.koid, info2.koid);
@@ -1046,14 +1047,15 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
 
-  zx::event exec_passive, wake_active;
-  zx::event::create(0, &exec_passive);
-  zx::event::create(0, &wake_active);
-  zx::event exec_passive_dupe, wake_active_dupe;
-  exec_passive.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_passive_dupe);
-  wake_active.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_active_dupe);
+  zx::event exec_opportunistic, wake_assertive;
+  zx::event::create(0, &exec_opportunistic);
+  zx::event::create(0, &wake_assertive);
+  zx::event exec_opportunistic_dupe, wake_assertive_dupe;
+  exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe);
+  wake_assertive.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_assertive_dupe);
 
-  SystemActivityGovernor sag_server(std::move(exec_passive_dupe), std::move(wake_active_dupe));
+  SystemActivityGovernor sag_server(std::move(exec_opportunistic_dupe),
+                                    std::move(wake_assertive_dupe));
 
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings;
   fbl::RefPtr<fs::Service> sag = fbl::MakeRefCounted<fs::Service>(
@@ -1109,7 +1111,7 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
       .child = "n/a",
       .parent = parent,
       .level_deps = {{one_to_one, three_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kPassive,
+      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
   }};
 
   fuchsia_hardware_power::LevelTuple two_to_two = {{
@@ -1121,7 +1123,7 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
       .child = "n/a",
       .parent = driver_parent,
       .level_deps = {{two_to_two}},
-      .strength = fuchsia_hardware_power::RequirementType::kPassive,
+      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
   }};
 
   fuchsia_hardware_power::PowerElementConfiguration df_config = {
@@ -1139,8 +1141,8 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
   fdf_power::TokenMap map = std::move(call_result.value());
   EXPECT_EQ(size_t(2), map.size());
   zx_info_handle_basic_t info1, info2;
-  exec_passive.get_info(ZX_INFO_HANDLE_BASIC, &info1, sizeof(zx_info_handle_basic_t), nullptr,
-                        nullptr);
+  exec_opportunistic.get_info(ZX_INFO_HANDLE_BASIC, &info1, sizeof(zx_info_handle_basic_t), nullptr,
+                              nullptr);
   map.at(parent).get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(zx_info_handle_basic_t), nullptr,
                           nullptr);
   EXPECT_EQ(info1.koid, info2.koid);

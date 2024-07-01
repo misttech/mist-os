@@ -568,7 +568,7 @@ void Session::DispatchNotifyThreadExiting(const debug_ipc::NotifyThreadExiting& 
 }
 
 void Session::HandleException(ThreadImpl* thread, const debug_ipc::NotifyException& notify,
-                              bool set_metadata) {
+                              HandleExceptionSettings settings) {
   if (!thread) {
     LOGS(Warn) << "Received thread exception for an unknown thread: pr:" << notify.thread.id.process
                << " thread: " << notify.thread.id.thread;
@@ -577,8 +577,8 @@ void Session::HandleException(ThreadImpl* thread, const debug_ipc::NotifyExcepti
 
   // First update the thread state so the breakpoint code can query it. This should not issue any
   // notifications.
-  if (set_metadata)
-    thread->SetMetadata(notify.thread);
+  if (settings.set_metadata)
+    thread->SetMetadata(notify.thread, settings.skip_metadata_frames);
 
   // The breakpoints that were hit to pass to the thread stop handler.
   StopInfo info;
@@ -639,25 +639,34 @@ void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, 
     return;
   }
 
+  HandleExceptionSettings settings;
+  settings.set_metadata = set_metadata;
+  settings.skip_metadata_frames = false;
+
   if (thread->process()->HasLoadedSymbols()) {
     // Normal case, just handle the exception.
-    HandleException(thread, notify, set_metadata);
+    HandleException(thread, notify, settings);
     return;
   }
 
   // If we were weakly attached, we may not have symbols yet. Check now if we need to load them,
   // then dispatch the exception to be handled.
-  thread->process()->GetModules(true, [weak_this = GetWeakPtr(), notify, set_metadata, thread](
+  thread->process()->GetModules(true, [weak_this = GetWeakPtr(), notify, settings, thread](
                                           const Err& err, const std::vector<debug_ipc::Module>&) {
     if (err.has_error())
       LOGS(Warn) << err.msg();
 
-    thread->process()->SyncThreads([weak_this, notify, set_metadata, thread]() {
+    thread->process()->SyncThreads([weak_this, notify, settings, thread]() {
       if (weak_this && thread) {
         thread->GetStack().SyncFrames(
-            true, [weak_this, notify, set_metadata, thread](const Err& err) mutable {
-              if (weak_this && thread)
-                weak_this->HandleException(thread, notify, set_metadata);
+            true, [weak_this, notify, settings, thread](const Err& err) mutable {
+              if (weak_this && thread) {
+                // Make sure we don't set the thread's stack to that from the exception
+                // notification, which will not contain the same amount of information that we just
+                // synced from the target.
+                settings.skip_metadata_frames = true;
+                weak_this->HandleException(thread, notify, settings);
+              }
             });
       }
     });

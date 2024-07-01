@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/syslog/cpp/log_settings.h>
-#include <lib/syslog/cpp/logging_backend.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <algorithm>
@@ -59,13 +58,20 @@ LogMessage::~LogMessage() {
     stream_ << ": " << status_ << " (" << zx_status_get_string(status_) << ")";
   }
 #endif
-  auto buffer = std::make_unique<syslog_runtime::LogBuffer>();
   auto str = stream_.str();
-  syslog_runtime::BeginRecord(buffer.get(), severity_, file_, line_, str.data(), condition_);
-  if (tag_) {
-    syslog_runtime::WriteKeyValue(buffer.get(), "tag", tag_);
+  syslog_runtime::LogBufferBuilder builder(severity_);
+  if (condition_) {
+    builder.WithCondition(condition_);
   }
-  buffer->Flush();
+  builder.WithMsg(str);
+  if (file_) {
+    builder.WithFile(file_, line_);
+  }
+  auto buffer = builder.Build();
+  if (tag_) {
+    buffer.WriteKeyValue("tag", tag_);
+  }
+  buffer.Flush();
   if (severity_ >= LOG_FATAL)
     __builtin_debugtrap();
 }

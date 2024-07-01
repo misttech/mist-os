@@ -278,7 +278,7 @@ class LinkerScriptParseTests(unittest.TestCase):
             with mock.patch.object(
                 linker.LinkerInvocation,
                 "resolve_path",
-                return_value=libdir / lib,
+                return_value=libdir / lib,  # not necessarily normalized
             ) as mock_resolve:
                 expanded = list(
                     link.expand_linker_script(f"INPUT( AS_NEEDED({lib}) )\n")

@@ -15,14 +15,14 @@ class Command:
     """Class for generating ffx command from 'Params'."""
 
     sdk_tool_path: str
-    target: str
+    target: str | None
     test_url: str
-    realm: str
-    max_severity_logs: str
+    realm: str | None
+    max_severity_logs: str | None
     test_args: List[str]
     test_filters: List[str]
     run_disabled_tests: bool
-    parallel: str
+    parallel: str | None
     output_directory: str
 
     @classmethod

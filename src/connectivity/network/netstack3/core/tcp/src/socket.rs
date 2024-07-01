@@ -568,6 +568,95 @@ where
 {
 }
 
+/// A marker trait for all dual stack conversions in [`TcpContext`].
+pub trait DualStackConverter<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
+    OwnedOrRefsBidirectionalConverter<
+        I::ConnectionAndAddr<D, BT>,
+        EitherStack<
+            (
+                Connection<I, I, D, BT>,
+                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+            ),
+            (
+                Connection<I, I::OtherVersion, D, BT>,
+                ConnAddr<ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+            ),
+        >,
+    > + OwnedOrRefsBidirectionalConverter<
+        I::ListenerIpAddr,
+        DualStackListenerIpAddr<I::Addr, NonZeroU16>,
+    > + OwnedOrRefsBidirectionalConverter<
+        ListenerAddr<I::ListenerIpAddr, D>,
+        ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, D>,
+    > + OwnedOrRefsBidirectionalConverter<
+        I::OriginalDstAddr,
+        EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
+    >
+{
+}
+
+impl<I, D, BT, O> DualStackConverter<I, D, BT> for O
+where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    O: OwnedOrRefsBidirectionalConverter<
+            I::ConnectionAndAddr<D, BT>,
+            EitherStack<
+                (
+                    Connection<I, I, D, BT>,
+                    ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+                ),
+                (
+                    Connection<I, I::OtherVersion, D, BT>,
+                    ConnAddr<ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+                ),
+            >,
+        > + OwnedOrRefsBidirectionalConverter<
+            I::ListenerIpAddr,
+            DualStackListenerIpAddr<I::Addr, NonZeroU16>,
+        > + OwnedOrRefsBidirectionalConverter<
+            ListenerAddr<I::ListenerIpAddr, D>,
+            ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, D>,
+        > + OwnedOrRefsBidirectionalConverter<
+            I::OriginalDstAddr,
+            EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
+        >,
+{
+}
+
+/// A marker trait for all single stack conversions in [`TcpContext`].
+pub trait SingleStackConverter<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>:
+    OwnedOrRefsBidirectionalConverter<
+        I::ConnectionAndAddr<D, BT>,
+        (Connection<I, I, D, BT>, ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>),
+    > + OwnedOrRefsBidirectionalConverter<I::ListenerIpAddr, ListenerIpAddr<I::Addr, NonZeroU16>>
+    + OwnedOrRefsBidirectionalConverter<
+        ListenerAddr<I::ListenerIpAddr, D>,
+        ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
+    > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>
+{
+}
+
+impl<I, D, BT, O> SingleStackConverter<I, D, BT> for O
+where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    BT: TcpBindingsTypes,
+    O: OwnedOrRefsBidirectionalConverter<
+            I::ConnectionAndAddr<D, BT>,
+            (
+                Connection<I, I, D, BT>,
+                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, D>,
+            ),
+        > + OwnedOrRefsBidirectionalConverter<I::ListenerIpAddr, ListenerIpAddr<I::Addr, NonZeroU16>>
+        + OwnedOrRefsBidirectionalConverter<
+            ListenerAddr<I::ListenerIpAddr, D>,
+            ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
+        > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>,
+{
+}
+
 /// Core context for TCP.
 pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     TcpDemuxContext<I, Self::WeakDeviceId, BC> + IpSocketHandler<I, BC>
@@ -589,17 +678,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     /// A collection of type assertions that must be true in the single stack
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
-    type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
-            I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
-            (
-                Connection<I, I, Self::WeakDeviceId, BC>,
-                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
-            ),
-        > + OwnedOrRefsBidirectionalConverter<I::ListenerIpAddr, ListenerIpAddr<I::Addr, NonZeroU16>>
-        + OwnedOrRefsBidirectionalConverter<
-            ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
-            ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-        > + OwnedOrRefsBidirectionalConverter<I::OriginalDstAddr, I::Addr>;
+    type SingleStackConverter: SingleStackConverter<I, Self::WeakDeviceId, BC>;
 
     /// The core context that will give access to both versions of the IP layer.
     type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
@@ -620,34 +699,7 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     /// A collection of type assertions that must be true in the dual stack
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
-    type DualStackConverter: OwnedOrRefsBidirectionalConverter<
-            I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
-            EitherStack<
-                (
-                    Connection<I, I, Self::WeakDeviceId, BC>,
-                    ConnAddr<
-                        ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        Self::WeakDeviceId,
-                    >,
-                ),
-                (
-                    Connection<I, I::OtherVersion, Self::WeakDeviceId, BC>,
-                    ConnAddr<
-                        ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        Self::WeakDeviceId,
-                    >,
-                ),
-            >,
-        > + OwnedOrRefsBidirectionalConverter<
-            I::ListenerIpAddr,
-            DualStackListenerIpAddr<I::Addr, NonZeroU16>,
-        > + OwnedOrRefsBidirectionalConverter<
-            ListenerAddr<I::ListenerIpAddr, Self::WeakDeviceId>,
-            ListenerAddr<DualStackListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-        > + OwnedOrRefsBidirectionalConverter<
-            I::OriginalDstAddr,
-            EitherStack<I::Addr, <I::OtherVersion as Ip>::Addr>,
-        >;
+    type DualStackConverter: DualStackConverter<I, Self::WeakDeviceId, BC>;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
     fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
@@ -1014,8 +1066,7 @@ impl<S: SpecSocketId> SocketMapAddrStateSpec for ListenerAddrState<S> {
 
     fn contains_id(&self, id: &Self::Id) -> bool {
         match self {
-            Self::ExclusiveBound(x) => id == x,
-            Self::ExclusiveListener(x) => id == x,
+            Self::ExclusiveBound(x) | Self::ExclusiveListener(x) => id == x,
             Self::Shared { listener, bound } => {
                 listener.as_ref().is_some_and(|x| id == x) || bound.contains(id)
             }
@@ -1396,6 +1447,7 @@ struct ConnAddrState<S> {
 }
 
 impl<S: SpecSocketId> ConnAddrState<S> {
+    #[cfg_attr(feature = "instrumented", track_caller)]
     pub(crate) fn id(&self) -> S {
         self.id.clone()
     }
@@ -3197,6 +3249,7 @@ where
                             core_ctx: &mut CC,
                             bindings_ctx: &mut BC,
                             id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                            demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
                             conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
                             addr: &ConnAddr<
                                 ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
@@ -3212,6 +3265,7 @@ where
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
                         {
+                            let was_closed = matches!(conn.state, State::Closed(_));
                             match core_ctx.with_counters(|counters| {
                                 conn.state.close(
                                     counters,
@@ -3220,7 +3274,21 @@ where
                                 )
                             }) {
                                 Ok(()) => {
+                                    // We should not be here if we were already closed.
+                                    assert!(!was_closed);
                                     do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
+                                    if matches!(conn.state, State::Closed(_)) {
+                                        // Uphold the invariant that we remove
+                                        // ourselves from the demux when moving
+                                        // to the closed state.
+                                        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
+                                            socketmap
+                                                .conns_mut()
+                                                .remove(demux_id, addr)
+                                                .expect("failed to remove from socketmap");
+                                        });
+                                        let _: Option<_> = bindings_ctx.cancel_timer(timer);
+                                    }
                                     Ok(())
                                 }
                                 Err(CloseError::NoConnection) => Err(NoConnection),
@@ -3230,16 +3298,36 @@ where
                         match core_ctx {
                             MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                                 let (conn, addr) = converter.convert(conn);
-                                do_shutdown(core_ctx, bindings_ctx, id, conn, addr, timer)?
+                                do_shutdown(
+                                    core_ctx,
+                                    bindings_ctx,
+                                    id,
+                                    &I::into_demux_socket_id(id.clone()),
+                                    conn,
+                                    addr,
+                                    timer,
+                                )?
                             }
                             MaybeDualStack::DualStack((core_ctx, converter)) => {
                                 match converter.convert(conn) {
-                                    EitherStack::ThisStack((conn, addr)) => {
-                                        do_shutdown(core_ctx, bindings_ctx, id, conn, addr, timer)?
-                                    }
-                                    EitherStack::OtherStack((conn, addr)) => {
-                                        do_shutdown(core_ctx, bindings_ctx, id, conn, addr, timer)?
-                                    }
+                                    EitherStack::ThisStack((conn, addr)) => do_shutdown(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        id,
+                                        &I::into_demux_socket_id(id.clone()),
+                                        conn,
+                                        addr,
+                                        timer,
+                                    )?,
+                                    EitherStack::OtherStack((conn, addr)) => do_shutdown(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        id,
+                                        &core_ctx.into_other_demux_socket_id(id.clone()),
+                                        conn,
+                                        addr,
+                                        timer,
+                                    )?,
                                 }
                             }
                         };
@@ -4353,10 +4441,6 @@ where
     }
 }
 
-/// A type to expose to bindings in the case of deferred resource removal.
-#[derive(Default)]
-struct TcpSocketResource<I: Ip>(IpVersionMarker<I>);
-
 /// Destroys the socket with `id`.
 fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsContext>(
     core_ctx: &mut CC,
@@ -4383,8 +4467,8 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
             hash_map::Entry::Vacant(v) => {
                 let id = v.key();
                 let TcpSocketId(rc) = id;
-                if StrongRc::marked_for_destruction(rc) {
-                    // Socket is already marked for destruction, we've raced
+                if !StrongRc::marked_for_destruction(rc) {
+                    // Socket is not yet marked for destruction, we've raced
                     // this removal with the addition to the socket set. Mark
                     // the entry as DOA.
                     debug!(
@@ -4416,7 +4500,10 @@ fn destroy_socket<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsConte
             BC::unwrap_or_notify_with_new_reference_notifier(primary, |state| state);
         match remove_result {
             RemoveResourceResult::Removed(state) => debug!("destroyed {weak:?} {state:?}"),
-            RemoveResourceResult::Deferred(receiver) => bindings_ctx.defer_removal(receiver),
+            RemoveResourceResult::Deferred(receiver) => {
+                debug!("deferred removal {weak:?}");
+                bindings_ctx.defer_removal(receiver)
+            }
         }
     })
 }
@@ -4543,6 +4630,7 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         let _: Option<_> = bindings_ctx.cancel_timer(timer);
     }
 
+    debug!("aborting pending socket {sock_id:?}");
     if let Some(reset) = core_ctx.with_counters(|counters| state.abort(counters)) {
         let ConnAddr { ip, device: _ } = conn_addr;
         send_tcp_segment(core_ctx, bindings_ctx, Some(sock_id), Some(ip_sock), *ip, reset.into());
@@ -4743,9 +4831,8 @@ pub enum ListenError {
 }
 
 /// Possible error for calling `shutdown` on a not-yet connected socket.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, GenericOverIp, Eq, PartialEq)]
 #[generic_over_ip()]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NoConnection;
 
 /// Error returned when attempting to set the ReuseAddress option.
@@ -4764,28 +4851,28 @@ pub enum SetReuseAddrError {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum ConnectError {
     /// Cannot allocate a local port for the connection.
-    #[error("Unable to allocate a port")]
+    #[error("unable to allocate a port")]
     NoPort,
     /// Cannot find a route to the remote host.
-    #[error("No route to remote host")]
+    #[error("no route to remote host")]
     NoRoute,
     /// There was a problem with the provided address relating to its zone.
-    #[error("{}", _0)]
+    #[error(transparent)]
     Zone(#[from] ZonedAddressError),
     /// There is an existing connection with the same 4-tuple.
-    #[error("There is already a connection at the address requested")]
+    #[error("there is already a connection at the address requested")]
     ConnectionExists,
     /// Doesn't support `connect` for a listener.
-    #[error("Called connect on a listener")]
+    #[error("called connect on a listener")]
     Listener,
     /// The handshake is still going on.
-    #[error("The handshake has already started")]
+    #[error("the handshake has already started")]
     Pending,
     /// Cannot call connect on a connection that is already established.
-    #[error("The handshake is completed")]
+    #[error("the handshake is completed")]
     Completed,
     /// The handshake is refused by the remote host.
-    #[error("The handshake is aborted")]
+    #[error("the handshake is aborted")]
     Aborted,
 }
 
@@ -4794,7 +4881,7 @@ pub enum ConnectError {
 #[generic_over_ip()]
 pub enum BindError {
     /// The socket was already bound.
-    #[error("The socket was already bound")]
+    #[error("the socket was already bound")]
     AlreadyBound,
     /// The socket cannot bind to the local address.
     #[error(transparent)]
@@ -5200,50 +5287,15 @@ mod tests {
     use crate::internal::state::{TimeWait, MSL};
 
     trait TcpTestIpExt: DualStackIpExt + TestIpExt + IpDeviceStateIpExt + DualStackIpExt {
-        type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
-            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
-            (
-                Connection<
-                    Self,
-                    Self,
-                    FakeWeakDeviceId<FakeDeviceId>,
-                    TcpBindingsCtx<FakeDeviceId>,
-                >,
-                ConnAddr<
-                    ConnIpAddr<<Self as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                    FakeWeakDeviceId<FakeDeviceId>,
-                >,
-            ),
+        type SingleStackConverter: SingleStackConverter<
+            Self,
+            FakeWeakDeviceId<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
         >;
-
-        type DualStackConverter: OwnedOrRefsBidirectionalConverter<
-            Self::ConnectionAndAddr<FakeWeakDeviceId<FakeDeviceId>, TcpBindingsCtx<FakeDeviceId>>,
-            EitherStack<
-                (
-                    Connection<
-                        Self,
-                        Self,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                        TcpBindingsCtx<FakeDeviceId>,
-                    >,
-                    ConnAddr<
-                        ConnIpAddr<<Self as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                    >,
-                ),
-                (
-                    Connection<
-                        Self,
-                        Self::OtherVersion,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                        TcpBindingsCtx<FakeDeviceId>,
-                    >,
-                    ConnAddr<
-                        ConnIpAddr<<Self::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        FakeWeakDeviceId<FakeDeviceId>,
-                    >,
-                ),
-            >,
+        type DualStackConverter: DualStackConverter<
+            Self,
+            FakeWeakDeviceId<FakeDeviceId>,
+            TcpBindingsCtx<FakeDeviceId>,
         >;
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
 

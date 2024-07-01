@@ -583,6 +583,11 @@ type WlanAssociationConfig = table {
 closed protocol WlanSoftmacBase {
     /// Gets general information about the device and its supported features.
     /// This method is safe to call even when the SoftMAC has not yet started.
+    ///
+    /// Note: The implementation of this method must not depend on a response
+    /// from an ethernet driver, otherwise there is a risk of deadlock.
+    /// The wlansoftmac driver calls this method synchronously while
+    /// serving the fuchsia.hardware.ethernet/EthernetImpl.Query method.
     @available(added=HEAD)
     @selector("fuchsia.wlan.softmac/WlanSoftmac.Query")
     strict Query() -> (WlanSoftmacQueryResponse) error zx.Status;
@@ -598,6 +603,11 @@ closed protocol WlanSoftmacBase {
 
     /// Gets information about the MAC features supported by the device. This
     /// method is safe to call even when the SoftMAC has not yet started.
+    ///
+    /// Note: The implementation of this method must not depend on a response
+    /// from an ethernet driver, otherwise there is a risk of deadlock.
+    /// The wlansoftmac driver calls this method synchronously while
+    /// serving the fuchsia.hardware.ethernet/EthernetImpl.Query method.
     @available(added=HEAD)
     @selector("fuchsia.wlan.softmac/WlanSoftmac.QueryMacSublayerSupport")
     strict QueryMacSublayerSupport() -> (struct {

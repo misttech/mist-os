@@ -6,12 +6,11 @@ use anyhow::Result;
 use diagnostics_assertions::{tree_assertion, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_power_topology_test as fpt;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
 };
-use fuchsia_zircon as zx;
 use tracing::*;
+use {fidl_fuchsia_power_topology_test as fpt, fuchsia_zircon as zx};
 
 const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
 
@@ -258,7 +257,7 @@ async fn test_invalid_topology() -> Result<()> {
         initial_current_level: 0,
         valid_levels: vec![0, 1],
         dependencies: vec![fpt::LevelDependency {
-            dependency_type: fpt::DependencyType::Active,
+            dependency_type: fpt::DependencyType::Assertive,
             dependent_level: 1,
             requires_element: "element2".to_string(),
             requires_level: 1,
@@ -323,7 +322,7 @@ async fn test_topology_control() -> Result<()> {
             initial_current_level: 0,
             valid_levels: vec![0, 5],
             dependencies: vec![fpt::LevelDependency {
-                dependency_type: fpt::DependencyType::Active,
+                dependency_type: fpt::DependencyType::Assertive,
                 dependent_level: 5,
                 requires_element: "P".to_string(),
                 requires_level: 50,
@@ -334,7 +333,7 @@ async fn test_topology_control() -> Result<()> {
             initial_current_level: 0,
             valid_levels: vec![0, 3],
             dependencies: vec![fpt::LevelDependency {
-                dependency_type: fpt::DependencyType::Active,
+                dependency_type: fpt::DependencyType::Assertive,
                 dependent_level: 3,
                 requires_element: "P".to_string(),
                 requires_level: 30,
@@ -346,13 +345,13 @@ async fn test_topology_control() -> Result<()> {
             valid_levels: vec![0, 30, 50],
             dependencies: vec![
                 fpt::LevelDependency {
-                    dependency_type: fpt::DependencyType::Active,
+                    dependency_type: fpt::DependencyType::Assertive,
                     dependent_level: 50,
                     requires_element: "GP".to_string(),
                     requires_level: 200,
                 },
                 fpt::LevelDependency {
-                    dependency_type: fpt::DependencyType::Active,
+                    dependency_type: fpt::DependencyType::Assertive,
                     dependent_level: 30,
                     requires_element: "GP".to_string(),
                     requires_level: 90,

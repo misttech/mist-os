@@ -13,11 +13,11 @@
 using namespace ktrace_provider;
 
 int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   if (!fxl::SetLogSettingsFromCommandLine(command_line))
     return 1;
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "ktrace_provider");
   trace_provider.SetGetKnownCategoriesCallback(
       []() { return fpromise::make_ok_promise(GetKnownCategories()); });

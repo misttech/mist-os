@@ -395,9 +395,19 @@ config("linker_string_merging") {
 
 # Disable remote linking for C++ executables.
 # This can be useful on large targets that OOM remotely.
+# Alternatively, try a bigger worker, following the instructions
+# in build/toolchain/concurrent_jobs.gni for "link_highmem".
 config("no_remote_link") {
   if (link_rbe_enable) {
     ldflags = [ "--remote-flag=--local" ]
+  }
+}
+
+# This option enables a workaround that finds linker inputs
+# where reclient fails to do so.  See b/346439263, b/349448459.
+config("remote_link_scandeps_workaround") {
+  if (link_rbe_enable) {
+    ldflags = [ "--remote-flag=--scandeps" ]
   }
 }
 

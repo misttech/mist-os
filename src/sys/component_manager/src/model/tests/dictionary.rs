@@ -9,7 +9,9 @@ use crate::model::testing::routing_test_helpers::*;
 use cm_rust::*;
 use cm_rust_testing::*;
 use fidl::endpoints::{self, ServerEnd};
+use fidl::Rights;
 use fidl_fidl_examples_routing_echo::EchoMarker;
+use fuchsia_zircon::HandleBased;
 use futures::TryStreamExt;
 use moniker::Moniker;
 use routing_test_helpers::RoutingTestModel;
@@ -1358,12 +1360,14 @@ async fn extend_from_program() {
     capability::open_framework(&factory_host, test.model.root(), server.into()).await.unwrap();
 
     // Create a dictionary with a Sender at "A" for the Echo protocol.
-    let dict = factory.create_dictionary().await.unwrap();
-    let dict = dict.into_proxy().unwrap();
+    let dict_ref = factory.create_dictionary().await.unwrap();
+    let dict_token = dict_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+    let (dict_proxy, server) = endpoints::create_proxy::<fsandbox::DictionaryMarker>().unwrap();
+    factory.open_dictionary(dict_ref, server).unwrap();
     let (receiver_client, mut receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
     let connector = factory.create_connector(receiver_client).await.unwrap();
-    dict.insert("A", fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
+    dict_proxy.insert("A", fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
 
     // Serve the Echo protocol from the Receiver.
     let _receiver_task = fasync::Task::spawn(async move {
@@ -1384,19 +1388,20 @@ async fn extend_from_program() {
     // Serve the Router protocol from the root's out dir. Its implementation calls Dictionary/Clone
     // and returns the handle.
     let mut root_out_dir = OutDir::new();
-    let dict_clone = Clone::clone(&dict);
     root_out_dir.add_entry(
         format!("/{ROUTER_PATH}").parse().unwrap(),
         vfs::service::endpoint(move |scope, channel| {
             let server_end: ServerEnd<fsandbox::RouterMarker> = channel.into_zx_channel().into();
             let mut stream = server_end.into_stream().unwrap();
-            let dict = Clone::clone(&dict_clone);
+            let dict_token = dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
             scope.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {
                     match request {
                         fsandbox::RouterRequest::Route { payload: _, responder } => {
-                            let client_end = dict.clone().await.unwrap();
-                            let capability = fsandbox::Capability::Dictionary(client_end);
+                            let dict_ref = fsandbox::DictionaryRef {
+                                token: dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap(),
+                            };
+                            let capability = fsandbox::Capability::Dictionary(dict_ref);
                             let _ = responder.send(Ok(capability));
                         }
                         fsandbox::RouterRequest::_UnknownMethod { .. } => {
@@ -1422,7 +1427,7 @@ async fn extend_from_program() {
     }
 
     // Now, remove "A" from the dictionary. Using "A" this time should fail.
-    let _ = dict.remove("A").await.unwrap().unwrap();
+    let _ = dict_proxy.remove("A").await.unwrap().unwrap();
     test.check_use(
         "leaf".try_into().unwrap(),
         CheckUse::Protocol {

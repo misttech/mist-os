@@ -537,8 +537,7 @@ TEST(RawSocketICMPv6Test, FilterICMPPackets) {
   SKIP_IF_CANT_ACCESS_RAW_SOCKETS();
 
   fbl::unique_fd fd;
-  ASSERT_TRUE(fd = fbl::unique_fd(socket(AF_INET6, SOCK_RAW | SOCK_NONBLOCK, IPPROTO_ICMPV6)))
-      << strerror(errno);
+  ASSERT_TRUE(fd = fbl::unique_fd(socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6))) << strerror(errno);
 
   constexpr sockaddr_in6 kLoopbackAddr = {
       .sin6_family = AF_INET6,
@@ -598,7 +597,7 @@ TEST(RawSocketICMPv6Test, FilterICMPPackets) {
     icmp6_hdr got_packet;
     sockaddr_in6 sender;
     socklen_t sender_len = sizeof(sender);
-    ASSERT_EQ(recvfrom(fd.get(), &got_packet, sizeof(got_packet), 0 /* flags */,
+    ASSERT_EQ(recvfrom(fd.get(), &got_packet, sizeof(got_packet), MSG_DONTWAIT,
                        reinterpret_cast<sockaddr*>(&sender), &sender_len),
               -1);
     EXPECT_EQ(errno, EAGAIN);

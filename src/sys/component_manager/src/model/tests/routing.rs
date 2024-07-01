@@ -21,7 +21,7 @@ use {
                 StopAction,
             },
             component::{IncomingCapabilities, StartReason},
-            routing::router_ext::WeakComponentTokenExt,
+            routing::router_ext::WeakInstanceTokenExt,
             routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{
                 echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
@@ -45,11 +45,11 @@ use {
     cm_types::RelativePath,
     errors::{ActionError, ModelError, ResolveActionError, StartActionError},
     fasync::TestExecutor,
-    fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd},
+    fidl::endpoints::{ProtocolMarker, ServerEnd},
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+    fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{
         channel::{mpsc, oneshot},
@@ -65,7 +65,7 @@ use {
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
-    sandbox::{Routable, WeakComponentToken},
+    sandbox::{Routable, WeakInstanceToken},
     std::{
         collections::HashSet,
         pin::pin,
@@ -1092,8 +1092,6 @@ async fn create_child_with_dict() {
     // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
     dict.insert("hippo".parse().unwrap(), sender.into()).expect("dict entry already exists");
 
-    let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
-
     let test = RoutingTest::new("a", components).await;
     test.create_dynamic_child_with_args(
         &Moniker::root(),
@@ -1106,10 +1104,7 @@ async fn create_child_with_dict() {
             on_terminate: None,
             config_overrides: None,
         },
-        fcomponent::CreateChildArgs {
-            dictionary: Some(dictionary_client_end),
-            ..Default::default()
-        },
+        fcomponent::CreateChildArgs { dictionary: Some(dict.into()), ..Default::default() },
     )
     .await;
 
@@ -3420,7 +3415,7 @@ async fn source_component_stopping_when_routing() {
             .unwrap()
             .route(sandbox::Request {
                 availability: Availability::Required,
-                target: WeakComponentToken::new_component(root.as_weak()),
+                target: WeakInstanceToken::new_component(root.as_weak()),
                 debug: false,
             })
             .await
@@ -3485,7 +3480,7 @@ async fn source_component_stopped_after_routing_before_open() {
         .unwrap()
         .route(sandbox::Request {
             availability: Availability::Required,
-            target: WeakComponentToken::new_component(root.as_weak()),
+            target: WeakInstanceToken::new_component(root.as_weak()),
             debug: false,
         })
         .await
@@ -3555,7 +3550,7 @@ async fn source_component_shutdown_after_routing_before_open() {
         .unwrap()
         .route(sandbox::Request {
             availability: Availability::Required,
-            target: WeakComponentToken::new_component(root.as_weak()),
+            target: WeakInstanceToken::new_component(root.as_weak()),
             debug: false,
         })
         .await

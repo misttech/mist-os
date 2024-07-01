@@ -95,6 +95,7 @@ async fn watch_for_crash(realm: &netemul::TestRealm<'_>, component_moniker: &str
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn version<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
 
@@ -146,9 +147,11 @@ impl TestIpExt for net_types::ip::Ipv6 {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(Protocol::Tcp; "tcp")]
 #[test_case(Protocol::Udp; "udp")]
-async fn loopback<N: Netstack, I: net_types::ip::Ip + TestIpExt>(name: &str, protocol: Protocol) {
+async fn loopback<N: Netstack, I: TestIpExt>(name: &str, protocol: Protocol) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
 
     const SERVER_MONIKER: &str = "iperf-server";

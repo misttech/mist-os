@@ -35,7 +35,7 @@ namespace debug_ipc {
 //   - More complex logic could be implemented by checking the protocol version before sending.
 //
 // NOTE: Before you want to bump the kCurrentProtocolVersion, please make sure that
-// CURRENT_SUPPORTED_API_LEVEL is equal to NEXT_STABLE_API_LEVEL.
+// CURRENT_SUPPORTED_API_LEVEL is equal to the numbered API level currently represented by "NEXT".
 // If not, continue reading the comments below.
 
 constexpr uint32_t kCurrentProtocolVersion = 63;
@@ -43,17 +43,16 @@ constexpr uint32_t kCurrentProtocolVersion = 63;
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
 //
+// Let NEXT_STABLE_API_LEVEL = The numbered API level currently represented by "NEXT".
+//
 // We want to maintain a compatibility window of 2 major releases, so that zxdb built with a given
 // NEXT_STABLE_API_LEVEL could support debug_agent built between NEXT_STABLE_API_LEVEL-2 (inclusive)
 // and NEXT_STABLE_API_LEVEL+2 (inclusive). This exceeds the minimum compatibility required by
 // RFC-0169, which only requires forward compatibility (older zxdb with newer debug_agent).
 //
 // To achieve this, kMinimumProtocolVersion must be set to the initial protocol version used in
-// NEXT_STABLE_API_LEVEL-2. The following macros are used to ensure that kMinimumProtocolVersion is
-// set based on NEXT_STABLE_API_LEVEL.
+// NEXT_STABLE_API_LEVEL-2.
 //
-// To avoid blocking NEXT_STABLE_API_LEVEL bumps, we allow CURRENT_SUPPORTED_API_LEVEL to be out of
-// sync with NEXT_STABLE_API_LEVEL, as long as the kCurrentProtocolVersion stays the same.
 // When NEXT_STABLE_API_LEVEL changes, we need to update those macros as the following:
 //
 //   - INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 = INITIAL_VERSION_FOR_API_LEVEL_MINUS_1
@@ -66,16 +65,7 @@ constexpr uint32_t kCurrentProtocolVersion = 63;
 #define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 60
 #define CURRENT_SUPPORTED_API_LEVEL 19
 
-#if !defined(NEXT_STABLE_API_LEVEL)
-#error `NEXT_STABLE_API_LEVEL` must be defined
-#elif NEXT_STABLE_API_LEVEL < CURRENT_SUPPORTED_API_LEVEL
-#error `NEXT_STABLE_API_LEVEL` must be at least CURRENT_SUPPORTED_API_LEVEL
-#elif NEXT_STABLE_API_LEVEL == CURRENT_SUPPORTED_API_LEVEL
 constexpr uint32_t kMinimumProtocolVersion = INITIAL_VERSION_FOR_API_LEVEL_MINUS_2;
-#else
-// If this branch is chosen, please update as above.
-constexpr uint32_t kMinimumProtocolVersion = INITIAL_VERSION_FOR_API_LEVEL_MINUS_1;
-#endif
 
 // This is so that it's obvious if the timestamp wasn't properly set (that number should be at
 // least 30,000 years) but it's not the max so that if things add to it then time keeps moving

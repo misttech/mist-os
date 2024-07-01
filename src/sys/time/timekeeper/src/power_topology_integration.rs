@@ -47,9 +47,9 @@ where
 
     let _ignore = activity.send(super::Command::PowerManagement).await;
     if let Some(execution_state) = power_elements.execution_state {
-        if let Some(token) = execution_state.passive_dependency_token {
+        if let Some(token) = execution_state.opportunistic_dependency_token {
             let deps = vec![fpb::LevelDependency {
-                dependency_type: fpb::DependencyType::Passive,
+                dependency_type: fpb::DependencyType::Opportunistic,
                 dependent_level: POWER_ON,
                 requires_token: token,
                 requires_level_by_preference: vec![REQUIRED_LEVEL],
@@ -63,8 +63,6 @@ where
                     initial_current_level: Some(POWER_ON),
                     valid_levels: Some(vec![POWER_ON, POWER_OFF]),
                     dependencies: Some(deps),
-                    active_dependency_tokens_to_register: Some(vec![]),
-                    passive_dependency_tokens_to_register: Some(vec![]),
                     level_control_channels: Some(fpb::LevelControlChannels {
                         current: current_level_channel,
                         required: required_level_channel,
@@ -276,7 +274,7 @@ mod tests {
                         responder
                             .send(fps::PowerElements {
                                 execution_state: Some(fps::ExecutionState {
-                                    passive_dependency_token: Some(event),
+                                    opportunistic_dependency_token: Some(event),
                                     ..Default::default()
                                 }),
                                 ..Default::default()

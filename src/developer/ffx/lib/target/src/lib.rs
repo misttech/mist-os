@@ -15,7 +15,9 @@ use fidl_fuchsia_developer_ffx::{
     self as ffx, DaemonError, DaemonProxy, TargetCollectionMarker, TargetCollectionProxy,
     TargetInfo, TargetMarker, TargetQuery,
 };
-use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
+use fidl_fuchsia_developer_remotecontrol::{
+    IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy,
+};
 use fidl_fuchsia_net as net;
 use fuchsia_async::TimeoutExt;
 use futures::future::join_all;
@@ -32,6 +34,10 @@ use timeout::timeout;
 use tracing::{debug, info};
 
 mod connection;
+
+#[cfg(test)]
+use {mockall::mock, mockall::predicate::*};
+
 mod fidl_pipe;
 mod overnet_connector;
 mod ssh_connector;
@@ -51,6 +57,7 @@ pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
 const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
 const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
+const CONFIG_TARGET_SSH_TIMEOUT: &str = "target.host_pipe_ssh_timeout";
 
 /// Attempt to connect to RemoteControl on a target device using a connection to a daemon.
 ///
@@ -62,10 +69,13 @@ pub async fn get_remote_proxy(
     daemon_proxy: DaemonProxy,
     proxy_timeout: Duration,
     mut target_info: Option<&mut Option<TargetInfo>>,
-    env_context: &EnvironmentContext,
+    context: &EnvironmentContext,
 ) -> Result<RemoteControlProxy> {
+    // See if we need to do local resolution. (Do it here not in
+    // open_target_with_fut because o_t_w_f is not async)
+    let target_spec = maybe_locally_resolve_target_spec(target_spec, context).await?;
     let (target_proxy, target_proxy_fut) =
-        open_target_with_fut(target_spec.clone(), daemon_proxy, proxy_timeout, env_context)?;
+        open_target_with_fut(target_spec.clone(), daemon_proxy, proxy_timeout, context)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
     let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
     let mut open_remote_control_fut =
@@ -168,35 +178,238 @@ pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
         || !ffx_config::is_mdns_discovery_disabled(ctx).await
 }
 
-fn non_empty_match_name(on1: &Option<String>, on2: &Option<String>) -> bool {
-    match (on1, on2) {
-        (Some(n1), Some(n2)) => n1 == n2,
-        _ => false,
-    }
-}
-
-fn non_empty_match_addr(state: &discovery::TargetState, sa: &Option<SocketAddr>) -> bool {
-    match (state, sa) {
-        (discovery::TargetState::Product(addrs), Some(sa)) => {
-            addrs.iter().any(|a| a.ip() == sa.ip())
-        }
-        _ => false,
-    }
-}
-
 // Descriptions are used for matching against a TargetInfoQuery
-fn handle_to_description(handle: &discovery::TargetHandle) -> Description {
-    let addresses = match &handle.state {
-        discovery::TargetState::Product(target_addr) => target_addr.clone(),
-        _ => vec![],
+fn handle_to_description(handle: &TargetHandle) -> Description {
+    let (addresses, serial) = match &handle.state {
+        TargetState::Product(target_addr) => (target_addr.clone(), None),
+        TargetState::Fastboot(discovery::FastbootTargetState { serial_number: sn, .. }) => {
+            (vec![], Some(sn.clone()))
+        }
+        _ => (vec![], None),
     };
-    Description { nodename: handle.node_name.clone(), addresses, ..Default::default() }
+    Description { nodename: handle.node_name.clone(), addresses, serial, ..Default::default() }
 }
 
+// Group the information collected when resolving the address. (This is
+// particularly important for the rcs_proxy, which we may need when resolving
+// a manual target -- we don't want make an RCS connection just to resolve the
+// name, drop it, then re-establish it later.)
+enum ResolutionTarget {
+    Addr(SocketAddr),
+    Serial(String),
+}
+
+impl ResolutionTarget {
+    // If the target is a product, pull out the "best" address from the
+    // target, and return it.
+    fn from_target_handle(target: &TargetHandle) -> Result<ResolutionTarget> {
+        match &target.state {
+            TargetState::Product(ref addresses) => {
+                if addresses.is_empty() {
+                    bail!("Target discovered but does not contain addresses: {target:?}");
+                }
+                let mut addrs_sorted = addresses
+                    .into_iter()
+                    .map(SocketAddr::from)
+                    .sorted_by(|a1, a2| {
+                        match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
+                            (true, true) | (false, false) => Ordering::Equal,
+                            (true, false) => Ordering::Less,
+                            (false, true) => Ordering::Greater,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let mut sock: SocketAddr = addrs_sorted.pop().unwrap();
+                if sock.port() == 0 {
+                    sock.set_port(SSH_PORT_DEFAULT);
+                }
+                Ok(ResolutionTarget::Addr(sock))
+            }
+            TargetState::Fastboot(fts) => Ok(ResolutionTarget::Serial(fts.serial_number.clone())),
+            state => {
+                Err(anyhow::anyhow!("Target discovered but not in the correct state: {state:?}"))
+            }
+        }
+    }
+
+    fn to_spec(&self) -> String {
+        match &self {
+            ResolutionTarget::Addr(ssh_addr) => {
+                format!("{ssh_addr}")
+            }
+            ResolutionTarget::Serial(serial) => {
+                format!("serial:{serial}")
+            }
+        }
+    }
+}
+
+pub struct Resolution {
+    target: ResolutionTarget,
+    discovered: Option<TargetHandle>,
+    connection: Option<Connection>,
+    rcs_proxy: Option<RemoteControlProxy>,
+    identify_host_response: Option<IdentifyHostResponse>,
+}
+
+impl Resolution {
+    fn from_target(target: ResolutionTarget) -> Self {
+        Self {
+            target,
+            discovered: None,
+            connection: None,
+            rcs_proxy: None,
+            identify_host_response: None,
+        }
+    }
+    fn from_addr(sa: SocketAddr) -> Self {
+        let scope_id = if let SocketAddr::V6(addr) = sa { addr.scope_id() } else { 0 };
+        let port = match sa.port() {
+            0 => SSH_PORT_DEFAULT,
+            p => p,
+        };
+        Self::from_target(ResolutionTarget::Addr(TargetAddr::new(sa.ip(), scope_id, port).into()))
+    }
+
+    fn from_target_handle(th: TargetHandle) -> Result<Self> {
+        let target = ResolutionTarget::from_target_handle(&th)?;
+        Ok(Self { discovered: Some(th), ..Self::from_target(target) })
+    }
+
+    pub fn addr(&self) -> Result<SocketAddr> {
+        match self.target {
+            ResolutionTarget::Addr(addr) => Ok(addr),
+            _ => bail!("target resolved to serial, not socket_addr"),
+        }
+    }
+
+    pub async fn get_connection(&mut self, context: &EnvironmentContext) -> Result<&Connection> {
+        if self.connection.is_none() {
+            let connector = SshConnector::new(self.addr()?, context).await?;
+            let conn = Connection::new(connector)
+                .await
+                .map_err(|e| KnockError::CriticalError(e.into()))?;
+            self.connection = Some(conn);
+        }
+        Ok(self.connection.as_ref().unwrap())
+    }
+
+    pub async fn get_rcs_proxy(
+        &mut self,
+        context: &EnvironmentContext,
+    ) -> Result<&RemoteControlProxy> {
+        if self.rcs_proxy.is_none() {
+            let conn = self.get_connection(context).await?;
+            self.rcs_proxy = Some(conn.rcs_proxy().await?);
+        }
+        Ok(self.rcs_proxy.as_ref().unwrap())
+    }
+
+    pub async fn identify(
+        &mut self,
+        context: &EnvironmentContext,
+    ) -> Result<&IdentifyHostResponse> {
+        if self.identify_host_response.is_none() {
+            let rcs_proxy = self.get_rcs_proxy(context).await?;
+            self.identify_host_response = Some(
+                rcs_proxy
+                    .identify_host()
+                    .await?
+                    .map_err(|e| anyhow::anyhow!("Error identifying host: {e:?}"))?,
+            );
+        }
+        Ok(self.identify_host_response.as_ref().unwrap())
+    }
+}
+
+pub trait QueryResolverT {
+    #[allow(async_fn_in_trait)]
+    async fn resolve_target_query(
+        &self,
+        query: TargetInfoQuery,
+        ctx: &EnvironmentContext,
+    ) -> Result<Vec<TargetHandle>>;
+
+    #[allow(async_fn_in_trait)]
+    async fn try_resolve_manual_target(
+        &self,
+        name: &str,
+        ctx: &EnvironmentContext,
+    ) -> Result<Option<Resolution>>;
+
+    #[allow(async_fn_in_trait)]
+    async fn resolve_target_address(
+        &self,
+        target_spec: &Option<String>,
+        ctx: &EnvironmentContext,
+    ) -> Result<Resolution> {
+        let query = TargetInfoQuery::from(target_spec.clone());
+        if let TargetInfoQuery::Addr(a) = query {
+            return Ok(Resolution::from_addr(a));
+        }
+        let res = self.resolve_single_target(&target_spec, ctx).await?;
+        let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
+        tracing::debug!("resolved target spec {target_spec_info} to address {:?}", res.addr());
+        Ok(res)
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn resolve_single_target(
+        &self,
+        target_spec: &Option<String>,
+        env_context: &EnvironmentContext,
+    ) -> Result<Resolution, anyhow::Error> {
+        let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
+        let query = TargetInfoQuery::from(target_spec.clone());
+        if let TargetInfoQuery::NodenameOrSerial(ref s) = query {
+            match self.try_resolve_manual_target(s, env_context).await {
+                Err(e) => {
+                    tracing::debug!("Failed to resolve target {s} as manual target: {e:?}");
+                }
+                Ok(Some(res)) => return Ok(res),
+                _ => (), // Keep going
+            }
+        }
+        let mut handles = self.resolve_target_query(query, env_context).await?;
+        if handles.len() == 0 {
+            return Err(anyhow::anyhow!(
+                "unable to resolve address for target '{target_spec_info}'"
+            ));
+        }
+        if handles.len() > 1 {
+            return Err(FfxError::DaemonError {
+                err: DaemonError::TargetAmbiguous,
+                target: target_spec.clone(),
+            }
+            .into());
+        }
+        Ok(Resolution::from_target_handle(handles.remove(0))?)
+    }
+}
+
+#[cfg(test)]
+mock! {
+    QueryResolverT{}
+    impl QueryResolverT for QueryResolverT {
+        async fn resolve_target_query(
+            &self,
+            query: TargetInfoQuery,
+            ctx: &EnvironmentContext,
+        ) -> Result<Vec<TargetHandle>>;
+        async fn try_resolve_manual_target(
+            &self,
+            name: &str,
+            ctx: &EnvironmentContext,
+        ) -> Result<Option<Resolution>>;
+    }
+}
+
+/// Attempts to resolve a TargetInfoQuery into a list of discovered targets.
+/// Useful when multiple results are reasonable (e.g. from `ffx target list`)
 pub async fn resolve_target_query(
     query: TargetInfoQuery,
     ctx: &EnvironmentContext,
-) -> Result<Vec<discovery::TargetHandle>> {
+) -> Result<Vec<TargetHandle>> {
     resolve_target_query_with_sources(
         query,
         ctx,
@@ -284,7 +497,7 @@ impl Default for RetrievedTargetInfo {
 impl RetrievedTargetInfo {
     async fn get(context: &EnvironmentContext, addrs: &[addr::TargetAddr]) -> Result<Self> {
         let ssh_timeout: u64 =
-            ffx_config::get("target.host_pipe_ssh_timeout").await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         for addr in addrs {
             tracing::debug!("Trying to make a connection to {addr:?}");
@@ -338,7 +551,7 @@ pub async fn resolve_target_query_with(
     ctx: &EnvironmentContext,
     usb: bool,
     mdns: bool,
-) -> Result<Vec<discovery::TargetHandle>> {
+) -> Result<Vec<TargetHandle>> {
     let mut sources = DiscoverySources::MANUAL | DiscoverySources::EMULATOR;
     if usb {
         sources = sources | DiscoverySources::USB;
@@ -353,71 +566,132 @@ async fn resolve_target_query_with_sources(
     query: TargetInfoQuery,
     ctx: &EnvironmentContext,
     sources: DiscoverySources,
-) -> Result<Vec<discovery::TargetHandle>> {
+) -> Result<Vec<TargetHandle>> {
     // Get nodename, in case we're trying to find an exact match
-    let (qname, qaddr) = match query {
-        TargetInfoQuery::NodenameOrSerial(ref s) => (Some(s.clone()), None),
-        TargetInfoQuery::Addr(ref a) => (None, Some(a.clone())),
-        _ => (None, None),
-    };
+    QueryResolver::new(sources).resolve_target_query(query, ctx).await
+}
 
-    let qsources = query.discovery_sources();
-    // Mask out any sources that the query says shouldn't be used
-    let sources = sources & qsources;
-    let filter = move |handle: &TargetHandle| {
-        let description = handle_to_description(handle);
-        query.match_description(&description)
-    };
-    let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)?;
-    let stream =
-        discovery::wait_for_devices(filter, Some(emu_instance_root), true, false, sources).await?;
-    let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).unwrap_or(2000);
-    let delay = Duration::from_millis(discovery_delay);
+/// Attempts to resolve the query into a target's ssh-able address. It is an error
+/// if it the query doesn't match exactly one target.
+// Perhaps refactor as connect_to_target() -> Result<Connection>, since that seems
+// to be the only way this function is used?
+pub async fn resolve_target_address(
+    target_spec: &Option<String>,
+    ctx: &EnvironmentContext,
+) -> Result<Resolution> {
+    QueryResolver::default().resolve_target_address(target_spec, ctx).await
+}
 
-    // This is tricky. We want the stream to complete immediately if we find
-    // a target whose name matches the query exactly. Otherwise, run until the
-    // timer fires.
-    // We can't use `Stream::wait_until()`, because that would require us
-    // to return true for the found item, and false for the _next_ item.
-    // But there may be no next item, so the stream would end up waiting for
-    // the timer anyway. Instead, we create two futures: the timer, and one
-    // that is ready when we find the name we're looking for. Then we use
-    // `Stream::take_until()`, waiting until _either_ of those futures is ready
-    // (by using `race()`). The only remaining tricky part is that we need to
-    // examine each event to determine if it matches what we're looking for --
-    // so we interpose a closure via `Stream::map()` that examines each item,
-    // before returning them unmodified.
-    // Oh, and once we've got a set of results, if any of them are Err, cause
-    // the whole thing to be an Err.  We could stop the race early in case of
-    // failure by using the same technique, I suppose.
-    let target_events: Result<Vec<TargetEvent>> = {
-        let timer = fuchsia_async::Timer::new(delay).fuse();
-        let found_target_event = async_utils::event::Event::new();
-        let found_it = found_target_event.wait().fuse();
-        let results: Vec<Result<_>> = stream
-            .map(move |ev| {
-                if let Ok(TargetEvent::Added(ref h)) = ev {
-                    if non_empty_match_name(&h.node_name, &qname) {
-                        found_target_event.signal();
-                    } else if non_empty_match_addr(&h.state, &qaddr) {
-                        found_target_event.signal();
-                    }
-                    ev
-                } else {
-                    unreachable!()
+fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
+    match query {
+        TargetInfoQuery::NodenameOrSerial(ref s) => {
+            if let Some(nn) = &h.node_name {
+                if nn == s {
+                    return true;
                 }
-            })
-            .take_until(futures_lite::future::race(timer, found_it))
-            .collect()
-            .await;
-        // Fail if any results are Err
-        let r: Result<Vec<_>> = results.into_iter().collect();
-        r
-    };
+            }
+            if let TargetState::Fastboot(fts) = &h.state {
+                if fts.serial_number == *s {
+                    return true;
+                }
+            }
+        }
+        TargetInfoQuery::Serial(ref s) => {
+            if let TargetState::Fastboot(fts) = &h.state {
+                if fts.serial_number == *s {
+                    return true;
+                }
+            }
+        }
+        TargetInfoQuery::Addr(ref sa) => {
+            if let TargetState::Product(addrs) = &h.state {
+                if addrs.iter().any(|a| a.ip() == sa.ip()) {
+                    return true;
+                }
+            }
+        }
+        TargetInfoQuery::First => {}
+    }
+    false
+}
 
-    // Extract handles from Added events
-    let added_handles: Vec<_> =
-        target_events?
+struct QueryResolver {
+    sources: DiscoverySources,
+}
+
+impl Default for QueryResolver {
+    fn default() -> Self {
+        Self::new(DiscoverySources::all())
+    }
+}
+
+impl QueryResolver {
+    fn new(sources: DiscoverySources) -> Self {
+        Self { sources }
+    }
+}
+
+impl QueryResolverT for QueryResolver {
+    async fn resolve_target_query(
+        &self,
+        query: TargetInfoQuery,
+        ctx: &EnvironmentContext,
+    ) -> Result<Vec<TargetHandle>> {
+        // Get nodename, in case we're trying to find an exact match
+        let query_clone = query.clone();
+        let filter = move |handle: &TargetHandle| {
+            let description = handle_to_description(handle);
+            query_clone.match_description(&description)
+        };
+        let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)?;
+        let stream =
+            discovery::wait_for_devices(filter, Some(emu_instance_root), true, false, self.sources)
+                .await?;
+        let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).unwrap_or(2000);
+        let delay = Duration::from_millis(discovery_delay);
+
+        // This is tricky. We want the stream to complete immediately if we find
+        // a target whose name/serial matches the query exactly. Otherwise, run
+        // until the timer fires.
+        // We can't use `Stream::wait_until()`, because that would require us
+        // to return true for the found item, and false for the _next_ item.
+        // But there may be no next item, so the stream would end up waiting
+        // for the timer anyway. Instead, we create two futures: the timer, and
+        // one that is ready when we find the target we're looking for. Then we
+        // use `Stream::take_until()`, waiting until _either_ of those futures
+        // is ready (by using `race()`). The only remaining tricky part is that
+        // we need to examine each event to determine if it matches what we're
+        // looking for -- so we interpose a closure via `Stream::map()` that
+        // examines each item, before returning them unmodified.
+        // Oh, and once we've got a set of results, if any of them are Err,
+        // cause the whole thing to be an Err.  We could stop the race early in
+        // case of failure by using the same technique, I suppose.
+        let target_events: Result<Vec<TargetEvent>> = {
+            let timer = fuchsia_async::Timer::new(delay).fuse();
+            let found_target_event = async_utils::event::Event::new();
+            let found_it = found_target_event.wait().fuse();
+            let results: Vec<Result<_>> = stream
+                .map(move |ev| {
+                    if let Ok(TargetEvent::Added(ref h)) = ev {
+                        if query_matches_handle(&query, h) {
+                            found_target_event.signal();
+                        }
+                        ev
+                    } else {
+                        unreachable!()
+                    }
+                })
+                .take_until(futures_lite::future::race(timer, found_it))
+                .collect()
+                .await;
+            // Fail if any results are Err
+            tracing::debug!("target events results: {results:?}");
+            let r: Result<Vec<_>> = results.into_iter().collect();
+            r
+        };
+
+        // Extract handles from Added events
+        let added_handles: Vec<_> = target_events?
             .into_iter()
             .map(|e| {
                 if let discovery::TargetEvent::Added(handle) = e {
@@ -428,66 +702,80 @@ async fn resolve_target_query_with_sources(
             })
             .collect();
 
-    // Sometimes libdiscovery returns multiple Added events for the same target (I think always
-    // user emulators). The information is always the same, let's just extract the unique entries.
-    let unique_handles = added_handles.into_iter().collect::<HashSet<_>>();
-    Ok(unique_handles.into_iter().collect())
+        // Sometimes libdiscovery returns multiple Added events for the same target (I think always
+        // user emulators). The information is always the same, let's just extract the unique entries.
+        let unique_handles = added_handles.into_iter().collect::<HashSet<_>>();
+        Ok(unique_handles.into_iter().collect())
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn try_resolve_manual_target(
+        &self,
+        name: &str,
+        ctx: &EnvironmentContext,
+    ) -> Result<Option<Resolution>> {
+        // This is something that is often mocked for testing. An improvement here would be to use the
+        // environment context for locating manual targets.
+        let finder = manual_targets::Config::default();
+        let ssh_timeout: u64 =
+            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+        let ssh_timeout = Duration::from_millis(ssh_timeout);
+        let mut res = None;
+        for t in manual_targets::watcher::parse_manual_targets(&finder).await.into_iter() {
+            let addr = t.addr();
+            let mut resolution = Resolution::from_addr(addr);
+            let identify = resolution
+                .identify(ctx)
+                .on_timeout(ssh_timeout, || {
+                    Err(anyhow::anyhow!(
+                        "timeout after {ssh_timeout:?} identifying manual target {t:?}"
+                    ))
+                })
+                .await?;
+
+            if identify.nodename == Some(String::from(name)) {
+                res = Some(resolution);
+            }
+        }
+        Ok(res)
+    }
 }
 
-/// Attempts to resolve the query into a target's ssh-able address. Returns Some(_) if a target has been
-/// found, None otherwise.
-pub async fn resolve_target_address(
+/// Attempts to resolve the query into an explicit string query that can be
+/// passed to the daemon. If already an address or serial number, just return
+/// it. Otherwise, perform discovery to find the address or serial #. Returns
+/// Some(_) if a target has been found, None otherwise.
+async fn locally_resolve_target_spec<T: QueryResolverT>(
+    target_spec: Option<String>,
+    resolver: &T,
+    env_context: &EnvironmentContext,
+) -> Result<Option<String>> {
+    let query = TargetInfoQuery::from(target_spec.clone());
+    let explicit_spec = match query {
+        TargetInfoQuery::Addr(addr) if addr.port() != 0 => format!("{addr}"),
+        TargetInfoQuery::Serial(sn) => format!("serial:{sn}"),
+        _ => {
+            let resolution = resolver.resolve_single_target(&target_spec, env_context).await?;
+            tracing::debug!(
+                "Locally resolved target '{target_spec:?}' to {:?}",
+                resolution.discovered
+            );
+            resolution.target.to_spec()
+        }
+    };
+
+    Ok(Some(explicit_spec))
+}
+
+/// Check if daemon discovery is disabled, resolving locally if so.
+pub async fn maybe_locally_resolve_target_spec(
     target_spec: Option<String>,
     env_context: &EnvironmentContext,
-) -> Result<SocketAddr> {
-    let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
-    let query = TargetInfoQuery::from(target_spec.clone());
-    // If it's already an address, return it
-    if let TargetInfoQuery::Addr(a) = query {
-        let scope_id = if let SocketAddr::V6(addr) = a { addr.scope_id() } else { 0 };
-        let port = match a.port() {
-            0 => SSH_PORT_DEFAULT,
-            p => p,
-        };
-        return Ok(TargetAddr::new(a.ip(), scope_id, port).into());
-    }
-    let handles = resolve_target_query(query, env_context).await?;
-    if handles.len() == 0 {
-        bail!("unable to resolve address for target '{target_spec_info}'");
-    }
-    if handles.len() > 1 {
-        return Err(FfxError::DaemonError {
-            err: DaemonError::TargetAmbiguous,
-            target: target_spec,
-        }
-        .into());
-    }
-    let target = &handles[0];
-
-    match &target.state {
-        TargetState::Product(ref addresses) => {
-            if addresses.is_empty() {
-                bail!("Target discovered but does not contain addresses: {target:?}");
-            }
-            let mut addrs_sorted = addresses
-                .into_iter()
-                .map(SocketAddr::from)
-                .sorted_by(|a1, a2| {
-                    match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
-                        (true, true) | (false, false) => Ordering::Equal,
-                        (true, false) => Ordering::Less,
-                        (false, true) => Ordering::Greater,
-                    }
-                })
-                .collect::<Vec<_>>();
-            let mut sock: SocketAddr = addrs_sorted.pop().unwrap();
-            if sock.port() == 0 {
-                sock.set_port(SSH_PORT_DEFAULT)
-            }
-            tracing::debug!("resolved target spec '{target_spec_info}' to address {sock}");
-            Ok(sock)
-        }
-        state => Err(anyhow::anyhow!("Target discovered but not in the correct state: {state:?}")),
+) -> Result<Option<String>> {
+    if is_discovery_enabled(env_context).await {
+        Ok(target_spec)
+    } else {
+        locally_resolve_target_spec(target_spec, &QueryResolver::default(), env_context).await
     }
 }
 
@@ -536,27 +824,45 @@ const DOWN_REPOLL_DELAY_MS: u64 = 500;
 
 pub async fn wait_for_device(
     wait_timeout: Option<Duration>,
+    env: &EnvironmentContext,
     target_spec: Option<String>,
     target_collection: &TargetCollectionProxy,
     behavior: WaitFor,
 ) -> Result<(), ffx_command::Error> {
+    if is_discovery_enabled(env).await {
+        wait_for_device_inner(
+            DaemonRcsKnockerImpl { tc_proxy: target_collection },
+            wait_timeout,
+            env,
+            target_spec,
+            behavior,
+        )
+        .await
+    } else {
+        wait_for_device_inner(LocalRcsKnockerImpl, wait_timeout, env, target_spec, behavior).await
+    }
+}
+
+async fn wait_for_device_inner(
+    knocker: impl RcsKnocker,
+    wait_timeout: Option<Duration>,
+    env: &EnvironmentContext,
+    target_spec: Option<String>,
+    behavior: WaitFor,
+) -> Result<(), ffx_command::Error> {
     let target_spec_clone = target_spec.clone();
+    let env = env.clone();
     let knock_fut = async {
         loop {
-            break match knock_target_by_name(
-                &target_spec_clone,
-                target_collection,
-                OPEN_TARGET_TIMEOUT,
-                DEFAULT_RCS_KNOCK_TIMEOUT,
-            )
-            .await
-            {
+            futures_lite::future::yield_now().await;
+            break match knocker.knock_rcs(target_spec_clone.clone(), &env).await {
                 Err(KnockError::CriticalError(e)) => Err(ffx_command::Error::Unexpected(e)),
                 Err(KnockError::NonCriticalError(e)) => {
                     if let WaitFor::DeviceOffline = behavior {
                         Ok(())
                     } else {
                         tracing::debug!("unable to knock target: {e:?}");
+                        async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
                         continue;
                     }
                 }
@@ -585,6 +891,65 @@ pub async fn wait_for_device(
     .await
 }
 
+#[cfg_attr(test, mockall::automock)]
+trait RcsKnocker {
+    fn knock_rcs(
+        &self,
+        target_spec: Option<String>,
+        env: &EnvironmentContext,
+    ) -> impl Future<Output = Result<(), KnockError>>;
+}
+
+impl<T: RcsKnocker + ?Sized> RcsKnocker for Box<T> {
+    fn knock_rcs(
+        &self,
+        target_spec: Option<String>,
+        env: &EnvironmentContext,
+    ) -> impl Future<Output = Result<(), KnockError>> {
+        (**self).knock_rcs(target_spec, env)
+    }
+}
+
+struct LocalRcsKnockerImpl;
+
+impl RcsKnocker for LocalRcsKnockerImpl {
+    async fn knock_rcs(
+        &self,
+        target_spec: Option<String>,
+        env: &EnvironmentContext,
+    ) -> Result<(), KnockError> {
+        knock_target_daemonless(&target_spec, env, Some(DEFAULT_RCS_KNOCK_TIMEOUT)).await.map(
+            |compat| {
+                let msg = match compat {
+                    Some(c) => format!("Received compat info: {c:?}"),
+                    None => format!("No compat info received"),
+                };
+                tracing::debug!("Knocked target. {msg}");
+            },
+        )
+    }
+}
+
+struct DaemonRcsKnockerImpl<'a> {
+    tc_proxy: &'a TargetCollectionProxy,
+}
+
+impl<'a> RcsKnocker for DaemonRcsKnockerImpl<'a> {
+    async fn knock_rcs(
+        &self,
+        target_spec: Option<String>,
+        _env: &EnvironmentContext,
+    ) -> Result<(), KnockError> {
+        knock_target_by_name(
+            &target_spec,
+            self.tc_proxy,
+            OPEN_TARGET_TIMEOUT,
+            DEFAULT_RCS_KNOCK_TIMEOUT,
+        )
+        .await
+    }
+}
+
 /// Attempts to "knock" a target to determine if it is up and connectable via RCS, within
 /// a specified timeout.
 ///
@@ -593,7 +958,7 @@ pub async fn wait_for_device(
 /// and no longer loop.
 ///
 /// The timeout must be longer than `rcs::RCS_KNOCK_TIMEOUT`
-pub async fn knock_target_with_timeout(
+async fn knock_target_with_timeout(
     target: &TargetProxy,
     rcs_timeout: Duration,
 ) -> Result<(), KnockError> {
@@ -658,20 +1023,27 @@ pub async fn knock_target_by_name(
 /// `knock_timeout` is set to `None`, the default timeout will be set to 2 times
 /// `DEFAULT_RCS_KNOCK_TIMEOUT`.
 pub async fn knock_target_daemonless(
-    target_spec: Option<String>,
+    target_spec: &Option<String>,
     context: &EnvironmentContext,
     knock_timeout: Option<Duration>,
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
     let knock_timeout = knock_timeout.unwrap_or(DEFAULT_RCS_KNOCK_TIMEOUT * 2);
     let res_future = async {
         tracing::trace!("resolving target spec address from {target_spec:?}");
-        let address = resolve_target_address(target_spec, context).await?;
-        tracing::debug!("daemonless knock connecting to address {address}");
-        let conn = Connection::new(SshConnector::new(address, context).await?)
-            .await
-            .map_err(|e| KnockError::CriticalError(e.into()))?;
-        tracing::debug!("daemonless knock connection established");
-        let _ = conn.rcs_proxy().await.map_err(|e| KnockError::NonCriticalError(e.into()))?;
+        let res = resolve_target_address(target_spec, context).await?;
+        tracing::debug!("daemonless knock connecting to address {}", res.addr()?);
+        let conn = match res.connection {
+            Some(c) => c,
+            None => {
+                let conn = Connection::new(SshConnector::new(res.addr()?, context).await?)
+                    .await
+                    .map_err(|e| KnockError::CriticalError(e.into()))?;
+                tracing::debug!("daemonless knock connection established");
+                let _ =
+                    conn.rcs_proxy().await.map_err(|e| KnockError::NonCriticalError(e.into()))?;
+                conn
+            }
+        };
         Ok(conn.compatibility_info())
     };
     futures_lite::pin!(res_future);
@@ -735,10 +1107,25 @@ pub async fn add_manual_target(
     } else {
         ffx_bail!("ffx lost connection to the daemon before receiving a response.");
     };
+
+    // Change TargetAddrInfo to TargetAddr so ip can be extracted.
+    // This is similar logic found in get_ssh_address().
+    const DEFAULT_SSH_PORT: u16 = 22;
+    let taddr = TargetAddr::from(&addr);
+    let taddr_str = match taddr.ip() {
+        IpAddr::V4(_) => format!("{}", taddr),
+        IpAddr::V6(_) => format!("[{}]", taddr),
+    };
+
+    // Pass formatted ip and port to target connection error, so it is more user friendly
     res.map_err(|e| {
         let err = e.connection_error.unwrap();
         let logs = e.connection_error_logs.map(|v| v.join("\n"));
-        let target = Some(format!("{addr:?}"));
+        let target = Some(format!(
+            "{}:{}",
+            taddr_str,
+            if taddr.port() == 0 { DEFAULT_SSH_PORT } else { taddr.port() }
+        ));
         FfxError::TargetConnectionError { err, target, logs }.into()
     })
 }
@@ -746,10 +1133,13 @@ pub async fn add_manual_target(
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_command::bug;
     use ffx_config::macro_deps::serde_json::Value;
     use ffx_config::{test_init, ConfigLevel};
+    use futures_lite::future::{pending, ready};
 
     #[fuchsia::test]
+
     async fn test_target_wait_too_short_timeout() {
         let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
         let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
@@ -836,11 +1226,299 @@ mod test {
     async fn test_bad_timeout() {
         let env = test_init().await.unwrap();
         assert!(knock_target_daemonless(
-            Some("foo".to_string()),
+            &Some("foo".to_string()),
             &env.context,
             Some(rcs::RCS_KNOCK_TIMEOUT)
         )
         .await
         .is_err());
     }
+
+    #[fuchsia::test]
+    async fn wait_for_device_knock_works() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(async { Ok(()) }));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(10000)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_hangs_indefinitely() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(pending()));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_critical_error_causes_failure() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().times(1).returning(|_, _| {
+            Box::pin(async { Err(KnockError::CriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_device_critical_error_causes_failure_even_waiting_for_down() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().times(1).returning(|_, _| {
+            Box::pin(async { Err(KnockError::CriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn non_critical_error_causes_eventual_timeout() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| {
+            Box::pin(async { Err(KnockError::NonCriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(3)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn non_critical_error_returns_ok_for_down_target() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| {
+            Box::pin(async { Err(KnockError::NonCriticalError(bug!("Oh no!").into())) })
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn knock_error_reattempt_successful() {
+        let mut mock = MockRcsKnocker::new();
+        let mut seq = mockall::Sequence::new();
+        mock.expect_knock_rcs().times(1).in_sequence(&mut seq).returning(|_, _| {
+            Box::pin(ready(Err(KnockError::NonCriticalError(bug!("timeout").into()))))
+        });
+        mock.expect_knock_rcs()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Box::pin(ready(Ok(()))));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(10)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOnline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_offline_after_online() {
+        let mut mock = MockRcsKnocker::new();
+        let mut seq = mockall::Sequence::new();
+        mock.expect_knock_rcs()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Box::pin(ready(Ok(()))));
+        mock.expect_knock_rcs()
+            .times(1)
+            .in_sequence(&mut seq)
+            .returning(|_, _| Box::pin(ready(Ok(()))));
+        mock.expect_knock_rcs().times(1).in_sequence(&mut seq).returning(|_, _| {
+            Box::pin(ready(Err(KnockError::NonCriticalError(
+                bug!("Oh no it's not connected").into(),
+            ))))
+        });
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(10)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_ok(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn wait_for_down_when_able_to_connect_to_device() {
+        let mut mock = MockRcsKnocker::new();
+        mock.expect_knock_rcs().returning(|_, _| Box::pin(ready(Ok(()))));
+        let env = ffx_config::test_init().await.unwrap();
+        let res = wait_for_device_inner(
+            mock,
+            Some(Duration::from_secs(5)),
+            &env.context,
+            Some("foo".to_string()),
+            WaitFor::DeviceOffline,
+        )
+        .await;
+        assert!(res.is_err(), "{:?}", res);
+    }
+
+    #[fuchsia::test]
+    async fn test_can_resolve_target_locally() {
+        let test_env = ffx_config::test_init().await.unwrap();
+        let mut resolver = MockQueryResolverT::new();
+        // A network address will resolve to itself
+        let addr = "127.0.0.1:123".to_string();
+        let addr_spec = Some(addr.clone());
+        // Note that this will fail if we try to call resolve_target_spec()
+        // since we haven't mocked a return value. So it's also checking that no
+        // resolution is done.
+        let target_spec =
+            locally_resolve_target_spec(addr_spec.clone(), &resolver, &test_env.context)
+                .await
+                .unwrap();
+        assert_eq!(target_spec, addr_spec.clone());
+
+        // A serial spec will resolve to itself
+        let sn = "abcdef".to_string();
+        let sn_spec = format!("serial:{sn}");
+        // Note that this will fail if we try to call resolve_target_spec()
+        // since we still haven't mocked a return value. So it's also checking that no
+        // resolution is done.
+        let target_spec =
+            locally_resolve_target_spec(Some(sn_spec.clone()), &resolver, &test_env.context)
+                .await
+                .unwrap();
+        assert_eq!(target_spec, Some(sn_spec.clone()));
+
+        // A DNS name will satisfy the resolution request
+        let name_spec = Some("foobar".to_string());
+        let sa = addr.parse::<SocketAddr>().unwrap();
+        let state = TargetState::Product(vec![sa.into()]);
+        let th = TargetHandle { node_name: name_spec.clone(), state };
+        resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
+        resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
+        let target_spec =
+            locally_resolve_target_spec(name_spec.clone(), &resolver, &test_env.context)
+                .await
+                .unwrap();
+        assert_eq!(target_spec, addr_spec);
+
+        // A serial number for an existing target will satisfy the resolution request
+        let mut resolver = MockQueryResolverT::new();
+        let th = TargetHandle {
+            node_name: None,
+            state: TargetState::Fastboot(discovery::FastbootTargetState {
+                serial_number: sn.clone(),
+                connection_state: discovery::FastbootConnectionState::Usb,
+            }),
+        };
+        resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
+        resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
+        // Test with "<serial>", _not_ "serial:<serial>"
+        let target_spec =
+            locally_resolve_target_spec(Some(sn.clone()), &resolver, &test_env.context)
+                .await
+                .unwrap();
+        assert_eq!(target_spec, Some(sn_spec));
+
+        // An ambiguous name will result in an error
+        let mut resolver = MockQueryResolverT::new();
+        let name_spec = Some("foobar".to_string());
+        let sa = addr.parse::<SocketAddr>().unwrap();
+        let ts1 = TargetState::Product(vec![sa.into(), sa.into()]);
+        let ts2 = TargetState::Product(vec![sa.into(), sa.into()]);
+        let th1 = TargetHandle { node_name: name_spec.clone(), state: ts1 };
+        let th2 = TargetHandle { node_name: name_spec.clone(), state: ts2 };
+        resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th1, th2]));
+        resolver.expect_try_resolve_manual_target().return_once(move |_, _| Ok(None));
+        let target_spec_res =
+            locally_resolve_target_spec(Some("foo".to_string()), &resolver, &test_env.context)
+                .await;
+        assert!(target_spec_res.is_err());
+        assert!(dbg!(target_spec_res.unwrap_err().to_string()).contains("multiple targets"));
+    }
+
+    #[fuchsia::test]
+    async fn test_locally_resolve_manual_before_mdns() {
+        use manual_targets::ManualTargets;
+        let test_env = ffx_config::test_init().await.unwrap();
+        let mut resolver = MockQueryResolverT::new();
+        let name_spec = Some("foobar".to_string());
+        // Set up to return an mDNS address;
+        let mdns_addr = "[fe80::8c14:9c4e:7c7c:c57]:123".to_string();
+        let sa = mdns_addr.parse::<SocketAddr>().unwrap();
+        let state = TargetState::Product(vec![sa.into()]);
+        let th = TargetHandle { node_name: name_spec.clone(), state };
+        resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
+
+        let mt_addr = "127.0.0.1:123".to_string();
+        let mt_sa = mt_addr.parse::<SocketAddr>().unwrap();
+        let mt_config = manual_targets::Config::default();
+        // Also set up a manual target with a different result
+        mt_config.add(mt_addr.clone(), None).await.expect("add manual target");
+        resolver
+            .expect_try_resolve_manual_target()
+            .return_once(move |_, _| Ok(Some(Resolution::from_addr(mt_sa))));
+
+        // Confirm that we get the manual address back
+        let name_spec = Some("foobar".to_string());
+        let target_spec =
+            locally_resolve_target_spec(name_spec.clone(), &resolver, &test_env.context)
+                .await
+                .unwrap();
+        assert_eq!(target_spec, Some(mt_addr));
+    }
+
+    // XXX Creating a reasonable test for the rest of the behavior:
+    // * partial matching of names
+    // * timing out when no matching targets return
+    // * returning early when there is an exact name match
+    // requires mocking a Stream<Item=TargetEvent>, which is difficult since a
+    // trait for returning such a stream can't be made since the items are not ?
+    // Sized (according to the rust compiler). So these additional tests will
+    // require some more work.
 }

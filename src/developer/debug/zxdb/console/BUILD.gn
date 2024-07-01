@@ -194,6 +194,8 @@ static_library("console") {
     "string_util.cc",
     "string_util.h",
     "switch_record.h",
+    "test_failure_stack_matcher.cc",
+    "test_failure_stack_matcher.h",
     "verbs.cc",
     "verbs.h",
     "verbs_settings.cc",
@@ -276,6 +278,7 @@ source_set("tests") {
     "output_buffer_unittest.cc",
     "string_formatters_unittest.cc",
     "string_util_unittest.cc",
+    "test_failure_stack_matcher_unittest.cc",
     "verbs_settings_unittest.cc",
   ]
 

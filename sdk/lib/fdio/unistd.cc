@@ -29,6 +29,7 @@
 #include <sys/uio.h>
 #include <threads.h>
 #include <utime.h>
+#include <zircon/availability.h>
 #include <zircon/compiler.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
@@ -51,96 +52,68 @@
 
 namespace fio = fuchsia_io;
 
+namespace fdio_internal {
+
+namespace {
+
 static_assert(IOFLAG_CLOEXEC == FD_CLOEXEC, "Unexpected fdio flags value");
 
 // non-thread-safe emulation of unistd io functions using the fdio transports
 
-// Verify the O_* flags which align with fuchsia.io.
-static_assert(O_PATH == static_cast<uint32_t>(fio::wire::OpenFlags::kNodeReference),
-              "Open Flag mismatch");
-static_assert(O_CREAT == static_cast<uint32_t>(fio::wire::OpenFlags::kCreate),
-              "Open Flag mismatch");
-static_assert(O_EXCL == static_cast<uint32_t>(fio::wire::OpenFlags::kCreateIfAbsent),
-              "Open Flag mismatch");
-static_assert(O_TRUNC == static_cast<uint32_t>(fio::wire::OpenFlags::kTruncate),
-              "Open Flag mismatch");
-static_assert(O_DIRECTORY == static_cast<uint32_t>(fio::wire::OpenFlags::kDirectory),
-              "Open Flag mismatch");
-static_assert(O_APPEND == static_cast<uint32_t>(fio::wire::OpenFlags::kAppend),
-              "Open Flag mismatch");
+// Verify sub-set of fuchsia.io constants that have a 1:1 mapping with POSIX O_* flags.
+// fuchisa.io/OpenFlags:
+static_assert(O_PATH == static_cast<uint32_t>(fio::OpenFlags::kNodeReference));
+static_assert(O_CREAT == static_cast<uint32_t>(fio::OpenFlags::kCreate));
+static_assert(O_EXCL == static_cast<uint32_t>(fio::OpenFlags::kCreateIfAbsent));
+static_assert(O_TRUNC == static_cast<uint32_t>(fio::OpenFlags::kTruncate));
+static_assert(O_DIRECTORY == static_cast<uint32_t>(fio::OpenFlags::kDirectory));
+static_assert(O_APPEND == static_cast<uint32_t>(fio::OpenFlags::kAppend));
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+// fuchisa.io/Flags:
+static_assert(O_PATH == static_cast<uint64_t>(fio::Flags::kProtocolNode));
+static_assert(O_CREAT == static_cast<uint64_t>(fio::Flags::kFlagMaybeCreate));
+static_assert(O_EXCL == static_cast<uint64_t>(fio::Flags::kFlagMustCreate));
+static_assert(O_TRUNC == static_cast<uint64_t>(fio::Flags::kFileTruncate));
+static_assert(O_DIRECTORY == static_cast<uint64_t>(fio::Flags::kProtocolDirectory));
+static_assert(O_APPEND == static_cast<uint64_t>(fio::Flags::kFileAppend));
+#endif
 
-// The mask of "1:1" flags which match between both open flag representations.
-constexpr fio::wire::OpenFlags kZxioFsMask =
-    fio::wire::OpenFlags::kNodeReference | fio::wire::OpenFlags::kCreate |
-    fio::wire::OpenFlags::kCreateIfAbsent | fio::wire::OpenFlags::kTruncate |
-    fio::wire::OpenFlags::kDirectory | fio::wire::OpenFlags::kAppend |
-    fio::wire::OpenFlags::kCloneSameRights;
+// Mask of all fuchsia.io OpenFlags that have a 1:1 mapping to the POSIX O_* flags above.
+constexpr fio::OpenFlags kZxioFsMask = fio::OpenFlags::kNodeReference | fio::OpenFlags::kCreate |
+                                       fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kTruncate |
+                                       fio::OpenFlags::kDirectory | fio::OpenFlags::kAppend;
 
-constexpr fio::wire::OpenFlags kZxioFsFlags =
-    kZxioFsMask | fio::wire::OpenFlags::kPosixWritable | fio::wire::OpenFlags::kPosixExecutable |
-    fio::wire::OpenFlags::kNotDirectory | fio::wire::OpenFlags::kCloneSameRights;
-
-// Verify that the remaining O_* flags don't overlap with the ZXIO_FS flags.
-static_assert(!(O_RDONLY & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_WRONLY & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_RDWR & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_NONBLOCK & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_DSYNC & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_SYNC & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_RSYNC & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_NOFOLLOW & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_CLOEXEC & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_NOCTTY & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_ASYNC & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_DIRECT & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_LARGEFILE & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_NOATIME & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-static_assert(!(O_TMPFILE & static_cast<uint32_t>(kZxioFsFlags)),
-              "Unexpected collision with static_cast<uint32_t>(kZxioFsFlags)");
-
-static fio::wire::OpenFlags fdio_flags_to_zxio(uint32_t flags) {
-  fio::wire::OpenFlags rights = {};
+// Map POSIX O_* flags to equivalent fuchsia.io OpenFlags.
+fio::OpenFlags posix_flags_to_fio(uint32_t flags) {
+  fio::OpenFlags rights = {};
   switch (flags & O_ACCMODE) {
     case O_RDONLY:
-      rights |= fio::wire::OpenFlags::kRightReadable;
+      rights |= fio::OpenFlags::kRightReadable;
       break;
     case O_WRONLY:
-      rights |= fio::wire::OpenFlags::kRightWritable;
+      rights |= fio::OpenFlags::kRightWritable;
       break;
     case O_RDWR:
-      rights |= fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable;
+      rights |= fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable;
       break;
   }
 
-  fio::wire::OpenFlags result = rights | fio::wire::OpenFlags::kDescribe |
-                                (static_cast<fio::wire::OpenFlags>(flags) & kZxioFsMask);
+  fio::OpenFlags result =
+      rights | fio::OpenFlags::kDescribe | (static_cast<fio::OpenFlags>(flags) & kZxioFsMask);
 
-  if (!(result & fio::wire::OpenFlags::kNodeReference)) {
-    result |= fio::wire::OpenFlags::kPosixWritable | fio::wire::OpenFlags::kPosixExecutable;
+  if (!(result & fio::OpenFlags::kNodeReference)) {
+    result |= fio::OpenFlags::kPosixWritable | fio::OpenFlags::kPosixExecutable;
   }
   return result;
 }
 
-static uint32_t zxio_flags_to_fdio(fio::wire::OpenFlags flags) {
+// Map fuchsia.io OpenFlags to equivalent POSIX O_* flags.
+uint32_t fio_flags_to_posix(fio::OpenFlags flags) {
   uint32_t result = 0;
-  if ((flags & (fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable)) ==
-      (fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable)) {
+  if ((flags & (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) ==
+      (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) {
     result |= O_RDWR;
-  } else if (flags & fio::wire::OpenFlags::kRightWritable) {
+  } else if (flags & fio::OpenFlags::kRightWritable) {
     result |= O_WRONLY;
   } else {
     result |= O_RDONLY;
@@ -173,7 +146,7 @@ fdio_ptr fdio_iodir(int dirfd, std::string_view& in_out_path) {
   return fd_to_io_locked(dirfd);
 }
 
-static int close_impl(int fd, bool should_wait) {
+int close_impl(int fd, bool should_wait) {
   fdio_ptr io = unbind_from_fd(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
@@ -186,27 +159,28 @@ static int close_impl(int fd, bool should_wait) {
   return 0;
 }
 
-namespace fdio_internal {
-
 zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32_t mode,
                                   bool enforce_eisdir) {
   // Emulate EISDIR behavior from
   // http://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
   const bool flags_incompatible_with_directory =
       ((flags & ~O_PATH & O_ACCMODE) != O_RDONLY) || (flags & O_CREAT);
-  fio::wire::OpenFlags fio_flags = fdio_flags_to_zxio(static_cast<uint32_t>(flags));
+  fio::OpenFlags fio_flags = posix_flags_to_fio(static_cast<uint32_t>(flags));
   if (S_ISDIR(mode)) {
-    fio_flags |= fio::wire::OpenFlags::kDirectory;
+    fio_flags |= fio::OpenFlags::kDirectory;
   }
 
-  return open_at_impl(dirfd, path, fio_flags,
-                      {
-                          .disallow_directory = enforce_eisdir && flags_incompatible_with_directory,
-                          .allow_absolute_path = true,
-                      });
+  return fdio_internal::open_at_impl(
+      dirfd, path, fio_flags,
+      {
+          .disallow_directory = enforce_eisdir && flags_incompatible_with_directory,
+          .allow_absolute_path = true,
+      });
 }
 
-zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::wire::OpenFlags flags,
+}  // namespace
+
+zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::OpenFlags flags,
                                   OpenAtOptions options) {
   if (path == nullptr) {
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -239,24 +213,25 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::wire::OpenFl
   }
 
   if (has_ending_slash) {
-    flags |= fio::wire::OpenFlags::kDirectory;
+    flags |= fio::OpenFlags::kDirectory;
   }
 
-  if (!(flags & fio::wire::OpenFlags::kDirectory)) {
+  if (!(flags & fio::OpenFlags::kDirectory)) {
     // At this point we're not sure if the path refers to a directory.
     // To emulate EISDIR behavior, if the flags are not compatible with directory,
     // use this flag to instruct open to error if the path turns out to be a directory.
     // Otherwise, opening a directory with O_RDWR will incorrectly succeed.
     if (options.disallow_directory) {
-      flags |= fio::wire::OpenFlags::kNotDirectory;
+      flags |= fio::OpenFlags::kNotDirectory;
     }
   }
-  if (flags & fio::wire::OpenFlags::kNodeReference) {
+  if (flags & fio::OpenFlags::kNodeReference) {
     flags &= fio::wire::kOpenFlagsAllowedWithNodeReference;
   }
   return iodir->open(clean, flags);
 }
 
+namespace {
 // Open |path| from the |dirfd| directory, enforcing the POSIX EISDIR error condition. Specifically,
 // ZX_ERR_NOT_FILE will be returned when opening a directory with write access/O_CREAT.
 zx::result<fdio_ptr> open_at(int dirfd, const char* path, int flags, uint32_t mode) {
@@ -393,8 +368,40 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
     base = ".";
   }
 
-  return iodir->open(base, fdio_flags_to_zxio(O_RDONLY | O_DIRECTORY));
+  return iodir->open(base, posix_flags_to_fio(O_RDONLY | O_DIRECTORY));
 }
+
+zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
+  zxio_node_attributes_t attr = {.has = {
+                                     .protocols = true,
+                                     .abilities = true,
+                                     .id = true,
+                                     .content_size = true,
+                                     .storage_size = true,
+                                     .link_count = true,
+                                     .creation_time = true,
+                                     .modification_time = true,
+                                 }};
+  const zx_status_t status = io->get_attr(&attr);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  memset(s, 0, sizeof(struct stat));
+  s->st_mode = zxio_get_posix_mode(attr.protocols, attr.abilities);
+  s->st_ino = attr.has.id ? attr.id : fio::wire::kInoUnknown;
+  s->st_size = attr.content_size;
+  s->st_blksize = VNATTR_BLKSIZE;
+  s->st_blocks = attr.storage_size / VNATTR_BLKSIZE;
+  s->st_nlink = attr.link_count;
+  s->st_ctim.tv_sec = attr.creation_time / ZX_SEC(1);
+  s->st_ctim.tv_nsec = attr.creation_time % ZX_SEC(1);
+  s->st_mtim.tv_sec = attr.modification_time / ZX_SEC(1);
+  s->st_mtim.tv_nsec = attr.modification_time % ZX_SEC(1);
+  return ZX_OK;
+}
+
+}  // namespace
 
 }  // namespace fdio_internal
 
@@ -404,6 +411,8 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
 //
 // extern "C" is required here, since the corresponding declaration is in an internal musl header:
 // zircon/third_party/ulib/musl/src/internal/libc.h
+//
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle_t handle[],
                                                 uint32_t handle_info[], uint32_t name_count,
                                                 char** names) __TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -507,6 +516,8 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
 //
 // extern "C" is required here, since the corresponding declaration is in an internal musl header:
 // zircon/third_party/ulib/musl/src/internal/libc.h
+//
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern "C" __EXPORT void __libc_extensions_fini(void) __TA_ACQUIRE(fdio_lock) {
   mtx_lock(&fdio_lock);
   [[maybe_unused]] auto root = fdio_root_handle.release();
@@ -548,36 +559,6 @@ zx_status_t fdio_wait(const fdio_ptr& io, uint32_t events, zx::time deadline,
   }
 
   return status;
-}
-
-static zx_status_t fdio_stat(const fdio_ptr& io, struct stat* s) {
-  zxio_node_attributes_t attr = {.has = {
-                                     .protocols = true,
-                                     .abilities = true,
-                                     .id = true,
-                                     .content_size = true,
-                                     .storage_size = true,
-                                     .link_count = true,
-                                     .creation_time = true,
-                                     .modification_time = true,
-                                 }};
-  const zx_status_t status = io->get_attr(&attr);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  memset(s, 0, sizeof(struct stat));
-  s->st_mode = zxio_get_posix_mode(attr.protocols, attr.abilities);
-  s->st_ino = attr.has.id ? attr.id : fio::wire::kInoUnknown;
-  s->st_size = attr.content_size;
-  s->st_blksize = VNATTR_BLKSIZE;
-  s->st_blocks = attr.storage_size / VNATTR_BLKSIZE;
-  s->st_nlink = attr.link_count;
-  s->st_ctim.tv_sec = attr.creation_time / ZX_SEC(1);
-  s->st_ctim.tv_nsec = attr.creation_time % ZX_SEC(1);
-  s->st_mtim.tv_sec = attr.modification_time / ZX_SEC(1);
-  s->st_mtim.tv_nsec = attr.modification_time % ZX_SEC(1);
-  return ZX_OK;
 }
 
 // The functions from here on provide implementations of fd and path
@@ -766,7 +747,7 @@ ssize_t write(int fd, const void* buf, size_t count) {
 }
 
 __EXPORT
-int close(int fd) { return close_impl(fd, /*should_wait=*/true); }
+int close(int fd) { return fdio_internal::close_impl(fd, /*should_wait=*/true); }
 
 __EXPORT
 int dup2(int oldfd, int newfd) {
@@ -874,12 +855,12 @@ int fcntl(int fd, int cmd, ...) {
       if (io == nullptr) {
         return ERRNO(EBADF);
       }
-      fio::wire::OpenFlags flags;
+      fio::OpenFlags flags;
       zx_status_t status = io->get_flags(&flags);
       if (status != ZX_OK) {
         return ERROR(status);
       }
-      uint32_t fdio_flags = zxio_flags_to_fdio(flags);
+      uint32_t fdio_flags = fdio_internal::fio_flags_to_posix(flags);
       if (io->ioflag() & IOFLAG_NONBLOCK) {
         fdio_flags |= O_NONBLOCK;
       }
@@ -892,7 +873,7 @@ int fcntl(int fd, int cmd, ...) {
       }
       GET_INT_ARG(fdio_flags);
 
-      const fio::wire::OpenFlags flags = fdio_flags_to_zxio(fdio_flags & ~O_NONBLOCK);
+      const fio::OpenFlags flags = fdio_internal::posix_flags_to_fio(fdio_flags & ~O_NONBLOCK);
       zx_status_t status = io->set_flags(flags);
 
       // Some remotes don't support setting flags; we
@@ -912,14 +893,12 @@ int fcntl(int fd, int cmd, ...) {
       }
       return 0;
     }
+    // Unsupported features (managing signals, advisory locks):
     case F_GETOWN:
     case F_SETOWN:
-      // TODO(kulakowski) Socket support.
-      return ERRNO(ENOSYS);
     case F_GETLK:
     case F_SETLK:
     case F_SETLKW:
-      // TODO(kulakowski) Advisory file locking support.
       return ERRNO(ENOSYS);
     default:
       return ERRNO(EINVAL);
@@ -1163,7 +1142,7 @@ int fstat(int fd, struct stat* s) {
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
-  return STATUS(fdio_stat(io, s));
+  return STATUS(fdio_internal::stat_impl(io, s));
 }
 
 int fstatat(int dirfd, std::string_view filename, struct stat* s, int flags) {
@@ -1171,7 +1150,7 @@ int fstatat(int dirfd, std::string_view filename, struct stat* s, int flags) {
   if (io.is_error()) {
     return ERROR(io.status_value());
   }
-  return STATUS(fdio_stat(io.value(), s));
+  return STATUS(fdio_internal::stat_impl(io.value(), s));
 }
 
 __EXPORT
@@ -1372,7 +1351,7 @@ int faccessat(int dirfd, const char* filename, int amode, int flag) {
       return ERROR(io.status_value());
     }
     struct stat s;
-    return STATUS(fdio_stat(io.value(), &s));
+    return STATUS(fdio_internal::stat_impl(io.value(), &s));
   }
 
   // Check that the file has each of the permissions in mode.
@@ -1528,12 +1507,16 @@ struct __dirstream {
   struct dirent de = {};
 };
 
-static DIR* internal_opendir(int fd) {
+namespace {
+
+DIR* internal_opendir(int fd) {
   DIR* dir = new __dirstream;
   mtx_init(&dir->lock, mtx_plain);
   dir->fd = fd;
   return dir;
 }
+
+}  // namespace
 
 __EXPORT
 DIR* opendir(const char* name) {
@@ -1542,7 +1525,7 @@ DIR* opendir(const char* name) {
     return nullptr;
   DIR* dir = internal_opendir(fd);
   if (dir == nullptr) {
-    close_impl(fd, /*should_wait=*/true);
+    fdio_internal::close_impl(fd, /*should_wait=*/true);
   }
   return dir;
 }
@@ -1569,7 +1552,7 @@ int closedir(DIR* dir) {
     io->dirent_iterator_destroy(dir->iterator.get());
     dir->iterator.reset();
   }
-  close_impl(dir->fd, /*should_wait=*/false);
+  fdio_internal::close_impl(dir->fd, /*should_wait=*/false);
   delete dir;
   return 0;
 }
@@ -2114,10 +2097,12 @@ int shutdown(int fd, int how) {
   return out_code;
 }
 
+namespace fdio_internal {
+namespace {
 // The common denominator between the Linux-y fstatfs and the POSIX
 // fstatvfs, which align on most fields. The fs version is more easily
 // computed from the fuchsia_io::FilesystemInfo, so this takes a struct statfs.
-static int fs_stat(int fd, struct statfs* buf) {
+int statfs_impl(int fd, struct statfs* buf) {
   const fdio_ptr io = fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
@@ -2164,9 +2149,11 @@ static int fs_stat(int fd, struct statfs* buf) {
   *buf = stats;
   return 0;
 }
+}  // namespace
+}  // namespace fdio_internal
 
 __EXPORT
-int fstatfs(int fd, struct statfs* buf) { return fs_stat(fd, buf); }
+int fstatfs(int fd, struct statfs* buf) { return fdio_internal::statfs_impl(fd, buf); }
 
 __EXPORT
 int statfs(const char* path, struct statfs* buf) {
@@ -2175,14 +2162,14 @@ int statfs(const char* path, struct statfs* buf) {
     return fd;
   }
   const int rv = fstatfs(fd, buf);
-  close_impl(fd, /*should_wait=*/true);
+  fdio_internal::close_impl(fd, /*should_wait=*/true);
   return rv;
 }
 
 __EXPORT
 int fstatvfs(int fd, struct statvfs* buf) {
   struct statfs stats = {};
-  const int result = fs_stat(fd, &stats);
+  const int result = fdio_internal::statfs_impl(fd, &stats);
   if (result >= 0) {
     struct statvfs vstats = {};
 
@@ -2230,7 +2217,7 @@ int statvfs(const char* path, struct statvfs* buf) {
     return fd;
   }
   const int rv = fstatvfs(fd, buf);
-  close_impl(fd, /*should_wait=*/true);
+  fdio_internal::close_impl(fd, /*should_wait=*/true);
   return rv;
 }
 

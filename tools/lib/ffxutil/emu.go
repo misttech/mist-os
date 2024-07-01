@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
+	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
 const (
@@ -45,8 +46,17 @@ type File struct {
 	Source      string `json:"source"`
 }
 
+type EmuStartArgs struct {
+	// If using a custom config, all other fields should be empty.
+	Config string
+
+	// TODO(https://fxbug.dev/329144967): Add more fields as necessary
+	// to provide as flags to `ffx emu start`.
+	ProductBundle string
+}
+
 // EmuStartConsole returns a command to launch the emulator.
-func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string, qemu bool, config string, tools EmuTools) (*exec.Cmd, error) {
+func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string, qemu bool, tools EmuTools, startArgs EmuStartArgs) (*exec.Cmd, error) {
 	// If using different tools from the ones in the sdk, `ffx emu` expects them to
 	// have certain names and to be located in a parent directory of the ffx binary.
 	ffxDir := filepath.Dir(f.ffxPath)
@@ -79,9 +89,18 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 	if err := f.ConfigSet(ctx, "sdk.root", absPath); err != nil {
 		return nil, err
 	}
-	args := []string{"emu", "start", "--console", "--net", "tap", "--name", name, "-H", "-s", "0", "--config", config}
+	args := []string{"emu", "start", "--console", "--net", "tap", "--name", name, "-H", "-s", "0"}
+	if startArgs.Config != "" {
+		args = append(args, "--config", startArgs.Config)
+	} else {
+		args = append(args, startArgs.ProductBundle)
+	}
 	if qemu {
 		args = append(args, "--engine", "qemu")
+	}
+	dryRunCommand := append(args, "--dry-run")
+	if err := f.Run(ctx, dryRunCommand...); err != nil {
+		logger.Debugf(ctx, "failed to run dry-run command: %s", err)
 	}
 	return f.Command(args...), nil
 }

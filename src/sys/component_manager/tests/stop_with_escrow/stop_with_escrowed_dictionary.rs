@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::{ClientEnd, Proxy, RequestStream, ServerEnd};
+use fidl::endpoints::{self, ClientEnd, Proxy, RequestStream, ServerEnd};
 use fidl_fidl_test_components::{TriggerMarker, TriggerRequestStream};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_runtime::{HandleInfo, HandleType};
@@ -79,8 +79,9 @@ async fn escrow_counter_then_stop(counter: u64) {
     // Create a new dictionary.
     let factory =
         fuchsia_component::client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
-    let dictionary = factory.create_dictionary().await.unwrap();
-    let dictionary = dictionary.into_proxy().unwrap();
+    let dictionary_ref = factory.create_dictionary().await.unwrap();
+    let (dictionary, server) = endpoints::create_proxy().unwrap();
+    factory.open_dictionary(dictionary_ref, server).unwrap();
 
     // Add the counter into the dictionary.
     dictionary

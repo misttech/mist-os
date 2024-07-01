@@ -36,9 +36,9 @@ pub enum StartupError {
     NotRunning,
 }
 
-impl Into<fsession::LaunchError> for StartupError {
-    fn into(self) -> fsession::LaunchError {
-        match self {
+impl From<StartupError> for fsession::LaunchError {
+    fn from(e: StartupError) -> fsession::LaunchError {
+        match e {
             StartupError::NotDestroyed { .. } => fsession::LaunchError::DestroyComponentFailed,
             StartupError::NotCreated { err, .. } => match err {
                 fcomponent::Error::InstanceCannotResolve => fsession::LaunchError::NotFound,
@@ -53,9 +53,9 @@ impl Into<fsession::LaunchError> for StartupError {
     }
 }
 
-impl Into<fsession::RestartError> for StartupError {
-    fn into(self) -> fsession::RestartError {
-        match self {
+impl From<StartupError> for fsession::RestartError {
+    fn from(e: StartupError) -> fsession::RestartError {
+        match e {
             StartupError::NotDestroyed { .. } => fsession::RestartError::DestroyComponentFailed,
             StartupError::NotCreated { err, .. } => match err {
                 fcomponent::Error::InstanceCannotResolve => fsession::RestartError::NotFound,
@@ -70,9 +70,9 @@ impl Into<fsession::RestartError> for StartupError {
     }
 }
 
-impl Into<fsession::LifecycleError> for StartupError {
-    fn into(self) -> fsession::LifecycleError {
-        match self {
+impl From<StartupError> for fsession::LifecycleError {
+    fn from(e: StartupError) -> fsession::LifecycleError {
+        match e {
             StartupError::NotDestroyed { .. } => fsession::LifecycleError::DestroyComponentFailed,
             StartupError::NotCreated { err, .. } => match err {
                 fcomponent::Error::InstanceCannotResolve => {
@@ -93,7 +93,7 @@ impl Into<fsession::LifecycleError> for StartupError {
 const SESSION_NAME: &str = "session";
 
 /// The name of the child collection the session is added to, must match the declaration in
-/// session_manager.cml.
+/// `session_manager.cml`.
 const SESSION_CHILD_COLLECTION: &str = "session";
 
 /// Launches the specified session.
@@ -117,7 +117,7 @@ pub async fn launch_session(
     info!(session_url, "Launching session");
 
     let start_time = zx::Time::get_monotonic();
-    let controller = set_session(&session_url, realm, exposed_dir).await?;
+    let controller = set_session(session_url, realm, exposed_dir).await?;
     let end_time = zx::Time::get_monotonic();
 
     fasync::Task::local(async move {
@@ -183,14 +183,14 @@ async fn set_session(
         })?;
 
     let (controller, controller_server_end) =
-        create_proxy::<fcomponent::ControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ControllerMarker>().expect("creating proxy should not fail");
     let create_child_args = fcomponent::CreateChildArgs {
         controller: Some(controller_server_end),
         ..Default::default()
     };
     realm_management::create_child_component(
         SESSION_NAME,
-        &session_url,
+        session_url,
         SESSION_CHILD_COLLECTION,
         create_child_args,
         realm,
@@ -219,7 +219,8 @@ async fn set_session(
 
     // Start the component.
     let (execution_controller, execution_controller_server_end) =
-        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+        create_proxy::<fcomponent::ExecutionControllerMarker>()
+            .expect("creating proxy should not fail");
     controller
         .start(fcomponent::StartChildArgs::default(), execution_controller_server_end)
         .await
@@ -236,6 +237,7 @@ async fn set_session(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::{set_session, stop_session, SESSION_CHILD_COLLECTION, SESSION_NAME};
     use anyhow::Error;

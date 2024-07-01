@@ -33,7 +33,7 @@ bool get_bit(const std::array<uint8_t, SIZE>& buf, size_t bit_num) {
 
 // TODO(quiche): Maybe move this to a test fixture, and guarantee removal of the input
 // node between test cases.
-test_helper::ScopedFD GetInputFile(const uint32_t kInputMinor) {
+fbl::unique_fd GetInputFile(const uint32_t kInputMinor) {
   // TODO(b/310963779): Here should directly /dev/input/eventX.
 
   // Typically, this would be `/dev/input/event0` or `/dev/input/event1`, but there's
@@ -49,7 +49,7 @@ test_helper::ScopedFD GetInputFile(const uint32_t kInputMinor) {
   };
 
   // Open device node.
-  test_helper::ScopedFD fd(open(kInputFile.c_str(), O_RDONLY));
+  fbl::unique_fd fd(open(kInputFile.c_str(), O_RDONLY));
   EXPECT_TRUE(fd.is_valid()) << " failed to open " << kInputFile << ": " << strerror(errno);
 
   return fd;
@@ -283,7 +283,7 @@ TEST(InputTest, DeviceCanBeRegisteredWithEpoll) {
   auto input_fd = GetInputFile(kTouchInputMinor);
   ASSERT_TRUE(input_fd.is_valid());
 
-  test_helper::ScopedFD epoll_fd(epoll_create(1));  // Per `man` page, must be >0.
+  fbl::unique_fd epoll_fd(epoll_create(1));  // Per `man` page, must be >0.
   ASSERT_TRUE(epoll_fd.is_valid()) << "failed to create epoll fd: " << strerror(errno);
 
   epoll_event epoll_params = {.events = EPOLLIN | EPOLLWAKEUP, .data = {.fd = input_fd.get()}};

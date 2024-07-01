@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/compiled_action.gni")
 
 # Provides a mechanism for creating a zip file containing all of the
@@ -115,19 +115,16 @@ template("bazel_docgen") {
 #     Usual GN meaning.
 template("extract_bazel_doc_textproto") {
   assert(defined(invoker.bazel_target), "bazel_target must be defined")
-  bazel_target = invoker.bazel_target
 
-  bazel_action(target_name) {
+  bazel_build_action(target_name) {
     forward_variables_from(invoker,
                            [
-                             "bazel_inputs",
                              "deps",
                              "metadata",
                              "testonly",
                              "visibility",
                            ])
-    command = "build"
-    bazel_targets = [ bazel_target + ".textproto" ]
+    bazel_target = invoker.bazel_target + ".textproto"
     copy_outputs = [
       {
         bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"

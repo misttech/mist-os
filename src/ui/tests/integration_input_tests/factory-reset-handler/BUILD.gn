@@ -76,7 +76,7 @@ fuchsia_test_package("factory-reset-handler-test") {
     "//src/graphics/display/testing/fake-coordinator-connector:component",
     "//src/ui/a11y/testing:fake-a11y-manager",
     "//src/ui/bin/scene_manager:scene_manager_component_for_test",
-    "//src/ui/testing/ui_test_realm:scenic_only",
+    "//src/ui/testing/ui_test_realm:scenic_with_config",
   ]
   test_specs = {
     environments = [

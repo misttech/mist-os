@@ -8,15 +8,20 @@ use pin_project::pin_project;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use zx::AsHandleRef;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution,
     fuchsia_zircon as zx,
 };
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct PrincipalIdentifier(pub u64);
+
 /// A simple tree breakdown of resource usage useful for tests.
 #[derive(Debug, Clone)]
 pub struct Principal {
+    /// Identifier of the principal.
+    pub identifier: PrincipalIdentifier,
+
     /// Name of the principal.
     pub name: String,
 
@@ -28,8 +33,8 @@ pub struct Principal {
 }
 
 impl Principal {
-    pub fn new(identifier: String) -> Principal {
-        Principal { name: identifier, resources: vec![], children: vec![] }
+    pub fn new(identifier: PrincipalIdentifier, name: String) -> Principal {
+        Principal { identifier, name, resources: vec![], children: vec![] }
     }
 }
 
@@ -42,19 +47,26 @@ impl Principal {
 /// Returns a stream of tree that are momentary snapshots of the memory state.
 /// The tree will evolve over time as principals are added and removed.
 pub fn attribute_memory(
+    identifier: PrincipalIdentifier,
     name: String,
     attribution_provider: fattribution::ProviderProxy,
     introspector: fcomponent::IntrospectorProxy,
 ) -> BoxStream<'static, Principal> {
-    futures::stream::unfold(StreamState::new(name, introspector, attribution_provider), get_next)
-        .boxed()
+    futures::stream::unfold(
+        StreamState::new(identifier, name, introspector, attribution_provider),
+        get_next,
+    )
+    .boxed()
 }
 
 /// Wait for the next hanging-get message and recompute the tree.
 async fn get_next(mut state: StreamState) -> Option<(Principal, StreamState)> {
-    let mut node = state.node.clone().unwrap_or_else(|| Principal::new(state.name.clone()));
-    let mut children: HashMap<String, Principal> =
-        node.children.clone().into_iter().map(|n| (n.name.clone(), n)).collect();
+    let mut node = state
+        .node
+        .clone()
+        .unwrap_or_else(|| Principal::new(state.identifier.clone(), state.name.clone()));
+    let mut children: HashMap<PrincipalIdentifier, Principal> =
+        node.children.clone().into_iter().map(|n| (n.identifier.clone(), n)).collect();
 
     // Wait for new attribution information.
     match state.next().await {
@@ -68,7 +80,7 @@ async fn get_next(mut state: StreamState) -> Option<(Principal, StreamState)> {
                 }
                 // New attribution information for a child principal.
                 Event::Child(child) => {
-                    children.insert(child.name.clone(), child);
+                    children.insert(child.identifier.clone(), child);
                 }
             }
         }
@@ -83,91 +95,75 @@ async fn get_next(mut state: StreamState) -> Option<(Principal, StreamState)> {
 async fn handle_update(
     attribution: fattribution::AttributionUpdate,
     state: &mut StreamState,
-    children: &mut HashMap<String, Principal>,
+    children: &mut HashMap<PrincipalIdentifier, Principal>,
 ) {
     match attribution {
         fattribution::AttributionUpdate::Add(new_principal) => {
-            let identifier = get_identifier_string(
-                new_principal.identifier.unwrap(),
-                &state.introspector,
-                &mut state.koid_to_component_moniker,
-            )
-            .await;
+            let identifier_id = PrincipalIdentifier(new_principal.identifier.unwrap());
+            let principal_name =
+                get_identifier_string(new_principal.description.unwrap(), &state.introspector)
+                    .await;
 
             // Recursively attribute memory in this child principal if applicable.
             if let Some(client) = new_principal.detailed_attribution {
                 state.child_update.push(
                     attribute_memory(
-                        identifier.clone(),
+                        identifier_id.clone(),
+                        principal_name.clone(),
                         client.into_proxy().unwrap(),
                         state.introspector.clone(),
                     )
                     .boxed(),
                 );
             }
-            children.insert(identifier.clone(), Principal::new(identifier));
+            children.insert(identifier_id.clone(), Principal::new(identifier_id, principal_name));
         }
         fattribution::AttributionUpdate::Update(updated_principal) => {
-            let identifier = get_identifier_string(
-                updated_principal.identifier.unwrap(),
-                &state.introspector,
-                &mut state.koid_to_component_moniker,
-            )
-            .await;
+            let identifier = PrincipalIdentifier(updated_principal.identifier.unwrap());
 
             let child = children.get_mut(&identifier).unwrap();
-            match updated_principal.resources.unwrap() {
-                fattribution::Resources::Data(d) => {
-                    child.resources = d
-                        .into_iter()
-                        .filter_map(|r| {
-                            if let fattribution::Resource::KernelObject(koid) = r {
-                                Some(zx::Koid::from_raw(koid))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
+            let raw_resources = match updated_principal.resources.unwrap() {
+                fattribution::Resources::Data(d) => d.resources,
+                fattribution::Resources::Buffer(b) => {
+                    let mapping = mapped_vmo::ImmutableMapping::create_from_vmo(&b, false).unwrap();
+                    let resource_vector: fattribution::Data = fidl::unpersist(&mapping).unwrap();
+                    resource_vector.resources
                 }
-                _ => todo!("unimplemented"),
+                fattribution::ResourcesUnknown!() => {
+                    unimplemented!()
+                }
             };
+            child.resources = raw_resources
+                .into_iter()
+                .filter_map(|r| {
+                    if let fattribution::Resource::KernelObject(koid) = r {
+                        Some(zx::Koid::from_raw(koid))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
         }
-        fattribution::AttributionUpdate::Remove(identifier) => {
-            let name = get_identifier_string(
-                identifier,
-                &state.introspector,
-                &mut state.koid_to_component_moniker,
-            )
-            .await;
-            children.remove(&name);
+        fattribution::AttributionUpdate::Remove(identifier_ref) => {
+            let identifier = PrincipalIdentifier(identifier_ref);
+            children.remove(&identifier);
         }
         x @ _ => panic!("unimplemented {x:?}"),
     }
 }
 
 async fn get_identifier_string(
-    identifier: fattribution::Identifier,
+    description: fattribution::Description,
     introspector: &fcomponent::IntrospectorProxy,
-    koid_to_component_moniker: &mut HashMap<zx::Koid, String>,
 ) -> String {
-    match identifier {
-        fattribution::Identifier::Self_(_) => todo!("self attribution not supported"),
-        fattribution::Identifier::Component(c) => {
-            let koid = c.get_koid().unwrap();
-            if let Some(moniker) = koid_to_component_moniker.get(&koid) {
-                moniker.to_owned()
-            } else {
-                let moniker = introspector
-                    .get_moniker(c)
-                    .await
-                    .expect("Inspector call failed")
-                    .expect("Inspector::GetMoniker call failed");
-                koid_to_component_moniker.insert(koid, moniker.clone());
-                moniker
-            }
-        }
-        fattribution::Identifier::Part(sc) => sc.clone(),
-        _ => todo!(),
+    match description {
+        fattribution::Description::Component(c) => introspector
+            .get_moniker(c)
+            .await
+            .expect("Inspector call failed")
+            .expect("Inspector::GetMoniker call failed"),
+        fattribution::Description::Part(sc) => sc.clone(),
+        fattribution::DescriptionUnknown!() => todo!(),
     }
 }
 
@@ -181,14 +177,14 @@ async fn get_identifier_string(
 /// child principal.
 #[pin_project]
 struct StreamState {
+    /// The identifier of the principal at the root of the tree.
+    identifier: PrincipalIdentifier,
+
     /// The name of the principal at the root of the tree.
     name: String,
 
     /// A capability used to unseal component instance tokens back to monikers.
     introspector: fcomponent::IntrospectorProxy,
-
-    /// A cached mapping from component instance tokens KOIDs to component monikers.
-    koid_to_component_moniker: HashMap<zx::Koid, String>,
 
     /// The tree of principals rooted at `node`.
     node: Option<Principal>,
@@ -208,14 +204,15 @@ struct StreamState {
 
 impl StreamState {
     fn new(
+        identifier: PrincipalIdentifier,
         name: String,
         introspector: fcomponent::IntrospectorProxy,
         attribution_provider: fattribution::ProviderProxy,
     ) -> Self {
         Self {
+            identifier,
             name: name.clone(),
             introspector,
-            koid_to_component_moniker: HashMap::new(),
             node: None,
             hanging_get_update: Some(Box::pin(hanging_get_stream(name, attribution_provider))),
             child_update: SelectAll::new(),

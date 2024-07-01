@@ -57,9 +57,14 @@ pub async fn populate_data_map(inspect_handles: &[InspectHandle]) -> DataMap {
     let mut data_map = DataMap::new();
     for inspect_handle in inspect_handles {
         match inspect_handle {
-            InspectHandle::Directory(ref dir) => return populate_data_map_from_dir(dir).await,
-            InspectHandle::Tree(proxy, ref name) => {
-                data_map.insert(name.clone(), InspectData::Tree(proxy.clone()));
+            InspectHandle::Directory { proxy: ref dir } => {
+                return populate_data_map_from_dir(dir).await
+            }
+            InspectHandle::Tree { proxy, name } => {
+                data_map.insert(
+                    name.as_ref().map(|name| InspectHandleName::name(name.clone())),
+                    InspectData::Tree(proxy.clone()),
+                );
             }
         }
     }
@@ -200,9 +205,9 @@ mod tests {
         let name3 = None;
 
         let data = populate_data_map(&[
-            InspectHandle::Tree(tree1.into_proxy().unwrap(), name1.clone()),
-            InspectHandle::Tree(tree2.into_proxy().unwrap(), name2.clone()),
-            InspectHandle::Tree(tree3.into_proxy().unwrap(), name3.clone()),
+            InspectHandle::Tree { proxy: tree1.into_proxy().unwrap(), name: Some("tree1".into()) },
+            InspectHandle::Tree { proxy: tree2.into_proxy().unwrap(), name: Some("tree2".into()) },
+            InspectHandle::Tree { proxy: tree3.into_proxy().unwrap(), name: None },
         ])
         .await;
 

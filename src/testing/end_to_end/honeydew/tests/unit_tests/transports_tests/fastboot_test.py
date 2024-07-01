@@ -6,7 +6,6 @@
 
 import ipaddress
 import os
-import subprocess
 import sys
 import unittest
 from collections.abc import Callable
@@ -19,7 +18,7 @@ from parameterized import param, parameterized
 from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fastboot, ffx
-from honeydew.utils import common
+from honeydew.utils import common, host_shell
 
 _IPV4: str = "11.22.33.44"
 _IPV4_OBJ: ipaddress.IPv4Address = ipaddress.IPv4Address(_IPV4)
@@ -94,19 +93,12 @@ _INPUT_ARGS: dict[str, Any] = {
     "fastboot_node_id": _USB_BASED_FASTBOOT_NODE_ID,
     "device_ip_v4": _IPV4_OBJ,
     "run_cmd": ["getvar", "hw-revision"],
-    "subprocess_run_cmd": [
-        "fastboot",
-        "-s",
-        _USB_BASED_FASTBOOT_NODE_ID,
-        "getvar",
-        "hw-revision",
-    ],
 }
 
 _MOCK_ARGS: dict[str, Any] = {
     "ffx_target_info_when_in_fuchsia_mode": _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
     "ffx_target_info_when_in_fastboot_mode": _USB_BASED_TARGET_WHEN_IN_FASTBOOT_MODE,
-    "fastboot_getvar_hw_revision": b"hw-revision: core.x64-b4\nFinished. Total time: 0.000s\n",
+    "fastboot_getvar_hw_revision": "hw-revision: core.x64-b4\nFinished. Total time: 0.000s",
 }
 
 _EXPECTED_VALUES: dict[str, Any] = {
@@ -207,7 +199,7 @@ class FastbootTests(unittest.TestCase):
     @mock.patch.object(
         fastboot.Fastboot,
         "wait_for_fuchsia_mode",
-        side_effect=errors.FfxCommandError("error"),
+        side_effect=errors.FuchsiaDeviceError("error"),
         autospec=True,
     )
     def test_boot_to_fastboot_mode_when_not_in_fuchsia_mode(
@@ -242,20 +234,27 @@ class FastbootTests(unittest.TestCase):
 
     @mock.patch.object(
         fastboot.Fastboot,
+        "wait_for_fastboot_mode",
+        side_effect=errors.FuchsiaDeviceError("error"),
+        autospec=True,
+    )
+    @mock.patch.object(
+        fastboot.Fastboot,
         "wait_for_fuchsia_mode",
         autospec=True,
     )
     def test_boot_to_fastboot_mode_failed(
-        self, mock_wait_for_fuchsia_mode: mock.Mock
+        self,
+        mock_wait_for_fuchsia_mode: mock.Mock,
+        mock_wait_for_fastboot_mode: mock.Mock,
     ) -> None:
         """Test case for Fastboot.boot_to_fastboot_mode() raising an
         exception"""
-        self.ffx_obj.run.side_effect = errors.FfxCommandError("error")
-
-        with self.assertRaises(errors.FastbootCommandError):
+        with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj.boot_to_fastboot_mode()
 
         mock_wait_for_fuchsia_mode.assert_called()
+        mock_wait_for_fastboot_mode.assert_called()
 
     @mock.patch.object(
         fastboot.Fastboot,
@@ -313,7 +312,7 @@ class FastbootTests(unittest.TestCase):
         self, mock_is_in_fastboot_mode: mock.Mock, mock_fastboot_run: mock.Mock
     ) -> None:
         """Test case for Fastboot.boot_to_fuchsia_mode() raising an exception"""
-        with self.assertRaises(errors.FastbootCommandError):
+        with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj.boot_to_fuchsia_mode()
 
         mock_is_in_fastboot_mode.assert_called()
@@ -355,16 +354,6 @@ class FastbootTests(unittest.TestCase):
             parameterized_dict["expected"],
         )
 
-    def test_is_in_fastboot_mode_exception(self) -> None:
-        """Test case for Fastboot.is_in_fastboot_mode() raising
-        FastbootCommandError."""
-        self.ffx_obj.get_target_info_from_target_list.side_effect = (
-            errors.FfxCommandError("error")
-        )
-
-        with self.assertRaises(errors.FastbootCommandError):
-            self.fastboot_obj.is_in_fastboot_mode()
-
     @mock.patch.object(
         fastboot.Fastboot,
         "is_in_fastboot_mode",
@@ -380,8 +369,8 @@ class FastbootTests(unittest.TestCase):
         mock_is_in_fastboot_mode.assert_called()
 
     @mock.patch.object(
-        subprocess,
-        "check_output",
+        host_shell,
+        "run",
         return_value=_MOCK_ARGS["fastboot_getvar_hw_revision"],
         autospec=True,
     )
@@ -394,7 +383,7 @@ class FastbootTests(unittest.TestCase):
     def test_run_when_in_fastboot_mode_success(
         self,
         mock_is_in_fastboot_mode: mock.Mock,
-        mock_subprocess_check_output: mock.Mock,
+        mock_host_shell_run: mock.Mock,
     ) -> None:
         """Test case for Fastboot.run() when device is in fastboot mode and
         returns success."""
@@ -403,43 +392,30 @@ class FastbootTests(unittest.TestCase):
             _EXPECTED_VALUES["fastboot_run_getvar_hw_revision"],
         )
         mock_is_in_fastboot_mode.assert_called()
-        mock_subprocess_check_output.assert_called()
+        mock_host_shell_run.assert_called()
 
     @parameterized.expand(
         [
             (
                 {
-                    "label": "TimeoutExpired",
-                    "check_output": subprocess.TimeoutExpired(
-                        timeout=10, cmd=_INPUT_ARGS["subprocess_run_cmd"]
+                    "label": "HoneydewTimeoutError",
+                    "host_shell_run_return_value": errors.HoneydewTimeoutError(
+                        "timed out"
                     ),
-                    "expected_exception": subprocess.TimeoutExpired,
+                    "expected_exception": errors.HoneydewTimeoutError,
                 },
             ),
             (
                 {
-                    "label": "FastbootCommandError_because_of_FileNotFoundError",
-                    "check_output": FileNotFoundError(
-                        "No such file or directory: 'fastbot'"
-                    ),
-                    "expected_exception": errors.FastbootCommandError,
-                },
-            ),
-            (
-                {
-                    "label": "FastbootCommandError_because_of_CalledProcessError",
-                    "check_output": subprocess.CalledProcessError(
-                        returncode=1,
-                        cmd="fastboot devices",
-                        output="command output and error",
-                    ),
+                    "label": "FastbootCommandError",
+                    "host_shell_run_return_value": errors.HostCmdError("error"),
                     "expected_exception": errors.FastbootCommandError,
                 },
             ),
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(subprocess, "check_output", autospec=True)
+    @mock.patch.object(host_shell, "run", autospec=True)
     @mock.patch.object(
         fastboot.Fastboot,
         "is_in_fastboot_mode",
@@ -450,48 +426,19 @@ class FastbootTests(unittest.TestCase):
         self,
         parameterized_dict: dict[str, Any],
         mock_is_in_fastboot_mode: mock.Mock,
-        mock_subprocess_check_output: mock.Mock,
+        mock_host_shell_run: mock.Mock,
     ) -> None:
         """Test case for Fastboot.run() when device is in fastboot mode and
         returns in exceptions."""
-        mock_subprocess_check_output.side_effect = parameterized_dict[
-            "check_output"
+        mock_host_shell_run.side_effect = parameterized_dict[
+            "host_shell_run_return_value"
         ]
 
         with self.assertRaises(parameterized_dict["expected_exception"]):
             self.fastboot_obj.run(cmd=_INPUT_ARGS["run_cmd"])
 
         mock_is_in_fastboot_mode.assert_called()
-        mock_subprocess_check_output.assert_called()
-
-    @mock.patch.object(
-        subprocess,
-        "check_output",
-        side_effect=RuntimeError("error"),
-        autospec=True,
-    )
-    @mock.patch.object(
-        fastboot.Fastboot,
-        "is_in_fastboot_mode",
-        return_value=True,
-        autospec=True,
-    )
-    def test_run_when_in_fastboot_mode_with_exceptions_to_skip(
-        self,
-        mock_is_in_fastboot_mode: mock.Mock,
-        mock_subprocess_check_output: mock.Mock,
-    ) -> None:
-        """Test case for Fastboot.run() when device is in fastboot mode and
-        called with exceptions_to_skip."""
-        self.assertEqual(
-            self.fastboot_obj.run(
-                cmd=_INPUT_ARGS["run_cmd"], exceptions_to_skip=[RuntimeError]
-            ),
-            [],
-        )
-
-        mock_is_in_fastboot_mode.assert_called()
-        mock_subprocess_check_output.assert_called()
+        mock_host_shell_run.assert_called()
 
     def test_get_fastboot_node_with_fastboot_node_id_arg(self) -> None:
         """Test case for Fastboot._get_fastboot_node() when called with
@@ -620,7 +567,7 @@ class FastbootTests(unittest.TestCase):
     def test_wait_for_fuchsia_mode_exception(self) -> None:
         """Test case for Fastboot.wait_for_fuchsia_mode() failure case."""
         self.ffx_obj.wait_for_rcs_connection.side_effect = (
-            errors.HoneydewTimeoutError("error")
+            errors.FfxTimeoutError("error")
         )
         with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj.wait_for_fuchsia_mode()

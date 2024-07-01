@@ -77,21 +77,16 @@ const int8_t kDefaultSimFwRssi = -20;
 class ConnectTest;
 class ConnectInterface : public SimInterface {
  public:
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override;
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override;
-  void ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
-                   ConnectConfCompleter::Sync& completer) override;
-  void DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
+  void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override;
+  void DisassocConf(DisassocConfRequestView request,
                     DisassocConfCompleter::Sync& completer) override;
-  void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
-                  DeauthConfCompleter::Sync& completer) override;
-  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                 DeauthIndCompleter::Sync& completer) override;
-  void DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
-                   DisassocIndCompleter::Sync& completer) override;
-  void SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+  void DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;
+  void DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) override;
+  void SignalReport(SignalReportRequestView request,
                     SignalReportCompleter::Sync& completer) override;
 
   ConnectTest* test_;
@@ -147,7 +142,7 @@ class ConnectTest : public SimTest {
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
   void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
-  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest* resp);
+  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
 
@@ -240,45 +235,45 @@ class ConnectTest : public SimTest {
           std::shared_ptr<const simulation::WlanRxInfo> info) override;
 };
 
-void ConnectInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+void ConnectInterface::OnScanResult(OnScanResultRequestView request,
                                     OnScanResultCompleter::Sync& completer) {
   // Ignore and reply.
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
+void ConnectInterface::OnScanEnd(OnScanEndRequestView request,
                                  OnScanEndCompleter::Sync& completer) {
   // Ignore and reply.
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::ConnectConf(ConnectConfRequestView request, fdf::Arena& arena,
+void ConnectInterface::ConnectConf(ConnectConfRequestView request,
                                    ConnectConfCompleter::Sync& completer) {
   test_->OnConnectConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena& arena,
+void ConnectInterface::DisassocConf(DisassocConfRequestView request,
                                     DisassocConfCompleter::Sync& completer) {
   test_->OnDisassocConf(&request->resp);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
+void ConnectInterface::DeauthConf(DeauthConfRequestView request,
                                   DeauthConfCompleter::Sync& completer) {
   test_->OnDeauthConf(request);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
+void ConnectInterface::DeauthInd(DeauthIndRequestView request,
                                  DeauthIndCompleter::Sync& completer) {
   test_->OnDeauthInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::DisassocInd(DisassocIndRequestView request, fdf::Arena& arena,
+void ConnectInterface::DisassocInd(DisassocIndRequestView request,
                                    DisassocIndCompleter::Sync& completer) {
   test_->OnDisassocInd(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
-void ConnectInterface::SignalReport(SignalReportRequestView request, fdf::Arena& arena,
+void ConnectInterface::SignalReport(SignalReportRequestView request,
                                     SignalReportCompleter::Sync& completer) {
   test_->OnSignalReport(&request->ind);
-  completer.buffer(arena).Reply();
+  completer.Reply();
 }
 
 void ConnectTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
@@ -388,8 +383,7 @@ void ConnectTest::OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocCon
   }
 }
 
-void ConnectTest::OnDeauthConf(
-    const wlan_fullmac_wire::WlanFullmacImplIfcBaseDeauthConfRequest* resp) {
+void ConnectTest::OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp) {
   context_.deauth_conf_count++;
 }
 
@@ -422,8 +416,7 @@ void ConnectTest::OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalRepor
 
 void ConnectTest::StartConnect() {
   // Send connect request
-  auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseConnectRequest::Builder(client_ifc_.test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   std::memcpy(bss.bssid.data(), context_.bssid.byte, ETH_ALEN);
   bss.ies = fidl::VectorView<uint8_t>(client_ifc_.test_arena_, context_.ies);
@@ -439,7 +432,7 @@ void ConnectTest::StartReconnect() {
   // Send reconnect request
   // This is what SME does on a disassoc ind.
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseReconnectRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplReconnectRequest::Builder(client_ifc_.test_arena_);
   ::fidl::Array<uint8_t, 6> peer_sta_address;
   std::memcpy(peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -647,8 +640,8 @@ void ConnectTest::StartDeauth() {
 }
 
 void ConnectTest::DisassocClient(const common::MacAddr& mac_addr) {
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseDisassocRequest::Builder(
-      client_ifc_.test_arena_);
+  auto builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplDisassocRequest::Builder(client_ifc_.test_arena_);
 
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), mac_addr.byte, ETH_ALEN);
@@ -660,8 +653,8 @@ void ConnectTest::DisassocClient(const common::MacAddr& mac_addr) {
 }
 
 void ConnectTest::DeauthClient() {
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseDeauthRequest::Builder(
-      client_ifc_.test_arena_);
+  auto builder =
+      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(client_ifc_.test_arena_);
 
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
@@ -1094,7 +1087,7 @@ TEST_F(ConnectTest, AssocWhileScanning) {
 
   const uint8_t channels_list[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
 
   builder.txn_id(42);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kPassive);

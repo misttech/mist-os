@@ -10,24 +10,9 @@
 #include "src/developer/debug/zxdb/expr/eval_context_impl.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/developer/debug/zxdb/symbols/mock_symbol_data_provider.h"
+#include "src/developer/debug/zxdb/symbols/namespace.h"
 
 namespace zxdb {
-
-namespace {
-
-Location MakeLocation(TargetPointer ip, const std::string& func_name, FileLine file_line) {
-  // The function name currently can't handle "::". Because we pass the string to set_assigned_name,
-  // they will be treated as literals and not scope separators. If support for those is needed,
-  // we need to make the hierarchy of namespaces, etc. to put the function in.
-  FX_DCHECK(func_name.find("::") == std::string::npos);
-
-  auto function = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
-  function->set_assigned_name(func_name);
-
-  return Location(ip, std::move(file_line), 0, SymbolContext::ForRelativeAddresses(), function);
-}
-
-}  // namespace
 
 MockFrame::MockFrame(Session* session, Thread* thread, const Location& location, uint64_t sp,
                      uint64_t cfa, std::vector<debug::RegisterValue> regs, uint64_t frame_base,
@@ -44,7 +29,17 @@ MockFrame::MockFrame(Session* session, Thread* thread, const Location& location,
 
 MockFrame::MockFrame(Session* session, Thread* thread, TargetPointer ip, TargetPointer sp,
                      const std::string& func_name, FileLine file_line)
-    : MockFrame(session, thread, MakeLocation(ip, func_name, std::move(file_line)), sp) {}
+    : MockFrame(session, thread, Location{}, sp) {
+  MakeLocation(ip, func_name, std::move(file_line), {});
+}
+
+MockFrame::MockFrame(Session* session, Thread* thread, TargetPointer ip, TargetPointer sp,
+                     FileLine file_line, std::vector<std::string> absolute_function_name)
+    : MockFrame(session, thread, Location{}, sp) {
+  auto function_name = absolute_function_name.back();
+  absolute_function_name.pop_back();
+  MakeLocation(ip, function_name, std::move(file_line), absolute_function_name);
+}
 
 MockFrame::~MockFrame() = default;
 
@@ -131,5 +126,40 @@ fxl::RefPtr<EvalContext> MockFrame::GetEvalContext() const {
 }
 
 bool MockFrame::IsAmbiguousInlineLocation() const { return is_ambiguous_inline_; }
+
+void MockFrame::MakeLocation(TargetPointer ip, const std::string& function_name, FileLine file_line,
+                             const std::vector<std::string>& namespace_strings) {
+  // Pointer to the last created namespace.
+  fxl::RefPtr<Namespace> last = nullptr;
+  std::vector<fxl::RefPtr<Namespace>> namespaces;
+  namespaces.resize(namespace_strings.size());
+
+  // This is very important. If we don't reserve the right amount of parents
+  // here, then emplace_back will drop the Symbol references leading to the
+  // function having an incomplete identifier.
+  parent_setters_.reserve(namespace_strings.size());
+
+  for (const auto& ns : namespace_strings) {
+    auto nsptr = fxl::MakeRefCounted<Namespace>(ns);
+
+    if (last.get() == nullptr) {
+      last = nsptr;
+    } else {
+      parent_setters_.emplace_back(nsptr, last);
+      last = nsptr;
+    }
+
+    namespaces.push_back(nsptr.Clone());
+  }
+
+  auto function = fxl::MakeRefCounted<Function>(DwarfTag::kSubprogram);
+  function->set_assigned_name(function_name);
+  if (!namespaces.empty()) {
+    parent_setters_.emplace_back(function, namespaces.back());
+  }
+
+  location_ =
+      Location(ip, std::move(file_line), 0, SymbolContext::ForRelativeAddresses(), function);
+}
 
 }  // namespace zxdb

@@ -256,6 +256,57 @@ impl TargetCollectionProtocol {
         }
         Ok(())
     }
+
+    // Discovery is turned off, so  we're not going to discover
+    // anything.  But since the query provided us with an address/
+    // serial#, we can try to connect to it.
+    async fn add_and_use_target(
+        &self,
+        target_collection: &Rc<TargetCollection>,
+        node: &Arc<overnet_core::Router>,
+        query: TargetInfoQuery,
+    ) -> Result<Rc<Target>, ffx::OpenTargetError> {
+        let addrs;
+        let serial: String;
+        let (update, filter) = match query {
+            TargetInfoQuery::Addr(addr) => {
+                addrs = [addr];
+                let update =
+                    TargetUpdateBuilder::new().net_addresses(&addrs).transient_target().enable();
+                let filter = [TargetUpdateFilter::NetAddrs(&addrs)];
+                (update, filter)
+            }
+            TargetInfoQuery::Serial(ref sn) => {
+                // We're not going to discover anything.  But since
+                // the query provided us with a serial number, we can try
+                // to connect to it.
+                serial = sn.clone();
+                let update = TargetUpdateBuilder::new()
+                    .identity(target::Identity::from_serial(sn))
+                    // This is only explicit when the client has discovered this device
+                    .discovered(TargetProtocol::Fastboot, TargetTransport::Usb)
+                    .transient_target()
+                    .enable();
+                let filter = [TargetUpdateFilter::Serial(&serial)];
+                (update, filter)
+            }
+            _ => unreachable!(),
+        };
+        target_collection.update_target(&filter, update.build(), true);
+        target_collection.try_to_reconnect_target(&filter, &node);
+        // Creating and connecting to the target doesn't actually _give_ us
+        // the target, so we now need to search for the one we just created
+        target_collection
+            .query_single_enabled_target(&query)
+            .map_err(|_| ffx::OpenTargetError::QueryAmbiguous)
+            .and_then(|target| match target {
+                None => {
+                    tracing::error!("Couldn't find target we just created");
+                    Err(ffx::OpenTargetError::TargetNotFound)
+                }
+                Some(t) => Ok(t),
+            })
+    }
 }
 
 #[async_trait(?Send)]
@@ -298,24 +349,42 @@ impl FidlProtocol for TargetCollectionProtocol {
                 tracing::trace!("Open Target {query:?}");
 
                 let query = TargetInfoQuery::from(query.string_matcher.clone());
+                tracing::debug!("Open Target parsed query: {query:?}");
 
+                let node = cx.overnet_node()?;
                 // Get a previously used target first, otherwise fall back to discovery + use.
                 let result = match target_collection.query_single_connected_target(&query) {
                     Ok(Some(target)) => Ok(target),
                     Ok(None) => {
-                        target_collection
-                            // OpenTarget is called on behalf of the user.
-                            .discover_target(&query)
-                            .await
-                            .map_err(|_| ffx::OpenTargetError::QueryAmbiguous)
-                            .map(|t| target_collection.use_target(t, "OpenTarget request"))
+                        let can_discover = ffx_target::is_discovery_enabled(&self.context).await;
+                        if can_discover {
+                            target_collection
+                                // OpenTarget is called on behalf of the user.
+                                .discover_target(&query)
+                                .await
+                                .map_err(|_| ffx::OpenTargetError::QueryAmbiguous)
+                                .map(|t| target_collection.use_target(t, "OpenTarget request"))
+                        } else {
+                            match query {
+                                TargetInfoQuery::Addr(_) | TargetInfoQuery::Serial(_) => {
+                                    self.add_and_use_target(&target_collection, &node, query).await
+                                }
+                                _ => {
+                                    tracing::warn!("OpenTarget(query:?): daemon discovery is turned off, so client should only be sending already-resolved addresses (Addr or Serial)");
+                                    Err(ffx::OpenTargetError::TargetNotFound)
+                                }
+                            }
+                        }
                     }
                     Err(()) => Err(ffx::OpenTargetError::QueryAmbiguous),
                 };
 
                 let target = match result {
                     Ok(target) => target,
-                    Err(e) => return responder.send(Err(e)).map_err(Into::into),
+                    Err(e) => {
+                        tracing::debug!("OpenTarget: got err {e:?}");
+                        return responder.send(Err(e)).map_err(Into::into);
+                    }
                 };
 
                 tracing::trace!("Found target: {target:?}");

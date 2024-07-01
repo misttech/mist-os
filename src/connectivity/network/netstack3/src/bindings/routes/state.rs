@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use either::Either;
 use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker};
 use futures::channel::oneshot;
-use futures::{FutureExt, TryStream, TryStreamExt as _};
+use futures::{TryStream, TryStreamExt as _};
 use log::{error, info, warn};
 use net_types::ethernet::Mac;
 use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
@@ -23,6 +23,7 @@ use {
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
 };
 
+use crate::bindings::routes::rules_state::RuleInterest;
 use crate::bindings::routes::watcher::{
     serve_watcher, FidlWatcherEvent, ServeWatcherError, Update, UpdateDispatcher, WatcherEvent,
     WatcherInterest,
@@ -180,22 +181,34 @@ where
 /// Serve the `fuchsia.net.routes/StateV4` protocol.
 pub(crate) async fn serve_state_v4(
     rs: fnet_routes::StateV4RequestStream,
-    dispatcher: &RouteUpdateDispatcher<Ipv4>,
+    dispatchers: &routes::Dispatchers<Ipv4>,
 ) {
-    rs.try_for_each_concurrent(None, |req| match req {
-        fnet_routes::StateV4Request::GetWatcherV4 { options, watcher, control_handle: _ } => {
-            serve_route_watcher::<Ipv4>(watcher, options.into(), dispatcher).map(|result| {
-                Ok(result.unwrap_or_else(|e| {
-                    warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
-                }))
-            })
-        }
-        fnet_routes::StateV4Request::GetRuleWatcherV4 {
-            options: _,
-            watcher: _,
-            control_handle: _,
-        } => {
-            todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher");
+    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = dispatchers;
+    rs.try_for_each_concurrent(None, |req| async move {
+        match req {
+            fnet_routes::StateV4Request::GetWatcherV4 { options, watcher, control_handle: _ } => {
+                Ok(serve_route_watcher::<Ipv4>(watcher, options.into(), route_update_dispatcher)
+                    .await
+                    .unwrap_or_else(|e| {
+                        warn!("error serving {}: {:?}", fnet_routes::WatcherV4Marker::DEBUG_NAME, e)
+                    }))
+            }
+            fnet_routes::StateV4Request::GetRuleWatcherV4 {
+                options:
+                    fnet_routes::RuleWatcherOptionsV4 {
+                        __source_breaking: fidl::marker::SourceBreaking,
+                    },
+                watcher,
+                control_handle: _,
+            } => Ok(serve_watcher::<fnet_routes_ext::rules::RuleEvent<Ipv4>, _>(
+                watcher,
+                RuleInterest,
+                rule_update_dispatcher,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                warn!("error serving {}: {:?}", fnet_routes::RuleWatcherV4Marker::DEBUG_NAME, e)
+            })),
         }
     })
     .await
@@ -207,22 +220,34 @@ pub(crate) async fn serve_state_v4(
 /// Serve the `fuchsia.net.routes/StateV6` protocol.
 pub(crate) async fn serve_state_v6(
     rs: fnet_routes::StateV6RequestStream,
-    dispatcher: &RouteUpdateDispatcher<Ipv6>,
+    dispatchers: &routes::Dispatchers<Ipv6>,
 ) {
-    rs.try_for_each_concurrent(None, |req| match req {
-        fnet_routes::StateV6Request::GetWatcherV6 { options, watcher, control_handle: _ } => {
-            serve_route_watcher::<Ipv6>(watcher, options.into(), dispatcher).map(|result| {
-                Ok(result.unwrap_or_else(|e| {
-                    warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
-                }))
-            })
-        }
-        fnet_routes::StateV6Request::GetRuleWatcherV6 {
-            options: _,
-            watcher: _,
-            control_handle: _,
-        } => {
-            todo!("TODO(https://fxbug.dev/336204757): Implement rules watcher");
+    let routes::Dispatchers { route_update_dispatcher, rule_update_dispatcher } = dispatchers;
+    rs.try_for_each_concurrent(None, |req| async move {
+        match req {
+            fnet_routes::StateV6Request::GetWatcherV6 { options, watcher, control_handle: _ } => {
+                Ok(serve_route_watcher::<Ipv6>(watcher, options.into(), route_update_dispatcher)
+                    .await
+                    .unwrap_or_else(|e| {
+                        warn!("error serving {}: {:?}", fnet_routes::WatcherV6Marker::DEBUG_NAME, e)
+                    }))
+            }
+            fnet_routes::StateV6Request::GetRuleWatcherV6 {
+                options:
+                    fnet_routes::RuleWatcherOptionsV6 {
+                        __source_breaking: fidl::marker::SourceBreaking,
+                    },
+                watcher,
+                control_handle: _,
+            } => Ok(serve_watcher::<fnet_routes_ext::rules::RuleEvent<Ipv6>, _>(
+                watcher,
+                RuleInterest,
+                rule_update_dispatcher,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                warn!("error serving {}: {:?}", fnet_routes::RuleWatcherV6Marker::DEBUG_NAME, e)
+            })),
         }
     })
     .await
@@ -288,11 +313,7 @@ impl<I: Ip> WatcherInterest<fnet_routes_ext::Event<I>> for RouteTableInterest {
 impl<I: Ip> WatcherEvent for fnet_routes_ext::Event<I> {
     type Resource = fnet_routes_ext::InstalledRoute<I>;
 
-    // The maximum number of events for the `fuchsia.net.routes/Watcher` client
-    // is allowed to have queued. Clients will be dropped if they exceed this
-    // limit. Keep this a multiple of `fnet_routes::MAX_EVENTS` (5 is somewhat
-    // arbitrary) so we don't artificially truncate the allowed batch size.
-    const MAX_PENDING_EVENTS: usize = (fnet_routes::MAX_EVENTS * 5) as usize;
+    const MAX_EVENTS: usize = fnet_routes::MAX_EVENTS as usize;
 
     const IDLE: Self = fnet_routes_ext::Event::Idle;
 
@@ -315,7 +336,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt> FidlWatcherEvent for fnet_routes_ext::E
 
     // Responds to a single `Watch` request with the given batch of events.
     fn respond_to_watch_request(
-        req: <<Self::WatcherMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
+        req: fidl::endpoints::Request<Self::WatcherMarker>,
         events: Vec<Self>,
     ) -> Result<(), fidl::Error> {
         #[derive(GenericOverIp)]
@@ -324,44 +345,49 @@ impl<I: fnet_routes_ext::FidlRouteIpExt> FidlWatcherEvent for fnet_routes_ext::E
             req: <<I::WatcherMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
             events: Vec<fnet_routes_ext::Event<I>>,
         }
-        let result =
-            I::map_ip_in::<Inputs<I>, _>(
-                Inputs { req, events },
-                |Inputs { req, events }| match req {
-                    fnet_routes::WatcherV4Request::Watch { responder } => {
-                        let events = events
-                            .into_iter()
-                            .map(|event| {
-                                event.try_into().unwrap_or_else(|e| {
-                                    match e {
-                            fnet_routes_ext::NetTypeConversionError::UnknownUnionVariant(msg) => {
-                                panic!("tried to send an event with Unknown enum variant: {}", msg)
-                            }
-                        }
-                                })
+        let result = I::map_ip_in::<Inputs<I>, _>(
+            Inputs { req, events },
+            |Inputs { req, events }| match req {
+                fnet_routes::WatcherV4Request::Watch { responder } => {
+                    let events = events
+                        .into_iter()
+                        .map(|event| {
+                            event.try_into().unwrap_or_else(|e| match e {
+                                fnet_routes_ext::NetTypeConversionError::UnknownUnionVariant(
+                                    msg,
+                                ) => {
+                                    panic!(
+                                        "tried to send an event with Unknown enum variant: {}",
+                                        msg
+                                    )
+                                }
                             })
-                            .collect::<Vec<_>>();
-                        responder.send(&events)
-                    }
-                },
-                |Inputs { req, events }| match req {
-                    fnet_routes::WatcherV6Request::Watch { responder } => {
-                        let events = events
-                            .into_iter()
-                            .map(|event| {
-                                event.try_into().unwrap_or_else(|e| {
-                                    match e {
-                            fnet_routes_ext::NetTypeConversionError::UnknownUnionVariant(msg) => {
-                                panic!("tried to send an event with Unknown enum variant: {}", msg)
-                            }
-                        }
-                                })
+                        })
+                        .collect::<Vec<_>>();
+                    responder.send(&events)
+                }
+            },
+            |Inputs { req, events }| match req {
+                fnet_routes::WatcherV6Request::Watch { responder } => {
+                    let events = events
+                        .into_iter()
+                        .map(|event| {
+                            event.try_into().unwrap_or_else(|e| match e {
+                                fnet_routes_ext::NetTypeConversionError::UnknownUnionVariant(
+                                    msg,
+                                ) => {
+                                    panic!(
+                                        "tried to send an event with Unknown enum variant: {}",
+                                        msg
+                                    )
+                                }
                             })
-                            .collect::<Vec<_>>();
-                        responder.send(&events)
-                    }
-                },
-            );
+                        })
+                        .collect::<Vec<_>>();
+                    responder.send(&events)
+                }
+            },
+        );
         result
     }
 }

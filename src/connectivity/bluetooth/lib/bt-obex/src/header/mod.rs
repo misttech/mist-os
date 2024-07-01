@@ -5,6 +5,7 @@
 use chrono::NaiveDateTime;
 use fuchsia_bluetooth::types::Uuid;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
+use std::collections::HashMap;
 use tracing::trace;
 
 pub use self::header_set::HeaderSet;
@@ -20,6 +21,12 @@ mod obex_string;
 /// Defined in OBEX 1.5 Section 2.2.11.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ConnectionIdentifier(pub(crate) u32);
+
+impl ConnectionIdentifier {
+    pub fn id(&self) -> u32 {
+        self.0
+    }
+}
 
 impl TryFrom<u32> for ConnectionIdentifier {
     type Error = PacketError;
@@ -125,6 +132,95 @@ impl From<String> for MimeType {
 impl From<&str> for MimeType {
     fn from(src: &str) -> MimeType {
         MimeType(src.to_string())
+    }
+}
+
+/// Represents a user-defined Header type.
+// TODO(https://fxbug.dev/42072539): This representation may change depending on what kind of user
+// headers we expect.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UserDefinedHeader {
+    /// The Header Identifier (HI) can be any value between 0x30 and 0x3f. See
+    /// `HeaderIdentifier::User` for more details.
+    identifier: u8,
+    /// The user data.
+    value: Vec<u8>,
+}
+
+/// Used to support a variety of application request/response parameters
+/// which are represented in Tag-Length-Value triplets.
+pub type TypeValue = (u8, Vec<u8>);
+
+/// Represents the vector of TypeLengthValue triplets in application
+/// parameter headers.
+/// See OBEX spec v1.5 Section 2.2.12.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TagLengthValue(Vec<TypeValue>);
+
+impl TagLengthValue {
+    /// Minimum data length of a single triplet includes the tag and length byte.
+    const MIN_TRIPLET_LENGTH_BYTES: usize = 2;
+
+    pub fn map(&self) -> HashMap<u8, Vec<u8>> {
+        self.0.iter().cloned().collect()
+    }
+}
+
+impl From<Vec<TypeValue>> for TagLengthValue {
+    fn from(value: Vec<TypeValue>) -> Self {
+        Self(value)
+    }
+}
+
+impl Encodable for TagLengthValue {
+    type Error = PacketError;
+
+    fn encoded_len(&self) -> core::primitive::usize {
+        self.0
+            .iter()
+            .fold(0, |init, triplet| init + Self::MIN_TRIPLET_LENGTH_BYTES + triplet.1.len())
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> core::result::Result<(), Self::Error> {
+        if buf.len() < self.encoded_len() {
+            return Err(PacketError::BufferTooSmall);
+        }
+        let mut start_index = 0;
+        for (tag, value) in &self.0 {
+            buf[start_index] = *tag;
+            buf[start_index + 1] = value.len() as u8;
+            buf[start_index + 2..start_index + 2 + value.len()].copy_from_slice(value.as_slice());
+            start_index += 2 + value.len();
+        }
+        Ok(())
+    }
+}
+
+impl TryFrom<&[u8]> for TagLengthValue {
+    type Error = PacketError;
+
+    /// Attempts to parse application parameters header from raw data.
+    fn try_from(raw_data: &[u8]) -> Result<Self, Self::Error> {
+        let data_len = raw_data.len();
+
+        let mut decoded_len = 0;
+        let mut list = vec![];
+
+        while decoded_len < data_len {
+            if data_len < (decoded_len + Self::MIN_TRIPLET_LENGTH_BYTES) {
+                return Err(PacketError::DataLength);
+            }
+            let tag: u8 = raw_data[decoded_len];
+            let value_len = raw_data[decoded_len + 1] as usize;
+            if data_len < (decoded_len + Self::MIN_TRIPLET_LENGTH_BYTES + value_len) {
+                return Err(PacketError::DataLength);
+            }
+            let value_start_idx = decoded_len + Self::MIN_TRIPLET_LENGTH_BYTES;
+            let value = (&raw_data[value_start_idx..value_start_idx + value_len]).into();
+            let _ = list.push((tag, value));
+            decoded_len += Self::MIN_TRIPLET_LENGTH_BYTES + value_len;
+        }
+        Ok(TagLengthValue(list))
     }
 }
 
@@ -336,18 +432,6 @@ impl Into<u8> for &HeaderIdentifier {
     }
 }
 
-/// Represents a user-defined Header type.
-// TODO(https://fxbug.dev/42072539): This representation may change depending on what kind of user
-// headers we expect.
-#[derive(Clone, Debug, PartialEq)]
-pub struct UserDefinedHeader {
-    /// The Header Identifier (HI) can be any value between 0x30 and 0x3f. See
-    /// `HeaderIdentifier::User` for more details.
-    identifier: u8,
-    /// The user data.
-    value: Vec<u8>,
-}
-
 /// The building block of an OBEX object. A single OBEX object consists of one or more Headers.
 /// Defined in OBEX 1.5 Section 2.0.
 #[derive(Clone, Debug, PartialEq)]
@@ -373,7 +457,7 @@ pub enum Header {
     EndOfBody(Vec<u8>),
     Who(Vec<u8>),
     ConnectionId(ConnectionIdentifier),
-    ApplicationParameters(Vec<u8>),
+    ApplicationParameters(TagLengthValue),
     AuthenticationChallenge(Vec<u8>),
     AuthenticationResponse(Vec<u8>),
     CreatorId(u32),
@@ -462,11 +546,13 @@ impl Header {
             | Body(b)
             | EndOfBody(b)
             | Who(b)
-            | ApplicationParameters(b)
             | AuthenticationChallenge(b)
             | AuthenticationResponse(b)
             | ObjectClass(b)
             | SessionParameters(b) => b.len(),
+            ApplicationParameters(params) => params.0.iter().fold(0, |acc, param| {
+                acc + TagLengthValue::MIN_TRIPLET_LENGTH_BYTES + param.1.len()
+            }),
             Type(mime_type) => mime_type.len(),
             TimeIso8601(_) => Self::ISO_8601_LENGTH_BYTES,
             WanUuid(_) => Uuid::BLUETOOTH_UUID_LENGTH_BYTES,
@@ -536,7 +622,6 @@ impl Encodable for Header {
             | Body(src)
             | EndOfBody(src)
             | Who(src)
-            | ApplicationParameters(src)
             | AuthenticationChallenge(src)
             | AuthenticationResponse(src)
             | ObjectClass(src)
@@ -544,6 +629,9 @@ impl Encodable for Header {
                 // Encode all byte buffer headers.
                 let n = src.len();
                 buf[start_index..start_index + n].copy_from_slice(&src[..]);
+            }
+            ApplicationParameters(params) => {
+                params.encode(&mut buf[start_index..])?;
             }
             SessionSequenceNumber(v) | SingleResponseModeParameters(v) => {
                 // Encode all 1-byte value headers.
@@ -680,8 +768,7 @@ impl Decodable for Header {
                 ConnectionIdentifier::try_from(u32::from_be_bytes(data[..].try_into().unwrap()))?,
             )),
             HeaderIdentifier::ApplicationParameters => {
-                out_buf.copy_from_slice(&data[..]);
-                Ok(Header::ApplicationParameters(out_buf))
+                Ok(Header::ApplicationParameters(TagLengthValue::try_from(&data[..])?))
             }
             HeaderIdentifier::AuthenticationChallenge => {
                 out_buf.copy_from_slice(&data[..]);
@@ -1246,5 +1333,87 @@ mod tests {
             0x11, 0x22, // Response = [0x11, 0x22]
         ];
         assert_eq!(buf, expected_buf);
+    }
+
+    #[fuchsia::test]
+    fn decode_application_header_success() {
+        #[rustfmt::skip]
+        let buf = [
+            0x4C,                   // HI = Application Parameters
+            0x00, 0x09,             // Total Length = 9 bytes
+            0x29,                   // Tag
+            0x04,                   // Length
+            0x20, 0x00, 0x01, 0x00, // Value
+        ];
+        let result = Header::decode(&buf).expect("can decode application parameters header");
+        assert_eq!(
+            result,
+            Header::ApplicationParameters(vec![(0x29, vec![0x20, 0x00, 0x01, 0x00])].into()),
+        );
+
+        #[rustfmt::skip]
+        let buf = [
+            0x4C,       // HI = Application Parameters
+            0x00, 0x0B, // Total Length = 11 bytes
+            0x01,       // Tag 1
+            0x02,       // Length
+            0x00, 0x01, // Value
+            0x02,       // Tag 2
+            0x02,       // Length
+            0x00, 0x02  // Value
+        ];
+        let result = Header::decode(&buf).expect("can decode application parameters header");
+        assert_eq!(
+            result,
+            Header::ApplicationParameters(
+                vec![(0x01, vec![0x00, 0x01]), (0x02, vec![0x00, 0x02]),].into()
+            ),
+        );
+    }
+
+    #[fuchsia::test]
+    fn decode_application_header_fail() {
+        #[rustfmt::skip]
+        let buf = [
+            0x4C,                   // HI = Application Parameters
+            0x00, 0x09,             // Total Length = 9 bytes
+            0x29,                   // Tag
+            0x03,                   // Length (incorrect)
+            0x20, 0x00, 0x01, 0x00, // Value
+        ];
+        let _ = Header::decode(&buf).expect_err("should have failed");
+
+        #[rustfmt::skip]
+        let buf = [
+            0x4C,       // HI = Application Parameters
+            0x00, 0x0B, // Total Length = 11 bytes
+            0x01,       // Tag 1
+            0x02,       // Length
+            0x00, 0x01, // Value
+            0x02,       // Tag 2
+            0x01,       // Length (incorrect)
+            0x00, 0x02  // Value
+        ];
+        let _ = Header::decode(&buf).expect_err("should have failed");
+    }
+
+    #[fuchsia::test]
+    fn encode_application_header() {
+        // Single parameter.
+        let header =
+            Header::ApplicationParameters(vec![(0x29, vec![0x20, 0x00, 0x01, 0x00])].into());
+        let mut buf = vec![0; header.encoded_len()];
+        let _ = header.encode(&mut buf).expect("should encode successfully");
+
+        #[rustfmt::skip]
+        assert_eq!(buf, vec![
+            0x4C,                   // HI = Application Parameters
+            0x00, 0x09,             // Total Length = 9 bytes
+            0x29,                   // Tag
+            0x04,                   // Length
+            0x20, 0x00, 0x01, 0x00, // Value
+        ]);
+
+        // Multiple parameters.
     }
 }

@@ -38,10 +38,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
     struct Args {
         open_flags: fio::OpenFlags,
         expected_mode_type: u32,
-        // TODO(https://fxbug.dev/327633753): Remove multiple mode protections. Nodes should only
-        // have a single protection mode. Multiple protection modes are supported to transition
-        // MetaFile and MetaAsFile from being read-write to read-only.
-        expected_mode_protections: Vec<u32>,
+        expected_mode_protection: u32,
         id_verifier: Box<dyn U64Verifier>,
         expected_content_size: u64,
         storage_size_verifier: Box<dyn U64Verifier>,
@@ -53,7 +50,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
             Self {
                 open_flags: fio::OpenFlags::empty(),
                 expected_mode_type: 0,
-                expected_mode_protections: vec![],
+                expected_mode_protection: 0,
                 id_verifier: Box::new(1),
                 expected_content_size: 0,
                 storage_size_verifier: Box::new(AnyU64),
@@ -67,11 +64,12 @@ async fn get_attr_per_package_source(source: PackageSource) {
         let (status, attrs) = node.get_attr().await.unwrap();
         let () = zx::Status::ok(status).unwrap();
         assert_eq!(Mode(attrs.mode & fio::MODE_TYPE_MASK), Mode(args.expected_mode_type));
-        assert!(
-            args.expected_mode_protections.contains(&(attrs.mode & fio::MODE_PROTECTION_MASK)),
-            "expected {:o} to be one of {:?}",
+        assert_eq!(
             attrs.mode & fio::MODE_PROTECTION_MASK,
-            args.expected_mode_protections.iter().map(|n| format!("{:o}", n)).collect::<Vec<_>>()
+            args.expected_mode_protection,
+            "expected {:o} to equal {:o}",
+            attrs.mode & fio::MODE_PROTECTION_MASK,
+            args.expected_mode_protection
         );
         args.id_verifier.verify(attrs.id);
         assert_eq!(attrs.content_size, args.expected_content_size);
@@ -87,7 +85,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         Args {
             open_flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o700],
+            expected_mode_protection: 0o700,
             time_verifier: Box::new(0),
             ..Default::default()
         },
@@ -98,7 +96,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         "dir",
         Args {
             expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o700],
+            expected_mode_protection: 0o700,
             time_verifier: Box::new(0),
             ..Default::default()
         },
@@ -110,7 +108,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         Args {
             open_flags: fio::OpenFlags::RIGHT_READABLE,
             expected_mode_type: fio::MODE_TYPE_FILE,
-            expected_mode_protections: vec![0o500],
+            expected_mode_protection: 0o500,
             id_verifier: Box::new(AnyU64),
             expected_content_size: 4,
             time_verifier: Box::new(0),
@@ -124,7 +122,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         Args {
             open_flags: fio::OpenFlags::NOT_DIRECTORY,
             expected_mode_type: fio::MODE_TYPE_FILE,
-            expected_mode_protections: vec![0o400, 0o600],
+            expected_mode_protection: 0o400,
             expected_content_size: 64,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -137,7 +135,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         Args {
             open_flags: fio::OpenFlags::DIRECTORY,
             expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o700],
+            expected_mode_protection: 0o700,
             expected_content_size: 75,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -149,7 +147,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         "meta/dir",
         Args {
             expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o700],
+            expected_mode_protection: 0o700,
             expected_content_size: 75,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -161,7 +159,7 @@ async fn get_attr_per_package_source(source: PackageSource) {
         "meta/file",
         Args {
             expected_mode_type: fio::MODE_TYPE_FILE,
-            expected_mode_protections: vec![0o400, 0o600],
+            expected_mode_protection: 0o400,
             expected_content_size: 9,
             time_verifier: Box::new(0),
             ..Default::default()
@@ -512,7 +510,7 @@ impl SetFlagsOutcome<'_> {
                 self.error_context()
             ),
             Ok(Ok(())) => panic!(
-                "set_flags({:?}) suceeded unexpectedly on {}",
+                "set_flags({:?}) succeeded unexpectedly on {}",
                 self.argument,
                 self.error_context()
             ),

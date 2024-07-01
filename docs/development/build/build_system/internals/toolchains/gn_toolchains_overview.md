@@ -163,7 +163,7 @@ with various features:
   the Clang compiler. It provides support for building C++ and Rust
   sources using GN's builtin rules.
 
-  Supported target platforms are Fuchsia, Linux, MacOS, Win32 PE/COFF
+  Supported target platforms are Fuchsia, Linux, Win32 PE/COFF
   (as required by the UEFI bootloader) and even WebAssembly!
 
 - `clang_toolchain_suite()` defines one more toolchain instances

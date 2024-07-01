@@ -251,10 +251,10 @@ impl TopologyTestDaemon {
                     .get(&required_element_name)
                     .unwrap()
                     .power_element_context;
-                let token = if dependency.dependency_type == fpt::DependencyType::Active {
-                    power_element_context.active_dependency_token()
+                let token = if dependency.dependency_type == fpt::DependencyType::Assertive {
+                    power_element_context.assertive_dependency_token()
                 } else {
-                    power_element_context.passive_dependency_token()
+                    power_element_context.opportunistic_dependency_token()
                 };
                 dependencies.push(fbroker::LevelDependency {
                     dependency_type: dependency.dependency_type,
@@ -340,9 +340,9 @@ impl TopologyTestDaemon {
                     error!("Failed to get application_activity power element");
                     fpt::SystemActivityControlError::Internal
                 })?
-                .active_dependency_token
+                .assertive_dependency_token
                 .ok_or_else(|| {
-                    error!("Failed to get active_dependency_token of application_activity");
+                    error!("Failed to get assertive_dependency_token of application_activity");
                     fpt::SystemActivityControlError::Internal
                 })?;
             let aa_controller = PowerElement::new(
@@ -351,7 +351,7 @@ impl TopologyTestDaemon {
                 &[0, 1],
                 0,
                 vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Active,
+                    dependency_type: fbroker::DependencyType::Assertive,
                     dependent_level: 1,
                     requires_token: aa_token,
                     requires_level_by_preference: vec![1],

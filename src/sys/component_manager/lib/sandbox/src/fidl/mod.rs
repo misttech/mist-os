@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 mod capability;
-mod component;
 mod connector;
 mod data;
 mod dict;
+mod dir_entry;
 mod directory;
 mod handle;
-mod open;
+mod instance_token;
 pub mod registry;
 mod router;
 mod unit;

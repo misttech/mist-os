@@ -4,8 +4,6 @@
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_DEVICE_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_DEVICE_H_
 
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/handle.h>
@@ -95,12 +93,6 @@ class Device {
   std::unique_ptr<Backend> backend_;
   // irq thread object
   thrd_t irq_thread_ = {};
-
-  // DDK device
-  // TODO: It might make sense for the base device class to be the one
-  // to handle device_add() calls rather than delegating it to the derived
-  // instances of devices.
-  zx_protocol_device_t device_ops_ = {};
 
   // This lock exists for devices to synchronize themselves, it should not be used by the base
   // device class.

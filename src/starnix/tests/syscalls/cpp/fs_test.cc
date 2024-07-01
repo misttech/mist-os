@@ -540,7 +540,7 @@ TEST_P(FsMountTest, CreateWithDifferentModes) {
 
       std::string file_path = fxl::StringPrintf("%s/create.%o", user1_folder.c_str(), mode);
       {
-        test_helper::ScopedFD fd(open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, mode));
+        fbl::unique_fd fd(open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, mode));
         EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno);
       }
 
@@ -573,8 +573,7 @@ TEST_P(FsMountTest, ChmodWithDifferentModes) {
 
       std::string file_path = fxl::StringPrintf("%s/chmod.%o", user1_folder.c_str(), mode);
       {
-        test_helper::ScopedFD fd(
-            open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR));
+        fbl::unique_fd fd(open(file_path.c_str(), O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR));
         EXPECT_TRUE(fd.is_valid()) << "open: " << std::strerror(errno);
       }
       auto cleanup =

@@ -10,6 +10,7 @@
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/symbols/arch.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
+#include "src/developer/debug/zxdb/symbols/symbol_test_parent_setter.h"
 #include "src/lib/fxl/memory/ref_ptr.h"
 
 namespace zxdb {
@@ -34,6 +35,16 @@ class MockFrame : public Frame {
   // value of everything else. It's usuaully enough for many types of tests.
   MockFrame(Session* session, Thread* thread, TargetPointer ip, TargetPointer sp,
             const std::string& func_name, FileLine file_line);
+
+  // This variant is similar to the above, but takes an absolute function name as a vector of
+  // strings, which will mimic the namespace hierarchy of a function. The last element of this
+  // vector is the function name.
+  //
+  // Note: Right now all of the strings passed in |absolute_function_name| will create Namespace
+  // symbol objects, except for the final string which is the function name. If we ever require the
+  // function to be nested in a collection/lexical block/etc, this will have to be changed.
+  MockFrame(Session* session, Thread* thread, TargetPointer ip, TargetPointer sp,
+            FileLine file_line, std::vector<std::string> absolute_function_name);
 
   ~MockFrame() override;
 
@@ -73,6 +84,8 @@ class MockFrame : public Frame {
   bool IsAmbiguousInlineLocation() const override;
 
  private:
+  void MakeLocation(TargetPointer ip, const std::string& function_name, FileLine file_line,
+                    const std::vector<std::string>& namespace_strings);
   Thread* thread_;
 
   uint64_t sp_;
@@ -81,6 +94,9 @@ class MockFrame : public Frame {
   uint64_t frame_base_;
   const Frame* physical_frame_;  // Null if non-inlined.
   Location location_;
+  // Holds all of the parent<-child links for the symbols if specified at construction time. Empty
+  // if there is no hierarchy.
+  std::vector<SymbolTestParentSetter> parent_setters_;
   mutable fxl::RefPtr<MockSymbolDataProvider> symbol_data_provider_;  // Lazy.
   mutable fxl::RefPtr<EvalContextImpl> eval_context_;                 // Lazy.
   bool is_ambiguous_inline_ = false;

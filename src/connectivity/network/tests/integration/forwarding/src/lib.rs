@@ -34,6 +34,7 @@ const REQUEST: &str = "hello from client";
 const RESPONSE: &str = "hello from server";
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     Setup {
         client_ip: std_ip!("192.168.1.2"),

@@ -17,7 +17,6 @@ use crate::task::{
     Session, StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo,
     TaskPersistentInfoState, TimerId, TimerTable, WaitQueue, ZombiePtraces,
 };
-use crate::time::utc;
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
@@ -31,7 +30,7 @@ use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::resource_limits::{Resource, ResourceLimits};
 use starnix_uapi::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU};
 use starnix_uapi::stats::TaskTimeStats;
-use starnix_uapi::time::{duration_from_timeval, timeval_from_duration};
+use starnix_uapi::time::{itimerspec_from_itimerval, timeval_from_duration};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     errno, error, itimerval, pid_t, rlimit, uid_t, CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL,
@@ -800,9 +799,9 @@ impl ThreadGroup {
             itimer_real.arm(
                 &self.kernel,
                 Arc::downgrade(self),
-                utc::utc_now() + duration_from_timeval(value.it_value)?,
-                duration_from_timeval(value.it_interval)?,
-            );
+                itimerspec_from_itimerval(value),
+                false,
+            )?;
         } else {
             itimer_real.disarm();
         }
@@ -1387,6 +1386,12 @@ impl ThreadGroup {
     }
 }
 
+pub enum WaitableChildResult {
+    ReadyNow(WaitResult),
+    ShouldWait,
+    NoneFound,
+}
+
 #[apply(state_implementation!)]
 impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
     pub fn leader(&self) -> pid_t {
@@ -1518,7 +1523,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &PidTable,
-    ) -> Result<Option<WaitResult>, Errno> {
+    ) -> WaitableChildResult {
         // The children whose pid matches the pid selector queried.
         let filter_children_by_pid_selector = |child: &Arc<ThreadGroup>| match selector {
             ProcessSelector::Any => true,
@@ -1571,10 +1576,10 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                     pids.get_process_group(pgid).as_ref() == pids.get_process_group(tracee).as_ref()
                 }
             }) {
-                return Ok(None);
+                return WaitableChildResult::ShouldWait;
             }
 
-            return error!(ECHILD);
+            return WaitableChildResult::NoneFound;
         }
         for child in selected_children {
             let child = child.write();
@@ -1606,19 +1611,19 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                 };
                 let child_stopped = child.base.load_stopped();
                 if child_stopped == StopState::Awake && options.wait_for_continued {
-                    return Ok(Some(build_wait_result(child, &|siginfo| {
+                    return WaitableChildResult::ReadyNow(build_wait_result(child, &|siginfo| {
                         ExitStatus::Continue(siginfo, PtraceEvent::None)
-                    })));
+                    }));
                 }
                 if child_stopped == StopState::GroupStopped && options.wait_for_stopped {
-                    return Ok(Some(build_wait_result(child, &|siginfo| {
+                    return WaitableChildResult::ReadyNow(build_wait_result(child, &|siginfo| {
                         ExitStatus::Stop(siginfo, PtraceEvent::None)
-                    })));
+                    }));
                 }
             }
         }
 
-        Ok(None)
+        WaitableChildResult::ShouldWait
     }
 
     /// Returns any waitable child matching the given `selector` and `options`. Returns None if no
@@ -1631,7 +1636,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &mut PidTable,
-    ) -> Result<Option<WaitResult>, Errno> {
+    ) -> WaitableChildResult {
         if options.wait_for_exited {
             if let Some(waitable_zombie) = self.get_waitable_zombie(
                 &|state: &mut ThreadGroupMutableState| &mut state.zombie_children,
@@ -1639,7 +1644,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
                 options,
                 pids,
             ) {
-                return Ok(Some(waitable_zombie));
+                return WaitableChildResult::ReadyNow(waitable_zombie);
             }
         }
 

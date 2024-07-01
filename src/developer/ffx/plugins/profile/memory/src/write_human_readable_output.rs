@@ -97,18 +97,31 @@ fn print_processes_digest<W: Write>(
         // Write the actual content of the table of VMOs.
         for vmo_name in vmo_names {
             if let Some(sizes) = process.name_to_vmo_memory.get(vmo_name) {
-                let extra_info = if sizes.total == sizes.private { "" } else { "(shared)" };
-                writeln!(
-                    w,
-                    "    {:<p1$} {:>p2$} {:>p2$} {:>p2$} {:>p2$}",
-                    vmo_name,
-                    size_formatter(sizes.private),
-                    size_formatter(sizes.scaled),
-                    size_formatter(sizes.total),
-                    extra_info,
-                    p1 = process_name_trailing_padding,
-                    p2 = padding_between_number_columns
-                )?;
+                if sizes.total != sizes.private {
+                    let extra_info = "(shared)";
+                    writeln!(
+                        w,
+                        "    {:<p1$} {:>p2$} {:>p2$} {:>p2$} {:>p2$}",
+                        vmo_name,
+                        size_formatter(sizes.private),
+                        size_formatter(sizes.scaled),
+                        size_formatter(sizes.total),
+                        extra_info,
+                        p1 = process_name_trailing_padding,
+                        p2 = padding_between_number_columns
+                    )?;
+                } else {
+                    writeln!(
+                        w,
+                        "    {:<p1$} {:>p2$} {:>p2$} {:>p2$}",
+                        vmo_name,
+                        size_formatter(sizes.private),
+                        size_formatter(sizes.scaled),
+                        size_formatter(sizes.total),
+                        p1 = process_name_trailing_padding,
+                        p2 = padding_between_number_columns
+                    )?;
+                }
             }
         }
         writeln!(w)?;
@@ -147,14 +160,19 @@ fn print_complete_digest<W: Write>(
     }
     writeln!(w)?;
 
-    let sorted_buckets = {
-        let mut sorted_buckets = digest.buckets;
+    let sorted_buckets = if let Some(buckets) = digest.buckets {
+        let mut sorted_buckets = buckets;
         sorted_buckets.sort_by_key(|bucket| Reverse(bucket.size));
         sorted_buckets
+    } else {
+        vec![]
     };
 
     for bucket in sorted_buckets {
         writeln!(w, "Bucket {}: {}", bucket.name, size_formatter(bucket.size))?;
+    }
+    if let Some(total_undigested) = digest.total_undigested {
+        writeln!(w, "Undigested: {}", size_formatter(total_undigested))?;
     }
     print_processes_digest(w, digest.processes, size_formatter)?;
     writeln!(w)?;
@@ -187,8 +205,9 @@ pub fn write_human_readable_output<'a, W: Write>(
 mod tests {
 
     use super::*;
+    use crate::bucket::Bucket;
     use crate::plugin_output::ProcessesMemoryUsage;
-    use crate::ProfileMemoryOutput::ProcessDigest;
+    use crate::ProfileMemoryOutput::{CompleteDigest, ProcessDigest};
     use std::collections::HashSet;
 
     #[test]
@@ -256,7 +275,7 @@ mod tests {
         ProcessDigest(ProcessesMemoryUsage {
             capture_time: 123,
             process_data: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,
@@ -316,7 +335,7 @@ mod tests {
         ProcessDigest(ProcessesMemoryUsage {
             capture_time: 123,
             process_data: vec![processed::Process {
-                koid: 4,
+                koid: processed::ProcessKoid::new(4),
                 name: "P".to_string(),
                 memory: RetainedMemory {
                     private: 11,
@@ -369,6 +388,72 @@ mod tests {
                 },
                 vmos: HashSet::new(),
             }],
+        })
+    }
+
+    fn data_for_bucket_test() -> crate::ProfileMemoryOutput {
+        CompleteDigest(processed::Digest {
+            time: 1,
+            total_committed_bytes_in_vmos: 1000,
+            kernel: processed::Kernel {
+                total: 1500,
+                free: 100,
+                wired: 200,
+                total_heap: 100,
+                free_heap: 100,
+                vmo: 1000,
+                vmo_pager_total: 0,
+                vmo_pager_newest: 0,
+                vmo_pager_oldest: 0,
+                vmo_discardable_locked: 0,
+                vmo_discardable_unlocked: 0,
+                mmu: 0,
+                ipc: 0,
+                other: 0,
+                zram_compressed_total: Some(0),
+                zram_uncompressed: Some(0),
+                zram_fragmentation: Some(0),
+            },
+            processes: vec![processed::Process {
+                koid: processed::ProcessKoid::new(1),
+                name: "process1".to_owned(),
+                memory: RetainedMemory {
+                    private: 100,
+                    private_populated: 100,
+                    scaled: 100,
+                    scaled_populated: 100,
+                    total: 100,
+                    total_populated: 100,
+                    vmos: vec![processed::VmoKoid::new(10)],
+                },
+                name_to_vmo_memory: HashMap::from_iter(vec![(
+                    "vmo1".to_owned(),
+                    processed::RetainedMemory {
+                        private: 100,
+                        private_populated: 100,
+                        scaled: 100,
+                        scaled_populated: 100,
+                        total: 100,
+                        total_populated: 100,
+                        vmos: vec![processed::VmoKoid::new(10)],
+                    },
+                )]),
+                vmos: HashSet::from_iter(vec![processed::VmoKoid::new(10)]),
+            }],
+            vmos: vec![processed::Vmo {
+                koid: processed::VmoKoid::new(10),
+                name: "vmo1".to_owned(),
+                parent_koid: processed::VmoKoid::new(0),
+                committed_bytes: 100,
+                allocated_bytes: 100,
+                populated_bytes: None,
+            }],
+            buckets: Some(vec![Bucket {
+                name: "some_bucket".to_owned(),
+                size: 300,
+                vmos: HashSet::from_iter(vec![processed::VmoKoid::new(20)]),
+            }]),
+            total_undigested: Some(200),
         })
     }
 
@@ -427,6 +512,41 @@ Total uncompressed:   3.22 KiB
     vmoA    43.40 KiB   542.53 KiB     6.36 MiB     (shared)
     vmoB     4.34 KiB    54.25 KiB   651.04 KiB     (shared)
     vmoC     4.34 KiB    54.25 KiB   651.04 KiB     (shared)
+
+"#;
+        pretty_assertions::assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn write_human_readable_output_buckets_test() {
+        let mut writer = Vec::new();
+        let _ = write_human_readable_output(&mut writer, data_for_bucket_test(), false);
+        let actual_output = std::str::from_utf8(&writer).unwrap();
+        let expected_output = r#"Time:  1 ns
+VMO:   1000 B
+Free:  100 B
+
+Task:      kernel
+PID:       1
+Total:     1.27 KiB
+    wired: 200 B
+    vmo:   1000 B
+    heap:  100 B
+    mmu:   0 B
+    ipc:   0 B
+    zram:  0 B
+    other: 0 B
+
+Bucket some_bucket: 300 B
+Undigested: 200 B
+Process name:         process1
+Process koid:         1
+Private:              100 B
+PSS:                  100 B (Proportional Set Size)
+Total:                100 B (Private + Shared unscaled)
+              Private       Scaled        Total
+    vmo1        100 B        100 B        100 B
+
 
 "#;
         pretty_assertions::assert_eq!(actual_output, expected_output);

@@ -23,6 +23,7 @@ template("assembly_resources_directory") {
     dir = "${target_name}_dir"
     assembly_config = "${target_name}_assembly_config"
     bazel_inputs = "${target_name}_bazel_inputs"
+    gn_targets_name = target_name
   }
 
   # We add an assembly_config.json so that this directory "looks" like an AIB and
@@ -40,10 +41,10 @@ template("assembly_resources_directory") {
   }
 
   # Make the static resources available to Bazel.
-  bazel_input_resource_directory(labels.bazel_inputs) {
-    source_dir = "${files.dir}"
-    dest_dir = rebase_path("${files.dir}", root_out_dir)
-    deps = [ ":${labels.dir}" ]
+  bazel_input_directory(labels.bazel_inputs) {
+    generator = ":${labels.dir}"
+    output_directory = "${files.dir}"
+    gn_targets_name = labels.gn_targets_name
   }
 
   group(target_name) {

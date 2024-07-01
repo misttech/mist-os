@@ -56,7 +56,7 @@ pub struct Indexer {
     // Contains the ephemeral drivers. This is wrapped in a RefCell since the
     // ephemeral drivers are added after the driver index server has started
     // through the FIDL API, fuchsia.driver.registrar.Register.
-    ephemeral_drivers: RefCell<HashMap<url::Url, ResolvedDriver>>,
+    ephemeral_drivers: RefCell<HashMap<cm_types::Url, ResolvedDriver>>,
 }
 
 impl Indexer {
@@ -393,7 +393,7 @@ impl Indexer {
         driver_url: String,
         resolver: &fresolution::ResolverProxy,
     ) -> Result<(), i32> {
-        let component_url = url::Url::parse(&driver_url).map_err(|e| {
+        let component_url = cm_types::Url::new(&driver_url).map_err(|e| {
             tracing::error!("Couldn't parse driver url: {}: error: {}", &driver_url, e);
             Status::ADDRESS_UNREACHABLE.into_raw()
         })?;

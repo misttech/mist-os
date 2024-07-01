@@ -41,19 +41,19 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use router_error::{DowncastErrorForTest, RouterError};
-    use sandbox::{Capability, Data, WeakComponentToken};
+    use sandbox::{Capability, Data, WeakInstanceToken};
     use std::sync::Arc;
 
     #[derive(Debug)]
     struct FakeComponentToken {}
 
     impl FakeComponentToken {
-        fn new() -> WeakComponentToken {
-            WeakComponentToken { inner: Arc::new(FakeComponentToken {}) }
+        fn new() -> WeakInstanceToken {
+            WeakInstanceToken { inner: Arc::new(FakeComponentToken {}) }
         }
     }
 
-    impl sandbox::WeakComponentTokenAny for FakeComponentToken {
+    impl sandbox::WeakInstanceTokenAny for FakeComponentToken {
         fn as_any(&self) -> &dyn std::any::Any {
             self
         }

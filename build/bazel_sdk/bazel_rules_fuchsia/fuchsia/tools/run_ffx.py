@@ -23,7 +23,7 @@ def run(*command) -> None:
 
 def parse_args() -> None:
     """Parses arguments."""
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(add_help=False)
 
     def path_arg(type="file"):
         def arg(path):

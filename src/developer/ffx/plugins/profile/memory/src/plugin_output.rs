@@ -30,12 +30,12 @@ pub enum ProfileMemoryOutput {
 /// Returns a ProfileMemoryOutput that only contains information related to the process identified by `koid`.
 pub fn filter_digest_by_process(
     digest: processed::Digest,
-    koids: &[u64],
+    raw_koids: &[processed::ProcessKoid],
     names: &[String],
 ) -> ProfileMemoryOutput {
     let mut vec = Vec::new();
     for process in digest.processes {
-        if koids.contains(&process.koid) || names.contains(&process.name) {
+        if raw_koids.contains(&process.koid) || names.contains(&process.name) {
             vec.push(process);
         }
     }
@@ -49,7 +49,7 @@ pub fn filter_digest_by_process(
 mod tests {
     use super::*;
 
-    fn mock_process(koid: u64, name: &str) -> processed::Process {
+    fn mock_process(koid: processed::ProcessKoid, name: &str) -> processed::Process {
         processed::Process {
             koid,
             name: name.to_string(),
@@ -65,12 +65,13 @@ mod tests {
             total_committed_bytes_in_vmos: 1000,
             kernel: Default::default(),
             processes: vec![
-                mock_process(1, "process1"),
-                mock_process(2, "process2"),
-                mock_process(3, "process3"),
+                mock_process(processed::ProcessKoid::new(1), "process1"),
+                mock_process(processed::ProcessKoid::new(2), "process2"),
+                mock_process(processed::ProcessKoid::new(3), "process3"),
             ],
             vmos: vec![],
-            buckets: vec![],
+            buckets: None,
+            total_undigested: None,
         }
     }
 
@@ -78,9 +79,9 @@ mod tests {
     fn filter_by_process_koid() {
         let digest = mock_digest();
         let capture_time = digest.time;
-        let observed = filter_digest_by_process(digest, &[1], &[]);
+        let observed = filter_digest_by_process(digest, &[processed::ProcessKoid::new(1)], &[]);
         let expected = ProfileMemoryOutput::ProcessDigest(ProcessesMemoryUsage {
-            process_data: vec![mock_process(1, "process1")],
+            process_data: vec![mock_process(processed::ProcessKoid::new(1), "process1")],
             capture_time,
         });
         assert_eq!(observed, expected);
@@ -92,7 +93,7 @@ mod tests {
         let capture_time = digest.time;
         let observed = filter_digest_by_process(digest, &[], &[String::from("process1")]);
         let expected = ProfileMemoryOutput::ProcessDigest(ProcessesMemoryUsage {
-            process_data: vec![mock_process(1, "process1")],
+            process_data: vec![mock_process(processed::ProcessKoid::new(1), "process1")],
             capture_time,
         });
         assert_eq!(observed, expected);
@@ -102,9 +103,16 @@ mod tests {
     fn filter_by_process_koid_and_name() {
         let digest = mock_digest();
         let capture_time = digest.time;
-        let observed = filter_digest_by_process(digest, &[2], &[String::from("process1")]);
+        let observed = filter_digest_by_process(
+            digest,
+            &[processed::ProcessKoid::new(2)],
+            &[String::from("process1")],
+        );
         let expected = ProfileMemoryOutput::ProcessDigest(ProcessesMemoryUsage {
-            process_data: vec![mock_process(1, "process1"), mock_process(2, "process2")],
+            process_data: vec![
+                mock_process(processed::ProcessKoid::new(1), "process1"),
+                mock_process(processed::ProcessKoid::new(2), "process2"),
+            ],
             capture_time,
         });
         assert_eq!(observed, expected);

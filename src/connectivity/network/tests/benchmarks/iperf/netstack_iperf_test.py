@@ -202,8 +202,9 @@ def generate_result(label: str, key: str, values: list[Any]) -> dict[str, Any]:
 
 class IperfServer:
     def __init__(self, port: int, ffx: honeydew.transports.ffx.FFX) -> None:
-        self._process = ffx.popen(
+        self._process: subprocess.Popen[bytes] = ffx.popen(
             ["target", "ssh", f"iperf3 --server --port {port} --json"],
+            text=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -212,7 +213,7 @@ class IperfServer:
         self._process.kill()
         output, err = self._process.communicate()
         if err:
-            _LOGGER.warn(f"Server wrote errors: {err}")
+            _LOGGER.warn(f"Server wrote errors: {err!r}")
         # NOTE: this file contains a set of JSON objects (not a list of objects, just a bunch of
         # JSON objects). The first one is the one we used to check that the connection had been
         # established. Consider removing that one as it's a test implementation detail.

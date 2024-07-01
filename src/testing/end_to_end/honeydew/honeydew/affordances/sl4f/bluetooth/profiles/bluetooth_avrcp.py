@@ -19,9 +19,6 @@ class Sl4fMethods(StrEnum):
     STOP_MOCK_PLAYER = "media_session_facade.StopMockPlayer"
 
 
-BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
-
-
 class BluetoothAvrcp(
     bluetooth_common.BluetoothCommon, bluetooth_avrcp.BluetoothAvrcp
 ):
@@ -61,7 +58,9 @@ class BluetoothAvrcp(
         """
         self._sl4f.run(method=Sl4fMethods.PUBLISH_MOCK_PLAYER)
 
-    def send_avrcp_command(self, command: BluetoothAvrcpCommand) -> None:
+    def send_avrcp_command(
+        self, command: bluetooth.BluetoothAvrcpCommand
+    ) -> None:
         """Send Avrcp command from the sink device.
 
         Args:

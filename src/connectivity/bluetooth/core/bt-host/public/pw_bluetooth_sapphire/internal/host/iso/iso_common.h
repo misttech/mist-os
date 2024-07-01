@@ -5,6 +5,9 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_ISO_ISO_COMMON_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_ISO_ISO_COMMON_H_
 
+#include <pw_function/function.h>
+
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 
@@ -63,6 +66,13 @@ struct CisEstablishedParameters {
   // Peripheral => Central parameters
   CisUnidirectionalParams p_to_c_params;
 };
+
+class IsoStream;
+
+using CisEstablishedCallback =
+    pw::Callback<void(pw::bluetooth::emboss::StatusCode,
+                      std::optional<WeakSelf<IsoStream>::WeakPtr>,
+                      const std::optional<CisEstablishedParameters>&)>;
 
 // A convenience class for holding an identifier that uniquely represents a
 // CIG/CIS combination.

@@ -106,7 +106,7 @@ pub fn create_wpa3_authenticator(
 pub async fn handle_sae_exchange(
     authenticator: &mut Authenticator,
     fullmac_req_stream: &mut RecordedRequestStream,
-    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) -> UpdateSink {
     let mut update_sink = UpdateSink::new();
 
@@ -153,7 +153,7 @@ pub async fn handle_fourway_eapol_handshake(
     bssid: [u8; 6],
     client_sta_addr: [u8; 6],
     fullmac_req_stream: &mut RecordedRequestStream,
-    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) -> UpdateSink {
     let mut update_sink = UpdateSink::new();
     let mic_size = authenticator.get_negotiated_protection().mic_size;
@@ -200,7 +200,7 @@ async fn send_eapol_frame_to_test_realm(
     frame: eapol::KeyFrameBuf,
     authenticator_addr: [u8; 6],
     client_addr: [u8; 6],
-    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) {
     fullmac_ifc_proxy
         .eapol_ind(&fidl_fullmac::WlanFullmacEapolIndication {
@@ -221,10 +221,10 @@ async fn send_eapol_frame_to_test_realm(
 async fn get_eapol_frame_from_test_realm(
     authenticator_addr: [u8; 6],
     fullmac_req_stream: &mut RecordedRequestStream,
-    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) -> Vec<u8> {
     let frame_data = assert_variant!(fullmac_req_stream.next().await,
-        fidl_fullmac::WlanFullmacImplBridgeRequest::EapolTx { payload, responder } => {
+        fidl_fullmac::WlanFullmacImpl_Request::EapolTx { payload, responder } => {
             responder
                 .send()
                 .expect("Failed to respond to EapolTx");
@@ -251,7 +251,7 @@ async fn get_sae_frame_from_test_realm(
     fullmac_req_stream: &mut RecordedRequestStream,
 ) -> fidl_mlme::SaeFrame {
     let fullmac_sae_frame = assert_variant!(fullmac_req_stream.next().await,
-        fidl_fullmac::WlanFullmacImplBridgeRequest::SaeFrameTx { frame, responder } => {
+        fidl_fullmac::WlanFullmacImpl_Request::SaeFrameTx { frame, responder } => {
             responder
                 .send()
                 .expect("Failed to respond to SaeFrameTx");
@@ -268,7 +268,7 @@ async fn get_sae_frame_from_test_realm(
 
 async fn send_sae_frame_to_test_realm(
     frame: fidl_mlme::SaeFrame,
-    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+    fullmac_ifc_proxy: &fidl_fullmac::WlanFullmacImplIfcProxy,
 ) {
     fullmac_ifc_proxy
         .sae_frame_rx(&fidl_fullmac::WlanFullmacSaeFrame {

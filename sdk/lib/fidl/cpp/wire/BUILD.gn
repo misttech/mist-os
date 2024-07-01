@@ -7,6 +7,9 @@ import("//build/zircon/migrated_targets.gni")
 
 config("include") {
   include_dirs = [ "include" ]
+
+  # TODO(https://fxbug.dev/349718971): Remove once the issue is addressed.
+  defines = [ "_LIBCPP_ENABLE_REMOVED_ALLOCATOR_CONST" ]
 }
 
 wavl_tree_headers = [

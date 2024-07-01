@@ -4,18 +4,27 @@
 
 # AUTO-GENERATED - DO NOT EDIT!
 
-# Enable gcert authentication. This will use gcert credentials instead of application default credentials.  Applicable to Google FTEs only.
+# Enable gcert authentication. This will use gcert credentials instead of application
+# default credentials.  Applicable to Google FTEs only, running inside a Corp
+# environment.
 build:gcertauth --experimental_credential_helper=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
 
 # Setup remote build (RBE)
-build:remote --remote_instance_name={remote_instance_name}
+build:_remote_common --remote_instance_name={remote_instance_name}
+build:_remote_common --incompatible_strict_action_env=true
 build:remote --define=EXECUTOR=remote
-build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
-build:remote --incompatible_strict_action_env=true
-build:remote --google_default_credentials=true
+build:_remote_common --google_default_credentials=true
 # Only accept outputs from remote execution on the back-end (remote workers).
-build:remote --noremote_upload_local_results
+build:_remote_common --noremote_upload_local_results
 # --remote_proxy may be passed at run time, with a pointer to a temporary socket.
+
+# remote: will request remote execution on cache-misses
+build:remote --config=_remote_common
+build:remote --remote_executor=grpcs://remotebuildexecution.googleapis.com
+
+# remote_cache_only: will lookup cache, but on cache-miss, only spawn local execution
+build:remote_cache_only --config=_remote_common
+build:remote_cache_only --remote_cache=grpcs://remotebuildexecution.googleapis.com
 
 # Build event protocol (BEP) streaming
 build:_bes_common --google_auth_scopes=https://www.googleapis.com/auth/cloud-platform

@@ -479,6 +479,7 @@ impl LibraryCommand {
                 };
                 match ffx_target::wait_for_device(
                     duration,
+                    &env.context,
                     target_spec,
                     &tc,
                     ffx_target::WaitFor::DeviceOnline,

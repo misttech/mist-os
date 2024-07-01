@@ -4,8 +4,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/stdcompat/bit.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
@@ -13,6 +12,10 @@
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
+
+#include <fbl/algorithm.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio {
 
@@ -24,27 +27,24 @@ void virtio_dump_desc(const struct vring_desc* desc) {
   printf("next=%#04hx]\n", desc->next);
 }
 
-Ring::Ring(Device* device) : device_(device) { memset(&ring_buf_, 0, sizeof(ring_buf_)); }
+Ring::Ring(Device* device) : device_(device) {}
 
 Ring::Ring(Ring&& other) noexcept {
   index_ = other.index_;
   device_ = other.device_;
   other.device_ = nullptr;
-  ring_buf_ = other.ring_buf_;
-  other.ring_buf_ = io_buffer_t{};
+  ring_buffer_ = std::move(other.ring_buffer_);
   ring_ = other.ring_;
   other.ring_ = vring{};
 }
 
-Ring::~Ring() { io_buffer_release(&ring_buf_); }
+Ring::~Ring() = default;
 
 Ring& Ring::operator=(Ring&& other) noexcept {
-  io_buffer_release(&ring_buf_);
   index_ = other.index_;
   device_ = other.device_;
   other.device_ = nullptr;
-  ring_buf_ = other.ring_buf_;
-  other.ring_buf_ = io_buffer_t{};
+  ring_buffer_ = std::move(other.ring_buffer_);
   ring_ = other.ring_;
   other.ring_ = vring{};
   return *this;
@@ -73,20 +73,27 @@ zx_status_t Ring::Init(uint16_t index, uint16_t count) {
   }
 
   // allocate a ring
-  size_t size = vring_size(count, zx_system_get_page_size());
-  zxlogf(TRACE, "%s: need %zu bytes", __func__, size);
+  const size_t vring_required_size = vring_size(count, zx_system_get_page_size());
 
-  zx_status_t status =
-      io_buffer_init(&ring_buf_, device_->bti().get(), size, IO_BUFFER_RW | IO_BUFFER_CONTIG);
+  // DMA buffer size must be multiples of page size. Round up to the nearest
+  // page size.
+  const size_t dma_buffer_size = fbl::round_up(vring_required_size, zx_system_get_page_size());
+  zxlogf(TRACE, "%s: need %zu bytes", __func__, dma_buffer_size);
+
+  std::unique_ptr<dma_buffer::BufferFactory> buffer_factory = dma_buffer::CreateBufferFactory();
+  zx_status_t status = buffer_factory->CreateContiguous(device_->bti(), dma_buffer_size,
+                                                        /*alignment_log2=*/0, &ring_buffer_);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "failed to allocate ring buffer of size %zu: %s", dma_buffer_size,
+           zx_status_get_string(status));
     return status;
   }
 
   zxlogf(TRACE, "%s: allocated vring at %p, physical address %#" PRIxPTR, __func__,
-         io_buffer_virt(&ring_buf_), io_buffer_phys(&ring_buf_));
+         ring_buffer_->virt(), ring_buffer_->phys());
 
   /* initialize the ring */
-  vring_init(&ring_, count, io_buffer_virt(&ring_buf_), zx_system_get_page_size());
+  vring_init(&ring_, count, ring_buffer_->virt(), zx_system_get_page_size());
   ring_.free_list = 0xffff;
   ring_.free_count = 0;
 
@@ -96,7 +103,7 @@ zx_status_t Ring::Init(uint16_t index, uint16_t count) {
   }
 
   /* register the ring with the device */
-  zx_paddr_t pa_desc = io_buffer_phys(&ring_buf_);
+  zx_paddr_t pa_desc = ring_buffer_->phys();
   zx_paddr_t pa_avail = pa_desc + ((uintptr_t)ring_.avail - (uintptr_t)ring_.desc);
   zx_paddr_t pa_used = pa_desc + ((uintptr_t)ring_.used - (uintptr_t)ring_.desc);
   device_->SetRing(index_, count, pa_desc, pa_avail, pa_used);

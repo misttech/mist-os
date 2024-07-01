@@ -21,7 +21,7 @@ use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::{FutureExt, StreamExt};
 use router_error::RouterError;
-use sandbox::{Capability, Dict, Open};
+use sandbox::{Capability, Dict, DirEntry};
 use serve_processargs::NamespaceBuilder;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -164,7 +164,7 @@ fn protocol_use(
     decl: UseProtocolDecl,
     component: &Arc<ComponentInstance>,
     program_input_dict: &Dict,
-) -> Open {
+) -> DirEntry {
     let (router, request) = BedrockUseRouteRequest::UseProtocol(decl.clone()).into_router(
         component.as_weak(),
         program_input_dict,
@@ -175,7 +175,7 @@ fn protocol_use(
     // errors.
     let weak_target = component.as_weak();
     let legacy_request = LegacyRouteRequest::UseProtocol(decl);
-    Open::new(router.into_directory_entry(
+    DirEntry::new(router.into_directory_entry(
         request,
         fio::DirentType::Service,
         component.execution_scope.clone(),

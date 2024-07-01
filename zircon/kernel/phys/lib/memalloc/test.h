@@ -55,7 +55,7 @@ inline std::string ToString(RangeIter first, RangeIter last) {
   return s;
 }
 
-inline std::string ToString(const std::vector<const memalloc::Range>& ranges) {
+inline std::string ToString(const std::vector<memalloc::Range>& ranges) {
   return ToString(ranges.begin(), ranges.end());
 }
 

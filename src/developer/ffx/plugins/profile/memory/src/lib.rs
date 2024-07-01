@@ -74,12 +74,21 @@ pub async fn print_output(
         Ok(())
     } else {
         let memory_monitor_output = get_output(collector).await?;
-        let processed_digest =
-            processed::digest_from_memory_monitor_output(memory_monitor_output, cmd.buckets);
+        let processed_digest = processed::digest_from_memory_monitor_output(
+            memory_monitor_output,
+            cmd.buckets,
+            cmd.undigested,
+        );
         let output = if cmd.process_koids.is_empty() && cmd.process_names.is_empty() {
             ProfileMemoryOutput::CompleteDigest(processed_digest)
         } else {
-            filter_digest_by_process(processed_digest, &cmd.process_koids, &cmd.process_names)
+            let process_koids = cmd
+                .process_koids
+                .iter()
+                .copied()
+                .map(processed::ProcessKoid::new)
+                .collect::<Vec<processed::ProcessKoid>>();
+            filter_digest_by_process(processed_digest, &process_koids, &cmd.process_names)
         };
         if cmd.csv {
             write_csv_output(writer, output, cmd.buckets)

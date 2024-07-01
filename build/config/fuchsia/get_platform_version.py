@@ -87,6 +87,14 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
     runtime_supported_api_levels = (
         sunset_api_levels + build_time_supported_api_levels
     )
+
+    # Temporarily do not support the numbered in-development API level, which
+    # will soon be replaced with NEXT, in the IDK since so IDK consumers do not
+    # start using it.
+    # TODO(https://fxbug.dev/326277078): Remove this when transitioning to NEXT.
+    for level in in_development_api_levels:
+        build_time_supported_api_levels.remove(level)
+
     # The special API levels cannot currently be targeted in the IDK and thus
     # must be added here.
     runtime_supported_api_levels += in_development_special_api_levels

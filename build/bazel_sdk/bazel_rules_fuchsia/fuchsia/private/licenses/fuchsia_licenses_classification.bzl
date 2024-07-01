@@ -54,7 +54,7 @@ fuchsia_licenses_classification = rule(
     doc = """
 Produces a json file with license classification output.
 
-The [name].json has the following schema:
+The \\[name\\].json has the following schema:
 
 ```
 {

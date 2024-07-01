@@ -13,6 +13,7 @@ rustc_library("attribution") {
 
   deps = [
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
+    "//sdk/fidl/fuchsia.memory.attribution:measure_tape_for_attribution",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-sync",
     "//src/lib/zircon/rust:fuchsia-zircon",

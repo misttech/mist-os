@@ -1,12 +1,13 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_power_broker as fbroker;
 use fuchsia_inspect::Property;
 use fuchsia_zircon::{HandleBased, Rights};
 use futures::future::{FutureExt, LocalBoxFuture};
+use std::sync::Arc;
+use {fidl_fuchsia_power_broker as fbroker, fuchsia_async as fasync};
 
 /// A well-known set of PowerLevels to be specified as the valid_levels for a
 /// power element. This is the set of levels in fbroker::BinaryPowerLevel.
@@ -20,8 +21,8 @@ pub struct PowerElementContext {
     pub lessor: fbroker::LessorProxy,
     pub required_level: fbroker::RequiredLevelProxy,
     pub current_level: fbroker::CurrentLevelProxy,
-    active_dependency_token: fbroker::DependencyToken,
-    passive_dependency_token: fbroker::DependencyToken,
+    assertive_dependency_token: fbroker::DependencyToken,
+    opportunistic_dependency_token: fbroker::DependencyToken,
     name: String,
 }
 
@@ -34,14 +35,14 @@ impl PowerElementContext {
         PowerElementContextBuilder::new(topology, element_name, valid_levels)
     }
 
-    pub fn active_dependency_token(&self) -> fbroker::DependencyToken {
-        self.active_dependency_token
+    pub fn assertive_dependency_token(&self) -> fbroker::DependencyToken {
+        self.assertive_dependency_token
             .duplicate_handle(Rights::SAME_RIGHTS)
             .expect("failed to duplicate token")
     }
 
-    pub fn passive_dependency_token(&self) -> fbroker::DependencyToken {
-        self.passive_dependency_token
+    pub fn opportunistic_dependency_token(&self) -> fbroker::DependencyToken {
+        self.opportunistic_dependency_token
             .duplicate_handle(Rights::SAME_RIGHTS)
             .expect("failed to duplicate token")
     }
@@ -57,8 +58,6 @@ pub struct PowerElementContextBuilder<'a> {
     initial_current_level: fbroker::PowerLevel,
     valid_levels: &'a [fbroker::PowerLevel],
     dependencies: Vec<fbroker::LevelDependency>,
-    active_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
-    passive_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
 }
 
 impl<'a> PowerElementContextBuilder<'a> {
@@ -73,8 +72,6 @@ impl<'a> PowerElementContextBuilder<'a> {
             valid_levels,
             initial_current_level: Default::default(),
             dependencies: Default::default(),
-            active_dependency_tokens_to_register: Default::default(),
-            passive_dependency_tokens_to_register: Default::default(),
         }
     }
 
@@ -88,37 +85,7 @@ impl<'a> PowerElementContextBuilder<'a> {
         self
     }
 
-    pub fn active_dependency_tokens_to_register(
-        mut self,
-        value: Vec<fbroker::DependencyToken>,
-    ) -> Self {
-        self.active_dependency_tokens_to_register = value;
-        self
-    }
-
-    pub fn passive_dependency_tokens_to_register(
-        mut self,
-        value: Vec<fbroker::DependencyToken>,
-    ) -> Self {
-        self.passive_dependency_tokens_to_register = value;
-        self
-    }
-
-    pub async fn build(mut self) -> Result<PowerElementContext> {
-        let active_dependency_token = fbroker::DependencyToken::create();
-        self.active_dependency_tokens_to_register.push(
-            active_dependency_token
-                .duplicate_handle(Rights::SAME_RIGHTS)
-                .expect("failed to duplicate token"),
-        );
-
-        let passive_dependency_token = fbroker::DependencyToken::create();
-        self.passive_dependency_tokens_to_register.push(
-            passive_dependency_token
-                .duplicate_handle(Rights::SAME_RIGHTS)
-                .expect("failed to duplicate token"),
-        );
-
+    pub async fn build(self) -> Result<PowerElementContext> {
         let (current_level, current_level_server_end) =
             create_proxy::<fbroker::CurrentLevelMarker>()?;
         let (required_level, required_level_server_end) =
@@ -131,12 +98,6 @@ impl<'a> PowerElementContextBuilder<'a> {
                 initial_current_level: Some(self.initial_current_level),
                 valid_levels: Some(self.valid_levels.to_vec()),
                 dependencies: Some(self.dependencies),
-                active_dependency_tokens_to_register: Some(
-                    self.active_dependency_tokens_to_register,
-                ),
-                passive_dependency_tokens_to_register: Some(
-                    self.passive_dependency_tokens_to_register,
-                ),
                 level_control_channels: Some(fbroker::LevelControlChannels {
                     current: current_level_server_end,
                     required: required_level_server_end,
@@ -147,13 +108,36 @@ impl<'a> PowerElementContextBuilder<'a> {
             .await?
             .map_err(|d| anyhow::anyhow!("{d:?}"))?;
         let element_control = element_control_client_end.into_proxy()?;
+
+        let assertive_dependency_token = fbroker::DependencyToken::create();
+        let _ = element_control
+            .register_dependency_token(
+                assertive_dependency_token
+                    .duplicate_handle(Rights::SAME_RIGHTS)
+                    .expect("failed to duplicate token"),
+                fbroker::DependencyType::Assertive,
+            )
+            .await?
+            .expect("register assertive dependency token");
+
+        let opportunistic_dependency_token = fbroker::DependencyToken::create();
+        let _ = element_control
+            .register_dependency_token(
+                opportunistic_dependency_token
+                    .duplicate_handle(Rights::SAME_RIGHTS)
+                    .expect("failed to duplicate token"),
+                fbroker::DependencyType::Opportunistic,
+            )
+            .await?
+            .expect("register opportunistic dependency token");
+
         Ok(PowerElementContext {
             element_control,
             lessor,
             required_level,
             current_level,
-            active_dependency_token,
-            passive_dependency_token,
+            assertive_dependency_token,
+            opportunistic_dependency_token,
             name: self.element_name.to_string(),
         })
     }
@@ -247,6 +231,98 @@ pub async fn run_power_element<'a>(
     }
 }
 
+/// A dependency for a lease. It is equivalent to an fbroker::LevelDependency with the dependent
+/// fields omitted.
+pub struct LeaseDependency {
+    pub dependency_type: fbroker::DependencyType,
+    pub requires_token: fbroker::DependencyToken,
+    pub requires_level_by_preference: Vec<fbroker::PowerLevel>,
+}
+
+/// Helper for acquiring leases. Instantiate with LeaseControl::new(), and then acquire a lease with
+/// the lease() method. The lease() call will return only once the lease is satisfied.
+///
+/// A single LeaseHelper may be reused to create leases an arbitrary number of times.
+pub struct LeaseHelper {
+    lessor: fbroker::LessorProxy,
+    _element_runner: fasync::Task<()>,
+}
+
+pub struct Lease {
+    /// This may be used to further monitor the lease status, if desired, beyond the
+    /// await-until-satisfied behavior of LeaseHelper::lease().
+    pub control_proxy: fbroker::LeaseControlProxy,
+
+    // The originating LeaseHelper must be kept alive as long as the lease to keep its associated
+    // power element running.
+    _helper: Arc<LeaseHelper>,
+}
+
+impl LeaseHelper {
+    /// Creates a new LeaseHelper. Returns an error upon failure to register the to-be-leased power
+    /// element with Power Broker.
+    pub async fn new<'a>(
+        topology: &'a fbroker::TopologyProxy,
+        name: &'a str,
+        lease_dependencies: Vec<LeaseDependency>,
+    ) -> Result<Arc<Self>> {
+        let level_dependencies = lease_dependencies
+            .into_iter()
+            .map(|d| fbroker::LevelDependency {
+                dependency_type: d.dependency_type,
+                dependent_level: BINARY_POWER_LEVELS[1],
+                requires_token: d.requires_token,
+                requires_level_by_preference: d.requires_level_by_preference,
+            })
+            .collect();
+
+        let element_context = PowerElementContext::builder(topology, name, &BINARY_POWER_LEVELS)
+            .dependencies(level_dependencies)
+            .initial_current_level(BINARY_POWER_LEVELS[1])
+            .build()
+            .await?;
+
+        let lessor = element_context.lessor.clone();
+
+        let _element_runner = fasync::Task::local(async move {
+            run_power_element(
+                &element_context.name(),
+                &element_context.required_level,
+                BINARY_POWER_LEVELS[0], /* initial_level */
+                None,                   /* inspect_node */
+                basic_update_fn_factory(&element_context),
+            )
+            .await;
+        });
+
+        Ok(Arc::new(Self { lessor, _element_runner }))
+    }
+
+    /// Acquires a lease, completing only once the lease is satisfied. Returns an error if the
+    /// underlying `Lessor.Lease` or `LeaseControl.WatchStatus` call fails.
+    pub async fn lease(self: &Arc<Self>) -> Result<Lease> {
+        let lease = self
+            .lessor
+            .lease(BINARY_POWER_LEVELS[1])
+            .await?
+            .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?;
+
+        // Wait for the lease to be satisfied.
+        let lease = lease.into_proxy()?;
+        let mut status = fbroker::LeaseStatus::Unknown;
+        loop {
+            match lease.watch_status(status).await? {
+                fbroker::LeaseStatus::Satisfied => break,
+                new_status @ _ => status = new_status,
+            }
+        }
+
+        Ok(Lease { control_proxy: lease, _helper: self.clone() })
+    }
+}
+
+// TODO(https://fxbug.dev/349841776): Use this as a demo case for test library support for faking
+// Power Broker interfaces.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,8 +376,8 @@ mod tests {
             lessor,
             required_level,
             current_level,
-            active_dependency_token: fbroker::DependencyToken::create(),
-            passive_dependency_token: fbroker::DependencyToken::create(),
+            assertive_dependency_token: fbroker::DependencyToken::create(),
+            opportunistic_dependency_token: fbroker::DependencyToken::create(),
             name: "test_name".to_string(),
         };
 

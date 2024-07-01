@@ -15,6 +15,7 @@ import fcntl
 import filecmp
 import io
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -234,6 +235,31 @@ def remove_hash_comments(lines: Iterable[str]) -> Iterable[str]:
     for line in lines:
         if not line.startswith("#"):
             yield line
+
+
+_C_COMMENT_RE = re.compile(
+    r'//.*?$|/\*.*?\*/|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"',
+    re.DOTALL | re.MULTILINE,
+)
+
+
+def remove_c_comments(text: str) -> str:
+    """Remove C and C++ style comments from text.
+
+    Adapted from https://stackoverflow.com/questions/241327/remove-c-and-c-comments-using-python
+    """
+
+    def replacer(match: re.Match[str]) -> str:
+        s = match.group(0)
+        if s.startswith("/"):
+            # Note: space and not empty string (prevent token concatenation)
+            # Alternatively, we could return an equivalent number of newlines
+            # to preserve line numbers.
+            return " "
+        else:
+            return s
+
+    return _C_COMMENT_RE.sub(replacer, text)
 
 
 def expand_response_files(

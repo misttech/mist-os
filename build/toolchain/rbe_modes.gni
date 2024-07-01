@@ -60,7 +60,8 @@ _all_modes_defaults = {
   rust_download_rlibs = true
   rust_download_unstripped_binaries = true
 
-  # bazel defaults (currently none applicable)
+  # bazel defaults
+  bazel_exec_strategy = "remote"
 }
 
 _default_rbe_settings = {
@@ -99,9 +100,8 @@ _default_rbe_settings = {
     rust_enable = true
     rust_exec_strategy = "remote"
 
-    # Goal is to enable bazel+RBE, but perhaps only after
-    # a subset of actions are tagged no-remote.
-    bazel_enable = false
+    bazel_enable = true
+    bazel_exec_strategy = "remote"
   }
 
   # The build infrastructure environment is also expected
@@ -116,8 +116,8 @@ _default_rbe_settings = {
     rust_enable = true
     rust_exec_strategy = "remote"
 
-    # TODO(b/42067312): enable after un-blocking
-    bazel_enable = false
+    bazel_enable = true
+    bazel_exec_strategy = "remote"
   }
 
   # This mode itself is experimental.
@@ -140,11 +140,8 @@ _default_rbe_settings = {
     rust_enable = true
     rust_exec_strategy = "local"
 
-    # Goal is to enable bazel+RBE, but perhaps only after
-    # a subset of actions are tagged no-remote.
-    bazel_enable = false
-
-    # The equivalent cache-only mode for bazel has not yet been plumbed.
+    bazel_enable = true
+    bazel_exec_strategy = "local"
   }
 
   # This mode itself is experimental.
@@ -169,10 +166,8 @@ _default_rbe_settings = {
     rust_download_rlibs = false
     rust_download_unstripped_binaries = false
 
-    # Currently, bazel sub-builds are late-stage in the overall
-    # build, which often have lower cache hit rates, and include larger
-    # artifacts that can be slow to download.
-    bazel_enable = false
+    # bazel-7 already defaults to --remote_download_outputs=minimal
+    bazel_enable = true
   }
 }
 
@@ -273,5 +268,8 @@ rbe_settings = {
   # bazel overrides
   if (defined(rbe_settings_overrides["bazel_enable"])) {
     bazel_enable = rbe_settings_overrides["bazel_enable"]
+  }
+  if (defined(rbe_settings_overrides["bazel_exec_strategy"])) {
+    bazel_exec_strategy = rbe_settings_overrides["bazel_exec_strategy"]
   }
 }

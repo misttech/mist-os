@@ -6,8 +6,6 @@ import("//build/icu/config.gni")  # icu_git_info
 
 platform_aibs_dir = get_label_info("//bundles/assembly", "target_out_dir")
 
-# LINT.IfChange
-
 # These are the user-buildtype-safe platform AIBs that are used by bootstrap
 # feature-set-level assemblies.  This is a subset of the overall platform AIBs
 # so that these systems (e.g. bringup) don't need to build the entire platform.
@@ -279,10 +277,7 @@ user_platform_aib_names =
       "zoneinfo",
     ]
 
-# LINT.ThenChange(platform_aib_names.bzl)
-
 # The names of all userdebug-allowed platform Assembly Input Bundles
-#LINT.IfChange
 _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          # Needed by both eng and userdebug products, but contains things disallowed in
                          # user.
@@ -300,11 +295,9 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "wlan_development",
                        ]
 
-# LINT.ThenChange(platform_aib_names.bzl)
 userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
 
 # The names of all of the platform's Assembly Input Bundles.
-# LINT.IfChange
 eng_only_platform_aib_names =
     bootstrap_eng_platform_aib_names + [
       # the core realm additions for eng build-type assemblies
@@ -355,8 +348,6 @@ eng_only_platform_aib_names =
     ]
 eng_platform_aib_names =
     userdebug_platform_aib_names + eng_only_platform_aib_names
-
-# LINT.ThenChange(platform_aib_names.bzl)
 
 required_user_aib_names = [
   "embeddable",

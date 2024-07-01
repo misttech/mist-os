@@ -3,11 +3,16 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <sys/epoll.h>
 #include <sys/file.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <syscall.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <climits>
 #include <vector>
 
@@ -16,6 +21,50 @@
 #include <linux/bpf.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
+
+#define BPF_LOAD_MAP(reg, value)                               \
+  bpf_insn{                                                    \
+      .code = BPF_LD | BPF_DW,                                 \
+      .dst_reg = reg,                                          \
+      .src_reg = 1,                                            \
+      .off = 0,                                                \
+      .imm = static_cast<int32_t>(value),                      \
+  },                                                           \
+      bpf_insn {                                               \
+    .code = 0, .dst_reg = 0, .src_reg = 0, .off = 0, .imm = 0, \
+  }
+
+#define BPF_MOV_IMM(reg, value)                                                    \
+  bpf_insn {                                                                       \
+    .code = BPF_ALU64 | BPF_MOV | BPF_IMM, .dst_reg = reg, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(value),                                            \
+  }
+
+#define BPF_MOV_REG(dst, src)                                                                \
+  bpf_insn {                                                                                 \
+    .code = BPF_ALU64 | BPF_MOV | BPF_X, .dst_reg = dst, .src_reg = src, .off = 0, .imm = 0, \
+  }
+
+#define BPF_CALL_EXTERNAL(function)                                   \
+  bpf_insn {                                                          \
+    .code = BPF_JMP | BPF_CALL, .dst_reg = 0, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(function),                            \
+  }
+
+#define BPF_STORE(ptr, value)                                                 \
+  bpf_insn {                                                                  \
+    .code = BPF_ST | BPF_B | BPF_MEM, .dst_reg = ptr, .src_reg = 0, .off = 0, \
+    .imm = static_cast<int32_t>(value),                                       \
+  }
+
+#define BPF_RETURN() \
+  bpf_insn { .code = BPF_JMP | BPF_EXIT, .dst_reg = 0, .src_reg = 0, .off = 0, .imm = 0, }
+
+#define BPF_JNE_IMM(dst, value, offset)                                     \
+  bpf_insn {                                                                \
+    .code = BPF_JMP | BPF_JNE, .dst_reg = dst, .src_reg = 0, .off = offset, \
+    .imm = static_cast<int32_t>(value),                                     \
+  }
 
 namespace {
 
@@ -29,7 +78,7 @@ TEST(BpfTest, ArraySizeOverflow) {
                                                                   .max_entries = INT_MAX / 8,
                                                               }));
   EXPECT_EQ(result, -1);
-  EXPECT_EQ(errno, EINVAL);
+  EXPECT_EQ(errno, ENOMEM);
 }
 
 class BpfMapTest : public testing::Test {
@@ -47,6 +96,13 @@ class BpfMapTest : public testing::Test {
                                                                  .value_size = sizeof(int),
                                                                  .max_entries = 10,
                                                              }));
+    ringbuf_fd_ = SAFE_SYSCALL_SKIP_ON_EPERM(
+        bpf(BPF_MAP_CREATE, (union bpf_attr){
+                                .map_type = BPF_MAP_TYPE_RINGBUF,
+                                .key_size = 0,
+                                .value_size = 0,
+                                .max_entries = static_cast<uint32_t>(getpagesize()),
+                            }));
 
     CheckMapInfo();
   }
@@ -149,12 +205,98 @@ class BpfMapTest : public testing::Test {
     return BpfLock(BpfFdGet(pathname, BPF_F_WRONLY), F_WRLCK);
   }
 
-  int map_fd() const { return map_fd_; }
+  // Run the given bpf program.
+  void Run(const bpf_insn* program, size_t len) {
+    char buffer[4096];
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.prog_type = BPF_PROG_TYPE_SOCKET_FILTER;
+    attr.insns = reinterpret_cast<uint64_t>(program);
+    attr.insn_cnt = static_cast<uint32_t>(len);
+    attr.license = reinterpret_cast<uint64_t>("N/A");
+    attr.log_buf = reinterpret_cast<uint64_t>(buffer);
+    attr.log_size = 4096;
+    attr.log_level = 1;
+    bpf(BPF_PROG_LOAD, attr);
+
+    fbl::unique_fd prog_fd(SAFE_SYSCALL(bpf(BPF_PROG_LOAD, attr)));
+    int sk[2];
+    SAFE_SYSCALL(socketpair(AF_UNIX, SOCK_DGRAM, 0, sk));
+    fbl::unique_fd sk0(sk[0]);
+    fbl::unique_fd sk1(sk[1]);
+    int fd = prog_fd.get();
+    SAFE_SYSCALL(setsockopt(sk1.get(), SOL_SOCKET, SO_ATTACH_BPF, &fd, sizeof(int)));
+    SAFE_SYSCALL(write(sk0.get(), "", 1));
+  }
+
+  void WriteToRingBuffer(char v, uint32_t submit_flag = 0) {
+    // A bpf program that write a record in the ringbuffer.
+    bpf_insn program[] = {
+        // r1 <- ringbuf_fd_
+        BPF_LOAD_MAP(1, ringbuf_fd()),
+        // r2 <- 1
+        BPF_MOV_IMM(2, 1),
+        // r3 <- 0
+        BPF_MOV_IMM(3, 0),
+        // Call bpf_ringbuf_reserve
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_reserve),
+        // r0 != 0 -> JMP 1
+        BPF_JNE_IMM(0, 0, 1),
+        // exit
+        BPF_RETURN(),
+        // *r0 = `v`
+        BPF_STORE(0, v),
+        // r1 <- r0,
+        BPF_MOV_REG(1, 0),
+        // r2 <- `submit_flag`,
+        BPF_MOV_IMM(2, submit_flag),
+        // Call bpf_ringbuf_submit
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_submit),
+        // r0 <- 0,
+        BPF_MOV_IMM(0, 0),
+        // exit
+        BPF_RETURN(),
+    };
+    Run(program, sizeof(program) / sizeof(program[0]));
+  }
+
+  void DiscardWriteToRingBuffer() {
+    // A bpf program that cancel a write the ringbuffer.
+    bpf_insn program[] = {
+        // r1 <- ringbuf_fd_
+        BPF_LOAD_MAP(1, ringbuf_fd()),
+        // r2 <- 1
+        BPF_MOV_IMM(2, 1),
+        // r3 <- 0
+        BPF_MOV_IMM(3, 0),
+        // Call bpf_ringbuf_reserve
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_reserve),
+        // r0 != 0 -> JMP 1
+        BPF_JNE_IMM(0, 0, 1),
+        // exit
+        BPF_RETURN(),
+        // r1 <- r0,
+        BPF_MOV_REG(1, 0),
+        // r2 <- 0,
+        BPF_MOV_IMM(2, 0),
+        // Call bpf_ringbuf_discard
+        BPF_CALL_EXTERNAL(BPF_FUNC_ringbuf_discard),
+        // r0 <- 0,
+        BPF_MOV_IMM(0, 0),
+        // exit
+        BPF_RETURN(),
+    };
+    Run(program, sizeof(program) / sizeof(program[0]));
+  }
+
   int array_fd() const { return array_fd_; }
+  int map_fd() const { return map_fd_; }
+  int ringbuf_fd() const { return ringbuf_fd_; }
 
  private:
   int array_fd_ = -1;
   int map_fd_ = -1;
+  int ringbuf_fd_ = -1;
 };
 
 TEST_F(BpfMapTest, Map) {
@@ -245,6 +387,143 @@ TEST_F(BpfMapTest, LockTest) {
   ASSERT_TRUE(fd7.is_valid());  // no lock taken
   fbl::unique_fd fd8(MapRetrieveExclusiveRW(m2));
   ASSERT_FALSE(fd8.is_valid());  // busy due to fd6
+}
+
+TEST_F(BpfMapTest, MMapRingBufTest) {
+  // Can map the first page of the ringbuffer R/W
+  ASSERT_TRUE(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ | PROT_WRITE,
+                                            MAP_SHARED, ringbuf_fd(), 0)
+                  .is_ok());
+  // Cannot mmap the second page of the ringbuffer R/W
+  ASSERT_EQ(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ | PROT_WRITE,
+                                          MAP_SHARED, ringbuf_fd(), getpagesize())
+                .error_value(),
+            EPERM);
+  // Cannot mmap the second page, 3rd and 4th page RO
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_TRUE(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ, MAP_SHARED,
+                                              ringbuf_fd(), (i + 1) * getpagesize())
+                    .is_ok());
+  }
+  // Can mmap the 4 pages in a single mapping.
+  ASSERT_TRUE(test_helper::ScopedMMap::MMap(nullptr, 4 * getpagesize(), PROT_READ, MAP_SHARED,
+                                            ringbuf_fd(), 0)
+                  .is_ok());
+  // Cannot mmap 5 pages.
+  ASSERT_EQ(test_helper::ScopedMMap::MMap(nullptr, 5 * getpagesize(), PROT_READ, MAP_SHARED,
+                                          ringbuf_fd(), 0)
+                .error_value(),
+            EINVAL);
+}
+
+TEST_F(BpfMapTest, WriteRingBufTest) {
+  auto pagewr = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, ringbuf_fd(), 0));
+  auto pagero = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 3 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), getpagesize()));
+  std::atomic<unsigned long>* consumer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagewr.mapping());
+  std::atomic<unsigned long>* producer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagero.mapping());
+  uint8_t* data = static_cast<uint8_t*>(pagero.mapping()) + getpagesize();
+  ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
+  ASSERT_EQ(0u, producer_pos->load(std::memory_order_acquire));
+
+  WriteToRingBuffer(42);
+
+  ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
+  ASSERT_EQ(16u, producer_pos->load(std::memory_order_acquire));
+
+  uint32_t record_length = *reinterpret_cast<uint32_t*>(data);
+  ASSERT_EQ(0u, record_length & BPF_RINGBUF_BUSY_BIT);
+  ASSERT_EQ(0u, record_length & BPF_RINGBUF_DISCARD_BIT);
+  ASSERT_EQ(1u, record_length);
+
+  uint8_t record_value = *(data + 8);
+  ASSERT_EQ(42u, record_value);
+
+  DiscardWriteToRingBuffer();
+
+  ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
+  ASSERT_EQ(32u, producer_pos->load(std::memory_order_acquire));
+
+  record_length = *reinterpret_cast<uint32_t*>(data + 16);
+  ASSERT_EQ(0u, record_length & BPF_RINGBUF_BUSY_BIT);
+  ASSERT_EQ(BPF_RINGBUF_DISCARD_BIT, record_length & BPF_RINGBUF_DISCARD_BIT);
+}
+
+TEST_F(BpfMapTest, IdenticalPagesRingBufTest) {
+  // Map the last 2 pages, and check that they are the same after some operations on the buffer.
+  auto pages = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 2 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), 2 * getpagesize()));
+
+  uint8_t* page1 = static_cast<uint8_t*>(pages.mapping());
+  uint8_t* page2 = page1 + getpagesize();
+
+  // Check that the pages are equal after creating the buffer.
+  ASSERT_EQ(memcmp(page1, page2, getpagesize()), 0);
+
+  for (size_t i = 0; i < 256; ++i) {
+    WriteToRingBuffer(static_cast<uint8_t>(i));
+  }
+
+  // Check that they are still equals after some operations.
+  ASSERT_EQ(memcmp(page1, page2, getpagesize()), 0);
+}
+
+TEST_F(BpfMapTest, NotificationsRingBufTest) {
+  auto pagewr = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, ringbuf_fd(), 0));
+  auto pagero = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+      nullptr, 3 * getpagesize(), PROT_READ, MAP_SHARED, ringbuf_fd(), getpagesize()));
+  std::atomic<unsigned long>* consumer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagewr.mapping());
+  std::atomic<unsigned long>* producer_pos =
+      static_cast<std::atomic<unsigned long>*>(pagero.mapping());
+
+  fbl::unique_fd epollfd(SAFE_SYSCALL(epoll_create(1)));
+
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLET;
+
+  SAFE_SYSCALL(epoll_ctl(epollfd.get(), EPOLL_CTL_ADD, ringbuf_fd(), &ev));
+
+  // First wait should return no result.
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // After a normal write, epoll should return an event.
+  WriteToRingBuffer(42);
+  ASSERT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // But only once, as this is edge triggered.
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // A new write will not trigger an event, as the reader is late.
+  WriteToRingBuffer(42);
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // Unless the event is forced through flags
+  WriteToRingBuffer(42, BPF_RB_FORCE_WAKEUP);
+  ASSERT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // Let's catch up.
+  consumer_pos->store(producer_pos->load(std::memory_order_acquire), std::memory_order_release);
+
+  // Execute a write, preventing an event to run.
+  WriteToRingBuffer(42, BPF_RB_NO_WAKEUP);
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // A normal write will now not send an event because the client has not caught
+  // up.
+  WriteToRingBuffer(42);
+  ASSERT_EQ(0, epoll_wait(epollfd.get(), &ev, 1, 0));
+
+  // Let's catch up again.
+  consumer_pos->store(producer_pos->load(std::memory_order_acquire), std::memory_order_release);
+
+  // A normal write will now send an event.
+  WriteToRingBuffer(42);
+  EXPECT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
 }
 
 }  // namespace

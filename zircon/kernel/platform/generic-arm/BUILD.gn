@@ -43,7 +43,6 @@ source_set("generic-arm") {
     "//zircon/kernel/lib/jtrace:headers",
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/lockdep",
-    "//zircon/kernel/lib/memory_limit",
     "//zircon/kernel/lib/persistent-debuglog",
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/object",

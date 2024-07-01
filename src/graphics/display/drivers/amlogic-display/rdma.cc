@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/rdma.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/bti.h>
@@ -31,14 +32,12 @@
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
 // static
 zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
-    display::DispatcherFactory& dispatcher_factory,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
     inspect::Node* video_input_unit_node) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
@@ -64,14 +63,17 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
   }
   fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
 
-  zx::result<std::unique_ptr<display::Dispatcher>> create_dispatcher_result =
-      dispatcher_factory.Create("rdma_irq_thread", /*scheduler_role=*/{});
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                          "rdma_irq_thread",
+                                          /*shutdown_handler=*/[](fdf_dispatcher_t*) {},
+                                          /*scheduler_role=*/{});
   if (create_dispatcher_result.is_error()) {
     zxlogf(ERROR, "Failed to create IRQ handler dispatcher: %s",
            create_dispatcher_result.status_string());
     return create_dispatcher_result.take_error();
   }
-  std::unique_ptr<display::Dispatcher> dispatcher = std::move(create_dispatcher_result).value();
+  fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
 
   fbl::AllocChecker alloc_checker;
   auto rdma = fbl::make_unique_checked<RdmaEngine>(
@@ -85,7 +87,7 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
 }
 
 RdmaEngine::RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt rdma_done_interrupt,
-                       std::unique_ptr<display::Dispatcher> rdma_irq_handler_dispatcher,
+                       fdf::SynchronizedDispatcher rdma_irq_handler_dispatcher,
                        inspect::Node* inspect_node)
     : vpu_mmio_(std::move(vpu_mmio)),
       bti_(std::move(dma_bti)),
@@ -380,7 +382,7 @@ zx_status_t RdmaEngine::SetupRdma() {
 }
 
 zx::result<> RdmaEngine::InitializeIrqHandler() {
-  zx_status_t status = rdma_irq_handler_.Begin(rdma_irq_handler_dispatcher_->async_dispatcher());
+  zx_status_t status = rdma_irq_handler_.Begin(rdma_irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to begin IRQ handler on the dispatcher: %s",
            zx_status_get_string(status));

@@ -5,7 +5,10 @@
 import("//build/assembly/board_configuration.gni")
 
 board_configuration("qemu-arm64") {
-  provided_features = [ "fuchsia::driver_framework_v2_support" ]
+  provided_features = [
+    "fuchsia::driver_framework_v2_support",
+    "fuchsia::real_time_clock",
+  ]
 
   input_bundles = [
     "//boards/arm64:main_bundle",

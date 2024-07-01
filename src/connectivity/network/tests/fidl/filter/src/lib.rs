@@ -26,7 +26,7 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet};
-use net_types::ip::IpInvariant;
+use net_types::ip::IpVersion;
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
 use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
@@ -1275,13 +1275,12 @@ fn invalid_address_range_matcher<I: net_types::ip::Ip>() -> Matchers {
         src_addr: Some(AddressMatcher {
             matcher: AddressMatcherType::Range(
                 AddressRange::try_from({
-                    let IpInvariant((start, end)) = I::map_ip(
-                        (),
+                    let (start, end) = match I::VERSION {
                         // IPv6 range in an IPv4 namespace
-                        |()| IpInvariant((fidl_ip!("2001:db8::1"), fidl_ip!("2001:db8::2"))),
+                        IpVersion::V4 => (fidl_ip!("2001:db8::1"), fidl_ip!("2001:db8::2")),
                         // IPv4 range in an IPv6 namespace
-                        |()| IpInvariant((fidl_ip!("192.0.2.1"), fidl_ip!("192.0.2.2"))),
-                    );
+                        IpVersion::V6 => (fidl_ip!("192.0.2.1"), fidl_ip!("192.0.2.2")),
+                    };
                     fnet_filter::AddressRange { start, end }
                 })
                 .unwrap(),
@@ -1297,14 +1296,12 @@ fn invalid_subnet_matcher<I: net_types::ip::Ip>() -> Matchers {
         src_addr: Some(AddressMatcher {
             matcher: AddressMatcherType::Subnet(
                 Subnet::try_from({
-                    let IpInvariant(subnet) = I::map_ip(
-                        (),
+                    match I::VERSION {
                         // IPv6 subnet in an IPv4 namespace
-                        |()| IpInvariant(fidl_subnet!("2001:db8::/64")),
+                        IpVersion::V4 => fidl_subnet!("2001:db8::/64"),
                         // IPv4 subnet in an IPv6 namespace
-                        |()| IpInvariant(fidl_subnet!("192.0.2.0/24")),
-                    );
-                    subnet
+                        IpVersion::V6 => fidl_subnet!("192.0.2.0/24"),
+                    }
                 })
                 .unwrap(),
             ),
@@ -1317,20 +1314,19 @@ fn invalid_subnet_matcher<I: net_types::ip::Ip>() -> Matchers {
 fn invalid_transport_protocol_matcher<I: net_types::ip::Ip>() -> Matchers {
     Matchers {
         transport_protocol: Some({
-            let IpInvariant(matcher) = I::map_ip(
-                (),
+            match I::VERSION {
                 // ICMPv6 in an IPv4 namespace
-                |()| IpInvariant(TransportProtocolMatcher::Icmpv6),
+                IpVersion::V4 => TransportProtocolMatcher::Icmpv6,
                 // ICMPv4 in an IPv6 namespace
-                |()| IpInvariant(TransportProtocolMatcher::Icmp),
-            );
-            matcher
+                IpVersion::V6 => TransportProtocolMatcher::Icmp,
+            }
         }),
         ..Default::default()
     }
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::AddressRange)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::Subnet)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::TransportProtocol)]
@@ -1357,14 +1353,10 @@ async fn ip_specific_matcher_in_namespace<I: net_types::ip::Ip>(
             id: namespace_id,
             domain: match domain {
                 DomainType::IpAgnostic => Domain::AllIp,
-                DomainType::IpSpecific => {
-                    let IpInvariant(domain) = I::map_ip(
-                        (),
-                        |()| IpInvariant(Domain::Ipv4),
-                        |()| IpInvariant(Domain::Ipv6),
-                    );
-                    domain
-                }
+                DomainType::IpSpecific => match I::VERSION {
+                    IpVersion::V4 => Domain::Ipv4,
+                    IpVersion::V6 => Domain::Ipv6,
+                },
             },
         }),
         Resource::Routine(Routine {
@@ -1403,6 +1395,7 @@ async fn ip_specific_matcher_in_namespace<I: net_types::ip::Ip>(
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::AddressRange)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::Subnet)]
 #[test_case(DomainType::IpSpecific, InvalidMatcher::TransportProtocol)]
@@ -1432,14 +1425,10 @@ async fn jump_to_routine_with_ip_specific_matcher_in_namespace<I: net_types::ip:
             id: namespace_id,
             domain: match domain {
                 DomainType::IpAgnostic => Domain::AllIp,
-                DomainType::IpSpecific => {
-                    let IpInvariant(domain) = I::map_ip(
-                        (),
-                        |()| IpInvariant(Domain::Ipv4),
-                        |()| IpInvariant(Domain::Ipv6),
-                    );
-                    domain
-                }
+                DomainType::IpSpecific => match I::VERSION {
+                    IpVersion::V4 => Domain::Ipv4,
+                    IpVersion::V6 => Domain::Ipv6,
+                },
             },
         }),
         // Target routine includes a rule with an IP-version-specific matcher.
@@ -1665,6 +1654,7 @@ async fn routine_cycle(name: &str, calling_routine: RoutineType) {
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 async fn uninstalled_routine_validated_even_if_unreachable<I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
@@ -1679,10 +1669,9 @@ async fn uninstalled_routine_validated_even_if_unreachable<I: net_types::ip::Ip>
     let resources = [
         Resource::Namespace(Namespace {
             id: namespace_id,
-            domain: {
-                let IpInvariant(domain) =
-                    I::map_ip((), |()| IpInvariant(Domain::Ipv4), |()| IpInvariant(Domain::Ipv6));
-                domain
+            domain: match I::VERSION {
+                IpVersion::V4 => Domain::Ipv4,
+                IpVersion::V6 => Domain::Ipv6,
             },
         }),
         // Uninstalled routine includes a rule with an IP-version-specific matcher.

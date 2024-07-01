@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Macro wrapper for logging simple events (occurrence, integer, histogram, string)
-// and log a warning when the status is not Ok
+/// Macro wrapper for logging simple events (occurrence, integer, histogram, string)
+/// and log a warning when the status is not Ok.
+// TODO(339221340): remove these allows once the skeleton has a few uses
+#[allow(unused)]
 macro_rules! log_cobalt_1dot1 {
     ($cobalt_proxy:expr, $method_name:ident, $metric_id:expr, $value:expr, $event_codes:expr $(,)?) => {{
         let status = $cobalt_proxy.$method_name($metric_id, $value, $event_codes).await;
@@ -28,4 +30,6 @@ macro_rules! log_cobalt_1dot1_batch {
     }};
 }
 
+// TODO(339221340): remove these allows once the skeleton has a few uses
+#[allow(unused)]
 pub(crate) use {log_cobalt_1dot1, log_cobalt_1dot1_batch};

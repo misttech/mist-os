@@ -5,7 +5,6 @@
 """Unit tests for honeydew.auxiliary_devices.power_switch_dmc.py."""
 
 import os
-import subprocess
 import unittest
 from collections.abc import Callable
 from typing import Any
@@ -13,8 +12,10 @@ from unittest import mock
 
 from parameterized import param, parameterized
 
+from honeydew import errors
 from honeydew.auxiliary_devices import power_switch_dmc
 from honeydew.interfaces.auxiliary_devices import power_switch
+from honeydew.utils import host_shell
 
 _MOCK_OS_ENVIRON: dict[str, str] = {"DMC_PATH": "/tmp/foo/bar"}
 
@@ -58,131 +59,47 @@ class PowerSwitchDmcTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        subprocess,
-        "check_output",
-        return_value=b"some output",
+        power_switch_dmc.PowerSwitchDmc,
+        "_run",
         autospec=True,
     )
-    def test_power_off(self, mock_subprocess_check_output: mock.Mock) -> None:
-        """Test case for PowerSwitchDmc.power_off() success case."""
+    def test_power_off(self, mock_power_switch_dmc_run: mock.Mock) -> None:
+        """Test case for PowerSwitchDmc.power_off()."""
         self.power_switch_dmc_obj.power_off()
-        mock_subprocess_check_output.assert_called_once()
-
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "CalledProcessError",
-                    "side_effect": subprocess.CalledProcessError(
-                        returncode=1,
-                        cmd="some command",
-                        output="command output",
-                        stderr="command error",
-                    ),
-                },
-            ),
-            (
-                {
-                    "label": "TimeoutExpired",
-                    "side_effect": subprocess.TimeoutExpired(
-                        cmd="some command",
-                        timeout=60,
-                    ),
-                },
-            ),
-            (
-                {
-                    "label": "RuntimeError",
-                    "side_effect": RuntimeError("command failed"),
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
-    @mock.patch.object(
-        subprocess,
-        "check_output",
-        side_effect=subprocess.CalledProcessError(
-            returncode=1, cmd="some command"
-        ),
-        autospec=True,
-    )
-    def test_power_off_error(
-        self,
-        parameterized_dict: dict[str, Any],
-        mock_subprocess_check_output: mock.Mock,
-    ) -> None:
-        """Test case for PowerSwitchDmc.power_off() error case."""
-        mock_subprocess_check_output.side_effect = parameterized_dict[
-            "side_effect"
-        ]
-
-        with self.assertRaises(power_switch.PowerSwitchError):
-            self.power_switch_dmc_obj.power_off()
-
-        mock_subprocess_check_output.assert_called_once()
+        mock_power_switch_dmc_run.assert_called_once()
 
     @mock.patch.object(
-        subprocess,
-        "check_output",
-        return_value=b"some output",
+        power_switch_dmc.PowerSwitchDmc,
+        "_run",
         autospec=True,
     )
-    def test_power_on(self, mock_subprocess_check_output: mock.Mock) -> None:
-        """Test case for PowerSwitchDmc.power_on() success case."""
+    def test_power_on(self, mock_power_switch_dmc_run: mock.Mock) -> None:
+        """Test case for PowerSwitchDmc.power_on()."""
         self.power_switch_dmc_obj.power_on()
-        mock_subprocess_check_output.assert_called_once()
+        mock_power_switch_dmc_run.assert_called_once()
 
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "CalledProcessError",
-                    "side_effect": subprocess.CalledProcessError(
-                        returncode=1,
-                        cmd="some command",
-                        output="command output",
-                        stderr="command error",
-                    ),
-                },
-            ),
-            (
-                {
-                    "label": "TimeoutExpired",
-                    "side_effect": subprocess.TimeoutExpired(
-                        cmd="some command",
-                        timeout=60,
-                    ),
-                },
-            ),
-            (
-                {
-                    "label": "RuntimeError",
-                    "side_effect": RuntimeError("command failed"),
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
-    )
     @mock.patch.object(
-        subprocess,
-        "check_output",
-        side_effect=subprocess.CalledProcessError(
-            returncode=1, cmd="some command"
-        ),
+        host_shell,
+        "run",
         autospec=True,
     )
-    def test_power_on_error(
-        self,
-        parameterized_dict: dict[str, Any],
-        mock_subprocess_check_output: mock.Mock,
-    ) -> None:
-        """Test case for PowerSwitchDmc.power_on() error case."""
-        mock_subprocess_check_output.side_effect = parameterized_dict[
-            "side_effect"
-        ]
+    def test_run(self, mock_host_shell_run: mock.Mock) -> None:
+        """Test case for PowerSwitchDmc._run() success case."""
+        self.power_switch_dmc_obj._run(  # pylint: disable=protected-access
+            command=["ls"]
+        )
+        mock_host_shell_run.assert_called_once()
 
+    @mock.patch.object(
+        host_shell,
+        "run",
+        side_effect=errors.HostCmdError("error"),
+        autospec=True,
+    )
+    def test_run_error(self, mock_host_shell_run: mock.Mock) -> None:
+        """Test case for PowerSwitchDmc._run() failure case."""
         with self.assertRaises(power_switch.PowerSwitchError):
-            self.power_switch_dmc_obj.power_on()
-
-        mock_subprocess_check_output.assert_called_once()
+            self.power_switch_dmc_obj._run(  # pylint: disable=protected-access
+                command=["ls"]
+            )
+        mock_host_shell_run.assert_called_once()

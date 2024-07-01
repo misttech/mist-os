@@ -4,9 +4,14 @@
 
 #include "device_server.h"
 
-#include <fidl/fuchsia.hardware.hrtimer/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.hrtimer/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
 
+#include <future>
 #include <limits>
 #include <optional>
 #include <vector>
@@ -18,7 +23,45 @@ using fuchsia_hardware_hrtimer::Properties;
 using fuchsia_hardware_hrtimer::Resolution;
 using fuchsia_hardware_hrtimer::TimerProperties;
 
-DeviceServer::DeviceServer() = default;
+DeviceServer::DeviceServer() {
+  zx::result topology_client_end = component::Connect<fuchsia_power_broker::Topology>();
+  if (!topology_client_end.is_ok()) {
+    FX_LOGS(ERROR)
+        << "Synchronous error when connecting to the |"
+        << fidl::DiscoverableProtocolDefaultPath<fuchsia_power_broker::Topology> << "| protocol: "
+        << topology_client_end.status_string();
+    return;
+  }
+
+  fidl::SyncClient topology{*std::move(topology_client_end)};
+
+  zx::result<fidl::Endpoints<fuchsia_power_broker::Lessor>> lessor_endpoints =
+      fidl::CreateEndpoints<fuchsia_power_broker::Lessor>();
+  if (lessor_endpoints.is_error()) {
+    FX_LOGS(ERROR) << "Couldn't create FIDL endpoints: " << lessor_endpoints.status_string();
+    return;
+  }
+
+  fuchsia_power_broker::ElementSchema schema;
+  schema.element_name(std::string("fake-hrtimer"))
+      .initial_current_level(fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOff))
+      .valid_levels(std::vector<uint8_t>({
+          fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOff),
+          fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOn),
+      }))
+      .lessor_channel(std::move(lessor_endpoints->server));
+
+  fidl::Result<fuchsia_power_broker::Topology::AddElement> element =
+      topology->AddElement(std::move(schema));
+  if (element.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add element to topology: "
+                   << element.error_value().FormatDescription();
+    return;
+  }
+
+  element_control_client_ = std::move(element.value().element_control_channel());
+  lessor_ = fidl::SyncClient{std::move(lessor_endpoints->client)};
+}
 
 void DeviceServer::Start(StartRequest& request, StartCompleter::Sync& completer) {
   completer.Reply(zx::ok());
@@ -48,7 +91,44 @@ void DeviceServer::SetEvent(SetEventRequest& request, SetEventCompleter::Sync& c
 
 void DeviceServer::StartAndWait(StartAndWaitRequest& request,
                                 StartAndWaitCompleter::Sync& completer) {
-  completer.Reply(zx::error_result());
+  auto fut = std::async(
+      std::launch::async,
+      [&]() -> zx::result<fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse> {
+        std::this_thread::sleep_for(std::chrono::nanoseconds(
+            request.resolution().duration().value() * (request.ticks() + 1)));
+        if (!lessor_.has_value()) {
+          FX_LOGS(ERROR) << "No active lessor";
+          return zx::error(ZX_ERR_BAD_STATE);
+        }
+        fidl::Result<fuchsia_power_broker::Lessor::Lease> result_lease =
+            lessor_.value()->Lease(fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOn));
+
+        if (result_lease.is_error()) {
+          FX_LOGS(ERROR) << "Failed to acquire a lease: "
+                         << result_lease.error_value().FormatDescription();
+          return zx::error(ZX_ERR_BAD_STATE);
+        }
+
+        fuchsia_power_broker::LeaseStatus lease_status =
+            fuchsia_power_broker::LeaseStatus::kUnknown;
+        fidl::SyncClient<fuchsia_power_broker::LeaseControl> lease_control(
+            std::move(result_lease->lease_control()));
+        do {
+          auto result = lease_control->WatchStatus(lease_status);
+          if (result.is_error()) {
+            FX_LOGS(ERROR) << "Power WatchStatus returned error: "
+                           << result.error_value().FormatDescription().c_str();
+            return zx::error(ZX_ERR_BAD_STATE);
+          }
+          lease_status = result->status();
+        } while (lease_status != fuchsia_power_broker::LeaseStatus::kSatisfied);
+
+        fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse response;
+        response.keep_alive(lease_control.TakeClientEnd());
+        return zx::ok(std::move(response));
+      });
+  auto response = fut.get();
+  completer.Reply(std::move(response));
 }
 
 void DeviceServer::GetProperties(GetPropertiesCompleter::Sync& completer) {

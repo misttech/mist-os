@@ -12,6 +12,21 @@ declare_args() {
   # for the current build configuration's `target_cpu` value will be generated
   # to save about 3 minutes of build time when they are not needed.
   bazel_fuchsia_sdk_all_cpus = false
+
+  # Set to true to populate the @fuchsia_sdk external repository with prebuilt
+  # binaries for all API levels, or a subset of them. Possible values are:
+  #
+  #   false: The default, which is to only build for the current PLATFORM
+  #       API level, unless `override_target_api_level` is set.
+  #       See //build/config/fuchsia/override_target_api_level.gni.
+  #
+  #   true: To build for all API levels listed in
+  #       platform_version.build_time_supported_api_levels, which defaults to
+  #       all supported API levels, including the PLATFORM one, unless
+  #       `override_build_time_supported_api_levels` is also set.
+  #       See //build/config/fuchsia/platform_versions.gni.
+  #
+  bazel_fuchsia_sdk_all_api_levels = false
 }
 
 # Generate a Fuchsia Bazel SDK directory at build time from the
@@ -137,6 +152,12 @@ template("generate_fuchsia_bazel_sdk") {
 #       Override the global `enable_bazel_remote_rbe` setting for building.
 #       Set to false to prevent use of remote services for building.
 #
+#    remote_build_strategy: (optional)
+#       Override the global `bazel_rbe_exec_strategy` setting for building.
+#       Valid choices:
+#         "remote": execute cache-misses remotely
+#         "local": execute cache-misses locally
+#
 template("run_fuchsia_bazel_sdk_tests") {
   _use_idk_exported = defined(invoker.idk_exported_path)
   if (_use_idk_exported) {
@@ -205,6 +226,10 @@ template("run_fuchsia_bazel_sdk_tests") {
     if (defined(invoker.remote_build)) {
       _remote_build = invoker.remote_build
     }
+    _remote_build_strategy = bazel_rbe_exec_strategy
+    if (defined(invoker.remote_build_strategy)) {
+      _remote_build_strategy = invoker.remote_build_strategy
+    }
     if (_remote_build || bazel_upload_build_events != "") {
       _remote_services_bazelrc_target = "//build/bazel:remote_services_bazelrc"
       _remote_services_bazelrc_path =
@@ -217,7 +242,13 @@ template("run_fuchsia_bazel_sdk_tests") {
       deps += [ _remote_services_bazelrc_target ]
     }
     if (_remote_build) {
-      args += [ "--bazel-config=remote" ]
+      if (_remote_build_strategy == "remote") {
+        args += [ "--bazel-config=remote" ]
+      } else if (_remote_build_strategy == "local") {
+        args += [ "--bazel-config=remote_cache_only" ]
+      }
+    } else {
+      not_needed([ "_remote_build_strategy" ])
     }
     if (bazel_upload_build_events != "") {
       args += [ "--bazel-config=" + bazel_upload_build_events ]

@@ -57,4 +57,25 @@ const char* PowerRoleDetectionStateToString(PowerRoleDetectionState state) {
   return "(undocumented)";
 }
 
+const char* ReceiveTokenTypeToString(ReceiveTokenType receive_token_type) {
+  switch (receive_token_type) {
+    case ReceiveTokenType::kSop:
+      return "SOP (PD Source <-> PD Sink)";
+    case ReceiveTokenType::kSopPrime:
+      return "SOP' (VCONN source <-> Cable Plug)";
+    case ReceiveTokenType::kSopDoublePrime:
+      return "SOP\" (VCONN source <-> Cable Plug)";
+    case ReceiveTokenType::kSopPrimeDebug:
+      return "SOP' Debug (reserved)";
+    case ReceiveTokenType::kSopDoublePrimeDebug:
+      return "SOP\" Debug (reserved)";
+    case ReceiveTokenType::kUndocumented:
+      return "(undocumented token)";
+  }
+
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid ReceiveTokenType: %" PRId8,
+                      static_cast<int8_t>(receive_token_type));
+  return "(invalid token)";
+}
+
 }  // namespace fusb302

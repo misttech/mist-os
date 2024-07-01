@@ -14,6 +14,7 @@ board_configuration("arm64") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::paravirtualization",
+    "fuchsia::real_time_clock",
   ]
 
   input_bundles = [

@@ -212,14 +212,26 @@ UBSAN_HANDLER __ubsan_handle_nullability_return_v1(NonNullReturnData& Data, Sour
   HandleNonnullReturn(Data, Loc, "_Nonnull return type annotation");
 }
 
+UBSAN_HANDLER __ubsan_handle_missing_return(UnreachableData* Data) {
+  Report failure(
+      "execution reached the end of a value-returning function "
+      "without returning a value",
+      Data->Loc);
+}
+
+UBSAN_HANDLER
+__ubsan_handle_vla_bound_not_positive(VLABoundData* Data, ValueHandle Bound) {
+  Report failure("variable length array bound evaluates to non-positive value", Data->Loc);
+  Printf("Computed bound: " UBSAN_FMT_PRIxPTR "\n", Bound);
+  PrintTypeDescriptor(Data->Type);
+}
+
 // TODO(https://fxbug.dev/42056251): Add missing handlers:
 // * nullability_arg
 // * cfi_check_fail
 // * cfi_bad_type
 
 // NOTE: The following functions should never be generated in the kernel ubsan:
-//  * missing_return
-//  * vla_bound_not_positive
 //  * float_cast_overflow
 
 #undef UBSAN_HANDLER

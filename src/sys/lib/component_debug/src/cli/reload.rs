@@ -78,6 +78,15 @@ mod test {
                 }
             }
             match stream.try_next().await.unwrap().unwrap() {
+                fsys::LifecycleControllerRequest::StartInstanceWithArgs {
+                    moniker,
+                    binder: _,
+                    args: _,
+                    responder,
+                } => {
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
+                    responder.send(Ok(())).unwrap();
+                }
                 fsys::LifecycleControllerRequest::StartInstance {
                     moniker,
                     binder: _,

@@ -153,16 +153,6 @@ impl NamespaceBuilder {
     }
 }
 
-impl Clone for NamespaceBuilder {
-    fn clone(&self) -> Self {
-        Self {
-            entries: self.entries.clone(),
-            not_found: self.not_found.clone(),
-            scope: self.scope.clone(),
-        }
-    }
-}
-
 /// Returns a disconnected sender which should ignore all the path-not-found errors.
 pub fn ignore_not_found() -> UnboundedSender<String> {
     let (sender, _receiver) = unbounded();

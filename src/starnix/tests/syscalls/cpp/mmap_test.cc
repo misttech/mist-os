@@ -198,8 +198,7 @@ TEST_F(MMapProcTest, MapFileWithNewlineInName) {
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
   std::string path = dir + "/mmap\nnewline";
-  test_helper::ScopedFD fd =
-      test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+  fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
@@ -220,8 +219,7 @@ TEST_F(MMapProcTest, MapDeletedField) {
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
   std::string path = dir + "/tmpfile";
-  test_helper::ScopedFD fd =
-      test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+  fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
@@ -832,8 +830,7 @@ TEST(Mprotect, GrowTempFilePermisisons) {
   std::string path = dir + "/grow_temp_file_permissions";
   {
     uint8_t buf[] = {'a'};
-    test_helper::ScopedFD fd =
-        test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+    fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
     ASSERT_TRUE(fd);
     ASSERT_EQ(write(fd.get(), &buf[0], sizeof(buf)), 1) << errno << ": " << strerror(errno);
   }
@@ -844,7 +841,7 @@ TEST(Mprotect, GrowTempFilePermisisons) {
 
   {
     uint8_t buf[] = {'b'};
-    test_helper::ScopedFD fd = test_helper::ScopedFD(open(path.c_str(), O_RDONLY));
+    fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDONLY));
     ASSERT_EQ(-1, write(fd.get(), buf, sizeof(buf)));
 
     void* ptr = mmap(NULL, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
@@ -870,12 +867,11 @@ TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
   std::string path = dir + "/test_mprotect_consistent_failure";
   {
     uint8_t buf[] = {1};
-    test_helper::ScopedFD fd =
-        test_helper::ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+    fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
     ASSERT_TRUE(fd);
     ASSERT_EQ(write(fd.get(), &buf[0], sizeof(buf)), 1);
   }
-  test_helper::ScopedFD fd = test_helper::ScopedFD(open(path.c_str(), O_RDONLY));
+  fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDONLY));
   ASSERT_TRUE(fd);
 
   void* ptr = mmap(0, page_size * 3, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);

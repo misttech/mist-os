@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::ui_config::PlatformUiConfig;
 use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
@@ -60,66 +61,112 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
         );
 
         // We should only configure scenic here when it has been added to assembly.
-        let mut scenic_config = builder.package("scenic").component("meta/scenic.cm")?;
-        scenic_config
-            .field("renderer", serde_json::to_value(ui_config.renderer.clone())?)?
-            .field(
-                "frame_scheduler_min_predicted_frame_duration_in_us",
-                ui_config.frame_scheduler_min_predicted_frame_duration_in_us,
-            )?
-            .field("pointer_auto_focus", ui_config.pointer_auto_focus)?
-            .field("display_composition", ui_config.display_composition)?
-            .field("i_can_haz_display_id", -1i64)?
-            .field("i_can_haz_display_mode", -1i64)?
-            .field("display_rotation", ui_config.display_rotation)?
-            .field(
-                "min_display_horizontal_resolution_px",
+        builder.set_config_capability(
+            "fuchsia.scenic.Renderer",
+            Config::new(
+                ConfigValueType::String { max_size: 16 },
+                serde_json::to_value(ui_config.renderer.clone())?.into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
+            Config::new(
+                ConfigValueType::Uint64,
+                ui_config.frame_scheduler_min_predicted_frame_duration_in_us.into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.PointerAutoFocus",
+            Config::new(ConfigValueType::Bool, ui_config.pointer_auto_focus.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.DisplayComposition",
+            Config::new(ConfigValueType::Bool, ui_config.display_composition.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.ICanHazDisplayId",
+            Config::new(ConfigValueType::Int64, (-1i64).into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.ICanHazDisplayMode",
+            Config::new(ConfigValueType::Int64, (-1i64).into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.DisplayRotation",
+            Config::new(ConfigValueType::Uint64, ui_config.display_rotation.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.MinDisplayHorizontalResolutionPx",
+            Config::new(
+                ConfigValueType::Int32,
                 ui_config
                     .display_mode_horizontal_resolution_px_range
                     .start
                     .map(|v| v as i32)
-                    .unwrap_or(-1),
-            )?
-            .field(
-                "max_display_horizontal_resolution_px",
+                    .unwrap_or(-1)
+                    .into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.MaxDisplayHorizontalResolutionPx",
+            Config::new(
+                ConfigValueType::Int32,
                 ui_config
                     .display_mode_horizontal_resolution_px_range
                     .end
                     .map(|v| v as i32)
-                    .unwrap_or(-1),
-            )?
-            .field(
-                "min_display_vertical_resolution_px",
+                    .unwrap_or(-1)
+                    .into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.MinDisplayVerticalResolutionPx",
+            Config::new(
+                ConfigValueType::Int32,
                 ui_config
                     .display_mode_vertical_resolution_px_range
                     .start
                     .map(|v| v as i32)
-                    .unwrap_or(-1),
-            )?
-            .field(
-                "max_display_vertical_resolution_px",
+                    .unwrap_or(-1)
+                    .into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.MaxDisplayVerticalResolutionPx",
+            Config::new(
+                ConfigValueType::Int32,
                 ui_config
                     .display_mode_vertical_resolution_px_range
                     .end
                     .map(|v| v as i32)
-                    .unwrap_or(-1),
-            )?
-            .field(
-                "min_display_refresh_rate_millihertz",
+                    .unwrap_or(-1)
+                    .into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.MinDisplayRefreshRateMillihertz",
+            Config::new(
+                ConfigValueType::Int32,
                 ui_config
                     .display_mode_refresh_rate_millihertz_range
                     .start
                     .map(|v| v as i32)
-                    .unwrap_or(-1),
-            )?
-            .field(
-                "max_display_refresh_rate_millihertz",
+                    .unwrap_or(-1)
+                    .into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.scenic.MaxDisplayRefreshRateMillihertz",
+            Config::new(
+                ConfigValueType::Int32,
                 ui_config
                     .display_mode_refresh_rate_millihertz_range
                     .end
                     .map(|v| v as i32)
-                    .unwrap_or(-1),
-            )?;
+                    .unwrap_or(-1)
+                    .into(),
+            ),
+        )?;
 
         let mut scene_manager_config =
             builder.package("scene_manager").component("meta/scene_manager.cm")?;

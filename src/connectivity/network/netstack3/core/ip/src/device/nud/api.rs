@@ -47,7 +47,7 @@ pub enum NeighborRemovalError {
     IpAddressInvalid,
 
     /// Entry cannot be found.
-    #[error("{0}")]
+    #[error(transparent)]
     NotFound(#[from] NotFoundError),
 }
 

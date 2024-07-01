@@ -134,14 +134,13 @@ static const auto kCompositeNodeSpec =
 
 zx_status_t Astro::RawNandInit() {
   // Set alternate functions to enable raw_nand.
-  gpio_init_steps_.push_back({S905D2_GPIOBOOT(8), GpioSetAltFunction(2)});
-  gpio_init_steps_.push_back({S905D2_GPIOBOOT(9), GpioSetAltFunction(2)});
-  gpio_init_steps_.push_back({S905D2_GPIOBOOT(10), GpioSetAltFunction(2)});
-  gpio_init_steps_.push_back({S905D2_GPIOBOOT(11), GpioSetAltFunction(2)});
-  gpio_init_steps_.push_back({S905D2_GPIOBOOT(12), GpioSetAltFunction(2)});
-  gpio_init_steps_.push_back({S905D2_GPIOBOOT(14), GpioSetAltFunction(2)});
-  gpio_init_steps_.push_back({S905D2_GPIOBOOT(15), GpioSetAltFunction(2)});
-
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOBOOT(8), 2));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOBOOT(9), 2));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOBOOT(10), 2));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOBOOT(11), 2));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOBOOT(12), 2));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOBOOT(14), 2));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOBOOT(15), 2));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('RAWN');

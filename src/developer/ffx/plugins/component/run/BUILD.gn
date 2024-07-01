@@ -21,6 +21,7 @@ if (is_host) {
       "//src/sys/lib/component_debug",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
+      "//third_party/rust_crates:futures",
     ]
 
     args_sources = [ "src/args.rs" ]

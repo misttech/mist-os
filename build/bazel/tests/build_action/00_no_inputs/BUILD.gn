@@ -2,12 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_build_action.gni")
 
 # See README.md for details
-bazel_action("test") {
-  command = "build"
-  bazel_targets = [ ":generate_foo" ]
+bazel_build_action("test") {
+  bazel_target = ":generate_foo"
   copy_outputs = [
     {
       bazel = "{{BAZEL_TARGET_OUT_DIR}}/foo.out"

@@ -20,9 +20,6 @@
 
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"
-
 namespace amlogic_display {
 
 // Receives Vertical Sync (Vsync) interrupts triggered by the display engine
@@ -45,7 +42,6 @@ class VsyncReceiver {
   // `on_vsync` is called when the display engine finishes presenting a frame
   // to the display device and triggers a Vsync interrupt. Must be non-null.
   static zx::result<std::unique_ptr<VsyncReceiver>> Create(
-      display::DispatcherFactory& dispatcher_factory,
       fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device,
       VsyncHandler on_vsync);
 
@@ -55,7 +51,7 @@ class VsyncReceiver {
   // `vsync_irq` must be valid.
   // `on_vsync` must be non-null.
   explicit VsyncReceiver(zx::interrupt vsync_irq, VsyncHandler on_vsync,
-                         std::unique_ptr<display::Dispatcher> irq_handler_dispatcher);
+                         fdf::SynchronizedDispatcher irq_handler_dispatcher);
 
   VsyncReceiver(const VsyncReceiver&) = delete;
   VsyncReceiver& operator=(const VsyncReceiver&) = delete;
@@ -96,7 +92,7 @@ class VsyncReceiver {
   // The `irq_handler_dispatcher_` and `irq_handler_` are constant between
   // Init() and instance destruction. Only accessed on the threads used for
   // class initialization and destruction.
-  std::unique_ptr<display::Dispatcher> irq_handler_dispatcher_;
+  fdf::SynchronizedDispatcher irq_handler_dispatcher_;
   async::IrqMethod<VsyncReceiver, &VsyncReceiver::InterruptHandler> irq_handler_{this};
 };
 

@@ -43,7 +43,7 @@ class CliDocTest(unittest.TestCase):
     Validate the clidoc contents
     """
 
-    def test_tarball_exists(self):
+    def test_tarball_exists(self) -> None:
         tarball = clidoc_tarfile
         parents = os.listdir(os.path.dirname(clidoc_tarfile))
         parents += os.listdir(os.path.dirname(os.path.dirname(clidoc_tarfile)))
@@ -51,7 +51,7 @@ class CliDocTest(unittest.TestCase):
             os.path.exists(tarball), f"{tarball} does not exist in {parents}"
         )
 
-    def test_tarball_contents(self):
+    def test_tarball_contents(self) -> None:
         tarball = clidoc_tarfile
         got_names = []
         with tarfile.open(tarball, mode="r:gz") as tf:
@@ -60,7 +60,7 @@ class CliDocTest(unittest.TestCase):
         got_names.sort()
         self.assertEqual(got_names, want_names)
 
-    def test_ffx_contents(self):
+    def test_ffx_contents(self) -> None:
         want_subcommands = [
             "component",
             "config",
@@ -83,7 +83,7 @@ class CliDocTest(unittest.TestCase):
             ffx_member = tf.getmember("clidoc/ffx.md")
             self.assertIsNotNone(ffx_member)
             ffx_file = tf.extractfile(ffx_member)
-            contents = ffx_file.readlines()
+            contents = ffx_file.readlines() if ffx_file else []
         # filter the H2 elements these are subcommands
         subcommands_headings = [
             l.decode() for l in contents if l.startswith(b"## ")

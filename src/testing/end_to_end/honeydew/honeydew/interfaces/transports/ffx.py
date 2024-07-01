@@ -6,7 +6,6 @@
 
 import abc
 import subprocess
-from collections.abc import Iterable
 from typing import Any
 
 from honeydew.typing import custom_types
@@ -45,8 +44,9 @@ class FFX(abc.ABC):
             timeout: How long in seconds to wait for FFX command to complete.
 
         Raises:
-            subprocess.TimeoutExpired: In case of timeout
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
@@ -76,8 +76,9 @@ class FFX(abc.ABC):
             Output of `ffx -t {target} target show`.
 
         Raises:
-            subprocess.TimeoutExpired: In case of timeout
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
@@ -94,7 +95,8 @@ class FFX(abc.ABC):
             Output of `ffx --machine json target list <target>`.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of FFX command failure.
         """
 
     @abc.abstractmethod
@@ -108,7 +110,9 @@ class FFX(abc.ABC):
             Target name.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
@@ -124,7 +128,9 @@ class FFX(abc.ABC):
             (Target SSH IP Address, Target SSH Port)
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
@@ -138,7 +144,9 @@ class FFX(abc.ABC):
             Target's board.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
@@ -152,7 +160,9 @@ class FFX(abc.ABC):
             Target's product.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            errors.FfxTimeoutError: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
@@ -160,16 +170,14 @@ class FFX(abc.ABC):
         self,
         cmd: list[str],
         timeout: float | None = TIMEOUTS["FFX_CLI"],
-        exceptions_to_skip: Iterable[type[Exception]] | None = None,
         capture_output: bool = True,
         log_output: bool = True,
     ) -> str:
-        """Executes and returns the output of `ffx -t {target} {cmd}`.
+        """Runs an FFX command.
 
         Args:
             cmd: FFX command to run.
             timeout: Timeout to wait for the ffx command to return.
-            exceptions_to_skip: Any non fatal exceptions to be ignored.
             capture_output: When True, the stdout/err from the command will be
                 captured and returned. When False, the output of the command
                 will be streamed to stdout/err accordingly and it won't be
@@ -177,23 +185,27 @@ class FFX(abc.ABC):
             log_output: When True, logs the output in DEBUG level. Callers
                 may set this to False when expecting particularly large
                 or spammy output.
+            include_target: If set to True, `ffx -t {target} {cmd}` will be run.
+                Otherwise, `ffx {cmd}` will be run.
+
         Returns:
-            Output of `ffx -t {target} {cmd}` when capture_output is set to True, otherwise an
-            empty string.
+            Output of FFX command when capture_output is set to True, otherwise
+            an empty string.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def popen(
+    def popen(  # type: ignore[no-untyped-def]
         self,
         cmd: list[str],
-        **kwargs: dict[str, Any],
-    ) -> subprocess.Popen[Any]:
-        """Executes the command `ffx -t {target} ... {cmd}` via `subprocess.Popen`.
+        **kwargs,
+    ) -> subprocess.Popen[custom_types.AnyString]:
+        """Starts a new process to run the FFX cmd and returns the corresponding
+        process.
 
         Intended for executing daemons or processing streamed output. Given
         the raw nature of this API, it is up to callers to detect and handle
@@ -207,6 +219,9 @@ class FFX(abc.ABC):
 
         Returns:
             The Popen object of `ffx -t {target} {cmd}`.
+            If text arg of subprocess.Popen is set to True,
+            subprocess.Popen[str] will be returned. Otherwise,
+            subprocess.Popen[bytes] will be returned.
         """
 
     @abc.abstractmethod
@@ -250,7 +265,7 @@ class FFX(abc.ABC):
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
@@ -293,7 +308,7 @@ class FFX(abc.ABC):
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
@@ -308,6 +323,6 @@ class FFX(abc.ABC):
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """

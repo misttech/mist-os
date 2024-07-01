@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <lib/syslog/cpp/log_settings.h>
-#include <lib/syslog/cpp/logging_backend.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <functional>
@@ -286,15 +285,18 @@ TEST_F(LoggingFixture, SLog) {
 TEST_F(LoggingFixture, BackendDirect) {
   LogState state = SetupLogs(false);
 
-  syslog_runtime::LogBuffer buffer;
-  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "Log message",
-                              "condition");
-  syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
-  buffer.Flush();
-  syslog_runtime::BeginRecord(&buffer, fuchsia_logging::LOG_ERROR, "foo.cc", 42, "fake message",
-                              "condition");
-  syslog_runtime::WriteKeyValue(&buffer, "tag", "fake tag");
-  syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
+  {
+    syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_ERROR);
+    auto buffer =
+        builder.WithFile("foo.cc", 42).WithMsg("Log message").WithCondition("condition").Build();
+    buffer.WriteKeyValue("tag", "fake tag");
+    buffer.Flush();
+  }
+  syslog_runtime::LogBufferBuilder builder(fuchsia_logging::LOG_ERROR);
+  auto buffer =
+      builder.WithMsg("fake message").WithCondition("condition").WithFile("foo.cc", 42).Build();
+  buffer.WriteKeyValue("tag", "fake tag");
+  buffer.WriteKeyValue("foo", static_cast<int64_t>(42));
   buffer.Flush();
 
   std::string log = ReadLogs(state);
@@ -367,9 +369,9 @@ TEST(StructuredLogging, Remaining) {
   ASSERT_TRUE(temp_dir.NewTempFile(&log_file));
   builder.WithLogFile(log_file);
   builder.BuildAndInitialize();
-  syslog_runtime::LogBuffer buffer;
-  syslog_runtime::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
-  auto header = syslog_runtime::MsgHeader::CreatePtr(&buffer);
+  syslog_runtime::LogBufferBuilder builder2(LOG_INFO);
+  auto buffer = builder2.WithFile("test", 5).WithMsg("test_msg").Build();
+  auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteChar('t');
   ASSERT_EQ(header->RemainingSpace(), initial - 1);
@@ -378,9 +380,9 @@ TEST(StructuredLogging, Remaining) {
 }
 
 TEST(StructuredLogging, FlushAndReset) {
-  syslog_runtime::LogBuffer buffer;
-  syslog_runtime::BeginRecord(&buffer, LOG_INFO, "test", 5, "test_msg", "");
-  auto header = syslog_runtime::MsgHeader::CreatePtr(&buffer);
+  syslog_runtime::LogBufferBuilder builder(LOG_INFO);
+  auto buffer = builder.WithFile("test", 5).WithMsg("test_msg").Build();
+  auto header = syslog_runtime::internal::MsgHeader::CreatePtr(&buffer);
   auto initial = header->RemainingSpace();
   header->WriteString("test");
   ASSERT_EQ(header->RemainingSpace(), initial - 4);

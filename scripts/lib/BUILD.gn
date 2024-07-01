@@ -7,6 +7,7 @@ group("tests") {
   deps = [
     "async_utils:tests",
     "build_dir:tests",
+    "fx_cmd:tests",
     "statusinfo:tests",
     "termout:tests",
   ]

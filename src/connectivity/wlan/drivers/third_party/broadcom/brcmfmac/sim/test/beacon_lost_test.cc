@@ -25,8 +25,7 @@ const common::MacAddr kSecondBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbd});
 const common::MacAddr kMadeupClient({0xde, 0xad, 0xbe, 0xef, 0x00, 0x01});
 
 struct ClientIfc : public SimInterface {
-  void DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                 DeauthIndCompleter::Sync& completer) override;
+  void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;
 
   // Once test is finished, associations and disassociations from teardowns are ignored
   bool test_complete_ = false;
@@ -54,10 +53,9 @@ class BeaconLostTest : public SimTest {
 };
 
 // Ignore any deauth indications that are received during teardown
-void ClientIfc::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
-                          DeauthIndCompleter::Sync& completer) {
+void ClientIfc::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) {
   if (!test_complete_) {
-    SimInterface::DeauthInd(request, arena, completer);
+    SimInterface::DeauthInd(request, completer);
   }
 }
 

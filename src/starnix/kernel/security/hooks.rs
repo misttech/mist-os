@@ -446,6 +446,11 @@ mod tests {
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
     const DIFFERENT_VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_different_valid_t:s0";
 
+    const VALID_SECURITY_CONTEXT_WITH_NULL: &[u8] = b"u:object_r:test_valid_t:s0\0";
+    const INVALID_SECURITY_CONTEXT_BECAUSE_OF_NULL: &[u8] = b"u:object_r:test_valid_\0t:s0";
+
+    const INVALID_SECURITY_CONTEXT: &[u8] = b"not_a_u:object_r:test_valid_t:s0";
+
     const HOOKS_TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
 
@@ -1061,8 +1066,25 @@ mod tests {
         );
 
         assert_eq!(
+            // Test policy allows "kernel_t" tasks to set the "exec" context.
             set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()),
             Ok(())
+        );
+
+        assert_eq!(
+            // Test policy does not allow "kernel_t" tasks to set the "fscreate" context.
+            set_procattr(
+                &current_task,
+                ProcAttr::FsCreate,
+                DIFFERENT_VALID_SECURITY_CONTEXT.into()
+            ),
+            error!(EACCES)
+        );
+
+        assert_eq!(
+            // Cannot set an invalid context.
+            set_procattr(&current_task, ProcAttr::Exec, INVALID_SECURITY_CONTEXT.into()),
+            error!(EINVAL)
         );
 
         assert_eq!(
@@ -1071,6 +1093,73 @@ mod tests {
         );
 
         assert!(get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current).is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn set_get_procattr_with_nulls() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            Ok(Vec::new())
+        );
+
+        assert_eq!(
+            // Setting a Context with a string with trailing null(s) should work, if the Context is valid.
+            set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT_WITH_NULL.into()),
+            Ok(())
+        );
+
+        assert_eq!(
+            // Nulls in the middle of an otherwise valid Context truncate it, rendering it invalid.
+            set_procattr(
+                &current_task,
+                ProcAttr::FsCreate,
+                INVALID_SECURITY_CONTEXT_BECAUSE_OF_NULL.into()
+            ),
+            error!(EINVAL)
+        );
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            Ok(VALID_SECURITY_CONTEXT.into())
+        );
+
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::FsCreate),
+            Ok(Vec::new())
+        );
+    }
+
+    #[fuchsia::test]
+    async fn set_get_procattr_clear_context() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(false);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+
+        // Set up the "exec" and "fscreate" Contexts with valid values.
+        assert_eq!(
+            set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()),
+            Ok(())
+        );
+        assert_eq!(
+            set_procattr(
+                &current_task,
+                ProcAttr::FsCreate,
+                DIFFERENT_VALID_SECURITY_CONTEXT.into()
+            ),
+            Ok(())
+        );
+
+        // Clear the "exec" context with a write containing a single null octet.
+        assert_eq!(set_procattr(&current_task, ProcAttr::Exec, b"\0"), Ok(()));
+        assert_eq!(current_task.thread_group.read().security_state.0.exec_sid, None);
+
+        // Clear the "fscreate" context with a write containing a single newline.
+        assert_eq!(set_procattr(&current_task, ProcAttr::Exec, b"\x0a"), Ok(()));
+        assert_eq!(current_task.thread_group.read().security_state.0.fscreate_sid, None);
     }
 
     #[fuchsia::test]
@@ -1085,14 +1174,34 @@ mod tests {
         );
 
         assert_eq!(
+            // Test policy allows "kernel_t" tasks to set the "exec" context.
             set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()),
             Ok(())
         );
 
         assert_eq!(
-            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
-            Ok(VALID_SECURITY_CONTEXT.into())
+            // Test policy does not allow "kernel_t" tasks to set the "fscreate" context, but
+            // in permissive mode the setting will be allowed.
+            set_procattr(
+                &current_task,
+                ProcAttr::FsCreate,
+                DIFFERENT_VALID_SECURITY_CONTEXT.into()
+            ),
+            Ok(())
         );
+
+        // TODO(b/331375792): Validate Contexts even when permission checks are permissive,
+        //assert_eq!(
+        //    // Setting an invalid context should fail, even in permissive mode.
+        //    set_procattr(&current_task, ProcAttr::Exec, INVALID_SECURITY_CONTEXT.into()),
+        //    error!(EINVAL)
+        //);
+
+        // TODO(b/331375792): Allow permissive set-attr to succeed.
+        //assert_eq!(
+        //    get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+        //    Ok(DIFFERENT_VALID_SECURITY_CONTEXT.into())
+        //);
 
         assert!(get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current).is_ok());
     }
@@ -1107,7 +1216,20 @@ mod tests {
         );
 
         assert_eq!(
-            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            // Test policy allows "kernel_t" tasks to set the "exec" context.
+            set_procattr(&current_task, ProcAttr::Exec, VALID_SECURITY_CONTEXT.into()),
+            error!(EINVAL)
+        );
+
+        assert_eq!(
+            // Test policy does not allow "kernel_t" tasks to set the "fscreate" context.
+            set_procattr(&current_task, ProcAttr::FsCreate, VALID_SECURITY_CONTEXT.into()),
+            error!(EINVAL)
+        );
+
+        assert_eq!(
+            // Cannot set an invalid context.
+            set_procattr(&current_task, ProcAttr::Exec, INVALID_SECURITY_CONTEXT.into()),
             error!(EINVAL)
         );
 

@@ -20,6 +20,7 @@ constexpr char kDefaultConfigFile[] = "/pkg/data/tracing.config";
 }  // namespace
 
 int main(int argc, char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   if (!fxl::SetLogSettingsFromCommandLine(command_line)) {
     exit(EXIT_FAILURE);
@@ -35,7 +36,6 @@ int main(int argc, char** argv) {
 
   FX_LOGS(INFO) << "Trace Manager starting with config: " << config_file;
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async::Executor executor{loop.dispatcher()};
   tracing::TraceManagerApp trace_manager_app{
       sys::ComponentContext::CreateAndServeOutgoingDirectory(), std::move(config), executor};

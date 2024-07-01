@@ -4,8 +4,14 @@
 
 source_set("driver_loader") {
   sources = [
+    "diagnostics.h",
     "loader.cc",
     "loader.h",
   ]
-  public_deps = [ "//zircon/system/ulib/zx" ]
+  deps = [ "//sdk/lib/ld:ld-stub.basic" ]
+  public_deps = [
+    "//src/devices/lib/log",
+    "//src/lib/elfldltl",
+    "//zircon/system/ulib/zx",
+  ]
 }

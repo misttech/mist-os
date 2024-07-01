@@ -15,6 +15,9 @@
 
 namespace elfldltl {
 
+template <typename T, bool Swap>
+class UnsignedField;
+
 template <typename T>
 struct FileOffset;
 
@@ -67,6 +70,15 @@ struct PrintfType<uint32_t> {
   static constexpr auto kFormat = ConstString(" %" PRIu32);
   static constexpr auto Arguments(uint32_t arg) { return std::make_tuple(arg); }
 };
+
+// A field.h type will implicitly convert to its underlying integer type, which
+// is is why diagnostics-ostream.h doesn't need to define operator<< for them.
+// But the generic definition (for uint64_t and equivalents) and the
+// specializations for integer types intentionally don't work as template
+// instantiations for just any type convertible to their respective integer
+// types, because we don't want to use them for signed integer types.
+template <typename T, bool Swap>
+struct PrintfType<UnsignedField<T, Swap>> : public PrintfType<T> {};
 
 template <typename T, size_t N>
 struct Map {

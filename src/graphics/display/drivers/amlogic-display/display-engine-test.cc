@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
 
+#include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -11,22 +12,21 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
+
+#include <memory>
+#include <utility>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.images2/cpp/wire_types.h"
-#include "fidl/fuchsia.sysmem2/cpp/wire_types.h"
-#include "lib/fidl/cpp/wire/arena.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/loop-backed-dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter-dfv1.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace-dfv1.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -355,30 +355,28 @@ class FakeSysmemTest : public testing::Test {
 
   FakeSysmemTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
-  void SetUp() override {
-    mock_root_ = MockDevice::FakeRootParent();
+  void InitializeTestEnvironment() {
+    auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    std::vector<fuchsia_component_runner::ComponentNamespaceEntry> entries;
+    entries.push_back({{.path = "/", .directory = std::move(directory_client)}});
+    zx::result<fdf::Namespace> namespace_result = fdf::Namespace::Create(entries);
+    ASSERT_OK(namespace_result.status_value());
 
+    incoming_ = std::make_shared<fdf::Namespace>(std::move(namespace_result).value());
+
+    zx::result<> test_environment_init_result = test_environment_.SyncCall(
+        &fdf_testing::TestEnvironment::Initialize, std::move(directory_server));
+    ASSERT_OK(test_environment_init_result.status_value());
+  }
+
+  void SetUp() override {
     loop_.StartThread("sysmem-handler-loop");
     auto endpoints = fidl::Endpoints<fuchsia_hardware_amlogiccanvas::Device>::Create();
     canvas_.SyncCall(&FakeCanvasProtocol::Serve, std::move(endpoints.server));
 
-    zx::result<std::unique_ptr<display::Namespace>> create_incoming_result =
-        display::NamespaceDfv1::Create(mock_root_.get());
-    ASSERT_OK(create_incoming_result.status_value());
-    incoming_ = std::move(create_incoming_result).value();
+    InitializeTestEnvironment();
 
-    zx::result<std::unique_ptr<display::MetadataGetter>> create_metadata_getter_result =
-        display::MetadataGetterDfv1::Create(mock_root_.get());
-    ASSERT_OK(create_metadata_getter_result.status_value());
-    metadata_getter_ = std::move(create_metadata_getter_result).value();
-
-    zx::result<std::unique_ptr<display::DispatcherFactory>> create_dispatcher_factory_result =
-        display::LoopBackedDispatcherFactory::Create(mock_root_.get());
-    ASSERT_OK(create_dispatcher_factory_result.status_value());
-    dispatcher_factory_ = std::move(create_dispatcher_factory_result).value();
-
-    display_engine_ = std::make_unique<DisplayEngine>(incoming_.get(), metadata_getter_.get(),
-                                                      dispatcher_factory_.get());
+    display_engine_ = std::make_unique<DisplayEngine>(incoming_);
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
     display_engine_->SetCanvasForTesting(std::move(endpoints.client));
 
@@ -427,12 +425,14 @@ class FakeSysmemTest : public testing::Test {
   }
 
  protected:
-  std::shared_ptr<MockDevice> mock_root_;
-  async::Loop loop_;
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
+  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+      env_dispatcher_->async_dispatcher(), std::in_place};
 
-  std::unique_ptr<display::Namespace> incoming_;
-  std::unique_ptr<display::MetadataGetter> metadata_getter_;
-  std::unique_ptr<display::DispatcherFactory> dispatcher_factory_;
+  std::shared_ptr<fdf::Namespace> incoming_;
+
+  async::Loop loop_;
 
   ddk_fake::FakeMmioRegRegion vpu_mmio_ =
       ddk_fake::FakeMmioRegRegion(/*reg_size=*/4, /*reg_count=*/0x10000);

@@ -4,112 +4,73 @@
 
 """Rules related to assembly developer overrides."""
 
-load(":util.bzl", "extract_labels", "replace_labels_with_files")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(
     ":providers.bzl",
-    "FuchsiaAssembledPackageInfo",
     "FuchsiaAssemblyDeveloperOverridesInfo",
     "FuchsiaAssemblyDeveloperOverridesListInfo",
 )
 
-def _fuchsia_assembly_developer_overrides_impl(ctx):
-    overrides = json.decode(ctx.attr.raw_json)
-    overrides_file = ctx.actions.declare_file(ctx.label.name + "_developer_overrides.json")
+def _fuchsia_prebuilt_assembly_developer_overrides_impl(ctx):
+    manifest = None
+    for file in ctx.files.overrides_path:
+        if file.path.endswith("product_assembly_overrides.json"):
+            manifest = file
 
-    relative_base = None
-
-    replace_labels_with_files(overrides, ctx.attr.input_labels, relative = relative_base)
-
-    inputs = ctx.files.input_labels
-
-    for dep in ctx.attr.input_labels.keys():
-        if type(dep) == "Target":
-            # Extract extra inputs from packages.
-            if FuchsiaPackageInfo in dep:
-                inputs += dep[FuchsiaPackageInfo].files
-            elif FuchsiaAssembledPackageInfo in dep:
-                inputs += dep[FuchsiaAssembledPackageInfo].files
-
-    ctx.actions.write(overrides_file, json.encode(overrides, indent = "  "))
-    outputs = [overrides_file]
+    if not manifest:
+        fail("Unable to locate 'product_assembly_overrides.json' in Assembly Developer Overrides input.")
 
     return [
-        DefaultInfo(files = depset(direct = outputs + inputs)),
         FuchsiaAssemblyDeveloperOverridesInfo(
-            manifest = overrides_file,
-            inputs = inputs,
+            manifest = manifest,
+            inputs = ctx.files.overrides_path,
         ),
     ]
 
-_fuchsia_assembly_developer_overrides = rule(
-    doc = "Records information about a specific set of developer overrides",
-    implementation = _fuchsia_assembly_developer_overrides_impl,
+_fuchsia_prebuilt_assembly_developer_overrides = rule(
+    doc = "Records information about a set of prebuilt developer overrides",
+    implementation = _fuchsia_prebuilt_assembly_developer_overrides_impl,
     attrs = {
-        "raw_json": attr.string(
-            doc = "Raw json string for developer overrides.",
-            default = "{}",
-        ),
-        "input_labels": attr.label_keyed_string_dict(
-            doc = """Map of labels in the raw json input to LABEL(label) strings. Labels in the raw json config are replaced by file paths
-            identified by their corresponding values in this dict.""",
-            allow_files = True,
-            default = {},
+        "overrides_path": attr.label(
+            doc = "Path to the directory containing the prebuilt developer overrides",
+            mandatory = True,
         ),
     },
 )
 
-def fuchsia_assembly_developer_overrides(name, developer_overrides_json):
-    """Record information about a set of assembly developer overrides.
+def fuchsia_prebuilt_assembly_developer_overrides(name, overrides_path):
+    """Record information about a set of prebuilt (from GN?) assembly developer overrides.
 
     Args:
         name: target name.
-        developer_overrides_json: A developer overrides json config, as a starlark dictionary.
-            Format of this JSON can be found in this Rust definitions:
-                //src/lib/assembly/config_schema/src/developer_overrides.rs
-
-            Key values that take file paths or target labels should be
-            declared as a string with the label path wrapped via "LABEL("
-            prefix and ")" suffix.
+        overrides_path: A file glob to the folder that contains the manifest
+            and all resources that are referred to by the manifest.
     """
-    json_config = developer_overrides_json
-    if type(json_config) != "dict":
-        fail("expecting a dictionary")
-
-    inputs = extract_labels(json_config)
-
-    _fuchsia_assembly_developer_overrides(
-        raw_json = json.encode_indent(json_config, indent = "    "),
-        input_labels = extract_labels(json_config),
+    _fuchsia_prebuilt_assembly_developer_overrides(
+        name = name,
+        overrides_path = overrides_path,
     )
 
 def _fuchsia_assembly_developer_overrides_list_impl(ctx):
-    if len(ctx.attr.patterns) != len(ctx.attr.developer_overrides):
-        fail("Expecting two equal-sized lists: %s != %s" % (
-            len(ctx.attr.patterns),
-            len(ctx.attr.developer_overrides),
-        ))
-
-    overrides_info = [
-        dep[FuchsiaAssemblyDeveloperOverridesInfo]
-        for dep in ctx.attr.developer_overrides
-    ]
+    maps = {}
+    for (label, assembly_targets_json) in ctx.attr.developer_overrides.items():
+        assembly_targets = json.decode(assembly_targets_json)
+        for assembly in assembly_targets:
+            if assembly in maps:
+                fail("Found duplicate developer overrides for assembly: %s" % assembly)
+            maps[assembly] = label
 
     return FuchsiaAssemblyDeveloperOverridesListInfo(
-        maps = zip(ctx.attr.patterns, overrides_info),
+        maps = maps,
     )
 
 _fuchsia_assembly_developer_overrides_list = rule(
     doc = "Record information about a list of mappings for developer overrides. Uses two parallel lists of equal sizes.",
     implementation = _fuchsia_assembly_developer_overrides_list_impl,
     attrs = {
-        "patterns": attr.string_list(
-            doc = "List of fuchsia_product() label patterns.",
-            default = [],
-        ),
-        "developer_overrides": attr.label_list(
+        "developer_overrides": attr.label_keyed_string_dict(
             doc = "List of labels to fuchsia_assembly_developer_overrides() targets.",
-            default = [],
+            default = {},
             providers = [FuchsiaAssemblyDeveloperOverridesInfo],
         ),
     },
@@ -158,11 +119,18 @@ def fuchsia_assembly_developer_overrides_list(name, maps = []):
     if type(maps) != "list":
         fail("expecting a list")
 
-    patterns = [m["assembly"] for m in maps]
-    overrides = [m["overrides"] for m in maps]
+    developer_overrides = {}
+    for mapping in maps:
+        overrides = mapping["overrides"]
+        if overrides in developer_overrides:
+            assemblies = developer_overrides[overrides]
+        else:
+            assemblies = []
+        assemblies.append(mapping["assembly"])
+        developer_overrides[overrides] = assemblies
 
     _fuchsia_assembly_developer_overrides_list(
         name = name,
-        patterns = patterns,
-        developer_overrides = overrides,
+        # patterns = patterns,
+        developer_overrides = {label: json.encode(assemblies) for label, assemblies in developer_overrides.items()},
     )

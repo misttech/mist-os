@@ -17,7 +17,7 @@ use {
     fidl_fuchsia_session_power as fpower, fuchsia_zircon as zx,
 };
 
-/// Maximum number of concurrent connections to the protocols served by SessionManager.
+/// Maximum number of concurrent connections to the protocols served by `SessionManager`.
 const MAX_CONCURRENT_CONNECTIONS: usize = 10_000;
 
 /// The name for the inspect node that tracks session restart timestamps.
@@ -26,11 +26,11 @@ const DIANGNOSTICS_SESSION_STARTED_AT_NAME: &str = "session_started_at";
 /// The max size for the session restart timestamps list.
 const DIANGNOSTICS_SESSION_STARTED_AT_SIZE: usize = 100;
 
-/// The name of the property for each entry in the session_started_at list for
+/// The name of the property for each entry in the `session_started_at` list for
 /// the start timestamp.
 const DIAGNOSTICS_TIME_PROPERTY_NAME: &str = "@time";
 
-/// A request to connect to a protocol exposed by SessionManager.
+/// A request to connect to a protocol exposed by `SessionManager`.
 pub enum IncomingRequest {
     Launcher(fsession::LauncherRequestStream),
     Restarter(fsession::RestarterRequestStream),
@@ -61,7 +61,8 @@ struct PendingSession {
 
 impl PendingSession {
     fn new() -> (fio::DirectoryProxy, Self) {
-        let (exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (exposed_dir, exposed_dir_server_end) =
+            create_proxy::<fio::DirectoryMarker>().expect("creating proxy should not fail");
         (exposed_dir, Self { exposed_dir_server_end })
     }
 }
@@ -100,7 +101,7 @@ struct PowerState {
 
 impl PowerState {
     pub fn new(suspend_enabled: bool) -> Self {
-        Self { power_element: Default::default(), suspend_enabled }
+        Self { power_element: futures::lock::Mutex::default(), suspend_enabled }
     }
 
     /// Attempt to ensures that `session_manager` has a lease on the application activity element.
@@ -203,18 +204,18 @@ impl SessionManagerState {
             Session::Pending(pending) => pending,
             Session::Started(_) => {
                 let (proxy, pending) = PendingSession::new();
-                self.inner.lock().unwrap().exposed_dir = proxy;
+                self.inner.lock().expect("mutex should not be poisoned").exposed_dir = proxy;
                 pending
             }
         };
         if let Err(e) =
             startup::launch_session(&url, pending.exposed_dir_server_end, &self.realm).await
         {
-            self.inner.lock().unwrap().exposed_dir = proxy_on_failure;
+            self.inner.lock().expect("mutex should not be poisoned").exposed_dir = proxy_on_failure;
             return Err(e);
         }
         *session = Session::Started(StartedSession { url });
-        self.inner.lock().unwrap().diagnostics.record_session_start();
+        self.inner.lock().expect("mutex should not be poisoned").diagnostics.record_session_start();
         Ok(())
     }
 
@@ -225,7 +226,7 @@ impl SessionManagerState {
         if let Session::Started(_) = &*session {
             let (proxy, new_pending) = Session::new_pending();
             *session = new_pending;
-            self.inner.lock().unwrap().exposed_dir = proxy;
+            self.inner.lock().expect("mutex should not be poisoned").exposed_dir = proxy;
             startup::stop_session(&self.realm).await?;
         }
         Ok(())
@@ -239,7 +240,7 @@ impl SessionManagerState {
             return Err(startup::StartupError::NotRunning);
         };
         let url = url.clone();
-        self.start_impl(&mut *session, url).await?;
+        self.start_impl(&mut session, url).await?;
         Ok(())
     }
 
@@ -252,8 +253,9 @@ impl SessionManagerState {
 }
 
 impl vfs::remote::GetRemoteDir for SessionManagerState {
+    #[allow(clippy::unwrap_in_result)]
     fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, zx::Status> {
-        Ok(Clone::clone(&self.inner.lock().unwrap().exposed_dir))
+        Ok(Clone::clone(&self.inner.lock().expect("mutex should not be poisoned").exposed_dir))
     }
 }
 
@@ -264,7 +266,7 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
-    /// Constructs a new SessionManager.
+    /// Constructs a new `SessionManager`.
     ///
     /// # Parameters
     /// - `realm`: The realm in which session components will be created.
@@ -379,7 +381,7 @@ impl SessionManager {
     /// Serves a specified [`LauncherRequestStream`].
     ///
     /// # Parameters
-    /// - `request_stream`: the LauncherRequestStream.
+    /// - `request_stream`: the `LauncherRequestStream`.
     ///
     /// # Errors
     /// When an error is encountered reading from the request stream.
@@ -403,7 +405,7 @@ impl SessionManager {
     /// Serves a specified [`RestarterRequestStream`].
     ///
     /// # Parameters
-    /// - `request_stream`: the RestarterRequestStream.
+    /// - `request_stream`: the `RestarterRequestStream`.
     ///
     /// # Errors
     /// When an error is encountered reading from the request stream.
@@ -427,7 +429,7 @@ impl SessionManager {
     /// Serves a specified [`LifecycleRequestStream`].
     ///
     /// # Parameters
-    /// - `request_stream`: the LifecycleRequestStream.
+    /// - `request_stream`: the `LifecycleRequestStream`.
     ///
     /// # Errors
     /// When an error is encountered reading from the request stream.
@@ -479,7 +481,7 @@ impl SessionManager {
         Ok(())
     }
 
-    /// Handles calls to Launcher.Launch().
+    /// Handles calls to `Launcher.Launch()`.
     ///
     /// # Parameters
     /// - configuration: The launch configuration for the new session.
@@ -491,7 +493,7 @@ impl SessionManager {
         self.state.start(session_url).await.map_err(Into::into)
     }
 
-    /// Handles a Restarter.Restart() request.
+    /// Handles a `Restarter.Restart()` request.
     async fn handle_restart_request(&mut self) -> Result<(), fsession::RestartError> {
         self.state.restart().await.map_err(Into::into)
     }
@@ -499,7 +501,7 @@ impl SessionManager {
     /// Handles a `Lifecycle.Start()` request.
     ///
     /// # Parameters
-    /// - session_url: The component URL for the session to start.
+    /// - `session_url`: The component URL for the session to start.
     async fn handle_lifecycle_start_request(
         &mut self,
         session_url: Option<String>,
@@ -531,6 +533,7 @@ impl SessionManager {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::SessionManager;
     use anyhow::{anyhow, Error};

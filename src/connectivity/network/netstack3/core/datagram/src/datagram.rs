@@ -875,6 +875,7 @@ pub trait DualStackDatagramBoundStateContext<I: IpExt, BC, S: DatagramSocketSpec
         S::AddrSpec,
     >>::BoundSocketId;
 
+    /// Calls the provided callback with mutable access to both the
     /// demultiplexing maps.
     fn with_both_bound_sockets_mut<
         O,
@@ -2473,7 +2474,7 @@ fn listen_inner<
 #[derive(Error, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum ConnectError {
     /// An error was encountered creating an IP socket.
-    #[error("{}", _0)]
+    #[error(transparent)]
     Ip(#[from] IpSockCreationError),
     /// No local port was specified, and none could be automatically allocated.
     #[error("a local port could not be allocated")]
@@ -2483,7 +2484,7 @@ pub enum ConnectError {
     #[error("the socket's IP address and port conflict with an existing socket")]
     SockAddrConflict,
     /// There was a problem with the provided address relating to its zone.
-    #[error("{}", _0)]
+    #[error(transparent)]
     Zone(#[from] ZonedAddressError),
     /// The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
     /// socket is not dual-stack enabled.
@@ -4809,11 +4810,14 @@ where
         })
     }
 
-    /// Updates the socket's sharing state to `new_sharing`.
+    /// Updates the socket's sharing state to the result of `f`.
+    ///
+    /// `f` is given mutable access to the sharing state and is called under the
+    /// socket lock, allowing for atomic updates to the sharing state.
     pub fn update_sharing(
         &mut self,
         id: &DatagramApiSocketId<I, C, S>,
-        new_sharing: S::SharingState,
+        f: impl FnOnce(&mut S::SharingState),
     ) -> Result<(), ExpectedUnboundError> {
         self.core_ctx().with_socket_state_mut(id, |_core_ctx, state| {
             let state = match state {
@@ -4821,8 +4825,7 @@ where
                 SocketState::Unbound(state) => state,
             };
 
-            let UnboundSocketState { device: _, sharing, ip_options: _ } = state;
-            *sharing = new_sharing;
+            f(&mut state.sharing);
             Ok(())
         })
     }

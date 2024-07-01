@@ -20,11 +20,19 @@ void Allocation::Init(ktl::span<memalloc::Range> mem_ranges,
   static fbl::NoDestructor<memalloc::Pool> pool;
 
   ktl::array ranges{mem_ranges, special_ranges};
-  // kAllocationMinAddr is defined in arch-allocation.h.
-  auto init_result = kAllocationMinAddr  // ktl::nullopt if don't care.
-                         ? pool->Init(ranges, *kAllocationMinAddr)
-                         : pool->Init(ranges);
-  ZX_ASSERT(init_result.is_ok());
+  // kArchAllocationMinAddr is defined in arch-allocation.h.
+  if (kArchAllocationMinAddr) {
+    ZX_ASSERT(pool->Init(ranges, *kArchAllocationMinAddr).is_ok());
+
+    // While the pool will now prevent allocation in
+    // [0, *kArchAllocationMinAddr), it can be strictly enforced by allocating
+    // all such RAM now. Plus, it is convenient to distinguish this memory at
+    // hand-off time.
+    ZX_ASSERT(pool->UpdateFreeRamSubranges(memalloc::Type::kReservedLow, 0, *kArchAllocationMinAddr)
+                  .is_ok());
+  } else {
+    ZX_ASSERT(pool->Init(ranges).is_ok());
+  }
 
   // Install the pool for GetPool.
   InitWithPool(*pool);

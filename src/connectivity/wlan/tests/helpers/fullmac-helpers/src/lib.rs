@@ -53,8 +53,8 @@ pub async fn create_fullmac_driver(
     config: &config::FullmacDriverConfig,
 ) -> (
     fidl_testcontroller::FullmacId,
-    fidl_fullmac::WlanFullmacImplBridgeRequestStream,
-    fidl_fullmac::WlanFullmacImplIfcBridgeProxy,
+    fidl_fullmac::WlanFullmacImpl_RequestStream,
+    fidl_fullmac::WlanFullmacImplIfcProxy,
     fidl_sme::GenericSmeProxy,
 ) {
     let (fullmac_bridge_client, fullmac_bridge_server) = create_endpoints();
@@ -76,11 +76,11 @@ pub async fn create_fullmac_driver(
 }
 
 pub async fn handle_fullmac_startup(
-    fullmac_bridge_stream: &mut fidl_fullmac::WlanFullmacImplBridgeRequestStream,
+    fullmac_bridge_stream: &mut fidl_fullmac::WlanFullmacImpl_RequestStream,
     config: &config::FullmacDriverConfig,
-) -> (fidl_fullmac::WlanFullmacImplIfcBridgeProxy, fidl_sme::GenericSmeProxy) {
+) -> (fidl_fullmac::WlanFullmacImplIfcProxy, fidl_sme::GenericSmeProxy) {
     assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::QueryMacSublayerSupport { responder })) => {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QueryMacSublayerSupport { responder })) => {
             responder
                 .send(Ok(&config.mac_sublayer_support))
                 .expect("Failed to respond to QueryMacSublayerSupport");
@@ -92,7 +92,7 @@ pub async fn handle_fullmac_startup(
             .expect("Could not craete usme_bootstrap proxy");
 
     let fullmac_ifc_proxy = assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Start { ifc, responder })) => {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Start { ifc, responder })) => {
             responder
                 .send(Ok(usme_bootstrap_server.into_channel()))
                 .expect("Failed to respond to Start");
@@ -109,7 +109,7 @@ pub async fn handle_fullmac_startup(
         .expect("Failed to call usme_bootstrap.start");
 
     assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Query { responder })) => {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Query { responder })) => {
             responder
                 .send(Ok(&config.query_info))
                 .expect("Failed to respond to Query");
@@ -117,7 +117,7 @@ pub async fn handle_fullmac_startup(
     );
 
     assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::QueryMacSublayerSupport {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QueryMacSublayerSupport {
             responder,
         })) => {
             responder
@@ -127,7 +127,7 @@ pub async fn handle_fullmac_startup(
     );
 
     assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::QuerySecuritySupport {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QuerySecuritySupport {
             responder,
         })) => {
             responder
@@ -137,7 +137,7 @@ pub async fn handle_fullmac_startup(
     );
 
     assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::QuerySpectrumManagementSupport {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QuerySpectrumManagementSupport {
                 responder,
         })) => {
             responder
@@ -147,7 +147,7 @@ pub async fn handle_fullmac_startup(
     );
 
     assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImplBridgeRequest::Query { responder })) => {
+        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::Query { responder })) => {
             responder
                 .send(Ok(&config.query_info))
                 .expect("Failed to respond to Query");

@@ -10,6 +10,17 @@ use crate::header::{Header, HeaderIdentifier, HeaderSet, SingleResponseMode};
 use crate::operation::{OpCode, RequestPacket, ResponseCode};
 use crate::transport::ObexTransport;
 
+/// Represents the status of the PUT operation.
+#[derive(Debug)]
+enum Status {
+    /// First write call has not been completed yet.
+    /// Holds the initial headers that need to be included in the
+    /// first write call.
+    NotStarted(HeaderSet),
+    /// First write has been completed and the operation is ongoing.
+    Started,
+}
+
 /// Represents an in-progress PUT Operation.
 /// Defined in OBEX 1.5 Section 3.4.3.
 ///
@@ -28,14 +39,10 @@ use crate::transport::ObexTransport;
 #[must_use]
 #[derive(Debug)]
 pub struct PutOperation<'a> {
-    /// The initial set of headers used in the PUT operation. This is Some<T> when the operation is
-    /// first initialized, and None after the first `PutOperation::write` call. The operation is
-    /// considered "in progress" when this is None.
-    headers: Option<HeaderSet>,
     /// The L2CAP or RFCOMM connection to the remote peer.
     transport: ObexTransport<'a>,
-    /// Whether the operation is in-progress or not - one or more PUT requests have been made.
-    is_started: bool,
+    /// Status of the operation.
+    status: Status,
     /// The status of SRM for this operation. By default, SRM will be enabled if the transport
     /// supports it. However, it may be disabled if the peer requests to disable it.
     srm: SingleResponseMode,
@@ -44,17 +51,41 @@ pub struct PutOperation<'a> {
 impl<'a> PutOperation<'a> {
     pub fn new(headers: HeaderSet, transport: ObexTransport<'a>) -> Self {
         let srm = transport.srm_supported().into();
-        Self { headers: Some(headers), transport, is_started: false, srm }
+        Self { transport, status: Status::NotStarted(headers), srm }
     }
 
-    #[cfg(test)]
-    fn set_headers(&mut self, headers: HeaderSet) {
-        self.headers = Some(headers);
+    /// Returns true by checking whether the initial headers were taken
+    /// out for the first put operation.
+    fn is_started(&self) -> bool {
+        match self.status {
+            Status::NotStarted(_) => false,
+            Status::Started => true,
+        }
     }
 
-    fn set_started(&mut self) {
-        let _ = self.headers.take().unwrap();
-        self.is_started = true;
+    /// Sets the operation as started.
+    fn set_started(&mut self) -> Result<(), Error> {
+        match std::mem::replace(&mut self.status, Status::Started) {
+            Status::NotStarted(_) => Ok(()),
+            Status::Started => {
+                Err(Error::other("Attempted to start a PUT operation that was already started"))
+            }
+        }
+    }
+
+    /// Returns the HeaderSet that takes the initial headers and
+    /// combines them with the input headers.
+    fn combine_with_initial_headers(&mut self, headers: HeaderSet) -> Result<HeaderSet, Error> {
+        let mut initial_headers = match &mut self.status {
+            Status::NotStarted(ref mut initial_headers) => std::mem::take(initial_headers),
+            Status::Started => {
+                return Err(Error::other(
+                    "Cannot add initial headers when PUT operation already started",
+                ))
+            }
+        };
+        let _ = initial_headers.try_append(headers)?;
+        Ok(initial_headers)
     }
 
     /// Returns Error if the `headers` contain non-informational OBEX Headers.
@@ -70,9 +101,14 @@ impl<'a> PutOperation<'a> {
 
     /// Attempts to initiate a PUT operation with the `final_` bit set.
     /// Returns the peer response headers on success, Error otherwise.
-    async fn do_put(&mut self, final_: bool, headers: HeaderSet) -> Result<HeaderSet, Error> {
+    async fn do_put(&mut self, final_: bool, mut headers: HeaderSet) -> Result<HeaderSet, Error> {
+        let is_started = self.is_started();
+        if !is_started {
+            headers = self.combine_with_initial_headers(headers)?;
+        }
+
         // SRM is considered active if this is a subsequent PUT request & the transport supports it.
-        let srm_active = self.is_started && self.get_srm() == SingleResponseMode::Enable;
+        let srm_active = is_started && self.get_srm() == SingleResponseMode::Enable;
         let (opcode, request, expected_response_code) = if final_ {
             (OpCode::PutFinal, RequestPacket::new_put_final(headers), ResponseCode::Ok)
         } else {
@@ -81,6 +117,9 @@ impl<'a> PutOperation<'a> {
         trace!("Making outgoing PUT request: {request:?}");
         self.transport.send(request)?;
         trace!("Successfully made PUT request");
+        if !is_started {
+            self.set_started()?;
+        }
         // Expect a response if this is the final PUT request or if SRM is inactive, in which case
         // every request must be responded to.
         if final_ || !srm_active {
@@ -108,19 +147,15 @@ impl<'a> PutOperation<'a> {
     /// non-empty set of headers.
     pub async fn write(&mut self, data: &[u8], mut headers: HeaderSet) -> Result<HeaderSet, Error> {
         Self::validate_headers(&headers)?;
-        if !self.is_started {
-            // Grab the initial set of headers to be sent to the peer and combine with any
-            // additional application-specified headers.
-            let initial = self.headers.replace(HeaderSet::new()).unwrap();
-            headers.try_append(initial)?;
+        let is_first_write = !self.is_started();
+        if is_first_write {
             // Try to enable SRM if this is the first packet of the operation.
             self.try_enable_srm(&mut headers)?;
         }
         headers.add(Header::Body(data.to_vec()))?;
         let response_headers = self.do_put(false, headers).await?;
-        if !self.is_started {
+        if is_first_write {
             self.check_response_for_srm(&response_headers);
-            self.set_started();
         }
         Ok(response_headers)
     }
@@ -146,7 +181,7 @@ impl<'a> PutOperation<'a> {
     /// OBEX client and remote OBEX server.
     pub async fn terminate(mut self, headers: HeaderSet) -> Result<HeaderSet, Error> {
         let opcode = OpCode::Abort;
-        if !self.is_started {
+        if !self.is_started() {
             return Err(Error::operation(opcode, "can't abort PUT that hasn't started"));
         }
         let request = RequestPacket::new_abort(headers);
@@ -186,16 +221,20 @@ mod tests {
     };
     use crate::transport::ObexTransportManager;
 
-    fn setup_put_operation(mgr: &ObexTransportManager) -> PutOperation<'_> {
+    fn setup_put_operation(
+        mgr: &ObexTransportManager,
+        initial_headers: Vec<Header>,
+    ) -> PutOperation<'_> {
         let transport = mgr.try_new_operation().expect("can start operation");
-        PutOperation::new(HeaderSet::new(), transport)
+        PutOperation::new(HeaderSet::from_headers(initial_headers).unwrap(), transport)
     }
 
     #[fuchsia::test]
     fn put_operation_single_chunk_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let operation = setup_put_operation(&manager);
+        let operation =
+            setup_put_operation(&manager, vec![Header::ConnectionId(0x1u32.try_into().unwrap())]);
 
         let payload = vec![5, 6, 7, 8, 9];
         let headers =
@@ -208,6 +247,7 @@ mod tests {
         let expectation = |request: RequestPacket| {
             assert_eq!(*request.code(), OpCode::PutFinal);
             let headers = HeaderSet::from(request);
+            assert!(headers.contains_header(&HeaderIdentifier::ConnectionId));
             assert!(!headers.contains_header(&HeaderIdentifier::Body));
             assert!(headers.contains_headers(&vec![
                 HeaderIdentifier::EndOfBody,
@@ -226,7 +266,7 @@ mod tests {
     fn put_operation_multiple_chunks_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
 
         let payload: Vec<u8> = (1..100).collect();
         for chunk in payload.chunks(20) {
@@ -267,7 +307,7 @@ mod tests {
     fn put_operation_delete_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let operation = setup_put_operation(&manager);
+        let operation = setup_put_operation(&manager, vec![]);
 
         let headers = HeaderSet::from_headers(vec![
             Header::Description("deleting file".into()),
@@ -295,7 +335,7 @@ mod tests {
     fn put_operation_terminate_success() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
 
         // Write the first chunk of data to "start" the operation.
         {
@@ -325,7 +365,7 @@ mod tests {
     #[fuchsia::test]
     async fn put_with_body_header_is_error() {
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
 
         let payload = vec![1, 2, 3];
         // The payload should only be included as an argument. All other headers must be
@@ -354,7 +394,7 @@ mod tests {
 
         let payload = vec![1, 2, 3];
         // Body shouldn't be included in delete.
-        let operation = setup_put_operation(&manager);
+        let operation = setup_put_operation(&manager, vec![]);
         let body_headers = HeaderSet::from_headers(vec![
             Header::Body(payload.clone()),
             Header::name("foobar.txt"),
@@ -364,7 +404,7 @@ mod tests {
         assert_matches!(result, Err(Error::OperationError { .. }));
 
         // EndOfBody shouldn't be included in delete.
-        let operation = setup_put_operation(&manager);
+        let operation = setup_put_operation(&manager, vec![]);
         let eob_headers = HeaderSet::from_headers(vec![
             Header::EndOfBody(payload.clone()),
             Header::name("foobar1.txt"),
@@ -377,7 +417,7 @@ mod tests {
     #[fuchsia::test]
     async fn put_operation_terminate_before_start_error() {
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let operation = setup_put_operation(&manager);
+        let operation = setup_put_operation(&manager, vec![]);
 
         // Trying to terminate early doesn't work as the operation has not started.
         let headers = HeaderSet::from_header(Header::Description("terminating test".into()));
@@ -389,7 +429,7 @@ mod tests {
     fn put_operation_srm_enabled_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ true);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
 
         {
             let first_buf = [1, 2, 3];
@@ -455,8 +495,13 @@ mod tests {
     fn client_disable_srm_mid_operation_is_ignored() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ true);
-        let mut operation = setup_put_operation(&manager);
-        operation.set_started();
+        let mut operation = setup_put_operation(&manager, vec![]);
+        // Pretend first write happened already by manually setting the operation as started.
+        if let Status::NotStarted(_) = &mut operation.status {
+            let _ = operation.set_started().unwrap();
+        } else {
+            panic!("At this point operation not started");
+        };
         // SRM is enabled for the duration of the operation.
         assert_eq!(operation.srm, SingleResponseMode::Enable);
 
@@ -482,7 +527,7 @@ mod tests {
     fn application_select_srm_success() {
         let _exec = fasync::TestExecutor::new();
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
         // The application requesting to disable SRM when it isn't supported is OK.
         let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
@@ -491,7 +536,7 @@ mod tests {
 
         // The application requesting to disable SRM when it is supported is OK.
         let (manager, _remote) = new_manager(/* srm_supported */ true);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
         assert_eq!(operation.srm, SingleResponseMode::Enable);
         let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
         assert_matches!(operation.try_enable_srm(&mut headers), Ok(()));
@@ -499,7 +544,7 @@ mod tests {
 
         // The application requesting to enable SRM when it is supported is OK.
         let (manager, _remote) = new_manager(/* srm_supported */ true);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
         assert_eq!(operation.srm, SingleResponseMode::Enable);
         let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         assert_matches!(operation.try_enable_srm(&mut headers), Ok(()));
@@ -510,7 +555,7 @@ mod tests {
     fn application_enable_srm_when_not_supported_is_error() {
         let _exec = fasync::TestExecutor::new();
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
         let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         assert_matches!(operation.try_enable_srm(&mut headers), Err(Error::SrmNotSupported));
@@ -521,7 +566,7 @@ mod tests {
     fn peer_srm_response() {
         let _exec = fasync::TestExecutor::new();
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
         // An enable response from the peer when SRM is disabled locally should not enable SRM.
         let headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         operation.check_response_for_srm(&headers);
@@ -532,7 +577,7 @@ mod tests {
         assert_eq!(operation.srm, SingleResponseMode::Disable);
 
         let (manager, _remote) = new_manager(/* srm_supported */ true);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
         // An enable response from the peer when SRM is enable is a no-op.
         let headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         operation.check_response_for_srm(&headers);
@@ -543,7 +588,7 @@ mod tests {
         assert_eq!(operation.srm, SingleResponseMode::Disable);
 
         let (manager, _remote) = new_manager(/* srm_supported */ true);
-        let mut operation = setup_put_operation(&manager);
+        let mut operation = setup_put_operation(&manager, vec![]);
         // A response with no SRM header should be treated like a disable request.
         operation.check_response_for_srm(&HeaderSet::new());
         assert_eq!(operation.srm, SingleResponseMode::Disable);
@@ -554,9 +599,8 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (manager, _remote) = new_manager(/* srm_supported */ false);
         // The initial operation contains a ConnectionId header which was negotiated during CONNECT.
-        let mut operation = setup_put_operation(&manager);
-        operation
-            .set_headers(HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(5))));
+        let mut operation =
+            setup_put_operation(&manager, vec![Header::ConnectionId(ConnectionIdentifier(5))]);
 
         let write_headers = HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10)));
         let write_fut = operation.write(&[1, 2, 3], write_headers);

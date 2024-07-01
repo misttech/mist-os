@@ -74,7 +74,9 @@ func execute(ctx context.Context, serialLogPath string, stdout io.Writer) error 
 	for {
 		if match, err := iomisc.ReadUntilMatchString(ctx, serialTee, successString); err != nil {
 			if ctx.Err() != nil {
+				// LINT.IfChange(timed_out)
 				return fmt.Errorf("timed out before success string %q was read from serial", successString)
+				// LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:seriallistener_timed_out)
 			}
 			if !errors.Is(err, io.EOF) {
 				return fmt.Errorf("error trying to read from serial log: %w", err)

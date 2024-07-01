@@ -12,7 +12,9 @@ driver_bind_rules("dwc3_bind") {
   bind_output = "dwc3.bindbc"
   tests = "tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
     "//src/devices/bind/fuchsia.designware.platform",
+    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
@@ -51,6 +53,11 @@ fuchsia_driver_component("dwc3") {
   component_name = "dwc3"
   deps = [ ":dwc3-driver" ]
   manifest = "meta/dwc3.cml"
+}
+
+fuchsia_driver_package("package") {
+  package_name = "dwc3"
+  driver_components = [ ":dwc3" ]
 }
 
 test("dwc3-test-bin") {

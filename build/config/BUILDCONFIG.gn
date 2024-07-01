@@ -1763,11 +1763,14 @@ declare_args() {
       configs = [ "//build/config/sanitizers:ubsan" ]
       remove_common_configs = _ubsan_remove_common_configs
       tags = [
-        # This doesn't have "instrumentation-runtime" et al because while it
-        # requires some kind of runtime, every special environment that avoids
-        # the toolchain prebuilt libraries can use a custom runtime of its own.
         "instrumented",
         "ubsan",
+
+        # This has "custom-runtime" instead of "instrumentation-runtime" et al
+        # because while it requires some kind of runtime, every special
+        # environment that avoids the toolchain prebuilt libraries can use a
+        # custom runtime of its own via //src/lib/ubsan-custom.
+        "custom-runtime",
       ]
     },
     {
@@ -3380,7 +3383,8 @@ template("basic_executable") {
 #   build API file.
 #
 # - For executable instances built with host toolchains, metadata is used to add an
-#   entry to the `tool_paths.json` build API file.
+#   entry to the `tool_paths.json` build API file unless `emit_tool_path`
+#   is set to `false`.
 #
 # - Metadata is used to add an distribution manifest entry describing how to
 #   copy the stripped executable binary to 'bin/$output_name'. NOTE: This
@@ -3446,6 +3450,9 @@ template("executable") {
       } else {
         output_extension = ""
       }
+    }
+    if (!defined(emit_tool_path)) {
+      emit_tool_path = true
     }
 
     output_file = "$output_dir/$output_name"
@@ -3558,7 +3565,9 @@ template("executable") {
             test_component_manifest_program_barrier = []
           }
         }
-      } else {
+
+        not_needed([ "emit_tool_path" ])
+      } else if (emit_tool_path) {
         tool_paths = [
           {
             cpu = current_cpu

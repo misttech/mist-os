@@ -7,21 +7,21 @@
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
-    "FuchsiaAssemblyConfigInfo",
+    "FuchsiaPartitionsConfigInfo",
     "FuchsiaProductImageInfo",
     "FuchsiaUpdatePackageInfo",
 )
-load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_update_package_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    partitions_configuration = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
+    partitions_configuration = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
     system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
 
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
 
-    inputs = get_ffx_assembly_inputs(fuchsia_toolchain) + [partitions_configuration, ctx.file.update_version_file] + ctx.files.main + ctx.files.partitions_config
+    inputs = get_ffx_assembly_inputs(fuchsia_toolchain) + [partitions_configuration.files, ctx.file.update_version_file] + ctx.files.main
     outputs = [out_dir, ffx_isolate_dir]
 
     # Gather all the arguments to pass to ffx.
@@ -33,7 +33,7 @@ def _fuchsia_update_package_impl(ctx):
         "assembly",
         "create-update",
         "--partitions",
-        partitions_configuration.path,
+        partitions_configuration.config.path,
         "--board-name",
         ctx.attr.board_name,
         "--version-file",

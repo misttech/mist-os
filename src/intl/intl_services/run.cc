@@ -37,8 +37,8 @@ void init(int argc, const char** argv) {
 }  // namespace
 
 zx_status_t serve_intl_profile_provider(int argc, const char** argv) {
-  init(argc, argv);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  init(argc, argv);
   std::unique_ptr<sys::ComponentContext> context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 

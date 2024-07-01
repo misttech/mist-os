@@ -16,7 +16,8 @@ struct CurrentChannelToAnnotations {
   Annotations operator()(const std::string& current_channel);
 };
 
-// Responsible for collecting annotations for fuchsia.hwinfo/Board.
+// Responsible for collecting annotations for
+// fuchsia.update.channelcontrol/ChannelControl::GetCurrent.
 class CurrentChannelProvider : public StaticSingleFidlMethodAnnotationProvider<
                                    fuchsia::update::channelcontrol::ChannelControl,
                                    &fuchsia::update::channelcontrol::ChannelControl::GetCurrent,

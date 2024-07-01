@@ -222,8 +222,9 @@ zx_status_t PlatformDevice::PDevGetInterrupt(uint32_t index, uint32_t flags,
   if (flags == 0) {
     flags = irq.mode().value();
   }
-  zx_status_t status =
-      zx::interrupt::create(*bus_->GetIrqResource(), irq.irq().value(), flags, out_irq);
+  auto vector = irq.irq().value();
+  zxlogf(INFO, "Creating interrupt with vector %u for platform device \"%s\"", vector, name_);
+  zx_status_t status = zx::interrupt::create(*bus_->GetIrqResource(), vector, flags, out_irq);
   if (status != ZX_OK) {
     zxlogf(ERROR, "platform_dev_map_interrupt: zx_interrupt_create failed %d", status);
     return status;

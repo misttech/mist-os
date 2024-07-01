@@ -7,15 +7,16 @@
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
+    "FuchsiaAssemblyDeveloperOverridesInfo",
     "FuchsiaAssemblyDeveloperOverridesListInfo",
-    "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
-    "FuchsiaProductAssemblyBundleInfo",
+    "FuchsiaLegacyBundleInfo",
+    "FuchsiaPlatformArtifactsInfo",
     "FuchsiaProductAssemblyInfo",
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
 )
-load(":util.bzl", "LOCAL_ONLY_ACTION_KWARGS")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 PACKAGE_MODE = struct(
     DISK = "disk",
@@ -53,7 +54,7 @@ def _match_assembly_pattern_string(label, pattern):
 def _fuchsia_product_assembly_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     ffx_tool = fuchsia_toolchain.ffx_assembly
-    platform_artifacts = ctx.attr.platform_artifacts[FuchsiaProductAssemblyBundleInfo]
+    platform_artifacts = ctx.attr.platform_artifacts[FuchsiaPlatformArtifactsInfo]
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     platform_aibs_file = ctx.actions.declare_file(ctx.label.name + "_platform_assembly_input_bundles.json")
 
@@ -68,38 +69,19 @@ def _fuchsia_product_assembly_impl(ctx):
             "--output",
             platform_aibs_file.path,
         ],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     # Calculate the path to the board configuration file, if it's not directly
     # provided.
-    board_config_file_path = None
-    board_config_input = None
+    board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
 
-    if FuchsiaBoardConfigInfo in ctx.attr.board_config:
-        board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
+    # Add all files from the `board_config` attribute as inputs
+    board_config_input = board_config.files
 
-        # Add all files from the `board_config` attribute as inputs
-        board_config_input = ctx.files.board_config
-
-        # The path to the json file itself will be in the provider's board_config
-        # field, this needs to be in the arguments to assembly.
-        board_config_file_path = board_config.board_config.path
-
-    elif FuchsiaBoardConfigDirectoryInfo in ctx.attr.board_config:
-        board_config = ctx.attr.board_config[FuchsiaBoardConfigDirectoryInfo]
-
-        # Add all files from the directory specified in the provider as inputs
-        board_config_input = board_config.config_directory
-
-        # Locate the file that is the board_configuration.json, and pass the
-        # path to that file as an argument to assembly.
-        for file in board_config.config_directory:
-            if file.path.endswith("board_configuration.json") or file.path.endswith("board_config.json"):
-                board_config_file_path = file.path
-                break
-
-        if not board_config_file_path:
-            fail("Unable to locate 'board_configuration.json' in BoardConfigDirectoryInfo")
+    # The path to the json file itself will be in the provider's board_config
+    # field, this needs to be in the arguments to assembly.
+    board_config_file_path = board_config.config.path
 
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
@@ -110,8 +92,6 @@ def _fuchsia_product_assembly_impl(ctx):
     ffx_inputs += board_config_input
     ffx_inputs += platform_artifacts.files
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
-
-    mode_arg = "--mode " + ctx.attr.package_mode if ctx.attr.package_mode else ""
 
     ffx_invocation = [
         ffx_tool.path,
@@ -135,15 +115,15 @@ def _fuchsia_product_assembly_impl(ctx):
         ffx_invocation.extend(["--mode", ctx.attr.package_mode])
 
     if ctx.attr.legacy_bundle:
-        legacy_bundle = ctx.attr.legacy_bundle[FuchsiaProductAssemblyBundleInfo]
+        legacy_bundle = ctx.attr.legacy_bundle[FuchsiaLegacyBundleInfo]
         ffx_invocation.extend(["--legacy-bundle", legacy_bundle.root])
         ffx_inputs += legacy_bundle.files
 
     # Add developer overrides manifest and inputs if necessary.
     overrides_maps = ctx.attr._developer_overrides_list[FuchsiaAssemblyDeveloperOverridesListInfo].maps
-    for pattern_string, overrides_info in overrides_maps:
+    for (pattern_string, overrides_label) in overrides_maps.items():
         if _match_assembly_pattern_string(ctx.label, pattern_string):
-            print("Found assembly developer overrides: %s" % overrides_info)
+            overrides_info = overrides_label[FuchsiaAssemblyDeveloperOverridesInfo]
             ffx_inputs += overrides_info.inputs
             ffx_invocation.extend([
                 "--developer-overrides",
@@ -168,6 +148,7 @@ def _fuchsia_product_assembly_impl(ctx):
         ],
         command = "\n".join(shell_src),
         progress_message = "Product Assembly for %s" % ctx.label.name,
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     cache_package_list = ctx.actions.declare_file(ctx.label.name + "/bazel_cache_package_manifests.list")
@@ -190,7 +171,7 @@ def _fuchsia_product_assembly_impl(ctx):
     deps = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list, platform_aibs_file] + ffx_inputs
 
     return [
-        DefaultInfo(files = depset(direct = deps)),
+        DefaultInfo(files = depset(deps)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
             all_files = depset(deps),
@@ -202,8 +183,7 @@ def _fuchsia_product_assembly_impl(ctx):
         ),
     ]
 
-fuchsia_product_assembly = rule(
-    # TODO(http://b/326152150): Make this rule private.
+_fuchsia_product_assembly = rule(
     doc = """Declares a target to product a fully-configured list of artifacts that make up a product.""",
     implementation = _fuchsia_product_assembly_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
@@ -216,7 +196,7 @@ fuchsia_product_assembly = rule(
         ),
         "board_config": attr.label(
             doc = "Board configuration used to assemble this product.",
-            providers = [[FuchsiaBoardConfigInfo], [FuchsiaBoardConfigDirectoryInfo]],
+            providers = [FuchsiaBoardConfigInfo],
             mandatory = True,
         ),
         "package_mode": attr.string(
@@ -225,11 +205,11 @@ fuchsia_product_assembly = rule(
         ),
         "legacy_bundle": attr.label(
             doc = "Legacy AIB for this product.",
-            providers = [FuchsiaProductAssemblyBundleInfo],
+            providers = [FuchsiaLegacyBundleInfo],
         ),
         "platform_artifacts": attr.label(
             doc = "Platform artifacts to use for this product.",
-            providers = [FuchsiaProductAssemblyBundleInfo],
+            providers = [FuchsiaPlatformArtifactsInfo],
             mandatory = True,
         ),
         "package_validation": attr.string(
@@ -298,7 +278,7 @@ def _fuchsia_product_create_system_impl(ctx):
         **LOCAL_ONLY_ACTION_KWARGS
     )
     return [
-        DefaultInfo(files = depset(direct = [out_dir, ffx_isolate_dir] + ffx_inputs)),
+        DefaultInfo(files = depset([out_dir, ffx_isolate_dir] + ffx_inputs)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
             all_files = depset([out_dir, ffx_isolate_dir] + ffx_inputs),
@@ -341,7 +321,7 @@ def fuchsia_product(
         legacy_bundle = None,
         package_validation = None,
         **kwargs):
-    fuchsia_product_assembly(
+    _fuchsia_product_assembly(
         name = name + "_product_assembly",
         board_config = board_config,
         product_config = product_config,

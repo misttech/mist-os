@@ -51,7 +51,7 @@ class PassiveScanTestInterface : public SimInterface {
   // Run the verifier method (if one was added) on the given scan result.
   void VerifyScanResult(wlan_fullmac_wire::WlanFullmacScanResult result);
 
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override;
 
   PassiveScanTest* test_ = nullptr;
@@ -129,9 +129,9 @@ void PassiveScanTestInterface::VerifyScanResult(wlan_fullmac_wire::WlanFullmacSc
 }
 
 // Verify that each incoming scan result is as expected, using VerifyScanResult.
-void PassiveScanTestInterface::OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+void PassiveScanTestInterface::OnScanResult(OnScanResultRequestView request,
                                             OnScanResultCompleter::Sync& completer) {
-  SimInterface::OnScanResult(request, arena, completer);
+  SimInterface::OnScanResult(request, completer);
   VerifyScanResult(request->result);
 }
 

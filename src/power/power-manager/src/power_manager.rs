@@ -87,7 +87,11 @@ impl PowerManager {
         node_futures: &FuturesUnordered<LocalBoxFuture<'c, ()>>,
     ) -> Result<(), Error> {
         let node_config_path = &structured_config.node_config_path;
-        let contents = std::fs::read_to_string(node_config_path)?;
+        if !std::path::Path::new(node_config_path).exists() {
+            return Err(format_err!("Config file not found at path {}", node_config_path));
+        }
+        let contents = std::fs::read_to_string(node_config_path)
+            .context(format!("Failed to read file {}", node_config_path))?;
         let json_data: json::Value = serde_json5::from_str(&contents)
             .context(format!("Failed to parse file {}", node_config_path))?;
 

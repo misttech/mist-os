@@ -48,6 +48,8 @@ enum RouteSet {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(true, METRIC_TRACKS_INTERFACE, RouteSet::User; "explicitly removing the route")]
 #[test_case(
     true,
@@ -80,10 +82,7 @@ enum RouteSet {
     RouteSet::Global;
     "explicit non-zero metric, global"
 )]
-async fn add_remove_route<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
-    N: Netstack,
->(
+async fn add_remove_route<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>(
     name: &str,
     explicit_remove: bool,
     metric: fnet_routes::SpecifiedMetric,
@@ -198,6 +197,7 @@ fn specified_properties(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     fidl_ip_v4_with_prefix!("192.0.2.0/24"),
     None,
@@ -309,6 +309,7 @@ async fn validates_route_v4<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     fidl_ip_v6_with_prefix!("2001:DB8::/64"), None,
     specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
@@ -414,12 +415,11 @@ async fn validates_route_v6<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
 #[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
-async fn add_route_twice_with_same_set<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
-    N: Netstack,
->(
+async fn add_route_twice_with_same_set<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>(
     name: &str,
     system_route_protocol: SystemRouteProtocol,
 ) {
@@ -506,8 +506,10 @@ async fn add_route_twice_with_same_set<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 async fn add_route_with_multiple_route_sets<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -536,7 +538,7 @@ async fn add_route_with_multiple_route_sets<
     let proxy_a = get_route_set();
     let proxy_b = get_route_set();
 
-    async fn authenticate<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
+    async fn authenticate<I: FidlRouteAdminIpExt + FidlRouteIpExt>(
         proxy: &<I::RouteSetMarker as ProtocolMarker>::Proxy,
         grant: &fidl_fuchsia_net_interfaces_admin::GrantForInterfaceAuthorization,
     ) {
@@ -606,12 +608,11 @@ async fn add_route_with_multiple_route_sets<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
 #[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
-async fn add_remove_system_route<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
-    N: Netstack,
->(
+async fn add_remove_system_route<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>(
     name: &str,
     system_route_protocol: SystemRouteProtocol,
 ) {
@@ -716,10 +717,12 @@ async fn add_remove_system_route<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
 #[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
 async fn system_removes_route_from_route_set<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -819,10 +822,12 @@ async fn system_removes_route_from_route_set<
 // TODO(https://fxbug.dev/42081105): Remove all uses of {Add,Del}ForwardingEntry
 // from this file.
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]
 #[test_case(SystemRouteProtocol::NetStack; "fuchsia.net.stack/Stack")]
 async fn root_route_apis_can_remove_loopback_route<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -938,10 +943,12 @@ enum DefaultRouteRemovalCase {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(DefaultRouteRemovalCase::DropRouteSet; "drop route set")]
 #[test_case(DefaultRouteRemovalCase::ExplicitRemove; "explicit remove")]
 async fn removing_one_default_route_does_not_flip_presence<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -1102,8 +1109,10 @@ async fn removing_one_default_route_does_not_flip_presence<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 async fn dropping_global_route_set_does_not_remove_routes<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -1180,6 +1189,8 @@ enum InvalidProofKind {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(
     InvalidProofKind::ClientGenerated,
     RouteSet::Global;
@@ -1211,7 +1222,7 @@ enum InvalidProofKind {
     "bad interface token user routeset"
 )]
 async fn interface_authorization_fails_with_invalid_token<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -1292,10 +1303,12 @@ async fn interface_authorization_fails_with_invalid_token<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(RouteSet::User; "user routeset")]
 #[test_case(RouteSet::Global; "global routeset")]
 async fn authorizing_for_one_interface_out_of_two<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -1343,10 +1356,12 @@ async fn authorizing_for_one_interface_out_of_two<
 // interface_authorization_fails_with_invalid_token ensures that unauthenticated
 // connections can't add routes.
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 #[test_case(RouteSet::User)]
 #[test_case(RouteSet::Global)]
 async fn unauthenticated_connections_cannot_remove_routes<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
+    I: FidlRouteAdminIpExt + FidlRouteIpExt,
     N: Netstack,
 >(
     name: &str,
@@ -1428,12 +1443,9 @@ async fn unauthenticated_connections_cannot_remove_routes<
 }
 
 #[netstack_test]
-async fn main_table_remove<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
-    N: Netstack,
->(
-    name: &str,
-) {
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn main_table_remove<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm::<N, _>(format!("routes-admin-{name}"))
@@ -1450,6 +1462,7 @@ async fn main_table_remove<
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn unique_main_table_id<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -1471,10 +1484,9 @@ async fn unique_main_table_id<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-async fn main_table_authorization<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
-    N: Netstack,
->(
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn main_table_authorization<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Netstack>(
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -1496,7 +1508,8 @@ async fn main_table_authorization<
 }
 
 #[netstack_test]
-async fn add_route_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(name: &str) {
+#[variant(I, Ip)]
+async fn add_route_table<I: FidlRouteAdminIpExt + FidlRouteIpExt>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // We don't support multiple route tables in netstack2.
     let realm = sandbox
@@ -1539,13 +1552,12 @@ fn route_set_err_stream<I: FidlRouteAdminIpExt>(
 }
 
 #[netstack_test]
+#[variant(I, Ip)]
 #[test_matrix(
     [true, false],
     [true, false]
 )]
-async fn route_set_closed_when_table_removed<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
->(
+async fn route_set_closed_when_table_removed<I: FidlRouteAdminIpExt + FidlRouteIpExt>(
     name: &str,
     explicit_remove: bool,
     detach: bool,
@@ -1655,9 +1667,8 @@ async fn route_set_closed_when_table_removed<
 }
 
 #[netstack_test]
-async fn add_route_in_user_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
-    name: &str,
-) {
+#[variant(I, Ip)]
+async fn add_route_in_user_table<I: FidlRouteAdminIpExt + FidlRouteIpExt>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // We don't support multiple route tables in netstack2.
     let TestSetup {
@@ -1718,9 +1729,8 @@ async fn add_route_in_user_table<I: net_types::ip::Ip + FidlRouteAdminIpExt + Fi
 }
 
 #[netstack_test]
-async fn interface_removal_remove_routes_in_all_tables<
-    I: net_types::ip::Ip + FidlRouteAdminIpExt + FidlRouteIpExt,
->(
+#[variant(I, Ip)]
+async fn interface_removal_remove_routes_in_all_tables<I: FidlRouteAdminIpExt + FidlRouteIpExt>(
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");

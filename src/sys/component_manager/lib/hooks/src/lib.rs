@@ -10,7 +10,7 @@ use errors::ModelError;
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use moniker::{ExtendedMoniker, Moniker};
-use sandbox::{Connector, Receiver, WeakComponentToken};
+use sandbox::{Connector, Receiver, WeakInstanceToken};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex as StdMutex, Weak};
@@ -235,7 +235,7 @@ pub enum EventPayload {
     Discovered,
     Destroyed,
     Resolved {
-        component: WeakComponentToken,
+        component: WeakInstanceToken,
         decl: ComponentDecl,
     },
     Unresolved,

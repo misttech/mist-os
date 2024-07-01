@@ -6,7 +6,7 @@
 //! manner (Trigger-c), and one from a dynamic dictionary that is exposed using the Router
 //! protocol. This lets us test a dictionary that is a composite of dynamic and static routes.
 
-use fidl::endpoints;
+use fidl::{endpoints, HandleBased, Rights};
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
@@ -25,8 +25,10 @@ enum IncomingRequest {
 async fn main() {
     info!("trigger.cm started");
     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
-    let dict = factory.create_dictionary().await.unwrap();
-    let dict = dict.into_proxy().unwrap();
+    let dict_ref = factory.create_dictionary().await.unwrap();
+    let (dict, server) = endpoints::create_proxy().unwrap();
+    let dict_token = dict_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+    factory.open_dictionary(dict_ref, server).unwrap();
 
     // Dynamically add trigger-d to the dictionary
     let (trigger_receiver_client, trigger_receiver_stream) =
@@ -49,7 +51,7 @@ async fn main() {
     fs.dir("svc").add_fidl_service(IncomingRequest::Router);
     fs.take_and_serve_directory_handle().expect("failed to serve outgoing directory");
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
-        let dict = Clone::clone(&dict);
+        let dict_token = dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
         async move {
             match request {
                 IncomingRequest::Trigger(stream) => {
@@ -59,8 +61,12 @@ async fn main() {
                     while let Ok(Some(request)) = stream.try_next().await {
                         match request {
                             fsandbox::RouterRequest::Route { payload: _, responder } => {
-                                let client_end = dict.clone().await.unwrap();
-                                let capability = fsandbox::Capability::Dictionary(client_end);
+                                let dict_ref = fsandbox::DictionaryRef {
+                                    token: dict_token
+                                        .duplicate_handle(Rights::SAME_RIGHTS)
+                                        .unwrap(),
+                                };
+                                let capability = fsandbox::Capability::Dictionary(dict_ref);
                                 let _ = responder.send(Ok(capability));
                             }
                             fsandbox::RouterRequest::_UnknownMethod { .. } => unimplemented!(),

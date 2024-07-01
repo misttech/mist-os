@@ -203,14 +203,14 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 zx_status_t Sherlock::I2cInit() {
   // setup pinmux for our I2C busses
   // i2c_ao_0
-  gpio_init_steps_.push_back({T931_GPIOAO(2), GpioSetAltFunction(1)});
-  gpio_init_steps_.push_back({T931_GPIOAO(3), GpioSetAltFunction(1)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOAO(2), 1));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOAO(3), 1));
   // i2c2
-  gpio_init_steps_.push_back({T931_GPIOZ(14), GpioSetAltFunction(3)});
-  gpio_init_steps_.push_back({T931_GPIOZ(15), GpioSetAltFunction(3)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOZ(14), 3));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOZ(15), 3));
   // i2c3
-  gpio_init_steps_.push_back({T931_GPIOA(14), GpioSetAltFunction(2)});
-  gpio_init_steps_.push_back({T931_GPIOA(15), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOA(14), 2));
+  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOA(15), 2));
 
   for (const auto& bus : buses) {
     AddI2cBus(bus, pbus_);

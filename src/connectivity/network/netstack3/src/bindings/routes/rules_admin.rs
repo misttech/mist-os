@@ -9,11 +9,11 @@ use std::pin::pin;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
-use fnet_routes_ext::admin::Responder;
 use fnet_routes_ext::rules::{
-    FidlRuleAdminIpExt, RuleAction, RuleIndex, RuleSelector, RuleSetPriority, RuleSetRequest,
-    RuleTableRequest,
+    FidlRuleAdminIpExt, InstalledRule, RuleAction, RuleIndex, RuleSelector, RuleSetPriority,
+    RuleSetRequest, RuleTableRequest,
 };
+use fnet_routes_ext::Responder;
 use futures::channel::{mpsc, oneshot};
 use futures::TryStreamExt as _;
 use net_types::ip::Ip;
@@ -54,11 +54,7 @@ pub(super) struct RuleWorkItem<I: Ip> {
 
 #[derive(Debug)]
 struct Rule<I: Ip> {
-    // TODO(https://fxbug.dev/336204757): Implement watcher and use the field.
-    #[allow(unused)]
     selector: RuleSelector<I>,
-    // TODO(https://fxbug.dev/336204757): Implement watcher and use the field.
-    #[allow(unused)]
     action: RuleAction,
 }
 
@@ -101,8 +97,16 @@ impl<I: Ip> RuleTable<I> {
         }
     }
 
-    pub(super) fn remove_rule_set(&mut self, priority: RuleSetPriority) {
-        let _: Option<RuleSet<I>> = self.rule_sets.remove(&priority);
+    pub(super) fn remove_rule_set(
+        &mut self,
+        priority: RuleSetPriority,
+    ) -> impl Iterator<Item = InstalledRule<I>> {
+        let removed = self.rule_sets.remove(&priority);
+        removed.into_iter().flat_map(move |rule_set| {
+            rule_set.rules.into_iter().map(move |(index, Rule { selector, action })| {
+                InstalledRule { priority, index, selector, action }
+            })
+        })
     }
 
     pub(super) fn add_rule(
@@ -126,12 +130,12 @@ impl<I: Ip> RuleTable<I> {
         &mut self,
         priority: RuleSetPriority,
         index: RuleIndex,
-    ) -> Result<(), fnet_routes_admin::RuleSetError> {
+    ) -> Result<InstalledRule<I>, fnet_routes_admin::RuleSetError> {
         let mut set = self.get_rule_set_entry(priority);
         match set.get_mut().rules.entry(index) {
             BTreeEntry::Occupied(entry) => {
-                let _: Rule<I> = entry.remove();
-                Ok(())
+                let Rule { selector, action } = entry.remove();
+                Ok(InstalledRule { priority, index, selector, action })
             }
             BTreeEntry::Vacant(_entry) => Err(fnet_routes_admin::RuleSetError::RuleDoesNotExist),
         }

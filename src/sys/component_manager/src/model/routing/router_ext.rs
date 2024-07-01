@@ -2,16 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::{ExtendedInstance, WeakComponentInstance, WeakExtendedInstance};
-use ::routing::error::{ComponentInstanceError, RoutingError};
-use ::routing::policy::GlobalPolicyChecker;
-use async_trait::async_trait;
+use ::routing::error::ComponentInstanceError;
 use futures::future::BoxFuture;
-use moniker::ExtendedMoniker;
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, Dict, Open, RemotableCapability, Request, Routable, Router, WeakComponentToken,
+    Capability, Dict, DirEntry, RemotableCapability, Request, Router, WeakInstanceToken,
 };
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
@@ -21,20 +17,12 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 /// A trait to add functions to Router that know about the component manager
 /// types.
 pub trait RouterExt: Send + Sync {
-    /// Returns a router that ensures the capability request is allowed by the
-    /// policy in [`GlobalPolicyChecker`].
-    fn with_policy_check(
-        self,
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-    ) -> Self;
-
     /// Returns a [Dict] equivalent to `dict`, but with all [Router]s replaced with [Open].
     ///
     /// This is an alternative to [Dict::try_into_open] when the [Dict] contains [Router]s, since
     /// [Router] is not currently a type defined by the sandbox library.
     fn dict_routers_to_open(
-        weak_component: &WeakComponentToken,
+        weak_component: &WeakInstanceToken,
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict;
@@ -61,27 +49,22 @@ pub trait RouterExt: Send + Sync {
 }
 
 impl RouterExt for Router {
-    fn with_policy_check(
-        self,
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-    ) -> Self {
-        Router::new(PolicyCheckRouter::new(capability_source, policy_checker, self))
-    }
-
     fn dict_routers_to_open(
-        weak_component: &WeakComponentToken,
+        weak_component: &WeakInstanceToken,
         scope: &ExecutionScope,
         dict: &Dict,
     ) -> Dict {
         let out = Dict::new();
         for (key, value) in dict.enumerate() {
+            let Ok(value) = value else {
+                // This capability is not cloneable. Skip it.
+                continue;
+            };
             let value = match value {
                 Capability::Dictionary(dict) => {
                     Capability::Dictionary(Self::dict_routers_to_open(weak_component, scope, &dict))
                 }
-                Capability::Router(r) => {
-                    let router = r.clone();
+                Capability::Router(router) => {
                     let request = Request {
                         target: weak_component.clone(),
                         // Use the weakest availability, so that it gets immediately upgraded to
@@ -91,14 +74,14 @@ impl RouterExt for Router {
                     };
                     // TODO: Should we convert the Open to a Directory here if the Router wraps a
                     // Dict?
-                    Capability::Open(Open::new(router.into_directory_entry(
+                    Capability::DirEntry(DirEntry::new(router.into_directory_entry(
                         request,
                         fio::DirentType::Service,
                         scope.clone(),
                         |_| None,
                     )))
                 }
-                other => other.clone(),
+                other => other,
             };
             out.insert(key, value).ok();
         }
@@ -187,47 +170,15 @@ impl RouterExt for Router {
     }
 }
 
-pub struct PolicyCheckRouter {
-    capability_source: CapabilitySource,
-    policy_checker: GlobalPolicyChecker,
-    router: Router,
-}
-
-impl PolicyCheckRouter {
-    pub fn new(
-        capability_source: CapabilitySource,
-        policy_checker: GlobalPolicyChecker,
-        router: Router,
-    ) -> Self {
-        PolicyCheckRouter { capability_source, policy_checker, router }
-    }
-}
-
-#[async_trait]
-impl Routable for PolicyCheckRouter {
-    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-        let ExtendedMoniker::ComponentInstance(moniker) = request.target.moniker() else {
-            return Err(RoutingError::from(
-                ComponentInstanceError::ComponentManagerInstanceUnexpected {},
-            )
-            .into());
-        };
-        match self.policy_checker.can_route_capability(&self.capability_source, &moniker) {
-            Ok(()) => self.router.route(request).await,
-            Err(policy_error) => Err(RoutingError::PolicyError(policy_error).into()),
-        }
-    }
-}
-
 /// A trait to add functions WeakComponentInstancethat know about the component
 /// manager types.
-pub trait WeakComponentTokenExt {
+pub trait WeakInstanceTokenExt {
     /// Create a new token for a component instance or component_manager.
-    fn new(instance: WeakExtendedInstance) -> WeakComponentToken;
+    fn new(instance: WeakExtendedInstance) -> WeakInstanceToken;
 
     /// Create a new token for a component instance.
-    fn new_component(instance: WeakComponentInstance) -> WeakComponentToken {
-        WeakComponentToken::new(WeakExtendedInstance::Component(instance))
+    fn new_component(instance: WeakComponentInstance) -> WeakInstanceToken {
+        WeakInstanceToken::new(WeakExtendedInstance::Component(instance))
     }
 
     /// Upgrade this token to the underlying instance.
@@ -243,26 +194,14 @@ pub trait WeakComponentTokenExt {
     fn moniker(&self) -> moniker::ExtendedMoniker;
 
     #[cfg(test)]
-    fn invalid() -> WeakComponentToken {
-        WeakComponentToken::new_component(WeakComponentInstance::invalid())
+    fn invalid() -> WeakInstanceToken {
+        WeakInstanceToken::new_component(WeakComponentInstance::invalid())
     }
 }
 
-// We need this extra struct because WeakComponentInstance isn't defined in this
-// crate so we can't implement WeakComponentTokenAny for it.
-#[derive(Debug)]
-pub struct WeakComponentInstanceExt {
-    inner: WeakExtendedInstance,
-}
-impl sandbox::WeakComponentTokenAny for WeakComponentInstanceExt {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-
-impl WeakComponentTokenExt for WeakComponentToken {
+impl WeakInstanceTokenExt for WeakInstanceToken {
     fn new(instance: WeakExtendedInstance) -> Self {
-        Self { inner: Arc::new(WeakComponentInstanceExt { inner: instance }) }
+        Self { inner: Arc::new(instance) }
     }
 
     fn to_instance(self) -> WeakExtendedInstance {
@@ -270,8 +209,8 @@ impl WeakComponentTokenExt for WeakComponentToken {
     }
 
     fn as_ref(&self) -> &WeakExtendedInstance {
-        match self.inner.as_any().downcast_ref::<WeakComponentInstanceExt>() {
-            Some(instance) => &instance.inner,
+        match self.inner.as_any().downcast_ref::<WeakExtendedInstance>() {
+            Some(instance) => &instance,
             None => panic!(),
         }
     }

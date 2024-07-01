@@ -9,22 +9,19 @@
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/scsi/controller-dfv1.h>
-#include <lib/scsi/disk-dfv1.h>
+#include <lib/scsi/controller.h>
+#include <lib/scsi/disk.h>
 #include <lib/sync/completion.h>
-#include <threads.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/assert.h>
 #include <zircon/listnode.h>
 
 #include <atomic>
 #include <memory>
 #include <mutex>
-#include <thread>
 
-#include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/condition_variable.h>
 #include <fbl/ref_counted.h>
@@ -62,28 +59,30 @@ struct Transaction {
   list_node_t node;
 };
 
-class UsbMassStorageDevice;
-
 struct UsbRequestContext {
   usb_request_complete_callback_t completion;
 };
 
-using MassStorageDeviceType = ddk::Device<UsbMassStorageDevice, ddk::Unbindable,
-                                          ddk::ChildPreReleaseable, ddk::Initializable>;
-class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceType {
+class UsbMassStorageDevice : public fdf::DriverBase, public scsi::Controller {
  public:
-  explicit UsbMassStorageDevice(fbl::RefPtr<WaiterInterface> waiter, zx_device_t* parent = nullptr)
-      : MassStorageDeviceType(parent), waiter_(waiter) {}
+  static constexpr char kDriverName[] = "ums";
 
+  UsbMassStorageDevice(fdf::DriverStartArgs start_args,
+                       fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
   ~UsbMassStorageDevice() override = default;
 
-  void DdkRelease();
-  void DdkInit(ddk::InitTxn txn);
+  zx::result<> Start() override;
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkChildPreRelease(void* child_ctx);
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // scsi::Controller
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& root_node() override { return root_node_; }
+  std::string_view driver_name() const override { return name(); }
+  const std::shared_ptr<fdf::Namespace>& driver_incoming() const override { return incoming(); }
+  std::shared_ptr<fdf::OutgoingDirectory>& driver_outgoing() override { return outgoing(); }
+  const std::optional<std::string>& driver_node_name() const override { return node_name(); }
+  fdf::Logger& driver_logger() override { return logger(); }
   size_t BlockOpSize() override { return sizeof(Transaction); }
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
@@ -91,8 +90,11 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
                            uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) override;
 
   // Performs the object initialization.
-  zx_status_t Init(bool is_test_mode);
-  void Release();  // Visible for testing.
+  zx_status_t Init();
+
+  // Visible for testing.
+  const std::vector<std::unique_ptr<scsi::Disk>>& block_devs() const { return block_devs_; }
+  void set_waiter(fbl::RefPtr<WaiterInterface> waiter) { waiter_ = std::move(waiter); }
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbMassStorageDevice);
 
@@ -122,7 +124,7 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
 
   zx_status_t CheckLunsReady();
 
-  int WorkerThread(ddk::InitTxn&& txn);
+  void WorkerLoop();
 
   void RequestQueue(usb_request_t* request, const usb_request_complete_callback_t* completion);
 
@@ -139,7 +141,12 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
   uint32_t max_transfer_bytes_;  // maximum transfer size reported by usb_get_max_transfer_size()
 
   uint8_t interface_number_;
-  std::optional<std::thread> worker_thread_;
+
+  // Dispatcher for processing queued block requests.
+  fdf::Dispatcher worker_dispatcher_;
+  // Signaled when worker_dispatcher_ is shut down.
+  libsync::Completion worker_shutdown_completion_;
+
   uint8_t bulk_in_addr_;
 
   uint8_t bulk_out_addr_;
@@ -162,19 +169,23 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
 
   fbl::RefPtr<WaiterInterface> waiter_;
 
-  bool dead_;
+  std::atomic_bool dead_ = false;
 
   // list of queued transactions
   list_node_t queued_txns_;
 
-  sync_completion_t txn_completion_;  // signals WorkerThread when new txns are available
+  sync_completion_t txn_completion_;  // signals WorkerLoop when new txns are available
                                       // and when device is dead
   std::mutex txn_lock_;               // protects queued_txns, txn_completion and dead
+  std::mutex luns_lock_;              // Synchronizes the checking of whether LUNs are ready.
 
-  fbl::Array<fbl::RefPtr<scsi::Disk>> block_devs_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 
-  bool is_test_mode_ = false;
+  std::vector<std::unique_ptr<scsi::Disk>> block_devs_;
 };
+
 }  // namespace ums
 
 #endif  // SRC_DEVICES_BLOCK_DRIVERS_USB_MASS_STORAGE_USB_MASS_STORAGE_H_

@@ -12,6 +12,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/io-buffer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
@@ -130,9 +131,6 @@ class DisplayEngine final : public DisplayEngineInterface {
   // On success, returns ZX_OK and the sysmem allocator client will be open
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
-
-  // gpu op
-  io_buffer_t gpu_req_ = {};
 
   DisplayInfo current_display_;
 

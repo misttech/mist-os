@@ -28,6 +28,7 @@ source_set("usb-phy-visitor-impl") {
     "//sdk/lib/driver/devicetree/visitors:registration",
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
   ]
   public_deps = [ "//sdk/lib/driver/devicetree/visitors:property-parser" ]

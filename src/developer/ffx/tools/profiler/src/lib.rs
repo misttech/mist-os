@@ -7,6 +7,7 @@ use ::std::path::PathBuf;
 use anyhow::{Context, Result};
 use args::{ProfilerCommand, ProfilerSubCommand};
 use async_fs::File;
+use core::fmt;
 use errors::{ffx_bail, ffx_error};
 use fho::{deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_cpu_profiler as profiler;
@@ -16,7 +17,41 @@ use std::process::Command;
 use std::time::Duration;
 use tempfile::Builder;
 
-type Writer = MachineWriter<()>;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+#[derive(Serialize, JsonSchema)]
+pub struct ShowCpuProfilerCmd {
+    pub samples_collected: Option<u64>,
+    pub median_sample_time: Option<u64>,
+    pub mean_sample_time: Option<u64>,
+    pub max_sample_time: Option<u64>,
+    pub min_sample_time: Option<u64>,
+}
+
+impl fmt::Display for ShowCpuProfilerCmd {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Session Stats: \n")?;
+        if let Some(num_samples) = self.samples_collected {
+            write!(f, "    Number of samples collected: {}\n", num_samples)?;
+        }
+        if let Some(median_sample_time) = self.median_sample_time {
+            write!(f, "    Median sample time: {}us\n", median_sample_time)?;
+        }
+        if let Some(mean_sample_time) = self.mean_sample_time {
+            write!(f, "    Mean sample time: {}us\n", mean_sample_time)?;
+        }
+        if let Some(max_sample_time) = self.max_sample_time {
+            write!(f, "    Max sample time: {}us\n", max_sample_time)?;
+        }
+        if let Some(min_sample_time) = self.min_sample_time {
+            write!(f, "    Min sample time: {}us\n", min_sample_time)?;
+        }
+        Ok(())
+    }
+}
+
+type Writer = MachineWriter<ShowCpuProfilerCmd>;
 #[derive(FfxTool)]
 pub struct ProfilerTool {
     #[with(deferred(moniker("/core/profiler")))]
@@ -166,22 +201,15 @@ async fn run_session(
     }
     let stats = controller.stop().await?;
     if opts.print_stats {
-        writer.line(format!("\nSession Stats: "))?;
-        if let Some(num_samples) = stats.samples_collected {
-            writer.line(format!("    Num of samples collected: {}", num_samples))?;
-        }
-        if let Some(median_sample_time) = stats.median_sample_time {
-            writer.line(format!("    Median sample time: {}us", median_sample_time))?;
-        }
-        if let Some(mean_sample_time) = stats.mean_sample_time {
-            writer.line(format!("    Mean sample time: {}us", mean_sample_time))?;
-        }
-        if let Some(max_sample_time) = stats.max_sample_time {
-            writer.line(format!("    Max sample time: {}us", max_sample_time))?;
-        }
-        if let Some(min_sample_time) = stats.min_sample_time {
-            writer.line(format!("    Min sample time: {}us", min_sample_time))?;
-        }
+        let output = ShowCpuProfilerCmd {
+            samples_collected: stats.samples_collected,
+            median_sample_time: stats.median_sample_time,
+            mean_sample_time: stats.mean_sample_time,
+            max_sample_time: stats.max_sample_time,
+            min_sample_time: stats.min_sample_time,
+        };
+        writer.machine(&output)?;
+        writer.line(format!("\n{output}"))?;
     }
     copy_task.await?;
     controller.reset().await?;

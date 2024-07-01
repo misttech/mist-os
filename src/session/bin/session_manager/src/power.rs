@@ -39,6 +39,8 @@ pub struct PowerElement {
 static POWER_ON_LEVEL: fbroker::PowerLevel = 1;
 
 impl PowerElement {
+    /// # Panics
+    /// If internal invariants about the state of the `lease` field are violated.
     pub async fn new() -> Result<Self, anyhow::Error> {
         let topology = fuchsia_component::client::connect_to_protocol::<fbroker::TopologyMarker>()?;
         let activity_governor =
@@ -51,9 +53,9 @@ impl PowerElement {
             .context("cannot get power elements from SAG")?;
         let Some(Some(application_activity_token)) = power_elements
             .application_activity
-            .map(|application_activity| application_activity.active_dependency_token)
+            .map(|application_activity| application_activity.assertive_dependency_token)
         else {
-            return Err(anyhow!("Did not find application activity active dependency token"));
+            return Err(anyhow!("Did not find application activity assertive dependency token"));
         };
 
         // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
@@ -63,11 +65,11 @@ impl PowerElement {
             rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
         let power_element = topology
             .add_element(fbroker::ElementSchema {
-                element_name: Some(format!("session-manager-element-{}", random_string)),
+                element_name: Some(format!("session-manager-element-{random_string}")),
                 initial_current_level: Some(POWER_ON_LEVEL),
                 valid_levels: Some(power_levels),
                 dependencies: Some(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Active,
+                    dependency_type: fbroker::DependencyType::Assertive,
                     dependent_level: POWER_ON_LEVEL,
                     requires_token: application_activity_token,
                     requires_level_by_preference: vec![
@@ -92,10 +94,12 @@ impl PowerElement {
         loop {
             match lease.watch_status(status).await? {
                 fbroker::LeaseStatus::Satisfied => break,
-                new_status @ _ => status = new_status,
+                new_status => status = new_status,
             }
         }
-        let lease = lease.into_client_end().expect("No ongoing calls on lease");
+        let lease = lease
+            .into_client_end()
+            .expect("Proxy should be in a valid state to convert into client end");
 
         Ok(Self { power_element, lease: Some(lease) })
     }

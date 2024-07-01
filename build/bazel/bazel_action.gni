@@ -48,6 +48,8 @@ declare_args() {
 #     Type: string.
 #
 #   bazel_inputs: (optional)
+#     DEPRECATED: Just use `deps` for these.
+#
 #     List of labels to bazel_input_xxx() targets that define
 #     the set of Ninja-generated inputs that the Bazel build command will
 #     use. These must be in the dependency tree of
@@ -338,11 +340,6 @@ template("bazel_action") {
   _bazel_build_events_log_json =
       "$target_out_dir/$target_name.bazel_events.log.json"
 
-  _bazel_inputs = []
-  if (defined(invoker.bazel_inputs)) {
-    _bazel_inputs = invoker.bazel_inputs
-  }
-
   _bazel_build_files = []
   _bazel_targets = []
   foreach(label, invoker.bazel_targets) {
@@ -357,10 +354,16 @@ template("bazel_action") {
   # A group to depend on all bazel_input_xxx() dependencies.
   _bazel_inputs_group_target = "$target_name.bazel_inputs"
   group(_bazel_inputs_group_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    deps = _bazel_inputs
-    if (defined(invoker.deps)) {
-      deps += invoker.deps
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+    if (defined(invoker.bazel_inputs)) {
+      if (!defined(deps)) {
+        deps = []
+      }
+      deps += invoker.bazel_inputs
     }
     visibility = [ ":*" ]
   }
@@ -581,7 +584,14 @@ template("bazel_action") {
       _remote_build = invoker.remote_build
     }
     if (_remote_build) {
-      args += [ "--config=remote" ]
+      if (bazel_rbe_exec_strategy == "remote") {
+        args += [ "--config=remote" ]
+      } else if (bazel_rbe_exec_strategy == "local") {
+        args += [ "--config=remote_cache_only" ]
+      } else {
+        assert(false,
+               "Unknown bazel_rbe_exec_strategy: $bazel_rbe_exec_strategy")
+      }
     }
 
     if (bazel_upload_build_events != "") {

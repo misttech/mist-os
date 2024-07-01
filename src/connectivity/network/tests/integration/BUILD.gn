@@ -187,7 +187,7 @@ group("tests") {
            ":netstack-integration-tests",
            "guest:build-only",
            "inspect:tests",
-           "macros:netstack_testing_macros_test",
+           "macros:tests",
          ] + err_log_package_deps
 
   if (!is_coverage) {

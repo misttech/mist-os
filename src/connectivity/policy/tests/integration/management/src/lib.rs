@@ -139,6 +139,8 @@ async fn with_netcfg_owned_device<
 /// Test that NetCfg discovers a newly added device and it adds the device
 /// to the Netstack.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 #[test_case(ManagerConfig::Empty, "eth"; "no_prefix")]
 #[test_case(ManagerConfig::IfacePrefix, "testeth"; "with_prefix")]
 async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, prefix: &str) {
@@ -168,6 +170,8 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, pr
 // Send a UDP packet between Realm1 and Realm2, where Realm1 and Realm2 can be
 // initialized with a predefined ManagerConfig.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 #[test_case(
     ManagerConfig::Empty,
     ManagerConfig::PacketFilterEthernet,
@@ -433,6 +437,8 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
 // Test that Netcfg discovers a device, adds it to the Netstack,
 // and does not provision the device (send DHCP packets).
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) {
     // RFC2131 and RFC8415 specify the ports that DHCP servers
     // must use for sending messages.
@@ -558,6 +564,8 @@ enum InterfaceWatcherEvent {
 /// Tests that when two interfaces are added with the same PersistentIdentifier,
 /// that the first interface is removed prior to adding the second interface.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -692,6 +700,8 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
 /// directly and not managed by Netcfg, or managed by Netcfg with a
 /// different naming identifier and the same name.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 #[test_case(true; "netcfg_managed")]
 #[test_case(false; "not_netcfg_managed")]
 async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
@@ -837,6 +847,8 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
 /// Also make sure that a new WLAN AP interface may be added after a previous interface has been
 /// removed from the netstack.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
     // Use a large timeout to check for resolution.
     //
@@ -1159,6 +1171,8 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
 
 /// Tests that netcfg observes component stop events and exits cleanly.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
     use component_events::events::{self};
 
@@ -1211,6 +1225,8 @@ async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
 /// Test that NetCfg enables forwarding on interfaces when the device class is configured to have
 /// that enabled.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
@@ -1251,6 +1267,8 @@ async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -1294,6 +1312,8 @@ async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str)
 // TODO(https://fxbug.dev/42065403): Remove this test when multiple clients
 // requesting prefixes is supported.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -1378,6 +1398,8 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
 }
 
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 #[test_case(
     fnet_dhcpv6::AcquirePrefixConfig {
         interface_id: Some(42),
@@ -1434,6 +1456,8 @@ async fn test_prefix_provider_config_error<M: Manager, N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
@@ -1660,6 +1684,8 @@ mod dhcpv6_helper {
 }
 
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &str) {
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
@@ -1784,6 +1810,8 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
 // Regression test for https://fxbug.dev/335892036, in which netcfg panicked if an interface was
 // disabled while it was holding a DHCPv6 prefix for it.
 #[netstack_test]
+#[variant(M, Manager)]
+#[variant(N, Netstack)]
 async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(name: &str) {
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
@@ -1918,6 +1946,8 @@ struct MasqueradeTestSetup {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(M, Manager)]
 #[test_case(
     MasqueradeTestSetup {
         client_ip: std_ip!("192.168.1.2"),

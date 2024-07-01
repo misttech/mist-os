@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::target::{
-    self, DiscoveredTarget, Identity, IdentityCmp, SharedIdentity, Target, TargetAddrEntry,
-    TargetAddrStatus, TargetUpdate, WeakIdentity,
+    self, DiscoveredTarget, Identity, IdentityCmp, SharedIdentity, Target, TargetUpdate,
+    WeakIdentity,
 };
 use crate::MDNS_MAX_AGE;
 use addr::TargetAddr;
@@ -16,7 +16,6 @@ use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{DaemonEvent, TargetEvent};
 use ffx_target::TargetInfoQuery;
 use fidl_fuchsia_developer_ffx as ffx;
-use netext::IsLocalAddr;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
@@ -745,6 +744,7 @@ impl TargetCollection {
         if create_new && merge_targets.is_empty() {
             // Insert a fresh & empty target to apply an update against.
             let target = self.merge_insert(Target::new());
+            tracing::debug!("No existing targets; creating new target with id {}", target.id());
 
             let target = Target::new_with_id(target.id());
             target.apply_update(update.clone());
@@ -1064,6 +1064,12 @@ pub enum TargetUpdateFilter<'a> {
     NetAddrs(&'a [SocketAddr]),
 }
 
+fn match_addr(sa: SocketAddr, ta: TargetAddr) -> bool {
+    (ta.ip() == IpAddr::from(sa.ip()))
+        // Support port 0 as a wildcard
+        && ((ta.port() == sa.port()) || (ta.port() == 0) || (sa.port() == 0))
+}
+
 impl<'a> TargetUpdateFilter<'a> {
     fn matches(&self, target: &Target) -> bool {
         match *self {
@@ -1080,23 +1086,14 @@ impl<'a> TargetUpdateFilter<'a> {
                 addrs.iter().any(|addr| {
                     // Because of Rust's strange handling of scoped IPv6 addresses, link-local IPv6
                     // address filtering requires special logic to match addresses correctly.
-                    match addr {
-                        SocketAddr::V6(addr)
-                            if addr.ip().is_link_local_addr() && addr.scope_id() == 0 =>
-                        {
-                            // Wildcard scope
-                            target_addrs.iter().any(|entry| {
-                                (entry.addr.ip(), entry.addr.port())
-                                    == (IpAddr::from(*addr.ip()), addr.port())
-                            })
-                        }
-                        _ => target_addrs.contains(&TargetAddrEntry::new(
-                            (*addr).into(),
-                            // NOTE: The following fields do not matter for address lookups
-                            chrono::DateTime::<Utc>::MIN_UTC,
-                            TargetAddrStatus::ssh(),
-                        )),
-                    }
+                    // XXX Removed special handling since I don't understand what was special
+                    // about that logic
+                    tracing::debug!("In NetAddrs match, comparing addr {addr:?} to target_addrs {target_addrs:?}");
+                    let addr_match =  target_addrs.iter().any(|entry| {
+                        match_addr(*addr, entry.addr)
+                    });
+                    tracing::debug!("Is there a match? {addr_match}");
+                    addr_match
                 })
             }
         }
@@ -1106,7 +1103,9 @@ impl<'a> TargetUpdateFilter<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::target::{TargetProtocol, TargetTransport, TargetUpdateBuilder};
+    use crate::target::{
+        TargetAddrEntry, TargetAddrStatus, TargetProtocol, TargetTransport, TargetUpdateBuilder,
+    };
     use chrono::TimeZone;
     use ffx_daemon_events::TargetConnectionState;
     use ffx_target::Description;

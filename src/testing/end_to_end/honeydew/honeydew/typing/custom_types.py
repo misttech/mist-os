@@ -9,8 +9,11 @@ from __future__ import annotations
 import enum
 import ipaddress
 from dataclasses import dataclass
+from typing import TypeVar
 
 import fuchsia_controller_py as fuchsia_controller
+
+AnyString = TypeVar("AnyString", str, bytes)
 
 
 class LEVEL(enum.StrEnum):

@@ -1073,7 +1073,7 @@ where
 }
 
 #[derive(Error, Debug)]
-#[error("Multiple mutually exclusive flags are set: syn: {syn}, fin: {fin}, rst: {rst}")]
+#[error("multiple mutually exclusive flags are set: syn: {syn}, fin: {fin}, rst: {rst}")]
 pub(crate) struct MalformedFlags {
     syn: bool,
     fin: bool,

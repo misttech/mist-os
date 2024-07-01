@@ -22,15 +22,15 @@ fn to_installed_route<I: ip::Ip>(
     Route { destination, outbound_interface, next_hop }: Route,
 ) -> fnet_routes_ext::InstalledRoute<I> {
     const ARBITRARY_METRIC: u32 = 1;
-    let destination: ip::Subnet<I::Addr> = I::map_ip(
-        ip::IpInvariant(destination),
-        |ip::IpInvariant(destination)| {
+    let destination = I::map_ip_out(
+        destination,
+        |destination| {
             assert_matches!(
                 destination.addr,
                 fnet::IpAddress::Ipv4(network) => ip::Subnet::new(
                     network.into_ext(), destination.prefix_len).expect("invalid subnet"))
         },
-        |ip::IpInvariant(destination)| {
+        |destination| {
             assert_matches!(
                 destination.addr,
                 fnet::IpAddress::Ipv6(network) => ip::Subnet::new(
@@ -38,12 +38,12 @@ fn to_installed_route<I: ip::Ip>(
         },
     );
     let next_hop: Option<SpecifiedAddr<I::Addr>> = next_hop.map(|next_hop| {
-        SpecifiedAddr::new(I::map_ip(
-            ip::IpInvariant(next_hop),
-            |ip::IpInvariant(next_hop)| {
+        SpecifiedAddr::new(I::map_ip_out(
+            next_hop,
+            |next_hop| {
                 assert_matches!(next_hop, fnet::IpAddress::Ipv4(next_hop) => next_hop.into_ext())
             },
-            |ip::IpInvariant(next_hop)| {
+            |next_hop| {
                 assert_matches!(next_hop, fnet::IpAddress::Ipv6(next_hop) => next_hop.into_ext())
             },
         ))

@@ -32,11 +32,11 @@ pub trait IpForwardingDeviceContext<I: Ip>: DeviceIdContext<AnyDevice> {
 #[derive(Error, Debug, PartialEq)]
 pub enum AddRouteError {
     /// Indicates that the route already exists.
-    #[error("Already exists")]
+    #[error("already exists")]
     AlreadyExists,
 
     /// Indicates the gateway is not a neighbor of this node.
-    #[error("Gateway is not a neighbor")]
+    #[error("gateway is not a neighbor")]
     GatewayNotNeighbor,
 }
 

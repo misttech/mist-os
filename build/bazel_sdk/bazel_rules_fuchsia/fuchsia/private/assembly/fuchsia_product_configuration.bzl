@@ -14,7 +14,7 @@ load(
     "FuchsiaOmahaOtaConfigInfo",
     "FuchsiaProductConfigInfo",
 )
-load(":util.bzl", "extract_labels", "replace_labels_with_files")
+load(":utils.bzl", "extract_labels", "replace_labels_with_files")
 
 # Define build types
 BUILD_TYPES = struct(

@@ -20,12 +20,12 @@ class Params:
     """Class to parse and validate environment parameters."""
 
     sdk_tool_path: str
-    target: str
+    target: str | None
     execution_params: ExecutionParams
     output_directory: str
 
     @classmethod
-    def initialize(cls, env_vars: dict) -> Self:
+    def initialize(cls, env_vars: dict[str, str | None]) -> Self:
         """This function initializes this class using environment dictionary.
 
         Args:

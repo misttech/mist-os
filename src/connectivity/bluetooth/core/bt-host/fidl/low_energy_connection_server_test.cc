@@ -14,25 +14,12 @@ namespace fbg = fuchsia::bluetooth::gatt2;
 
 const bt::DeviceAddress kTestAddr(bt::DeviceAddress::Type::kLEPublic, {0x01, 0, 0, 0, 0, 0});
 
+// Used for test cases that require all of the test infrastructure, but don't want to auto-
+// configure the client and server at startup.
 class LowEnergyConnectionServerTest : public bthost::testing::AdapterTestFixture {
  public:
   LowEnergyConnectionServerTest() = default;
   ~LowEnergyConnectionServerTest() override = default;
-
-  void SetUp() override {
-    bthost::testing::AdapterTestFixture::SetUp();
-
-    fidl::InterfaceHandle<fuchsia::bluetooth::le::Connection> handle;
-    std::unique_ptr<bt::gap::LowEnergyConnectionHandle> connection = EstablishConnection();
-    server_ = std::make_unique<LowEnergyConnectionServer>(
-        adapter()->AsWeakPtr(), gatt()->GetWeakPtr(), std::move(connection),
-        handle.NewRequest().TakeChannel(),
-        /*closed_cb=*/[this] {
-          server_closed_cb_called_ = true;
-          server_.reset();
-        });
-    client_ = handle.Bind();
-  }
 
   fble::Connection* client() { return client_.get(); }
 
@@ -43,12 +30,7 @@ class LowEnergyConnectionServerTest : public bthost::testing::AdapterTestFixture
   bool server_closed_cb_called() const { return server_closed_cb_called_; }
 
  protected:
-  void RunGetCodecDelayRangeTest(
-      fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest&& params,
-      std::optional<zx_status_t> err);
-
- private:
-  std::unique_ptr<bt::gap::LowEnergyConnectionHandle> EstablishConnection() {
+  void EstablishConnectionAndStartServer() {
     // Since LowEnergyConnectionHandle must be created by LowEnergyConnectionManager, we discover
     // and connect to a fake peer to get a LowEnergyConnectionHandle.
     std::unique_ptr<bt::testing::FakePeer> fake_peer =
@@ -77,16 +59,47 @@ class LowEnergyConnectionServerTest : public bthost::testing::AdapterTestFixture
     RunLoopUntilIdle();
     BT_ASSERT(conn_result);
     BT_ASSERT(conn_result->is_ok());
-    return std::move(*conn_result).value();
+    std::unique_ptr<bt::gap::LowEnergyConnectionHandle> connection =
+        std::move(*conn_result).value();
+
+    // Start our FIDL connection server.
+    fidl::InterfaceHandle<fuchsia::bluetooth::le::Connection> handle;
+    server_ = std::make_unique<LowEnergyConnectionServer>(
+        adapter()->AsWeakPtr(), gatt()->GetWeakPtr(), std::move(connection),
+        handle.NewRequest().TakeChannel(),
+        /*closed_cb=*/[this] {
+          server_closed_cb_called_ = true;
+          server_.reset();
+        });
+    client_ = handle.Bind();
   }
 
+ private:
   std::unique_ptr<LowEnergyConnectionServer> server_;
   fble::ConnectionPtr client_;
   bool server_closed_cb_called_ = false;
   bt::PeerId peer_id_;
 };
 
-TEST_F(LowEnergyConnectionServerTest, RequestGattClientTwice) {
+// Tests that want to automatically allocate and start the client and server before entering the
+// test body.
+class LowEnergyConnectionServerAutoStartTest : public LowEnergyConnectionServerTest {
+ public:
+  LowEnergyConnectionServerAutoStartTest() = default;
+  ~LowEnergyConnectionServerAutoStartTest() override = default;
+
+  void SetUp() override {
+    LowEnergyConnectionServerTest::SetUp();
+    EstablishConnectionAndStartServer();
+  }
+
+ protected:
+  void RunGetCodecDelayRangeTest(
+      fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest&& params,
+      std::optional<zx_status_t> err);
+};
+
+TEST_F(LowEnergyConnectionServerAutoStartTest, RequestGattClientTwice) {
   fidl::InterfaceHandle<fuchsia::bluetooth::gatt2::Client> handle_0;
   client()->RequestGattClient(handle_0.NewRequest());
   fbg::ClientPtr client_0 = handle_0.Bind();
@@ -106,7 +119,7 @@ TEST_F(LowEnergyConnectionServerTest, RequestGattClientTwice) {
   EXPECT_EQ(client_epitaph_1.value(), ZX_ERR_ALREADY_BOUND);
 }
 
-TEST_F(LowEnergyConnectionServerTest, GattClientServerError) {
+TEST_F(LowEnergyConnectionServerAutoStartTest, GattClientServerError) {
   fidl::InterfaceHandle<fuchsia::bluetooth::gatt2::Client> handle_0;
   client()->RequestGattClient(handle_0.NewRequest());
   fbg::ClientPtr client_0 = handle_0.Bind();
@@ -131,7 +144,8 @@ TEST_F(LowEnergyConnectionServerTest, GattClientServerError) {
   EXPECT_FALSE(client_epitaph_1);
 }
 
-TEST_F(LowEnergyConnectionServerTest, RequestGattClientThenUnbindThenRequestAgainShouldSucceed) {
+TEST_F(LowEnergyConnectionServerAutoStartTest,
+       RequestGattClientThenUnbindThenRequestAgainShouldSucceed) {
   fidl::InterfaceHandle<fuchsia::bluetooth::gatt2::Client> handle_0;
   client()->RequestGattClient(handle_0.NewRequest());
   fbg::ClientPtr client_0 = handle_0.Bind();
@@ -184,7 +198,7 @@ CreateDelayRangeRequestParams(bool has_vendor_config) {
   return params;
 }
 
-void LowEnergyConnectionServerTest::RunGetCodecDelayRangeTest(
+void LowEnergyConnectionServerAutoStartTest::RunGetCodecDelayRangeTest(
     ::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest&& params,
     std::optional<zx_status_t> err = std::nullopt) {
   fuchsia::bluetooth::le::CodecDelay_GetCodecLocalDelayRange_Result result;
@@ -194,6 +208,7 @@ void LowEnergyConnectionServerTest::RunGetCodecDelayRangeTest(
       };
   client()->GetCodecLocalDelayRange(std::move(params), std::move(callback));
   RunLoopUntilIdle();
+
   if (err.has_value()) {
     ASSERT_TRUE(result.is_err());
     EXPECT_EQ(result.err(), err.value());
@@ -207,21 +222,21 @@ void LowEnergyConnectionServerTest::RunGetCodecDelayRangeTest(
 }
 
 // Invoking GetCodecLocalDelay with a spec-defined coding format
-TEST_F(LowEnergyConnectionServerTest, GetCodecLocalDelaySpecCodingFormat) {
+TEST_F(LowEnergyConnectionServerAutoStartTest, GetCodecLocalDelaySpecCodingFormat) {
   ::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest params =
       CreateDelayRangeRequestParams(/*has_vendor_config=*/false);
   RunGetCodecDelayRangeTest(std::move(params));
 }
 
 // Invoking GetCodecLocalDelay with a vendor-defined coding format
-TEST_F(LowEnergyConnectionServerTest, GetCodecLocalDelayVendorCodingFormat) {
+TEST_F(LowEnergyConnectionServerAutoStartTest, GetCodecLocalDelayVendorCodingFormat) {
   ::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest params =
       CreateDelayRangeRequestParams(/*has_vendor_config=*/true);
   RunGetCodecDelayRangeTest(std::move(params));
 }
 
 // Invoking GetCodecLocalDelay with missing parameters
-TEST_F(LowEnergyConnectionServerTest, GetCodecLocalDelayMissingParams) {
+TEST_F(LowEnergyConnectionServerAutoStartTest, GetCodecLocalDelayMissingParams) {
   // Logical transport type missing
   ::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest params =
       CreateDelayRangeRequestParams(/*has_vendor_config=*/false);
@@ -245,7 +260,7 @@ TEST_F(LowEnergyConnectionServerTest, GetCodecLocalDelayMissingParams) {
 }
 
 // Calling GetCodecLocalDelay when the controller doesn't support it
-TEST_F(LowEnergyConnectionServerTest, GetCodecLocalDelayCommandNotSupported) {
+TEST_F(LowEnergyConnectionServerAutoStartTest, GetCodecLocalDelayCommandNotSupported) {
   // Disable the Read Local Supported Controller Delay instruction
   bt::testing::FakeController::Settings settings;
   constexpr size_t kReadLocalSupportedControllerDelayOctet = 45;
@@ -261,6 +276,12 @@ TEST_F(LowEnergyConnectionServerTest, GetCodecLocalDelayCommandNotSupported) {
 // Calling AcceptCis with CIG/CIS values matching those we are already waiting for causes the
 // IsochronousStream handle to be closed with an INVALID_ARGS epitaph.
 TEST_F(LowEnergyConnectionServerTest, AcceptCisCalledTwiceSameArgs) {
+  // AcceptCis() should only be called on a connection where we are acting as the peripheral.
+  bt::testing::FakeController::Settings settings;
+  settings.le_connection_role = pw::bluetooth::emboss::ConnectionRole::PERIPHERAL;
+  test_device()->set_settings(settings);
+  EstablishConnectionAndStartServer();
+
   fuchsia::bluetooth::le::ConnectionAcceptCisRequest params1, params2;
   params1.set_cig_id(0x10);
   params2.set_cig_id(0x10);
@@ -268,8 +289,8 @@ TEST_F(LowEnergyConnectionServerTest, AcceptCisCalledTwiceSameArgs) {
   params2.set_cis_id(0x08);
 
   fidl::InterfaceHandle<fuchsia::bluetooth::le::IsochronousStream> stream1_handle, stream2_handle;
-  params2.set_connection_stream(stream2_handle.NewRequest());
   params1.set_connection_stream(stream1_handle.NewRequest());
+  params2.set_connection_stream(stream2_handle.NewRequest());
   fuchsia::bluetooth::le::IsochronousStreamPtr client1 = stream1_handle.Bind();
   fuchsia::bluetooth::le::IsochronousStreamPtr client2 = stream2_handle.Bind();
 
@@ -286,13 +307,13 @@ TEST_F(LowEnergyConnectionServerTest, AcceptCisCalledTwiceSameArgs) {
   EXPECT_EQ(*client2_epitaph, ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(LowEnergyConnectionServerTest, ServerClosedOnConnectionClosed) {
+TEST_F(LowEnergyConnectionServerAutoStartTest, ServerClosedOnConnectionClosed) {
   adapter()->le()->Disconnect(peer_id());
   RunLoopUntilIdle();
   EXPECT_TRUE(server_closed_cb_called());
 }
 
-TEST_F(LowEnergyConnectionServerTest, ServerClosedWhenFIDLClientClosesConnection) {
+TEST_F(LowEnergyConnectionServerAutoStartTest, ServerClosedWhenFIDLClientClosesConnection) {
   UnbindClient();
   RunLoopUntilIdle();
   EXPECT_TRUE(server_closed_cb_called());

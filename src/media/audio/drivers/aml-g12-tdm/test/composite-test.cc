@@ -7,9 +7,6 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
-#include <fidl/fuchsia.power.broker/cpp/fidl.h>
-#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/platform-defs.h>
@@ -42,7 +39,7 @@ constexpr fuchsia_hardware_audio::ElementId kEngineCRingBufferIdInput = 9;
 constexpr fuchsia_hardware_audio::ElementId kInvalidBufferId0 = 3;
 constexpr fuchsia_hardware_audio::ElementId kInvalidBufferId1 = 10;
 
-constexpr std::array<fuchsia_hardware_audio::ElementId, 6> kAllValidIds{
+constexpr std::array<fuchsia_hardware_audio::ElementId, 6> kAllValidRingBufferIds{
     kEngineARingBufferIdOutput, kEngineBRingBufferIdOutput, kEngineCRingBufferIdOutput,
     kEngineARingBufferIdInput,  kEngineBRingBufferIdInput,  kEngineCRingBufferIdInput,
 };
@@ -139,40 +136,15 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
+  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   void MapMmio() { EXPECT_EQ(ZX_OK, mapped_mmio_.Map(mmio_)); }
-
-  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
-    // fuchsia_hardware_power uses FIDL uint8 for power levels matching fuchsia_power_broker's.
-    constexpr uint8_t kPowerLevelOff =
-        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
-    constexpr uint8_t kPowerLevelOn =
-        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
-    constexpr char kPowerElementName[] = "audio-hw";
-    fuchsia_hardware_power::LevelTuple wake_handling_on = {{
-        .child_level = kPowerLevelOn,
-        .parent_level = static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kActive),
-    }};
-    fuchsia_hardware_power::PowerDependency passive_on_execution_state = {{
-        .child = kPowerElementName,
-        .parent = fuchsia_hardware_power::ParentElement::WithSag(
-            fuchsia_hardware_power::SagElement::kExecutionState),
-        .level_deps = {{std::move(wake_handling_on)}},
-        .strength = fuchsia_hardware_power::RequirementType::kPassive,
-    }};
-    fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
-    fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelOn, .name = "on"}};
-    fuchsia_hardware_power::PowerElement element = {
-        {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
-    fuchsia_hardware_power::PowerElementConfiguration wake_config = {
-        {.element = std::move(element), .dependencies = {{std::move(passive_on_execution_state)}}}};
-
-    completer.Reply(zx::ok(
-        std::vector<fuchsia_hardware_power::PowerElementConfiguration>{{std::move(wake_config)}}));
-  }
 
   zx::vmo mmio_;
   fzl::VmoMapper mapped_mmio_;
@@ -270,194 +242,9 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
 };
 
-// Power Specific.
-class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
- public:
-  FakeSystemActivityGovernor(zx::event wake_handling) : wake_handling_(std::move(wake_handling)) {}
-
-  fidl::ProtocolHandler<fuchsia_power_system::ActivityGovernor> CreateHandler() {
-    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   fidl::kIgnoreBindingClosure);
-  }
-
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
-    fuchsia_power_system::PowerElements elements;
-    zx::event duplicate;
-    wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
-
-    fuchsia_power_system::ExecutionState wake_handling = {
-        {.passive_dependency_token = std::move(duplicate)}};
-
-    elements = {{.execution_state = std::move(wake_handling)}};
-
-    completer.Reply({{std::move(elements)}});
-  }
-
-  void RegisterListener(RegisterListenerRequest& request,
-                        RegisterListenerCompleter::Sync& completer) override {}
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  zx::event wake_handling_;
-  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
-};
-
-class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
- public:
-  void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& request,
-                   WatchStatusCompleter::Sync& completer) override {
-    completer.Reply(lease_status_);
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kSatisfied;
-};
-
-class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
- public:
-  void Lease(fuchsia_power_broker::LessorLeaseRequest& request,
-             LeaseCompleter::Sync& completer) override {
-    auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
-    lease_control_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   std::move(lease_control->server), &lease_control_,
-                                   [](fidl::UnbindInfo info) mutable {});
-
-    completer.Reply(fit::success(std::move(lease_control->client)));
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  FakeLeaseControl lease_control_;
-  std::optional<fidl::ServerBinding<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
-};
-
-class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
- public:
-  void Watch(WatchCompleter::Sync& completer) override {
-    ZX_ASSERT(!completer_);
-    completer_.emplace(completer.ToAsync());
-    sync_completion_signal(&ready_);
-  }
-
-  void set_required_level(fuchsia_power_broker::PowerLevel level) {
-    ASSERT_EQ(ZX_OK, sync_completion_wait(&ready_, zx::duration::infinite().get()));
-    sync_completion_reset(&ready_);
-    ZX_ASSERT(completer_);
-    completer_->Reply(fit::success(level));
-    completer_.reset();
-    required_level_ = level;
-  }
-
-  bool watch_received() { return sync_completion_signaled(&ready_); }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  fuchsia_power_broker::PowerLevel required_level_ = AudioCompositeServer::kAudioHardwareOn;
-  std::optional<WatchCompleter::Async> completer_;
-  sync_completion_t ready_;
-};
-
-class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
- public:
-  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& request,
-              UpdateCompleter::Sync& completer) override {
-    current_level_ = request.current_level();
-    completer.Reply(fit::success());
-  }
-
-  fuchsia_power_broker::PowerLevel current_level() { return current_level_; }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  fuchsia_power_broker::PowerLevel current_level_ = AudioCompositeServer::kAudioHardwareOn;
-};
-
-class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
- public:
-  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
-    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   fidl::kIgnoreBindingClosure);
-  }
-
-  void AddElement(fuchsia_power_broker::ElementSchema& request,
-                  AddElementCompleter::Sync& completer) override {
-    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
-    element_control_server_ = std::move(element_control->server);
-    if (request.lessor_channel()) {
-      auto lessor_impl = std::make_unique<FakeLessor>();
-      wake_lessor_ = lessor_impl.get();
-      fidl::BindServer<fuchsia_power_broker::Lessor>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.lessor_channel()),
-          std::move(lessor_impl),
-          [](FakeLessor* impl, fidl::UnbindInfo info,
-             fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) mutable {});
-    }
-    if (request.level_control_channels()) {
-      auto required_level_impl = std::make_unique<FakeRequiredLevel>();
-      required_level_ = required_level_impl.get();
-      fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->required()), std::move(required_level_impl),
-          [](FakeRequiredLevel* impl, fidl::UnbindInfo info,
-             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_end) mutable {});
-      auto current_level_impl = std::make_unique<FakeCurrentLevel>();
-      current_level_ = current_level_impl.get();
-      fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->current()), std::move(current_level_impl),
-          [](FakeCurrentLevel* impl, fidl::UnbindInfo info,
-             fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> server_end) mutable {});
-    }
-
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control->client)},
-    };
-
-    completer.Reply(fit::success(std::move(result)));
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  uint8_t current_level() {
-    ZX_ASSERT(current_level_);
-    return current_level_->current_level();
-  }
-  FakeRequiredLevel* required_level() {
-    ZX_ASSERT(required_level_);
-    return required_level_;
-  }
-
- private:
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
-  FakeLessor* wake_lessor_ = nullptr;
-  FakeRequiredLevel* required_level_ = nullptr;
-  FakeCurrentLevel* current_level_ = nullptr;
-  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
-};
-
 struct IncomingNamespace {
-  IncomingNamespace() {
-    zx::event::create(0, &execution_state);
-    zx::event execution_state_duplicate;
-    execution_state.duplicate(ZX_RIGHT_SAME_RIGHTS, &execution_state_duplicate);
-    system_activity_governor.emplace(std::move(execution_state_duplicate));
-  }
   fdf_testing::TestNode node_{std::string("root")};
   fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
-  zx::event execution_state;
-  std::optional<FakeSystemActivityGovernor> system_activity_governor;
-  FakePowerBroker power_broker;
 };
 
 class AmlG12CompositeTest : public testing::Test {
@@ -467,12 +254,11 @@ class AmlG12CompositeTest : public testing::Test {
         driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
         incoming_(env_dispatcher(), std::in_place) {}
 
-  void SetUp() override { Init(/*power_framework_enabled=*/false); }
+  void SetUp() override { Init(); }
 
-  void Init(bool power_framework_enabled) {
+  void Init() {
     fuchsia_driver_framework::DriverStartArgs driver_start_args;
-    incoming_.SyncCall([power_framework_enabled, &driver_start_args,
-                        this](IncomingNamespace* incoming) {
+    incoming_.SyncCall([&driver_start_args, this](IncomingNamespace* incoming) {
       auto start_args_result = incoming->node_.CreateStartArgsAndServe();
       ASSERT_TRUE(start_args_result.is_ok());
 
@@ -510,23 +296,6 @@ class AmlG12CompositeTest : public testing::Test {
           incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
               sclk_tdm_c_server_.GetInstanceHandler(), "gpio-tdm-c-sclk");
       ASSERT_TRUE(add_sclk_tdm_c_result.is_ok());
-
-      // Power specific.
-      // TODO(b/339038497): This driver is built with Bazel and structured configuration is not
-      // yet supported when building a driver with Bazel. Once available add a config parameter
-      // check and test with power awareness enabled and disabled.
-      if (power_framework_enabled) {
-        auto result_sag = incoming->env_.incoming_directory()
-                              .component()
-                              .AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
-                                  incoming->system_activity_governor->CreateHandler());
-        EXPECT_EQ(ZX_OK, result_sag.status_value());
-        auto result_broker = incoming->env_.incoming_directory()
-                                 .component()
-                                 .AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
-                                     incoming->power_broker.CreateHandler());
-        EXPECT_EQ(ZX_OK, result_broker.status_value());
-      }
 
       driver_start_args = std::move(start_args_result->start_args);
     });
@@ -578,11 +347,12 @@ class AmlG12CompositeTest : public testing::Test {
     ASSERT_TRUE(dai_formats_result.is_ok());
     ASSERT_EQ(1, dai_formats_result->dai_formats().size());
     auto& dai_formats = dai_formats_result->dai_formats()[0];
-    ASSERT_EQ(1, dai_formats.number_of_channels().size());
-    ASSERT_EQ(2, dai_formats.number_of_channels()[0]);
+    ASSERT_EQ(2, dai_formats.number_of_channels().size());
+    ASSERT_EQ(1, dai_formats.number_of_channels()[0]);
+    ASSERT_EQ(2, dai_formats.number_of_channels()[1]);
     ASSERT_EQ(1, dai_formats.sample_formats().size());
     ASSERT_EQ(fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned, dai_formats.sample_formats()[0]);
-    ASSERT_EQ(5, dai_formats.frame_formats().size());
+    ASSERT_EQ(7, dai_formats.frame_formats().size());
     ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                   fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
               dai_formats.frame_formats()[0]);
@@ -598,6 +368,12 @@ class AmlG12CompositeTest : public testing::Test {
     ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                   fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft),
               dai_formats.frame_formats()[4]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                  fuchsia_hardware_audio::DaiFrameFormatCustom(true, true, 1, 1)),
+              dai_formats.frame_formats()[5]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                  fuchsia_hardware_audio::DaiFrameFormatCustom(true, false, 1, 1)),
+              dai_formats.frame_formats()[6]);
     ASSERT_EQ(5, dai_formats.frame_rates().size());
     ASSERT_EQ(8'000, dai_formats.frame_rates()[0]);
     ASSERT_EQ(16'000, dai_formats.frame_rates()[1]);
@@ -644,6 +420,26 @@ class AmlG12CompositeTest : public testing::Test {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_ok());
+  }
+
+  void SetDaiFormatFrameFormatNumberOfChannels(uint64_t id,
+                                               fuchsia_hardware_audio::DaiFrameFormat frame_format,
+                                               uint32_t number_of_channels) {
+    auto format = GetDefaultDaiFormat();
+    format.number_of_channels(number_of_channels);
+    format.channels_to_use_bitmask((1 << number_of_channels) - 1);
+    format.frame_format(std::move(frame_format));
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+  }
+
+  void TestPowerState(bool on) {
+    EXPECT_EQ(IsTdmASclkSet(), on);
+    EXPECT_EQ(IsTdmBSclkSet(), on);
+    EXPECT_EQ(IsTdmCSclkSet(), on);
+    EXPECT_EQ(IsFakeClockGateEnabled(), on);
+    EXPECT_EQ(IsFakeClockPllEnabled(), on);
   }
 
   fidl::SyncClient<fuchsia_hardware_audio::Composite> client_;
@@ -1014,6 +810,37 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 4
   ASSERT_EQ(0x3004'001F, platform_device_.mmio()[0x300 / 4]);
 
+  // Custom with sclk_on_raising=true, 1 channel.
+  SetDaiFormatFrameFormatNumberOfChannels(
+      1,
+      fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+          fuchsia_hardware_audio::DaiFrameFormatCustom(true, true, 1, 1)),
+      1);
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3001'001F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 1 lrduty, 16 lrdiv (1 channel).
+  ASSERT_EQ(0xc180'001f, platform_device_.mmio()[0x040 / 4]);
+  // SCLK CTRL, no clk_inv (sclk_on_raising=true)
+  ASSERT_EQ(0x0000'0000, platform_device_.mmio()[0x044 / 4]);
+
+  // Custom with sclk_on_raising=false, 2 channels.
+  SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
+                                 fuchsia_hardware_audio::DaiFrameFormatCustom(true, false, 1, 1)));
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
+  // (same as TDM2 for frame_sync_sclks_offset=1).
+  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 1 lrduty, 32 lrdiv (2x16 bits channels).
+  ASSERT_EQ(0xc180'003f, platform_device_.mmio()[0x040 / 4]);
+  // SCLK CTRL, clk_inv ph0 (sclk_on_raising=false).
+  ASSERT_EQ(0x0000'0001, platform_device_.mmio()[0x044 / 4]);
+
   SetDaiFormatFrameRate(1, 8'000);
   EXPECT_EQ(0x8400'003b, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 60.
 
@@ -1152,7 +979,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
  protected:
   void SetUp() override { AmlG12CompositeTest::SetUp(); }
 
-  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetClient(
+  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetRingBufferClient(
       fuchsia_hardware_audio::ElementId id) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
@@ -1162,8 +989,28 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     return fidl::SyncClient<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client));
   }
 
+  fidl::SyncClient<fuchsia_hardware_audio::RingBuffer> GetRingBufferClientReadyForSetActiveChannels(
+      fuchsia_hardware_audio::ElementId id, uint32_t number_of_channels) {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
+    fuchsia_hardware_audio::Format format = GetDefaultRingBufferFormat();
+    format.pcm_format()->number_of_channels(number_of_channels);
+    fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(id, format,
+                                                                     std::move(endpoints->server));
+    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    ZX_ASSERT(ring_buffer_result.is_ok());
+    auto ring_buffer_client =
+        fidl::SyncClient<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client));
+
+    constexpr uint32_t kMinFrames = 8192;
+    auto get_vmo_result =
+        ring_buffer_client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
+    ZX_ASSERT(get_vmo_result.is_ok());
+
+    return ring_buffer_client;
+  }
+
   void TestProperties(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     fidl::Result result = client->GetProperties();
     ASSERT_TRUE(result.is_ok());
     ASSERT_TRUE(result->properties().needs_cache_flush_or_invalidate().has_value());
@@ -1172,7 +1019,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestGetVmo(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 1;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1181,7 +1028,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestGetVmoMultipleTimes(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 1;
     auto get_vmo_result0 =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1194,19 +1041,19 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestStartRingBufferNoVmo(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     auto start_result = client->Start();
     ASSERT_FALSE(start_result.is_ok());  // Not ok to start a ring buffer with no VMO.
   }
 
   void TestStopRingBufferNoVmo(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     auto stop_result = client->Stop();
     ASSERT_FALSE(stop_result.is_ok());  // Not ok to stop a ring buffer with no VMO.
   }
 
   void TestCreationAndStartStop(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1220,7 +1067,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestStartStartedRingBuffer(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1234,7 +1081,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestStopStoppedRingBuffer(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 8192;
     auto get_vmo_result =
         client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
@@ -1251,39 +1098,90 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
   }
 
   void TestGetDelay(fuchsia_hardware_audio::ElementId id) {
-    auto client = GetClient(id);
+    auto client = GetRingBufferClient(id);
     auto delay_result = client->WatchDelayInfo();
     ASSERT_TRUE(delay_result.is_ok());
     ASSERT_TRUE(delay_result->delay_info().internal_delay().has_value());  // Some delay reported.
   }
+
+  void TestSetActiveChannels(fuchsia_hardware_audio::ElementId id, uint64_t mask) {
+    auto client = GetRingBufferClientReadyForSetActiveChannels(id, 2);
+    auto set_active_channels_result = client->SetActiveChannels(mask);
+    ASSERT_TRUE(set_active_channels_result.is_ok());
+  }
+
+  void TestInvalidActiveChannelsFor1Channel(fuchsia_hardware_audio::ElementId id) {
+    auto client = GetRingBufferClientReadyForSetActiveChannels(id, 1);
+
+    {
+      // Bit 0 is a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(1);
+      ASSERT_TRUE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 1 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(2);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 2 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(4);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+  }
+
+  void TestInvalidActiveChannelsFor2Channels(fuchsia_hardware_audio::ElementId id) {
+    auto client = GetRingBufferClientReadyForSetActiveChannels(id, 2);
+
+    {
+      // Bit 0 is a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(1);
+      ASSERT_TRUE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 1 is a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(2);
+      ASSERT_TRUE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 2 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(4);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+    {
+      // Bit 3 is not a valid channel.
+      auto set_active_channels_result = client->SetActiveChannels(8);
+      ASSERT_FALSE(set_active_channels_result.is_ok());
+    }
+  }
 };
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferProperties) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestProperties(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmo) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestGetVmo(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmoMultipleTimes) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestGetVmoMultipleTimes(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersStartStop) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestCreationAndStartStop(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         id, GetDefaultRingBufferFormat(), std::move(endpoints->server));
@@ -1295,82 +1193,21 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStartStartedRingBuffer) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestStartStartedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStopStoppedRingBuffer) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestStopStoppedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetDelay) {
-  for (auto& id : kAllValidIds) {
+  for (auto& id : kAllValidRingBufferIds) {
     TestGetDelay(id);
   }
-}
-
-class AmlG12CompositeTestPower : public AmlG12CompositeTest {
- protected:
-  void SetUp() override { Init(/*power_framework_enabled=*/true); }
-};
-
-TEST_F(AmlG12CompositeTestPower, DriverIsAlive) {
-  fidl::Result result = client_->GetProperties();
-  ASSERT_TRUE(result.is_ok());
-  ASSERT_EQ(fuchsia_hardware_audio::kClockDomainMonotonic,
-            result->properties().clock_domain().value());
-}
-
-TEST_F(AmlG12CompositeTestPower, PowerSuspendResume) {
-  EXPECT_TRUE(IsTdmASclkSet());
-  EXPECT_TRUE(IsTdmBSclkSet());
-  EXPECT_TRUE(IsTdmCSclkSet());
-  EXPECT_TRUE(IsFakeClockGateEnabled());
-  EXPECT_TRUE(IsFakeClockPllEnabled());
-
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.required_level()->set_required_level(
-        AudioCompositeServer::kAudioHardwareOff);
-  });
-  fuchsia_power_broker::PowerLevel level = {};
-  do {
-    level = incoming_.SyncCall(
-        [](IncomingNamespace* incoming) { return incoming->power_broker.current_level(); });
-  } while (level != AudioCompositeServer::kAudioHardwareOff);
-
-  EXPECT_FALSE(IsTdmASclkSet());
-  EXPECT_FALSE(IsTdmBSclkSet());
-  EXPECT_FALSE(IsTdmCSclkSet());
-  EXPECT_FALSE(IsFakeClockGateEnabled());
-  EXPECT_FALSE(IsFakeClockPllEnabled());
-
-  bool watch_received = false;
-  do {
-    watch_received = incoming_.SyncCall([](IncomingNamespace* incoming) {
-      return incoming->power_broker.required_level()->watch_received();
-    });
-  } while (!watch_received);
-
-  incoming_.SyncCall([](IncomingNamespace* incoming) {
-    incoming->power_broker.required_level()->set_required_level(
-        AudioCompositeServer::kAudioHardwareOn);
-  });
-  {
-    fuchsia_power_broker::PowerLevel level = {};
-    do {
-      level = incoming_.SyncCall(
-          [](IncomingNamespace* incoming) { return incoming->power_broker.current_level(); });
-    } while (level != AudioCompositeServer::kAudioHardwareOn);
-  }
-
-  EXPECT_TRUE(IsTdmASclkSet());
-  EXPECT_TRUE(IsTdmBSclkSet());
-  EXPECT_TRUE(IsTdmCSclkSet());
-  EXPECT_TRUE(IsFakeClockGateEnabled());
-  EXPECT_TRUE(IsFakeClockPllEnabled());
 }
 
 }  // namespace audio::aml_g12

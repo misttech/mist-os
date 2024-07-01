@@ -4,7 +4,9 @@
 #ifndef SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_
 #define SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_
 
+#include <lib/fit/result.h>
 #include <stdint.h>
+#include <sys/mman.h>
 #include <sys/uio.h>
 #include <unistd.h>
 
@@ -13,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/genetlink.h>
 #include <linux/netlink.h>
@@ -42,6 +45,13 @@
       }                                                                               \
     }                                                                                 \
     retval;                                                                           \
+  })
+
+#define ASSERT_RESULT_SUCCESS_AND_RETURN(S)          \
+  ({                                                 \
+    auto retval = (S);                               \
+    ASSERT_TRUE(retval.is_ok()) << #S << " failed."; \
+    std::move(retval.value());                       \
   })
 
 namespace test_helper {
@@ -121,40 +131,6 @@ class SignalMaskHelper {
   sigset_t _sigmaskCopy;
 };
 
-class ScopedFD {
- public:
-  explicit ScopedFD(int fd = -1) : fd_(fd) {}
-  ScopedFD(ScopedFD &&other) noexcept {
-    fd_ = -1;
-    *this = std::move(other);
-  }
-  ~ScopedFD() {
-    if (is_valid())
-      close(fd_);
-  }
-
-  ScopedFD &operator=(ScopedFD &&other) noexcept {
-    reset();
-    fd_ = other.fd_;
-    other.fd_ = -1;
-    return *this;
-  }
-
-  bool is_valid() const { return fd_ != -1; }
-  void reset() {
-    if (is_valid()) {
-      close(fd_);
-    }
-    fd_ = -1;
-  }
-  explicit operator bool() const { return is_valid(); }
-
-  int get() const { return fd_; }
-
- private:
-  int fd_;
-};
-
 class ScopedTempFD {
  public:
   ScopedTempFD();
@@ -168,7 +144,7 @@ class ScopedTempFD {
 
  public:
   std::string name_;
-  ScopedFD fd_;
+  fbl::unique_fd fd_;
 };
 
 class ScopedTempDir {
@@ -303,6 +279,52 @@ class NetlinkEncoder {
   size_t netlink_header;
   size_t genetlink_header;
   std::vector<uint8_t> data_;
+};
+
+// A RRAI classes than handles a memory mapping. The container will ensure the
+// mapping is destroyed when the object is deleted.
+class ScopedMMap {
+ public:
+  static fit::result<int, ScopedMMap> MMap(void *addr, size_t length, int prot, int flags, int fd,
+                                           off_t offset) {
+    void *mapping = mmap(addr, length, prot, flags, fd, offset);
+    if (mapping == MAP_FAILED) {
+      int error = errno;
+      return fit::error(error);
+    }
+    return fit::ok(ScopedMMap(mapping, length));
+  }
+
+  ScopedMMap(ScopedMMap &&other) noexcept { *this = std::move(other); }
+
+  ~ScopedMMap() { Unmap(); }
+
+  ScopedMMap &operator=(ScopedMMap &&other) noexcept {
+    Unmap();
+    mapping_ = other.mapping_;
+    length_ = other.length_;
+    other.mapping_ = MAP_FAILED;
+    return *this;
+  }
+
+  void Unmap() {
+    if (is_valid()) {
+      munmap(mapping_, length_);
+      mapping_ = MAP_FAILED;
+    }
+  }
+
+  bool is_valid() const { return mapping_ != MAP_FAILED; }
+
+  explicit operator bool() const { return is_valid(); }
+
+  void *mapping() const { return mapping_; }
+
+ private:
+  ScopedMMap(void *mapping, size_t length) : mapping_(mapping), length_(length) {}
+
+  void *mapping_;
+  size_t length_;
 };
 
 // Returns the first memory mapping that matches the given predicate.

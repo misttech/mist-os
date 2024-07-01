@@ -39,6 +39,8 @@ impl FlatlandEnvironment {
             .unwrap();
         let scenic =
             builder.add_child("scenic", "#meta/scenic.cm", ChildOptions::new()).await.unwrap();
+        let config =
+            builder.add_child("config", "#meta/config.cm", ChildOptions::new()).await.unwrap();
 
         let cobalt = builder
             .add_local_child(
@@ -56,6 +58,42 @@ impl FlatlandEnvironment {
                 Route::new()
                     .capability(Capability::protocol::<MetricEventLoggerFactoryMarker>())
                     .from(&cobalt)
+                    .to(&scenic),
+            )
+            .await
+            .unwrap();
+
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.scenic.Renderer"))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
+                    ))
+                    .capability(Capability::configuration("fuchsia.scenic.PointerAutoFocus"))
+                    .capability(Capability::configuration("fuchsia.scenic.DisplayComposition"))
+                    .capability(Capability::configuration("fuchsia.scenic.ICanHazDisplayId"))
+                    .capability(Capability::configuration("fuchsia.scenic.ICanHazDisplayMode"))
+                    .capability(Capability::configuration("fuchsia.scenic.DisplayRotation"))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.MinDisplayHorizontalResolutionPx",
+                    ))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.MaxDisplayHorizontalResolutionPx",
+                    ))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.MinDisplayVerticalResolutionPx",
+                    ))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.MaxDisplayVerticalResolutionPx",
+                    ))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.MinDisplayRefreshRateMillihertz",
+                    ))
+                    .capability(Capability::configuration(
+                        "fuchsia.scenic.MaxDisplayRefreshRateMillihertz",
+                    ))
+                    .from(&config)
                     .to(&scenic),
             )
             .await

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.pty/cpp/wire.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/io-buffer.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <lib/zircon-internal/thread_annotations.h>

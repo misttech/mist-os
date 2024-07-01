@@ -113,11 +113,18 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         let file_path =
             format!("meta/{}", path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref()));
 
-        if let Some(file) = self.root_dir.get_meta_file(&file_path) {
-            flags
-                .to_object_request(server_end)
-                .handle(|object_request| vfs::file::serve(file, scope, &flags, object_request));
-            return;
+        match self.root_dir.get_meta_file(&file_path) {
+            Ok(Some(meta_file)) => {
+                flags.to_object_request(server_end).handle(|object_request| {
+                    vfs::file::serve(meta_file, scope, &flags, object_request)
+                });
+                return;
+            }
+            Ok(None) => {}
+            Err(status) => {
+                let () = send_on_open_with_error(describe, server_end, status);
+                return;
+            }
         }
 
         if let Some(subdir) = self.root_dir.get_meta_subdir(file_path + "/") {
@@ -175,7 +182,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Me
         let file_path =
             format!("meta/{}", path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref()));
 
-        if let Some(file) = self.root_dir.get_meta_file(&file_path) {
+        if let Some(file) = self.root_dir.get_meta_file(&file_path)? {
             return vfs::file::serve(file, scope, &protocols, object_request);
         }
 

@@ -217,33 +217,56 @@ pub fn get_procattr(
 
 /// Sets the Security Context associated with the `attr` entry in the task security state.
 pub fn set_procattr(
-    security_server: &SecurityServer,
-    _source: SecurityId,
+    security_server: &Arc<SecurityServer>,
+    source: SecurityId,
     target: &mut ThreadGroupState,
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
-    use bstr::ByteSlice;
+    use std::ffi::CStr;
 
-    // TODO(b/322849067): Does the `source` have the required permission(s)?
+    // Userspace may write C-style null-terminated strings, which is the only
+    // way to write an "empty" value since POSIX doesn't allow zero-length writes.
+    let context =
+        CStr::from_bytes_until_nul(context).and_then(|x| Ok(x.to_bytes())).unwrap_or(context);
 
     // Attempt to convert the Security Context string to a SID.
-    // Writes that consist of a single NUL or a newline clear the SID.
-    let context = context.trim_end_with(|c| c == '\0');
+    // Empty writes, or those containing a single newline, clear the SID.
     let sid = match context {
-        b"\x0a" => None,
+        b"\x0a" | b"" => None,
         slice => Some(security_server.security_context_to_sid(slice).map_err(|_| errno!(EINVAL))?),
     };
 
+    let check_permission = |permission| {
+        // Proc/attr values may only be set for a task by the task itself,
+        // and require that the task have the corresponding permissions.
+        check_permissions(&security_server.as_permission_check(), source, source, &[permission])
+    };
     match attr {
-        ProcAttr::Current => target.current_sid = sid.ok_or(errno!(EINVAL))?,
-        ProcAttr::Exec => target.exec_sid = sid,
-        ProcAttr::FsCreate => target.fscreate_sid = sid,
-        ProcAttr::KeyCreate => target.keycreate_sid = sid,
+        ProcAttr::Current => {
+            check_permission(ProcessPermission::SetCurrent)?;
+            // TODO(b/322849067): Verify the `source` has `dyntransition` permission to the new SID.
+            target.current_sid = sid.ok_or(errno!(EINVAL))?
+        }
         ProcAttr::Previous => {
             return error!(EINVAL);
         }
-        ProcAttr::SockCreate => target.sockcreate_sid = sid,
+        ProcAttr::Exec => {
+            check_permission(ProcessPermission::SetExec)?;
+            target.exec_sid = sid
+        }
+        ProcAttr::FsCreate => {
+            check_permission(ProcessPermission::SetFsCreate)?;
+            target.fscreate_sid = sid
+        }
+        ProcAttr::KeyCreate => {
+            check_permission(ProcessPermission::SetKeyCreate)?;
+            target.keycreate_sid = sid
+        }
+        ProcAttr::SockCreate => {
+            check_permission(ProcessPermission::SetSockCreate)?;
+            target.sockcreate_sid = sid
+        }
     };
 
     Ok(())

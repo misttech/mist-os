@@ -3,14 +3,6 @@
 # found in the LICENSE file.
 
 load("@fuchsia_sdk//fuchsia:assembly.bzl", "fuchsia_legacy_bundle", "fuchsia_platform_artifacts")
-load(
-    "//:bundles/assembly/platform_aib_names.bzl",
-    "BRINGUP_PLATFORM_AIB_NAMES",
-    "ENG_PLATFORM_AIB_NAMES",
-    "USERDEBUG_PLATFORM_AIB_NAMES",
-    "USER_PLATFORM_AIB_NAMES",
-)
-load("//build/bazel/assembly:platform_aibs.bzl", "platform_aibs")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -32,35 +24,28 @@ fuchsia_legacy_bundle(
     files = "@gn_targets//build/images/zedboot:zedboot.bazel_legacy_aib",
 )
 
-[
-    fuchsia_platform_artifacts(
-        name = aib,
-        applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
-        files = "@gn_targets//bundles/assembly:{}".format(aib),
-    )
-    for aib in ENG_PLATFORM_AIB_NAMES
-]
-
-platform_aibs(
+alias(
     name = "platform_bringup",
-    aibs = [":{}".format(aib) for aib in BRINGUP_PLATFORM_AIB_NAMES],
-    applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    actual = ":platform_eng",
 )
 
-platform_aibs(
+fuchsia_platform_artifacts(
     name = "platform_user",
-    aibs = [":{}".format(aib) for aib in USER_PLATFORM_AIB_NAMES],
     applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    directory = "@gn_targets//bundles/assembly:user.bazel_inputs.directory",
+    files = "@gn_targets//bundles/assembly:user.bazel_inputs",
 )
 
-platform_aibs(
+fuchsia_platform_artifacts(
     name = "platform_userdebug",
-    aibs = [":{}".format(aib) for aib in USERDEBUG_PLATFORM_AIB_NAMES],
     applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    directory = "@gn_targets//bundles/assembly:userdebug.bazel_inputs.directory",
+    files = "@gn_targets//bundles/assembly:userdebug.bazel_inputs",
 )
 
-platform_aibs(
+fuchsia_platform_artifacts(
     name = "platform_eng",
-    aibs = [":{}".format(aib) for aib in ENG_PLATFORM_AIB_NAMES],
     applicable_licenses = ["@gn_targets//:all_licenses_spdx_json"],
+    directory = "@gn_targets//bundles/assembly:eng.bazel_inputs.directory",
+    files = "@gn_targets//bundles/assembly:eng.bazel_inputs",
 )

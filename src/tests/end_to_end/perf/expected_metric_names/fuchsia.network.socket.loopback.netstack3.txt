@@ -18,6 +18,8 @@ fuchsia.network.socket.loopback.netstack3: MultiWriteRead/UDP/IPv6/1kB/10Message
 fuchsia.network.socket.loopback.netstack3: MultiWriteRead/UDP/IPv6/1kB/50Messages
 fuchsia.network.socket.loopback.netstack3: MultiWriteRead/UDP/IPv6/60kB/10Messages
 fuchsia.network.socket.loopback.netstack3: MultiWriteRead/UDP/IPv6/60kB/50Messages
+fuchsia.network.socket.loopback.netstack3: PingLatency/IPv4
+fuchsia.network.socket.loopback.netstack3: PingLatency/IPv6
 fuchsia.network.socket.loopback.netstack3: WriteRead/TCP/IPv4/1000kB
 fuchsia.network.socket.loopback.netstack3: WriteRead/TCP/IPv4/100kB
 fuchsia.network.socket.loopback.netstack3: WriteRead/TCP/IPv4/10kB

@@ -17,7 +17,7 @@ import unittest.mock as mock
 # keep-sorted start
 from pathlib import Path
 from power_test_utils import power_test_utils
-from trace_processing import trace_metrics
+from trace_processing import trace_model
 
 # keep-sorted end
 
@@ -57,12 +57,11 @@ class PowerSamplerTest(unittest.TestCase):
         with mock.patch.object(time, "time", return_value=10):
             sampler.stop()
 
-        self.assertEqual(sampler.to_fuchsiaperf_results(), [])
+        self.assertEqual(
+            sampler.metrics_processor().process_metrics(trace_model.Model()), []
+        )
 
-    @mock.patch("subprocess.Popen")
-    def test_sampler_with_measurepower(
-        self, mock_popen: mock.MagicMock
-    ) -> None:
+    def test_sampler_with_measurepower(self) -> None:
         """Tests PowerSampler when given a path to a measurepower binary.
 
         The sampler should interact with the binary via subprocess.Popen
@@ -72,57 +71,46 @@ class PowerSamplerTest(unittest.TestCase):
             self.config_width_measurepower_path, fallback_to_stub=False
         )
 
-        mock_proc = mock_popen.return_value
-        mock_proc.poll.return_value = None
+        with mock.patch("subprocess.Popen") as mock_popen:
+            mock_proc = mock_popen.return_value
+            mock_proc.poll.return_value = None
 
-        # Fake output from mock_proc
-        self.expected_csv_output_path.write_text(
-            """Timestamp,Current,Voltage
+            # Fake output from mock_proc
+            self.expected_csv_output_path.write_text(
+                """Mandatory Timestamp,Current,Voltage
 0,0,12
 1000000000,25,12
 2000000000,100,12
 4000000000,75,12
-"""
-        )
+""",
+                encoding="utf-8",
+            )
 
-        sampler.start()
+            sampler.start()
 
-        mock_popen.assert_called()
+            mock_popen.assert_called()
+            self.assertEqual(
+                mock_popen.call_args.args[0],
+                [
+                    _MEASUREPOWER_PATH,
+                    "-format",
+                    "csv",
+                    "-out",
+                    str(self.expected_csv_output_path),
+                ],
+            )
+
+            mock_proc.wait.return_value = 0
+            sampler.stop()
+
+            mock_proc.send_signal.assert_called_with(signal.SIGINT)
         self.assertEqual(
-            mock_popen.call_args.args[0],
+            sampler.extract_samples(),
             [
-                _MEASUREPOWER_PATH,
-                "-format",
-                "csv",
-                "-out",
-                str(self.expected_csv_output_path),
-            ],
-        )
-
-        mock_proc.wait.return_value = 0
-        sampler.stop()
-
-        mock_proc.send_signal.assert_called_with(signal.SIGINT)
-
-        results = sampler.to_fuchsiaperf_results()
-        self.assertEqual(
-            results,
-            [
-                trace_metrics.TestCaseResult(
-                    label="MinPower",
-                    unit=trace_metrics.Unit.watts,
-                    values=[0.0],
-                ),
-                trace_metrics.TestCaseResult(
-                    label="MeanPower",
-                    unit=trace_metrics.Unit.watts,
-                    values=[0.6],
-                ),
-                trace_metrics.TestCaseResult(
-                    label="MaxPower",
-                    unit=trace_metrics.Unit.watts,
-                    values=[1.2],
-                ),
+                power_test_utils.Sample("0", "0", "12", None),
+                power_test_utils.Sample("1000000000", "25", "12", None),
+                power_test_utils.Sample("2000000000", "100", "12", None),
+                power_test_utils.Sample("4000000000", "75", "12", None),
             ],
         )
 

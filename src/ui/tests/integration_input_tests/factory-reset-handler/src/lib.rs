@@ -34,7 +34,7 @@ async fn assemble_realm(
 
     // Declare packaged components.
     let scenic_test_realm =
-        PackagedComponent::new_from_modern_url("scenic-test-realm", "#meta/scenic_only.cm");
+        PackagedComponent::new_from_modern_url("scenic-test-realm", "#meta/scenic_with_config.cm");
     let a11y_test_realm =
         PackagedComponent::new_from_modern_url("a11y-test-realm", "#meta/fake-a11y-manager.cm");
     let scene_manager = PackagedComponent::new_from_modern_url("input-owner", SCENE_MANAGER_URL);

@@ -189,7 +189,13 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
                             off: bpf_instruction.k as i16,
                             ..Default::default()
                         };
-                        prep_patch(&mut to_be_patched, (i as i16) + j_instr.off, ebpf_code.len());
+                        prep_patch(
+                            &mut to_be_patched,
+                            (i as i16).checked_add(j_instr.off).ok_or_else(|| {
+                                EbpfError::ProgramLoadError("buffer overflow".to_owned())
+                            })?,
+                            ebpf_code.len(),
+                        );
                         ebpf_code.push(j_instr);
                     }
                     _ => {
@@ -213,7 +219,13 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
                             jt_instr.set_src_reg(REG_X);
                         }
                         jt_instr.set_dst_reg(REG_A);
-                        prep_patch(&mut to_be_patched, (i as i16) + jt_instr.off, ebpf_code.len());
+                        prep_patch(
+                            &mut to_be_patched,
+                            (i as i16).checked_add(jt_instr.off).ok_or_else(|| {
+                                EbpfError::ProgramLoadError("buffer overflow".to_owned())
+                            })?,
+                            ebpf_code.len(),
+                        );
 
                         ebpf_code.push(jt_instr);
 
@@ -223,7 +235,13 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
                             off: bpf_instruction.jf as i16,
                             ..Default::default()
                         };
-                        prep_patch(&mut to_be_patched, (i as i16) + jf_instr.off, ebpf_code.len());
+                        prep_patch(
+                            &mut to_be_patched,
+                            (i as i16).checked_add(jf_instr.off).ok_or_else(|| {
+                                EbpfError::ProgramLoadError("buffer overflow".to_owned())
+                            })?,
+                            ebpf_code.len(),
+                        );
 
                         ebpf_code.push(jf_instr);
                     }
@@ -318,4 +336,28 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
         }
     }
     Ok(ebpf_code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_offset_overflow() {
+        let prg = vec![
+            sock_filter {
+                code: (BPF_JMP | BPF_JA) as u16,
+                jt: u8::max_value(),
+                jf: u8::max_value(),
+                k: 0x7fff,
+            },
+            sock_filter {
+                code: (BPF_JMP | BPF_JA) as u16,
+                jt: u8::max_value(),
+                jf: u8::max_value(),
+                k: 0x7fff,
+            },
+        ];
+        assert!(cbpf_to_ebpf(&prg).is_err());
+    }
 }

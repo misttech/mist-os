@@ -9,7 +9,7 @@ use session_framework_metrics_registry::cobalt_registry as metrics;
 use tracing::warn;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
-/// Creates a LoggerProxy connected to Cobalt.
+/// Creates a `LoggerProxy` connected to Cobalt.
 ///
 /// The connection is performed in a Future run on the global executor, but the `LoggerProxy`
 /// can be used immediately.
@@ -42,8 +42,8 @@ pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
 ///
 /// # Parameters
 /// - `logger_proxy`: The cobalt logger.
-/// - `start_time`: The time when session_manager starts launching a session.
-/// - `end_time`: The time when session_manager has bound to a session. This must be strictly after
+/// - `start_time`: The time when `session_manager` starts launching a session.
+/// - `end_time`: The time when `session_manager` has bound to a session. This must be strictly after
 ///               `start_time`.
 ///
 /// # Returns
@@ -72,14 +72,16 @@ pub async fn log_session_launch_time(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventLoggerRequest};
     use futures::TryStreamExt;
 
     /// Tests that the right payload is sent to Cobalt when logging the session launch time.
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_log_session_launch_time() {
         let (logger_proxy, mut logger_server) =
             create_proxy_and_stream::<MetricEventLoggerMarker>()
@@ -92,30 +94,24 @@ mod tests {
         })
         .detach();
 
-        if let Some(log_request) = logger_server.try_next().await.unwrap() {
-            if let MetricEventLoggerRequest::LogInteger {
-                metric_id,
-                value,
+        assert_matches!(
+            logger_server.try_next().await.unwrap(),
+            Some(MetricEventLoggerRequest::LogInteger {
+                metric_id: metrics::SESSION_LAUNCH_TIME_MIGRATED_METRIC_ID,
+                value: 5,
                 event_codes,
                 responder: _,
-            } = log_request
-            {
-                assert_eq!(metric_id, metrics::SESSION_LAUNCH_TIME_MIGRATED_METRIC_ID);
+            }) => {
                 assert_eq!(
                     event_codes,
                     vec![metrics::SessionLaunchTimeMigratedMetricDimensionStatus::Success as u32]
                 );
-                assert_eq!(value, 5);
-            } else {
-                assert!(false);
             }
-        } else {
-            assert!(false);
-        }
+        )
     }
 
     /// Tests that an error is raised if end_time < start_time.
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test(allow_stalls = false)]
     async fn test_log_session_launch_time_swap_start_end_time() {
         let (logger_proxy, _logger_server) = create_proxy_and_stream::<MetricEventLoggerMarker>()
             .expect("Failed to create Logger FIDL.");

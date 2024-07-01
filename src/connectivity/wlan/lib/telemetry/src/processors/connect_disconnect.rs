@@ -122,27 +122,10 @@ pub struct DisconnectInfo {
     pub connected_duration: zx::Duration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
-    pub ap_state: ApState,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ApState {
-    pub original: BssDescription,
-    pub tracked: TrackedBss,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TrackedBss {
-    pub signal: Signal,
-    pub channel: Channel,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Signal {
-    /// Calculated received signal strength for the beacon/probe response.
-    pub rssi_dbm: i8,
-    /// Signal to noise ratio for the beacon/probe response.
-    pub snr_db: i8,
+    pub original_bss_desc: Box<BssDescription>,
+    pub current_rssi_dbm: i8,
+    pub current_snr_db: i8,
+    pub current_channel: Channel,
 }
 
 pub struct ConnectDisconnectLogger {
@@ -191,15 +174,19 @@ impl ConnectDisconnectLogger {
         }
     }
 
-    pub async fn log_connect_attempt(&self, result: fidl_sme::ConnectResult, bss: &BssDescription) {
+    pub async fn log_connect_attempt(
+        &self,
+        result: fidl_ieee80211::StatusCode,
+        bss: &BssDescription,
+    ) {
         let mut metric_events = vec![];
         metric_events.push(MetricEvent {
             metric_id: metrics::CONNECT_ATTEMPT_BREAKDOWN_BY_STATUS_CODE_METRIC_ID,
-            event_codes: vec![result.code as u32],
+            event_codes: vec![result as u32],
             payload: MetricEventPayload::Count(1),
         });
 
-        if result.code == fidl_ieee80211::StatusCode::Success {
+        if result == fidl_ieee80211::StatusCode::Success {
             *self.connection_state.lock() = ConnectionState::Connected(ConnectedState {});
             inspect_log!(self.connect_events_node.lock().get_mut(), {
                 network: {
@@ -224,7 +211,7 @@ impl ConnectDisconnectLogger {
     }
 
     fn log_disconnect_inspect(&self, info: &DisconnectInfo) {
-        let connected_network = InspectConnectedNetwork::from(&info.ap_state.original);
+        let connected_network = InspectConnectedNetwork::from(&*info.original_bss_desc);
         let connected_network_id =
             self.connected_networks_node.lock().record_item(connected_network);
         let disconnect_source = InspectDisconnectSource::from(&info.disconnect_source);
@@ -234,9 +221,9 @@ impl ConnectDisconnectLogger {
             connected_duration: info.connected_duration.into_nanos(),
             disconnect_source_id: disconnect_source_id,
             network_id: connected_network_id,
-            rssi_dbm: info.ap_state.tracked.signal.rssi_dbm,
-            snr_db: info.ap_state.tracked.signal.snr_db,
-            channel: format!("{}", info.ap_state.tracked.channel),
+            rssi_dbm: info.current_rssi_dbm,
+            snr_db: info.current_snr_db,
+            channel: format!("{}", info.current_channel),
         });
     }
 }
@@ -267,14 +254,8 @@ mod tests {
 
         // Log the event
         let bss_description = random_bss_description!();
-        let mut test_fut = pin!(logger.log_connect_attempt(
-            fidl_sme::ConnectResult {
-                code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
-                is_credential_rejected: false,
-                is_reconnect: false,
-            },
-            &bss_description
-        ));
+        let mut test_fut =
+            pin!(logger.log_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
         assert_eq!(
             test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
             Poll::Ready(())
@@ -313,14 +294,8 @@ mod tests {
         );
 
         // Log the event
-        let mut test_fut = pin!(logger.log_connect_attempt(
-            fidl_sme::ConnectResult {
-                code: fidl_fuchsia_wlan_ieee80211::StatusCode::Success,
-                is_credential_rejected: false,
-                is_reconnect: false,
-            },
-            &bss_description
-        ));
+        let mut test_fut =
+            pin!(logger.log_connect_attempt(fidl_ieee80211::StatusCode::Success, &bss_description));
         assert_eq!(
             test_helper.run_until_stalled_drain_cobalt_events(&mut test_fut),
             Poll::Ready(())
@@ -356,10 +331,10 @@ mod tests {
                 mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
                 reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
             }),
-            ap_state: ApState {
-                original: bss_description,
-                tracked: TrackedBss { signal: Signal { rssi_dbm: -30, snr_db: 25 }, channel },
-            },
+            original_bss_desc: Box::new(bss_description),
+            current_rssi_dbm: -30,
+            current_snr_db: 25,
+            current_channel: channel,
         };
         let mut test_fut = pin!(logger.log_disconnect(&disconnect_info));
         assert_eq!(

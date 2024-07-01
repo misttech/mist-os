@@ -210,7 +210,7 @@ static const fpbus::Node gpio_c_dev = []() {
 
 zx_status_t Nelson::GpioInit() {
   // Enable mute LED so it will be controlled by mute switch.
-  gpio_init_steps_.push_back({GPIO_AMBER_LED_PWM, GpioConfigOut(1)});
+  gpio_init_steps_.push_back(GpioConfigOut(GPIO_AMBER_LED_PWM, 1));
 
   fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
   metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(

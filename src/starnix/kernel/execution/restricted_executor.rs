@@ -12,6 +12,7 @@ use crate::task::{
     ptrace_attach_from_state, CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup,
     PtraceCoreState, StopState, Task, TaskBuilder, ThreadGroup, ThreadGroupWriteGuard,
 };
+use crate::vfs::DelayedReleaser;
 use anyhow::{format_err, Error};
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use fuchsia_zircon::{
@@ -481,6 +482,10 @@ pub fn execute_task<F, G>(
             let pre_run_result = pre_run(&mut locked, &mut current_task);
             if pre_run_result.is_err() {
                 log_error!("Pre run failed from {pre_run_result:?}. The task will not be run.");
+
+                // Drop the task_complete callback to ensure that the closure isn't holding any
+                // releasables.
+                std::mem::drop(task_complete);
             } else {
                 let run_result = match run_task(&mut locked, &mut current_task) {
                     Err(error) => {
@@ -499,6 +504,9 @@ pub fn execute_task<F, G>(
             // `release` must be called as the absolute last action on this thread to ensure that
             // any deferred release are done before it.
             current_task.release(&mut locked);
+
+            // Ensure that no releasables are registered after this point as we unwind the stack.
+            DelayedReleaser::finalize();
         })
         .expect("able to spawn threads");
 

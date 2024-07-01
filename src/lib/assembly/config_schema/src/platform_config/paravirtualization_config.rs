@@ -12,9 +12,18 @@ fn default_allowed() -> FeatureControl {
 }
 
 /// Platform configuration options for paravirtualization.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformParavirtualizationConfig {
     #[serde(default = "default_allowed")]
     pub enabled: FeatureControl,
+}
+
+impl Default for PlatformParavirtualizationConfig {
+    fn default() -> Self {
+        Self {
+            // Match the value given to serde when the field is omitted.
+            enabled: default_allowed(),
+        }
+    }
 }

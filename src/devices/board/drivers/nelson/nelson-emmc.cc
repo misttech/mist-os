@@ -111,18 +111,18 @@ const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
 
 zx_status_t Nelson::EmmcInit() {
   // set alternate functions to enable EMMC
-  gpio_init_steps_.push_back({S905D3_EMMC_D0, GpioSetAltFunction(S905D3_EMMC_D0_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_D1, GpioSetAltFunction(S905D3_EMMC_D1_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_D2, GpioSetAltFunction(S905D3_EMMC_D2_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_D3, GpioSetAltFunction(S905D3_EMMC_D3_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_D4, GpioSetAltFunction(S905D3_EMMC_D4_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_D5, GpioSetAltFunction(S905D3_EMMC_D5_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_D6, GpioSetAltFunction(S905D3_EMMC_D6_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_D7, GpioSetAltFunction(S905D3_EMMC_D7_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_CLK, GpioSetAltFunction(S905D3_EMMC_CLK_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_RST, GpioSetAltFunction(S905D3_EMMC_RST_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_CMD, GpioSetAltFunction(S905D3_EMMC_CMD_FN)});
-  gpio_init_steps_.push_back({S905D3_EMMC_DS, GpioSetAltFunction(S905D3_EMMC_DS_FN)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D0, S905D3_EMMC_D0_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D1, S905D3_EMMC_D1_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D2, S905D3_EMMC_D2_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D3, S905D3_EMMC_D3_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D4, S905D3_EMMC_D4_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D5, S905D3_EMMC_D5_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D6, S905D3_EMMC_D6_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_D7, S905D3_EMMC_D7_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_CLK, S905D3_EMMC_CLK_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_RST, S905D3_EMMC_RST_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_CMD, S905D3_EMMC_CMD_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_EMMC_DS, S905D3_EMMC_DS_FN));
 
   fidl::Arena<> fidl_arena;
 

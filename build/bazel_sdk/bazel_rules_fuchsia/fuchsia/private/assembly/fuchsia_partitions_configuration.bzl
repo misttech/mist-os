@@ -6,9 +6,10 @@
 
 load(
     ":providers.bzl",
-    "FuchsiaAssemblyConfigInfo",
     "FuchsiaPartitionInfo",
+    "FuchsiaPartitionsConfigInfo",
 )
+load(":utils.bzl", "select_single_file")
 
 def _fuchsia_partitions_configuration(ctx):
     partitions_config_file = ctx.actions.declare_file("%s/partitions_config.json" % ctx.label.name)
@@ -42,7 +43,10 @@ def _fuchsia_partitions_configuration(ctx):
 
     return [
         DefaultInfo(files = depset(direct = output_files)),
-        FuchsiaAssemblyConfigInfo(config = partitions_config_file),
+        FuchsiaPartitionsConfigInfo(
+            files = output_files,
+            config = partitions_config_file,
+        ),
     ]
 
 fuchsia_partitions_configuration = rule(
@@ -72,24 +76,32 @@ fuchsia_partitions_configuration = rule(
 )
 
 def _fuchsia_prebuilt_partitions_configuration_impl(ctx):
+    partitions_config = ctx.file.partitions_config or select_single_file(
+        ctx.files.files,
+        "partitions_config.json",
+        "Use the 'partitions_config' attribute to manually specify the partitions config file.",
+    )
     return [
-        DefaultInfo(files = depset(direct = ctx.files.srcs)),
-        FuchsiaAssemblyConfigInfo(config = ctx.file.partitions_config),
+        DefaultInfo(files = depset(ctx.files.files)),
+        FuchsiaPartitionsConfigInfo(
+            files = ctx.files.files,
+            config = partitions_config,
+        ),
     ]
 
 fuchsia_prebuilt_partitions_configuration = rule(
     doc = """Instantiates a prebuilt partitions configuration.""",
     implementation = _fuchsia_prebuilt_partitions_configuration_impl,
     attrs = {
-        "srcs": attr.label(
+        "files": attr.label(
             doc = "A filegroup target capturing all prebuilt partition config artifacts.",
             allow_files = True,
             mandatory = True,
         ),
         "partitions_config": attr.label(
-            doc = "Relative path of prebuilt partition config file. Must be present within `srcs` as well.",
+            doc = """For manually specifying the prebuilt partition config file.
+                This file must be present within `files` as well.""",
             allow_single_file = [".json"],
-            mandatory = True,
         ),
     },
 )

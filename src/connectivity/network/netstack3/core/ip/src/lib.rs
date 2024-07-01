@@ -184,6 +184,7 @@ pub mod socket {
 
 /// Raw IP sockets.
 pub mod raw {
+    pub use crate::internal::raw::counters::RawIpSocketCounters;
     pub use crate::internal::raw::filter::RawIpSocketIcmpFilter;
     pub use crate::internal::raw::protocol::RawIpSocketProtocol;
     pub use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};

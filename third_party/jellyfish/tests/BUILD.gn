@@ -6,6 +6,7 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("jellyfish_test") {
+    enable_mypy = false
     main_source = "test_jellyfish.py"
     libraries = [
       "//build/python/tests/lib",

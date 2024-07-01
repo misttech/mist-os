@@ -22,13 +22,12 @@
 #include "src/performance/perfetto-bridge/producer_connector_impl.h"
 
 int main(int argc, char** argv) {
+  // Set up the FIDL task runner.
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fxl::CommandLine cl = fxl::CommandLineFromArgcArgv(argc, argv);
   if (!fxl::SetLogSettingsFromCommandLine(cl)) {
     return EXIT_FAILURE;
   }
-
-  // Set up the FIDL task runner.
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
 
   // Set up the Perfetto environment and task runner.

@@ -11,7 +11,6 @@
 
 #include "lib/syslog/cpp/log_level.h"
 #include "lib/syslog/cpp/log_settings.h"
-#include "lib/syslog/cpp/logging_backend.h"
 
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
@@ -24,14 +23,6 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
  public:
   explicit Puppet(std::unique_ptr<sys::ComponentContext> context) : context_(std::move(context)) {
     context_->outgoing()->AddPublicService(sink_bindings_.GetHandler(this));
-    syslog_runtime::SetInterestChangedListener(
-        +[](void* context, fuchsia_logging::LogSeverity severity) {
-          syslog_runtime::LogBuffer buffer;
-          syslog_runtime::BeginRecord(&buffer, severity, __FILE__, __LINE__, "Changed severity",
-                                      nullptr);
-          buffer.Flush();
-        },
-        nullptr);
   }
 
   void StopInterestListener(StopInterestListenerCallback callback) override {
@@ -50,28 +41,27 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   }
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
-    syslog_runtime::LogBuffer buffer;
-    syslog_runtime::BeginRecord(&buffer, spec.record.severity, spec.file.data(), spec.line, nullptr,
-                                nullptr);
+    auto builder = syslog_runtime::LogBufferBuilder(spec.record.severity);
+    auto buffer = builder.WithFile(spec.file, spec.line).Build();
     for (auto& arg : spec.record.arguments) {
       switch (arg.value.Which()) {
         case fuchsia::diagnostics::stream::Value::kUnknown:
         case fuchsia::diagnostics::stream::Value::Invalid:
           break;
         case fuchsia::diagnostics::stream::Value::kFloating:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.floating());
+          buffer.WriteKeyValue(arg.name, arg.value.floating());
           break;
         case fuchsia::diagnostics::stream::Value::kSignedInt:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.signed_int());
+          buffer.WriteKeyValue(arg.name, arg.value.signed_int());
           break;
         case fuchsia::diagnostics::stream::Value::kUnsignedInt:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.unsigned_int());
+          buffer.WriteKeyValue(arg.name, arg.value.unsigned_int());
           break;
         case fuchsia::diagnostics::stream::Value::kText:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.text().data());
+          buffer.WriteKeyValue(arg.name, arg.value.text().data());
           break;
         case fuchsia::diagnostics::stream::Value::kBoolean:
-          syslog_runtime::WriteKeyValue(&buffer, arg.name.data(), arg.value.boolean());
+          buffer.WriteKeyValue(arg.name, arg.value.boolean());
           break;
       }
     }
@@ -84,10 +74,24 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
   fidl::BindingSet<fuchsia::validate::logs::LogSinkPuppet> sink_bindings_;
 };
 
+static bool is_init = true;
+
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::LogSettingsBuilder log_settings;
-  log_settings.WithDispatcher(loop.dispatcher());
+  log_settings.WithDispatcher(loop.dispatcher())
+      .WithSeverityChangedListener(+[](fuchsia_logging::LogSeverity severity) {
+        if (is_init) {
+          // Don't log if it's our first interest event.
+          // If we try to log here, we deadlock (since this is the first event,
+          // and logging is still being setup at this point).
+          is_init = false;
+          return;
+        }
+        auto builder = syslog_runtime::LogBufferBuilder(severity);
+        auto buffer = builder.WithFile(__FILE__, __LINE__).WithMsg("Changed severity").Build();
+        buffer.Flush();
+      });
   log_settings.BuildAndInitialize();
   Puppet puppet(sys::ComponentContext::CreateAndServeOutgoingDirectory());
   // Note: This puppet is ran by a runner that

@@ -38,15 +38,14 @@ struct ApInfo {
 
 struct ClientIfc : public SimInterface {
  public:
-  void OnScanResult(OnScanResultRequestView request, fdf::Arena& arena,
+  void OnScanResult(OnScanResultRequestView request,
                     OnScanResultCompleter::Sync& completer) override {
     on_scan_result_(&request->result);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
-  void OnScanEnd(OnScanEndRequestView request, fdf::Arena& arena,
-                 OnScanEndCompleter::Sync& completer) override {
+  void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override {
     on_scan_end_(&request->end);
-    completer.buffer(arena).Reply();
+    completer.Reply();
   }
 
   std::function<void(const wlan_fullmac_wire::WlanFullmacScanResult*)> on_scan_result_;
@@ -69,7 +68,7 @@ class ActiveScanTest : public SimTest {
                    const wlan_common::WlanChannel& channel,
                    zx::duration beacon_interval = kBeaconInterval);
 
-  void StartScan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req);
+  void StartScan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req);
   // TODO(https://fxbug.dev/https://fxbug.dev/42164585): Align the way active_scan_test and
   // passive_scan_test
 
@@ -152,8 +151,8 @@ void ActiveScanTest::StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80
 }
 
 // Tell the DUT to run a scan
-void ActiveScanTest::StartScan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req) {
-  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->StartScan(*req);
+void ActiveScanTest::StartScan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req) {
+  ASSERT_OK(client_ifc_.client_->StartScan(*req));
 }
 
 // Called when simulation time has run out. Takes down all fake APs and the simulated DUT.
@@ -278,7 +277,7 @@ TEST_F(ActiveScanTest, RandomMacThreeAps) {
 
   // Build scan request
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   builder.channels(
@@ -303,7 +302,7 @@ TEST_F(ActiveScanTest, RandomMacThreeAps) {
 TEST_F(ActiveScanTest, ScanTwice) {
   // Build scan request
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   builder.channels(
@@ -334,7 +333,7 @@ TEST_F(ActiveScanTest, ScanTwice) {
 // driver (as there are no APs in the environment).
 TEST_F(ActiveScanTest, CheckNumProbeReqsSent) {
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   builder.channels(
@@ -363,7 +362,7 @@ TEST_F(ActiveScanTest, EmptyChannelList) {
 
   // Case contains empty channels_list.
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   // Keep the table entry but make the VectorView empty.
@@ -406,7 +405,7 @@ TEST_F(ActiveScanTest, SsidTooLong) {
 
   // Case contains over-size ssid in ssids_list in request.
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   // Keep the table entry but make the VectorView empty.
@@ -443,7 +442,7 @@ TEST_F(ActiveScanTest, ScanWhenFirmwareBusy) {
   });
 
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   // Keep the table entry but make the VectorView empty.

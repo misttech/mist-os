@@ -53,12 +53,16 @@ void riscv64_feature_init() {
 
     // Make sure the detected cbom size is usable.
     DEBUG_ASSERT(riscv_cbom_size > 0 && ispow2(riscv_cbom_size));
+  } else {
+    riscv_cbom_size = 0;
   }
   if (gRiscvFeatures[arch::RiscvFeature::kZicboz]) {
     dprintf(INFO, "RISCV: feature cboz, size %#x\n", riscv_cboz_size);
 
     // Make sure the detected cboz size is usable.
     DEBUG_ASSERT(riscv_cboz_size > 0 && ispow2(riscv_cboz_size) && riscv_cboz_size < PAGE_SIZE);
+  } else {
+    riscv_cboz_size = 0;
   }
   if (gRiscvFeatures[arch::RiscvFeature::kSstc]) {
     dprintf(INFO, "RISCV: feature sstc\n");

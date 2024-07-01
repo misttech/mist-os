@@ -205,6 +205,7 @@ fn create_bridged_network(
 // `guest`s and the `gateway` can communicate with each other if there is a
 // candidate for upstream present.
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     "basic",
     &[
@@ -526,6 +527,7 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn dhcpv4_client_started<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let host_realm = sandbox

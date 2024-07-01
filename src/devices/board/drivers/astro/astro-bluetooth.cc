@@ -53,10 +53,10 @@ static const std::vector<fpbus::BootMetadata> bt_uart_boot_metadata{
 
 zx_status_t Astro::BluetoothInit() {
   // set alternate functions to enable Bluetooth UART
-  gpio_init_steps_.push_back({S905D2_UART_TX_A, GpioSetAltFunction(S905D2_UART_TX_A_FN)});
-  gpio_init_steps_.push_back({S905D2_UART_RX_A, GpioSetAltFunction(S905D2_UART_RX_A_FN)});
-  gpio_init_steps_.push_back({S905D2_UART_CTS_A, GpioSetAltFunction(S905D2_UART_CTS_A_FN)});
-  gpio_init_steps_.push_back({S905D2_UART_RTS_A, GpioSetAltFunction(S905D2_UART_RTS_A_FN)});
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_UART_TX_A, S905D2_UART_TX_A_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_UART_RX_A, S905D2_UART_RX_A_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_UART_CTS_A, S905D2_UART_CTS_A_FN));
+  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_UART_RTS_A, S905D2_UART_RTS_A_FN));
 
   fdf::Arena arena('BLUE');
 

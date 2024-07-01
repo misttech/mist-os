@@ -88,7 +88,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2115
+From //build/config/BUILDCONFIG.gn:2118
 
 ### allowed_test_device_types
 
@@ -114,17 +114,6 @@ Path to the amlogic decoder firmware file. Overrides the default in the build.
 **Current value (from the default):** `""`
 
 From //src/media/drivers/amlogic_decoder/BUILD.gn:12
-
-### amlogic_display_is_dfv2
-
-If true, the driver component `fuchsia://fuchsia.com/amlogic-display#
-meta/amlogic-display.cm` will be the DFv2 version of the driver component
-(`:amlogic-display-dfv2`). Otherwise, it will be the DFv1 version of the
-driver component (`:amlogic-display-dfv1`).
-
-**Current value (from the default):** `true`
-
-From //src/graphics/display/drivers/amlogic-display/BUILD.gn:16
 
 ### api_compatibility_testing
 
@@ -333,6 +322,26 @@ remote inputs, and more.
 
 From //build/bazel/logging.gni:9
 
+### bazel_fuchsia_sdk_all_api_levels
+
+Set to true to populate the @fuchsia_sdk external repository with prebuilt
+binaries for all API levels, or a subset of them. Possible values are:
+
+  false: The default, which is to only build for the current PLATFORM
+      API level, unless `override_target_api_level` is set.
+      See //build/config/fuchsia/override_target_api_level.gni.
+
+  true: To build for all API levels listed in
+      platform_version.build_time_supported_api_levels, which defaults to
+      all supported API levels, including the PLATFORM one, unless
+      `override_build_time_supported_api_levels` is also set.
+      See //build/config/fuchsia/platform_versions.gni.
+
+
+**Current value (from the default):** `false`
+
+From //build/bazel/bazel_fuchsia_sdk.gni:29
+
 ### bazel_fuchsia_sdk_all_cpus
 
 Set to true to populate the @fuchsia_sdk external repository with prebuilt
@@ -406,6 +415,19 @@ to stdout/stderr during the Ninja build.
 
 From //build/bazel/bazel_action.gni:18
 
+### bazel_rbe_exec_strategy
+
+When bazel is configured to use RBE, this controls the execution strategy
+that is used.
+
+Supported options:
+  "remote": on cache-miss, build remotely (default)
+  "local": on cache-miss, build locally
+
+**Current value (from the default):** `"remote"`
+
+From //build/bazel/remote_services.gni:24
+
 ### bazel_upload_build_events
 
 Configure bazel to stream build events and results to a service.
@@ -425,7 +447,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:32
+From //build/bazel/remote_services.gni:40
 
 ### blobfs_capacity
 
@@ -1212,7 +1234,7 @@ that we want the legacy AIB packaged and archived for a given product:
 
 **Current value (from the default):** `false`
 
-From //build/images/fuchsia/BUILD.gn:27
+From //build/images/fuchsia/BUILD.gn:26
 
 ### current_cpu
 
@@ -2769,14 +2791,6 @@ From //src/devices/sysmem/drivers/sysmem/BUILD.gn:48
 
 From //src/devices/sysmem/drivers/sysmem/BUILD.gn:40
 
-### driver_sysmem_contiguous_memory_size_override
-
-TODO(b/322009732): remove
-
-**Current value (from the default):** `-1`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:53
-
 ### driver_sysmem_contiguous_memory_size_percent
 
 **Current value (from the default):** `5`
@@ -2788,14 +2802,6 @@ From //src/devices/sysmem/drivers/sysmem/BUILD.gn:41
 **Current value (from the default):** `0`
 
 From //src/devices/sysmem/drivers/sysmem/BUILD.gn:42
-
-### driver_sysmem_protected_memory_size_override
-
-TODO(b/322009732): remove
-
-**Current value (from the default):** `-1`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:56
 
 ### driver_sysmem_protected_memory_size_percent
 
@@ -3296,10 +3302,9 @@ Consider the following example from a fictitious
      }
 
      # Build the installer with Bazel.
-     bazel_action("build_installer") {
-       command = "build"
+     bazel_build_action("build_installer") {
        bazel_targets = "//vendor/acme/proprietary/installer"
-       bazel_inputs = [ ":acme_firmware" ]
+       deps = [ ":acme_firmware" ]
        copy_outputs = [
          {
            bazel = "vendor/acme/proprietary/installer/installer"
@@ -3322,7 +3327,7 @@ vendor/acme/proprietary:build_installer with Ninja:
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:128
+From //build/bazel/legacy_ninja_build_outputs.gni:127
 
 ### extra_package_labels
 
@@ -3337,7 +3342,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1837
+From //build/config/BUILDCONFIG.gn:1840
 
 ### extra_vbmeta_descriptors
 
@@ -4404,7 +4409,7 @@ Each element of the list is one variant, which is a scope defining:
 }, {
   configs = ["//build/config/sanitizers:ubsan"]
   remove_common_configs = ["//build/config:no_rtti"]
-  tags = ["instrumented", "ubsan"]
+  tags = ["instrumented", "ubsan", "custom-runtime"]
 }, {
   configs = ["//build/config/sanitizers:ubsan", "//build/config/sanitizers:sancov"]
   remove_common_configs = ["//build/config:no_rtti"]
@@ -5657,7 +5662,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:331
+From //build/assembly/developer_overrides.gni:336
 
 ### product_bootfs_packages
 
@@ -7463,7 +7468,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"uMZ7FTsDPXul0QhF5rSabB0D1w7qjAGYbarpQUHyERoC"`
+**Current value (from the default):** `"3VvCiWbTMS4xenuM83IRa-G-xU7QLNpdgGqycF2BQegC"`
 
 From //build/rust/config.gni:38
 
@@ -7585,7 +7590,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"21.99991231.0.1"`
+**Current value (from the default):** `"22.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7733,7 +7738,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2105
+From //build/config/BUILDCONFIG.gn:2108
 
 ### select_variant_canonical
 
@@ -7743,7 +7748,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2110
+From //build/config/BUILDCONFIG.gn:2113
 
 ### select_variant_shortcuts
 
@@ -7802,7 +7807,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1883
+From //build/config/BUILDCONFIG.gn:1886
 
 ### size_checker_input
 
@@ -8288,7 +8293,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1867
+From //build/config/BUILDCONFIG.gn:1870
 
 ### universe_package_labels
 

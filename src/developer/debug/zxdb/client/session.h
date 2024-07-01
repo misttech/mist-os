@@ -181,8 +181,27 @@ class Session : public SettingStoreObserver {
   void DispatchNotifyComponentExiting(const debug_ipc::NotifyComponentExiting& notify);
   void DispatchNotifyTestExited(const debug_ipc::NotifyTestExited& notify);
 
+  // Settings that control how the exception is handled in the Session before passing the
+  // information along to the Thread object to decide what to actually do. This is primarily useful
+  // for determining what information to tell the thread from the exception notification itself
+  // as opposed to us requesting more complete information.
+  //
+  // In particular, the exception won't give us the complete stack, which is useful in the contexts
+  // of tests where we want to jump to a specific frame that won't be in the notification's stack.
+  struct HandleExceptionSettings {
+    // Typically, we want to use the metadata from the exception to populate the thread's metadata.
+    // Set this to false to not set metadata from the exception (note: the thread's information will
+    // be outdated and must be synchronized separately). This default should be kept in sync with
+    // the default value for the |set_metadata| argument to |DispatchNotifyException| above.
+    bool set_metadata = true;
+    // Use this option to set all the metadata from the exception, except the stack frames. This can
+    // be used to synchronize the stack explicitly but use the rest of the metadata from the
+    // exception to keep the thread information in sync.
+    bool skip_metadata_frames = false;
+  };
+
   void HandleException(ThreadImpl* thread, const debug_ipc::NotifyException& notify,
-                       bool set_metadata = true);
+                       HandleExceptionSettings settings);
 
   // SettingStoreObserver
   void OnSettingChanged(const SettingStore&, const std::string& setting_name) override;

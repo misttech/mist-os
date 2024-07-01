@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_action.gni")
+import("//build/assembly/developer_overrides.gni")
+import("//build/bazel/bazel_build_action.gni")
 import("//build/images/args.gni")
 import("//build/images/supports_fastboot_fvm.gni")
 import("//build/images/vbmeta.gni")
@@ -182,21 +183,49 @@ template("bazel_product_bundle") {
     }
   }
 
-  _aib_bazel_inputs = []
+  # The bazel inputs for all of the bazel actions described by this template.
+  _bazel_inputs = []
+
+  # See if there are any developer overrides enabled for this target, and
+  # if so, pass them to assembly.
+  foreach(overrides_def, product_assembly_overrides) {
+    # This is done by seeing if the target_name matches each of the defined
+    # label patterns that are to have overrides.
+    if (label_matches(":$target_name", [ overrides_def.assembly ])) {
+      # Compute the bazel input target for the overrides used by this product
+      # bundle.
+      _bazel_inputs += [ "${overrides_def.overrides}.bazel_input" ]
+    }
+
+    # TODO: The GN<->Bazel input analysis is falsely beleiving that it needs the
+    # inputs to the other assembly overrides targets as well (probably due to
+    # how the FuchsiaAssemblyDeveloperOverridesListInfo provider has a reference
+    # to all the Bazel overrides targets).  So add all the overrides as inputs,
+    # until this is understood.
+    _bazel_inputs += [ "${overrides_def.overrides}.bazel_input" ]
+  }
+
   if (defined(invoker.allow_eng_platform_bundle_use) &&
       invoker.allow_eng_platform_bundle_use) {
-    _aibs_to_use = eng_platform_aib_labels
+    # Some product bundles have eng artifacts in recovery slot and userdebug
+    # artifacts in the main slot.
+    _bazel_inputs += [
+      "//bundles/assembly:eng",
+      "//bundles/assembly:userdebug",
+    ]
     not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
   } else {
     if (defined(invoker.allow_userdebug_platform_bundle_use) &&
         invoker.allow_userdebug_platform_bundle_use) {
-      _aibs_to_use = userdebug_platform_aib_labels
+      # Some product bundles have user artifacts in recovery slot and userdebug
+      # artifacts in the main slot.
+      _bazel_inputs += [
+        "//bundles/assembly:user",
+        "//bundles/assembly:userdebug",
+      ]
     } else {
-      _aibs_to_use = user_platform_aib_labels
+      _bazel_inputs += [ "//bundles/assembly:user" ]
     }
-  }
-  foreach(_aib, _aibs_to_use) {
-    _aib_bazel_inputs += [ "${_aib}_bazel_inputs" ]
   }
 
   _generate_image = use_bazel_images_only
@@ -207,17 +236,18 @@ template("bazel_product_bundle") {
   # NOTE: Only depend on product image targets if your outputs are not included
   # in product bundles.
   _product_assembly_target = "${target_name}_product_assembly"
-  bazel_action(_product_assembly_target) {
+  bazel_build_action(_product_assembly_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
-                             "deps",
                            ])
 
-    command = "build"
-    bazel_targets = [ invoker.bazel_product_image_target + "_product_assembly" ]
-    bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+    bazel_target = invoker.bazel_product_image_target + "_product_assembly"
+    deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
     copy_outputs = [
       {
         bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out/image_assembly.json"
@@ -227,17 +257,18 @@ template("bazel_product_bundle") {
   }
 
   _create_system_target = "${target_name}_create_system"
-  bazel_action(_create_system_target) {
+  bazel_build_action(_create_system_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
-                             "deps",
                            ])
 
-    command = "build"
-    bazel_targets = [ invoker.bazel_product_image_target ]
-    bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+    bazel_target = invoker.bazel_product_image_target
+    deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
     allow_directory_in_outputs = true
     copy_outputs = [
       {
@@ -265,17 +296,18 @@ template("bazel_product_bundle") {
 
   if (defined(invoker.bazel_product_config_target)) {
     _product_config_target = "${target_name}_product_config"
-    bazel_action(_product_config_target) {
+    bazel_build_action(_product_config_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
-                               "deps",
                              ])
 
-      command = "build"
-      bazel_targets = [ invoker.bazel_product_config_target ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      bazel_target = invoker.bazel_product_config_target
+      deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
       copy_outputs = [
         {
           bazel = "{{BAZEL_TARGET_OUT_PATH}}/{{BAZEL_TARGET_NAME}}_product_config.json"
@@ -287,17 +319,18 @@ template("bazel_product_bundle") {
 
   if (defined(invoker.bazel_recovery_image_target)) {
     _create_recovery_system_target = "${target_name}_create_recovery_system"
-    bazel_action(_create_recovery_system_target) {
+    bazel_build_action(_create_recovery_system_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
-                               "deps",
                              ])
 
-      command = "build"
-      bazel_targets = [ invoker.bazel_recovery_image_target ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      bazel_target = invoker.bazel_recovery_image_target
+      deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
       allow_directory_in_outputs = true
       copy_outputs = [
         {
@@ -315,17 +348,18 @@ template("bazel_product_bundle") {
   if (defined(invoker.bazel_size_report_aggregator_target)) {
     _size_report_target = "${target_name}_size_report"
     _size_targets += [ ":${_size_report_target}" ]
-    bazel_action(_size_report_target) {
+    bazel_build_action(_size_report_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
-                               "deps",
                              ])
 
-      command = "build"
-      bazel_targets = [ invoker.bazel_size_report_aggregator_target ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      bazel_target = invoker.bazel_size_report_aggregator_target
+      deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
 
       # Size checker prints out size information when limits are exceeded on
       # INFO level, so it is necessary to include Bazel INFO logs here.
@@ -366,17 +400,18 @@ template("bazel_product_bundle") {
   if (defined(invoker.bazel_product_size_check_target)) {
     _product_size_checker_target = "${target_name}_product_size_checker"
     _size_targets += [ ":${_product_size_checker_target}" ]
-    bazel_action(_product_size_checker_target) {
+    bazel_build_action(_product_size_checker_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
-                               "deps",
                              ])
 
-      command = "build"
-      bazel_targets = [ invoker.bazel_product_size_check_target ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      bazel_target = invoker.bazel_product_size_check_target
+      deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
       allow_directory_in_outputs = true
 
       _visualization_path = "${_product_size_checker_target}/visualization"
@@ -421,17 +456,18 @@ template("bazel_product_bundle") {
   if (defined(invoker.bazel_elf_sizes_target)) {
     _elf_sizes_ninja_out_path =
         "${_elf_sizes_bazel_action_target}/elf_sizes.json"
-    bazel_action(_elf_sizes_bazel_action_target) {
+    bazel_build_action(_elf_sizes_bazel_action_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
                                "visibility",
-                               "deps",
                              ])
 
-      command = "build"
-      bazel_targets = [ invoker.bazel_elf_sizes_target ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      bazel_target = invoker.bazel_elf_sizes_target
+      deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
 
       copy_outputs = [
         {
@@ -458,17 +494,18 @@ template("bazel_product_bundle") {
   }
 
   if (defined(invoker.bazel_license_review_target)) {
-    bazel_action(labels.license_review_bazel_action_target) {
+    bazel_build_action(labels.license_review_bazel_action_target) {
       forward_variables_from(invoker,
                              [
-                               "deps",
                                "testonly",
                                "visibility",
                              ])
 
-      command = "build"
-      bazel_targets = [ invoker.bazel_license_review_target ]
-      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+      bazel_target = invoker.bazel_license_review_target
+      deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
       copy_outputs = [
         {
           bazel = "{{BAZEL_TARGET_OUT_DIR}}/license_review.zip"
@@ -489,7 +526,7 @@ template("bazel_product_bundle") {
     }
   }
 
-  bazel_action(labels.bazel_product_bundle) {
+  bazel_build_action(labels.bazel_product_bundle) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -499,10 +536,12 @@ template("bazel_product_bundle") {
 
     no_output_dir_leaks = false
 
-    command = "build"
-    bazel_targets = [ invoker.bazel_product_bundle_target ]
+    bazel_target = invoker.bazel_product_bundle_target
 
-    bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
+    deps = _bazel_inputs + invoker.bazel_inputs_from_gn
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
 
     # Directory outputs are OK because `product_bundle.json` correctly
     # represents the freshness of all outputs.

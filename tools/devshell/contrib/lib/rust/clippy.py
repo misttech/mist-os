@@ -60,14 +60,7 @@ def main():
         returncode = 0
     else:
         run_time = time.time()
-        returncode = build_targets(
-            output_files,
-            build_dir,
-            args.fuchsia_dir,
-            args.verbose,
-            args.quiet,
-            args.raw,
-        ).returncode
+        returncode = build_targets(output_files, build_dir, args).returncode
 
     lints = {}
     for clippy_output in output_files:
@@ -139,10 +132,10 @@ def fix_paths(lint):
     return lint
 
 
-def build_targets(output_files, build_dir, fuchsia_dir, verbose, quiet, raw):
+def build_targets(output_files, build_dir, args):
     prebuilt = PREBUILT_THIRD_PARTY_DIR
-    if fuchsia_dir:
-        prebuilt = Path(fuchsia_dir) / "prebuilt" / "third_party"
+    if args.fuchsia_dir:
+        prebuilt = Path(args.fuchsia_dir) / "prebuilt" / "third_party"
     ninja = [
         prebuilt / "ninja" / HOST_PLATFORM / "ninja",
         "-C",
@@ -150,14 +143,17 @@ def build_targets(output_files, build_dir, fuchsia_dir, verbose, quiet, raw):
         "-k",
         "0",
     ]
-    if verbose:
+    if args.verbose:
         ninja += ["--verbose"]
-    if quiet:
+    if args.quiet:
         ninja += ["--quiet"]
-    output = sys.stderr if raw else None
+    ninja += output_files
+    output = sys.stderr if args.raw else None
     env = os.environ
     env.setdefault("NINJA_PERSISTENT_MODE", "1")
-    return subprocess.run(ninja + output_files, stdout=output, env=env)
+    if args.verbose:
+        print(" ".join([str(arg) for arg in ninja]))
+    return subprocess.run(ninja, stdout=output, env=env)
 
 
 def get_targets(source_map, input_files, build_dir, get_all=False):
@@ -176,7 +172,11 @@ def parse_args():
         description="Run cargo clippy on a set of targets or rust files"
     )
     parser.add_argument(
-        "--verbose", "-v", help="verbose", action="store_true", default=False
+        "--verbose",
+        "-v",
+        help="verbose build output",
+        action="store_true",
+        default=False,
     )
     parser.add_argument(
         "--quiet",

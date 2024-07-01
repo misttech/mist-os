@@ -7,6 +7,7 @@
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 
 #include <fbl/auto_lock.h>
 
@@ -144,6 +145,7 @@ zx::result<> AmlSaradc::CreateNode() {
   auto offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
       fdf::MakeOffer2<fuchsia_hardware_adcimpl::Service>(arena, component::kDefaultInstance));
+  offers.push_back(metadata_server_.MakeOffer(arena));
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, kDeviceName)
@@ -166,9 +168,7 @@ zx::result<> AmlSaradc::CreateNode() {
 zx::result<> AmlSaradc::Start() {
   // Initialize our compat server.
   {
-    zx::result result =
-        compat_server_.Initialize(incoming(), outgoing(), node_name(), kDeviceName,
-                                  compat::ForwardMetadata::Some({DEVICE_METADATA_ADC}));
+    zx::result result = compat_server_.Initialize(incoming(), outgoing(), node_name(), kDeviceName);
     if (result.is_error()) {
       return result.take_error();
     }
@@ -205,6 +205,27 @@ zx::result<> AmlSaradc::Start() {
       FDF_LOG(ERROR, "Failed to get interrupt");
       return zx::error(status);
     }
+
+    zx::result metadata = pdev.GetMetadata<fuchsia_hardware_adcimpl::Metadata>(
+        fuchsia_hardware_adcimpl::kPdevMetadataType);
+    if (metadata.is_error()) {
+      FDF_SLOG(ERROR, "Failed to get metadata from platform device.",
+               KV("status", metadata.status_string()));
+      return metadata.take_error();
+    }
+
+    status = metadata_server_.SetMetadata(metadata.value());
+    if (status != ZX_OK) {
+      FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
+      return zx::error(status);
+    }
+  }
+
+  zx_status_t status =
+      metadata_server_.Serve(*outgoing(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
+    return zx::error(status);
   }
 
   device_ =

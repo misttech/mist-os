@@ -97,3 +97,7 @@ closed protocol Controller {
         session server_end:Device;
     });
 };
+
+service Service {
+    controller client_end:Controller;
+};

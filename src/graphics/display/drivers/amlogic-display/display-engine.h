@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/device-protocol/display-panel.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/compiler.h>
@@ -32,9 +33,6 @@
 #include "src/graphics/display/drivers/amlogic-display/vsync-receiver.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher-factory.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/metadata/metadata-getter.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -42,22 +40,16 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
  public:
   // Factory method for production use.
   //
-  // `incoming` must be non-null and outlive `DisplayEngine`.
-  // `metadata_getter` must be non-null and outlive `DisplayEngine`.
-  // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
+  // `incoming` must be non-null.
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
-      display::Namespace* incoming, display::MetadataGetter* metadata_getter,
-      display::DispatcherFactory* dispatcher_factory);
+      std::shared_ptr<fdf::Namespace> incoming);
 
   // Creates an uninitialized `DisplayEngine` instance.
   //
-  // `incoming` must be non-null and outlive `DisplayEngine`.
-  // `metadata_getter` must be non-null and outlive `DisplayEngine`.
-  // `dispatcher_factory` must be non-null and outlive `DisplayEngine`.
+  // `incoming` must be non-null.
   //
   // Production code should use `DisplayEngine::Create()` instead.
-  explicit DisplayEngine(display::Namespace* incoming, display::MetadataGetter* metadata_getter,
-                         display::DispatcherFactory* dispatcher_factory);
+  explicit DisplayEngine(std::shared_ptr<fdf::Namespace> incoming);
 
   DisplayEngine(const DisplayEngine&) = delete;
   DisplayEngine(DisplayEngine&&) = delete;
@@ -225,9 +217,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   // currently applied to the display.
   bool IsNewDisplayTiming(const display::DisplayTiming& timing) __TA_REQUIRES(display_mutex_);
 
-  display::Namespace& incoming_;
-  display::MetadataGetter& metadata_getter_;
-  display::DispatcherFactory& dispatcher_factory_;
+  std::shared_ptr<fdf::Namespace> incoming_;
 
   // Zircon handles
   zx::bti bti_;

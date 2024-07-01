@@ -24,9 +24,7 @@ use packet_formats::igmp::{self, IgmpPacketBuilder};
 use packet_formats::ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Packet, Ipv4PacketRaw};
 use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketRaw};
-use packet_formats::tcp::{
-    TcpParseArgs, TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions, TcpSegmentRaw,
-};
+use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilderWithOptions, TcpSegmentRaw};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs};
 use zerocopy::ByteSliceMut;
 
@@ -821,50 +819,6 @@ impl<I: IpExt, Inner> MaybeTransportPacketMut<I> for Nested<Inner, UdpPacketBuil
 impl<I: IpExt, Inner> TransportPacketMut<I> for Nested<Inner, UdpPacketBuilder<I::Addr>> {
     fn set_src_port(&mut self, port: NonZeroU16) {
         self.outer_mut().set_src_port(port.get());
-    }
-
-    fn set_dst_port(&mut self, port: NonZeroU16) {
-        self.outer_mut().set_dst_port(port);
-    }
-
-    fn update_pseudo_header_src_addr(&mut self, _old: I::Addr, new: I::Addr) {
-        self.outer_mut().set_src_ip(new);
-    }
-
-    fn update_pseudo_header_dst_addr(&mut self, _old: I::Addr, new: I::Addr) {
-        self.outer_mut().set_dst_ip(new);
-    }
-}
-
-impl<A: IpAddress, Inner> MaybeTransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
-    type TransportPacket = Self;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        Some(self)
-    }
-}
-
-impl<A: IpAddress, Inner> TransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
-    fn src_port(&self) -> u16 {
-        TcpSegmentBuilder::src_port(self.outer()).map_or(0, NonZeroU16::get)
-    }
-
-    fn dst_port(&self) -> u16 {
-        TcpSegmentBuilder::dst_port(self.outer()).map_or(0, NonZeroU16::get)
-    }
-}
-
-impl<I: IpExt, Inner> MaybeTransportPacketMut<I> for Nested<Inner, TcpSegmentBuilder<I::Addr>> {
-    type TransportPacketMut<'a> = &'a mut Self where Self: 'a;
-
-    fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
-        Some(self)
-    }
-}
-
-impl<I: IpExt, Inner> TransportPacketMut<I> for Nested<Inner, TcpSegmentBuilder<I::Addr>> {
-    fn set_src_port(&mut self, port: NonZeroU16) {
-        self.outer_mut().set_src_port(port);
     }
 
     fn set_dst_port(&mut self, port: NonZeroU16) {
@@ -1856,6 +1810,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use packet::InnerPacketBuilder as _;
     use packet_formats::icmp::IcmpUnusedCode;
+    use packet_formats::tcp::TcpSegmentBuilder;
     use test_case::test_case;
 
     use super::testutil::internal::TestIpExt;
@@ -1928,6 +1883,57 @@ mod tests {
                 Some(src_port),
                 dst_port,
             ))
+        }
+    }
+
+    // The `TcpSegmentBuilder` impls are test-only on purpose, and removing this
+    // restriction should be thought through.
+    //
+    // TCP state tracking depends on being able to read TCP options, but
+    // TcpSegmentBuilder does not have this information. If a TcpSegmentBuilder
+    // passes through filtering with options tracked separately, then these will
+    // not be seen by conntrack and could lead to state desynchronization.
+    impl<A: IpAddress, Inner> MaybeTransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
+        type TransportPacket = Self;
+
+        fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+            Some(self)
+        }
+    }
+
+    impl<A: IpAddress, Inner> TransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
+        fn src_port(&self) -> u16 {
+            TcpSegmentBuilder::src_port(self.outer()).map_or(0, NonZeroU16::get)
+        }
+
+        fn dst_port(&self) -> u16 {
+            TcpSegmentBuilder::dst_port(self.outer()).map_or(0, NonZeroU16::get)
+        }
+    }
+
+    impl<I: IpExt, Inner> MaybeTransportPacketMut<I> for Nested<Inner, TcpSegmentBuilder<I::Addr>> {
+        type TransportPacketMut<'a> = &'a mut Self where Self: 'a;
+
+        fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
+            Some(self)
+        }
+    }
+
+    impl<I: IpExt, Inner> TransportPacketMut<I> for Nested<Inner, TcpSegmentBuilder<I::Addr>> {
+        fn set_src_port(&mut self, port: NonZeroU16) {
+            self.outer_mut().set_src_port(port);
+        }
+
+        fn set_dst_port(&mut self, port: NonZeroU16) {
+            self.outer_mut().set_dst_port(port);
+        }
+
+        fn update_pseudo_header_src_addr(&mut self, _old: I::Addr, new: I::Addr) {
+            self.outer_mut().set_src_ip(new);
+        }
+
+        fn update_pseudo_header_dst_addr(&mut self, _old: I::Addr, new: I::Addr) {
+            self.outer_mut().set_dst_ip(new);
         }
     }
 

@@ -26,6 +26,7 @@ use {
 };
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn watcher_existing<N: Netstack>(name: &str) {
     // This test is limited to mostly IPv4 because IPv6 LL addresses are
     // subject to DAD and hard to test with Existing events.
@@ -242,6 +243,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn watcher_after_state_closed<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -310,6 +312,7 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
 
 /// Tests that adding an interface causes an interface changed event.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_add_remove_interface<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -351,6 +354,7 @@ async fn test_add_remove_interface<N: Netstack>(name: &str) {
 /// Tests that including all addresses includes temporary and unavailable
 /// addresses.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_include_all_addresses<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -470,6 +474,8 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
 
 /// Tests that adding/removing a default route causes an interface changed event.
 #[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
 async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -549,6 +555,7 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
 /// corresponding Netstack interface is deleted.
 /// if `enabled` is `true`, enables the interface before closing the device.
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case("disabled", false; "disabled")]
 #[test_case("enabled", true ; "enabled")]
 async fn test_close_interface<N: Netstack>(test_name: &str, sub_test_name: &str, enabled: bool) {
@@ -599,6 +606,7 @@ async fn test_close_interface<N: Netstack>(test_name: &str, sub_test_name: &str,
 
 /// Tests races between device link down and close.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_down_close_race<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -655,6 +663,7 @@ async fn test_down_close_race<N: Netstack>(name: &str) {
 
 /// Tests races between data traffic and closing a device.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_close_data_race<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let net = sandbox.create_network("net").await.expect("create network");
@@ -767,6 +776,7 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
 /// Tests that when an interface is enabled and removed, no disable event is
 /// observed before the remove event.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_remove_enabled_interface<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -847,6 +857,7 @@ async fn test_remove_enabled_interface<N: Netstack>(name: &str) {
 /// Tests that toggling interface enabled repeatedly results in every change
 /// in the boolean value being observable.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_watcher_online_edges<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -1002,6 +1013,7 @@ async fn test_watcher_online_edges<N: Netstack>(name: &str) {
 /// Tests that competing interface change events are reported by
 /// fuchsia.net.interfaces/Watcher in the correct order.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_watcher_race<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -1203,6 +1215,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
 // hides IPv6 addresses on offline interfaces from clients of
 // fuchsia.net.interfaces/Watcher.
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(fidl_subnet!("abcd::1/64"))]
 #[test_case(fidl_subnet!("1.2.3.4/24"))]
 async fn addresses_while_offline<N: Netstack>(
@@ -1316,6 +1329,7 @@ async fn addresses_while_offline<N: Netstack>(
 // TODO(https://fxbug.dev/42063946): Split this test up.
 /// Test interface changes are reported through the interface watcher.
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn watcher<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -1672,6 +1686,7 @@ async fn watcher<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn test_readded_address_present<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network(name).await.expect("create network");
@@ -1745,6 +1760,7 @@ enum LifetimeToUpdate {
 // hidden from clients of interface watcher (because the interface is offline)
 // does not cause null changes to be emitted via interface watcher.
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(LifetimeToUpdate::Preferred ; "updating preferred lifetime")]
 #[test_case(LifetimeToUpdate::Valid ; "updating valid lifetime")]
 async fn test_lifetime_change_on_hidden_addr<N: Netstack>(

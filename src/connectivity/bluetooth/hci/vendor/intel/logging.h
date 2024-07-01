@@ -5,11 +5,11 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_LOGGING_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_LOGGING_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 
-#define logf(level, args...)         \
-  do {                               \
-    zxlogf(level, "btintel: " args); \
+#define logf(level, args...)          \
+  do {                                \
+    FDF_LOG(level, "btintel: " args); \
   } while (false)
 
 #define errorf(args...) logf(ERROR, args)

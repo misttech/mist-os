@@ -43,6 +43,15 @@ mod test {
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
+                fsys::LifecycleControllerRequest::StartInstanceWithArgs {
+                    moniker,
+                    binder: _,
+                    args: _,
+                    responder,
+                } => {
+                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
+                    responder.send(Ok(())).unwrap();
+                }
                 fsys::LifecycleControllerRequest::StartInstance {
                     moniker,
                     binder: _,

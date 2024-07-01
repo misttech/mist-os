@@ -57,6 +57,7 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
       ddk::PDevFidl pdev, const fuchsia_hardware_serial::wire::SerialPortInfo& serial_port_info,
       fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
       std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher = std::nullopt,
+      bool power_control_enabled = false,
       std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end = std::nullopt,
       std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_end =
           std::nullopt,
@@ -141,6 +142,7 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
   zx::interrupt irq_;
   async::IrqMethod<AmlUart, &AmlUart::HandleIrq> irq_handler_{this};
 
+  bool power_control_enabled_;
   fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level_client_;
   fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_client_;
   fidl::SyncClient<fuchsia_power_broker::Lessor> lessor_client_;

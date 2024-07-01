@@ -17,6 +17,11 @@
             path: "/hrtimer",
         },
     ],
+    use: [
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+        },
+    ],
     expose: [
         {
             directory: "dev-hrtimer",

@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -22,7 +23,6 @@
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/namespace/namespace.h"
 
 namespace amlogic_display {
 
@@ -35,13 +35,13 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
  public:
   // Returns a non-null pointer to the Vout instance outputting DSI signal on
   // success.
-  static zx::result<std::unique_ptr<Vout>> CreateDsiVout(display::Namespace& incoming,
+  static zx::result<std::unique_ptr<Vout>> CreateDsiVout(fdf::Namespace& incoming,
                                                          uint32_t panel_type, uint32_t width,
                                                          uint32_t height, inspect::Node node);
 
   // Returns a non-null pointer to the Vout instance outputting HDMI signal on
   // success.
-  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(display::Namespace& incoming,
+  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(fdf::Namespace& incoming,
                                                           inspect::Node node);
 
   // Sets only the display size, feature bits and panel settings for testing.
@@ -64,7 +64,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   Vout& operator=(const Vout&) = delete;
 
   // `pixel_formats` must outlive the returned added_display_args_t.
-  added_display_args_t CreateAddedDisplayArgs(
+  raw_display_info_t CreateRawDisplayInfo(
       display::DisplayId display_id,
       cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats);
 
@@ -134,6 +134,9 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
     // TODO(https://fxbug.dev/318800903): Use const reference when `dsi_` moves
     // to its own implementation class.
     PanelConfig panel_config;
+
+    // Matches the timing in `panel_config`.
+    display_mode_t banjo_display_mode;
   } dsi_;
 
   struct hdmi_t {

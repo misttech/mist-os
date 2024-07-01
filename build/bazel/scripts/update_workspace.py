@@ -959,6 +959,15 @@ common --enable_bzlmod=false
         ),
     ]
 
+    generated.add_symlink(
+        os.path.join(
+            "workspace",
+            "fuchsia_build_generated",
+            "assembly_developer_overrides.json",
+        ),
+        os.path.join(gn_output_dir, "gen", "assembly_developer_overrides.json"),
+    )
+
     # LINT.IfChange
     generated.add_symlink(
         os.path.join("workspace", "fuchsia_build_generated", "args.json"),

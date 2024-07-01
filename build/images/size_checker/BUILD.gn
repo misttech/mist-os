@@ -80,10 +80,9 @@ if (size_checker_input != {
     output_conversion = "json"
   }
 
-  bazel_input_resource("size_checker_json_bazel_input") {
-    sources = [ "${root_build_dir}/size_checker.json" ]
-    outputs = [ "size_checker.json" ]
-    deps = [ ":size_checker_json" ]
+  bazel_input_file("size_checker_json_bazel_input") {
+    generator = ":size_checker_json"
+    outputs = [ "${root_build_dir}/size_checker.json" ]
   }
 }
 

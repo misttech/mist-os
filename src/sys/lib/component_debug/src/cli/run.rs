@@ -7,11 +7,12 @@ use crate::cli::format::{
 };
 use crate::lifecycle::{
     create_instance_in_collection, destroy_instance_in_collection, resolve_instance,
-    start_instance, ActionError, CreateError, DestroyError,
+    start_instance, start_instance_with_args, ActionError, CreateError, DestroyError, StartError,
 };
 use anyhow::{bail, format_err, Result};
 use fidl::HandleBased;
 use fuchsia_url::AbsoluteComponentUrl;
+use futures::future::BoxFuture;
 use futures::AsyncReadExt;
 use moniker::Moniker;
 use std::io::Read;
@@ -110,9 +111,11 @@ pub async fn run_cmd<W: std::io::Write>(
     recreate: bool,
     connect_stdio: bool,
     config_overrides: Vec<fdecl::ConfigOverride>,
-    lifecycle_controller: fsys::LifecycleControllerProxy,
+    lifecycle_controller_factory: impl Fn()
+        -> BoxFuture<'static, Result<fsys::LifecycleControllerProxy>>,
     mut writer: W,
 ) -> Result<()> {
+    let lifecycle_controller = lifecycle_controller_factory().await?;
     let parent = moniker
         .parent()
         .ok_or(format_err!("Error: {} does not reference a dynamic instance", moniker))?;
@@ -140,23 +143,18 @@ pub async fn run_cmd<W: std::io::Write>(
         }
     }
 
-    let (maybe_stdio, child_args) = if connect_stdio {
-        let (stdio, numbered_handles) = Stdio::new();
-
-        (
-            Some(stdio),
-            Some(fcomponent::CreateChildArgs {
-                numbered_handles: Some(numbered_handles),
-                ..Default::default()
-            }),
-        )
-    } else {
-        (None, None)
-    };
-
     writeln!(writer, "URL: {}", url)?;
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Creating component instance...")?;
+
+    // First try to use StartWithArgs
+
+    let (mut maybe_stdio, numbered_handles) = if connect_stdio {
+        let (stdio, numbered_handles) = Stdio::new();
+        (Some(stdio), Some(numbered_handles))
+    } else {
+        (None, Some(vec![]))
+    };
 
     let create_result = create_instance_in_collection(
         &lifecycle_controller,
@@ -164,8 +162,8 @@ pub async fn run_cmd<W: std::io::Write>(
         collection,
         child_name,
         &url,
-        config_overrides,
-        child_args,
+        config_overrides.clone(),
+        None,
     )
     .await;
 
@@ -185,9 +183,52 @@ pub async fn run_cmd<W: std::io::Write>(
         .map_err(|e| format_resolve_error(&moniker, e))?;
 
     writeln!(writer, "Starting component instance...")?;
-    let _ = start_instance(&lifecycle_controller, &moniker)
-        .await
-        .map_err(|e| format_start_error(&moniker, e))?;
+    let start_args = fcomponent::StartChildArgs { numbered_handles, ..Default::default() };
+    let res = start_instance_with_args(&lifecycle_controller, &moniker, start_args).await;
+    if let Err(StartError::ActionError(ActionError::Fidl(_e))) = &res {
+        // A FIDL error here could indicate that we're talking to a version of component manager
+        // that does not support `fuchsia.sys2/LifecycleController.StartInstanceWithArgs`. Let's
+        // try again with `fuchsia.sys2/LifecycleController.StartInstance`.
+
+        // Component manager will close the lifecycle controller when it encounters a FIDL error,
+        // so we need to create a new one.
+        let lifecycle_controller = lifecycle_controller_factory().await?;
+
+        if connect_stdio {
+            // We want to provide stdio handles to the component, but this is only possible when
+            // creating an instance when we have to use the legacy `StartInstance`. Delete and
+            // recreate the component, providing the handles to the create call.
+
+            let (stdio, numbered_handles) = Stdio::new();
+            maybe_stdio = Some(stdio);
+            let create_args = fcomponent::CreateChildArgs {
+                numbered_handles: Some(numbered_handles),
+                ..Default::default()
+            };
+
+            destroy_instance_in_collection(&lifecycle_controller, &parent, collection, child_name)
+                .await?;
+            create_instance_in_collection(
+                &lifecycle_controller,
+                &parent,
+                collection,
+                child_name,
+                &url,
+                config_overrides,
+                Some(create_args),
+            )
+            .await?;
+            resolve_instance(&lifecycle_controller, &moniker)
+                .await
+                .map_err(|e| format_resolve_error(&moniker, e))?;
+        }
+
+        let _stop_future = start_instance(&lifecycle_controller, &moniker)
+            .await
+            .map_err(|e| format_start_error(&moniker, e))?;
+    } else {
+        let _stop_future = res.map_err(|e| format_start_error(&moniker, e))?;
+    }
 
     if let Some(stdio) = maybe_stdio {
         stdio.forward().await;
@@ -203,7 +244,7 @@ mod test {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_sys2 as fsys;
-    use futures::TryStreamExt;
+    use futures::{FutureExt, TryStreamExt};
 
     fn setup_fake_lifecycle_controller_ok(
         expected_parent_moniker: &'static str,
@@ -268,9 +309,10 @@ mod test {
 
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::StartInstance {
+                fsys::LifecycleControllerRequest::StartInstanceWithArgs {
                     moniker,
                     binder: _,
+                    args: _,
                     responder,
                 } => {
                     assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
@@ -395,9 +437,10 @@ mod test {
 
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::StartInstance {
+                fsys::LifecycleControllerRequest::StartInstanceWithArgs {
                     moniker,
                     binder: _,
+                    args: _,
                     responder,
                 } => {
                     assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
@@ -427,7 +470,10 @@ mod test {
             true,
             false,
             vec![],
-            lifecycle_controller,
+            move || {
+                let lifecycle_controller = lifecycle_controller.clone();
+                async move { Ok(lifecycle_controller) }.boxed()
+            },
             &mut output,
         )
         .await;
@@ -452,7 +498,10 @@ mod test {
             false,
             false,
             vec![],
-            lifecycle_controller,
+            move || {
+                let lifecycle_controller = lifecycle_controller.clone();
+                async move { Ok(lifecycle_controller) }.boxed()
+            },
             &mut output,
         )
         .await;
@@ -475,7 +524,10 @@ mod test {
             true,
             false,
             vec![],
-            lifecycle_controller,
+            move || {
+                let lifecycle_controller = lifecycle_controller.clone();
+                async move { Ok(lifecycle_controller) }.boxed()
+            },
             &mut output,
         )
         .await;
@@ -499,7 +551,10 @@ mod test {
             true,
             false,
             vec![],
-            lifecycle_controller,
+            move || {
+                let lifecycle_controller = lifecycle_controller.clone();
+                async move { Ok(lifecycle_controller) }.boxed()
+            },
             &mut output,
         )
         .await;

@@ -96,6 +96,11 @@ enum class Type : uint64_t {
   // Memory carved out for the ZBI_TYPE_NVRAM region.
   kNvram,
 
+  // Low memory, in an architecture-specific context, that is deemed to be
+  // unsafe for general-purpose allocation and use (e.g., BIOS-related bits
+  // below 1MiB in the case of PCs).
+  kReservedLow,
+
   // A placeholder value signifying the last extended type. It must not be used
   // as an actual type value.
   kMaxExtended,
@@ -114,6 +119,8 @@ std::string_view ToString(Type type);
 constexpr bool IsExtendedType(Type type) {
   return static_cast<uint64_t>(type) >= kMinExtendedTypeValue;
 }
+
+constexpr bool IsRamType(Type type) { return type == Type::kFreeRam || IsExtendedType(type); }
 
 // A memory range type that is layout-compatible to zbi_mem_range_t, but with
 // the benefit of being able to use extended types.

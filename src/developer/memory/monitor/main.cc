@@ -46,13 +46,13 @@ bool SendCriticalMemoryPressureCrashReports() {
 }  // namespace
 
 int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   if (!fxl::SetLogSettingsFromCommandLine(command_line, {"memory_monitor"}))
     return 1;
 
   FX_LOGS(DEBUG) << argv[0] << ": starting";
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), monitor::Monitor::kTraceName);
   std::unique_ptr<sys::ComponentContext> startup_context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();

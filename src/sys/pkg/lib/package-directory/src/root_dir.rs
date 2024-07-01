@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::meta_as_dir::MetaAsDir;
-use crate::meta_file::{MetaFile, MetaFileLocation};
 use crate::meta_subdir::MetaSubdir;
 use crate::non_meta_subdir::NonMetaSubdir;
 use crate::{usize_to_u64_safe, Error, NonMetaStorageError};
@@ -151,10 +150,37 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
         ))
     }
 
-    /// Creates and returns a `MetaFile` if one exists at `path`.
-    pub(crate) fn get_meta_file(self: &Arc<Self>, path: &str) -> Option<Arc<MetaFile<S>>> {
-        let location = self.meta_files.get(path)?;
-        Some(MetaFile::new(self.clone(), *location))
+    /// Creates and returns a meta file if one exists at `path`.
+    pub(crate) fn get_meta_file(&self, path: &str) -> Result<Option<Arc<VmoFile>>, zx::Status> {
+        // The FAR spec requires 4 KiB alignment of content chunks [1], so offset will
+        // always be page-aligned, because pages are required [2] to be a power of 2 and at
+        // least 4 KiB.
+        // [1] https://fuchsia.dev/fuchsia-src/concepts/source_code/archive_format#content_chunk
+        // [2] https://fuchsia.dev/fuchsia-src/reference/syscalls/system_get_page_size
+        // TODO(https://fxbug.dev/42162525) Need to manually zero the end of the VMO if
+        // zx_system_get_page_size() > 4K.
+        assert_eq!(zx::system_get_page_size(), 4096);
+
+        let location = match self.meta_files.get(path) {
+            Some(location) => location,
+            None => return Ok(None),
+        };
+        let vmo = self
+            .meta_far_vmo
+            .create_child(
+                zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::NO_WRITE,
+                location.offset,
+                location.length,
+            )
+            .map_err(|e| {
+                error!("Error creating child vmo for meta file {:?}", e);
+                zx::Status::INTERNAL
+            })?;
+
+        Ok(Some(VmoFile::new_with_inode(
+            vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
+            /*inode*/ 1,
+        )))
     }
 
     /// Creates and returns a `MetaSubdir` if one exists at `path`. `path` must end in '/'.
@@ -319,11 +345,18 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         }
 
         if canonical_path.starts_with("meta/") {
-            if let Some(meta_file) = self.get_meta_file(canonical_path) {
-                flags.to_object_request(server_end).handle(|object_request| {
-                    vfs::file::serve(meta_file, scope, &flags, object_request)
-                });
-                return;
+            match self.get_meta_file(canonical_path) {
+                Ok(Some(meta_file)) => {
+                    flags.to_object_request(server_end).handle(|object_request| {
+                        vfs::file::serve(meta_file, scope, &flags, object_request)
+                    });
+                    return;
+                }
+                Ok(None) => {}
+                Err(status) => {
+                    let () = send_on_open_with_error(describe, server_end, status);
+                    return;
+                }
             }
 
             if let Some(subdir) = self.get_meta_subdir(canonical_path.to_string() + "/") {
@@ -408,7 +441,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         }
 
         if canonical_path.starts_with("meta/") {
-            if let Some(file) = self.get_meta_file(canonical_path) {
+            if let Some(file) = self.get_meta_file(canonical_path)? {
                 return vfs::file::serve(file, scope, &protocols, object_request);
             }
 
@@ -523,6 +556,13 @@ fn load_package_metadata(
         .into_contents();
 
     Ok((meta_files, non_meta_files))
+}
+
+/// Location of a meta file's contents within a meta.far
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct MetaFileLocation {
+    offset: u64,
+    length: u64,
 }
 
 #[cfg(test)]

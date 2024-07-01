@@ -2,106 +2,84 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::handle::Handle;
-use std::sync::{Arc, Mutex};
+use fidl::handle::{self, HandleBased};
 
-/// A capability that vends a single Zircon handle.
-#[derive(Clone, Debug)]
-pub struct OneShotHandle(Arc<Mutex<Option<Handle>>>);
+/// A capability that wraps a single Zircon handle.
+#[derive(Debug)]
+pub struct Handle(handle::Handle);
 
-impl OneShotHandle {
-    /// Creates a new [OneShotHandle] containing a Zircon `handle`.
-    pub fn new(handle: Handle) -> Self {
-        Self(Arc::new(Mutex::new(Some(handle))))
-    }
-
-    /// Returns the handle in this [OneShotHandle], taking it out.
-    ///
-    /// Subsequent calls will return `None`.
-    pub fn take(&self) -> Option<Handle> {
-        self.0.lock().unwrap().take()
+impl Handle {
+    /// Creates a new [Handle] containing a Zircon `handle`.
+    pub fn new(handle: handle::Handle) -> Self {
+        Self(handle)
     }
 }
 
-impl From<Handle> for OneShotHandle {
-    fn from(handle: Handle) -> Self {
-        OneShotHandle(Arc::new(Mutex::new(Some(handle))))
+impl From<handle::Handle> for Handle {
+    fn from(handle: handle::Handle) -> Self {
+        Handle(handle)
     }
 }
 
+impl Handle {
+    pub fn try_clone(&self) -> Result<Self, ()> {
+        Ok(Self(self.0.duplicate_handle(fidl::Rights::SAME_RIGHTS).map_err(|_| ())?))
+    }
+}
+
+impl From<Handle> for handle::Handle {
+    fn from(value: Handle) -> Self {
+        value.0
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::Capability;
-    use anyhow::{Context, Result};
     use assert_matches::assert_matches;
-    use fidl::handle::{AsHandleRef, Event, HandleBased, Rights};
-    use fidl_fuchsia_component_sandbox as fsandbox;
+    use fidl::handle::{AsHandleRef, HandleBased};
+    use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx};
 
+    // Tests converting the Handle to FIDL and back.
     #[fuchsia::test]
-    fn construction() {
-        let event = Event::create();
-        let one_shot = OneShotHandle::new(event.into_handle());
-        assert_matches!(one_shot.take(), Some(_));
-        assert_matches!(one_shot.take(), None);
-    }
-
-    // Tests converting the OneShotHandle to FIDL and back.
-    #[fuchsia::test]
-    async fn one_shot_into_fidl() -> Result<()> {
-        let event = Event::create();
+    async fn handle_into_fidl() {
+        let event = zx::Event::create();
         let expected_koid = event.get_koid().unwrap();
 
-        let one_shot = OneShotHandle::from(event.into_handle());
+        let handle = Handle::from(event.into_handle());
 
         // Convert the OneShotHandle to FIDL and back.
-        let fidl_capability: fsandbox::Capability = one_shot.into();
+        let fidl_capability: fsandbox::Capability = handle.into();
         assert_matches!(&fidl_capability, fsandbox::Capability::Handle(_));
 
-        let any: Capability = fidl_capability.try_into().context("failed to convert from FIDL")?;
-        let one_shot = assert_matches!(any, Capability::OneShotHandle(h) => h);
+        let any: Capability = fidl_capability.try_into().unwrap();
+        let handle = assert_matches!(any, Capability::Handle(h) => h);
 
         // Get the handle.
-        let handle = one_shot.take().unwrap();
+        let handle: zx::Handle = handle.into();
 
         // The handle should be for same Event that was in the original OneShotHandle.
         let got_koid = handle.get_koid().unwrap();
         assert_eq!(got_koid, expected_koid);
-
-        Ok(())
     }
 
-    /// Tests that a OneShotHandle can be cloned by cloning the token.
+    /// Tests that a Handle can be cloned by duplicating the handle.
     #[fuchsia::test]
-    async fn fidl_clone() -> Result<()> {
-        let event = Event::create();
+    async fn try_clone() {
+        let event = zx::Event::create();
         let expected_koid = event.get_koid().unwrap();
 
-        let one_shot = OneShotHandle::from(event.into_handle());
-        let one_shot_clone = one_shot.clone();
-        let fidl_handle: fsandbox::OneShotHandle = one_shot.into();
+        let handle = Handle::from(event.into_handle());
+        let handle = handle.try_clone().unwrap();
+        let handle: zx::Handle = handle.into();
 
-        // Clone the HandleCapability by cloning the token.
-        let token_clone = fsandbox::OneShotHandle {
-            token: fidl_handle.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap(),
-        };
-
-        // Get the handle from the clone.
-        let any: Capability = fsandbox::Capability::Handle(token_clone)
-            .try_into()
-            .context("failed to convert from FIDL")?;
-        let one_shot = assert_matches!(any, Capability::OneShotHandle(h) => h);
-
-        let handle = one_shot.take().expect("failed to call GetHandle");
-
-        // The handle should be for same Event that was in the original OneShotHandle.
         let got_koid = handle.get_koid().unwrap();
         assert_eq!(got_koid, expected_koid);
 
-        // The original OneShotHandle should now not have a handle because it was taken
-        // out by the GetHandle call on the clone.
-        assert_matches!(one_shot_clone.take(), None);
-
-        Ok(())
+        let (ch, _) = zx::Channel::create();
+        let handle = Handle::from(ch.into_handle());
+        assert_matches!(handle.try_clone(), Err(()));
     }
 }
