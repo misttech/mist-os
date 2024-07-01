@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::{TimerFile, TimerFileClock, TimerWakeup};
+use crate::fs::fuchsia::TimerFile;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter,
 };
+use crate::timer::{Timeline, TimerWakeup};
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
 use crate::vfs::inotify::InotifyFileObject;
@@ -26,8 +27,7 @@ use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
-    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM,
-    PTRACE_MODE_ATTACH_REALCREDS,
+    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, PTRACE_MODE_ATTACH_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
@@ -1854,21 +1854,15 @@ pub fn sys_timerfd_create(
     clock_id: u32,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
-    let (timer_file_clock, timer_type) = match clock_id {
-        CLOCK_MONOTONIC | CLOCK_BOOTTIME => (TimerFileClock::Monotonic, TimerWakeup::Regular),
-        CLOCK_BOOTTIME_ALARM => {
-            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
-                return error!(EPERM);
-            }
-            (TimerFileClock::Monotonic, TimerWakeup::Alarm)
-        }
-        CLOCK_REALTIME_ALARM => {
-            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
-                return error!(EPERM);
-            }
-            (TimerFileClock::Realtime, TimerWakeup::Alarm)
-        }
-        CLOCK_REALTIME => (TimerFileClock::Realtime, TimerWakeup::Regular),
+    let timeline = match clock_id {
+        CLOCK_MONOTONIC => Timeline::Monotonic,
+        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
+        CLOCK_REALTIME | CLOCK_REALTIME_ALARM => Timeline::RealTime,
+        _ => return error!(EINVAL),
+    };
+    let timer_type = match clock_id {
+        CLOCK_MONOTONIC | CLOCK_BOOTTIME | CLOCK_REALTIME => TimerWakeup::Regular,
+        CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => TimerWakeup::Alarm,
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
@@ -1887,7 +1881,7 @@ pub fn sys_timerfd_create(
         fd_flags |= FdFlags::CLOEXEC;
     };
 
-    let timer = TimerFile::new_file(current_task, timer_type, timer_file_clock, open_flags)?;
+    let timer = TimerFile::new_file(current_task, timer_type, timeline, open_flags)?;
     let fd = current_task.add_file(timer, fd_flags)?;
     Ok(fd)
 }

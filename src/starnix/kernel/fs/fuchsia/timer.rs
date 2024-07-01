@@ -6,6 +6,7 @@ use crate::task::{
     CurrentTask, EventHandler, HandleWaitCanceler, HrTimer, SignalHandler, SignalHandlerInner,
     WaitCanceler, Waiter,
 };
+use crate::timer::{Timeline, TimerWakeup};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
@@ -82,20 +83,6 @@ impl TimerOps for ZxTimer {
     }
 }
 
-/// Clock types supported by a `TimerFile`.
-pub enum TimerFileClock {
-    Monotonic,
-    Realtime,
-}
-
-/// Wakeup types supported by a `TimerFile`.
-pub enum TimerWakeup {
-    /// A regular timer that does not wake the system if it is suspended.
-    Regular,
-    /// An alarm timer that will wake the system if it is suspended.
-    Alarm,
-}
-
 /// A `TimerFile` represents a file created by `timerfd_create`.
 ///
 /// Clients can read the number of times the timer has triggered from the file. The file supports
@@ -105,7 +92,7 @@ pub struct TimerFile {
     timer: Arc<dyn TimerOps>,
 
     /// The type of clock this file was created with.
-    clock: TimerFileClock,
+    timeline: Timeline,
 
     /// The deadline (`zx::Time`) for the next timer trigger, and the associated interval
     /// (`zx::Duration`).
@@ -122,7 +109,7 @@ impl TimerFile {
     pub fn new_file(
         current_task: &CurrentTask,
         wakeup_type: TimerWakeup,
-        clock: TimerFileClock,
+        timeline: Timeline,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
         let timer: Arc<dyn TimerOps> = match wakeup_type {
@@ -134,7 +121,7 @@ impl TimerFile {
             current_task,
             Box::new(TimerFile {
                 timer,
-                clock,
+                timeline,
                 deadline_interval: Mutex::new((zx::Time::default(), zx::Duration::default())),
             }),
             flags,
@@ -182,8 +169,8 @@ impl TimerFile {
             let new_deadline = if flags & TFD_TIMER_ABSTIME != 0 {
                 // If the time_spec represents an absolute time, then treat the
                 // `it_value` as the deadline..
-                match &self.clock {
-                    TimerFileClock::Realtime => {
+                match &self.timeline {
+                    Timeline::RealTime => {
                         // Since Zircon does not have realtime timers, compute what the value would
                         // be in the monotonic clock assuming realtime progresses linearly.
                         track_stub!(
@@ -194,7 +181,9 @@ impl TimerFile {
                             timer_spec.it_value,
                         )?)
                     }
-                    TimerFileClock::Monotonic => time_from_timespec(timer_spec.it_value)?,
+                    Timeline::BootTime | Timeline::Monotonic => {
+                        time_from_timespec(timer_spec.it_value)?
+                    }
                 }
             } else {
                 // .. otherwise the deadline is computed relative to the current time. Without
