@@ -322,20 +322,20 @@ class BitfieldRef {
                 "Upper bit is out of range");                                                      \
   /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
-    struct NAME##Marker {};                                                                        \
+    struct NAME##Marker{};                                                                         \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
   /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
-  template <bool Cond = (COND)>                                                                    \
-  hwreg::internal::enable_if_t<Cond, typename SelfType::ValueType, (BIT_HIGH), (BIT_LOW)> NAME()   \
-      const {                                                                                      \
+  template <bool Cond = (COND),                                                                    \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>       \
+  typename SelfType::ValueType NAME() const {                                                      \
     return hwreg::BitfieldRef<const typename SelfType::ValueType>(this->reg_value_ptr(),           \
                                                                   (BIT_HIGH), (BIT_LOW))           \
         .get();                                                                                    \
   }                                                                                                \
-  template <bool Cond = (COND)>                                                                    \
-  hwreg::internal::enable_if_t<Cond, SelfType&, (BIT_HIGH), (BIT_LOW)> set_##NAME(                 \
-      typename SelfType::ValueType val) {                                                          \
+  template <bool Cond = (COND),                                                                    \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>       \
+  SelfType& set_##NAME(typename SelfType::ValueType val) {                                         \
     hwreg::BitfieldRef<typename SelfType::ValueType>(this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW)) \
         .set(val);                                                                                 \
     return *this;                                                                                  \
@@ -351,20 +351,20 @@ class BitfieldRef {
                 "Upper bit is out of range");                                                      \
   /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
-    struct NAME##Marker {};                                                                        \
+    struct NAME##Marker{};                                                                         \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
   /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
-  template <bool Cond = (COND)>                                                                    \
-  hwreg::internal::enable_if_t<Cond, typename SelfType::ValueType, (BIT_HIGH), (BIT_LOW)> NAME()   \
-      const {                                                                                      \
+  template <bool Cond = (COND),                                                                    \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>       \
+  typename SelfType::ValueType NAME() const {                                                      \
     return hwreg::BitfieldRef<const typename SelfType::ValueType>(this->reg_value_ptr(),           \
                                                                   (BIT_HIGH), (BIT_LOW), true)     \
         .get();                                                                                    \
   }                                                                                                \
-  template <bool Cond = (COND)>                                                                    \
-  hwreg::internal::enable_if_t<Cond, SelfType&, (BIT_HIGH), (BIT_LOW)> set_##NAME(                 \
-      typename SelfType::ValueType val) {                                                          \
+  template <bool Cond = (COND),                                                                    \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>       \
+  SelfType& set_##NAME(typename SelfType::ValueType val) {                                         \
     hwreg::BitfieldRef<typename SelfType::ValueType>(this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW), \
                                                      true)                                         \
         .set(val);                                                                                 \
@@ -382,18 +382,20 @@ class BitfieldRef {
   static_assert(std::is_enum_v<ENUM_TYPE>, "Field type is not an enum");                           \
   /* NOLINTBEGIN(misc-non-private-member-variables-in-classes) */                                  \
   __NO_UNIQUE_ADDRESS struct {                                                                     \
-    struct NAME##Marker {};                                                                        \
+    struct NAME##Marker{};                                                                         \
     __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker, (COND)> field;              \
   } HWREG_INTERNAL_MEMBER_NAME(NAME) = {{&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)}};          \
   /* NOLINTEND(misc-non-private-member-variables-in-classes) */                                    \
-  template <bool Cond = (COND)>                                                                    \
-  hwreg::internal::enable_if_t<Cond, ENUM_TYPE, (BIT_HIGH), (BIT_LOW)> NAME() const {              \
+  template <bool Cond = (COND),                                                                    \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>       \
+  ENUM_TYPE NAME() const {                                                                         \
     return static_cast<ENUM_TYPE>(hwreg::BitfieldRef<const typename SelfType::ValueType>(          \
                                       this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW))                \
                                       .get());                                                     \
   }                                                                                                \
-  template <bool Cond = (COND)>                                                                    \
-  hwreg::internal::enable_if_t<Cond, SelfType&, (BIT_HIGH), (BIT_LOW)> set_##NAME(ENUM_TYPE val) { \
+  template <bool Cond = (COND),                                                                    \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>       \
+  SelfType& set_##NAME(ENUM_TYPE val) {                                                            \
     hwreg::BitfieldRef<typename SelfType::ValueType>(this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW)) \
         .set(static_cast<typename SelfType::ValueType>(val));                                      \
     return *this;                                                                                  \
@@ -447,17 +449,16 @@ class BitfieldRef {
 
 #define DEF_COND_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME, COND)                                   \
   HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                         \
-  template <bool Cond = (COND)>                                                                   \
-  constexpr hwreg::internal::enable_if_t<Cond, std::remove_reference_t<decltype(FIELD)>,          \
-                                         (BIT_HIGH), (BIT_LOW)>                                   \
-  NAME() const {                                                                                  \
+  template <bool Cond = (COND),                                                                   \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>      \
+  constexpr std::remove_reference_t<decltype(FIELD)> NAME() const {                               \
     return hwreg::BitfieldRef<const std::remove_reference_t<decltype(FIELD)>>(&FIELD, (BIT_HIGH), \
                                                                               (BIT_LOW))          \
         .get();                                                                                   \
   }                                                                                               \
-  template <bool Cond = (COND), typename = std::enable_if_t<Cond>>                                \
-  constexpr hwreg::internal::enable_if_t<Cond, SelfType&, (BIT_HIGH), (BIT_LOW)> set_##NAME(      \
-      std::remove_reference_t<decltype(FIELD)> val) {                                             \
+  template <bool Cond = (COND),                                                                   \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>      \
+  constexpr SelfType& set_##NAME(std::remove_reference_t<decltype(FIELD)> val) {                  \
     hwreg::BitfieldRef<std::remove_reference_t<decltype(FIELD)>>(&FIELD, (BIT_HIGH), (BIT_LOW))   \
         .set(val);                                                                                \
     return *this;                                                                                 \
@@ -500,17 +501,16 @@ class BitfieldRef {
 
 #define DEF_COND_UNSHIFTED_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW, NAME, COND)                       \
   HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                       \
-  template <bool Cond = (COND), typename = std::enable_if_t<Cond>>                              \
-  constexpr hwreg::internal::enable_if_t<Cond, std::remove_reference_t<decltype(FIELD)>,        \
-                                         (BIT_HIGH), (BIT_LOW)>                                 \
-  NAME() const {                                                                                \
+  template <bool Cond = (COND),                                                                 \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>    \
+  constexpr std::remove_reference_t<decltype(FIELD)> NAME() const {                             \
     return hwreg::BitfieldRef<const std::remove_reference_t<decltype(FIELD)>>(                  \
                &FIELD, (BIT_HIGH), (BIT_LOW), /*unshifted=*/true)                               \
         .get();                                                                                 \
   }                                                                                             \
-  template <bool Cond = (COND), typename = std::enable_if_t<Cond>>                              \
-  constexpr hwreg::internal::enable_if_t<Cond, SelfType&, (BIT_HIGH), (BIT_LOW)> set_##NAME(    \
-      std::remove_reference_t<decltype(FIELD)> val) {                                           \
+  template <bool Cond = (COND),                                                                 \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>    \
+  constexpr SelfType& set_##NAME(std::remove_reference_t<decltype(FIELD)> val) {                \
     hwreg::BitfieldRef<std::remove_reference_t<decltype(FIELD)>>(&FIELD, (BIT_HIGH), (BIT_LOW), \
                                                                  /*unshifted=*/true)            \
         .set(val);                                                                              \
@@ -540,16 +540,17 @@ class BitfieldRef {
 #define DEF_COND_ENUM_SUBFIELD(FIELD, ENUM_TYPE, BIT_HIGH, BIT_LOW, NAME, COND)                 \
   HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                                       \
   static_assert(std::is_enum_v<ENUM_TYPE>, "ENUM_TYPE is not an enum");                         \
-  template <bool Cond = (COND), typename = std::enable_if_t<Cond>>                              \
-  constexpr hwreg::internal::enable_if_t<Cond, ENUM_TYPE, (BIT_HIGH), (BIT_LOW)> NAME() const { \
+  template <bool Cond = (COND),                                                                 \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>    \
+  constexpr ENUM_TYPE NAME() const {                                                            \
     return static_cast<ENUM_TYPE>(                                                              \
         hwreg::BitfieldRef<const std::remove_reference_t<decltype(FIELD)>>(&FIELD, (BIT_HIGH),  \
                                                                            (BIT_LOW))           \
             .get());                                                                            \
   }                                                                                             \
-  template <bool Cond = (COND), typename = std::enable_if_t<Cond>>                              \
-  constexpr hwreg::internal::enable_if_t<Cond, SelfType&, (BIT_HIGH), (BIT_LOW)> set_##NAME(    \
-      ENUM_TYPE val) {                                                                          \
+  template <bool Cond = (COND),                                                                 \
+            std::enable_if_t<hwreg::internal::kUnexpandedPred<Cond, __LINE__>, bool> = true>    \
+  constexpr SelfType& set_##NAME(ENUM_TYPE val) {                                               \
     hwreg::BitfieldRef<std::remove_reference_t<decltype(FIELD)>>(&FIELD, (BIT_HIGH), (BIT_LOW)) \
         .set(static_cast<std::remove_reference_t<decltype(FIELD)>>(val));                       \
     return *this;                                                                               \
