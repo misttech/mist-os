@@ -58,7 +58,7 @@ compile_commands: ## Generate ninja (with compile_commands.json to be imported b
 	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel_x64/kernel.zbi -t compdb > compile_commands.json
 .PHONY: compile_commands
 
-it: args gen info ## Build multiboot(bootloader) and kernel zircon binary image(zbi)
+it: gen info ## Build multiboot(bootloader) and kernel zircon binary image(zbi)
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi
 .PHONY: it
 
