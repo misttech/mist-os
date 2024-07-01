@@ -302,9 +302,15 @@ template("fidl_library") {
           _max_frozen_api_level = level
         }
       }
-      assert(platform_version.deprecated_highest_numbered_api_level ==
-                 _max_frozen_api_level,
-             "The previous API level must be frozen before adding a new one.")
+      if (platform_version.deprecated_highest_numbered_api_level !=
+          _max_frozen_api_level) {
+        # Although this should not happen, the platform-version-roller, like
+        # all fint recipes, runs a `gn check` after the build, which causes
+        # this condition to be hit now that the level has been added to
+        # version_history.json.
+        print(
+            "WARNING: The previous API level must be frozen before adding a new one. If this is not a post-build GN check, something is wrong.")
+      }
 
       next_level = 1 + platform_version.deprecated_highest_numbered_api_level
       api_levels += [ "$next_level" ]
