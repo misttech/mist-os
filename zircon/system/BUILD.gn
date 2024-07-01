@@ -13,22 +13,24 @@ import("//build/config/fuchsia/target_api_level.gni")
 static_library("availability_test") {
   visibility = [ "//sdk/*" ]
 
-  if (override_target_api_level != "PLATFORM") {
+  if (current_build_target_api_level != "PLATFORM") {
     # Define values used by the test.
 
     # Due to the way the macros are defined, only literals can be specified.
     # Therefore, separate literal values must be provided for relative levels.
-    _override_target_api_level_minus_one = override_target_api_level - 1
-    _override_target_api_level_plus_one = override_target_api_level + 1
+    _current_build_target_api_level_minus_one =
+        current_build_target_api_level - 1
+    _current_build_target_api_level_plus_one =
+        current_build_target_api_level + 1
 
     # TODO(https://fxbug.dev/305961460): Replace the RHS with another mechanism.
     _highest_numbered_api_level_plus_one =
         platform_version.deprecated_highest_numbered_api_level + 1
 
     defines = [
-      "BUILT_AT_NUMBERED_API_LEVEL=$override_target_api_level",
-      "BUILT_AT_NUMBERED_API_LEVEL_MINUS_ONE=$_override_target_api_level_minus_one",
-      "BUILT_AT_NUMBERED_API_LEVEL_PLUS_ONE=$_override_target_api_level_plus_one",
+      "BUILT_AT_NUMBERED_API_LEVEL=$current_build_target_api_level",
+      "BUILT_AT_NUMBERED_API_LEVEL_MINUS_ONE=$_current_build_target_api_level_minus_one",
+      "BUILT_AT_NUMBERED_API_LEVEL_PLUS_ONE=$_current_build_target_api_level_plus_one",
       "FUCHSIA_INTERNAL_LEVEL_${_highest_numbered_api_level_plus_one}_()=${_highest_numbered_api_level_plus_one}",
     ]
   }

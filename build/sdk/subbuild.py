@@ -314,7 +314,7 @@ def main():
     else:
         gn_api_level = int(api_level)
 
-    args_gn_content += f"override_target_api_level = {gn_api_level}\n"
+    args_gn_content += f"current_build_target_api_level = {gn_api_level}\n"
 
     logger.info(f"{build_dir}: args.gn content:\n{args_gn_content}")
     if (

@@ -12,7 +12,7 @@ import("//build/sdk/sdk_atom.gni")
 import("//build/testing/fidl_api_compatibility_test.gni")
 import("//build/testing/golden_files.gni")
 
-if (override_target_api_level == "PLATFORM") {
+if (current_build_target_api_level == "PLATFORM") {
   # FIDL directly supports targeting multiple API levels. "PLATFORM" is a
   # meta-level that refers to the set of all supported API levels.
   _levels = []
@@ -21,7 +21,7 @@ if (override_target_api_level == "PLATFORM") {
   }
   fidl_target_api_levels = string_join(",", _levels)
 } else {
-  fidl_target_api_levels = "$override_target_api_level"
+  fidl_target_api_levels = "$current_build_target_api_level"
 }
 
 # Declares a bindings agnostic FIDL library. See //build/fidl/fidl.gni for the

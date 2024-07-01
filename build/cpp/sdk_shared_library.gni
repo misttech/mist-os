@@ -448,10 +448,10 @@ template("sdk_shared_library") {
     if (defined(invoker.symbols_api)) {
       args += [ "--ifs" ] + [ get_path_info(invoker.symbols_api, "file") ]
     }
-    if (override_target_api_level != "PLATFORM") {
+    if (current_build_target_api_level != "PLATFORM") {
       args += [
         "--api-level",
-        "${override_target_api_level}",
+        "${current_build_target_api_level}",
       ]
     }
 
