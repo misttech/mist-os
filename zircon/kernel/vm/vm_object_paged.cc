@@ -1421,8 +1421,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
   // is set, reduce the requested length if it exceeds the the VMO size. We place these in a lambda
   // so that we can perform them any time the lock is dropped.
   const bool can_trim = !!(options & VmObjectReadWriteOptions::TrimLength);
-  auto check_and_trim = [this, can_trim, &end_offset]() -> zx_status_t {
-    AssertHeld(lock_ref());
+  auto check_and_trim = [this, can_trim, &end_offset]() TA_REQ(lock()) -> zx_status_t {
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
       return ZX_ERR_BAD_STATE;
     }
