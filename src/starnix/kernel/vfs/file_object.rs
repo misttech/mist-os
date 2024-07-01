@@ -1574,7 +1574,9 @@ impl FileObject {
             return error!(EBADF);
         }
 
-        self.node().fallocate(locked, current_task, mode, offset, length)
+        self.node().fallocate(locked, current_task, mode, offset, length)?;
+        self.notify(InotifyMask::MODIFY);
+        Ok(())
     }
 
     pub fn to_handle<L>(

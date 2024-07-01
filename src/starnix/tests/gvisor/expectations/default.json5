@@ -373,7 +373,6 @@
                 "Inotify.ExcludeUnlinkInodeEvents",
                 "Inotify.ExcludeUnlinkDirectory",
                 "Inotify.ExcludeUnlink",
-                "Inotify.Fallocate",
                 "Inotify.IncludeUnlinkedFile",
                 "Inotify.ExcludeUnlinkMultipleChildren",
                 "Inotify.Utimensat",
