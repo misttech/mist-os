@@ -162,7 +162,7 @@ ${archive_path}:  ../../tools/devshell/lib/platform.sh "
   } > "${base_out}/index.md"
 
   {
-    echo "# fx command"
+    echo "## fx command"
     echo
     echo "For help with specific subcommands, see [Overview page](index.md)."
     echo

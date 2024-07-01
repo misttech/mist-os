@@ -5,7 +5,7 @@
 
 #### CATEGORY=Software delivery
 #### DEPRECATED
-### [deprecated] alias for fx ota
+### deprecated alias for fx ota
 
 ## Deprecated: just runs 'fx ota' after a few seconds of intentional pause
 
