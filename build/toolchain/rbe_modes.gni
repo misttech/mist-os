@@ -20,9 +20,9 @@ declare_args() {
   # The overall mode for RBE to be operating in.  The valid values are:
   #  * 'off' => RBE is fully disabled. This is suitable for offline building
   #             using only local resources.
-  #  * 'default' => The standard RBE configuration used if not otherwise
-  #                 specified. This contains a mix of enabled/disabled remote
-  #                 services.
+  #  * 'legacy_default' => The standard RBE configuration used if not otherwise
+  #                        specified. This contains a mix of enabled/disabled
+  #                        remote services.
   #  * 'cloudtop' => An RBE configuration that's optimized for running on a
   #                  cloudtop. Suitable for high-bandwidth connections to
   #                  remote services.
@@ -31,7 +31,7 @@ declare_args() {
   #                           execute locally instead of remotely.
   #  * 'low_bandwidth' => An RBE configuration for developers that have a
   #                       powerful workstations, but low bandwidth.
-  rbe_mode = "default"
+  rbe_mode = "legacy_default"
 
   # Overridden settings for the RBE mode.  This is a set of override values for
   # variables whose default values are set by the chosen RBE mode (above).
@@ -79,7 +79,7 @@ _default_rbe_settings = {
   # via Goma (deprecated), has since been replaced by re-client.
   # It is advised to choose one of the other options that
   # best matches your development environment.
-  default = {
+  legacy_default = {
     forward_variables_from(_all_modes_defaults, "*")
     cxx_enable = true
     link_enable = false
@@ -174,7 +174,7 @@ _default_rbe_settings = {
 # Validate that the chosen RBE mode is one of the valid modes
 assert(
     defined(_default_rbe_settings[rbe_mode]),
-    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'default', 'cloudtop', 'infra', 'remote_cache_only' (*), and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
+    "The specified RBE mode (${rbe_mode}) is not a valid option. They are: 'off', 'legacy_default', 'cloudtop', 'infra', 'remote_cache_only' (*), and 'low_bandwidth_remote' (*).  (*) denotes an experimental mode.")
 
 # Set the RBE settings to use based on the chosen RBE mode
 _settings_defaults = _default_rbe_settings[rbe_mode]
