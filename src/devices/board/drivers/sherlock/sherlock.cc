@@ -149,6 +149,10 @@ int Sherlock::Start() {
     return -1;
   }
 
+  if (PwmInit() != ZX_OK) {
+    zxlogf(ERROR, "PwmInit() failed");
+  }
+
   // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
   // their init steps.
   if (ClkInit() != ZX_OK) {
@@ -179,10 +183,6 @@ int Sherlock::Start() {
 
   if (CanvasInit() != ZX_OK) {
     zxlogf(ERROR, "CanvasInit() failed");
-  }
-
-  if (PwmInit() != ZX_OK) {
-    zxlogf(ERROR, "PwmInit() failed");
   }
 
   // Then the platform device drivers.

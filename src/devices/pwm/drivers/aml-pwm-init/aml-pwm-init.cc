@@ -45,15 +45,6 @@ zx::result<> PwmInitDriver::Start() {
   }
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm(std::move(client_end.value()));
 
-  const char* kWifiGpioFragmentName = "gpio-wifi";
-  zx::result wifi_gpio =
-      incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(kWifiGpioFragmentName);
-  if (wifi_gpio.is_error()) {
-    FDF_LOG(ERROR, "Failed to get gpio FIDL protocol from fragment %s: %s", kWifiGpioFragmentName,
-            wifi_gpio.status_string());
-    return wifi_gpio.take_error();
-  }
-
   const char* kBtGpioFragmentName = "gpio-bt";
   zx::result bt_gpio =
       incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(kBtGpioFragmentName);
@@ -63,9 +54,8 @@ zx::result<> PwmInitDriver::Start() {
     return bt_gpio.take_error();
   }
 
-  initer_ =
-      std::make_unique<PwmInitDevice>(std::move(clock_result.value()), std::move(pwm),
-                                      std::move(wifi_gpio.value()), std::move(bt_gpio.value()));
+  initer_ = std::make_unique<PwmInitDevice>(std::move(clock_result.value()), std::move(pwm),
+                                            std::move(bt_gpio.value()));
 
   if ((status = initer_->Init()) != ZX_OK) {
     FDF_LOG(ERROR, "could not initialize PWM for bluetooth and SDIO. st = %s",
@@ -104,21 +94,6 @@ zx::result<> PwmInitDriver::Start() {
 }
 
 zx_status_t PwmInitDevice::Init() {
-  // Configure SOC_WIFI_LPO_32k768 pin for PWM_E
-  {
-    fidl::WireResult result = wifi_gpio_->SetAltFunction(1);
-    if (!result.ok()) {
-      FDF_LOG(ERROR, "Failed to send SetAltFunction request to wifi gpio: %s",
-              result.status_string());
-      return result.status();
-    }
-    if (result->is_error()) {
-      FDF_LOG(ERROR, "Failed to set wifi gpio's alt function: %s",
-              zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
-  }
-
   // Enable PWM_CLK_* for WIFI 32K768
   // This connection is optional, so if it does not connect, don't return an error.
   // In DFv2 Connect will succeed even if the fragment is not there, so we first learn of the

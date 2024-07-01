@@ -81,6 +81,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "BluetoothInit failed: %d", status);
   }
 
+  if ((status = PwmInit()) != ZX_OK) {
+    zxlogf(ERROR, "PwmInit failed: %d", status);
+  }
+
   // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
   // their init steps.
   if ((status = ClkInit()) != ZX_OK) {
@@ -127,10 +131,6 @@ int Nelson::Thread() {
 
   if ((status = CanvasInit()) != ZX_OK) {
     zxlogf(ERROR, "CanvasInit failed: %d", status);
-  }
-
-  if ((status = PwmInit()) != ZX_OK) {
-    zxlogf(ERROR, "PwmInit failed: %d", status);
   }
 
   if ((status = TeeInit()) != ZX_OK) {

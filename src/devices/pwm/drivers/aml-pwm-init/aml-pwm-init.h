@@ -20,19 +20,14 @@ class PwmInitDevice {
  public:
   explicit PwmInitDevice(fidl::ClientEnd<fuchsia_hardware_clock::Clock> clock,
                          fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm,
-                         fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> wifi_gpio,
                          fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> bt_gpio)
-      : wifi_32k768_clk_(std::move(clock)),
-        pwm_(std::move(pwm)),
-        wifi_gpio_(std::move(wifi_gpio)),
-        bt_gpio_(std::move(bt_gpio)) {}
+      : wifi_32k768_clk_(std::move(clock)), pwm_(std::move(pwm)), bt_gpio_(std::move(bt_gpio)) {}
 
   zx_status_t Init();
 
  private:
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> wifi_32k768_clk_;
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_;
-  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> wifi_gpio_;
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> bt_gpio_;
 };
 

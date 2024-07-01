@@ -173,6 +173,11 @@
 				drive-strength-microamp = <0 2500>;
 			};
 
+			wifi_lpo_pwm: wifi-lpo-pwm {
+				pins = <A311D_GPIOX(16)>;
+				function = <0 1>;
+			};
+
 		};
 
 		cpu_temp: temperature-sensor@ff634800 {
@@ -294,8 +299,9 @@
 
 		pwm_init: pwm-init {
 			pwms = <&pwm 4 0 0>; //A311D_PWM_E
-			gpios = <&gpio A311D_GPIOX(16) 0 &gpio A311D_GPIOX(17) 0>;
-			gpio-names = "WIFI_LPO", "BT_REG_ON";
+			gpios = <&gpio A311D_GPIOX(17) 0>;
+			gpio-names = "BT_REG_ON";
+			pinctrl-0 = <&wifi_lpo_pwm>;
 		};
 
 		usb_phy: phy@ffe09000 {
