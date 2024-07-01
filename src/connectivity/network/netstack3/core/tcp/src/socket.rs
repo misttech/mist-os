@@ -521,19 +521,6 @@ pub trait TcpDemuxContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBin
 
     /// Calls `f` with mutable access to the demux state.
     fn with_demux_mut<O, F: FnOnce(&mut DemuxState<I, D, BT>) -> O>(&mut self, cb: F) -> O;
-
-    /// Calls `f` with mutable access to the demux state and a transport core
-    /// context.
-    // TODO(https://fxbug.dev/327489613): This function allows us doing IP-level
-    // operations while holding on to the demux lock. We might want to revisit
-    // when we enable multithreading.
-    fn with_demux_mut_and_ip_transport_ctx<
-        O,
-        F: FnOnce(&mut DemuxState<I, D, BT>, &mut Self::IpTransportCtx<'_>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
 }
 
 /// Provides access to the current stack of the context.
@@ -879,23 +866,6 @@ pub trait TcpDualStackContext<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: Tc
     fn with_both_demux_mut<
         O,
         F: FnOnce(&mut DemuxState<I, D, BT>, &mut DemuxState<I::OtherVersion, D, BT>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
-
-    /// Calls `cb` with mutable access to both demux states and a transport
-    /// core context can operate on both IP versions.
-    // TODO(https://fxbug.dev/327489613): This function allows us doing IP-level
-    // operations while holding on to the demux locks. We might want to revisit
-    // when we enable multithreading.
-    fn with_both_demux_mut_and_ip_transport_ctx<
-        O,
-        F: FnOnce(
-            &mut DemuxState<I, D, BT>,
-            &mut DemuxState<I::OtherVersion, D, BT>,
-            &mut Self::DualStackIpTransportCtx<'_>,
-        ) -> O,
     >(
         &mut self,
         cb: F,
@@ -1975,23 +1945,16 @@ impl HandshakeStatus {
     }
 }
 
-fn bind_install_in_demux<I, BC, DC>(
-    core_ctx: &mut DC,
-    bindings_ctx: &mut BC,
-    demux_socket_id: I::DemuxSocketId<DC::WeakDeviceId, BC>,
-    addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, DC::DeviceId>>,
-    bound_device: &Option<DC::WeakDeviceId>,
-    port: Option<NonZeroU16>,
-    sharing: SharingState,
-    DemuxState { socketmap }: &mut DemuxState<I, DC::WeakDeviceId, BC>,
-) -> Result<
-    (ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, DC::WeakDeviceId>, ListenerSharingState),
-    LocalAddressError,
->
+/// Resolves the demux local address and bound device for the `bind` operation.
+fn bind_get_local_addr_and_device<I, BT, CC>(
+    core_ctx: &mut CC,
+    addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, CC::DeviceId>>,
+    bound_device: &Option<CC::WeakDeviceId>,
+) -> Result<(Option<SocketIpAddr<I::Addr>>, Option<CC::WeakDeviceId>), LocalAddressError>
 where
     I: DualStackIpExt,
-    BC: TcpBindingsTypes + RngContext,
-    DC: TransportIpContext<I, BC> + DeviceIpSocketHandler<I, BC>,
+    BT: TcpBindingsTypes,
+    CC: TransportIpContext<I, BT>,
 {
     let (local_ip, device) = match addr {
         Some(addr) => {
@@ -2017,8 +1980,27 @@ where
         }
         None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
     };
-
     let weak_device = device.map(|d| d.as_weak().into_owned());
+    Ok((local_ip, weak_device))
+}
+
+fn bind_install_in_demux<I, D, BC>(
+    bindings_ctx: &mut BC,
+    demux_socket_id: I::DemuxSocketId<D, BC>,
+    local_ip: Option<SocketIpAddr<I::Addr>>,
+    weak_device: Option<D>,
+    port: Option<NonZeroU16>,
+    sharing: SharingState,
+    DemuxState { socketmap }: &mut DemuxState<I, D, BC>,
+) -> Result<
+    (ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>, ListenerSharingState),
+    LocalAddressError,
+>
+where
+    I: DualStackIpExt,
+    BC: TcpBindingsTypes + RngContext,
+    D: WeakDeviceIdentifier,
+{
     let port = match port {
         None => {
             match netstack3_base::simple_randomized_port_alloc(
@@ -2259,24 +2241,17 @@ where
                 socket_extra: socket_extra.clone(),
             };
 
-            // TODO(https://fxbug.dev/327489613): We have some code duplication
-            // below calling `bind_install_in_demux` because we want to only
-            // take the other stack's demux lock when necessary.
-            // TODO(https://fxbug.dev/327488712): To maximize code reuse,
-            // `bind_install_in_demux` doesn't acquire locks directly, but this
-            // may cause worse contention down the road when multithreading is
-            // enabled.
             let (listener_addr, sharing) = match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => match bind_addr {
                     BindAddr::BindInOneStack(EitherStack::ThisStack(local_addr)) => {
+                        let (local_addr, device) = bind_get_local_addr_and_device(core_ctx, local_addr, bound_device)?;
                         let (addr, sharing) =
-                            core_ctx.with_demux_mut_and_ip_transport_ctx(|demux, core_ctx| {
+                            core_ctx.with_demux_mut(|demux| {
                                 bind_install_in_demux(
-                                    core_ctx,
                                     bindings_ctx,
                                     I::into_demux_socket_id(id.clone()),
                                     local_addr,
-                                    bound_device,
+                                    device,
                                     port,
                                     *sharing,
                                     demux,
@@ -2312,14 +2287,14 @@ where
                     };
                     match bind_addr {
                         BindAddr::BindInOneStack(EitherStack::ThisStack(addr)) => {
+                            let (addr, device) = bind_get_local_addr_and_device::<I, _, _>(core_ctx, addr, bound_device)?;
                             let (ListenerAddr { ip, device }, sharing) =
-                                TcpDemuxContext::<I, _, _>::with_demux_mut_and_ip_transport_ctx(core_ctx, |demux, core_ctx| {
+                                core_ctx.with_demux_mut(|demux: &mut DemuxState<I, _, _>| {
                                     bind_install_in_demux(
-                                        core_ctx,
                                         bindings_ctx,
                                         I::into_demux_socket_id(id.clone()),
                                         addr,
-                                        bound_device,
+                                        device,
                                         port,
                                         *sharing,
                                         demux,
@@ -2335,14 +2310,14 @@ where
                         }
                         BindAddr::BindInOneStack(EitherStack::OtherStack(addr)) => {
                             let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                            let (addr, device) = bind_get_local_addr_and_device::<I::OtherVersion, _, _>(core_ctx, addr, bound_device)?;
                             let (ListenerAddr { ip, device }, sharing) =
-                                TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut_and_ip_transport_ctx(core_ctx, |demux, core_ctx| {
+                                core_ctx.with_demux_mut(|demux: &mut DemuxState<I::OtherVersion, _, _>| {
                                     bind_install_in_demux(
-                                        core_ctx,
                                         bindings_ctx,
                                         other_demux_id,
                                         addr,
-                                        bound_device,
+                                        device,
                                         port,
                                         *sharing,
                                         demux,
@@ -2359,7 +2334,7 @@ where
                         BindAddr::BindInBothStacks => {
                             let other_demux_id = core_ctx.into_other_demux_socket_id(id.clone());
                             let (port, device, sharing) =
-                                core_ctx.with_both_demux_mut_and_ip_transport_ctx(|demux, other_demux, core_ctx| {
+                                core_ctx.with_both_demux_mut(|demux, other_demux| {
                                     // We need to allocate the port for both
                                     // stacks before `bind_inner` tries to make
                                     // a decision, because it might give two
@@ -2384,21 +2359,19 @@ where
                                         }
                                     };
                                     let (this_stack_addr, this_stack_sharing) = bind_install_in_demux(
-                                        core_ctx,
                                         bindings_ctx,
                                         I::into_demux_socket_id(id.clone()),
                                         None,
-                                        bound_device,
+                                        bound_device.clone(),
                                         Some(port),
                                         *sharing,
                                         demux,
                                     )?;
                                     match bind_install_in_demux(
-                                        core_ctx,
                                         bindings_ctx,
                                         other_demux_id,
                                         None,
-                                        bound_device,
+                                        bound_device.clone(),
                                         Some(port),
                                         *sharing,
                                         other_demux,
@@ -5698,18 +5671,6 @@ mod tests {
         ) -> O {
             cb(&mut self.tcp.v4.demux.borrow_mut())
         }
-
-        fn with_demux_mut_and_ip_transport_ctx<
-            O,
-            F: FnOnce(&mut DemuxState<Ipv4, D::Weak, BC>, &mut Self::IpTransportCtx<'_>) -> O,
-        >(
-            &mut self,
-            cb: F,
-        ) -> O {
-            let demux = Rc::clone(&self.tcp.v4.demux);
-            let mut demux = demux.borrow_mut();
-            cb(&mut *demux, self)
-        }
     }
 
     impl<D, BC> TcpDemuxContext<Ipv6, D::Weak, BC> for TcpCoreCtx<D, BC>
@@ -5727,18 +5688,6 @@ mod tests {
             cb: F,
         ) -> O {
             cb(&mut self.tcp.v6.demux.borrow_mut())
-        }
-
-        fn with_demux_mut_and_ip_transport_ctx<
-            O,
-            F: FnOnce(&mut DemuxState<Ipv6, D::Weak, BC>, &mut Self::IpTransportCtx<'_>) -> O,
-        >(
-            &mut self,
-            cb: F,
-        ) -> O {
-            let demux = Rc::clone(&self.tcp.v6.demux);
-            let mut demux = demux.borrow_mut();
-            cb(&mut *demux, self)
         }
     }
 
@@ -5912,23 +5861,6 @@ mod tests {
             cb: F,
         ) -> O {
             cb(&mut self.tcp.v6.demux.borrow_mut(), &mut self.tcp.v4.demux.borrow_mut())
-        }
-        fn with_both_demux_mut_and_ip_transport_ctx<
-            O,
-            F: FnOnce(
-                &mut DemuxState<Ipv6, FakeWeakDeviceId<D>, BT>,
-                &mut DemuxState<Ipv4, FakeWeakDeviceId<D>, BT>,
-                &mut Self::DualStackIpTransportCtx<'_>,
-            ) -> O,
-        >(
-            &mut self,
-            cb: F,
-        ) -> O {
-            let demux_v6 = Rc::clone(&self.tcp.v6.demux);
-            let demux_v4 = Rc::clone(&self.tcp.v4.demux);
-            let mut demux_v6 = demux_v6.borrow_mut();
-            let mut demux_v4 = demux_v4.borrow_mut();
-            cb(&mut demux_v6, &mut demux_v4, self)
         }
     }
 

@@ -28,15 +28,6 @@ impl<
     fn with_demux_mut<O, F: FnOnce(&mut DemuxState<I, D, BT>) -> O>(&mut self, _cb: F) -> O {
         self.uninstantiable_unreachable()
     }
-    fn with_demux_mut_and_ip_transport_ctx<
-        O,
-        F: FnOnce(&mut DemuxState<I, D, BT>, &mut Self::IpTransportCtx<'_>) -> O,
-    >(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
 }
 
 impl<P> AsThisStack<P> for UninstantiableWrapper<P> {
@@ -79,20 +70,6 @@ where
     fn with_both_demux_mut<
         O,
         F: FnOnce(&mut DemuxState<I, D, BT>, &mut DemuxState<I::OtherVersion, D, BT>) -> O,
-    >(
-        &mut self,
-        _cb: F,
-    ) -> O {
-        self.uninstantiable_unreachable()
-    }
-
-    fn with_both_demux_mut_and_ip_transport_ctx<
-        O,
-        F: FnOnce(
-            &mut DemuxState<I, D, BT>,
-            &mut DemuxState<I::OtherVersion, D, BT>,
-            &mut Self::DualStackIpTransportCtx<'_>,
-        ) -> O,
     >(
         &mut self,
         _cb: F,

@@ -53,18 +53,6 @@ where
     ) -> O {
         cb(&mut self.write_lock::<crate::lock_ordering::TcpDemux<I>>())
     }
-
-    fn with_demux_mut_and_ip_transport_ctx<
-        O,
-        F: FnOnce(&mut tcp::DemuxState<I, WeakDeviceId<BC>, BC>, &mut Self::IpTransportCtx<'_>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut demux_state, mut restricted) =
-            self.write_lock_and::<crate::lock_ordering::TcpDemux<I>>();
-        cb(&mut demux_state, &mut restricted)
-    }
 }
 
 impl<L, BC> TcpContext<Ipv4, BC> for CoreCtx<'_, BC, L>
@@ -272,24 +260,6 @@ impl<L: LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>, BC: BindingsContext>
             self.write_lock_and::<crate::lock_ordering::TcpDemux<Ipv4>>();
         let mut demux_v6 = locked.write_lock::<crate::lock_ordering::TcpDemux<Ipv6>>();
         cb(&mut demux_v6, &mut demux_v4)
-    }
-
-    fn with_both_demux_mut_and_ip_transport_ctx<
-        O,
-        F: FnOnce(
-            &mut tcp::DemuxState<Ipv6, WeakDeviceId<BC>, BC>,
-            &mut tcp::DemuxState<Ipv4, WeakDeviceId<BC>, BC>,
-            &mut Self::DualStackIpTransportCtx<'_>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut demux_v4, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::TcpDemux<Ipv4>>();
-        let (mut demux_v6, mut locked) =
-            locked.write_lock_and::<crate::lock_ordering::TcpDemux<Ipv6>>();
-        cb(&mut demux_v6, &mut demux_v4, &mut locked)
     }
 }
 
