@@ -42,8 +42,10 @@ class Interrupts {
   Interrupts(Interrupts&&) = delete;
   Interrupts& operator=(Interrupts&&) = delete;
 
-  // The lifetimes of |dev|, |pci|, and |mmio_space| must outlast the initialized Interrupts
-  // instance.
+  // Must be called exactly once.
+  //
+  // `dev` and `mmio_space` must be non-null and outlive the initialized
+  // `Interrupts` instance.
   zx_status_t Init(PipeVsyncCallback pipe_vsync_callback, HotplugCallback hotplug_callback,
                    zx_device_t* dev, const ddk::Pci& pci, fdf::MmioBuffer* mmio_space,
                    uint16_t device_id);

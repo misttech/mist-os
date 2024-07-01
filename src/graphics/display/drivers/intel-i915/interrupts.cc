@@ -373,12 +373,7 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
   ZX_DEBUG_ASSERT(hotplug_callback);
   ZX_DEBUG_ASSERT(dev);
   ZX_DEBUG_ASSERT(mmio_space);
-
-  // TODO(https://fxbug.dev/42167004): Looks like calling Init multiple times is allowed for unit
-  // tests but it would make the state of instances of this class more predictable to disallow this.
-  if (irq_) {
-    Destroy();
-  }
+  ZX_DEBUG_ASSERT(!irq_.is_valid());
 
   pipe_vsync_callback_ = std::move(pipe_vsync_callback);
   hotplug_callback_ = std::move(hotplug_callback);
