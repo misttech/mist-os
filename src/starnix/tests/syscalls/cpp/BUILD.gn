@@ -11,7 +11,11 @@ import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_linux_test_component.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 
+# We want to use a newer sysroot than is available by default in $host_toolchain.
+_host_linux_toolchain = "//build/toolchain:linux_$host_cpu"
+
 syscall_tests = [
+  # go/keep-sorted start
   "abort_test",
   "ashmem_test",
   "bpf_test",
@@ -64,6 +68,8 @@ syscall_tests = [
   "vmsplice_test",
   "waitpid_exit_signal_test",
   "waitpid_flags_test",
+
+  # go/keep-sorted end
 ]
 
 if (target_cpu == "x64") {
@@ -75,42 +81,31 @@ if (target_cpu == "x64") {
 group("tests") {
   testonly = true
   deps = [ ":starnix_syscalls_cpp_tests" ]
-  if (host_os == "linux" && host_cpu == "x64" && has_board) {
+  if (host_os == "linux" && host_cpu == "x64") {
     foreach(test_name, syscall_tests) {
       deps += [
         # These are Linux tests, so we can run them as host tests on our host Linux bot.
-        ":${test_name}_host($host_toolchain)",
+        ":${test_name}_baseline($host_toolchain)",
       ]
     }
   }
 }
 
-if (is_host && has_board) {
-  foreach(test_name, syscall_tests) {
-    host_test("${test_name}_host") {
-      binary_path = get_label_info(":${test_name}_bin($target_linux_toolchain)",
-                                   "root_out_dir") + "/${test_name}_bin"
-      deps = [
-        ":${test_name}_bin($target_linux_toolchain)",
-        ":host_runtime_deps",
-      ]
-    }
-  }
-
+if (is_host) {
   host_test_data("host_runtime_deps") {
     sources = [
       get_label_info(
-              ":extended_pstate_initial_state_child($target_linux_toolchain)",
+              ":extended_pstate_initial_state_child($_host_linux_toolchain)",
               "root_out_dir") + "/extended_pstate_initial_state_child",
-      get_label_info(":syscall_test_exec_child($target_linux_toolchain)",
+      get_label_info(":syscall_test_exec_child($_host_linux_toolchain)",
                      "root_out_dir") + "/syscall_test_exec_child",
-      get_label_info(":ptrace_test_exec_child($target_linux_toolchain)",
+      get_label_info(":ptrace_test_exec_child($_host_linux_toolchain)",
                      "root_out_dir") + "/ptrace_test_exec_child",
     ]
     deps = [
-      ":extended_pstate_initial_state_child($target_linux_toolchain)",
-      ":ptrace_test_exec_child($target_linux_toolchain)",
-      ":syscall_test_exec_child($target_linux_toolchain)",
+      ":extended_pstate_initial_state_child($_host_linux_toolchain)",
+      ":ptrace_test_exec_child($_host_linux_toolchain)",
+      ":syscall_test_exec_child($_host_linux_toolchain)",
     ]
   }
 }
@@ -135,13 +130,13 @@ source_set("test_utils") {
   configs += [ "//build/config:rtti" ]
 }
 
-if (target_cpu == "x64" || target_cpu == "arm64") {
+if (current_cpu == "x64" || current_cpu == "arm64") {
   resource("fuse_overlayfs") {
     sources = []
-    if (target_cpu == "x64") {
+    if (current_cpu == "x64") {
       sources += [ "//prebuilt/starnix/fuse-overlayfs-amd64/fuse-overlayfs" ]
     }
-    if (target_cpu == "arm64") {
+    if (current_cpu == "arm64") {
       sources += [ "//prebuilt/starnix/fuse-overlayfs-arm64/fuse-overlayfs" ]
     }
     outputs = [ "data/fuse-overlayfs" ]
@@ -167,7 +162,22 @@ config("march") {
   }
 }
 
-template("syscall_test_component") {
+# TODO(https://fxbug.dev/350479500) Remove these and reference any missing headers directly.
+config("bionic_uapi") {
+  include_dirs = [
+    "//third_party/android/platform/bionic/libc/kernel/uapi",
+    "//third_party/android/platform/bionic/libc/kernel/android/uapi",
+  ]
+  if (current_cpu == "x64") {
+    include_dirs +=
+        [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-x86" ]
+  } else if (current_cpu == "arm64") {
+    include_dirs +=
+        [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64" ]
+  }
+}
+
+template("syscall_test") {
   test_name = invoker.test_name
 
   # Generate the manifest
@@ -185,54 +195,70 @@ template("syscall_test_component") {
     }
   }
 
-  _test_label = "${test_name}_bin"
-  test(_test_label) {
-    # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
-    exclude_toolchain_tags = [ "asan" ]
-    sources = [ "${test_name}.cc" ]
-    deps = [
+  _target_test_label = "${test_name}_bin"
+  _host_test_label = "${test_name}_host"
+  if (is_linux) {
+    _test_deps = [
       ":test_utils",
       "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
-      "//sdk/lib/stdcompat",
-      "//src/lib/files",
+      "//src/lib/fxl",
       "//src/lib/fxl/test:gtest_main",
       "//third_party/googletest:gmock",
       "//third_party/googletest:gtest",
-      "//zircon/system/public",
-      "//zircon/system/ulib/fbl",
     ]
-    include_dirs = [
-      "//third_party/android/platform/bionic/libc/kernel/uapi",
-      "//third_party/android/platform/bionic/libc/kernel/android/uapi",
+    _test_configs = [
+      ":bionic_uapi",
+      "//build/config:rtti",
+      "//build/config:thread_safety_annotations",
+
+      # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
+      "//build/config:Wno-vla-cxx-extension",
+
+      # TODO(b/307959737): Compile syscall test on target with the bionic toolchain and then move this
+      # to the bionic toolchain.
+      ":march",
+
+      # TODO(b/331282813): 'ENODATA' is deprecated in ISO C++, disable the warning for now.
+      "//build/config:Wno-deprecated-pragma",
     ]
-    if (target_cpu == "x64") {
-      include_dirs +=
-          [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-x86" ]
-    } else if (target_cpu == "arm64") {
-      include_dirs +=
-          [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64" ]
+
+    test(_target_test_label) {
+      # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
+      exclude_toolchain_tags = [ "instrumented" ]
+      sources = [ "${test_name}.cc" ]
+      deps = _test_deps
+      configs += _test_configs
     }
 
-    configs += [ "//build/config:rtti" ]
-
-    if (!is_fuchsia) {
-      configs += [ "//build/config:thread_safety_annotations" ]
+    test(_host_test_label) {
+      # TODO(https://fxbug.dev/350520251) the tests should be correct enough to pass w/ asan on host
+      exclude_toolchain_tags = [ "instrumented" ]
+      sources = [ "${test_name}.cc" ]
+      deps = _test_deps
+      configs += _test_configs
     }
+  } else {
+    not_needed([
+                 "_target_test_label",
+                 "_host_test_label",
+               ])
+  }
 
-    # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-vla-cxx-extension" ]
-
-    # TODO(b/307959737): Compile syscall test with the bionic toolchain and then move this
-    # to the bionic toolchain.
-    configs += [ ":march" ]
-
-    # TODO(b/331282813): 'ENODATA' is deprecated in ISO C++, disable the warning for now.
-    configs += [ "//build/config:Wno-deprecated-pragma" ]
+  if (is_host) {
+    host_test("${target_name}_baseline") {
+      binary_path =
+          get_label_info(":${_host_test_label}($_host_linux_toolchain)",
+                         "root_out_dir") + "/$_host_test_label"
+      deps = [
+        ":${_host_test_label}($_host_linux_toolchain)",
+        ":host_runtime_deps",
+      ]
+    }
   }
 
   starnix_linux_test_component(target_name) {
-    test_label = ":${_test_label}"
-    test_binary = _test_label
+    test_label = ":${_target_test_label}"
+    test_binary = _target_test_label
     manifest = _manifest_file
     deps = [
       ":${_manifest_label}",
@@ -248,7 +274,7 @@ template("syscall_test_component") {
 }
 
 foreach(test_name, syscall_tests) {
-  syscall_test_component(test_name) {
+  syscall_test(test_name) {
     test_name = test_name
   }
 }
@@ -275,6 +301,7 @@ test("syslog_non_root") {
 
 if (is_linux) {
   executable("extended_pstate_initial_state_child") {
+    testonly = true
     emit_tool_path = false
 
     # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
@@ -346,6 +373,7 @@ if (is_linux) {
 }
 
 resource("extended_pstate_initial_state_child_resource") {
+  testonly = true
   binary_name = "extended_pstate_initial_state_child"
   exe_label = ":${binary_name}($target_linux_toolchain)"
   out_dir = get_label_info(exe_label, "root_out_dir")
