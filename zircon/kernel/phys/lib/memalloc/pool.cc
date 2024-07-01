@@ -145,7 +145,7 @@ fit::result<fit::failed> Pool::Init(cpp20::span<internal::RangeIterationContext>
   };
   ZX_ASSERT_MSG(memalloc::FindNormalizedRanges(ranges, find_scratch, process_range).is_ok(),
                 "Pool::Init(): bad input: the provided ranges feature overlap among different "
-                "extended types, or an extended type with one of kReserved or kPeripheral");
+                "allocated types, or an allocated type with one of kReserved or kPeripheral");
   if (alloc_failure) {
     return fit::failed();
   }
@@ -377,7 +377,7 @@ fit::result<fit::failed> Pool::CoalescePeripherals(cpp20::span<const size_t> ali
 fit::result<fit::failed, uint64_t> Pool::FindAllocatable(Type type, uint64_t size,
                                                          uint64_t alignment, uint64_t min_addr,
                                                          uint64_t max_addr) {
-  ZX_DEBUG_ASSERT(IsExtendedType(type));
+  ZX_DEBUG_ASSERT(IsAllocatedType(type));
   ZX_DEBUG_ASSERT(size > 0);
   ZX_DEBUG_ASSERT(min_addr <= max_addr);
   if (size - 1 > max_addr - min_addr) {
@@ -432,7 +432,7 @@ fit::result<fit::failed> Pool::Free(uint64_t addr, uint64_t size) {
   TryToEnsureTwoBookkeepingNodes();
 
   ZX_ASSERT(it->type != Type::kPoolBookkeeping);
-  ZX_ASSERT(IsExtendedType(it->type));
+  ZX_ASSERT(IsAllocatedType(it->type));
   const Range range{.addr = addr, .size = size, .type = Type::kFreeRam};
   if (auto status = InsertSubrange(range, it); status.is_error()) {
     return status.take_error();
@@ -447,7 +447,7 @@ fit::result<fit::failed> Pool::Free(uint64_t addr, uint64_t size) {
 fit::result<fit::failed, uint64_t> Pool::Resize(const Range& original, uint64_t new_size,
                                                 uint64_t min_alignment) {
   ZX_ASSERT(new_size > 0);
-  ZX_ASSERT(IsExtendedType(original.type));
+  ZX_ASSERT(IsAllocatedType(original.type));
   ZX_ASSERT(cpp20::has_single_bit(min_alignment));
   ZX_ASSERT(original.addr % min_alignment == 0);
 
@@ -567,7 +567,7 @@ fit::result<fit::failed, uint64_t> Pool::Resize(const Range& original, uint64_t 
 }
 
 fit::result<fit::failed> Pool::UpdateFreeRamSubranges(Type type, uint64_t addr, uint64_t size) {
-  ZX_ASSERT(IsExtendedType(type));
+  ZX_ASSERT(IsAllocatedType(type));
   ZX_ASSERT(kMax - addr >= size);
 
   if (size == 0) {

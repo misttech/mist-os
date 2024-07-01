@@ -73,7 +73,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     switch (provider.ConsumeEnum<Action>()) {
       case Action::kAllocate: {
         auto type = static_cast<memalloc::Type>(provider.ConsumeIntegralInRange<uint64_t>(
-            memalloc::kMinExtendedTypeValue, memalloc::kMaxExtendedTypeValue));
+            memalloc::kMinAllocatedTypeValue, memalloc::kMaxAllocatedTypeValue));
         uint64_t size = provider.ConsumeIntegralInRange<uint64_t>(1, kMax);
         uint64_t alignment = uint64_t{1} << provider.ConsumeIntegralInRange<size_t>(0, 63);
 
@@ -104,7 +104,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       }
       case Action::kUpdateFreeRamSubranges: {
         auto type = static_cast<memalloc::Type>(provider.ConsumeIntegralInRange<uint64_t>(
-            memalloc::kMinExtendedTypeValue, memalloc::kMaxExtendedTypeValue));
+            memalloc::kMinAllocatedTypeValue, memalloc::kMaxAllocatedTypeValue));
         uint64_t addr = provider.ConsumeIntegral<uint64_t>();
         uint64_t size = provider.ConsumeIntegralInRange<uint64_t>(0, kMax - addr);
         (void)ctx.pool.UpdateFreeRamSubranges(type, addr, size);

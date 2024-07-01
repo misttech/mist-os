@@ -959,7 +959,7 @@ TEST(MemallocPoolTests, Freeing) {
   ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
   ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
 
-  // A subrange of extended type passed to Init() can be freed.
+  // A subrange of allocated type passed to Init() can be freed.
   ASSERT_NO_FATAL_FAILURE(TestPoolFreeing(ctx.pool, 2 * kChunkSize, kChunkSize / 2));
   ASSERT_NO_FATAL_FAILURE(TestPoolFreeing(ctx.pool, 5 * kChunkSize / 2, kChunkSize / 2));
   ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected_after}));
@@ -1114,7 +1114,7 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
     ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
   }
 
-  // Updating can happen across an extended type.
+  // Updating can happen across an allocated type.
   {
     ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
                                                             kDefaultMinAddr, 3 * kChunkSize));
@@ -1160,7 +1160,7 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
     };
     ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
 
-    // Weak allocation does not affect extended type ranges, even when there
+    // Weak allocation does not affect allocated type ranges, even when there
     // is no free RAM in the provided range.
     ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
                                                             3 * kChunkSize, kChunkSize));
@@ -2208,8 +2208,8 @@ TEST(MemallocPoolTests, NormalizeRanges) {
           return true;
         },
         [](Type type) {
-          return (IsExtendedType(type) || type == Type::kFreeRam) ? std::nullopt
-                                                                  : std::make_optional(type);
+          return (IsAllocatedType(type) || type == Type::kFreeRam) ? std::nullopt
+                                                                   : std::make_optional(type);
         });
 
     constexpr Range kExpected[] = {

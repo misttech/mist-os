@@ -27,7 +27,7 @@ namespace memalloc {
 // available regions of RAM from among them.
 //
 // One initializes a Pool with a variable number of arrays of memory ranges.
-// Except among extended types (see Type documentation), the ranges are
+// Except among allocated types (see Type documentation), the ranges are
 // permitted to overlap with one another to an arbitrary degree. In practice,
 // the main array of ranges would be supplied by a ZBI or synthesized from a
 // legacy booting protocol, while the others would consist of other auxiliary
@@ -127,8 +127,8 @@ class Pool {
   // prescribe default bounds on the addresses Pool is allowed to allocate; the
   // placement of the internal bookkeeping must respect these.
   //
-  // The provided ranges cannot feature overlap among different extended
-  // types, or between an extended type with one of kReserved or kPeripheral;
+  // The provided ranges cannot feature overlap among different allocated
+  // types, or between an allocated type with one of kReserved or kPeripheral;
   // otherwise, arbitrary overlap is permitted.
   //
   // fit::failed is returned if there is insufficient free RAM to use for
@@ -169,7 +169,7 @@ class Pool {
   // Attempts to allocate memory out of free RAM of the prescribed type, size,
   // and alignment. An optional upper address bound may be passed: if
   // unspecified the default upper bound passed to Init() will be respected.
-  // `type` must be an extended type. `size` must be positive and the following
+  // `type` must be an allocated type. `size` must be positive and the following
   // must hold:
   //
   // `min_addr.value_or(default_min_addr) <= max_addr.value_or(default_max_addr)`
@@ -186,7 +186,7 @@ class Pool {
 
   // Attempts to perform a "weak allocation" of the given range, wherein all
   // kFreeRam subranges are updated to `type`. The given range must be
-  // comprised of tracked subranges of extended type, kFreeRam, or
+  // comprised of tracked subranges of allocated type, kFreeRam, or
   // kBookkeeping. `addr + size` cannot exceed UINT64_MAX.
   //
   // The utility of weak allocation lies in situations where there is a special
@@ -202,7 +202,7 @@ class Pool {
   fit::result<fit::failed> UpdateFreeRamSubranges(Type type, uint64_t addr, uint64_t size);
 
   // Attempts to free a subrange of a previously allocated range or one of
-  // an extended type that had previously been passed to Init(). This subrange
+  // an allocated type that had previously been passed to Init(). This subrange
   // is updated to have type kFreeRam.
   //
   // Freeing a range already tracked as kFreeRam is a no-op.
@@ -213,7 +213,7 @@ class Pool {
   fit::result<fit::failed> Free(uint64_t addr, uint64_t size);
 
   // Attempts to resize a previously allocated range or one of the ranges of
-  // extended type originally passed to Init(). The resizing occurs only at
+  // allocated type originally passed to Init(). The resizing occurs only at
   // the level of bookkeeping; the start of the resized region is returned and,
   // if it differs from the one originally supplied, it is the responsibility
   // of the caller to actually std::memmove the old contents to the new region
@@ -225,7 +225,7 @@ class Pool {
   // initialization, the pool may have coalesced neighbouring regions into it
   // or freed subregions of it, this method asserts that the associated tracked
   // range does at least still have `original` as a subrange with the
-  // appropriate type. The provided range must also be of extended type.
+  // appropriate type. The provided range must also be of allocated type.
   //
   // `new_size` must be positive; this method is not a backdoor `Free()`. The
   // original range must already be `min_alignment`-aligned.
@@ -289,7 +289,7 @@ class Pool {
   }
 
   // Provides a callback with a normalized view of RAM ranges alone, reducing
-  // any extended types as kFreeRam.
+  // any allocated types as kFreeRam.
   template <typename RangeCallback>
   void NormalizeRam(RangeCallback&& cb) const {
     return NormalizeRanges(std::forward<RangeCallback>(cb), [](Type type) {
@@ -299,7 +299,7 @@ class Pool {
 
   // Returns `fit::success` if the provided range was succesully marked as peripheral. This requires
   // that `range.type` is `memalloc::Type::kPeripheral` and that there are no ranges of type
-  // `memalloc::Type::kFreeRam` or extended types overlapping in the range, otherwise `fit::failed`
+  // `memalloc::Type::kFreeRam` or allocated types overlapping in the range, otherwise `fit::failed`
   // is returned.
   fit::result<fit::failed> MarkAsPeripheral(const memalloc::Range& range);
 
