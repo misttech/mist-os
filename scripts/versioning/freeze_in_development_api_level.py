@@ -40,8 +40,10 @@ def freeze_version_history(
     raise Exception("No in-development API level found.")
 
 
-def update_owners_file(root_source_dir: str, fuchsia_api_level: str) -> None:
-    """Updates the OWNERS file with more limited access for frozen API levels."""
+def update_owners_file(root_source_dir: str, fuchsia_api_level: str) -> str:
+    """Updates the OWNERS file with more limited access for frozen API levels.
+    Returns the path to the file.
+    """
     level_dir_path = os.path.join(
         root_source_dir, "sdk", "history", fuchsia_api_level
     )
@@ -50,6 +52,8 @@ def update_owners_file(root_source_dir: str, fuchsia_api_level: str) -> None:
     print(f"Updating {owners_path}")
     with open(owners_path, "w") as f:
         f.write("include /sdk/history/FROZEN_API_LEVEL_OWNERS\n")
+
+    return owners_path
 
 
 def main() -> int:
@@ -62,8 +66,12 @@ def main() -> int:
 
     level_frozen = freeze_in_development_api_level(args.sdk_version_history)
 
-    update_owners_file(args.root_source_dir, level_frozen)
+    owners_path = update_owners_file(args.root_source_dir, level_frozen)
 
+    # Before printing, rebase the paths to what a developer would use from `//`.
+    history = os.path.relpath(args.sdk_version_history, args.root_source_dir)
+    owners = os.path.relpath(owners_path, args.root_source_dir)
+    print(f"Run `git add -u {history} {owners}`.")
     return 0
 
 

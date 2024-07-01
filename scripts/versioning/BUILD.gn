@@ -96,12 +96,6 @@ if (bump_api_level) {
     ]
 
     outputs = [ _stamp_file ]
-
-    # TODO(https://fxbug.dev/42084512): Automate this.
-    # TODO(https://fxbug.dev/326277078): Move this to the instructions for
-    # promoting "NEXT" to a stable API level.
-    print(
-        "Before continuing, add `#define FUCHSIA_INTERNAL_LEVEL_${_next_level}_() ${_next_level}` to `//zircon/system/public/zircon/availability_levels.inc`, run `fx build zircon/public/sysroot/sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//zircon/public/sysroot/sdk/sysroot.api`.")
   }
 }
 
