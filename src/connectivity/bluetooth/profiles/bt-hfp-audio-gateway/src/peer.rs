@@ -19,7 +19,7 @@ use futures::{Future, FutureExt, SinkExt, TryFutureExt};
 use profile_client::ProfileEvent;
 use std::sync::Arc;
 
-use crate::audio::AudioControl;
+use crate::audio::{AudioControl, AudioControlEvent};
 use crate::config::AudioGatewayFeatureSupport;
 use crate::error::Error;
 use crate::hfp;
@@ -43,6 +43,7 @@ pub mod update;
 #[derive(Debug)]
 pub enum PeerRequest {
     Profile(ProfileEvent),
+    Audio(AudioControlEvent),
     #[allow(dead_code)]
     Handle(PeerHandlerProxy),
     ManagerConnected {
@@ -50,6 +51,9 @@ pub enum PeerRequest {
     },
     BatteryLevel(u8),
     Behavior(ConnectionBehavior),
+    // Only constructed in test
+    #[cfg_attr(not(test), allow(unused))]
+    Shutdown,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -79,6 +83,11 @@ pub trait Peer: Future<Output = PeerId> + Unpin + Send {
     /// Pass a new profile event into the Peer. The Peer can then react to the event as it sees
     /// fit. This method will return once the peer accepts the event.
     async fn profile_event(&mut self, event: ProfileEvent) -> Result<(), Error>;
+
+    /// Send a new audio event to the Peer.  The Peer can then react by performing some actions
+    /// such as starting the audio connection or stopping it when an error occurs.
+    /// The AudioControlEvent should be for this peer (i.e. event.id() == self.id())
+    async fn audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error>;
 
     /// Notify the `Peer` of a newly connected call manager.
     /// `id` is the unique identifier for the connection to this call manager.
@@ -210,6 +219,22 @@ impl Peer for PeerImpl {
         Ok(())
     }
 
+    /// This method will panic if the peer cannot accept an AudioControlEvent. This is
+    /// not expected to happen under normal operation and likely indicates a bug or unrecoverable
+    /// failure condition in the system.
+    async fn audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+        if let Err(request) = self.queue.try_send_fut(PeerRequest::Audio(event)).await {
+            // Task ended, so let's spin it back up since somebody wants it.
+            self.spawn_task()?;
+            // If a call manager is set and we respawned, send the connect message
+            if let Some(id) = self.last_call_manager {
+                self.call_manager_connected(id).await?;
+            }
+            self.expect_send_request(request).await;
+        }
+        Ok(())
+    }
+
     /// This method will panic if the peer cannot accept a call manager connected event. This is
     /// not expected to happen under normal operation and likely indicates a bug or unrecoverable
     /// failure condition in the system.
@@ -296,6 +321,11 @@ pub(crate) mod fake {
             Ok(())
         }
 
+        async fn audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+            self.expect_send_request(PeerRequest::Audio(event)).await;
+            Ok(())
+        }
+
         async fn build_handler(&mut self) -> Result<ServerEnd<PeerHandlerMarker>, Error> {
             unimplemented!("Not needed for any currently written tests");
         }
@@ -346,10 +376,11 @@ mod tests {
         let proxy = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap().0;
         let (send, recv) = mpsc::channel(1);
         let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
+        let audio_control = new_audio_control();
         let peer = PeerImpl::new(
             id,
             proxy,
-            new_audio_control(),
+            audio_control,
             AudioGatewayFeatureSupport::default(),
             ConnectionBehavior::default(),
             send,

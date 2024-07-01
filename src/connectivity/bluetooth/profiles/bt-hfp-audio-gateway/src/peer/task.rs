@@ -34,7 +34,7 @@ use super::slc_request::SlcRequest;
 use super::update::AgUpdate;
 use super::{ConnectionBehavior, PeerRequest};
 
-use crate::audio::AudioControl;
+use crate::audio::{AudioControl, AudioControlEvent};
 use crate::config::AudioGatewayFeatureSupport;
 use crate::error::Error;
 use crate::features::CodecId;
@@ -220,6 +220,25 @@ impl PeerTask {
         }
     }
 
+    async fn on_audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+        info!(?event, "Audio Event received");
+        match event {
+            AudioControlEvent::Stopped { id, error } => {
+                if error.is_some() && id == self.id {
+                    info!(peer_id = %id, "Audio Stopped with error {error:?}, closing SCO");
+                    if self.sco_state.is_active() {
+                        self.sco_state.iset(ScoState::TearingDown);
+                        if let Err(err) = self.calls.transfer_to_ag() {
+                            warn!("Transfer to AG failed with {:} for peer {}", err, self.id)
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     async fn notify_peer_connected(&mut self, manager_id: hfp::ManagerConnectionId) {
         let (proxy, handle) =
             fidl::endpoints::create_proxy().expect("Cannot create required fidl handle");
@@ -323,7 +342,9 @@ impl PeerTask {
                 .left_stream();
     }
 
-    async fn peer_request(&mut self, request: PeerRequest) -> Result<(), Error> {
+    /// Handle a single peer request from the request channel. Returns Ok(true) if the peer should
+    /// be shutdown, Ok(false) otherwise, and an Error if the request could not be handled.
+    async fn peer_request(&mut self, request: PeerRequest) -> Result<bool, Error> {
         match request {
             PeerRequest::Profile(ProfileEvent::PeerConnected { protocol, channel, id: _ }) => {
                 let protocol = protocol
@@ -348,6 +369,9 @@ impl PeerTask {
                     .map_err(|e| Error::MissingParameter(e.to_string()))?;
                 self.on_search_result(protocol, attributes).await;
             }
+            PeerRequest::Audio(audio_event) => {
+                self.on_audio_event(audio_event).await?;
+            }
             PeerRequest::ManagerConnected { id } => self.on_manager_connected(id).await?,
             PeerRequest::Handle(handler) => self.on_peer_handler(handler).await?,
             PeerRequest::BatteryLevel(level) => {
@@ -358,8 +382,11 @@ impl PeerTask {
             PeerRequest::Behavior(behavior) => {
                 self.connection_behavior = behavior;
             }
+            PeerRequest::Shutdown => {
+                return Ok(true);
+            }
         }
-        Ok(())
+        Ok(false)
     }
 
     /// Processes a `request` for information from an HFP procedure.
@@ -566,15 +593,21 @@ impl PeerTask {
                 request = task_channel.next() => {
                     drop(sco_state);
                     info!(peer = %self.id, ?request, "Handling peer request");
-                    if let Some(request) = request {
-                        if let Err(e) = self.peer_request(request).await {
+                    let Some(request) = request else {
+                        info!(peer = %self.id, "Peer task channel closed");
+                        break;
+                    };
+                    match self.peer_request(request).await {
+                        Err(e) => {
                             warn!(peer = %self.id, %e, "Error handling peer request");
                             break;
                         }
-                    } else {
-                        info!(peer = %self.id, "Peer task channel closed");
-                        break;
-                    }
+                        Ok(true) => {
+                            info!(peer = %self.id, "Shutting down on peer request");
+                            break;
+                        },
+                        _ => {}
+                    };
                 }
                 // New request on the gain control protocol
                 request = self.gain_control.select_next_some() => {
@@ -764,7 +797,7 @@ impl PeerTask {
         {
             let mut audio = self.audio_control.lock();
             let codec_id = self.codec_for_parameter_set(&sco_connection.params.parameter_set);
-            if let Err(e) = audio.start(self.id.clone(), sco_connection, codec_id) {
+            if let Err(e) = audio.start(peer_id, sco_connection, codec_id) {
                 // Cancel the SCO connection, we can't send audio.
                 // TODO(https://fxbug.dev/42160054): this probably means we should just cancel out of HFP and
                 // this peer's connection entirely.
@@ -776,7 +809,7 @@ impl PeerTask {
         }
         Vigil::watch(&vigil, {
             let control = self.audio_control.clone();
-            move |_| match control.lock().stop() {
+            move |_| match control.lock().stop(peer_id) {
                 Err(e) => warn!(%peer_id, ?e,  "Couldn't stop HFP audio"),
                 Ok(()) => info!(%peer_id, "Stopped HFP audio"),
             }
@@ -907,7 +940,7 @@ mod tests {
     use std::collections::HashSet;
     use std::pin::pin;
 
-    use crate::audio::TestAudioControl;
+    use crate::audio::{AudioError, TestAudioControl};
     use crate::features::{AgFeatures, HfFeatures};
     use crate::peer::indicators::{AgIndicatorsReporting, HfIndicators};
     use crate::peer::service_level_connection::tests::{
@@ -915,7 +948,6 @@ mod tests {
         expect_peer_ready, serialize_at_response,
     };
     use crate::peer::service_level_connection::SlcState;
-    use crate::sco_connector::tests::connection_for_codec;
 
     fn arb_signal() -> impl Strategy<Value = Option<SignalStrength>> {
         proptest::option::of(prop_oneof![
@@ -943,14 +975,31 @@ mod tests {
         }
     }
 
-    fn setup_peer_task(
+    fn setup_peer_task_audiocontrol(
         connection: Option<ServiceLevelConnection>,
-    ) -> (PeerTask, Sender<PeerRequest>, mpsc::Receiver<PeerRequest>, ProfileRequestStream) {
+    ) -> (
+        PeerTask,
+        Sender<PeerRequest>,
+        mpsc::Receiver<PeerRequest>,
+        ProfileRequestStream,
+        TestAudioControl,
+    ) {
         let (sender, receiver) = mpsc::channel(1);
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap();
-        let audio: Arc<Mutex<Box<dyn AudioControl>>> =
-            Arc::new(Mutex::new(Box::new(TestAudioControl::default())));
+        let test_audio = TestAudioControl::default();
         let sco_connector = ScoConnector::build(proxy.clone(), HashSet::new());
+        let audio: Arc<Mutex<Box<dyn AudioControl>>> =
+            Arc::new(Mutex::new(Box::new(test_audio.clone())));
+        let mut audio_events = audio.lock().take_events();
+        fasync::Task::spawn({
+            let mut sender = sender.clone();
+            async move {
+                while let Some(event) = audio_events.next().await {
+                    let _ = sender.send(PeerRequest::Audio(event)).await;
+                }
+            }
+        })
+        .detach();
         let mut task = PeerTask::new(
             PeerId(1),
             proxy,
@@ -964,7 +1013,14 @@ mod tests {
         if let Some(conn) = connection {
             task.connection = conn;
         }
-        (task, sender, receiver, stream)
+        (task, sender, receiver, stream, test_audio)
+    }
+
+    fn setup_peer_task(
+        connection: Option<ServiceLevelConnection>,
+    ) -> (PeerTask, Sender<PeerRequest>, mpsc::Receiver<PeerRequest>, ProfileRequestStream) {
+        let (task, sender, receiver, request_stream, _) = setup_peer_task_audiocontrol(connection);
+        (task, sender, receiver, request_stream)
     }
 
     proptest! {
@@ -1051,19 +1107,28 @@ mod tests {
         // close the PeerHandler channel by dropping the server endpoint.
         drop(server_end);
 
-        peer.peer_request(PeerRequest::Handle(proxy)).await.expect("request to succeed");
+        let _ = peer.peer_request(PeerRequest::Handle(proxy)).await.expect("request to succeed");
         assert!(peer.handler.is_none());
     }
 
-    #[fuchsia::test(allow_stalls = false)]
-    async fn task_runs_until_all_event_sources_close() {
-        let (peer, sender, receiver, _) = setup_peer_task(None);
-        // Peer will stop running when all event sources are closed.
-        // Close all sources
-        drop(sender);
+    #[fuchsia::test]
+    fn task_runs_until_all_event_sources_close() {
+        let mut exec = fasync::TestExecutor::new();
+        let (peer, mut sender, receiver, profile_requests) = setup_peer_task(None);
+
+        let mut run_fut = pin!(peer.run(receiver));
+
+        // Drop the profile request stream
+        drop(profile_requests);
+        // Peer should still be running.
+        exec.run_until_stalled(&mut run_fut).expect_pending("shouldn't finish");
+
+        // Only source left is the sender.
+        // AudioEvents has a sender as well, so we request a shutdown.
+        sender.try_send(PeerRequest::Shutdown).unwrap();
 
         // Test that `run()` completes.
-        let _ = peer.run(receiver).await;
+        let _ = exec.run_until_stalled(&mut run_fut).expect("should finish when requested");
     }
 
     /// Expects a message to be received by the peer. This expectation does not validate the
@@ -1179,8 +1244,8 @@ mod tests {
             expect_data_received_by_peer(&mut remote, expected_data2),
         );
 
-        // Drop the peer task sender to force the PeerTask's run future to complete
-        drop(sender);
+        // Finish the peertask so we can inspect it
+        sender.try_send(PeerRequest::Shutdown).unwrap();
         let task = exec.run_singlethreaded(&mut run_fut);
 
         // Check that the task's network information contains the expected values
@@ -1331,8 +1396,8 @@ mod tests {
         let ((), mut run_fut) =
             run_while(&mut exec, run_fut, expect_data_received_by_peer(&mut remote, expected_data));
 
-        // Drop the peer task sender to force the PeerTask's run future to complete
-        drop(sender);
+        // Request the run task complete
+        sender.try_send(PeerRequest::Shutdown).unwrap();
         let task = exec.run_until_stalled(&mut run_fut).expect("run_fut to complete");
 
         // Check that the task's ringer has an active call with the expected call index.
@@ -1428,8 +1493,8 @@ mod tests {
         let (req, mut run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
         assert_matches!(req, Some(Ok(CallRequest::RequestActive { .. })));
 
-        // Drop the peer task sender to force the PeerTask's run future to complete
-        drop(sender);
+        // Make the peer task complete.
+        sender.try_send(PeerRequest::Shutdown).unwrap();
         assert!(exec.run_until_stalled(&mut run_fut).is_ready());
     }
 
@@ -1561,8 +1626,8 @@ mod tests {
         let ((), mut run_fut) =
             run_while(&mut exec, run_fut, expect_data_received_by_peer(&mut remote, expected_ciev));
 
-        // Drop the peer task sender to force the PeerTask's run future to complete
-        drop(sender);
+        // Force the PeerTask's run future to complete
+        sender.try_send(PeerRequest::Shutdown).unwrap();
         let _ = exec.run_until_stalled(&mut run_fut).expect("run_fut to complete");
     }
 
@@ -1743,8 +1808,8 @@ mod tests {
         let result = exec.run_until_stalled(&mut run_fut);
         assert!(result.is_pending());
 
-        // Closing the SLC connection will result in the completion of the peer task.
-        drop(sender);
+        // Request the run task complete
+        sender.try_send(PeerRequest::Shutdown).unwrap();
 
         let result = exec.run_until_stalled(&mut run_fut);
         let peer = result.expect("run to complete");
@@ -1777,8 +1842,8 @@ mod tests {
         let result = exec.run_until_stalled(&mut run_fut);
         assert!(result.is_pending());
 
-        // Closing the SLC connection will result in the completion of the peer task.
-        drop(sender);
+        // Request that the peer finish so we can check
+        sender.try_send(PeerRequest::Shutdown).unwrap();
 
         let result = exec.run_until_stalled(&mut run_fut);
         let peer = result.expect("run to complete");
@@ -1795,12 +1860,12 @@ mod tests {
     /// the channel cannot be used to send messages to a running PeerTask.
     #[track_caller]
     fn run_peer_until_stalled(exec: &mut fasync::TestExecutor, peer: PeerTask) -> PeerTask {
-        let (_sender, receiver) = mpsc::channel(0);
+        let (mut sender, receiver) = mpsc::channel(0);
         let run_fut = peer.run(receiver);
         let mut run_fut = pin!(run_fut);
         exec.run_until_stalled(&mut run_fut)
             .expect_pending("shouldn't be done while _sender is live");
-        drop(_sender);
+        sender.try_send(PeerRequest::Shutdown).unwrap();
         exec.run_until_stalled(&mut run_fut).unwrap()
     }
 
@@ -1926,24 +1991,16 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
         let (connection, _old_remote) = create_and_connect_slc();
-        let (mut peer, _sender, _receiver, mut profile_requests) =
-            setup_peer_task(Some(connection));
+        let (mut peer, _sender, _receiver, mut profile_requests, test_audio_control) =
+            setup_peer_task_audiocontrol(Some(connection));
 
         assert!(peer.connection.connected());
-
-        let audio_control = peer.audio_control.clone();
 
         let _remote_sco = setup_audio(&mut exec, &mut peer, &mut profile_requests);
 
         // Should have started up the test audio control. Test by trying to start it again, it
         // should be an error.
-        {
-            let mut lock = audio_control.lock();
-            let (connection, _stream) = connection_for_codec(CodecId::CVSD, false);
-            let _ = lock
-                .start(PeerId(0), connection, CodecId::CVSD)
-                .expect_err("shouldn't be able to start, already started");
-        }
+        assert!(test_audio_control.is_started(PeerId(1)));
     }
 
     #[fuchsia::test]
@@ -2046,22 +2103,15 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         // SLC is connected at the start of the test.
         let (connection, _old_remote) = create_and_connect_slc();
-        let (mut peer, _sender, receiver, mut profile_requests) = setup_peer_task(Some(connection));
+        let (mut peer, _sender, receiver, mut profile_requests, test_audio_control) =
+            setup_peer_task_audiocontrol(Some(connection));
 
         assert!(peer.connection.connected());
-
-        let audio_control = peer.audio_control.clone();
 
         let remote_sco = setup_audio(&mut exec, &mut peer, &mut profile_requests);
 
         // Should have started up the test audio control.
-        {
-            let mut lock = audio_control.lock();
-            let (connection, _stream) = connection_for_codec(CodecId::CVSD, false);
-            let _ = lock
-                .start(PeerId(0), connection, CodecId::CVSD)
-                .expect_err("shouldn't be able to start, already started");
-        }
+        assert!(test_audio_control.is_started(PeerId(1)));
 
         // Set up the run task.
         let run_fut = peer.run(receiver);
@@ -2074,9 +2124,46 @@ mod tests {
         // the audio / stop the audio.
         let _ = exec.run_until_stalled(&mut run_fut);
 
-        // Should have stopped the audio - check by trying to stop it again, it should be an error
-        let mut lock = audio_control.lock();
-        let _ = lock.stop().expect_err("should already be stopped");
+        // Should have stopped the audio.
+        assert!(!test_audio_control.is_started(PeerId(1)));
+    }
+
+    #[fuchsia::test]
+    fn sco_connection_closed_when_audio_stops_unexpectedly() {
+        let mut exec = fasync::TestExecutor::new();
+        // SLC is connected at the start of the test.
+        let (connection, _old_remote) = create_and_connect_slc();
+        let (mut peer, mut sender, receiver, mut profile_requests, test_audio_control) =
+            setup_peer_task_audiocontrol(Some(connection));
+
+        assert!(peer.connection.connected());
+
+        let _remote_sco = setup_audio(&mut exec, &mut peer, &mut profile_requests);
+
+        // Should have started up the test audio control.
+        assert!(test_audio_control.is_started(PeerId(1)));
+
+        // Run the peer task until it's stalled
+        let peer = run_peer_until_stalled(&mut exec, peer);
+
+        // Unexpectedly stop the audio.
+        test_audio_control.unexpected_stop(
+            PeerId(1),
+            AudioError::AudioCore { source: anyhow::format_err!("Whoops") },
+        );
+        assert!(!test_audio_control.is_started(PeerId(1)));
+
+        // Spin the run task to notice that the audio has stopped.
+        // We must use the receiver from above (it is where audio events get delivered)
+        let run_fut = peer.run(receiver);
+        let mut run_fut = pin!(run_fut);
+        exec.run_until_stalled(&mut run_fut)
+            .expect_pending("shouldn't be done while sender is live");
+        sender.try_send(PeerRequest::Shutdown).unwrap();
+        let peer = exec.run_until_stalled(&mut run_fut).unwrap();
+
+        // Should have dropped the SCO connection noticing that the audio has stopped.
+        assert!(!peer.sco_state.is_active());
     }
 
     #[fuchsia::test]

@@ -7,6 +7,8 @@ use fuchsia_audio_codec::{StreamProcessor, StreamProcessorOutputStream};
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
 use fuchsia_audio_device::{AudioFrameSink, AudioFrameStream};
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId};
+use fuchsia_sync::Mutex;
+use futures::stream::BoxStream;
 use futures::task::Context;
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
 use media::AudioDeviceEnumeratorProxy;
@@ -17,7 +19,7 @@ use {
     fuchsia_zircon as zx,
 };
 
-use crate::audio::{AudioControl, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
+use crate::audio::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID, HF_OUTPUT_UUID};
 use crate::sco_connector::ScoConnection;
 use crate::CodecId;
 
@@ -25,7 +27,9 @@ use crate::CodecId;
 /// to the controller via HCI (in contrast to offloaded audio).
 pub struct InbandAudioControl {
     audio_core: media::AudioDeviceEnumeratorProxy,
-    session_task: Option<fasync::Task<()>>,
+    session_task: Option<(PeerId, fasync::Task<()>)>,
+    event_sender: Mutex<futures::channel::mpsc::Sender<AudioControlEvent>>,
+    stream: Mutex<Option<futures::channel::mpsc::Receiver<AudioControlEvent>>>,
 }
 
 // Setup for a running AudioSession.
@@ -39,6 +43,7 @@ struct AudioSession {
     codec: CodecId,
     decoder: StreamProcessor,
     encoder: StreamProcessor,
+    event_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
 }
 
 impl AudioSession {
@@ -47,6 +52,7 @@ impl AudioSession {
         codec: CodecId,
         audio_frame_sink: AudioFrameSink,
         audio_frame_stream: AudioFrameStream,
+        event_sender: futures::channel::mpsc::Sender<AudioControlEvent>,
     ) -> Result<Self, AudioError> {
         if !codec.is_supported() {
             return Err(AudioError::UnsupportedParameters {
@@ -57,7 +63,15 @@ impl AudioSession {
             .map_err(|e| AudioError::audio_core(format_err!("creating decoder: {e:?}")))?;
         let encoder = StreamProcessor::create_encoder(codec.try_into()?, codec.try_into()?)
             .map_err(|e| AudioError::audio_core(format_err!("creating encoder: {e:?}")))?;
-        Ok(Self { sco: connection, decoder, encoder, audio_frame_sink, audio_frame_stream, codec })
+        Ok(Self {
+            sco: connection,
+            decoder,
+            encoder,
+            audio_frame_sink,
+            audio_frame_stream,
+            codec,
+            event_sender,
+        })
     }
 
     async fn encoder_to_sco(
@@ -220,6 +234,7 @@ impl AudioSession {
     }
 
     async fn run(mut self) {
+        let peer_id = self.sco.peer_id;
         let Ok(encoded_stream) = self.encoder.take_output_stream() else {
             error!("Couldn't take encoder output stream");
             return;
@@ -239,13 +254,14 @@ impl AudioSession {
         let sco_read =
             AudioSession::sco_to_decoder(self.sco.proxy.clone(), self.decoder, self.codec);
         let sco_read = pin!(sco_read);
-
-        futures::select! {
-            e = audio_to_encoder.fuse() => warn!(?e, "PCM to encoder write"),
-            e = sco_write.fuse() => warn!(?e, "Write encoded to SCO"),
-            e = sco_read.fuse() => warn!(?e, "SCO read to decoder"),
-            e = decoder_to_sink.fuse() => warn!(?e, "SCO decoder to PCM"),
+        let e = futures::select! {
+            e = audio_to_encoder.fuse() => { warn!(?e, "PCM to encoder write"); e},
+            e = sco_write.fuse() => { warn!(?e, "Write encoded to SCO"); e},
+            e = sco_read.fuse() => { warn!(?e, "SCO read to decoder"); e},
+            e = decoder_to_sink.fuse() => { warn!(?e, "SCO decoder to PCM"); e},
         };
+        let _ =
+            self.event_sender.try_send(AudioControlEvent::Stopped { id: peer_id, error: Some(e) });
     }
 
     fn start(self) -> fasync::Task<()> {
@@ -255,15 +271,25 @@ impl AudioSession {
 
 impl InbandAudioControl {
     pub fn create(proxy: AudioDeviceEnumeratorProxy) -> Result<Self, AudioError> {
-        Ok(Self { audio_core: proxy, session_task: None })
+        let (sender, receiver) = futures::channel::mpsc::channel(1);
+        Ok(Self {
+            audio_core: proxy,
+            session_task: None,
+            event_sender: Mutex::new(sender),
+            stream: Mutex::new(Some(receiver)),
+        })
     }
 
-    fn is_running(&mut self) -> bool {
-        if let Some(task) = self.session_task.as_mut() {
-            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
-            return task.poll_unpin(&mut cx).is_pending();
-        }
-        false
+    fn running_id(&mut self) -> Option<PeerId> {
+        self.session_task
+            .as_mut()
+            .and_then(|(running, task)| {
+                let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+                // We are the only thing that polls this task, so we are ok to poll it and throw away a
+                // wake.
+                task.poll_unpin(&mut cx).is_pending().then_some(running)
+            })
+            .copied()
     }
 
     const LOCAL_MONOTONIC_CLOCK_DOMAIN: u32 = 0;
@@ -320,21 +346,50 @@ impl AudioControl for InbandAudioControl {
         connection: ScoConnection,
         codec: CodecId,
     ) -> Result<(), AudioError> {
-        if self.is_running() {
-            return Err(AudioError::AlreadyStarted);
+        if let Some(running) = self.running_id() {
+            if running == id {
+                return Err(AudioError::AlreadyStarted);
+            }
+            return Err(AudioError::UnsupportedParameters {
+                source: format_err!("Only one peer can be started inband at once"),
+            });
         }
         let frame_sink = self.start_input(id, codec)?;
         let frame_stream = self.start_output(id, codec)?;
-        let session = AudioSession::setup(connection, codec, frame_sink, frame_stream)?;
-        self.session_task = Some(session.start());
+        let session = AudioSession::setup(
+            connection,
+            codec,
+            frame_sink,
+            frame_stream,
+            self.event_sender.lock().clone(),
+        )?;
+        self.session_task = Some((id, session.start()));
         Ok(())
     }
 
-    fn stop(&mut self) -> Result<(), AudioError> {
-        match self.session_task.take() {
-            Some(_) => Ok(()),
-            None => Err(AudioError::NotStarted),
+    fn stop(&mut self, id: PeerId) -> Result<(), AudioError> {
+        if self.running_id() != Some(id) {
+            return Err(AudioError::NotStarted);
         }
+        self.session_task = None;
+        let _ = self.event_sender.lock().try_send(AudioControlEvent::Stopped { id, error: None });
+        Ok(())
+    }
+
+    fn connect(&mut self, _id: PeerId, _supported_codecs: &[CodecId]) {
+        // Nothing to do here
+    }
+
+    fn disconnect(&mut self, id: PeerId) {
+        let _ = self.stop(id);
+    }
+
+    fn take_events(&self) -> BoxStream<'static, AudioControlEvent> {
+        self.stream.lock().take().unwrap().boxed()
+    }
+
+    fn failed_request(&self, _request: AudioControlEvent, _error: AudioError) {
+        // We send no requests, so ignore this.
     }
 }
 
@@ -395,11 +450,12 @@ mod tests {
                 .unwrap();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
-        let (connection, mut sco_request_stream) = connection_for_codec(CodecId::MSBC, true);
+        let (connection, mut sco_request_stream) =
+            connection_for_codec(PeerId(1), CodecId::MSBC, true);
 
         control.start(PeerId(1), connection, CodecId::MSBC).expect("should be able to start");
 
-        let (connection2, _request_stream) = connection_for_codec(CodecId::MSBC, true);
+        let (connection2, _request_stream) = connection_for_codec(PeerId(1), CodecId::MSBC, true);
         let _ = control
             .start(PeerId(1), connection2, CodecId::MSBC)
             .expect_err("Starting twice shouldn't be allowed");
@@ -413,8 +469,8 @@ mod tests {
             );
         }
 
-        control.stop().expect("should be able to stop");
-        let _ = control.stop().expect_err("can't stop a stopped thing");
+        control.stop(PeerId(1)).expect("should be able to stop");
+        let _ = control.stop(PeerId(1)).expect_err("can't stop a stopped thing");
 
         // Should be able to drain the requests.
         let mut extra_requests = 0;
@@ -435,7 +491,8 @@ mod tests {
                 .unwrap();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
-        let (connection, _sco_request_stream) = connection_for_codec(CodecId::MSBC, true);
+        let (connection, _sco_request_stream) =
+            connection_for_codec(PeerId(1), CodecId::MSBC, true);
         let res = control.start(PeerId(1), connection, 0xD0u8.into());
         assert!(res.is_err());
     }
@@ -448,7 +505,8 @@ mod tests {
                 .unwrap();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
-        let (connection, mut sco_request_stream) = connection_for_codec(CodecId::MSBC, true);
+        let (connection, mut sco_request_stream) =
+            connection_for_codec(PeerId(1), CodecId::MSBC, true);
 
         control.start(PeerId(1), connection, CodecId::MSBC).expect("should be able to start");
 
@@ -544,7 +602,8 @@ mod tests {
                 .unwrap();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
-        let (connection, mut sco_request_stream) = connection_for_codec(CodecId::MSBC, true);
+        let (connection, mut sco_request_stream) =
+            connection_for_codec(PeerId(1), CodecId::MSBC, true);
 
         control.start(PeerId(1), connection, CodecId::MSBC).expect("should be able to start");
 
@@ -624,7 +683,8 @@ mod tests {
                 .unwrap();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
-        let (connection, mut sco_request_stream) = connection_for_codec(CodecId::CVSD, true);
+        let (connection, mut sco_request_stream) =
+            connection_for_codec(PeerId(1), CodecId::CVSD, true);
 
         control.start(PeerId(1), connection, CodecId::CVSD).expect("should be able to start");
 
@@ -694,7 +754,8 @@ mod tests {
                 .unwrap();
         let mut control = InbandAudioControl::create(proxy).unwrap();
 
-        let (connection, mut sco_request_stream) = connection_for_codec(CodecId::MSBC, true);
+        let (connection, mut sco_request_stream) =
+            connection_for_codec(PeerId(1), CodecId::MSBC, true);
 
         control.start(PeerId(1), connection, CodecId::MSBC).expect("should be able to start");
 
@@ -755,5 +816,49 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[fuchsia::test]
+    async fn audio_output_error_sends_to_events() {
+        let (proxy, mut audio_enumerator_requests) =
+            fidl::endpoints::create_proxy_and_stream::<media::AudioDeviceEnumeratorMarker>()
+                .unwrap();
+        let mut control = InbandAudioControl::create(proxy).unwrap();
+        let mut events = control.take_events();
+
+        let (connection, _sco_request_stream) =
+            connection_for_codec(PeerId(1), CodecId::MSBC, true);
+
+        control.start(PeerId(1), connection, CodecId::MSBC).expect("should be able to start");
+
+        let audio_output_stream_config;
+        let mut _audio_input_stream_config;
+        loop {
+            match audio_enumerator_requests.next().await {
+                Some(Ok(media::AudioDeviceEnumeratorRequest::AddDeviceByChannel {
+                    is_input,
+                    channel,
+                    ..
+                })) => {
+                    if !is_input {
+                        audio_output_stream_config = channel.into_proxy().unwrap();
+                        break;
+                    } else {
+                        _audio_input_stream_config = channel.into_proxy().unwrap();
+                    }
+                }
+                x => panic!("Expected audio device by channel, got {x:?}"),
+            }
+        }
+
+        drop(audio_output_stream_config);
+
+        // Events should produce an error because there was an issue with audio output.
+        match events.next().await {
+            Some(AudioControlEvent::Stopped { id, error: Some(_) }) => {
+                assert_eq!(PeerId(1), id);
+            }
+            x => panic!("Expected the peer to have error stop, but got {x:?}"),
+        };
     }
 }
