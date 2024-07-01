@@ -262,8 +262,8 @@ func (e *profileReadingError) Error() string {
 	return fmt.Sprintf("cannot read profile %q: %q", e.profile, e.errMessage)
 }
 
-// readEmbeddedBuildId reads embedded build id from a profile by invoking llvm-profdata tool and returns it.
-func readEmbeddedBuildId(ctx context.Context, tool string, profile string) (string, error) {
+// readEmbeddedBuildIds reads embedded build ids from a profile by invoking llvm-profdata tool and returns them.
+func readEmbeddedBuildIds(ctx context.Context, tool string, profile string) ([]string, error) {
 	args := []string{
 		"show",
 		"--binary-ids",
@@ -272,7 +272,7 @@ func readEmbeddedBuildId(ctx context.Context, tool string, profile string) (stri
 	readCmd := Action{Path: tool, Args: args}
 	output, err := readCmd.Run(ctx)
 	if err != nil {
-		return "", &profileReadingError{profile, string(output)}
+		return nil, &profileReadingError{profile, string(output)}
 	}
 
 	// Split the lines in llvm-profdata output, which should have the following lines for build ids.
@@ -280,20 +280,22 @@ func readEmbeddedBuildId(ctx context.Context, tool string, profile string) (stri
 	// 1696251c (This is an example for build id)
 	splittedOutput := strings.Split((string(output)), "Binary IDs:")
 	if len(splittedOutput) < 2 {
-		return "", fmt.Errorf("invalid llvm-profdata output in profile %q: %w\n%s", profile, err, string(output))
+		return nil, fmt.Errorf("invalid llvm-profdata output in profile %q: %w\n%s", profile, err, string(output))
 	}
 
-	embeddedBuildId := strings.TrimSpace(splittedOutput[len(splittedOutput)-1])
-	if embeddedBuildId == "" {
-		return "", fmt.Errorf("no build id found in profile %q:\n%s", profile, string(output))
+	embeddedBuildIds := strings.Split(strings.TrimSpace(splittedOutput[len(splittedOutput)-1]), "\n")
+	if len(embeddedBuildIds) == 1 && embeddedBuildIds[0] == "" {
+		return nil, fmt.Errorf("no build id found in profile %q:\n%s", profile, string(output))
 	}
 	// Check if embedded build id consists of hex characters.
-	_, err = hex.DecodeString(embeddedBuildId)
-	if err != nil {
-		return "", fmt.Errorf("invalid build id in profile %q: %w", profile, err)
+	for _, buildId := range embeddedBuildIds {
+		_, err = hex.DecodeString(buildId)
+		if err != nil {
+			return nil, fmt.Errorf("invalid build id %q in profile %q: %w", buildId, profile, err)
+		}
 	}
 
-	return embeddedBuildId, nil
+	return embeddedBuildIds, nil
 }
 
 type profileEntry struct {
@@ -302,8 +304,9 @@ type profileEntry struct {
 }
 
 // createEntries creates a list of entries (profile and build id pairs) that is used to fetch binaries from symbol server.
-func createEntries(ctx context.Context, profiles map[string]string, llvmProfDataVersions map[string]string) ([]profileEntry, error) {
+func createEntries(ctx context.Context, profiles map[string]string, llvmProfDataVersions map[string]string) ([]profileEntry, []string, error) {
 	profileEntryChan := make(chan profileEntry, len(profiles))
+	malformedChan := make(chan string, len(profiles))
 	sems := make(chan struct{}, jobs)
 	var eg errgroup.Group
 	for profile, version := range profiles {
@@ -324,30 +327,37 @@ func createEntries(ctx context.Context, profiles map[string]string, llvmProfData
 			}
 
 			// Read embedded build ids.
-			embeddedBuildId, err := readEmbeddedBuildId(ctx, llvmProfData, profile)
+			embeddedBuildIds, err := readEmbeddedBuildIds(ctx, llvmProfData, profile)
 			if err != nil {
-				return err
+				malformedChan <- profile
+				return nil
 			}
-			profileEntryChan <- profileEntry{
-				Profile: profile,
-				Module:  embeddedBuildId,
+			for _, buildId := range embeddedBuildIds {
+				profileEntryChan <- profileEntry{
+					Profile: profile,
+					Module:  buildId,
+				}
 			}
 			return nil
 		})
 	}
 
 	if err := eg.Wait(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	close(profileEntryChan)
+	close(malformedChan)
 
 	var entries []profileEntry
 	for pe := range profileEntryChan {
 		entries = append(entries, pe)
 	}
-
-	return entries, nil
+	var malformed []string
+	for m := range malformedChan {
+		malformed = append(malformed, m)
+	}
+	return entries, malformed, nil
 }
 
 func isInstrumented(filepath string) bool {
@@ -363,15 +373,15 @@ func isInstrumented(filepath string) bool {
 }
 
 // fetchFromSymbolServer returns all the binaries that are fetched from the symbol server when symbol server option is provided.
-func fetchFromSymbolServer(ctx context.Context, mergedProfileFile string, tempDir string, entries *[]profileEntry) ([]symbolize.FileCloser, error) {
+func fetchFromSymbolServer(ctx context.Context, mergedProfileFile string, tempDir string, entries *[]profileEntry) ([]symbolize.FileCloser, []string, error) {
 	var fileCache *cache.FileCache
 	if len(symbolServers) > 0 {
 		if symbolCache == "" {
-			return nil, fmt.Errorf("-symbol-cache must be set if a symbol server is used")
+			return nil, nil, fmt.Errorf("-symbol-cache must be set if a symbol server is used")
 		}
 		var err error
 		if fileCache, err = cache.GetFileCache(symbolCache, symbolCacheSize); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -383,7 +393,7 @@ func fetchFromSymbolServer(ctx context.Context, mergedProfileFile string, tempDi
 	for _, symbolServer := range symbolServers {
 		cloudRepo, err := symbolize.NewCloudRepo(ctx, symbolServer, fileCache)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		cloudRepo.SetTimeout(cloudFetchTimeout)
 		repo.AddRepo(cloudRepo)
@@ -450,12 +460,7 @@ func fetchFromSymbolServer(ctx context.Context, mergedProfileFile string, tempDi
 		modules = append(modules, f)
 	}
 
-	// Write the malformed modules to a file in order to keep track of the tests affected by https://fxbug.dev/42153844.
-	if err := os.WriteFile(filepath.Join(tempDir, "malformed_binaries.txt"), []byte(strings.Join(malformed, "\n")), os.ModePerm); err != nil {
-		return modules, fmt.Errorf("failed to write malformed binaries to a file: %w", err)
-	}
-
-	return modules, nil
+	return modules, malformed, nil
 }
 
 // createLLVMCovResponseFile adds fetched binaries to the llvm-cov response file.
@@ -657,7 +662,10 @@ func process(ctx context.Context) error {
 		return fmt.Errorf("failed to merge profiles: %w", err)
 	}
 
-	entries, err := createEntries(ctx, versionedProfiles, llvmProfDataVersions)
+	entries, malformedProfiles, err := createEntries(ctx, versionedProfiles, llvmProfDataVersions)
+	if err != nil {
+		return fmt.Errorf("failed to create profile entries: %w", err)
+	}
 	if jsonOutput != "" {
 		file, err := os.Create(jsonOutput)
 		if err != nil {
@@ -670,7 +678,7 @@ func process(ctx context.Context) error {
 	}
 
 	start = time.Now()
-	modules, err := fetchFromSymbolServer(ctx, mergedProfileFile, tempDir, &entries)
+	modules, malformed, err := fetchFromSymbolServer(ctx, mergedProfileFile, tempDir, &entries)
 	logger.Debugf(ctx, "time to fetch from symbol server: %.2f minutes\n", time.Since(start).Minutes())
 
 	// Delete all the binary files that are fetched from symbol server.
@@ -680,6 +688,12 @@ func process(ctx context.Context) error {
 	}
 	if err != nil {
 		return fmt.Errorf("failed to fetch from symbol server: %w", err)
+	}
+
+	// Write the malformed modules/profiles to a file in order to keep track of them.
+	malformed = append(malformed, malformedProfiles...)
+	if err := os.WriteFile(filepath.Join(tempDir, "malformed_binaries.txt"), []byte(strings.Join(malformed, "\n")), os.ModePerm); err != nil {
+		return fmt.Errorf("failed to write malformed binaries to a file: %w", err)
 	}
 
 	covFile, err := createLLVMCovResponseFile(tempDir, &modules)
