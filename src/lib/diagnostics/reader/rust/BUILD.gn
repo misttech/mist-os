@@ -61,6 +61,6 @@ fuchsia_unittest_package("diagnostics-reader-tests") {
   deps = [
     ":lib_test",
     "//src/diagnostics/archivist:archivist-for-embedding-bundle",
-    "//src/lib/diagnostics/inspect/runtime/rust:inspect_test_component",
+    "//src/lib/diagnostics/inspect/runtime/rust:inspect_test_component_default",
   ]
 }

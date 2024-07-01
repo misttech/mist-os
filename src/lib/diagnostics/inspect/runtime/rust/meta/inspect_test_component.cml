@@ -16,4 +16,7 @@
             from: "framework",
         },
     ],
+    config: {
+        publish_n_trees: { type: "uint64" },
+    },
 }
