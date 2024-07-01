@@ -6,10 +6,10 @@
 // iptables structures.
 
 use starnix_logging::log_warn;
-use starnix_uapi::iptables_flags::IptIpInverseFlags;
+use starnix_uapi::iptables_flags::{IptIpFlags, IptIpFlagsV4, IptIpFlagsV6, IptIpInverseFlags};
 use starnix_uapi::{
-    c_char, c_int, c_uint, ipt_entry, ipt_replace,
-    xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
+    c_char, c_int, c_uchar, c_uint, in6_addr, in_addr, ip6t_entry, ip6t_ip6, ip6t_replace,
+    ipt_entry, ipt_ip, ipt_replace, xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
     xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp, xt_udp, IPPROTO_IP,
     IPPROTO_TCP, IPPROTO_UDP, IPT_RETURN, NF_ACCEPT, NF_DROP, NF_QUEUE,
 };
@@ -30,15 +30,18 @@ const CHAIN_OUTPUT: &str = "OUTPUT";
 const CHAIN_POSTROUTING: &str = "POSTROUTING";
 
 const IPT_REPLACE_SIZE: usize = size_of::<ipt_replace>();
+const IP6T_REPLACE_SIZE: usize = size_of::<ip6t_replace>();
 
 #[derive(Debug, Error, PartialEq)]
 pub enum IpTableParseError {
     #[error("error during ascii conversion: {0}")]
     AsciiConversion(#[from] AsciiConversionError),
+    #[error("error during address conversion: {0}")]
+    IpAddressConversion(#[from] IpAddressConversionError),
     #[error("FIDL conversion error: {0}")]
     FidlConversion(#[from] fnet_filter_ext::FidlConversionError),
-    #[error("buffer of size {size} is too small to read ipt_replace")]
-    BufferTooSmall { size: usize },
+    #[error("buffer of size {size} is too small to read ipt_replace or ip6t_replace")]
+    BufferTooSmallForMetadata { size: usize },
     #[error("specified size {specified_size} does not match size of entries {entries_size}")]
     SizeMismatch { specified_size: usize, entries_size: usize },
     #[error("reached end of buffer while trying to parse {type_name} at position {position}")]
@@ -71,10 +74,10 @@ pub enum IpTableParseError {
     ChainHasNoPolicy { chain_name: String },
     #[error("found rule specification before first chain definition")]
     RuleBeforeFirstChain,
-    #[error("address subnet mask {mask:#b} has non-prefix bits")]
-    SubnetMaskHasNonPrefixBits { mask: u32 },
-    #[error("invalid inverse flags {flags:#x} found in rule specification")]
-    InvalidInverseFlags { flags: u8 },
+    #[error("invalid IP flags {flags:#x} found in rule specification")]
+    InvalidIpFlags { flags: u8 },
+    #[error("invalid IP inverse flags {flags:#x} found in rule specification")]
+    InvalidIpInverseFlags { flags: u8 },
     #[error("invalid standard target verdict {verdict}")]
     InvalidVerdict { verdict: i32 },
     #[error("invalid jump target {jump_target}")]
@@ -95,8 +98,22 @@ pub enum AsciiConversionError {
     BufferTooSmall { buffer_size: usize, data_size: usize },
 }
 
+#[derive(Debug, Error, PartialEq)]
+pub enum IpAddressConversionError {
+    #[error("IPv4 address subnet mask {mask:#b} has non-prefix bits")]
+    IpV4SubnetMaskHasNonPrefixBits { mask: u32 },
+    #[error("IPv6 address subnet mask {mask:#b} has non-prefix bits")]
+    IpV6SubnetMaskHasNonPrefixBits { mask: u128 },
+}
+
+/// Metadata passed by `iptables` when updating a table.
+///
+/// Describes the subsequent buffer of `size` bytes, containing `num_entries` Entries that describe
+/// chain definitions, rule specifications, and end of input.
+/// IPv4 and IPv6 tables have the same metadata but uses different Linux structs: `ipt_replace` for
+/// IPv4, and `ip6t_replace` for IPv6.
 #[derive(Clone, Debug)]
-pub struct IptReplace {
+pub struct ReplaceInfo {
     pub name: String,
     pub num_entries: usize,
     pub size: usize,
@@ -108,21 +125,186 @@ pub struct IptReplace {
     pub num_counters: c_uint,
 }
 
-impl TryFrom<ipt_replace> for IptReplace {
+impl TryFrom<ipt_replace> for ReplaceInfo {
     type Error = IpTableParseError;
 
-    fn try_from(ipt_replace: ipt_replace) -> Result<Self, Self::Error> {
-        let name =
-            ascii_to_string(&ipt_replace.name).map_err(IpTableParseError::AsciiConversion)?;
+    fn try_from(replace: ipt_replace) -> Result<Self, Self::Error> {
+        let name = ascii_to_string(&replace.name).map_err(IpTableParseError::AsciiConversion)?;
         Ok(Self {
             name,
-            num_entries: usize::try_from(ipt_replace.num_entries).unwrap(),
-            size: usize::try_from(ipt_replace.size).unwrap(),
-            valid_hooks: ipt_replace.valid_hooks,
-            hook_entry: ipt_replace.hook_entry,
-            underflow: ipt_replace.underflow,
-            num_counters: ipt_replace.num_counters,
+            num_entries: usize::try_from(replace.num_entries).expect("u32 fits in usize"),
+            size: usize::try_from(replace.size).expect("u32 fits in usize"),
+            valid_hooks: replace.valid_hooks,
+            hook_entry: replace.hook_entry,
+            underflow: replace.underflow,
+            num_counters: replace.num_counters,
         })
+    }
+}
+
+impl TryFrom<ip6t_replace> for ReplaceInfo {
+    type Error = IpTableParseError;
+
+    fn try_from(replace: ip6t_replace) -> Result<Self, Self::Error> {
+        let name = ascii_to_string(&replace.name).map_err(IpTableParseError::AsciiConversion)?;
+        Ok(Self {
+            name,
+            num_entries: usize::try_from(replace.num_entries).expect("u32 fits in usize"),
+            size: usize::try_from(replace.size).expect("u32 fits in usize"),
+            valid_hooks: replace.valid_hooks,
+            hook_entry: replace.hook_entry,
+            underflow: replace.underflow,
+            num_counters: replace.num_counters,
+        })
+    }
+}
+
+// Metadata of each Entry.
+#[derive(Clone, Debug)]
+pub struct EntryInfo {
+    pub ip_info: IpInfo,
+    pub target_offset: usize,
+    pub next_offset: usize,
+}
+
+impl TryFrom<ipt_entry> for EntryInfo {
+    type Error = IpTableParseError;
+
+    fn try_from(entry: ipt_entry) -> Result<Self, Self::Error> {
+        let ip_info = IpInfo::try_from(entry.ip)?;
+
+        let target_offset = usize::from(entry.target_offset);
+        if target_offset < size_of::<ipt_entry>() {
+            return Err(IpTableParseError::TargetOffsetTooSmall { offset: target_offset });
+        }
+
+        let next_offset = usize::from(entry.next_offset);
+        if next_offset < size_of::<ipt_entry>() {
+            return Err(IpTableParseError::NextOffsetTooSmall { offset: next_offset });
+        }
+
+        Ok(Self { ip_info, target_offset, next_offset })
+    }
+}
+
+impl TryFrom<ip6t_entry> for EntryInfo {
+    type Error = IpTableParseError;
+
+    fn try_from(entry: ip6t_entry) -> Result<Self, Self::Error> {
+        let ip_info = IpInfo::try_from(entry.ipv6)?;
+
+        let target_offset = usize::from(entry.target_offset);
+        if target_offset < size_of::<ip6t_entry>() {
+            return Err(IpTableParseError::TargetOffsetTooSmall { offset: target_offset });
+        }
+
+        let next_offset = usize::from(entry.next_offset);
+        if next_offset < size_of::<ip6t_entry>() {
+            return Err(IpTableParseError::NextOffsetTooSmall { offset: next_offset });
+        }
+
+        Ok(Self { ip_info, target_offset, next_offset })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IpInfo {
+    pub src_subnet: Option<fnet::Subnet>,
+    pub dst_subnet: Option<fnet::Subnet>,
+    pub in_interface: Option<String>,
+    pub out_interface: Option<String>,
+    pub inverse_flags: IptIpInverseFlags,
+    pub protocol: c_uint,
+    pub flags: IptIpFlags,
+
+    // Only for IPv6
+    pub tos: c_uchar,
+}
+
+impl TryFrom<ipt_ip> for IpInfo {
+    type Error = IpTableParseError;
+
+    fn try_from(ip: ipt_ip) -> Result<Self, Self::Error> {
+        let src_subnet =
+            ipv4_to_subnet(ip.src, ip.smsk).map_err(IpTableParseError::IpAddressConversion)?;
+        let dst_subnet =
+            ipv4_to_subnet(ip.dst, ip.dmsk).map_err(IpTableParseError::IpAddressConversion)?;
+
+        let in_interface = if ip.iniface_mask == [0u8; 16] {
+            None
+        } else {
+            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+        };
+        let out_interface = if ip.outiface_mask == [0u8; 16] {
+            None
+        } else {
+            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+        };
+
+        let flags = IptIpFlagsV4::from_bits(ip.flags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags: ip.flags })?;
+        let inverse_flags = IptIpInverseFlags::from_bits(ip.invflags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: ip.invflags })?;
+
+        Ok(Self {
+            src_subnet,
+            dst_subnet,
+            in_interface,
+            out_interface,
+            inverse_flags,
+            protocol: ip.proto.into(),
+            flags: IptIpFlags::V4(flags),
+            // Unused in IPv4
+            tos: 0,
+        })
+    }
+}
+
+impl TryFrom<ip6t_ip6> for IpInfo {
+    type Error = IpTableParseError;
+
+    fn try_from(ip: ip6t_ip6) -> Result<Self, Self::Error> {
+        let src_subnet =
+            ipv6_to_subnet(ip.src, ip.smsk).map_err(IpTableParseError::IpAddressConversion)?;
+        let dst_subnet =
+            ipv6_to_subnet(ip.dst, ip.dmsk).map_err(IpTableParseError::IpAddressConversion)?;
+
+        let in_interface = if ip.iniface_mask == [0u8; 16] {
+            None
+        } else {
+            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+        };
+        let out_interface = if ip.outiface_mask == [0u8; 16] {
+            None
+        } else {
+            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+        };
+
+        let flags = IptIpFlagsV6::from_bits(ip.flags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags: ip.flags })?;
+        let inverse_flags = IptIpInverseFlags::from_bits(ip.invflags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: ip.invflags })?;
+
+        Ok(Self {
+            src_subnet,
+            dst_subnet,
+            in_interface,
+            out_interface,
+            inverse_flags,
+            protocol: ip.proto.into(),
+            flags: IptIpFlags::V6(flags),
+            tos: ip.tos,
+        })
+    }
+}
+
+impl IpInfo {
+    // For IPv6, whether to match protocol is configured via a flag.
+    fn should_match_protocol(&self) -> bool {
+        match self.flags {
+            IptIpFlags::V4(_) => true,
+            IptIpFlags::V6(flags) => flags.contains(IptIpFlagsV6::Protocol),
+        }
     }
 }
 
@@ -137,7 +319,10 @@ pub struct Entry {
     /// bytes since the first entry, referred to by JUMP targets.
     pub byte_pos: usize,
 
-    pub ipt_entry: ipt_entry,
+    /// index of entry in the original Linux struct.
+    pub index: u32,
+
+    pub entry_info: EntryInfo,
     pub matchers: Vec<Matcher>,
     pub target: Target,
 }
@@ -190,15 +375,24 @@ struct ErrorNameWithPadding {
 }
 
 #[derive(Debug)]
+enum Ip {
+    V4,
+    V6,
+}
+
+/// A parser for both `ipt_replace` and `ip6t_replace`, and its subsequent entries.
+#[derive(Debug)]
 pub struct IptReplaceParser {
-    pub replace_info: IptReplace,
+    protocol: Ip,
+
+    pub replace_info: ReplaceInfo,
 
     // Linux bytes to parse.
     //
     // General layout is an `ipt_replace` followed by N "entries", where each "entry" is
     // an `ipt_entry` and a `xt_*_target` with 0 or more "matchers" in between.
     //
-    // In this example, each row after the first is an entry:
+    // In this IPv4 example, each row after the first is an entry:
     //
     //        [ ipt_replace ]
     //   0:   [ ipt_entry ][ xt_error_target ]
@@ -206,22 +400,23 @@ pub struct IptReplaceParser {
     //   2:   [ ipt_entry ][ xt_error_target ]
     //        ...
     //   N-1: [ ipt_entry ][ xt_error_target ]
+    //
+    // The main difference for IPv6 is that `ipt_entry` is replaced by `ip6t_entry`, which contains
+    // 128-bit IP addresses.
     bytes: Vec<u8>,
 
     parse_pos: usize,
+
+    entry_index: u32,
 }
 
 impl IptReplaceParser {
     /// Initialize a new parser and tries to parse an `ipt_replace` struct from the buffer.
     /// The rest of the buffer is left unparsed.
-    fn new(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
-        if bytes.len() < IPT_REPLACE_SIZE {
-            return Err(IpTableParseError::BufferTooSmall { size: bytes.len() });
-        }
-
-        let ipt_replace = ipt_replace::read_from(&bytes[..IPT_REPLACE_SIZE])
-            .expect("successfully read ipt_replace");
-        let replace_info = IptReplace::try_from(ipt_replace)?;
+    fn new_ipv4(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
+        let ipt_replace = ipt_replace::read_from_prefix(&bytes)
+            .ok_or_else(|| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
+        let replace_info = ReplaceInfo::try_from(ipt_replace)?;
 
         if replace_info.size != bytes.len() - IPT_REPLACE_SIZE {
             return Err(IpTableParseError::SizeMismatch {
@@ -230,21 +425,80 @@ impl IptReplaceParser {
             });
         }
 
-        Ok(Self { replace_info, bytes, parse_pos: IPT_REPLACE_SIZE })
+        Ok(Self {
+            protocol: Ip::V4,
+            replace_info,
+            bytes,
+            parse_pos: IPT_REPLACE_SIZE,
+            entry_index: 0,
+        })
+    }
+
+    /// Initialize a new parser and tries to parse an `ip6t_replace` struct from the buffer.
+    /// The rest of the buffer is left unparsed.
+    fn new_ipv6(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
+        let ip6t_replace = ip6t_replace::read_from_prefix(&bytes)
+            .ok_or_else(|| IpTableParseError::BufferTooSmallForMetadata { size: bytes.len() })?;
+        let replace_info = ReplaceInfo::try_from(ip6t_replace)?;
+
+        if replace_info.size != bytes.len() - IP6T_REPLACE_SIZE {
+            return Err(IpTableParseError::SizeMismatch {
+                specified_size: replace_info.size,
+                entries_size: bytes.len() - IP6T_REPLACE_SIZE,
+            });
+        }
+
+        Ok(Self {
+            protocol: Ip::V6,
+            replace_info,
+            bytes,
+            parse_pos: IP6T_REPLACE_SIZE,
+            entry_index: 0,
+        })
     }
 
     fn finished(&self) -> bool {
-        self.parse_pos == self.bytes.len()
+        self.parse_pos >= self.bytes.len()
     }
 
     pub fn entries_bytes(&self) -> &[u8] {
-        &self.bytes[IPT_REPLACE_SIZE..]
+        match self.protocol {
+            Ip::V4 => &self.bytes[IPT_REPLACE_SIZE..],
+            Ip::V6 => &self.bytes[IP6T_REPLACE_SIZE..],
+        }
+    }
+
+    pub fn get_domain(&self) -> fnet_filter_ext::Domain {
+        match self.protocol {
+            Ip::V4 => fnet_filter_ext::Domain::Ipv4,
+            Ip::V6 => fnet_filter_ext::Domain::Ipv6,
+        }
+    }
+
+    pub fn get_table_name(&self) -> String {
+        match self.protocol {
+            Ip::V4 => format!("ipv4-{}", self.replace_info.name),
+            Ip::V6 => format!("ipv6-{}", self.replace_info.name),
+        }
+    }
+
+    fn next_entry_index(&mut self) -> u32 {
+        let index = self.entry_index;
+        self.entry_index += 1;
+        index
     }
 
     fn bytes_since_first_entry(&self) -> usize {
-        self.parse_pos
-            .checked_sub(IPT_REPLACE_SIZE)
-            .expect("parse_pos starts after initial ipt_replace")
+        match self.protocol {
+            Ip::V4 => self
+                .parse_pos
+                .checked_sub(IPT_REPLACE_SIZE)
+                .expect("parse_pos is always larger or equal to size of ipt_replace"),
+            Ip::V6 => self
+                .parse_pos
+                .checked_sub(IP6T_REPLACE_SIZE)
+                .expect("parse_pos is always larger or equal to size of ip6t_replace"),
+        }
     }
 
     fn get_next_bytes(&self, offset: usize) -> Option<&[u8]> {
@@ -286,22 +540,22 @@ impl IptReplaceParser {
         Ok(obj)
     }
 
-    /// Parse next bytes as an `ipt_entry` struct, its subsequent matchers and target.
+    /// Parse the next Entry.
+    ///
+    /// An Entry is an `ipt_entry` (or `ip6t_entry` for IPv6), followed by 0 or more Matchers, and
+    /// finally a Target.
+    /// This method must advance `parse_pos`, so callers can assume that repeatedly calling this
+    /// method will eventually terminate (i.e. `finished()` returns true) if no error is returned.
     fn parse_entry(&mut self) -> Result<Entry, IpTableParseError> {
         let byte_pos = self.bytes_since_first_entry();
-        let entry_info = self.parse_next_bytes_as::<ipt_entry>()?;
 
-        let target_offset = usize::from(entry_info.target_offset);
-        if target_offset < size_of::<ipt_entry>() {
-            return Err(IpTableParseError::TargetOffsetTooSmall { offset: target_offset });
-        }
-        let target_pos = byte_pos + target_offset;
+        let entry_info = match self.protocol {
+            Ip::V4 => EntryInfo::try_from(self.parse_next_bytes_as::<ipt_entry>()?)?,
+            Ip::V6 => EntryInfo::try_from(self.parse_next_bytes_as::<ip6t_entry>()?)?,
+        };
 
-        let next_offset = usize::from(entry_info.next_offset);
-        if next_offset < size_of::<ipt_entry>() {
-            return Err(IpTableParseError::NextOffsetTooSmall { offset: next_offset });
-        }
-        let next_pos = byte_pos + next_offset;
+        let target_pos = byte_pos + entry_info.target_offset;
+        let next_pos = byte_pos + entry_info.next_offset;
 
         let mut matchers: Vec<Matcher> = vec![];
 
@@ -310,22 +564,26 @@ impl IptReplaceParser {
             matchers.push(self.parse_matcher()?);
         }
 
-        // Check if matchers extend beyond the target_offset.
+        // Check if matchers extend beyond the `target_offset`.
         if self.bytes_since_first_entry() != target_pos {
-            return Err(IpTableParseError::InvalidTargetOffset { offset: target_offset });
+            return Err(IpTableParseError::InvalidTargetOffset {
+                offset: entry_info.target_offset,
+            });
         }
 
         // Each entry has 1 target.
         let target = self.parse_target()?;
 
+        // Check if matchers and target extend beyond the `next_offset`.
         if self.bytes_since_first_entry() != next_pos {
-            return Err(IpTableParseError::InvalidNextOffset { offset: target_offset });
+            return Err(IpTableParseError::InvalidNextOffset { offset: entry_info.next_offset });
         }
 
-        Ok(Entry { byte_pos, ipt_entry: entry_info, matchers, target })
+        assert!(self.bytes_since_first_entry() > byte_pos, "parse_pos must advance");
+        Ok(Entry { index: self.next_entry_index(), byte_pos, entry_info, matchers, target })
     }
 
-    // Parses next bytes as a `xt_entry_match` struct and a specified matcher struct.
+    /// Parses next bytes as a `xt_entry_match` struct and a specified matcher struct.
     fn parse_matcher(&mut self) -> Result<Matcher, IpTableParseError> {
         let match_info = self.parse_next_bytes_as::<xt_entry_match>()?;
 
@@ -379,7 +637,7 @@ impl IptReplaceParser {
         Ok(matcher)
     }
 
-    // Parses next bytes as a `xt_entry_target` struct and a specified target struct.
+    /// Parses next bytes as a `xt_entry_target` struct and a specified target struct.
     fn parse_target(&mut self) -> Result<Target, IpTableParseError> {
         let target_info = self.parse_next_bytes_as::<xt_entry_target>()?;
 
@@ -455,8 +713,16 @@ pub struct IpTable {
 
 impl IpTable {
     pub fn from_ipt_replace(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
-        let mut parser = IptReplaceParser::new(bytes)?;
-        let table_name = parser.replace_info.name.clone();
+        Self::from_parser(IptReplaceParser::new_ipv4(bytes)?)
+    }
+
+    pub fn from_ip6t_replace(bytes: Vec<u8>) -> Result<Self, IpTableParseError> {
+        Self::from_parser(IptReplaceParser::new_ipv6(bytes)?)
+    }
+
+    fn from_parser(mut parser: IptReplaceParser) -> Result<Self, IpTableParseError> {
+        let domain = parser.get_domain();
+        let table_name = parser.get_table_name();
 
         let mut entries: Vec<Entry> = vec![];
 
@@ -486,7 +752,7 @@ impl IpTable {
             parser,
             namespace: fnet_filter_ext::Namespace {
                 id: fnet_filter_ext::NamespaceId(table_name),
-                domain: fnet_filter_ext::Domain::Ipv4,
+                domain,
             },
             routine_map,
             rule_specs,
@@ -594,6 +860,12 @@ pub struct UntranslatedRule {
     pub entry: Entry,
 }
 
+// Currently the `UntranslatedRule` inside of `Unsupported` variant is unused, and with
+// optimizations the variant is 0-sized. This causes a large size difference warning, even though
+// their size is similar (240 vs 232 bytes). Ignore this warning until `UntranslatedRule` is used
+// to translate back to Linux structs.
+// TODO(https://fxbug.dev/350057558): Remove once we use the `Unsupported` variant for translation.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum RuleSpec {
     Unsupported(UntranslatedRule),
@@ -618,7 +890,7 @@ impl RuleSpec {
         Ok(Self::Translated(fnet_filter_ext::Rule {
             id: fnet_filter_ext::RuleId {
                 routine: untranslated.routine_id,
-                index: untranslated.entry.byte_pos as u32,
+                index: untranslated.entry.index,
             },
             matchers,
             action,
@@ -627,9 +899,9 @@ impl RuleSpec {
 }
 
 impl Entry {
-    // Creates a `fnet_filter_ext::Matchers` object and populate it with IP matchers in `ipt_ip`,
+    // Creates a `fnet_filter_ext::Matchers` object and populate it with IP matchers in `ip_info`,
     // and extension matchers like `xt_tcp`.
-    // Returns None if an unsupported matcher is found.
+    // Returns None if any unsupported matchers are found.
     fn get_rule_matchers(&self) -> Result<Option<fnet_filter_ext::Matchers>, IpTableParseError> {
         let mut matchers = fnet_filter_ext::Matchers::default();
 
@@ -643,6 +915,8 @@ impl Entry {
         Ok(Some(matchers))
     }
 
+    // Creates a `fnet_filter_ext::Action` from `target`.
+    // Returns None if target is unsupported.
     fn get_rule_action(
         &self,
         routine_map: &HashMap<usize, fnet_filter_ext::Routine>,
@@ -663,79 +937,72 @@ impl Entry {
         &self,
         matchers: &mut fnet_filter_ext::Matchers,
     ) -> Result<Option<()>, IpTableParseError> {
-        let inv_flags = IptIpInverseFlags::from_bits(self.ipt_entry.ip.invflags.into())
-            .ok_or_else(|| IpTableParseError::InvalidInverseFlags {
-                flags: self.ipt_entry.ip.invflags,
-            })?;
-        let ip = &self.ipt_entry.ip;
+        let ip_info = &self.entry_info.ip_info;
 
-        if ip.flags != 0 {
-            log_warn!("IpTables: ignored rule-specification with IP flags {}", ip.flags);
-            return Ok(None);
-        }
-
-        if ip.smsk.s_addr != 0 {
+        if let Some(subnet) = ip_info.src_subnet {
+            let subnet = fnet_filter_ext::Subnet::try_from(subnet)
+                .map_err(IpTableParseError::FidlConversion)?;
             matchers.src_addr = Some(fnet_filter_ext::AddressMatcher {
-                matcher: Self::new_address_matcher(ip.src.s_addr, ip.smsk.s_addr)?,
-                invert: inv_flags.contains(IptIpInverseFlags::SourceIpAddress),
+                matcher: fnet_filter_ext::AddressMatcherType::Subnet(subnet),
+                invert: ip_info.inverse_flags.contains(IptIpInverseFlags::SourceIpAddress),
             });
         }
 
-        if ip.dmsk.s_addr != 0 {
+        if let Some(subnet) = ip_info.dst_subnet {
+            let subnet = fnet_filter_ext::Subnet::try_from(subnet)
+                .map_err(IpTableParseError::FidlConversion)?;
             matchers.dst_addr = Some(fnet_filter_ext::AddressMatcher {
-                matcher: Self::new_address_matcher(ip.dst.s_addr, ip.dmsk.s_addr)?,
-                invert: inv_flags.contains(IptIpInverseFlags::DestinationIpAddress),
+                matcher: fnet_filter_ext::AddressMatcherType::Subnet(subnet),
+                invert: ip_info.inverse_flags.contains(IptIpInverseFlags::DestinationIpAddress),
             });
         }
 
-        if ip.iniface_mask != [0u8; 16] {
-            if inv_flags.contains(IptIpInverseFlags::InputInterface) {
+        if let Some(ref interface) = ip_info.in_interface {
+            if ip_info.inverse_flags.contains(IptIpInverseFlags::InputInterface) {
                 log_warn!("IpTables: ignored rule-specification with inversed input interface");
                 return Ok(None);
             }
-            matchers.in_interface = Some(fnet_filter_ext::InterfaceMatcher::Name(
-                ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?,
-            ))
+            matchers.in_interface = Some(fnet_filter_ext::InterfaceMatcher::Name(interface.clone()))
         }
 
-        if ip.outiface_mask != [0u8; 16] {
-            if inv_flags.contains(IptIpInverseFlags::OutputInterface) {
+        if let Some(ref interface) = ip_info.out_interface {
+            if ip_info.inverse_flags.contains(IptIpInverseFlags::OutputInterface) {
                 log_warn!("IpTables: ignored rule-specification with inversed output interface");
                 return Ok(None);
             }
-
-            matchers.out_interface = Some(fnet_filter_ext::InterfaceMatcher::Name(
-                ascii_to_string(&ip.outiface).map_err(IpTableParseError::AsciiConversion)?,
-            ))
+            matchers.out_interface =
+                Some(fnet_filter_ext::InterfaceMatcher::Name(interface.clone()))
         }
 
-        match self.ipt_entry.ip.proto {
-            // matches both TCP and UDP, which is true by default.
-            protocol if u32::from(protocol) == IPPROTO_IP => {}
+        if ip_info.should_match_protocol() {
+            match ip_info.protocol {
+                // matches both TCP and UDP, which is true by default.
+                protocol if protocol == IPPROTO_IP => {}
 
-            protocol if u32::from(protocol) == IPPROTO_TCP => {
-                matchers.transport_protocol =
-                    Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                        // These fields are set later by `xt_tcp` match extension, if present.
-                        src_port: None,
-                        dst_port: None,
-                    });
-            }
+                protocol if protocol == IPPROTO_TCP => {
+                    matchers.transport_protocol =
+                        Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                            // These fields are set later by `xt_tcp` match extension, if present.
+                            src_port: None,
+                            dst_port: None,
+                        });
+                }
 
-            protocol if u32::from(protocol) == IPPROTO_UDP => {
-                matchers.transport_protocol =
-                    Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
-                        // These fields are set later by `xt_udp` match extension, if present.
-                        src_port: None,
-                        dst_port: None,
-                    });
-            }
+                protocol if protocol == IPPROTO_UDP => {
+                    matchers.transport_protocol =
+                        Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
+                            // These fields are set later by `xt_udp` match extension, if present.
+                            src_port: None,
+                            dst_port: None,
+                        });
+                }
 
-            protocol => {
-                log_warn!("IpTables: ignored rule-specification with protocol {protocol}");
-                return Ok(None);
-            }
-        };
+                protocol => {
+                    log_warn!("IpTables: ignored rule-specification with protocol {protocol}");
+                    return Ok(None);
+                }
+            };
+        }
 
         Ok(Some(()))
     }
@@ -750,37 +1017,6 @@ impl Entry {
         }
 
         Ok(Some(()))
-    }
-
-    fn new_address_matcher(
-        ip_addr: u32,
-        subnet_mask: u32,
-    ) -> Result<fnet_filter_ext::AddressMatcherType, IpTableParseError> {
-        let subnet = fnet::Subnet {
-            addr: fnet::IpAddress::Ipv4(fnet::Ipv4Address {
-                addr: u32::from_be(ip_addr).to_be_bytes(),
-            }),
-            prefix_len: Self::mask_to_prefix_len(subnet_mask)?,
-        };
-
-        let subnet =
-            fnet_filter_ext::Subnet::try_from(subnet).map_err(IpTableParseError::FidlConversion)?;
-
-        Ok(fnet_filter_ext::AddressMatcherType::Subnet(subnet))
-    }
-
-    // Assumes mask is big endian.
-    fn mask_to_prefix_len(mask: u32) -> Result<u8, IpTableParseError> {
-        let mask = u32::from_be(mask);
-
-        // Check that all 1's in the mask are before all 0's.
-        // To do this, we can simply find if its 2-complement is a power of 2.
-        if !mask.wrapping_neg().is_power_of_two() {
-            return Err(IpTableParseError::SubnetMaskHasNonPrefixBits { mask });
-        }
-
-        // Impossible to have more 1's in a `u32` than 255.
-        Ok(mask.count_ones() as u8)
     }
 
     fn translate_standard_target(
@@ -979,18 +1215,84 @@ pub fn write_string_to_ascii_buffer(
     write_bytes_to_ascii_buffer(bytes, chars)
 }
 
+// Assumes `mask` is big endian.
+fn ipv4_mask_to_prefix_len(mask: u32) -> Result<u8, IpAddressConversionError> {
+    let mask = u32::from_be(mask);
+
+    // Check that all 1's in the mask are before all 0's.
+    // To do this, we can simply find if its 2-complement is a power of 2.
+    if !mask.wrapping_neg().is_power_of_two() {
+        return Err(IpAddressConversionError::IpV4SubnetMaskHasNonPrefixBits { mask });
+    }
+
+    // Impossible to have more 1's in a `u32` than 255.
+    Ok(mask.count_ones() as u8)
+}
+
+// Assumes `mask` is in big endian order.
+fn ipv6_mask_to_prefix_len(mask: [u8; 16]) -> Result<u8, IpAddressConversionError> {
+    let mask = u128::from_be_bytes(mask);
+
+    // Check that all 1's in the mask are before all 0's.
+    // To do this, we can simply find if its 2-complement is a power of 2.
+    if !mask.wrapping_neg().is_power_of_two() {
+        return Err(IpAddressConversionError::IpV6SubnetMaskHasNonPrefixBits { mask });
+    }
+
+    // Impossible to have more 1's in a `u128` than 255.
+    Ok(mask.count_ones() as u8)
+}
+
+// Converts an IPv4 address and subnet mask to fuchsia.net.Subnet.
+//
+// Assumes `ipv4_addr` and `subnet_mask` are both big endian. Returns Ok(None) if subnet mask is 0.
+// Errors if not all 1's in the subnet_mask are before all 0's.
+pub fn ipv4_to_subnet(
+    addr: in_addr,
+    mask: in_addr,
+) -> Result<Option<fnet::Subnet>, IpAddressConversionError> {
+    if mask.s_addr == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(fnet::Subnet {
+            addr: fnet::IpAddress::Ipv4(fnet::Ipv4Address {
+                addr: u32::from_be(addr.s_addr).to_be_bytes(),
+            }),
+            prefix_len: ipv4_mask_to_prefix_len(mask.s_addr)?,
+        }))
+    }
+}
+
+pub fn ipv6_to_subnet(
+    addr: in6_addr,
+    mask: in6_addr,
+) -> Result<Option<fnet::Subnet>, IpAddressConversionError> {
+    let addr_bytes = unsafe { addr.in6_u.u6_addr8 };
+    let mask_bytes = unsafe { mask.in6_u.u6_addr8 };
+
+    if mask_bytes == [0u8; 16] {
+        Ok(None)
+    } else {
+        Ok(Some(fnet::Subnet {
+            addr: fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: addr_bytes }),
+            prefix_len: ipv6_mask_to_prefix_len(mask_bytes)?,
+        }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
     use net_declare::fidl_subnet;
     use starnix_uapi::{
-        c_char, in_addr, ipt_entry, ipt_ip, ipt_replace,
+        c_char, in6_addr__bindgen_ty_1, in_addr, ipt_entry, ipt_ip, ipt_replace,
         xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
         xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp, xt_udp,
+        IP6T_F_PROTO,
     };
     use test_case::test_case;
+    use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
 
     fn string_to_16_chars(string: &str) -> [c_char; 16] {
         let mut buffer = [0; 16];
@@ -1023,17 +1325,7 @@ mod tests {
         bytes.extend_from_slice(VerdictWithPadding { verdict, ..Default::default() }.as_bytes());
     }
 
-    fn extend_with_standard_target_entry(bytes: &mut Vec<u8>, verdict: i32) {
-        bytes.extend_from_slice(
-            ipt_entry { target_offset: 112, next_offset: 152, ..Default::default() }.as_bytes(),
-        );
-        extend_with_standard_verdict(bytes, verdict);
-    }
-
-    fn extend_with_error_target_entry(bytes: &mut Vec<u8>, error_name: &str) {
-        bytes.extend_from_slice(
-            ipt_entry { target_offset: 112, next_offset: 176, ..Default::default() }.as_bytes(),
-        );
+    fn extend_with_error_name(bytes: &mut Vec<u8>, error_name: &str) {
         bytes.extend_from_slice(
             xt_entry_target { target_size: 64, name: string_to_29_chars("ERROR"), revision: 0 }
                 .as_bytes(),
@@ -1047,7 +1339,35 @@ mod tests {
         );
     }
 
-    fn table_with_ip_matchers() -> Vec<u8> {
+    fn extend_with_standard_target_ipv4_entry(bytes: &mut Vec<u8>, verdict: i32) {
+        bytes.extend_from_slice(
+            ipt_entry { target_offset: 112, next_offset: 152, ..Default::default() }.as_bytes(),
+        );
+        extend_with_standard_verdict(bytes, verdict);
+    }
+
+    fn extend_with_standard_target_ipv6_entry(bytes: &mut Vec<u8>, verdict: i32) {
+        bytes.extend_from_slice(
+            ip6t_entry { target_offset: 168, next_offset: 208, ..Default::default() }.as_bytes(),
+        );
+        extend_with_standard_verdict(bytes, verdict);
+    }
+
+    fn extend_with_error_target_ipv4_entry(bytes: &mut Vec<u8>, error_name: &str) {
+        bytes.extend_from_slice(
+            ipt_entry { target_offset: 112, next_offset: 176, ..Default::default() }.as_bytes(),
+        );
+        extend_with_error_name(bytes, error_name);
+    }
+
+    fn extend_with_error_target_ipv6_entry(bytes: &mut Vec<u8>, error_name: &str) {
+        bytes.extend_from_slice(
+            ip6t_entry { target_offset: 168, next_offset: 232, ..Default::default() }.as_bytes(),
+        );
+        extend_with_error_name(bytes, error_name);
+    }
+
+    fn ipv4_table_with_ip_matchers() -> Vec<u8> {
         let mut bytes: Vec<u8> = vec![];
 
         bytes.extend_from_slice(
@@ -1061,7 +1381,7 @@ mod tests {
         );
 
         // Entry 1: start of the chain.
-        extend_with_error_target_entry(&mut bytes, "mychain");
+        extend_with_error_target_ipv4_entry(&mut bytes, "mychain");
 
         // Entry 2: accept TCP packets from 10.0.0.1.
         bytes.extend_from_slice(
@@ -1097,36 +1417,110 @@ mod tests {
         extend_with_standard_verdict(&mut bytes, -1);
 
         // Entry 4: "policy" of the chain.
-        extend_with_standard_target_entry(&mut bytes, -5);
+        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
 
         // Entry 5: end of input.
-        extend_with_error_target_entry(&mut bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
 
         bytes
     }
 
-    #[fuchsia::test]
-    fn parse_ip_matchers_test() {
-        let table = IpTable::from_ipt_replace(table_with_ip_matchers()).unwrap();
-        assert_eq!(table.namespace.id.0, "filter");
+    fn ipv6_table_with_ip_matchers() -> Vec<u8> {
+        let mut bytes: Vec<u8> = vec![];
+
+        bytes.extend_from_slice(
+            ip6t_replace {
+                name: string_to_32_chars("filter"),
+                num_entries: 5,
+                size: 1088,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+
+        // Entry 1: start of the chain.
+        extend_with_error_target_ipv6_entry(&mut bytes, "mychain");
+
+        // Entry 2: accept TCP packets from .
+        bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    src: in6_addr {
+                        in6_u: in6_addr__bindgen_ty_1 {
+                            u6_addr8: [
+                                0x20, 0x1, 0x48, 0x60, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            ],
+                        },
+                    },
+                    smsk: in6_addr {
+                        in6_u: in6_addr__bindgen_ty_1 {
+                            u6_addr8: [
+                                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0,
+                                0, 0,
+                            ],
+                        },
+                    },
+                    proto: 6,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 208,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut bytes, -2);
+
+        // Entry 3: drop all packets going to en0 interface.
+        bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    iniface: string_to_16_chars("en0"),
+                    iniface_mask: [255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 208,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut bytes, -1);
+
+        // Entry 4: "policy" of the chain.
+        extend_with_standard_target_ipv6_entry(&mut bytes, -5);
+
+        // Entry 5: end of input.
+        extend_with_error_target_ipv6_entry(&mut bytes, "ERROR");
+
+        bytes
+    }
+
+    fn verify_table_with_ip_matchers(
+        table: IpTable,
+        expected_table_name: &str,
+        expected_subnet: fnet::Subnet,
+    ) {
+        assert_eq!(table.namespace.id.0, expected_table_name);
 
         let routines: Vec<_> = table.routine_map.into_values().collect();
         assert_eq!(routines.len(), 1);
 
         let routine_id = &routines.first().unwrap().id;
         assert_eq!(routine_id.name, "mychain");
-        assert_eq!(routine_id.namespace.0, "filter");
+        assert_eq!(routine_id.namespace.0, expected_table_name);
 
         let mut rules = table.rule_specs.iter();
         let RuleSpec::Translated(rule1) = rules.next().expect("rule 1 exists") else {
             panic!("rule 1 should be translated");
         };
         let expected_rule1 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 176, routine: routine_id.clone() },
+            id: fnet_filter_ext::RuleId { index: 1, routine: routine_id.clone() },
             matchers: fnet_filter_ext::Matchers {
                 src_addr: Some(fnet_filter_ext::AddressMatcher {
                     matcher: fnet_filter_ext::AddressMatcherType::Subnet(
-                        fnet_filter_ext::Subnet::try_from(fidl_subnet!("10.0.0.1/32")).unwrap(),
+                        fnet_filter_ext::Subnet::try_from(expected_subnet).unwrap(),
                     ),
                     invert: false,
                 }),
@@ -1144,7 +1538,7 @@ mod tests {
             panic!("rule 2 should be translated");
         };
         let expected_rule2 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 328, routine: routine_id.clone() },
+            id: fnet_filter_ext::RuleId { index: 2, routine: routine_id.clone() },
             matchers: fnet_filter_ext::Matchers {
                 in_interface: Some(fnet_filter_ext::InterfaceMatcher::Name("en0".to_string())),
                 ..Default::default()
@@ -1157,13 +1551,25 @@ mod tests {
             panic!("rule 3 should be translated");
         };
         let expected_rule3 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 480, routine: routine_id.clone() },
+            id: fnet_filter_ext::RuleId { index: 3, routine: routine_id.clone() },
             matchers: fnet_filter_ext::Matchers::default(),
             action: fnet_filter_ext::Action::Return,
         };
         assert_eq!(rule3, &expected_rule3);
 
         assert!(rules.next().is_none());
+    }
+
+    #[fuchsia::test]
+    fn parse_ip_matchers_ipv4_test() {
+        let table = IpTable::from_ipt_replace(ipv4_table_with_ip_matchers()).unwrap();
+        verify_table_with_ip_matchers(table, "ipv4-filter", fidl_subnet!("10.0.0.1/32"));
+    }
+
+    #[fuchsia::test]
+    fn parse_ip_matchers_ipv6_test() {
+        let table = IpTable::from_ip6t_replace(ipv6_table_with_ip_matchers()).unwrap();
+        verify_table_with_ip_matchers(table, "ipv6-filter", fidl_subnet!("2001:4860:4860::/64"));
     }
 
     fn table_with_match_extensions() -> Vec<u8> {
@@ -1180,7 +1586,7 @@ mod tests {
         );
 
         // Entry 1: start of the chain.
-        extend_with_error_target_entry(&mut bytes, "mychain");
+        extend_with_error_target_ipv4_entry(&mut bytes, "mychain");
 
         // Entry 2: a rule on the chain.
         bytes.extend_from_slice(
@@ -1207,10 +1613,10 @@ mod tests {
         extend_with_standard_verdict(&mut bytes, -5);
 
         // Entry 4: "policy" of the chain.
-        extend_with_standard_target_entry(&mut bytes, -5);
+        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
 
         // Entry 5: end of input.
-        extend_with_error_target_entry(&mut bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
 
         bytes
     }
@@ -1218,14 +1624,14 @@ mod tests {
     #[fuchsia::test]
     fn parse_match_extensions_test() {
         let table = IpTable::from_ipt_replace(table_with_match_extensions()).unwrap();
-        assert_eq!(table.namespace.id.0, "filter");
+        assert_eq!(table.namespace.id.0, "ipv4-filter");
 
         let routines: Vec<_> = table.routine_map.into_values().collect();
         assert_eq!(routines.len(), 1);
 
         let routine_id = &routines.first().unwrap().id;
         assert_eq!(routine_id.name, "mychain");
-        assert_eq!(routine_id.namespace.0, "filter");
+        assert_eq!(routine_id.namespace.0, "ipv4-filter");
 
         let mut rules = table.rule_specs.iter();
 
@@ -1236,7 +1642,7 @@ mod tests {
             panic!("rule 3 should be translated");
         };
         let expected_rule3 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 576, routine: routine_id.clone() },
+            id: fnet_filter_ext::RuleId { index: 3, routine: routine_id.clone() },
             matchers: fnet_filter_ext::Matchers::default(),
             action: fnet_filter_ext::Action::Return,
         };
@@ -1259,22 +1665,22 @@ mod tests {
         );
 
         // Entry 1: start of the chain1.
-        extend_with_error_target_entry(&mut bytes, "chain1");
+        extend_with_error_target_ipv4_entry(&mut bytes, "chain1");
 
         // Entry 2: jump to chain2 for all packets.
-        extend_with_standard_target_entry(&mut bytes, 656);
+        extend_with_standard_target_ipv4_entry(&mut bytes, 656);
 
         // Entry 3: policy of chain1.
-        extend_with_standard_target_entry(&mut bytes, -5);
+        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
 
         // Entry 4: start of chain2.
-        extend_with_error_target_entry(&mut bytes, "chain2");
+        extend_with_error_target_ipv4_entry(&mut bytes, "chain2");
 
         // Entry 5: policy of chain2.
-        extend_with_standard_target_entry(&mut bytes, -5);
+        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
 
         // Entry 6: end of input.
-        extend_with_error_target_entry(&mut bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
 
         bytes
     }
@@ -1289,18 +1695,18 @@ mod tests {
 
         let routine1_id = &routines.first().unwrap().id;
         assert_eq!(routine1_id.name, "chain1");
-        assert_eq!(routine1_id.namespace.0, "filter");
+        assert_eq!(routine1_id.namespace.0, "ipv4-filter");
 
         let routine2_id = &routines.last().unwrap().id;
         assert_eq!(routine2_id.name, "chain2");
-        assert_eq!(routine2_id.namespace.0, "filter");
+        assert_eq!(routine2_id.namespace.0, "ipv4-filter");
 
         let mut rules = table.rule_specs.iter();
         let RuleSpec::Translated(rule1) = rules.next().expect("rule 1 exists") else {
             panic!("rule 1 should be translated");
         };
         let expected_rule1 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 176, routine: routine1_id.clone() },
+            id: fnet_filter_ext::RuleId { index: 1, routine: routine1_id.clone() },
             matchers: fnet_filter_ext::Matchers::default(),
             action: fnet_filter_ext::Action::Jump("chain2".to_string()),
         };
@@ -1310,7 +1716,7 @@ mod tests {
             panic!("rule 2 should be translated");
         };
         let expected_rule2 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 328, routine: routine1_id.clone() },
+            id: fnet_filter_ext::RuleId { index: 2, routine: routine1_id.clone() },
             matchers: fnet_filter_ext::Matchers::default(),
             action: fnet_filter_ext::Action::Return,
         };
@@ -1320,7 +1726,8 @@ mod tests {
             panic!("rule 3 should be translated");
         };
         let expected_rule3 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 656, routine: routine2_id.clone() },
+            // entry at index 3 is the routine2's chain definition.
+            id: fnet_filter_ext::RuleId { index: 4, routine: routine2_id.clone() },
             matchers: fnet_filter_ext::Matchers::default(),
             action: fnet_filter_ext::Action::Return,
         };
@@ -1532,5 +1939,81 @@ mod tests {
         let mut buffer: [c_char; 8] = [0; 8];
         assert_eq!(write_string_to_ascii_buffer(input, &mut buffer), output);
         assert_eq!(buffer, expected);
+    }
+
+    #[test_case( [0, 0, 0, 0], [0x0, 0x0, 0x0, 0x0], Ok(None); "unset")]
+    #[test_case(
+        [127, 0, 0, 1],
+        [0xff, 0xff, 0xff, 0xff],
+        Ok(Some(fidl_subnet!("127.0.0.1/32")));
+        "full address"
+    )]
+    #[test_case(
+        [127, 0, 0, 1],
+        [0xff, 0x0, 0x0, 0xff],
+        Err(IpAddressConversionError::IpV4SubnetMaskHasNonPrefixBits { mask: 4278190335 });
+        "invalid mask"
+    )]
+    #[test_case(
+        [192, 0, 2, 15],
+        [0xff, 0xff, 0xff, 0x0],
+        Ok(Some(fidl_subnet!("192.0.2.15/24")));
+        "subnet"
+    )]
+    fn ipv4_address_test(
+        be_addr: [u8; 4],
+        be_mask: [u8; 4],
+        expected: Result<Option<fnet::Subnet>, IpAddressConversionError>,
+    ) {
+        assert_eq!(
+            ipv4_to_subnet(
+                in_addr { s_addr: u32::from_ne_bytes(be_addr) },
+                in_addr { s_addr: u32::from_ne_bytes(be_mask) },
+            ),
+            expected
+        );
+    }
+
+    #[test_case(
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        Ok(None);
+        "unset"
+    )]
+    #[test_case(
+        [0xff, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xc3],
+        [
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff
+        ],
+        Ok(Some(fidl_subnet!("ff06::c3/128")));
+        "full address"
+    )]
+    #[test_case(
+        [0xff, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xc3],
+        [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0],
+        Ok(Some(fidl_subnet!("ff06::c3/96")));
+        "subnet"
+    )]
+    #[test_case(
+        [0xff, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xc3],
+        [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0xf],
+        Err(IpAddressConversionError::IpV6SubnetMaskHasNonPrefixBits {
+            mask: 340282366920938463463374607427473244175,
+        });
+        "invalid mask"
+    )]
+    fn ipv6_address_test(
+        be_addr: [u8; 16],
+        be_mask: [u8; 16],
+        expected: Result<Option<fnet::Subnet>, IpAddressConversionError>,
+    ) {
+        assert_eq!(
+            ipv6_to_subnet(
+                in6_addr { in6_u: in6_addr__bindgen_ty_1 { u6_addr8: be_addr } },
+                in6_addr { in6_u: in6_addr__bindgen_ty_1 { u6_addr8: be_mask } },
+            ),
+            expected
+        );
     }
 }
