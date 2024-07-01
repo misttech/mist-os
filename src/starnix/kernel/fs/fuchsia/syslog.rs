@@ -5,6 +5,7 @@
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_logging::log_info;
 use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
@@ -32,7 +33,10 @@ impl FileOps for SyslogFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         data.read_each(&mut |bytes| {
+            #[cfg(not(feature = "starnix_lite"))]
             log_info!(tag = "stdio", "{}", String::from_utf8_lossy(bytes));
+            #[cfg(feature = "starnix_lite")]
+            print!("{}", String::from_utf8_lossy(bytes));
             Ok(bytes.len())
         })
     }
