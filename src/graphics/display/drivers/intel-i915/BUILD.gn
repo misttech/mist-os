@@ -111,6 +111,7 @@ source_set("common_srcs") {
     "//src/lib/ddktl",
     "//src/lib/fxl",
     "//src/lib/zbitl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",

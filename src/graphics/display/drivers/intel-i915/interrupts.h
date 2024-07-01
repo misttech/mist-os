@@ -6,6 +6,8 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTERRUPTS_H_
 
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
@@ -72,9 +74,11 @@ class Interrupts {
                                       uint32_t gpu_interrupt_mask);
 
  private:
-  int IrqLoop();
   void EnableHotplugInterrupts();
   void HandlePipeInterrupt(PipeId pipe_id, zx_time_t timestamp);
+
+  void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                        const zx_packet_interrupt_t* interrupt);
 
   PipeVsyncCallback pipe_vsync_callback_;
   HotplugCallback hotplug_callback_;
@@ -82,10 +86,16 @@ class Interrupts {
 
   mtx_t lock_;
 
-  // Initialized by |Init|.
+  // Initialized by `Init()`.
   zx::interrupt irq_;
   fuchsia_hardware_pci::InterruptMode irq_mode_;
-  std::optional<thrd_t> irq_thread_;  // Valid while irq_ is valid.
+
+  // The `irq_loop_` and `irq_handler_` are constant between `Init()` and
+  // instance destruction. Only accessed on the threads used for class
+  // initialization and destruction.
+  std::unique_ptr<async::Loop> irq_loop_;
+  async::IrqMethod<Interrupts, &Interrupts::InterruptHandler> irq_handler_{this};
+
   uint16_t device_id_;
 
   intel_gpu_core_interrupt_t gpu_interrupt_callback_ __TA_GUARDED(lock_) = {};
