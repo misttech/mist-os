@@ -59,6 +59,38 @@
             protocol: "fuchsia.media.sounds.Player",
             availability: "optional",
         },
+        {
+            config: "fuchsia.ui.IdleThresholdMs",
+            key: "idle_threshold_ms",
+            type: "uint64",
+        },
+        {
+            config: "fuchsia.ui.SupportedInputDevices",
+            key: "supported_input_devices",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 12,
+            },
+            max_count: 6,
+        },
+        {
+            config: "fuchsia.scenic.DisplayRotation",
+            key: "display_rotation",
+            type: "uint64",
+        },
+        {
+            config: "fuchsia.ui.DisplayPixelDensity",
+            key: "display_pixel_density",
+            type: "string",
+            max_size: 8,
+        },
+        {
+            config: "fuchsia.ui.ViewingDistance",
+            key: "viewing_distance",
+            type: "string",
+            max_size: 8,
+        },
     ],
     expose: [
         {
@@ -73,24 +105,4 @@
             from: "self",
         },
     ],
-    config: {
-        idle_threshold_ms: { type: "uint64" },
-        supported_input_devices: {
-            type: "vector",
-            element: {
-                type: "string",
-                max_size: 12,
-            },
-            max_count: 6,
-        },
-        display_rotation: { type: "uint64" },
-        display_pixel_density: {
-            type: "string",
-            max_size: 8,
-        },
-        viewing_distance: {
-            type: "string",
-            max_size: 8,
-        },
-    },
 }

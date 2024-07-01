@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
-use assembly_config_capabilities::{Config, ConfigValueType};
+use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::ui_config::PlatformUiConfig;
 use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
 
@@ -168,26 +168,46 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             ),
         )?;
 
-        let mut scene_manager_config =
-            builder.package("scene_manager").component("meta/scene_manager.cm")?;
-        scene_manager_config
-            .field(
-                "supported_input_devices",
+        builder.set_config_capability(
+            "fuchsia.ui.SupportedInputDevices",
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 12 },
+                    max_count: 6,
+                },
                 ui_config
                     .supported_input_devices
                     .iter()
                     .filter_map(|d| serde_json::to_value(d).ok())
                     .collect::<serde_json::Value>(),
-            )?
-            .field("display_pixel_density", ui_config.display_pixel_density.clone())?
-            .field("display_rotation", ui_config.display_rotation)?
-            .field("viewing_distance", ui_config.viewing_distance.as_ref())?
-            .field("idle_threshold_ms", {
+            ),
+        )?;
+
+        builder.set_config_capability(
+            "fuchsia.ui.DisplayPixelDensity",
+            Config::new(
+                ConfigValueType::String { max_size: 8 },
+                ui_config.display_pixel_density.clone().into(),
+            ),
+        )?;
+
+        builder.set_config_capability(
+            "fuchsia.ui.ViewingDistance",
+            Config::new(
+                ConfigValueType::String { max_size: 8 },
+                ui_config.viewing_distance.as_ref().to_string().into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.ui.IdleThresholdMs",
+            Config::new(ConfigValueType::Uint64, {
                 match context.build_type {
                     BuildType::Eng => 5000,
                     BuildType::UserDebug | BuildType::User => 100,
                 }
-            })?;
+                .into()
+            }),
+        )?;
 
         let config_dir = builder
             .add_domain_config(PackageSetDestination::Blob(PackageDestination::SensorConfig))

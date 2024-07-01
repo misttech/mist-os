@@ -110,9 +110,10 @@ fuchsia_structured_config_rust_lib("scene_manager_structured_config") {
   cm_label = ":manifest"
 }
 
-fuchsia_structured_config_values("config_for_test") {
+fuchsia_structured_config_values2("config_for_test") {
   visibility = [ ":scene_manager_component_for_test" ]
   cm_label = ":manifest"
+  output_component_name = "scene_manager_config"
   values = {
     idle_threshold_ms = 5000
     supported_input_devices = [
