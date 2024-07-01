@@ -2651,6 +2651,9 @@ pub fn sys_inotify_add_watch(
         LookupFlags::default()
     };
     let watched_node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, options)?;
+    if mask.contains(InotifyMask::ONLYDIR) && !watched_node.entry.node.is_dir() {
+        return error!(ENOTDIR);
+    }
     inotify_file.add_watch(watched_node.entry, mask, &file)
 }
 
