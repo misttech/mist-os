@@ -44,20 +44,20 @@ use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
-    gid_t, pid_t, rlimit, rusage, sched_param, uid_t, AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW,
-    CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1, CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS,
-    CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP,
-    PR_CAPBSET_READ, PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET,
-    PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE,
-    PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECCOMP, PR_GET_SECUREBITS,
-    PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS,
-    PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK,
-    PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
-    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW,
-    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL,
-    SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER,
-    SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2,
-    _LINUX_CAPABILITY_VERSION_3,
+    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uid_t, AT_EMPTY_PATH,
+    AT_SYMLINK_NOFOLLOW, BPF_MAXINSNS, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
+    CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
+    NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
+    PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE,
+    PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS,
+    PR_GET_SECCOMP, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS,
+    PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP,
+    PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH,
+    PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN, SECCOMP_FILTER_FLAG_LOG,
+    SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC,
+    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES,
+    SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT,
+    _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 
 pub fn do_clone<L>(
@@ -1456,15 +1456,19 @@ pub fn sys_seccomp(
             {
                 return error!(EINVAL);
             }
+            let fprog: sock_fprog = current_task.read_object(UserRef::new(args))?;
+            if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+                return error!(EINVAL);
+            }
+            let code: Vec<sock_filter> =
+                current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+
             if !current_task.read().no_new_privs()
                 && !current_task.creds().has_capability(CAP_SYS_ADMIN)
             {
                 return error!(EACCES);
             }
-            if args.is_null() {
-                return error!(EFAULT);
-            }
-            current_task.add_seccomp_filter(args, flags)
+            current_task.add_seccomp_filter(code, flags)
         }
         SECCOMP_GET_ACTION_AVAIL => {
             if flags != 0 || args.is_null() {

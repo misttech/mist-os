@@ -43,12 +43,12 @@ use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SI
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
-    clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter, sock_fprog,
-    BPF_MAXINSNS, CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS,
-    CLONE_INTO_CGROUP, CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS,
-    CLONE_SIGHAND, CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED,
-    FUTEX_TID_MASK, ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
-    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
+    clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
+    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
+    CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
+    CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK, ROBUST_LIST_LIMIT,
+    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
+    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
 use std::ffi::CString;
 use std::fmt;
@@ -939,18 +939,9 @@ impl CurrentTask {
 
     pub fn add_seccomp_filter(
         &mut self,
-        bpf_filter: UserAddress,
+        code: Vec<sock_filter>,
         flags: u32,
     ) -> Result<SyscallResult, Errno> {
-        let fprog: sock_fprog = self.read_object(UserRef::new(bpf_filter))?;
-
-        if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
-            return Err(errno!(EINVAL));
-        }
-
-        let code: Vec<sock_filter> =
-            self.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
-
         let new_filter = Arc::new(SeccompFilter::from_cbpf(
             &code,
             self.thread_group.next_seccomp_filter_id.add(1),
@@ -998,7 +989,7 @@ impl CurrentTask {
             }
 
             // Now that we're sure we're allowed to do so, add the filter to all threads.
-            filters.add_filter(new_filter, fprog.len)?;
+            filters.add_filter(new_filter, code.len() as u16)?;
 
             for task in &tasks {
                 let mut other_task_state = task.write();
@@ -1010,7 +1001,7 @@ impl CurrentTask {
         } else {
             let mut task_state = self.task.write();
 
-            task_state.seccomp_filters.add_filter(new_filter, fprog.len)?;
+            task_state.seccomp_filters.add_filter(new_filter, code.len() as u16)?;
             self.set_seccomp_state(SeccompStateValue::UserDefined)?;
         }
 

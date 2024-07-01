@@ -736,9 +736,6 @@
                 "RtSignalTest.InvalidCodes",
                 "RtSignalTest.SignoMatch",
 
-                // seccomp_test
-                "SeccompTest.EmptyProgramIsRejected",
-
                 // sigaltstack_test - https://fxbug.dev/42159586
                 "SigaltstackTest.ResetByExecve",
 
