@@ -149,5 +149,10 @@
             from: "#system-activity-governor",
             source_availability: "unknown",
         },
+        {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "#system-activity-governor",
+            source_availability: "unknown",
+        },
     ],
 }

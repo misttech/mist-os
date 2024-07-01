@@ -430,6 +430,12 @@
             availability: "same_as_target",
         },
         {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "parent",
+            to: "#session",
+            availability: "same_as_target",
+        },
+        {
             storage: [
                 "cache",
                 "data",

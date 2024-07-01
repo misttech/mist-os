@@ -173,6 +173,11 @@
             to: "#core",
         },
         {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "#bootstrap",
+            to: "#core",
+        },
+        {
             protocol: [
                 "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.virtualconsole.SessionManager",

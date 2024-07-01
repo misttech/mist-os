@@ -182,6 +182,11 @@
             from: "#shutdown_shim",
         },
         {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "#system-activity-governor",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.power.button.Monitor",
             from: "#critical-services",
         },

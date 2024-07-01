@@ -261,6 +261,12 @@
             to: "#session-manager",
         },
         {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
+        },
+        {
             storage: [
                 "cache",
                 "data",
