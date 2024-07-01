@@ -55,6 +55,7 @@ use starnix_core::execution::{
 #[cfg(feature = "starnix_lite")]
 use starnix_core::execution::{
     create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
+    parse_numbered_handles,
 };
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::tmpfs::TmpFs;
@@ -72,9 +73,11 @@ use starnix_logging::{
 };
 #[cfg(feature = "starnix_lite")]
 use starnix_logging::{
-    log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
+    log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+#[cfg(feature = "starnix_lite")]
+use starnix_uapi::errno;
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
@@ -405,23 +408,37 @@ pub async fn create_component_from_stream(
 }
 
 #[cfg(feature = "starnix_lite")]
-fn open_bootfs() -> zx::Channel {
+fn open_pkg() -> zx::Channel {
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let (server, client) = zx::Channel::create();
-    fdio::open("/boot", rights, server).expect("failed to open /boot");
+    fdio::open("/pkg", rights, server).expect("failed to open /pkg");
     client
 }
+
+/*
+#[cfg(feature = "starnix_lite")]
+fn open_svc() -> zx::Channel {
+    let rights = fio::OpenFlags::RIGHT_READABLE;
+    let (server, client) = zx::Channel::create();
+    fdio::open("/svc", rights, server).expect("failed to open /svc");
+    client
+}
+
+#[cfg(feature = "starnix_lite")]
+fn open_data() -> zx::Channel {
+    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+    let (server, client) = zx::Channel::create();
+    fdio::open("/data", rights, server).expect("failed to open /data");
+    client
+}
+    */
 
 #[cfg(feature = "starnix_lite")]
 pub async fn create_container_from_config(
     config: Config,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
-    let mut config_wrapper = ConfigWrapper {
-        config: config,
-        pkg_dir: Some(open_bootfs()),
-        svc_dir: None,
-        data_dir: None,
-    };
+    let mut config_wrapper =
+        ConfigWrapper { config: config, pkg_dir: Some(open_pkg()), svc_dir: None, data_dir: None };
 
     let (sender, receiver) = oneshot::channel::<TaskResult>();
     let container =
@@ -610,6 +627,12 @@ async fn create_container(
     execute_task_with_prerun_result(
         init_task,
         move |locked, init_task| {
+            #[cfg(feature = "starnix_lite")]
+            parse_numbered_handles(init_task, None, &init_task.files).map_err(|e| {
+                log_error!("Error while parsing the numbered handles: {e:?}");
+                errno!(EINVAL)
+            })?;
+
             init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])
         },
         move |result| {
