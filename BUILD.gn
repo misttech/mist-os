@@ -122,13 +122,11 @@ group("default") {
     "//src/lib/zircon/rust/examples/zx_toy:zx_toy_zbi",
 
     # Host tools tests
-    "//zircon/tools:tests",
-  ]
-}
+    #"//zircon/tools:tests",
 
-# Generate ZBIs used to run on target
-group("zbi") {
-  deps = [ "//src/starnix_lite" ]
+    # Generate ZBIs used to run on target
+    "//src/starnix_lite/kernel:starnix_lite_zbi",
+  ]
 }
 
 # Host-only tests.  These cannot have any dependency on an assembled platform

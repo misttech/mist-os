@@ -154,11 +154,11 @@
             to: "#console-launcher",
             source_availability: "unknown",
         },
-        {
-            protocol: [ "fuchsia.driver.development.Manager" ],
-            from: "#driver_manager",
-            to: "#console-launcher",
-        },
+        //{
+        //    protocol: [ "fuchsia.driver.development.Manager" ],
+        //    from: "#driver_manager",
+        //    to: "#console-launcher",
+        //},
         {
             protocol: [
                 "fuchsia.scheduler.deprecated.ProfileProvider",
@@ -168,11 +168,11 @@
             to: "#console-launcher",
             source_availability: "unknown",
         },
-        {
-            directory: "dev-topological",
-            from: "#devfs-with-pkg",
-            to: "#console-launcher",
-        },
+        //{
+        //    directory: "dev-topological",
+        //    from: "#devfs-with-pkg",
+        //    to: "#console-launcher",
+        //},
         {
             directory: [
                 "pkgfs",

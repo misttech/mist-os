@@ -6,7 +6,7 @@ import("//build/bazel/bazel_workspace.gni")
 import("//build/images/args.gni")
 import("//build/python/python_action.gni")
 
-assert(is_fuchsia,
+assert(is_fuchsia || is_mistos,
        "Assembly templates can only be used with `$default_toolchain`.")
 
 # Collect a newline-delimited text file of the package manifests for all

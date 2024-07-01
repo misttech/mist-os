@@ -1,6 +1,6 @@
 {
     features: [],
-    init: [],
+    init: ["/container/tests/nolibc"],
     kernel_cmdline: "",
     mounts: [
         "/:remotefs",

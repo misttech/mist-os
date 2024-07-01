@@ -55,8 +55,8 @@ import("//zircon/system/ulib/c/libc_toolchain.gni")
 # later the assembled image.  This makes it harder to reason about how and when
 # the artifacts are included within the assembled product.
 
-assert(is_fuchsia,
-       "Assembly Input Bundles can only be in the Fuchsia toolchain")
+assert(is_fuchsia || is_mistos,
+       "Assembly Input Bundles can only be in the Fuchsia|mist-os toolchain")
 
 # All of the platform assembly input bundles.
 group("assembly") {
@@ -150,16 +150,16 @@ assembly_input_bundle("embeddable") {
   ]
 
   boot_driver_packages = [
-    {
-      package_target = "//src/devices/bus/drivers/platform:package"
-      driver_components = [ "meta/platform-bus.cm" ]
-    },
-
-    # TODO: Move this to bootstrap after fixing pci to not depend on it.
-    {
-      package_target = "//src/devices/sysmem/drivers/sysmem:package"
-      driver_components = [ "meta/sysmem.cm" ]
-    },
+    #{
+    #  package_target = "//src/devices/bus/drivers/platform:package"
+    #  driver_components = [ "meta/platform-bus.cm" ]
+    #},
+    #
+    ## TODO: Move this to bootstrap after fixing pci to not depend on it.
+    #{
+    #  package_target = "//src/devices/sysmem/drivers/sysmem:package"
+    #  driver_components = [ "meta/sysmem.cm" ]
+    #},
   ]
 }
 
@@ -364,11 +364,10 @@ assembly_input_bundle("embeddable_userdebug") {
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/dlog:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
-    "//src/developer/forensics/crasher/cpp:bootfs",
-    "//src/sys/bin/psutils:bootfs",
+    #"//src/developer/forensics/crasher/cpp:bootfs",
+    #"//src/sys/bin/psutils:bootfs",
     "//src/sys/tools/component:bootfs",
-    "//src/zircon/bin/kcounter:bootfs",
-
+    #"//src/zircon/bin/kcounter:bootfs",
     # shell
     "//zircon/third_party/uapp/dash:bootfs",
   ]
@@ -412,9 +411,9 @@ assembly_input_bundle("embeddable_eng") {
   testonly = true
   bootfs_files_labels = [
     # tools
-    "//src/devices/bin/driver_tools:bootfs",
-    "//src/devices/bin/lsdev:bootfs",
-    "//src/diagnostics/iquery:bootfs",
+    #"//src/devices/bin/driver_tools:bootfs",
+    #"//src/devices/bin/lsdev:bootfs",
+    #"//src/diagnostics/iquery:bootfs",
   ]
 }
 
@@ -2164,23 +2163,23 @@ assembly_input_bundle("diagnostics_triage_detect_mali") {
 #
 assembly_input_bundle("driver_framework") {
   bootfs_packages = [
-    "//src/devices/bin/devfs:package",
-    "//src/devices/bin/driver_host:package",
-    "//src/devices/bin/driver_manager:package",
-    "//src/devices/bin/driver-index:package",
+    #"//src/devices/bin/devfs:package",
+    #"//src/devices/bin/driver_host:package",
+    #"//src/devices/bin/driver_manager:package",
+    #"//src/devices/bin/driver-index:package",
   ]
-  compiled_packages = [
-    {
-      bootfs_package = true
-      name = "bootstrap"
-      components = [
-        {
-          component_name = "bootstrap"
-          shards = [ "//src/devices/bin/driver_framework/meta/driver_framework.bootstrap_shard.cml" ]
-        },
-      ]
-    },
-  ]
+  #compiled_packages = [
+  #  {
+  #    bootfs_package = true
+  #    name = "bootstrap"
+  #    components = [
+  #      {
+  #        component_name = "bootstrap"
+  #        shards = [ "//src/devices/bin/driver_framework/meta/driver_framework.bootstrap_shard.cml" ]
+  #      },
+  #    ]
+  #  },
+  #]
 }
 
 # Full Package Driver Support
@@ -3924,22 +3923,22 @@ assembly_resources_directory("resources") {
     "//src/sys/component_manager/configs/bootfs_config.json5",
 
     # Networking resources.
-    "//src/connectivity/policy/netcfg/config/netcfg_default.json",
+    #"//src/connectivity/policy/netcfg/config/netcfg_default.json",
 
     # ICU resources.
-    "${icu_tzres_path}/metaZones.res",
-    "${icu_tzres_path}/timezoneTypes.res",
-    "${icu_tzres_path}/zoneinfo64.res",
-    "${root_gen_dir}/src/lib/icu/tzdata/revision.txt",
+    #"${icu_tzres_path}/metaZones.res",
+    #"${icu_tzres_path}/timezoneTypes.res",
+    #"${icu_tzres_path}/zoneinfo64.res",
+    #"${root_gen_dir}/src/lib/icu/tzdata/revision.txt",
 
     # Core shard templates.
-    "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
-    "//src/developer/forensics/flash_ts_feedback_id/meta/flash_ts_feedback_id.core_shard.cml.template",
-    "//src/lib/assembly/platform_configuration/src/subsystems/meta/trusted-apps.core_shard.cml",
-    "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
-    "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
+    #"//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
+    #"//src/developer/forensics/flash_ts_feedback_id/meta/flash_ts_feedback_id.core_shard.cml.template",
+    #"//src/lib/assembly/platform_configuration/src/subsystems/meta/trusted-apps.core_shard.cml",
+    #"//src/media/audio/meta/multizone_leader.core_shard.cml.template",
+    #"//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
   ]
-  deps = [ "//src/lib/icu/tzdata:revision" ]
+  #deps = [ "//src/lib/icu/tzdata:revision" ]
 }
 
 # Sets a low timeout for rebooting when the device runs out-of-memory.
