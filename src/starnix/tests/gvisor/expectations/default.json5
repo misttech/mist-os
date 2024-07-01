@@ -369,7 +369,6 @@
                 // inotify_test
                 "Inotify.InOnlyDirFlagRespected",
                 "Inotify.TruncateGeneratesModifyEvent",
-                "Inotify.SymlinkFollow",
                 "Inotify.UtimesGeneratesAttribEvent",
                 "Inotify.UnmatchedEventsAreDiscarded",
                 "Inotify.ControlEvents",

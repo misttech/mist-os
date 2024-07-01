@@ -2645,8 +2645,12 @@ pub fn sys_inotify_add_watch(
     }
     let file = current_task.files.get(fd)?;
     let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
-    let watched_node =
-        lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let options = if mask.contains(InotifyMask::DONT_FOLLOW) {
+        LookupFlags::no_follow()
+    } else {
+        LookupFlags::default()
+    };
+    let watched_node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, options)?;
     inotify_file.add_watch(watched_node.entry, mask, &file)
 }
 
