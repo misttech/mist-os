@@ -22,8 +22,8 @@ declare_args() {
   #
   #   true: To build for all API levels listed in
   #       platform_version.build_time_supported_api_levels, which defaults to
-  #       all supported API levels, including the PLATFORM one, unless
-  #       `override_build_time_supported_api_levels` is also set.
+  #       all Supported API levels plus the current in-development API level,
+  #       unless `override_build_time_supported_api_levels` is also set.
   #       See //build/config/fuchsia/platform_versions.gni.
   #
   bazel_fuchsia_sdk_all_api_levels = false
