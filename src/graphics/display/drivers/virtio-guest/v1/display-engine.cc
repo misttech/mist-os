@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/stdcompat/span.h>
@@ -36,7 +35,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v1/gpu-device-driver.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -425,12 +423,10 @@ zx::result<> DisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-DisplayEngine::DisplayEngine(zx_device_t* bus_device,
-                             DisplayCoordinatorEventsInterface* coordinator_events,
+DisplayEngine::DisplayEngine(DisplayCoordinatorEventsInterface* coordinator_events,
                              fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                              std::unique_ptr<VirtioGpuDevice> gpu_device)
     : sysmem_(std::move(sysmem_client)),
-      bus_device_(bus_device),
       coordinator_events_(*coordinator_events),
       gpu_device_(std::move(gpu_device)) {
   ZX_DEBUG_ASSERT(coordinator_events != nullptr);
@@ -441,28 +437,14 @@ DisplayEngine::~DisplayEngine() = default;
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
-    zx_device_t* bus_device, DisplayCoordinatorEventsInterface* coordinator_events) {
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
-      DdkDeviceType::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2>(
-          bus_device, "sysmem");
-  if (sysmem_client_result.is_error()) {
-    zxlogf(ERROR, "Failed to get sysmem client: %s", sysmem_client_result.status_string());
-    return sysmem_client_result.take_error();
-  }
-
-  zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
-      virtio::GetBtiAndBackend(bus_device);
-  if (!bti_and_backend_result.is_ok()) {
-    zxlogf(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
-    return bti_and_backend_result.take_error();
-  }
-  auto& [bti, backend] = bti_and_backend_result.value();
-
+    fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
+    std::unique_ptr<virtio::Backend> backend,
+    DisplayCoordinatorEventsInterface* coordinator_events) {
   zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
       VirtioPciDevice::Create(std::move(bti), std::move(backend));
-  if (!bti_and_backend_result.is_ok()) {
+  if (!virtio_device_result.is_ok()) {
     // VirtioPciDevice::Create() logs on error.
-    return bti_and_backend_result.take_error();
+    return virtio_device_result.take_error();
   }
 
   fbl::AllocChecker alloc_checker;
@@ -474,8 +456,7 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
   }
 
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
-      &alloc_checker, bus_device, coordinator_events, std::move(sysmem_client_result).value(),
-      std::move(gpu_device));
+      &alloc_checker, coordinator_events, std::move(sysmem_client), std::move(gpu_device));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);

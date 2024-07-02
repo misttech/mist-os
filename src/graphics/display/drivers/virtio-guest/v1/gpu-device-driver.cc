@@ -36,8 +36,26 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  zx::result<std::unique_ptr<DisplayEngine>> display_engine_result =
-      DisplayEngine::Create(parent, coordinator_events.get());
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
+      DdkDeviceType::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2>(
+          parent, "sysmem");
+  if (sysmem_client_result.is_error()) {
+    zxlogf(ERROR, "Failed to get sysmem client: %s", sysmem_client_result.status_string());
+    return sysmem_client_result.error_value();
+  }
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client =
+      std::move(sysmem_client_result).value();
+
+  zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
+      virtio::GetBtiAndBackend(parent);
+  if (!bti_and_backend_result.is_ok()) {
+    zxlogf(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
+    return bti_and_backend_result.error_value();
+  }
+  auto [bti, backend] = std::move(bti_and_backend_result).value();
+
+  zx::result<std::unique_ptr<DisplayEngine>> display_engine_result = DisplayEngine::Create(
+      std::move(sysmem_client), std::move(bti), std::move(backend), coordinator_events.get());
   if (display_engine_result.is_error()) {
     // DisplayEngine::Create() logs on error.
     return display_engine_result.error_value();

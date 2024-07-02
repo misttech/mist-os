@@ -11,8 +11,6 @@
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/io-buffer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
@@ -26,7 +24,6 @@
 #include <cstdint>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
@@ -57,13 +54,15 @@ class DisplayEngine final : public DisplayEngineInterface {
   };
 
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
-      zx_device_t* bus_device, DisplayCoordinatorEventsInterface* coordinator_events);
+      fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
+      std::unique_ptr<virtio::Backend> backend,
+      DisplayCoordinatorEventsInterface* coordinator_events);
 
   // Exposed for testing. Production code must use the Create() factory method.
   //
   // `bus_device` and `coordinator_events` must not be null, and must outlive
   // the newly created instance. `gpu_device` must not be null.
-  DisplayEngine(zx_device_t* bus_device, DisplayCoordinatorEventsInterface* coordinator_events,
+  DisplayEngine(DisplayCoordinatorEventsInterface* coordinator_events,
                 fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                 std::unique_ptr<VirtioGpuDevice> gpu_device);
   ~DisplayEngine();
@@ -142,7 +141,6 @@ class DisplayEngine final : public DisplayEngineInterface {
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 
-  zx_device_t* const bus_device_;
   DisplayCoordinatorEventsInterface& coordinator_events_;
 
   // Imported sysmem buffer collections.
