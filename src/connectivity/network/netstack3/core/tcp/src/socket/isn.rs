@@ -60,7 +60,7 @@ impl<I: Instant> IsnGenerator<I> {
 
         // Reduce the hashed output (h: u64) to 32 bits using XOR, but also
         // preserve entropy.
-        let elapsed = now.duration_since(*timestamp);
+        let elapsed = now.saturating_duration_since(*timestamp);
         SeqNum::new(((elapsed.as_micros() / 4) as u32).wrapping_add(h as u32 ^ (h >> 32) as u32))
     }
 }

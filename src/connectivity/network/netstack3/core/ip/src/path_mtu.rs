@@ -304,11 +304,6 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
         // potential PMTU (the first link's (connected to the node attempting
         // PMTU discovery)) PMTU.
         self.cache.retain(|_k, v| {
-            // We know the call to `duration_since` will not panic because all
-            // the entries in the cache should have been updated before this
-            // timer/PMTU maintenance task was run. Therefore, `curr_time` will
-            // be greater than `v.last_updated` for all `v`.
-            //
             // TODO(ghanan): Add per-path options as per RFC 1981 section 5.3.
             //               Specifically, some links/paths may not need to have
             //               PMTU rediscovered as the PMTU will never change.
@@ -319,7 +314,7 @@ impl<I: Ip, BT: PmtuBindingsTypes> PmtuCache<I, BT> {
             //               valid. Considering the use case, PMTU value changes
             //               may be infrequent so it may be enough to just use a
             //               long stale timer.
-            now.duration_since(v.last_updated) < PMTU_STALE_TIMEOUT
+            now.saturating_duration_since(v.last_updated) < PMTU_STALE_TIMEOUT
         });
     }
 

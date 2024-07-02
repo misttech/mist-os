@@ -122,7 +122,7 @@ impl<I: crate::Instant> TokenBucket<I> {
         // elapsed since the previous refill. In reality, there was no previous
         // refill, which means it's fine to fill the bucket completely.
         let dur_since_last_refilled = self.last_refilled.map_or(SECOND, |last_refilled| {
-            let dur = now.duration_since(last_refilled);
+            let dur = now.saturating_duration_since(last_refilled);
             if dur > SECOND {
                 SECOND
             } else {

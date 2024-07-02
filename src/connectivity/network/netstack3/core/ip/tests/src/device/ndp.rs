@@ -1175,7 +1175,9 @@ fn test_host_send_router_solicitations() {
     assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
     // Initial router solicitation should be a random delay between 0 and
     // `MAX_RTR_SOLICITATION_DELAY`.
-    assert!(ctx.bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
+    assert!(
+        ctx.bindings_ctx.now().checked_duration_since(time).unwrap() < MAX_RTR_SOLICITATION_DELAY
+    );
     let frames = ctx.bindings_ctx.take_ethernet_frames();
     let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
     let (src_mac, _, src_ip, _, _, message, code) =
@@ -1190,7 +1192,10 @@ fn test_host_send_router_solicitations() {
     // Should get 2 more router solicitation messages
     let time = ctx.bindings_ctx.now();
     assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
-    assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+    assert_eq!(
+        ctx.bindings_ctx.now().checked_duration_since(time).unwrap(),
+        RTR_SOLICITATION_INTERVAL
+    );
     let frames = ctx.bindings_ctx.take_ethernet_frames();
     let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
     let (src_mac, _, src_ip, _, _, message, code) =
@@ -1212,7 +1217,10 @@ fn test_host_send_router_solicitations() {
 
     let time = ctx.bindings_ctx.now();
     assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id));
-    assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+    assert_eq!(
+        ctx.bindings_ctx.now().checked_duration_since(time).unwrap(),
+        RTR_SOLICITATION_INTERVAL
+    );
     let frames = ctx.bindings_ctx.take_ethernet_frames();
     let (_dev, frame) = assert_matches!(&frames[..], [frame] => frame);
     let (src_mac, _, src_ip, _, _, message, code) =
@@ -1274,14 +1282,19 @@ fn test_host_send_router_solicitations() {
     assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
     // Initial router solicitation should be a random delay between 0 and
     // `MAX_RTR_SOLICITATION_DELAY`.
-    assert!(ctx.bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
+    assert!(
+        ctx.bindings_ctx.now().checked_duration_since(time).unwrap() < MAX_RTR_SOLICITATION_DELAY
+    );
     let frames = ctx.bindings_ctx.take_ethernet_frames();
     let (_dev, frame1) = assert_matches!(&frames[..], [frame] => frame);
 
     // Should trigger 1 more router solicitations
     let time = ctx.bindings_ctx.now();
     assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id));
-    assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+    assert_eq!(
+        ctx.bindings_ctx.now().checked_duration_since(time).unwrap(),
+        RTR_SOLICITATION_INTERVAL
+    );
     let frames = ctx.bindings_ctx.take_ethernet_frames();
     let (_dev, frame2) = assert_matches!(&frames[..], [frame] => frame);
 

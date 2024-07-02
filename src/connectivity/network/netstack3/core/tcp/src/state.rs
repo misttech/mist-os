@@ -438,7 +438,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                             let irs = seg_seq;
                             let mut rtt_estimator = Estimator::default();
                             if let Some(syn_sent_ts) = syn_sent_ts {
-                                rtt_estimator.sample(now.duration_since(syn_sent_ts));
+                                rtt_estimator.sample(now.saturating_duration_since(syn_sent_ts));
                             }
                             let (rcv_wnd_scale, snd_wnd_scale) = options
                                 .window_scale
@@ -507,7 +507,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                                     retrans_timer: RetransTimer::new(
                                         now,
                                         Estimator::RTO_INIT,
-                                        user_timeout_until.duration_since(now),
+                                        user_timeout_until.saturating_duration_since(now),
                                         DEFAULT_MAX_SYNACK_RETRIES,
                                     ),
                                     // This should be set to active_open by the caller:
@@ -690,7 +690,7 @@ impl<I: Instant> RetransTimer<I> {
         *remaining_retries = remaining_retries.and_then(|r| NonZeroU8::new(r.get() - 1));
         *rto = rto.saturating_mul(2);
         let remaining = if now < *user_timeout_until {
-            user_timeout_until.duration_since(now)
+            user_timeout_until.saturating_duration_since(now)
         } else {
             // `now` has already passed  `user_timeout_until`, just update the
             // timer to expire as soon as possible.
@@ -1315,7 +1315,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             // for RTT estimate, feed the sample to the estimator.
             if let Some((seq_max, timestamp)) = *last_seq_ts {
                 if !seg_ack.before(seq_max) {
-                    rtt_estimator.sample(now.duration_since(timestamp));
+                    rtt_estimator.sample(now.saturating_duration_since(timestamp));
                 }
             }
             congestion_control.on_ack(acked, now, rtt_estimator.rto());
@@ -1939,7 +1939,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         } else {
                             let mut rtt_estimator = Estimator::default();
                             if let Some(syn_rcvd_ts) = syn_rcvd_ts {
-                                rtt_estimator.sample(now.duration_since(*syn_rcvd_ts));
+                                rtt_estimator.sample(now.saturating_duration_since(*syn_rcvd_ts));
                             }
                             let (rcv_buffer, snd_buffer) = match simultaneous_open.take() {
                                 None => {
@@ -5693,10 +5693,10 @@ mod test {
                 );
             }
             let deadline = state.poll_send_at().expect("must have a retransmission timer");
-            clock.sleep(deadline.duration_since(clock.now()));
+            clock.sleep(deadline.checked_duration_since(clock.now()).unwrap());
             times += 1;
         }
-        let elapsed = clock.now().duration_since(start);
+        let elapsed = clock.now().checked_duration_since(start).unwrap();
         assert_eq!(elapsed, DEFAULT_USER_TIMEOUT);
         if max_retries {
             assert_eq!(times, DEFAULT_MAX_RETRIES.get());
@@ -6119,7 +6119,7 @@ mod test {
             state.poll_send_with_default_options(u32::MAX, clock.now(), &counters)
         {
             let deadline = state.poll_send_at().expect("must have a retransmission timer");
-            clock.sleep(deadline.duration_since(clock.now()));
+            clock.sleep(deadline.checked_duration_since(clock.now()).unwrap());
             retransmissions += 1;
         }
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));

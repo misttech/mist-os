@@ -7103,7 +7103,10 @@ mod tests {
         net.run_until_idle();
 
         net.with_context(LOCAL, |TcpCtx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(bindings_ctx.now().duration_since(close_called), expected_time_to_close);
+            assert_eq!(
+                bindings_ctx.now().checked_duration_since(close_called).unwrap(),
+                expected_time_to_close
+            );
             assert_eq!(weak_local.upgrade(), None);
         });
         if peer_calls_close {

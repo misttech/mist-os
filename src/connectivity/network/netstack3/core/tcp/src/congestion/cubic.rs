@@ -135,7 +135,7 @@ impl<I: Instant, const FAST_CONVERGENCE: bool> Cubic<I, FAST_CONVERGENCE> {
         //   It sets W_cubic(t+RTT) as the candidate target value of the
         //   congestion window, where RTT is the weighted average RTT calculated
         //   by Standard TCP.
-        let t = now.duration_since(epoch_start);
+        let t = now.saturating_duration_since(epoch_start);
         let target = self.cubic_window(t + rtt, *mss);
 
         // In a *very* rare case, we might overflow the counter if the acks

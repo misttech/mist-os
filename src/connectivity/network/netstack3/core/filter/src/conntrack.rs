@@ -686,7 +686,7 @@ impl From<Ipv6Proto> for IpAgnosticTransportProtocol {
 impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
     fn is_expired(&self, now: BT::Instant) -> bool {
         let state = self.state.lock().clone();
-        let duration = now.duration_since(state.last_packet_time);
+        let duration = now.saturating_duration_since(state.last_packet_time);
 
         let protocol = I::map_ip(
             &self.inner.original_tuple,

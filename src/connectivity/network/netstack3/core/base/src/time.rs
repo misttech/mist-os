@@ -25,26 +25,26 @@ pub trait Instant:
 {
     /// Returns the amount of time elapsed from another instant to this one.
     ///
-    /// # Panics
-    ///
-    /// This function will panic if `earlier` is later than `self`.
-    fn duration_since(&self, earlier: Self) -> core::time::Duration;
+    /// Returns `None` if `earlier` is not before `self`.
+    fn checked_duration_since(&self, earlier: Self) -> Option<Duration>;
 
     /// Returns the amount of time elapsed from another instant to this one,
     /// saturating at zero.
-    fn saturating_duration_since(&self, earlier: Self) -> core::time::Duration;
+    fn saturating_duration_since(&self, earlier: Self) -> Duration {
+        self.checked_duration_since(earlier).unwrap_or_default()
+    }
 
     /// Returns `Some(t)` where `t` is the time `self + duration` if `t` can be
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.
-    fn checked_add(&self, duration: core::time::Duration) -> Option<Self>;
+    fn checked_add(&self, duration: Duration) -> Option<Self>;
 
     /// Unwraps the result from `checked_add`.
     ///
     /// # Panics
     ///
     /// This function will panic if the addition makes the clock wrap around.
-    fn add(&self, duration: core::time::Duration) -> Self {
+    fn add(&self, duration: Duration) -> Self {
         self.checked_add(duration).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", duration, *self);
         })
@@ -53,7 +53,7 @@ pub trait Instant:
     /// Returns `Some(t)` where `t` is the time `self - duration` if `t` can be
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.
-    fn checked_sub(&self, duration: core::time::Duration) -> Option<Self>;
+    fn checked_sub(&self, duration: Duration) -> Option<Self>;
 }
 
 /// Trait defining the `Instant` type provided by bindings' [`InstantContext`]

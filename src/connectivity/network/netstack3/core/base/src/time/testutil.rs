@@ -51,12 +51,8 @@ impl From<Duration> for FakeInstant {
 }
 
 impl Instant for FakeInstant {
-    fn duration_since(&self, earlier: FakeInstant) -> Duration {
-        self.offset.checked_sub(earlier.offset).unwrap()
-    }
-
-    fn saturating_duration_since(&self, earlier: FakeInstant) -> Duration {
-        self.offset.saturating_sub(earlier.offset)
+    fn checked_duration_since(&self, earlier: FakeInstant) -> Option<Duration> {
+        self.offset.checked_sub(earlier.offset)
     }
 
     fn checked_add(&self, duration: Duration) -> Option<FakeInstant> {
