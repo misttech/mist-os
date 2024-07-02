@@ -53,7 +53,7 @@ zx_status_t PmmArena::Init(const pmm_arena_info_t* info, PmmNode* node) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  DEBUG_ASSERT(range.pa >= base() && range.len <= page_array_size);
+  DEBUG_ASSERT(range.pa >= base() && range.len >= page_array_size);
 
   // get the kernel pointer
   void* raw_page_array = paddr_to_physmap(range.pa);
