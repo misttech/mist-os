@@ -82,7 +82,7 @@ class VectorView {
       : VectorView(arena, span.begin(), span.end()) {}
 
   // Allocates a vector using an arena and copies the data from the supplied |std::vector|.
-  VectorView(AnyArena& arena, const std::vector<T>& vector)
+  VectorView(AnyArena& arena, const std::vector<std::remove_cv_t<T>>& vector)
       : VectorView(arena, cpp20::span(vector)) {}
 
   template <typename U>
@@ -107,7 +107,9 @@ class VectorView {
   //     auto my_view =
   //         fidl::VectorView<int32_t>::FromExternal(my_vector);
   //
-  static VectorView<T> FromExternal(std::vector<T>& from) { return VectorView<T>(from); }
+  static VectorView<T> FromExternal(std::vector<std::remove_cv_t<T>>& from) {
+    return VectorView<T>(from);
+  }
   template <size_t size>
   static VectorView<T> FromExternal(std::array<T, size>& from) {
     return VectorView<T>(from.data(), size);
@@ -159,7 +161,8 @@ class VectorView {
   }
 
  protected:
-  explicit VectorView(std::vector<T>& from) : count_(from.size()), data_(from.data()) {}
+  explicit VectorView(std::vector<std::remove_cv_t<T>>& from) :
+      count_(from.size()), data_(const_cast<T*>(from.data())) {}
   VectorView(T* data, size_t count) : count_(count), data_(data) {}
 
  private:
@@ -179,6 +182,9 @@ class VectorView {
 
 template <typename T>
 VectorView(fidl::AnyArena&, cpp20::span<T>) -> VectorView<T>;
+
+template <typename T>
+VectorView(fidl::AnyArena&, const std::vector<T>&) -> VectorView<T>;
 
 }  // namespace fidl
 
