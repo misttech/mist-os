@@ -13,6 +13,7 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "fidl",
     srcs = [
+        "bredr_connection_server.cc",
         "gatt2_client_server.cc",
         "gatt2_remote_service_server.cc",
         "gatt2_server_server.cc",
@@ -27,6 +28,7 @@ cc_library(
         "profile_server.cc",
     ],
     hdrs = [
+        "bredr_connection_server.h",
         "gatt2_client_server.h",
         "gatt2_remote_service_server.h",
         "gatt2_server_ids.h",
@@ -159,6 +161,7 @@ fuchsia_cc_test(
     name = "fidl_test",
     testonly = True,
     srcs = [
+        "bredr_connection_server_test.cc",
         "gatt2_client_server_test.cc",
         "gatt2_remote_service_server_test.cc",
         "gatt2_server_server_test.cc",
