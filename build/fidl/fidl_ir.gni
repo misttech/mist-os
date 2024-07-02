@@ -52,6 +52,7 @@ template("fidl_ir") {
          "json_representation is required")
   assert(defined(invoker.available), "available is required")
   assert(defined(invoker.sources), "sources is required")
+  assert(!defined(invoker.deps), "Use `public_deps` or `non_fidl_deps`")
 
   main_target_deps = []
 

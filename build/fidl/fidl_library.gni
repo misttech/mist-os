@@ -126,18 +126,21 @@ template("fidl_library") {
                            "library_name",
                            "fidl_ir_json",
                          ])
+
+  # Make sure  the same variables are forwarded to both fidl_ir() instances.
+  invoker_variables_to_forward_to_fidl_ir = [
+    "applicable_licenses",
+    "available",
+    "experimental_flags",
+    "non_fidl_deps",
+    "public_deps",
+    "sources",
+    "testonly",
+    "versioned",
+  ]
+
   fidl_ir(compilation_target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "applicable_licenses",
-                             "available",
-                             "experimental_flags",
-                             "non_fidl_deps",
-                             "public_deps",
-                             "sources",
-                             "testonly",
-                             "versioned",
-                           ])
+    forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
     visibility = [ ":*" ]
     fidl_target_name = main_target_name
     fidl_library_name = library_name
@@ -327,15 +330,7 @@ template("fidl_library") {
     foreach(level, api_levels) {
       fidl_ir_target_name = "${main_target_name}_compile_$level"
       fidl_ir(fidl_ir_target_name) {
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "experimental_flags",
-                                 "non_fidl_deps",
-                                 "public_deps",
-                                 "sources",
-                                 "testonly",
-                               ])
+        forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
         fidl_target_name = main_target_name
         fidl_library_name = library_name
 

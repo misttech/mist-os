@@ -23,15 +23,16 @@ import("//build/fidl/toolchain.gni")
 #   visibility
 #
 template("fidlc") {
+  assert(defined(invoker.available), "available is required")
   assert(defined(invoker.fidl_library_name), "fidl_library_name is required")
   assert(defined(invoker.fidl_target_name), "fidl_target_name is required")
   assert(defined(invoker.gen_dir), "gen_dir is required")
   assert(defined(invoker.json_representation),
          "json_representation is required")
   assert(defined(invoker.sources), "sources is required")
+  assert(!defined(invoker.deps), "Use `public_deps` or `non_fidl_deps`")
 
   experimental_flags = []
-
   if (defined(invoker.experimental_flags)) {
     experimental_flags += invoker.experimental_flags
   }
@@ -50,8 +51,8 @@ template("fidlc") {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
-                             "testonly",
                              "public_deps",
+                             "testonly",
                            ])
     visibility = [ ":*" ]
 
