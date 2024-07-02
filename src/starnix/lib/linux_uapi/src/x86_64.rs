@@ -4032,6 +4032,20 @@ pub const NF_VERDICT_FLAG_QUEUE_BYPASS: u32 = 32768;
 pub const NF_VERDICT_QMASK: u32 = 4294901760;
 pub const NF_VERDICT_QBITS: u32 = 16;
 pub const NF_VERDICT_BITS: u32 = 16;
+pub const NF_CT_STATE_INVALID_BIT: u32 = 1;
+pub const NF_CT_STATE_UNTRACKED_BIT: u32 = 64;
+pub const NF_CT_EXPECT_PERMANENT: u32 = 1;
+pub const NF_CT_EXPECT_INACTIVE: u32 = 2;
+pub const NF_CT_EXPECT_USERSPACE: u32 = 4;
+pub const NF_NAT_RANGE_MAP_IPS: u32 = 1;
+pub const NF_NAT_RANGE_PROTO_SPECIFIED: u32 = 2;
+pub const NF_NAT_RANGE_PROTO_RANDOM: u32 = 4;
+pub const NF_NAT_RANGE_PERSISTENT: u32 = 8;
+pub const NF_NAT_RANGE_PROTO_RANDOM_FULLY: u32 = 16;
+pub const NF_NAT_RANGE_PROTO_OFFSET: u32 = 32;
+pub const NF_NAT_RANGE_NETMAP: u32 = 64;
+pub const NF_NAT_RANGE_PROTO_RANDOM_ALL: u32 = 20;
+pub const NF_NAT_RANGE_MASK: u32 = 127;
 pub const MB_LEN_MAX: u32 = 1;
 pub const NF_IP_PRE_ROUTING: u32 = 0;
 pub const NF_IP_LOCAL_IN: u32 = 1;
@@ -14159,7 +14173,7 @@ pub const NFPROTO_DECNET: _bindgen_ty_121 = 12;
 pub const NFPROTO_NUMPROTO: _bindgen_ty_121 = 13;
 pub type _bindgen_ty_121 = crate::types::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
 pub union nf_inet_addr {
     pub all: [__u32; 4usize],
     pub ip: __be32,
@@ -14168,6 +14182,221 @@ pub union nf_inet_addr {
     pub in6: in6_addr,
 }
 impl Default for nf_inet_addr {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub const ip_conntrack_info_IP_CT_ESTABLISHED: ip_conntrack_info = 0;
+pub const ip_conntrack_info_IP_CT_RELATED: ip_conntrack_info = 1;
+pub const ip_conntrack_info_IP_CT_NEW: ip_conntrack_info = 2;
+pub const ip_conntrack_info_IP_CT_IS_REPLY: ip_conntrack_info = 3;
+pub const ip_conntrack_info_IP_CT_ESTABLISHED_REPLY: ip_conntrack_info = 3;
+pub const ip_conntrack_info_IP_CT_RELATED_REPLY: ip_conntrack_info = 4;
+pub const ip_conntrack_info_IP_CT_NUMBER: ip_conntrack_info = 5;
+pub const ip_conntrack_info_IP_CT_NEW_REPLY: ip_conntrack_info = 5;
+pub type ip_conntrack_info = crate::types::c_uint;
+pub const ip_conntrack_status_IPS_EXPECTED_BIT: ip_conntrack_status = 0;
+pub const ip_conntrack_status_IPS_EXPECTED: ip_conntrack_status = 1;
+pub const ip_conntrack_status_IPS_SEEN_REPLY_BIT: ip_conntrack_status = 1;
+pub const ip_conntrack_status_IPS_SEEN_REPLY: ip_conntrack_status = 2;
+pub const ip_conntrack_status_IPS_ASSURED_BIT: ip_conntrack_status = 2;
+pub const ip_conntrack_status_IPS_ASSURED: ip_conntrack_status = 4;
+pub const ip_conntrack_status_IPS_CONFIRMED_BIT: ip_conntrack_status = 3;
+pub const ip_conntrack_status_IPS_CONFIRMED: ip_conntrack_status = 8;
+pub const ip_conntrack_status_IPS_SRC_NAT_BIT: ip_conntrack_status = 4;
+pub const ip_conntrack_status_IPS_SRC_NAT: ip_conntrack_status = 16;
+pub const ip_conntrack_status_IPS_DST_NAT_BIT: ip_conntrack_status = 5;
+pub const ip_conntrack_status_IPS_DST_NAT: ip_conntrack_status = 32;
+pub const ip_conntrack_status_IPS_NAT_MASK: ip_conntrack_status = 48;
+pub const ip_conntrack_status_IPS_SEQ_ADJUST_BIT: ip_conntrack_status = 6;
+pub const ip_conntrack_status_IPS_SEQ_ADJUST: ip_conntrack_status = 64;
+pub const ip_conntrack_status_IPS_SRC_NAT_DONE_BIT: ip_conntrack_status = 7;
+pub const ip_conntrack_status_IPS_SRC_NAT_DONE: ip_conntrack_status = 128;
+pub const ip_conntrack_status_IPS_DST_NAT_DONE_BIT: ip_conntrack_status = 8;
+pub const ip_conntrack_status_IPS_DST_NAT_DONE: ip_conntrack_status = 256;
+pub const ip_conntrack_status_IPS_NAT_DONE_MASK: ip_conntrack_status = 384;
+pub const ip_conntrack_status_IPS_DYING_BIT: ip_conntrack_status = 9;
+pub const ip_conntrack_status_IPS_DYING: ip_conntrack_status = 512;
+pub const ip_conntrack_status_IPS_FIXED_TIMEOUT_BIT: ip_conntrack_status = 10;
+pub const ip_conntrack_status_IPS_FIXED_TIMEOUT: ip_conntrack_status = 1024;
+pub const ip_conntrack_status_IPS_TEMPLATE_BIT: ip_conntrack_status = 11;
+pub const ip_conntrack_status_IPS_TEMPLATE: ip_conntrack_status = 2048;
+pub const ip_conntrack_status_IPS_UNTRACKED_BIT: ip_conntrack_status = 12;
+pub const ip_conntrack_status_IPS_UNTRACKED: ip_conntrack_status = 4096;
+pub const ip_conntrack_status_IPS_HELPER_BIT: ip_conntrack_status = 13;
+pub const ip_conntrack_status_IPS_HELPER: ip_conntrack_status = 8192;
+pub const ip_conntrack_status_IPS_OFFLOAD_BIT: ip_conntrack_status = 14;
+pub const ip_conntrack_status_IPS_OFFLOAD: ip_conntrack_status = 16384;
+pub const ip_conntrack_status_IPS_HW_OFFLOAD_BIT: ip_conntrack_status = 15;
+pub const ip_conntrack_status_IPS_HW_OFFLOAD: ip_conntrack_status = 32768;
+pub const ip_conntrack_status_IPS_UNCHANGEABLE_MASK: ip_conntrack_status = 56313;
+pub const ip_conntrack_status___IPS_MAX_BIT: ip_conntrack_status = 16;
+pub type ip_conntrack_status = crate::types::c_uint;
+pub const ip_conntrack_events_IPCT_NEW: ip_conntrack_events = 0;
+pub const ip_conntrack_events_IPCT_RELATED: ip_conntrack_events = 1;
+pub const ip_conntrack_events_IPCT_DESTROY: ip_conntrack_events = 2;
+pub const ip_conntrack_events_IPCT_REPLY: ip_conntrack_events = 3;
+pub const ip_conntrack_events_IPCT_ASSURED: ip_conntrack_events = 4;
+pub const ip_conntrack_events_IPCT_PROTOINFO: ip_conntrack_events = 5;
+pub const ip_conntrack_events_IPCT_HELPER: ip_conntrack_events = 6;
+pub const ip_conntrack_events_IPCT_MARK: ip_conntrack_events = 7;
+pub const ip_conntrack_events_IPCT_SEQADJ: ip_conntrack_events = 8;
+pub const ip_conntrack_events_IPCT_NATSEQADJ: ip_conntrack_events = 8;
+pub const ip_conntrack_events_IPCT_SECMARK: ip_conntrack_events = 9;
+pub const ip_conntrack_events_IPCT_LABEL: ip_conntrack_events = 10;
+pub const ip_conntrack_events_IPCT_SYNPROXY: ip_conntrack_events = 11;
+pub type ip_conntrack_events = crate::types::c_uint;
+pub const ip_conntrack_expect_events_IPEXP_NEW: ip_conntrack_expect_events = 0;
+pub const ip_conntrack_expect_events_IPEXP_DESTROY: ip_conntrack_expect_events = 1;
+pub type ip_conntrack_expect_events = crate::types::c_uint;
+pub const ip_conntrack_dir_IP_CT_DIR_ORIGINAL: ip_conntrack_dir = 0;
+pub const ip_conntrack_dir_IP_CT_DIR_REPLY: ip_conntrack_dir = 1;
+pub const ip_conntrack_dir_IP_CT_DIR_MAX: ip_conntrack_dir = 2;
+pub type ip_conntrack_dir = crate::types::c_uint;
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub union nf_conntrack_man_proto {
+    pub all: __be16,
+    pub tcp: nf_conntrack_man_proto__bindgen_ty_1,
+    pub udp: nf_conntrack_man_proto__bindgen_ty_2,
+    pub icmp: nf_conntrack_man_proto__bindgen_ty_3,
+    pub dccp: nf_conntrack_man_proto__bindgen_ty_4,
+    pub sctp: nf_conntrack_man_proto__bindgen_ty_5,
+    pub gre: nf_conntrack_man_proto__bindgen_ty_6,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_conntrack_man_proto__bindgen_ty_1 {
+    pub port: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_conntrack_man_proto__bindgen_ty_2 {
+    pub port: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_conntrack_man_proto__bindgen_ty_3 {
+    pub id: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_conntrack_man_proto__bindgen_ty_4 {
+    pub port: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_conntrack_man_proto__bindgen_ty_5 {
+    pub port: __be16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_conntrack_man_proto__bindgen_ty_6 {
+    pub key: __be16,
+}
+impl Default for nf_conntrack_man_proto {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_nat_ipv4_range {
+    pub flags: crate::types::c_uint,
+    pub min_ip: __be32,
+    pub max_ip: __be32,
+    pub min: nf_conntrack_man_proto,
+    pub max: nf_conntrack_man_proto,
+}
+impl Default for nf_nat_ipv4_range {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_nat_ipv4_multi_range_compat {
+    pub rangesize: crate::types::c_uint,
+    pub range: [nf_nat_ipv4_range; 1usize],
+}
+impl Default for nf_nat_ipv4_multi_range_compat {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_nat_range {
+    pub flags: crate::types::c_uint,
+    pub min_addr: nf_inet_addr,
+    pub max_addr: nf_inet_addr,
+    pub min_proto: nf_conntrack_man_proto,
+    pub max_proto: nf_conntrack_man_proto,
+}
+impl Default for nf_nat_range {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct nf_nat_range2 {
+    pub flags: crate::types::c_uint,
+    pub min_addr: nf_inet_addr,
+    pub max_addr: nf_inet_addr,
+    pub min_proto: nf_conntrack_man_proto,
+    pub max_proto: nf_conntrack_man_proto,
+    pub base_proto: nf_conntrack_man_proto,
+    pub __bindgen_padding_0: [u8; 2usize],
+}
+impl Default for nf_nat_range2 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct xt_tproxy_target_info {
+    pub mark_mask: __u32,
+    pub mark_value: __u32,
+    pub laddr: __be32,
+    pub lport: __be16,
+    pub __bindgen_padding_0: [u8; 2usize],
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+pub struct xt_tproxy_target_info_v1 {
+    pub mark_mask: __u32,
+    pub mark_value: __u32,
+    pub laddr: nf_inet_addr,
+    pub lport: __be16,
+    pub __bindgen_padding_0: [u8; 2usize],
+}
+impl Default for xt_tproxy_target_info_v1 {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
