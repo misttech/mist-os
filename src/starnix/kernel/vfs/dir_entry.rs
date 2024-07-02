@@ -875,6 +875,8 @@ impl DirEntry {
             );
         }
 
+        // This check is incorrect if there's another hard link to this FsNode that isn't in
+        // memory at the moment.
         if Arc::strong_count(&self.node) == 1 {
             self.node.watchers.notify(InotifyMask::DELETE_SELF, 0, Default::default(), mode, false);
         }
