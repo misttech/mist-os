@@ -305,8 +305,9 @@ type profileEntry struct {
 
 // createEntries creates a list of entries (profile and build id pairs) that is used to fetch binaries from symbol server.
 func createEntries(ctx context.Context, profiles map[string]string, llvmProfDataVersions map[string]string) ([]profileEntry, []string, error) {
-	profileEntryChan := make(chan profileEntry, len(profiles))
-	malformedChan := make(chan string, len(profiles))
+	var mu sync.Mutex
+	var entries []profileEntry
+	var malformed []string
 	sems := make(chan struct{}, jobs)
 	var eg errgroup.Group
 	for profile, version := range profiles {
@@ -329,14 +330,18 @@ func createEntries(ctx context.Context, profiles map[string]string, llvmProfData
 			// Read embedded build ids.
 			embeddedBuildIds, err := readEmbeddedBuildIds(ctx, llvmProfData, profile)
 			if err != nil {
-				malformedChan <- profile
+				mu.Lock()
+				malformed = append(malformed, profile)
+				mu.Unlock()
 				return nil
 			}
 			for _, buildId := range embeddedBuildIds {
-				profileEntryChan <- profileEntry{
+				mu.Lock()
+				entries = append(entries, profileEntry{
 					Profile: profile,
 					Module:  buildId,
-				}
+				})
+				mu.Unlock()
 			}
 			return nil
 		})
@@ -346,17 +351,6 @@ func createEntries(ctx context.Context, profiles map[string]string, llvmProfData
 		return nil, nil, err
 	}
 
-	close(profileEntryChan)
-	close(malformedChan)
-
-	var entries []profileEntry
-	for pe := range profileEntryChan {
-		entries = append(entries, pe)
-	}
-	var malformed []string
-	for m := range malformedChan {
-		malformed = append(malformed, m)
-	}
 	return entries, malformed, nil
 }
 
