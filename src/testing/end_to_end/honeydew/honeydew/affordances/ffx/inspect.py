@@ -26,7 +26,7 @@ class Inspect(inspect.Inspect):
         self._name: str = device_name
         self._ffx: ffx_transport.FFX = ffx
 
-    def show(
+    def get_data(
         self,
         selectors: list[str] | None = None,
         monikers: list[str] | None = None,
@@ -66,6 +66,7 @@ class Inspect(inspect.Inspect):
             output: str = self._ffx.run(
                 cmd=cmd,
                 log_output=False,
+                timeout=None,
             )
             _LOGGER.info("Collected the inspect data from %s.", self._name)
 

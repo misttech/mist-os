@@ -107,17 +107,17 @@ class InspectFfxTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_show(
+    def test_get_data(
         self,
         label: str,  # pylint: disable=unused-argument
         selectors: list[str],
         monikers: list[str],
         expected_cmd: list[str],
     ) -> None:
-        """Test case for Inspect.show()"""
+        """Test case for Inspect.get_data()"""
         self.mock_ffx.run.return_value = _MOCK_ARGS["INSPECT_SHOW_JSON_TEXT"]
 
-        self.inspect_obj.show(
+        self.inspect_obj.get_data(
             selectors=selectors,
             monikers=monikers,
         )
@@ -125,6 +125,7 @@ class InspectFfxTests(unittest.TestCase):
         self.mock_ffx.run.assert_called_with(
             cmd=expected_cmd,
             log_output=False,
+            timeout=None,
         )
 
     @parameterized.expand(
@@ -147,14 +148,14 @@ class InspectFfxTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    def test_show_exception(
+    def test_get_data_exception(
         self,
         label: str,  # pylint: disable=unused-argument,
         side_effect: type[errors.HoneydewError],
         expected_error: type[errors.HoneydewError],
     ) -> None:
-        """Test case for Inspect.show() raising InspectError failure."""
+        """Test case for Inspect.get_data() raising InspectError failure."""
         self.mock_ffx.run.side_effect = side_effect
 
         with self.assertRaises(expected_error):
-            self.inspect_obj.show()
+            self.inspect_obj.get_data()

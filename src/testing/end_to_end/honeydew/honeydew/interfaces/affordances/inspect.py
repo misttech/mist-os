@@ -13,7 +13,7 @@ class Inspect(abc.ABC):
     query component nodes exposed via the Inspect API."""
 
     @abc.abstractmethod
-    def show(
+    def get_data(
         self,
         selectors: list[str] | None = None,
         monikers: list[str] | None = None,

@@ -22,18 +22,18 @@ class InspectAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-    def test_show_without_selectors_and_monikers(self) -> None:
-        inspect_data: list[dict[str, Any]] = self.device.inspect.show()
+    def test_get_data_without_selectors_and_monikers(self) -> None:
+        inspect_data: list[dict[str, Any]] = self.device.inspect.get_data()
 
         asserts.assert_is_instance(inspect_data, list)
         asserts.assert_is_not_none(inspect_data)
 
-    def test_show_with_one_selector_validate_schema(self) -> None:
+    def test_get_data_with_one_selector_validate_schema(self) -> None:
         class _AnyUnsignedInteger:
             def __eq__(self, other: object) -> bool:
                 return isinstance(other, int) and other >= 0
 
-        inspect_data: list[dict[str, Any]] = self.device.inspect.show(
+        inspect_data: list[dict[str, Any]] = self.device.inspect.get_data(
             selectors=["bootstrap/archivist:root/fuchsia.inspect.Health"],
         )
 
@@ -69,13 +69,13 @@ class InspectAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
             f"Expected: ####{expected}#### but received: ####{inspect_data}####",
         )
 
-    def test_show_with_multiple_selectors(self) -> None:
+    def test_get_data_with_multiple_selectors(self) -> None:
         selectors: list[str] = [
             "core/system-update/system-update-checker",
             "bootstrap/archivist",
         ]
 
-        inspect_data: list[dict[str, Any]] = self.device.inspect.show(
+        inspect_data: list[dict[str, Any]] = self.device.inspect.get_data(
             selectors=selectors,
         )
 
