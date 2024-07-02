@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{md_path, HEADER};
+use crate::{escape_text, md_path, HEADER};
 use anyhow::{bail, Context, Result};
 use ffx_command::{CliArgsInfo, ErrorCodeInfo, FlagInfo, SubCommandInfo};
 use std::fs::File;
@@ -17,7 +17,7 @@ pub(crate) fn write_formatted_output_for_ffx(
     sdk_root_path: &Option<PathBuf>,
     sdk_manifest_path: &Option<PathBuf>,
     isolate_dir_path: &Option<PathBuf>,
-) -> Result<()> {
+) -> Result<(String, String, PathBuf)> {
     // Get name of command from full path to the command executable.
     let cmd_name = cmd_path.file_name().expect("Could not get file name for command");
     let output_md_path = md_path(&cmd_name, &output_path);
@@ -67,7 +67,7 @@ pub(crate) fn write_formatted_output_for_ffx(
 
     writeln!(output_writer, "{}", HEADER)?;
     write_command(output_writer, 1, "", &value)?;
-    Ok(())
+    Ok((value.name.into(), value.description.into(), output_md_path.clone()))
 }
 
 fn write_command(
@@ -253,10 +253,6 @@ fn write_subcommand_list(
     }
     writeln!(output_writer, "\n")?;
     Ok(())
-}
-
-fn escape_text(raw: &str) -> String {
-    raw.replace("{", "&#123;").replace("}", "&#125;")
 }
 
 #[cfg(test)]
