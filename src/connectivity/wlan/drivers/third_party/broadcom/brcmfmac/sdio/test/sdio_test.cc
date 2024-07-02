@@ -23,6 +23,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -30,7 +31,6 @@
 #include <tuple>
 
 #include <wifi/wifi-config.h>
-#include <wlan/drivers/testing/test_helpers.h>
 #include <zxtest/zxtest.h>
 
 #include "sdk/lib/driver/testing/cpp/driver_runtime.h"
@@ -185,7 +185,7 @@ class FakeSdioBus {
 };
 
 class SdioTest : public zxtest::Test {
-  wlan::drivers::log::testing::UnitTestLogContext logging_{"SdioTest"};
+  fdf_testing::ScopedGlobalLogger logging_;
 
  private:
   // Create a testing driver runtime to allow for the creation of fdf dispatchers.
@@ -679,12 +679,12 @@ struct MinimalBrcmfSdio {
     bus.dpc_triggered.store(false);
   }
 
-  struct brcmf_pub drvr {};
+  struct brcmf_pub drvr{};
   brcmf_sdio_dev sdio_dev{};
   sdio_func func1{};
   sdio_func func2{};
-  struct brcmf_bus bus_if {};
-  struct brcmf_sdio bus {};
+  struct brcmf_bus bus_if{};
+  struct brcmf_sdio bus{};
   WorkQueue wq;
 
   // Fake timer that does nothing. This needs to exist for ResetClearsTxGlom test.

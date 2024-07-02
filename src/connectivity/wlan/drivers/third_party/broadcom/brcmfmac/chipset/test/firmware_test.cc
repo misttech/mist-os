@@ -13,13 +13,13 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/chipset/firmware.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <string>
 
-#include <wlan/drivers/testing/test_helpers.h>
 #include <zxtest/zxtest.h>
 
 namespace wlan {
@@ -29,7 +29,7 @@ namespace {
 // A fixture that simply creates a log context to prevent crashes in the test.
 class FirmwareTest : public zxtest::Test {
  private:
-  wlan::drivers::log::testing::UnitTestLogContext log_context{"test-logger"};
+  fdf_testing::ScopedGlobalLogger log_context;
 };
 
 // This is a simple test to verify the NVRAM parsing functionality.

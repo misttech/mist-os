@@ -23,7 +23,7 @@ executable("sdio_test") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2_test_helpers",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sdio",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:stub_device",
