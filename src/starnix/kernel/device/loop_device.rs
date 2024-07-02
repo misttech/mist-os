@@ -796,6 +796,7 @@ mod tests {
         );
 
         let config_addr = map_object_anywhere(
+            locked,
             &current_task,
             &uapi::loop_config {
                 block_size: MIN_BLOCK_SIZE,
@@ -842,6 +843,7 @@ mod tests {
             bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
         let info_addr = map_object_anywhere(
+            &mut locked,
             &current_task,
             &uapi::loop_info64 { lo_offset: 3, ..Default::default() },
         );
@@ -904,6 +906,7 @@ mod tests {
             bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
         let info_addr = map_object_anywhere(
+            &mut locked,
             &current_task,
             &uapi::loop_info64 {
                 lo_offset: expected_offset,

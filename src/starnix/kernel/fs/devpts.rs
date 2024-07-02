@@ -891,8 +891,12 @@ mod tests {
         command: u32,
         value: &T,
     ) -> Result<T, Errno> {
-        let address =
-            map_memory(current_task, UserAddress::default(), std::mem::size_of::<T>() as u64);
+        let address = map_memory(
+            locked,
+            current_task,
+            UserAddress::default(),
+            std::mem::size_of::<T>() as u64,
+        );
         let address_ref = UserRef::<T>::new(address);
         current_task.write_object(address_ref, value)?;
         file.ioctl(locked, current_task, command, address.into())?;

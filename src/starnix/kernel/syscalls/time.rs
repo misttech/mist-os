@@ -559,6 +559,7 @@ mod test {
 
         let duration = timespec_from_duration(zx::Duration::from_seconds(60));
         let address = map_memory(
+            &mut locked,
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<timespec>() as u64,
@@ -601,7 +602,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clock_nanosleep_interrupted_relative_to_fast_utc_clock() {
-        let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
@@ -617,7 +618,7 @@ mod test {
         let tv = timespec { tv_sec: 2, tv_nsec: 0 };
 
         let remaining = {
-            let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+            let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             UserRef::new(addr)
         };
 

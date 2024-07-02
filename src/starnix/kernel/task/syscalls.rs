@@ -1891,7 +1891,8 @@ mod tests {
     async fn test_prctl_set_vma_anon_name() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let name_addr = mapped_address + 128u64;
         let name = "test-name\0";
         current_task.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
@@ -1922,9 +1923,10 @@ mod tests {
     async fn test_set_vma_name_special_chars() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         for c in 1..255 {
             let vma_name = CString::new([c]).unwrap();
@@ -1959,9 +1961,10 @@ mod tests {
     async fn test_set_vma_name_long() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let name_too_long = CString::new(vec![b'a'; 256]).unwrap();
 
@@ -2001,9 +2004,10 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_vma_name_misaligned() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let name = CString::new("name").unwrap();
         current_task.write_memory(name_addr, name.as_bytes_with_nul()).unwrap();
@@ -2077,7 +2081,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_get_affinity_size() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let pid = current_task.get_pid();
         assert_eq!(
             sys_sched_getaffinity(&mut locked, &current_task, pid, 16, mapped_address),
@@ -2096,7 +2101,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_affinity_size() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
         let pid = current_task.get_pid();
         assert_eq!(
@@ -2112,7 +2118,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_task_name() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let name = "my-task-name\0";
         current_task.write_memory(mapped_address, name.as_bytes()).expect("failed to write name");
 
@@ -2128,7 +2135,8 @@ mod tests {
         .unwrap();
         assert_eq!(SUCCESS, result);
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let result = sys_prctl(
             &mut locked,
             &mut current_task,
@@ -2184,7 +2192,8 @@ mod tests {
         let scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
         assert_eq!(scheduler, SCHED_NORMAL, "tasks should have normal scheduler by default");
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let requested_params = sched_param { sched_priority: 15 };
         current_task.write_object(mapped_address.into(), &requested_params).unwrap();
 
@@ -2193,7 +2202,8 @@ mod tests {
         let new_scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
         assert_eq!(new_scheduler, SCHED_FIFO, "task should have been assigned fifo scheduler");
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
@@ -2203,7 +2213,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sched_getparam() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
@@ -2263,15 +2274,15 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_c_string_vector() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let arg_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let arg_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let arg = b"test-arg\0";
         current_task.write_memory(arg_addr, arg).expect("failed to write test arg");
         let arg_usercstr = UserCString::new(arg_addr);
         let null_usercstr = UserCString::default();
 
-        let argv_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let argv_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_object(argv_addr.into(), &arg_usercstr)
             .expect("failed to write UserCString");

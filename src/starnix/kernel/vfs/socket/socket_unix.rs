@@ -957,7 +957,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_socket_send_capacity() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let socket = Socket::new(
             &current_task,
             SocketDomain::Unix,
@@ -983,7 +983,8 @@ mod tests {
         let server_socket = socket.accept().unwrap();
 
         let opt_size = std::mem::size_of::<socklen_t>();
-        let user_address = map_memory(&current_task, UserAddress::default(), opt_size as u64);
+        let user_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), opt_size as u64);
         let send_capacity: socklen_t = 4 * 4096;
         current_task.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
         let user_buffer = UserBuffer { address: user_address, length: opt_size };

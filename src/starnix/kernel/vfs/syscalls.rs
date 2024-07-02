@@ -3041,7 +3041,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_open_cloexec() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let path = b"data/testfile.txt\0";
         current_task.write_memory(path_addr, path)?;
         let fd = sys_openat(
@@ -3077,7 +3077,7 @@ mod tests {
             current_task.open_file(&mut locked, file_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
         let user_stat = UserRef::new(path_addr + file_path.len());
@@ -3100,7 +3100,8 @@ mod tests {
 
         // Create the dir that we will attempt to unlink later.
         let no_slash_path = b"testdir";
-        let no_slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let no_slash_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(no_slash_path_addr, no_slash_path).expect("failed to write path");
         let no_slash_user_path = UserCString::new(no_slash_path_addr);
         sys_mkdirat(
@@ -3113,7 +3114,8 @@ mod tests {
         .unwrap();
 
         let slash_path = b"testdir/";
-        let slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let slash_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(slash_path_addr, slash_path).expect("failed to write path");
         let slash_user_path = UserCString::new(slash_path_addr);
 
@@ -3143,7 +3145,8 @@ mod tests {
             current_task.open_file(&mut locked, old_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let old_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let old_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(old_path_addr, old_user_path.as_bytes())
             .expect("failed to clear struct");
@@ -3154,7 +3157,8 @@ mod tests {
             current_task.open_file(&mut locked, new_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let new_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let new_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(new_path_addr, new_user_path.as_bytes())
             .expect("failed to clear struct");

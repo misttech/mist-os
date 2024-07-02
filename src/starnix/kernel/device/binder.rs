@@ -261,6 +261,7 @@ impl FileOps for BinderConnection {
 
     fn mmap(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -5640,7 +5641,7 @@ pub mod tests {
         );
 
         // Map some memory for process 1.
-        let data_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let data_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
 
         // Write transaction data in process 1.
         const BINDER_DATA: &[u8; 8] = b"binder!!";
@@ -6122,7 +6123,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a string into memory.
@@ -6244,7 +6245,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a series of buffers that point to empty data. Each successive buffer is smaller
@@ -6329,7 +6330,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Write the data for two buffer objects.
@@ -6433,7 +6434,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -6626,7 +6627,8 @@ pub mod tests {
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
             // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -6746,7 +6748,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -7061,7 +7063,8 @@ pub mod tests {
             }
         });
 
-        let read_buffer_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let read_buffer_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let bytes_read = binder_driver
             .handle_thread_read(
                 &current_task,
@@ -7925,7 +7928,8 @@ pub mod tests {
         );
 
         // Have the thread dequeue the command.
-        let read_buffer_addr = map_memory(&receiver.task, UserAddress::default(), *PAGE_SIZE);
+        let read_buffer_addr =
+            map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
         test.device
             .handle_thread_read(
                 &receiver.task,
@@ -8006,7 +8010,8 @@ pub mod tests {
         );
 
         // Have the thread dequeue the command.
-        let read_buffer_addr = map_memory(&receiver.task, UserAddress::default(), *PAGE_SIZE);
+        let read_buffer_addr =
+            map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
         test.device
             .handle_thread_read(
                 &receiver.task,

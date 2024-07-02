@@ -130,6 +130,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn mmap(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _addr: DesiredAddress,
@@ -1121,16 +1122,25 @@ mod tests {
                 let service_name_string =
                     CString::new(service_name.as_bytes()).expect("CString::new");
                 let service_name_bytes = service_name_string.as_bytes_with_nul();
-                let service_name_address =
-                    map_memory(&task, UserAddress::default(), service_name_bytes.len() as u64);
+                let service_name_address = map_memory(
+                    locked,
+                    &task,
+                    UserAddress::default(),
+                    service_name_bytes.len() as u64,
+                );
                 task.write_memory(service_name_address, service_name_bytes).expect("write_memory");
 
-                let start_command_address =
-                    map_memory(&task, UserAddress::default(), std::mem::size_of::<u64>() as u64);
+                let start_command_address = map_memory(
+                    locked,
+                    &task,
+                    UserAddress::default(),
+                    std::mem::size_of::<u64>() as u64,
+                );
                 task.write_object(start_command_address.into(), &service_name_address.ptr())
                     .expect("write_object");
 
                 let wait_command_address = map_memory(
+                    locked,
                     &task,
                     UserAddress::default(),
                     std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,

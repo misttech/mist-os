@@ -4,7 +4,7 @@
 
 use crate::task::TaskBuilder;
 use selinux::security_server::SecurityServer;
-use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked, WriteOps};
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
@@ -150,19 +150,31 @@ pub fn create_task(
 
 /// Maps a region of mery at least `len` bytes long with `PROT_READ | PROT_WRITE`,
 /// `MAP_ANONYMOUS | MAP_PRIVATE`, returning the mapped address.
-pub fn map_memory_anywhere(current_task: &CurrentTask, len: u64) -> UserAddress {
-    map_memory(current_task, UserAddress::NULL, len)
+pub fn map_memory_anywhere<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    len: u64,
+) -> UserAddress
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
+    map_memory(locked, current_task, UserAddress::NULL, len)
 }
 
 /// Maps a region of memory large enough for the object with `PROT_READ | PROT_WRITE`,
 /// `MAP_ANONYMOUS | MAP_PRIVATE` and writes the object to it, returning the mapped address.
 ///
 /// Useful for syscall in-pointer parameters.
-pub fn map_object_anywhere<T: AsBytes + NoCell>(
+pub fn map_object_anywhere<L, T>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     object: &T,
-) -> UserAddress {
-    let addr = map_memory_anywhere(current_task, std::mem::size_of::<T>() as u64);
+) -> UserAddress
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+    T: AsBytes + NoCell,
+{
+    let addr = map_memory_anywhere(locked, current_task, std::mem::size_of::<T>() as u64);
     current_task.write_object(addr.into(), object).expect("could not write object");
     addr
 }
@@ -170,20 +182,33 @@ pub fn map_object_anywhere<T: AsBytes + NoCell>(
 /// Maps `length` at `address` with `PROT_READ | PROT_WRITE`, `MAP_ANONYMOUS | MAP_PRIVATE`.
 ///
 /// Returns the address returned by `sys_mmap`.
-pub fn map_memory(current_task: &CurrentTask, address: UserAddress, length: u64) -> UserAddress {
-    map_memory_with_flags(current_task, address, length, MAP_ANONYMOUS | MAP_PRIVATE)
+pub fn map_memory<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    address: UserAddress,
+    length: u64,
+) -> UserAddress
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
+    map_memory_with_flags(locked, current_task, address, length, MAP_ANONYMOUS | MAP_PRIVATE)
 }
 
 /// Maps `length` at `address` with `PROT_READ | PROT_WRITE` and the specified flags.
 ///
 /// Returns the address returned by `sys_mmap`.
-pub fn map_memory_with_flags(
+pub fn map_memory_with_flags<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     address: UserAddress,
     length: u64,
     flags: u32,
-) -> UserAddress {
+) -> UserAddress
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     do_mmap(
+        locked,
         current_task,
         address,
         length as usize,

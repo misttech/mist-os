@@ -298,7 +298,7 @@ mod tests {
         let device = registry.open(0).expect("open failed.");
         let file = Anon::new_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
 
-        let arg_addr = map_object_anywhere(&current_task, &0u64);
+        let arg_addr = map_object_anywhere(&mut locked, &current_task, &0u64);
         // TODO(https://fxbug.dev/129314): replace with MaybeUninit::uninit_array.
         let arg: MaybeUninit<[MaybeUninit<u8>; 8]> = MaybeUninit::uninit();
         // SAFETY: We are converting from an uninitialized array to an array
