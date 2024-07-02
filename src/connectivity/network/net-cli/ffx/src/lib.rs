@@ -2,12 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/42156465): Replace with GN config once available in an ffx_plugin.
-#![deny(unused_results)]
-
 use anyhow::Context as _;
-use errors::FfxError;
-use ffx_core::ffx_plugin;
+use fho::{user_error, FfxMain, FfxTool, MachineWriter};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use {
     fidl_fuchsia_developer_remotecontrol as fremotecontrol, fidl_fuchsia_io as fio,
@@ -196,23 +192,38 @@ impl net_cli::ServiceConnector<fnet_migration::StateMarker> for FfxConnector<'_>
     }
 }
 
-const EXIT_FAILURE: i32 = 1;
+#[derive(FfxTool)]
+pub struct NetTool {
+    #[command]
+    pub cmd: ffx_net_args::Command,
+    pub remote_control: fremotecontrol::RemoteControlProxy,
+}
 
-// TODO(121214): Fix incorrect- or invalid-type writer declarations
-#[ffx_plugin()]
-pub async fn net(
-    remote_control: fremotecontrol::RemoteControlProxy,
-    cmd: ffx_net_args::Command,
-    #[ffx(machine = Vec<dyn serde::Serialize>)] writer: ffx_writer::Writer,
-) -> Result<(), anyhow::Error> {
-    let ffx_net_args::Command { cmd, realm } = cmd;
-    let realm = realm.as_deref().unwrap_or(NETWORK_REALM);
-    net_cli::do_root(writer, net_cli::Command { cmd }, &FfxConnector { remote_control, realm })
+#[async_trait::async_trait(?Send)]
+impl FfxMain for NetTool {
+    type Writer = MachineWriter<serde_json::Value>;
+    async fn main(self, writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        self.net(writer).await
+    }
+}
+
+fho::embedded_plugin!(NetTool);
+
+impl NetTool {
+    async fn net(&self, writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        let realm = self.cmd.realm.as_deref().unwrap_or(NETWORK_REALM);
+        let res = net_cli::do_root(
+            writer,
+            net_cli::Command { cmd: self.cmd.cmd.clone() },
+            &FfxConnector { remote_control: self.remote_control.clone(), realm },
+        )
         .await
         .map_err(|e| match net_cli::underlying_user_facing_error(&e) {
             Some(net_cli::UserFacingError { msg }) => {
-                FfxError::Error(anyhow::Error::msg(msg), EXIT_FAILURE).into()
+                user_error!(msg)
             }
-            None => e,
-        })
+            None => e.into(),
+        });
+        res.into()
+    }
 }

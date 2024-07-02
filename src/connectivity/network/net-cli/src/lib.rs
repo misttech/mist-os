@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
+use ffx_writer::ToolIO as _;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use filter::{IpRoutines, NatRoutines};
 use fnet_filter_ext::{ControllerId, Rule};
@@ -103,7 +104,7 @@ impl<O> NetCliDepsConnector for O where
 }
 
 pub async fn do_root<C: NetCliDepsConnector>(
-    mut out: ffx_writer::Writer,
+    mut out: ffx_writer::MachineWriter<serde_json::Value>,
     Command { cmd }: Command,
     connector: &C,
 ) -> Result<(), Error> {
@@ -353,7 +354,7 @@ fn extract_nud_config(
 }
 
 async fn do_if<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::Writer,
+    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
     cmd: opts::IfEnum,
     connector: &C,
 ) -> Result<(), Error> {
@@ -397,7 +398,7 @@ async fn do_if<C: NetCliDepsConnector>(
                 .collect();
             let () = response.sort_by_key(|ser::InterfaceView { nicid, .. }| *nicid);
             if out.is_machine() {
-                out.machine(&response)?;
+                out.machine(&serde_json::to_value(&response)?)?;
             } else {
                 write_tabulated_interfaces_info(out, response.into_iter())
                     .context("error tabulating interface info")?;
@@ -835,7 +836,7 @@ async fn do_if<C: NetCliDepsConnector>(
 }
 
 async fn do_route<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::Writer,
+    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
     cmd: opts::RouteEnum,
     connector: &C,
 ) -> Result<(), Error> {
@@ -864,7 +865,7 @@ async fn do_route<C: NetCliDepsConnector>(
 }
 
 async fn do_route_list<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::Writer,
+    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
     connector: &C,
 ) -> Result<(), Error> {
     let ipv4_route_event_stream = pin!({
@@ -901,7 +902,7 @@ async fn do_route_list<C: NetCliDepsConnector>(
             .filter_map(to_ser)
             .chain(v6_routes.into_iter().filter_map(to_ser))
             .collect::<Vec<_>>();
-        out.machine(&routes).context("serialize")?;
+        out.machine(&serde_json::to_value(routes)?).context("serialize")?;
     } else {
         let mut t = Table::new();
         t.set_format(format::FormatBuilder::new().padding(2, 2).build());
@@ -1227,7 +1228,7 @@ async fn do_dhcpd<C: NetCliDepsConnector>(
 }
 
 async fn do_neigh<C: NetCliDepsConnector>(
-    out: ffx_writer::Writer,
+    out: ffx_writer::MachineWriter<serde_json::Value>,
     cmd: opts::NeighEnum,
     connector: &C,
 ) -> Result<(), Error> {
@@ -1419,7 +1420,7 @@ fn jsonify_neigh_iter_item(
 }
 
 async fn print_neigh_entries(
-    mut out: ffx_writer::Writer,
+    mut out: ffx_writer::MachineWriter<serde_json::Value>,
     watch_for_changes: bool,
     view: fneighbor::ViewProxy,
 ) -> Result<(), Error> {
@@ -1526,7 +1527,7 @@ fn write_tabular_neigh_entry<W: std::io::Write>(
 }
 
 fn write_neigh_entry(
-    f: &mut ffx_writer::Writer,
+    f: &mut ffx_writer::MachineWriter<serde_json::Value>,
     item: fneighbor::EntryIteratorItem,
     include_entry_state: bool,
 ) -> Result<(), Error> {
@@ -1994,7 +1995,8 @@ mod tests {
             |c| extract_ip_forwarding(c, ip_version).expect("extract IP forwarding configuration"),
             enable,
         );
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buf = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buf);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::IpForward(opts::IfIpForward {
@@ -2015,9 +2017,10 @@ mod tests {
             interface1.nicid,
             configuration_with_ip_forwarding_set(ip_version, enable),
         );
-        let mut output_buf = ffx_writer::Writer::new_test(None);
+        let buf = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buf);
         let do_if_fut = do_if(
-            &mut output_buf,
+            &mut out,
             opts::IfEnum::IpForward(opts::IfIpForward {
                 cmd: opts::IfIpForwardEnum::Get(opts::IfIpForwardGet {
                     interface: interface1.identifier(false /* use_ifname */),
@@ -2029,7 +2032,7 @@ mod tests {
         let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
             .await
             .expect("getting interface ip forwarding should succeed");
-        let got_output = output_buf.test_output().unwrap();
+        let got_output = buf.into_stdout_str();
         pretty_assertions::assert_eq!(
             trim_whitespace_for_comparison(&got_output),
             trim_whitespace_for_comparison(&format!(
@@ -2115,7 +2118,8 @@ mod tests {
             |c| extract_igmp_version(c).unwrap(),
             Some(igmp_version),
         );
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::Igmp(opts::IfIgmp {
@@ -2144,7 +2148,8 @@ mod tests {
                 ..Default::default()
             },
         );
-        let mut output_buf = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut output_buf = ffx_writer::MachineWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut output_buf,
             opts::IfEnum::Igmp(opts::IfIgmp {
@@ -2157,7 +2162,7 @@ mod tests {
         let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
             .await
             .expect("getting interface IGMP configuration should succeed");
-        let got_output = output_buf.test_output().unwrap();
+        let got_output = buffers.into_stdout_str();
         pretty_assertions::assert_eq!(
             trim_whitespace_for_comparison(&got_output),
             trim_whitespace_for_comparison(&format!(
@@ -2184,7 +2189,8 @@ mod tests {
             |c| extract_mld_version(c).unwrap(),
             Some(mld_version),
         );
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::Mld(opts::IfMld {
@@ -2213,7 +2219,8 @@ mod tests {
                 ..Default::default()
             },
         );
-        let mut output_buf = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut output_buf = ffx_writer::MachineWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut output_buf,
             opts::IfEnum::Mld(opts::IfMld {
@@ -2226,7 +2233,7 @@ mod tests {
         let ((), ()) = futures::future::try_join(do_if_fut, requests_fut.map(Ok))
             .await
             .expect("getting interface MLD configuration should succeed");
-        let got_output = output_buf.test_output().unwrap();
+        let got_output = buffers.into_stdout_str();
         pretty_assertions::assert_eq!(
             trim_whitespace_for_comparison(&got_output),
             trim_whitespace_for_comparison(&format!(
@@ -2313,7 +2320,8 @@ mod tests {
 
         let connector =
             TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::Addr(opts::IfAddr {
@@ -2434,7 +2442,8 @@ mod tests {
             ..Default::default()
         };
 
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         // Make the first request.
         let succeeds = do_if(
             &mut out,
@@ -2474,7 +2483,8 @@ mod tests {
             ((), ()) = futures::future::join(handler_fut, succeeds).fuse() => {},
         }
 
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         // Make the second request.
         let fails = do_if(
             &mut out,
@@ -2626,7 +2636,8 @@ mod tests {
 
         let connector =
             TestConnector { interfaces_state: Some(interfaces_state), ..Default::default() };
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         let run_command = do_if(
             &mut out,
             opts::IfEnum::Addr(opts::IfAddr {
@@ -2641,7 +2652,7 @@ mod tests {
 
         let ((), ()) = futures::future::join(interfaces_handler, run_command).await;
 
-        let output = out.test_output().unwrap();
+        let output = buffers.into_stdout_str();
         pretty_assertions::assert_eq!(
             trim_whitespace_for_comparison(&output),
             trim_whitespace_for_comparison(expected_output),
@@ -2783,10 +2794,11 @@ mac               -
         let (interfaces_state, interfaces_state_stream) =
             fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>().unwrap();
 
+        let buffers = ffx_writer::TestBuffers::default();
         let mut output = if json {
-            ffx_writer::Writer::new_test(Some(ffx_writer::Format::Json))
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::Json), &buffers)
         } else {
-            ffx_writer::Writer::new_test(None)
+            ffx_writer::MachineWriter::new_test(None, &buffers)
         };
         let output_ref = &mut output;
 
@@ -2941,7 +2953,7 @@ mac               -
             });
         let ((), (), ()) = futures::future::join3(do_if_fut, watcher_fut, root_fut).await;
 
-        let got_output = output.test_output().unwrap();
+        let got_output = buffers.into_stdout_str();
 
         if json {
             let got: Value = serde_json::from_str(&got_output).unwrap();
@@ -3008,7 +3020,8 @@ mac               -
         let (stack, mut requests) =
             fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap();
         let connector = TestConnector { stack: Some(stack), ..Default::default() };
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         let op = do_route(&mut out, cmd.clone(), &connector);
         let op_succeeds = async move {
             let () = match cmd {
@@ -3124,10 +3137,11 @@ mac               -
             ..Default::default()
         };
 
+        let buffers = ffx_writer::TestBuffers::default();
         let mut output = if json {
-            ffx_writer::Writer::new_test(Some(ffx_writer::Format::Json))
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::Json), &buffers)
         } else {
-            ffx_writer::Writer::new_test(None)
+            ffx_writer::MachineWriter::new_test(None, &buffers)
         };
 
         let do_route_fut =
@@ -3223,7 +3237,7 @@ mac               -
             futures::try_join!(do_route_fut, route_v4_fut.map(Ok), route_v6_fut.map(Ok))
                 .expect("listing forwarding table entries should succeed");
 
-        let got_output = output.test_output().unwrap();
+        let got_output = buffers.into_stdout_str();
 
         if json {
             let got: Value = serde_json::from_str(&got_output).unwrap();
@@ -3274,7 +3288,8 @@ mac               -
             always_answer_with_interfaces(interfaces_state_requests, interface_fidls);
 
         let bridge_id = 4;
-        let mut out = ffx_writer::Writer::new_test(None);
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
         let bridge = do_if(
             &mut out,
             opts::IfEnum::Bridge(opts::IfBridge {
@@ -3350,10 +3365,11 @@ mac               -
             let mut stream = neigh_entry_stream(it, watch_for_changes);
 
             let item_to_string = |item| {
-                let mut buf = ffx_writer::Writer::new_test(None);
+                let buffers = ffx_writer::TestBuffers::default();
+                let mut buf = ffx_writer::MachineWriter::new_test(None, &buffers);
                 let () = write_neigh_entry(&mut buf, item, watch_for_changes)
                     .expect("write_neigh_entry should succeed");
-                buf.test_output().expect("string should be UTF-8")
+                buffers.into_stdout_str()
             };
 
             // Check each string sent by get_neigh_entries
@@ -3556,14 +3572,15 @@ mac               -
             ..Default::default()
         });
 
+        let buffers = ffx_writer::TestBuffers::default();
         let mut output = if json {
-            ffx_writer::Writer::new_test(Some(ffx_writer::Format::Json))
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::Json), &buffers)
         } else {
-            ffx_writer::Writer::new_test(None)
+            ffx_writer::MachineWriter::new_test(None, &buffers)
         };
         write_neigh_entry(&mut output, entry, include_entry_state)
             .expect("write_neigh_entry should succeed");
-        let got_output = output.test_output().unwrap();
+        let got_output = buffers.into_stdout_str();
         pretty_assertions::assert_eq!(
             trim_whitespace_for_comparison(&got_output),
             trim_whitespace_for_comparison(wanted_output),
