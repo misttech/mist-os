@@ -538,7 +538,7 @@ class ProfileServerTestOffloadedScoConnected : public ProfileServerTestScoConnec
   }
 };
 
-TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParameters) {
+TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParametersUseSocket) {
   std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
       std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
   adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
@@ -579,6 +579,57 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParameters) {
 
   ASSERT_TRUE(channel.has_value());
   EXPECT_TRUE(channel->has_socket());
+  EXPECT_FALSE(channel->IsEmpty());
+  EXPECT_EQ(channel->channel_mode(), chan_params.channel_mode());
+  // FakeL2cap returns channels with max tx sdu size of kDefaultMTU.
+  EXPECT_EQ(channel->max_tx_sdu_size(), bt::l2cap::kDefaultMTU);
+  EXPECT_FALSE(channel->has_ext_direction());
+  EXPECT_FALSE(channel->has_flush_timeout());
+}
+
+TEST_F(ProfileServerTestConnectedPeer, ConnectL2capChannelParametersUseConnection) {
+  server()->set_use_sockets(false);
+
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
+      std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
+  adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
+  // Approve pairing requests.
+  pairing_delegate->SetConfirmPairingCallback(
+      [](bt::PeerId, auto confirm_cb) { confirm_cb(true); });
+  pairing_delegate->SetCompletePairingCallback(
+      [&](bt::PeerId, bt::sm::Result<> status) { EXPECT_EQ(fit::ok(), status); });
+
+  bt::l2cap::ChannelParameters expected_params;
+  expected_params.mode = bt::l2cap::RetransmissionAndFlowControlMode::kEnhancedRetransmission;
+  expected_params.max_rx_sdu_size = bt::l2cap::kMinACLMTU;
+  l2cap()->ExpectOutboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41,
+                                      expected_params);
+
+  // Expect a non-empty channel result.
+  std::optional<fidlbredr::Channel> channel;
+  auto chan_cb = [&channel](fidlbredr::Profile_Connect_Result result) {
+    EXPECT_TRUE(result.is_response());
+    channel = std::move(result.response().channel);
+  };
+  // Initiates pairing
+
+  fuchsia::bluetooth::PeerId peer_id{peer()->identifier().value()};
+
+  // Set L2CAP channel parameters
+  fidlbredr::ChannelParameters chan_params;
+  fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  chan_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
+  chan_params.set_max_rx_sdu_size(bt::l2cap::kMinACLMTU);
+  l2cap_params.set_psm(kPsm);
+  l2cap_params.set_parameters(std::move(chan_params));
+  conn_params.set_l2cap(std::move(l2cap_params));
+
+  client()->Connect(peer_id, std::move(conn_params), std::move(chan_cb));
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(channel.has_value());
+  EXPECT_TRUE(channel->has_connection());
   EXPECT_FALSE(channel->IsEmpty());
   EXPECT_EQ(channel->channel_mode(), chan_params.channel_mode());
   // FakeL2cap returns channels with max tx sdu size of kDefaultMTU.
@@ -667,7 +718,7 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectEmptyChannelResponse) {
 }
 
 TEST_F(ProfileServerTestConnectedPeer,
-       AdvertiseChannelParametersReceivedInOnChannelConnectedCallback) {
+       AdvertiseChannelParametersReceivedInOnChannelConnectedCallbackUseSocket) {
   constexpr uint16_t kTxMtu = bt::l2cap::kMinACLMTU;
 
   std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
@@ -697,6 +748,46 @@ TEST_F(ProfileServerTestConnectedPeer,
   ASSERT_EQ(connect_receiver.connected_count(), 1u);
   ASSERT_EQ(connect_receiver.peer_id().value().value, peer()->identifier().value());
   ASSERT_TRUE(connect_receiver.channel().value().has_socket());
+  EXPECT_EQ(connect_receiver.channel().value().channel_mode(),
+            fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
+  EXPECT_EQ(connect_receiver.channel().value().max_tx_sdu_size(), kTxMtu);
+  EXPECT_FALSE(connect_receiver.channel().value().has_ext_direction());
+  EXPECT_FALSE(connect_receiver.channel().value().has_flush_timeout());
+}
+
+TEST_F(ProfileServerTestConnectedPeer,
+       AdvertiseChannelParametersReceivedInOnChannelConnectedCallbackUseConnection) {
+  server()->set_use_sockets(false);
+
+  constexpr uint16_t kTxMtu = bt::l2cap::kMinACLMTU;
+
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
+      std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
+  adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
+
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle;
+  FakeConnectionReceiver connect_receiver(connect_receiver_handle.NewRequest(), dispatcher());
+
+  std::vector<fidlbredr::ServiceDefinition> services;
+  services.emplace_back(MakeFIDLServiceDefinition());
+  fidlbredr::ChannelParameters chan_params;
+  chan_params.set_channel_mode(fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
+
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_parameters(std::move(chan_params));
+  adv_request.set_receiver(std::move(connect_receiver_handle));
+  client()->Advertise(std::move(adv_request), NopAdvertiseCallback);
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(connect_receiver.connected_count(), 0u);
+  EXPECT_TRUE(
+      l2cap()->TriggerInboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41, kTxMtu));
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(connect_receiver.connected_count(), 1u);
+  ASSERT_EQ(connect_receiver.peer_id().value().value, peer()->identifier().value());
+  ASSERT_TRUE(connect_receiver.channel().value().has_connection());
   EXPECT_EQ(connect_receiver.channel().value().channel_mode(),
             fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION);
   EXPECT_EQ(connect_receiver.channel().value().max_tx_sdu_size(), kTxMtu);
@@ -896,6 +987,110 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectReturnsValidSocket) {
   EXPECT_EQ(1u, send_count);
 }
 
+// Verifies that a BrEdrConnectionServer is correctly set up such that bytes written to the
+// Connection are sent to the channel.
+TEST_F(ProfileServerTestConnectedPeer, ConnectReturnsValidConnection) {
+  server()->set_use_sockets(false);
+
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
+      std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
+  adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
+  // Approve pairing requests.
+  pairing_delegate->SetConfirmPairingCallback(
+      [](bt::PeerId, auto confirm_cb) { confirm_cb(true); });
+  pairing_delegate->SetCompletePairingCallback(
+      [&](bt::PeerId, bt::sm::Result<> status) { EXPECT_EQ(fit::ok(), status); });
+
+  bt::l2cap::ChannelParameters expected_params;
+  l2cap()->ExpectOutboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41,
+                                      expected_params);
+
+  std::optional<FakeChannel::WeakPtr> fake_chan;
+  l2cap()->set_channel_callback(
+      [&fake_chan](FakeChannel::WeakPtr chan) { fake_chan = std::move(chan); });
+
+  // Expect a non-empty channel result.
+  std::optional<fidlbredr::Channel> channel;
+  auto result_cb = [&channel](fidlbredr::Profile_Connect_Result result) {
+    EXPECT_TRUE(result.is_response());
+    channel = std::move(result.response().channel);
+  };
+
+  fuchsia::bluetooth::PeerId peer_id{peer()->identifier().value()};
+
+  // Set L2CAP channel parameters
+  fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(kPsm);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
+  conn_params.set_l2cap(std::move(l2cap_params));
+
+  // Initiates pairing
+  client()->Connect(peer_id, std::move(conn_params), std::move(result_cb));
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(channel.has_value());
+  ASSERT_TRUE(channel->has_connection());
+
+  ASSERT_TRUE(fake_chan.has_value());
+  ASSERT_TRUE(fake_chan.value()->activated());
+  FakeChannel::WeakPtr fake_chan_ptr = fake_chan.value();
+  int send_count = 0;
+  fake_chan_ptr->SetSendCallback([&send_count](auto buffer) { send_count++; }, pw_dispatcher());
+
+  fidl::InterfacePtr<fidlbredr::Connection> conn = channel->mutable_connection()->Bind();
+  int send_cb_count = 0;
+  conn->Send(std::vector<uint8_t>{0x02}, [&](fidlbredr::Connection_Send_Result result) {
+    EXPECT_TRUE(result.is_response());
+    send_cb_count++;
+  });
+  RunLoopUntilIdle();
+  EXPECT_EQ(1, send_count);
+  EXPECT_EQ(1, send_cb_count);
+}
+
+TEST_F(ProfileServerTestConnectedPeer, ConnectFailsDueToChannelActivationFailure) {
+  server()->set_use_sockets(false);
+
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
+      std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
+  adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
+  // Approve pairing requests.
+  pairing_delegate->SetConfirmPairingCallback(
+      [](bt::PeerId, auto confirm_cb) { confirm_cb(true); });
+  pairing_delegate->SetCompletePairingCallback(
+      [&](bt::PeerId, bt::sm::Result<> status) { EXPECT_EQ(fit::ok(), status); });
+
+  bt::l2cap::ChannelParameters expected_params;
+  l2cap()->ExpectOutboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41,
+                                      expected_params);
+
+  std::optional<FakeChannel::WeakPtr> fake_chan;
+  l2cap()->set_channel_callback([&fake_chan](FakeChannel::WeakPtr chan) {
+    chan->set_activate_fails(true);
+    fake_chan = std::move(chan);
+  });
+
+  int connect_cb_count = 0;
+  auto connect_cb = [&](fidlbredr::Profile_Connect_Result result) {
+    EXPECT_TRUE(result.is_err());
+    connect_cb_count++;
+  };
+
+  fuchsia::bluetooth::PeerId peer_id{peer()->identifier().value()};
+
+  fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(kPsm);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
+  conn_params.set_l2cap(std::move(l2cap_params));
+
+  client()->Connect(peer_id, std::move(conn_params), std::move(connect_cb));
+  RunLoopUntilIdle();
+  EXPECT_EQ(connect_cb_count, 1);
+  EXPECT_FALSE(fake_chan.value()->activated());
+}
+
 // Verifies that a socket channel relay is correctly set up such that bytes written to the socket
 // are sent to the channel.
 TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
@@ -942,6 +1137,58 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidSocket) {
   EXPECT_EQ(1u, bytes_written);
   RunLoopUntilIdle();
   EXPECT_EQ(1u, send_count);
+}
+
+// Verifies that a BrEdrConnectionServer is correctly set up such that bytes written to the
+// Connection are sent to the channel.
+TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidConnection) {
+  server()->set_use_sockets(false);
+
+  std::unique_ptr<bt::gap::FakePairingDelegate> pairing_delegate =
+      std::make_unique<bt::gap::FakePairingDelegate>(bt::sm::IOCapability::kDisplayYesNo);
+  adapter()->SetPairingDelegate(pairing_delegate->GetWeakPtr());
+
+  fidlbredr::ConnectionReceiverHandle connect_receiver_handle;
+  FakeConnectionReceiver connect_receiver(connect_receiver_handle.NewRequest(), dispatcher());
+
+  std::optional<FakeChannel::WeakPtr> fake_chan;
+  l2cap()->set_channel_callback(
+      [&fake_chan](FakeChannel::WeakPtr chan) { fake_chan = std::move(chan); });
+
+  std::vector<fidlbredr::ServiceDefinition> services;
+  services.emplace_back(MakeFIDLServiceDefinition());
+
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(connect_receiver_handle));
+  client()->Advertise(std::move(adv_request), NopAdvertiseCallback);
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(connect_receiver.connected_count(), 0u);
+  EXPECT_TRUE(l2cap()->TriggerInboundL2capChannel(connection()->link().handle(), kPsm, 0x40, 0x41));
+  RunLoopUntilIdle();
+
+  ASSERT_EQ(connect_receiver.connected_count(), 1u);
+  ASSERT_EQ(connect_receiver.peer_id().value().value, peer()->identifier().value());
+  ASSERT_TRUE(connect_receiver.channel().has_value());
+  ASSERT_TRUE(connect_receiver.channel().value().has_connection());
+  // Taking channel is safe because of the previous checks.
+  fidlbredr::Channel channel = connect_receiver.take_channel();
+
+  ASSERT_TRUE(fake_chan.has_value());
+  FakeChannel::WeakPtr fake_chan_ptr = fake_chan.value();
+  int send_count = 0;
+  fake_chan_ptr->SetSendCallback([&send_count](auto buffer) { send_count++; }, pw_dispatcher());
+
+  fidl::InterfacePtr<fidlbredr::Connection> conn = channel.mutable_connection()->Bind();
+  int send_cb_count = 0;
+  conn->Send(std::vector<uint8_t>{0x02}, [&](fidlbredr::Connection_Send_Result result) {
+    EXPECT_TRUE(result.is_response());
+    send_cb_count++;
+  });
+  RunLoopUntilIdle();
+  EXPECT_EQ(1, send_count);
+  EXPECT_EQ(1, send_cb_count);
 }
 
 TEST_F(ProfileServerTest, ConnectScoWithInvalidParameters) {

@@ -21,7 +21,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/types.h"
 #include "zircon/errors.h"
 
 namespace fidlbredr = fuchsia::bluetooth::bredr;
@@ -701,9 +700,14 @@ void ProfileServer::Connect(fuchsia::bluetooth::PeerId peer_id,
       return;
     }
 
-    auto fidl_chan = self->ChannelToFidl(std::move(chan));
+    std::optional<fuchsia::bluetooth::bredr::Channel> fidl_chan =
+        self->ChannelToFidl(std::move(chan));
+    if (!fidl_chan) {
+      cb(fpromise::error(fuchsia::bluetooth::ErrorCode::FAILED));
+      return;
+    }
 
-    cb(fpromise::ok(std::move(fidl_chan)));
+    cb(fpromise::ok(std::move(fidl_chan.value())));
   };
   BT_DEBUG_ASSERT(adapter().is_alive());
 
@@ -826,9 +830,13 @@ void ProfileServer::OnChannelConnected(uint64_t ad_id, bt::l2cap::Channel::WeakP
   std::vector<fidlbredr::ProtocolDescriptor> list;
   list.emplace_back(std::move(*desc));
 
-  auto fidl_chan = ChannelToFidl(std::move(channel));
+  std::optional<fuchsia::bluetooth::bredr::Channel> fidl_chan = ChannelToFidl(std::move(channel));
+  if (!fidl_chan) {
+    bt_log(INFO, "fidl", "ChannelToFidl failed. Ignoring channel.");
+    return;
+  }
 
-  it->second.receiver->Connected(peer_id, std::move(fidl_chan), std::move(list));
+  it->second.receiver->Connected(peer_id, std::move(fidl_chan.value()), std::move(list));
 }
 
 void ProfileServer::OnConnectionReceiverClosed(uint64_t ad_id) {
@@ -1028,7 +1036,24 @@ fidl::InterfaceHandle<fidlbredr::AudioOffloadExt> ProfileServer::BindAudioOffloa
   return client;
 }
 
-fuchsia::bluetooth::bredr::Channel ProfileServer::ChannelToFidl(
+std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::bredr::Connection>>
+ProfileServer::BindBrEdrConnectionServer(bt::l2cap::Channel::WeakPtr channel,
+                                         fit::callback<void()> closed_callback) {
+  fidl::InterfaceHandle<fidlbredr::Connection> client;
+
+  bt::l2cap::Channel::UniqueId unique_id = channel->unique_id();
+
+  std::unique_ptr<bthost::BrEdrConnectionServer> connection_server = BrEdrConnectionServer::Create(
+      client.NewRequest(), std::move(channel), std::move(closed_callback));
+  if (!connection_server) {
+    return std::nullopt;
+  }
+
+  bredr_connection_servers_[unique_id] = std::move(connection_server);
+  return client;
+}
+
+std::optional<fuchsia::bluetooth::bredr::Channel> ProfileServer::ChannelToFidl(
     bt::l2cap::Channel::WeakPtr channel) {
   BT_ASSERT(channel.is_alive());
   fidlbredr::Channel fidl_chan;
@@ -1036,6 +1061,27 @@ fuchsia::bluetooth::bredr::Channel ProfileServer::ChannelToFidl(
   fidl_chan.set_max_tx_sdu_size(channel->max_tx_sdu_size());
   if (channel->info().flush_timeout) {
     fidl_chan.set_flush_timeout(channel->info().flush_timeout->count());
+  }
+
+  auto closed_cb = [this, unique_id = channel->unique_id()]() {
+    bt_log(DEBUG, "fidl", "Channel closed_cb called, destroying servers (unique_id: %d)",
+           unique_id);
+    bredr_connection_servers_.erase(unique_id);
+    l2cap_parameters_ext_servers_.erase(unique_id);
+    audio_direction_ext_servers_.erase(unique_id);
+    audio_offload_ext_servers_.erase(unique_id);
+    audio_offload_controller_server_ = nullptr;
+  };
+  if (use_sockets_) {
+    auto sock = l2cap_socket_factory_.MakeSocketForChannel(channel, std::move(closed_cb));
+    fidl_chan.set_socket(std::move(sock));
+  } else {
+    std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::bredr::Connection>> connection =
+        BindBrEdrConnectionServer(channel, std::move(closed_cb));
+    if (!connection) {
+      return std::nullopt;
+    }
+    fidl_chan.set_connection(std::move(connection.value()));
   }
 
   if (adapter()->state().IsControllerFeatureSupported(FeaturesBits::kSetAclPriorityCommand)) {
@@ -1049,15 +1095,6 @@ fuchsia::bluetooth::bredr::Channel ProfileServer::ChannelToFidl(
 
   fidl_chan.set_ext_l2cap(BindL2capParametersExtServer(channel));
 
-  auto closed_cb = [this, unique_id = channel->unique_id()]() {
-    l2cap_parameters_ext_servers_.erase(unique_id);
-    audio_direction_ext_servers_.erase(unique_id);
-    audio_offload_ext_servers_.erase(unique_id);
-    audio_offload_controller_server_ = nullptr;
-  };
-
-  auto sock = l2cap_socket_factory_.MakeSocketForChannel(std::move(channel), std::move(closed_cb));
-  fidl_chan.set_socket(std::move(sock));
   return fidl_chan;
 }
 
