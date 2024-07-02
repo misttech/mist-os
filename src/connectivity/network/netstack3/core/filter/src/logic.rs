@@ -538,7 +538,7 @@ pub enum FilterTimerId<I: Ip> {
 impl<I: IpExt, BC: FilterBindingsContext, CC: FilterIpContext<I, BC>> HandleableTimer<CC, BC>
     for FilterTimerId<I>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         match self {
             FilterTimerId::ConntrackGc(_) => core_ctx.with_filter_state(|state| {
                 state.conntrack.perform_gc(bindings_ctx);

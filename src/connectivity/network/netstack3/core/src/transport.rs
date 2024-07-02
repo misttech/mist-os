@@ -149,9 +149,9 @@ where
     BT: BindingsTypes,
     CC: TimerHandler<BT, TcpTimerId<WeakDeviceId<BT>, BT>>,
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT, timer: BT::UniqueTimerId) {
         match self {
-            TransportLayerTimerId::Tcp(id) => core_ctx.handle_timer(bindings_ctx, id),
+            TransportLayerTimerId::Tcp(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
         }
     }
 }

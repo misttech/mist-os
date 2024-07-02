@@ -889,7 +889,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
 impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
     for SlaacTimerId<CC::WeakDeviceId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self { device_id } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;

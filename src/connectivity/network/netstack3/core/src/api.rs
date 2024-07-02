@@ -5,7 +5,9 @@
 ///! Defines the main API entry objects for the exposed API from core.
 use lock_order::Unlocked;
 use net_types::ip::Ip;
-use netstack3_base::{ContextPair as _, ContextProvider, CtxPair, TimerHandler as _};
+use netstack3_base::{
+    ContextPair as _, ContextProvider, CtxPair, TimerBindingsTypes, TimerHandler as _,
+};
 use netstack3_device::queue::{ReceiveQueueApi, TransmitQueueApi};
 use netstack3_device::socket::DeviceSocketApi;
 use netstack3_device::{DeviceAnyApi, DeviceApi};
@@ -137,12 +139,15 @@ where
     }
 
     /// Handles a timer.
-    pub fn handle_timer(&mut self, timer: TimerId<BP::Context>)
-    where
+    pub fn handle_timer(
+        &mut self,
+        dispatch: TimerId<BP::Context>,
+        timer: <BP::Context as TimerBindingsTypes>::UniqueTimerId,
+    ) where
         BP::Context: crate::BindingsContext,
     {
         let Self(ctx) = self;
         let (core_ctx, bindings_ctx) = ctx.contexts();
-        core_ctx.handle_timer(bindings_ctx, timer)
+        core_ctx.handle_timer(bindings_ctx, dispatch, timer)
     }
 }

@@ -383,6 +383,7 @@ mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
+    use core::convert::Infallible as Never;
 
     use crate::testutil::{FakeInstant, FakeInstantCtx};
     use crate::InstantContext;
@@ -406,8 +407,8 @@ mod tests {
 
     impl TimerBindingsTypes for FakeTimerCtx {
         type Timer = FakeTimer;
-
         type DispatchId = ();
+        type UniqueTimerId = Never;
     }
 
     impl TimerContext for FakeTimerCtx {
@@ -429,6 +430,10 @@ mod tests {
 
         fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
             timer.scheduled.clone()
+        }
+
+        fn unique_timer_id(&self, _: &Self::Timer) -> Self::UniqueTimerId {
+            unimplemented!()
         }
     }
 

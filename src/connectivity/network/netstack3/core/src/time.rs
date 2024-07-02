@@ -94,14 +94,16 @@ where
         + TimerHandler<BT, IpDeviceTimerId<Ipv4, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>>
         + TimerHandler<BT, IpDeviceTimerId<Ipv6, WeakDeviceId<BT>, IpAddrCtxSpec<BT>>>,
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT, timer: BT::UniqueTimerId) {
         trace!("handle_timer: dispatching timerid: {self:?}");
         match self {
-            TimerId(TimerIdInner::DeviceLayer(x)) => core_ctx.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::TransportLayer(x)) => core_ctx.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::IpLayer(x)) => core_ctx.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::Ipv4Device(x)) => core_ctx.handle_timer(bindings_ctx, x),
-            TimerId(TimerIdInner::Ipv6Device(x)) => core_ctx.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::DeviceLayer(x)) => core_ctx.handle_timer(bindings_ctx, x, timer),
+            TimerId(TimerIdInner::TransportLayer(x)) => {
+                core_ctx.handle_timer(bindings_ctx, x, timer)
+            }
+            TimerId(TimerIdInner::IpLayer(x)) => core_ctx.handle_timer(bindings_ctx, x, timer),
+            TimerId(TimerIdInner::Ipv4Device(x)) => core_ctx.handle_timer(bindings_ctx, x, timer),
+            TimerId(TimerIdInner::Ipv6Device(x)) => core_ctx.handle_timer(bindings_ctx, x, timer),
         }
     }
 }

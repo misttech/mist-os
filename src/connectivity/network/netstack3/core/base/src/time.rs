@@ -86,6 +86,11 @@ pub trait TimerBindingsTypes {
     type Timer: Debug + Send + Sync;
     /// The type used to dispatch fired timers from bindings to core.
     type DispatchId: Clone;
+    /// A value that uniquely identifiers a `Timer`. It is given along with the
+    /// `DispatchId` whenever a timer is fired.
+    ///
+    /// See [`TimerContext::unique_timer_id`] for details.
+    type UniqueTimerId: PartialEq + Eq;
 }
 
 /// A context providing time scheduling to core.
@@ -133,6 +138,12 @@ pub trait TimerContext: InstantContext + TimerBindingsTypes {
 
     /// Get the instant a timer will fire, if one is scheduled.
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant>;
+
+    /// Retrieves the timer id for `timer`.
+    ///
+    /// This can be used with [`TimerHandler::handle_timer`] to match a
+    /// [`Self::Timer`] instance with a firing event.
+    fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId;
 }
 
 /// A handler for timer firing events.
@@ -143,17 +154,24 @@ pub trait TimerContext: InstantContext + TimerBindingsTypes {
 /// implement [`HandleableTimer`]. `TimerHandler` is meant to be used as bounds
 /// on core context types. whereas `HandleableTimer` allows split-crate
 /// implementations sidestepping coherence issues.
-pub trait TimerHandler<BC, Id> {
+pub trait TimerHandler<BC: TimerBindingsTypes, Id> {
     /// Handle a timer firing.
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
+    ///
+    /// `dispatch` is the firing timer's dispatch identifier, i.e., a
+    /// [`HandleableTimer`].
+    ///
+    /// `timer` is the unique timer identifier for the
+    /// [`TimerBindingsTypes::Timer`] that scheduled this operation.
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, dispatch: Id, timer: BC::UniqueTimerId);
 }
 
 impl<Id, CC, BC> TimerHandler<BC, Id> for CC
 where
+    BC: TimerBindingsTypes,
     Id: HandleableTimer<CC, BC>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id) {
-        id.handle(self, bindings_ctx)
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, dispatch: Id, timer: BC::UniqueTimerId) {
+        dispatch.handle(self, bindings_ctx, timer)
     }
 }
 
@@ -162,9 +180,12 @@ where
 ///
 /// This trait exists to sidestep coherence issues when dealing with timer
 /// layers, see [`TimerHandler`] for more.
-pub trait HandleableTimer<CC, BC> {
+pub trait HandleableTimer<CC, BC: TimerBindingsTypes> {
     /// Handles this timer firing.
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC);
+    ///
+    /// `timer` is the unique timer identifier for the
+    /// [`TimerBindingsTypes::Timer`] that scheduled this operation.
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId);
 }
 
 /// A core context providing timer type conversion.

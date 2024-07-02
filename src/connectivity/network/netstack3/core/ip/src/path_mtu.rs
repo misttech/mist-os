@@ -151,7 +151,7 @@ impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> PmtuHandler<I, BC> 
 impl<I: Ip, BC: PmtuBindingsContext, CC: PmtuContext<I, BC>> HandleableTimer<CC, BC>
     for PmtuTimerId<I>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self(IpVersionMarker { .. }) = self;
         core_ctx.with_state_mut(|cache| {
             let now = bindings_ctx.now();

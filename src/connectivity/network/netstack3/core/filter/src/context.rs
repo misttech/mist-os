@@ -210,8 +210,8 @@ pub(crate) mod testutil {
 
     impl<I: Ip> TimerBindingsTypes for FakeBindingsCtx<I> {
         type Timer = <FakeTimerCtx<FilterTimerId<I>> as TimerBindingsTypes>::Timer;
-
         type DispatchId = <FakeTimerCtx<FilterTimerId<I>> as TimerBindingsTypes>::DispatchId;
+        type UniqueTimerId = <FakeTimerCtx<FilterTimerId<I>> as TimerBindingsTypes>::UniqueTimerId;
     }
 
     impl<I: Ip> TimerContext for FakeBindingsCtx<I> {
@@ -233,6 +233,10 @@ pub(crate) mod testutil {
 
         fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
             self.timer_ctx.scheduled_instant(timer)
+        }
+
+        fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
+            self.timer_ctx.unique_timer_id(timer)
         }
     }
 

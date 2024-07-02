@@ -2083,7 +2083,7 @@ impl<
         CC: NudContext<I, D, BC> + NudIcmpContext<I, D, BC> + CounterContext<NudCounters<I>>,
     > HandleableTimer<CC, BC> for NudTimerId<I, D, CC::WeakDeviceId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self { device_id, timer_type, _marker: PhantomData } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;

@@ -6,7 +6,7 @@ use std::cmp;
 use std::collections::BinaryHeap;
 use std::fmt::Debug;
 use std::sync::atomic::{self, AtomicI64, AtomicUsize};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::task::Poll;
 
 use async_utils::futures::YieldToExecutorOnce;
@@ -62,7 +62,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
     /// # Panics
     ///
     /// Panics if this `TimerDispatcher` has already been spawned.
-    pub(crate) fn spawn<H: FnMut(T) + Send + Sync + 'static>(
+    pub(crate) fn spawn<H: FnMut(T, UniqueTimerId<T>) + Send + Sync + 'static>(
         &self,
         handler: H,
     ) -> fasync::Task<()> {
@@ -97,7 +97,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
         assert!(self.inner.state.lock().notifier.take().is_some(), "dispatcher already closed");
     }
 
-    async fn worker<H: FnMut(T)>(
+    async fn worker<H: FnMut(T, UniqueTimerId<T>)>(
         mut handler: H,
         mut watcher: NeedsDataWatcher,
         inner: Arc<TimerDispatcherInner<T>>,
@@ -177,13 +177,13 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
     ///
     /// Returns the next wakeup time for the worker task and the total number of
     /// entries in the internal heap.
-    async fn check_timer_heap<H: FnMut(T)>(
+    async fn check_timer_heap<H: FnMut(T, UniqueTimerId<T>)>(
         handler: &mut H,
         inner: &CoreMutex<TimerDispatcherState<T>>,
     ) -> (fasync::Time, usize) {
         let mut fired_count = 0;
         loop {
-            let fire = {
+            let (dispatch, unique_id) = {
                 let mut guard = inner.lock();
                 let TimerDispatcherState { heap, notifier: _, watcher: _ } = &mut *guard;
                 let heap_len = heap.len();
@@ -199,7 +199,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
                 // PeekMut implements Deref.
                 let front = std::collections::binary_heap::PeekMut::pop(front);
                 match front.try_fire() {
-                    TryFireResult::Fire(f) => f,
+                    TryFireResult::Fire(d, u) => (d, u),
                     TryFireResult::Ignore => continue,
                     TryFireResult::Reschedule(r) => {
                         heap.push(r);
@@ -207,8 +207,8 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
                     }
                 }
             };
-            trace!("firing timer {fire:?}");
-            handler(fire);
+            trace!("firing timer {dispatch:?}");
+            handler(dispatch, unique_id);
             fired_count += 1;
             if fired_count % YIELD_TIMER_COUNT == 0 {
                 YieldToExecutorOnce::new().await;
@@ -305,7 +305,10 @@ impl<T: Clone> TimerScheduledEntry<T> {
         ) {
             // We may only fire the timer if the timer state is holding the same
             // value that it had when it was put into the heap.
-            Ok(_) => TryFireResult::Fire(timer_state.dispatch.clone()),
+            Ok(_) => TryFireResult::Fire(
+                timer_state.dispatch.clone(),
+                UniqueTimerId(Arc::downgrade(&timer_state)),
+            ),
             Err(next) => {
                 let next = fasync::Time::from_nanos(next);
                 match ScheduledEntryValidity::new(next, scheduled_for) {
@@ -333,7 +336,7 @@ impl<T: Clone> TimerScheduledEntry<T> {
 /// The result of operating a valid timer entry.
 enum TryFireResult<T> {
     /// Fire this timer with the provided dispatch id.
-    Fire(T),
+    Fire(T, UniqueTimerId<T>),
     /// Timer entry is stale, ignore it.
     Ignore,
     /// Reschedule with this new entry.
@@ -361,6 +364,18 @@ pub(crate) struct Timer<T> {
     /// This type must not become Clone, see explanation in [`Timer::schedule`].
     _no_clone: NoCloneGuard,
 }
+
+pub(crate) struct UniqueTimerId<T>(Weak<TimerState<T>>);
+
+impl<T> PartialEq for UniqueTimerId<T> {
+    fn eq(&self, other: &Self) -> bool {
+        let Self(this) = self;
+        let Self(other) = other;
+        Weak::ptr_eq(this, other)
+    }
+}
+
+impl<T> Eq for UniqueTimerId<T> {}
 
 impl<T> Debug for Timer<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -448,6 +463,10 @@ impl<T> Timer<T> {
         ScheduledInstant::new(fasync::Time::from_nanos(
             self.state.scheduled.load(atomic::Ordering::SeqCst),
         ))
+    }
+
+    pub(crate) fn unique_id(&self) -> UniqueTimerId<T> {
+        UniqueTimerId(Arc::downgrade(&self.state))
     }
 }
 
@@ -709,8 +728,9 @@ mod tests {
         fn new() -> Self {
             let dispatcher = TimerDispatcher::default();
             let (sender, fired) = mpsc::unbounded();
-            let task = dispatcher
-                .spawn(move |t| sender.unbounded_send(t).expect("failed to send fired timer"));
+            let task = dispatcher.spawn(move |dispatch, _timer_id| {
+                sender.unbounded_send(dispatch).expect("failed to send fired timer")
+            });
             Self { dispatcher, fired, task }
         }
 

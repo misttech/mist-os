@@ -134,7 +134,7 @@ pub trait RsBindingsContext: RngContext + TimerContext {}
 impl<BC> RsBindingsContext for BC where BC: RngContext + TimerContext {}
 
 /// An implementation of Router Solicitation.
-pub trait RsHandler<BC>:
+pub trait RsHandler<BC: RsBindingsTypes>:
     DeviceIdContext<AnyDevice> + TimerHandler<BC, RsTimerId<Self::WeakDeviceId>>
 {
     /// Starts router solicitation.
@@ -178,7 +178,7 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
 impl<BC: RsBindingsContext, CC: RsContext<BC>> HandleableTimer<CC, BC>
     for RsTimerId<CC::WeakDeviceId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self { device_id } = self;
         if let Some(device_id) = device_id.upgrade() {
             do_router_solicitation(core_ctx, bindings_ctx, &device_id)

@@ -5130,7 +5130,7 @@ where
         + CounterContext<TcpCounters<Ipv4>>
         + CounterContext<TcpCounters<Ipv6>>,
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let ctx_pair = CtxPair { core_ctx, bindings_ctx };
         match self {
             TcpTimerId::V4(conn_id) => TcpApi::new(ctx_pair).handle_timer(conn_id),
@@ -5227,8 +5227,8 @@ mod tests {
     use netstack3_base::testutil::{
         new_rng, run_with_many_seeds, set_logger_for_test, FakeCoreCtx, FakeCryptoRng,
         FakeDeviceId, FakeInstant, FakeNetwork, FakeNetworkSpec, FakeStrongDeviceId, FakeTimerCtx,
-        FakeWeakDeviceId, InstantAndData, MultipleDevicesId, PendingFrameData, StepResult,
-        TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
+        FakeTimerId, FakeWeakDeviceId, InstantAndData, MultipleDevicesId, PendingFrameData,
+        StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
     };
     use netstack3_base::{
         ContextProvider, Instant as _, InstantContext, LinkDevice, ReferenceNotifiers,
@@ -5395,8 +5395,8 @@ mod tests {
                 }
             }
         }
-        fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId) {
-            match timer {
+        fn handle_timer(ctx: &mut Self::Context, dispatch: Self::TimerId, _: FakeTimerId) {
+            match dispatch {
                 TcpTimerId::V4(id) => ctx.tcp_api().handle_timer(id),
                 TcpTimerId::V6(id) => ctx.tcp_api().handle_timer(id),
             }
@@ -5455,9 +5455,11 @@ mod tests {
 
     /// Delegate implementation to internal thing.
     impl<D: FakeStrongDeviceId> TimerBindingsTypes for TcpBindingsCtx<D> {
+        type Timer = <FakeTimerCtx<TcpTimerId<D::Weak, Self>> as TimerBindingsTypes>::Timer;
         type DispatchId =
             <FakeTimerCtx<TcpTimerId<D::Weak, Self>> as TimerBindingsTypes>::DispatchId;
-        type Timer = <FakeTimerCtx<TcpTimerId<D::Weak, Self>> as TimerBindingsTypes>::Timer;
+        type UniqueTimerId =
+            <FakeTimerCtx<TcpTimerId<D::Weak, Self>> as TimerBindingsTypes>::UniqueTimerId;
     }
 
     /// Delegate implementation to internal thing.
@@ -5492,6 +5494,10 @@ mod tests {
 
         fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
             self.timers.scheduled_instant(timer)
+        }
+
+        fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
+            self.timers.unique_timer_id(timer)
         }
     }
 

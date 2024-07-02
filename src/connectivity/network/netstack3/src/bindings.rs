@@ -453,6 +453,7 @@ impl RngContext for BindingsCtx {
 impl TimerBindingsTypes for BindingsCtx {
     type Timer = timers::Timer<TimerId<BindingsCtx>>;
     type DispatchId = TimerId<BindingsCtx>;
+    type UniqueTimerId = timers::UniqueTimerId<TimerId<BindingsCtx>>;
 }
 
 impl TimerContext for BindingsCtx {
@@ -474,6 +475,10 @@ impl TimerContext for BindingsCtx {
 
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         timer.scheduled_time().map(Into::into)
+    }
+
+    fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
+        timer.unique_id()
     }
 }
 
@@ -1183,8 +1188,8 @@ impl NetstackSeed {
         let mut timer_handler_ctx = netstack.ctx.clone();
         let timers_task = NamedTask::new(
             "timers",
-            netstack.ctx.bindings_ctx().timers.spawn(move |timer| {
-                timer_handler_ctx.api().handle_timer(timer);
+            netstack.ctx.bindings_ctx().timers.spawn(move |dispatch, timer| {
+                timer_handler_ctx.api().handle_timer(dispatch, timer);
             }),
         );
 

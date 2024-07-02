@@ -29,8 +29,8 @@ use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::{DynDebugReferences, Mutex};
 use netstack3_base::testutil::{
     FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks, FakeNetworkSpec,
-    FakeTimerCtx, FakeTimerCtxExt, MonotonicIdentifier, TestAddrs, WithFakeFrameContext,
-    WithFakeTimerContext,
+    FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs,
+    WithFakeFrameContext, WithFakeTimerContext,
 };
 use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
@@ -705,6 +705,7 @@ impl InstantContext for FakeBindingsCtx {
 impl TimerBindingsTypes for FakeBindingsCtx {
     type Timer = <FakeTimerCtx<TimerId<Self>> as TimerBindingsTypes>::Timer;
     type DispatchId = TimerId<Self>;
+    type UniqueTimerId = <FakeTimerCtx<TimerId<Self>> as TimerBindingsTypes>::UniqueTimerId;
 }
 
 impl TimerContext for FakeBindingsCtx {
@@ -736,6 +737,10 @@ impl TimerContext for FakeBindingsCtx {
 
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         self.with_inner_mut(|ctx| ctx.scheduled_instant(timer))
+    }
+
+    fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
+        self.with_inner_mut(|ctx| ctx.unique_timer_id(timer))
     }
 }
 
@@ -1179,8 +1184,8 @@ impl FakeNetworkSpec for FakeCtxNetworkSpec {
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id }, data)
     }
-    fn handle_timer(ctx: &mut FakeCtx, timer: Self::TimerId) {
-        ctx.core_api().handle_timer(timer)
+    fn handle_timer(ctx: &mut FakeCtx, dispatch: Self::TimerId, timer: FakeTimerId) {
+        ctx.core_api().handle_timer(dispatch, timer)
     }
     fn process_queues(ctx: &mut FakeCtx) -> bool {
         ctx.test_api().handle_queued_rx_packets()

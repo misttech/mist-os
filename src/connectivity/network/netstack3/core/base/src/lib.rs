@@ -133,7 +133,7 @@ pub mod testutil {
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
-        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
+        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, InstantAndData,
         WithFakeTimerContext,
     };
     pub use crate::trace::testutil::FakeTracingCtx;

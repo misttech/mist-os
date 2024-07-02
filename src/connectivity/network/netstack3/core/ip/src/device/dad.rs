@@ -398,7 +398,7 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> DadHandler<Ipv6
 impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> HandleableTimer<CC, BC>
     for DadTimerId<CC::WeakDeviceId, CC::WeakAddressId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self { device_id, addr } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
@@ -593,7 +593,12 @@ mod tests {
                     groups: HashMap::default(),
                 }),
             }));
-        TimerHandler::handle_timer(&mut core_ctx, &mut bindings_ctx, dad_timer_id());
+        TimerHandler::handle_timer(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            dad_timer_id(),
+            Default::default(),
+        );
     }
 
     #[test]

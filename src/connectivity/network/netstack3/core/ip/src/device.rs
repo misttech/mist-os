@@ -31,7 +31,7 @@ use netstack3_base::{
     AnyDevice, DeferredResourceRemovalContext, DeviceIdContext, EventContext, ExistsError,
     HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext, NotFoundError,
     RemoveResourceResultWithContext, RngContext, SendFrameError, StrongDeviceIdentifier,
-    TimerContext, TimerHandler, WeakDeviceIdentifier,
+    TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
 use netstack3_filter::{IpPacket, ProofOfEgressCheck};
 use packet::{BufferMut, Serializer};
@@ -123,12 +123,12 @@ impl<D: WeakDeviceIdentifier> From<IgmpTimerId<D>> for Ipv4DeviceTimerId<D> {
     }
 }
 
-impl<D: WeakDeviceIdentifier, BC, CC: TimerHandler<BC, IgmpTimerId<D>>> HandleableTimer<CC, BC>
-    for Ipv4DeviceTimerId<D>
+impl<D: WeakDeviceIdentifier, BC: TimerBindingsTypes, CC: TimerHandler<BC, IgmpTimerId<D>>>
+    HandleableTimer<CC, BC> for Ipv4DeviceTimerId<D>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         let Self(id) = self;
-        core_ctx.handle_timer(bindings_ctx, id);
+        core_ctx.handle_timer(bindings_ctx, id, timer);
     }
 }
 
@@ -141,13 +141,13 @@ where
     for<'a> CC::WithIpDeviceConfigurationInnerCtx<'a>:
         TimerHandler<BC, I::Timer<CC::WeakDeviceId, A>>,
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         let Self(id) = self;
         let Some(device_id) = I::timer_device_id(&id) else {
             return;
         };
         core_ctx.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
-            TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id)
+            TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id, timer)
         })
     }
 }
@@ -241,7 +241,7 @@ impl<D: WeakDeviceIdentifier, A: WeakIpAddressId<Ipv6Addr>> From<SlaacTimerId<D>
 impl<
         D: WeakDeviceIdentifier,
         A: WeakIpAddressId<Ipv6Addr>,
-        BC,
+        BC: TimerBindingsTypes,
         CC: TimerHandler<BC, RsTimerId<D>>
             + TimerHandler<BC, Ipv6DiscoveredRouteTimerId<D>>
             + TimerHandler<BC, MldTimerId<D>>
@@ -249,13 +249,13 @@ impl<
             + TimerHandler<BC, DadTimerId<D, A>>,
     > HandleableTimer<CC, BC> for Ipv6DeviceTimerId<D, A>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         match self {
-            Ipv6DeviceTimerId::Mld(id) => core_ctx.handle_timer(bindings_ctx, id),
-            Ipv6DeviceTimerId::Dad(id) => core_ctx.handle_timer(bindings_ctx, id),
-            Ipv6DeviceTimerId::Rs(id) => core_ctx.handle_timer(bindings_ctx, id),
-            Ipv6DeviceTimerId::RouteDiscovery(id) => core_ctx.handle_timer(bindings_ctx, id),
-            Ipv6DeviceTimerId::Slaac(id) => core_ctx.handle_timer(bindings_ctx, id),
+            Ipv6DeviceTimerId::Mld(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            Ipv6DeviceTimerId::Dad(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            Ipv6DeviceTimerId::Rs(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            Ipv6DeviceTimerId::RouteDiscovery(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            Ipv6DeviceTimerId::Slaac(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
         }
     }
 }

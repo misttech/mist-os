@@ -635,7 +635,7 @@ mod tests {
     use netstack3_base::socket::SocketIpAddr;
     use netstack3_base::testutil::{
         assert_empty, FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeInstant, FakeLinkDeviceId,
-        FakeNetworkSpec, FakeWeakDeviceId, WithFakeFrameContext,
+        FakeNetworkSpec, FakeTimerId, FakeWeakDeviceId, WithFakeFrameContext,
     };
     use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, TimerHandler};
     use netstack3_ip::nud::testutil::{
@@ -735,9 +735,9 @@ mod tests {
                 data,
             )
         }
-        fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId) {
+        fn handle_timer(ctx: &mut Self::Context, dispatch: Self::TimerId, timer: FakeTimerId) {
             let CtxPair { core_ctx, bindings_ctx } = ctx;
-            TimerHandler::handle_timer(core_ctx, bindings_ctx, timer)
+            TimerHandler::handle_timer(core_ctx, bindings_ctx, dispatch, timer)
         }
 
         fn process_queues(_ctx: &mut Self::Context) -> bool {

@@ -96,6 +96,7 @@ impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta
 {
     type Timer = <FakeTimerCtx<Id> as TimerBindingsTypes>::Timer;
     type DispatchId = <FakeTimerCtx<Id> as TimerBindingsTypes>::DispatchId;
+    type UniqueTimerId = <FakeTimerCtx<Id> as TimerBindingsTypes>::UniqueTimerId;
 }
 
 impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta> TimerContext
@@ -119,6 +120,10 @@ impl<Id: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta
 
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         self.timers.scheduled_instant(timer)
+    }
+
+    fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
+        self.timers.unique_timer_id(timer)
     }
 }
 

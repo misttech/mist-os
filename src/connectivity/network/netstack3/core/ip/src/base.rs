@@ -24,7 +24,7 @@ use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
     ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector,
     InstantContext, NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
-    StrongDeviceIdentifier, TimerContext, TimerHandler, TracingContext,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -1527,15 +1527,20 @@ where
         + TimerHandler<BC, PmtuTimerId<Ipv6>>
         + TimerHandler<BC, FilterTimerId<Ipv4>>
         + TimerHandler<BC, FilterTimerId<Ipv6>>,
+    BC: TimerBindingsTypes,
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         match self {
-            IpLayerTimerId::ReassemblyTimeoutv4(id) => core_ctx.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::ReassemblyTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::PmtuTimeoutv4(id) => core_ctx.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::PmtuTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::FilterTimerv4(id) => core_ctx.handle_timer(bindings_ctx, id),
-            IpLayerTimerId::FilterTimerv6(id) => core_ctx.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::ReassemblyTimeoutv4(id) => {
+                core_ctx.handle_timer(bindings_ctx, id, timer)
+            }
+            IpLayerTimerId::ReassemblyTimeoutv6(id) => {
+                core_ctx.handle_timer(bindings_ctx, id, timer)
+            }
+            IpLayerTimerId::PmtuTimeoutv4(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            IpLayerTimerId::PmtuTimeoutv6(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            IpLayerTimerId::FilterTimerv4(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            IpLayerTimerId::FilterTimerv6(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
         }
     }
 }
