@@ -161,8 +161,10 @@ pub(crate) type AccessVectors<PS> = Vec<AccessVector<PS>>;
 impl<PS: ParseStrategy> Validate for AccessVectors<PS> {
     type Error = anyhow::Error;
 
-    /// TODO: Validate internal consistency between consecutive [`AccessVector`] instances.
     fn validate(&self) -> Result<(), Self::Error> {
+        for access_vector in self {
+            access_vector.validate()?;
+        }
         Ok(())
     }
 }
@@ -273,6 +275,18 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
     }
 }
 
+impl<PS: ParseStrategy> Validate for AccessVector<PS> {
+    type Error = anyhow::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        if PS::deref(&self.metadata).class.get() == 0 {
+            Err(ValidateError::NonOptionalIdIsZero.into())
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct AccessVectorMetadata {
@@ -329,7 +343,7 @@ impl<PS: ParseStrategy> ValidateArray<le::U32, RoleTransition> for RoleTransitio
         _metadata: &'a le::U32,
         _data: &'a [RoleTransition],
     ) -> Result<(), Self::Error> {
-        Ok(())
+        _data.validate()
     }
 }
 
@@ -363,8 +377,12 @@ impl RoleTransition {
 impl Validate for [RoleTransition] {
     type Error = anyhow::Error;
 
-    /// TODO: Validate sequence of [`RoleTransition`].
     fn validate(&self) -> Result<(), Self::Error> {
+        for role_transition in self {
+            if role_transition.tclass.get() == 0 {
+                return Err(ValidateError::NonOptionalIdIsZero.into());
+            }
+        }
         Ok(())
     }
 }
@@ -1130,6 +1148,11 @@ impl<PS: ParseStrategy> Validate for RangeTransitions<PS> {
 
     /// TODO: Validate sequence of [`RangeTransition`] objects.
     fn validate(&self) -> Result<(), Self::Error> {
+        for range_transition in self {
+            if PS::deref(&range_transition.metadata).target_class.get() == 0 {
+                return Err(ValidateError::NonOptionalIdIsZero.into());
+            }
+        }
         Ok(())
     }
 }
