@@ -8,6 +8,7 @@ import abc
 from collections.abc import Callable
 
 from honeydew.interfaces.affordances import (
+    inspect,
     rtc,
     session,
     system_power_state_controller,
@@ -186,6 +187,15 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             bluetooth_gap.BluetoothGap object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def inspect(self) -> inspect.Inspect:
+        """Returns a inspect affordance object.
+
+        Returns:
+            inspect.Inspect object
         """
 
     @properties.Affordance

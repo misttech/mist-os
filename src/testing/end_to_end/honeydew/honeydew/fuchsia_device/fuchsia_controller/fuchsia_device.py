@@ -22,6 +22,7 @@ import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fcp
 
 from honeydew import errors
+from honeydew.affordances.ffx import inspect as inspect_ffx
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
@@ -35,6 +36,7 @@ from honeydew.affordances.fuchsia_controller.ui import (
 from honeydew.affordances.starnix import (
     system_power_state_controller as system_power_state_controller_starnix,
 )
+from honeydew.interfaces.affordances import inspect as inspect_interface
 from honeydew.interfaces.affordances import (
     rtc,
     session,
@@ -420,6 +422,18 @@ class FuchsiaDevice(
             wlan.Wlan object
         """
         raise NotImplementedError
+
+    @properties.Affordance
+    def inspect(self) -> inspect_interface.Inspect:
+        """Returns a inspect affordance object.
+
+        Returns:
+            inspect.Inspect object
+        """
+        return inspect_ffx.Inspect(
+            device_name=self.device_name,
+            ffx=self.ffx,
+        )
 
     # List all the public methods
     def close(self) -> None:
