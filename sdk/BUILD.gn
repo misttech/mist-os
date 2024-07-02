@@ -80,7 +80,7 @@ if (override_target_api_level != "PLATFORM") {
 # also create $OUTPUT_DIR/sdk/exported/zircon_sysroot/ by
 # default, and should not affect other uses of _sdk_public_deps.
 _sdk_public_deps = [
-  ":core",
+  #":core",
   ":zircon_sysroot",
 ]
 
@@ -891,8 +891,8 @@ sdk_collection("platform") {
   id = sdk_id
 
   deps = [
-    ":platform_fidls",
-    ":platform_libs",
+    #":platform_fidls",
+    #":platform_libs",
   ]
 }
 
