@@ -8,22 +8,18 @@ use chrono::prelude::*;
 use chrono::LocalResult;
 use fdio::service_connect;
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_hardware_rtc as frtc;
 use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_fs::directory;
 use fuchsia_zircon::{self as zx, DurationNum};
-use futures::TryFutureExt;
-use lazy_static::lazy_static;
-use std::fs;
+use futures::{select, FutureExt, StreamExt, TryFutureExt};
 use std::path::PathBuf;
 use thiserror::Error;
-use tracing::error;
+use tracing::{debug, error, warn};
+use {fidl_fuchsia_hardware_rtc as frtc, fidl_fuchsia_io as fio};
 #[cfg(test)]
 use {fuchsia_sync::Mutex, std::sync::Arc};
 
-lazy_static! {
-    /// The absolute path at which RTC devices are exposed.
-    static ref RTC_PATH: PathBuf = PathBuf::from("/dev/class/rtc/");
-}
+static RTC_PATH: &str = "/dev/class/rtc";
 
 /// Time to wait before declaring a FIDL call to be failed.
 const FIDL_TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
@@ -31,16 +27,18 @@ const FIDL_TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
 // The minimum error at which to begin an async wait for top of second while setting RTC.
 const WAIT_THRESHOLD: zx::Duration = zx::Duration::from_millis(1);
 
+const RTC_DEVICE_OPEN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
 
 #[derive(Error, Debug)]
 pub enum RtcCreationError {
     #[error("Could not find any RTC devices")]
     NoDevices,
-    #[error("Found {0} RTC devices, more than the 1 we expected")]
-    MultipleDevices(usize),
     #[error("Could not connect to RTC device: {0}")]
     ConnectionFailed(Error),
+    #[error("Not configured to use RTC")]
+    NotConfigured,
 }
 
 /// Interface to interact with a real-time clock. Note that the RTC hardware interface is limited
@@ -54,6 +52,13 @@ pub trait Rtc: Send + Sync {
     async fn set(&self, value: zx::Time) -> Result<()>;
 }
 
+fn get_dir() -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
+    directory::open_in_namespace(
+        RTC_PATH,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+    )
+}
+
 /// An implementation of the `Rtc` trait that connects to an RTC device in /dev/class/rtc.
 pub struct RtcImpl {
     proxy: frtc::DeviceProxy,
@@ -62,19 +67,79 @@ pub struct RtcImpl {
 impl RtcImpl {
     /// Returns a new `RtcImpl` connected to the only available RTC device. Returns an Error if no
     /// devices were found, multiple devices were found, or the connection failed.
-    pub fn only_device() -> Result<RtcImpl, RtcCreationError> {
-        let mut iterator = fs::read_dir(&*RTC_PATH).map_err(|_| RtcCreationError::NoDevices)?;
-        match iterator.next() {
-            Some(Ok(first_entry)) => match iterator.count() {
-                0 => RtcImpl::new(first_entry.path()),
-                additional_devices => {
-                    Err(RtcCreationError::MultipleDevices(additional_devices + 1))
-                }
-            },
-            Some(Err(err)) => {
-                Err(RtcCreationError::ConnectionFailed(anyhow!("Failed to read entry: {}", err)))
+    pub async fn only_device(has_rtc: bool) -> Result<RtcImpl, RtcCreationError> {
+        Self::only_device_for_test(has_rtc, get_dir).await
+    }
+
+    // Call directly only for tests.
+    async fn only_device_for_test<F>(
+        has_rtc: bool,
+        rtc_dir_source: F,
+    ) -> Result<RtcImpl, RtcCreationError>
+    where
+        F: FnOnce() -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError>,
+    {
+        debug!("has_rtc: {}", has_rtc);
+        if has_rtc {
+            let maybe_dir = rtc_dir_source();
+            let dir = maybe_dir.map_err(|err| {
+                RtcCreationError::ConnectionFailed(anyhow!(
+                    "could not open {:?}: {}",
+                    &*RTC_PATH,
+                    err
+                ))
+            })?;
+
+            let mut rtc_devices = device_watcher::watch_for_files(&dir)
+                .await
+                .map_err(|err| {
+                    RtcCreationError::ConnectionFailed(anyhow!(
+                        "could not watch {}: {}",
+                        RTC_PATH,
+                        err
+                    ))
+                })?
+                .fuse();
+            let mut timeout = fasync::Timer::new(RTC_DEVICE_OPEN_TIMEOUT).fuse();
+            select! {
+                device = rtc_devices.next() => {
+                    match device {
+                        Some(device) => {
+                            let device = device.map_err(|err| {
+                                RtcCreationError::ConnectionFailed(anyhow!(
+                                    "could not read any RTC device from {}: {}",
+                                    RTC_PATH,
+                                    err
+                                ))
+                            })?;
+                            fasync::Task::local(async move {
+                                while let Some(device) = rtc_devices.next().await {
+                                    // Attempt to alert to the existence of multiple RTC drivers here.
+                                    // For the time being this situation probably means the choice
+                                    // of the RTC to use is not stable over time.
+                                    warn!("another RTC device appeared and was ignored: {:?}", device)
+                                }
+                            })
+                            .detach();
+                            let mut path = PathBuf::from(RTC_PATH);
+                            path.push(device);
+                            RtcImpl::new(path)
+                        },
+                        None => {
+                            // While this should not happen in general, we may be better
+                            // served by continuing without RTC if it does.
+                            Err(RtcCreationError::NoDevices)
+                        },
+                    }
+                },
+
+                _ = timeout => {
+                    Err(RtcCreationError::NoDevices)
+                },
             }
-            None => Err(RtcCreationError::NoDevices),
+        } else {
+            debug!("no RTC was configured in {}", RTC_PATH);
+            Err(RtcCreationError::NotConfigured)
         }
     }
 
@@ -83,6 +148,7 @@ impl RtcImpl {
         let path_str = path_buf
             .to_str()
             .ok_or(RtcCreationError::ConnectionFailed(anyhow!("Non unicode path")))?;
+        debug!("RTC at: {}", path_str);
         let (proxy, server) = create_proxy::<frtc::DeviceMarker>().map_err(|err| {
             RtcCreationError::ConnectionFailed(anyhow!("Failed to create proxy: {}", err))
         })?;
