@@ -21,6 +21,7 @@
 #include <linux/netlink.h>
 #include <linux/taskstats.h>
 
+#include "gtest/gtest.h"
 #include "syscall_matchers.h"
 
 #define SAFE_SYSCALL(X)                                                             \
@@ -366,6 +367,11 @@ void DropAllCapabilities();
 
 // Checks if a capability is in the effective set.
 bool HasCapability(int cap);
+
+enum AccessType { Read, Write };
+
+// Checks whether the provided access segfaults.
+testing::AssertionResult TestThatAccessSegfaults(void *test_address, AccessType type);
 
 }  // namespace test_helper
 

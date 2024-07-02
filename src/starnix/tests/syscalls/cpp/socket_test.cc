@@ -17,6 +17,7 @@
 #include <thread>
 
 #include <asm-generic/socket.h>
+#include <fbl/unaligned.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
@@ -80,7 +81,7 @@ TEST(UnixSocket, HupEvent) {
   no_ready = epoll_wait(epfd, &outev, 1, 0);
   ASSERT_EQ(1, no_ready);
   ASSERT_EQ(EPOLLIN | EPOLLHUP, outev.events);
-  ASSERT_EQ(42ul, outev.data.u64);
+  ASSERT_EQ(42ul, fbl::UnalignedLoad<uint64_t>(&outev.data.u64));
 
   close(fds[0]);
   close(epfd);

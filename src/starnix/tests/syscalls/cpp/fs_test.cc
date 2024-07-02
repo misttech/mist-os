@@ -79,6 +79,8 @@ TEST(FsTest, FchmodTest) {
   ASSERT_EQ(fchmod(fd, S_IRWXU | S_IRWXG | S_IFCHR), 0);
 }
 
+// This test passes non-null arguments and has other quirks that fail under sanitizers.
+#if (!__has_feature(address_sanitizer))
 TEST(FsTest, DevZeroAndNullQuirks) {
   size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGESIZE));
 
@@ -200,6 +202,7 @@ TEST(FsTest, DevZeroAndNullQuirks) {
     close(fd);
   }
 }
+#endif
 
 constexpr uid_t kOwnerUid = 65534;
 constexpr uid_t kNonOwnerUid = 65533;

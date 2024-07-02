@@ -381,4 +381,31 @@ bool HasCapability(int cap) {
   return caps[CAP_TO_INDEX(cap)].effective & CAP_TO_MASK(cap);
 }
 
+// This variable is accessed from within a signal handler and thus must be declared volatile.
+static volatile void *expected_fault_address;
+
+testing::AssertionResult TestThatAccessSegfaults(void *test_address, AccessType type) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([test_address, type] {
+    struct sigaction action;
+    action.sa_sigaction = [](int signo, siginfo_t *info, void *ucontext) {
+      if (signo == SIGSEGV && info->si_addr == expected_fault_address) {
+        _exit(EXIT_SUCCESS);
+      } else {
+        _exit(EXIT_FAILURE);
+      }
+    };
+    action.sa_flags = SA_SIGINFO;
+    SAFE_SYSCALL(sigaction(SIGSEGV, &action, nullptr));
+    expected_fault_address = test_address;
+    if (type == AccessType::Read) {
+      *static_cast<volatile std::byte *>(test_address);
+    } else {
+      *static_cast<volatile std::byte *>(test_address) = std::byte{};
+    }
+    FAIL() << "Must have observed segfault after access.";
+  });
+  return helper.WaitForChildren();
+}
+
 }  // namespace test_helper
