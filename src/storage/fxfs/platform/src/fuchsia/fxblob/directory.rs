@@ -22,7 +22,6 @@ use fidl_fuchsia_io::{
     self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
     NodeMarker, WatchMask,
 };
-use fuchsia_async as fasync;
 use fuchsia_hash::Hash;
 use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
 use fuchsia_zircon::Status;
@@ -95,12 +94,13 @@ impl RootDir for BlobDirectory {
     }
 
     fn on_open(self: Arc<Self>) {
-        fasync::Task::spawn(async move {
+        // It's safe for this task to be dropped when the volume is shut down.
+        let scope = self.volume().scope().clone();
+        scope.spawn(async move {
             if let Err(e) = self.prefetch_blobs().await {
                 tracing::warn!("Failed to prefetch blobs: {:?}", e);
             }
-        })
-        .detach();
+        });
     }
 
     /// Handle fuchsia.fxfs/BlobCreator requests for this [`BlobDirectory`].
