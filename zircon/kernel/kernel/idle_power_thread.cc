@@ -159,6 +159,11 @@ IdlePowerThread::TransitionResult IdlePowerThread::TransitionFromTo(State expect
 
     // The move to the transitional state failed because the current state is neither the expected
     // state nor the target state.
+    dprintf(INFO,
+            "Failed power state transition, "
+            "expected(current=%s, target=%s) transitional(current=%s, target=%s)\n",
+            ToString(expected.current), ToString(expected.target), ToString(transitional.current),
+            ToString(transitional.target));
     return {ZX_ERR_BAD_STATE, expected.current};
   }
   DEBUG_ASSERT(expected.current == expected_state);
