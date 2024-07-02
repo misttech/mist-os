@@ -16,7 +16,8 @@ class AmlSpiShutdownConfig final {
   using EnvironmentType = BaseTestEnvironment;
 };
 
-class AmlSpiShutdownTest : public fdf_testing::DriverTestFixture<AmlSpiShutdownConfig> {};
+class AmlSpiShutdownTest : public fdf_testing::DriverTestFixture<AmlSpiShutdownConfig>,
+                           public ::testing::Test {};
 
 TEST_F(AmlSpiShutdownTest, Shutdown) {
   // Must outlive AmlSpi device.

@@ -1,0 +1,24 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("cpp_fixture") {
+  public_configs = [ ":includes" ]
+  sources = [
+    "include/lib/driver/testing/cpp/fixture/driver_test_fixture.h",
+    "include/lib/driver/testing/cpp/fixture/internal/fixture_internals.h",
+  ]
+  public_deps = [
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
+  ]
+}
+
+source_set("cpp_fixture_extensions") {
+  sources = [ "minimal_compat_environment.h" ]
+  public_deps = [ "//sdk/lib/driver/compat/cpp" ]
+}
+
+config("includes") {
+  include_dirs = [ "include" ]
+}

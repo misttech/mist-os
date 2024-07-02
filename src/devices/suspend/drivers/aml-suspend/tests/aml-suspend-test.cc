@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.hardware.suspend/cpp/markers.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <gtest/gtest.h>
 #include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
@@ -88,7 +88,8 @@ class AmlSuspendTestConfiguration {
   using EnvironmentType = TestEnvironmentWrapper;
 };
 
-class AmlSuspendTestFixture : public fdf_testing::DriverTestFixture<AmlSuspendTestConfiguration> {
+class AmlSuspendTestFixture : public fdf_testing::DriverTestFixture<AmlSuspendTestConfiguration>,
+                              public ::testing::Test {
  protected:
   void SetUp() override {
     zx::result connect_result = Connect<fuchsia_hardware_suspend::SuspendService::Suspender>();

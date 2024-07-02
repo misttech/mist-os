@@ -10,9 +10,10 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/serial/drivers/aml-uart/tests/device_state.h"
@@ -284,7 +285,8 @@ class AmlUartAsyncTestConfig {
   using EnvironmentType = Environment;
 };
 
-class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig> {
+class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig>,
+                       public ::testing::Test {
  public:
   void SetUp() override {
     zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {
@@ -306,7 +308,8 @@ class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig> 
   }
 };
 
-class AmlUartAsyncHarness : public fdf_testing::DriverTestFixture<AmlUartAsyncTestConfig> {
+class AmlUartAsyncHarness : public fdf_testing::DriverTestFixture<AmlUartAsyncTestConfig>,
+                            public ::testing::Test {
  public:
   void SetUp() override {
     zx::result result = StartDriverCustomized([&](fdf::DriverStartArgs& args) {

@@ -91,7 +91,7 @@ fuchsia_cc_test(
     srcs = ["adc-buttons-test.cc"] + _common_sources,
     deps = [
         "//sdk/lib/driver/compat/cpp",
-        "//sdk/lib/driver/testing/cpp:driver_testing_cpp_gtest_fixture",
+        "//sdk/lib/driver/testing/cpp/fixture:driver_testing_cpp_fixture",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ] + _common_deps,

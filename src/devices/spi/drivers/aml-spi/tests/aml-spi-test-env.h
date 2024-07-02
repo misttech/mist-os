@@ -8,13 +8,14 @@
 #include <endian.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"

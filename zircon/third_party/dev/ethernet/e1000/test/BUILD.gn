@@ -17,7 +17,7 @@ test("e1000_test") {
   deps = [
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

@@ -115,8 +115,9 @@ executable("tests_executable") {
   deps = [
     ":common",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/mock-ddk",

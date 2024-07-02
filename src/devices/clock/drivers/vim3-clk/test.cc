@@ -8,7 +8,7 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -139,7 +139,7 @@ class FixtureConfig final {
   using EnvironmentType = TestEnvironment;
 };
 
-class DriverTest : public fdf_testing::DriverTestFixture<FixtureConfig> {
+class DriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
  protected:
   void SetUp() override {
     zx::result device_result = Connect<fuchsia_hardware_clockimpl::Service::Device>();

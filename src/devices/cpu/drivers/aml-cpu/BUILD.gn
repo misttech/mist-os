@@ -70,7 +70,7 @@ test("aml-cpu-test-bin") {
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",

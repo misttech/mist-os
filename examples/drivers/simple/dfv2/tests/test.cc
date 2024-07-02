@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+
+#include <gtest/gtest.h>
 
 #include "examples/drivers/simple/dfv2/simple_driver.h"
 
@@ -27,7 +29,8 @@ class FixtureConfig final {
   using EnvironmentType = SimpleDriverTestEnvironment;
 };
 
-class SimpleDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig> {};
+class SimpleDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+                         public ::testing::Test {};
 
 TEST_F(SimpleDriverTest, VerifyChildNode) {
   RunInNodeContext([](fdf_testing::TestNode& node) {

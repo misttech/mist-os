@@ -4,7 +4,7 @@
 
 #include "src/devices/adc/drivers/aml-saradc/aml-saradc.h"
 
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
@@ -85,7 +85,8 @@ class AmlSaradcTestConfig final {
   using EnvironmentType = AmlSaradcTestEnvironment;
 };
 
-class AmlSaradcTest : public fdf_testing::DriverTestFixture<AmlSaradcTestConfig> {
+class AmlSaradcTest : public fdf_testing::DriverTestFixture<AmlSaradcTestConfig>,
+                      public ::testing::Test {
  public:
   void SetUp() override {
     auto connect_result =

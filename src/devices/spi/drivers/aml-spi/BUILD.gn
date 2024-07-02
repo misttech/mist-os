@@ -59,7 +59,7 @@ test("aml-spi-test-bin") {
   ]
   deps = [
     ":common",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//src/devices/gpio/testing/fake-gpio",
     "//src/devices/registers/testing/mock-registers",
     "//src/devices/testing/fake-bti",

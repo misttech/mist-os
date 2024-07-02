@@ -8,9 +8,10 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <ddktl/device.h>
+#include <gtest/gtest.h>
 
 #include "device/test_session.h"
 #include "device/test_util_banjo.h"
@@ -48,7 +49,8 @@ struct BanjoTestFixtureConfig {
   using EnvironmentType = BanjoTestFixtureEnvironment;
 };
 
-class BanjoNetDeviceDriverTest : public fdf_testing::DriverTestFixture<BanjoTestFixtureConfig> {
+class BanjoNetDeviceDriverTest : public fdf_testing::DriverTestFixture<BanjoTestFixtureConfig>,
+                                 public ::testing::Test {
  protected:
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;

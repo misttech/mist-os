@@ -82,7 +82,8 @@ class AmlSpiTestConfig final {
   using EnvironmentType = BaseTestEnvironment;
 };
 
-class AmlSpiTest : public fdf_testing::DriverTestFixture<AmlSpiTestConfig> {};
+class AmlSpiTest : public fdf_testing::DriverTestFixture<AmlSpiTestConfig>,
+                   public ::testing::Test {};
 
 TEST_F(AmlSpiTest, DdkLifecycle) {
   RunInNodeContext([](fdf_testing::TestNode& node) {
@@ -958,7 +959,8 @@ class AmlSpiNoResetFragmentConfig final {
 };
 
 class AmlSpiNoResetFragmentTest
-    : public fdf_testing::DriverTestFixture<AmlSpiNoResetFragmentConfig> {};
+    : public fdf_testing::DriverTestFixture<AmlSpiNoResetFragmentConfig>,
+      public ::testing::Test {};
 
 TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
@@ -1066,7 +1068,8 @@ class AmlSpiNoIrqConfig final {
   using EnvironmentType = AmlSpiNoIrqEnvironment;
 };
 
-class AmlSpiNoIrqTest : public fdf_testing::DriverTestFixture<AmlSpiNoIrqConfig> {};
+class AmlSpiNoIrqTest : public fdf_testing::DriverTestFixture<AmlSpiNoIrqConfig>,
+                        public ::testing::Test {};
 
 TEST_F(AmlSpiNoIrqTest, InterruptRequired) {
   // Bind should fail if no interrupt was provided.
@@ -1122,7 +1125,8 @@ class AmlSpiForwardRoleMetadataConfig final {
 };
 
 class AmlSpiForwardRoleMetadataTest
-    : public fdf_testing::DriverTestFixture<AmlSpiForwardRoleMetadataConfig> {};
+    : public fdf_testing::DriverTestFixture<AmlSpiForwardRoleMetadataConfig>,
+      public ::testing::Test {};
 
 TEST_F(AmlSpiForwardRoleMetadataTest, Test) {
   zx::result compat_client_end = Connect<fuchsia_driver_compat::Service::Device>();

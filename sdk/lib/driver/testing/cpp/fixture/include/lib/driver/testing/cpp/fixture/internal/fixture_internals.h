@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_TESTING_CPP_FIXTURES_INTERNAL_FIXTURE_INTERNALS_H_
-#define LIB_DRIVER_TESTING_CPP_FIXTURES_INTERNAL_FIXTURE_INTERNALS_H_
+#ifndef LIB_DRIVER_TESTING_CPP_FIXTURE_INTERNAL_FIXTURE_INTERNALS_H_
+#define LIB_DRIVER_TESTING_CPP_FIXTURE_INTERNAL_FIXTURE_INTERNALS_H_
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -251,4 +251,4 @@ class ConfigurationExtractor {
 
 }  // namespace fdf_testing
 
-#endif  // LIB_DRIVER_TESTING_CPP_FIXTURES_INTERNAL_FIXTURE_INTERNALS_H_
+#endif  // LIB_DRIVER_TESTING_CPP_FIXTURE_INTERNAL_FIXTURE_INTERNALS_H_

@@ -13,7 +13,7 @@ test("child-driver-test") {
   ]
   deps = [
     "//examples/drivers/transport/driver:fuchsia.examples.gizmo_cpp",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

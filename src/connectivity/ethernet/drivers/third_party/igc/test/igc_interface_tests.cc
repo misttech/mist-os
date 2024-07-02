@@ -17,7 +17,9 @@
 #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+
+#include <gtest/gtest.h>
 
 #include "src/connectivity/ethernet/drivers/third_party/igc/igc_driver.h"
 #include "src/devices/pci/testing/pci_protocol_fake.h"
@@ -166,7 +168,8 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class IgcInterfaceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig> {
+class IgcInterfaceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
+                         public ::testing::Test {
  public:
   void SetUp() override {
     zx::result netdev_impl = Connect<netdriver::Service::NetworkDeviceImpl>();

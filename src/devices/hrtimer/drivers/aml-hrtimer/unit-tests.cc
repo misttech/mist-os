@@ -7,9 +7,11 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
+
+#include <gtest/gtest.h>
 
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer.h"
 
@@ -384,7 +386,7 @@ class FixtureConfig final {
   using EnvironmentType = TestEnvironment;
 };
 
-class DriverTest : public fdf_testing::DriverTestFixture<FixtureConfig> {
+class DriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
  protected:
   void SetUp() override {
     zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
@@ -919,7 +921,8 @@ class FixtureConfigNoAutoStop final {
   using EnvironmentType = TestEnvironment;
 };
 
-class DriverTestNoAutoStop : public fdf_testing::DriverTestFixture<FixtureConfigNoAutoStop> {
+class DriverTestNoAutoStop : public fdf_testing::DriverTestFixture<FixtureConfigNoAutoStop>,
+                             public ::testing::Test {
  protected:
   void SetUp() override {
     zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
@@ -1036,7 +1039,8 @@ class FixtureConfigNoPower final {
   using EnvironmentType = TestEnvironmentNoPower;
 };
 
-class DriverTestNoPower : public fdf_testing::DriverTestFixture<FixtureConfigNoPower> {
+class DriverTestNoPower : public fdf_testing::DriverTestFixture<FixtureConfigNoPower>,
+                          public ::testing::Test {
  protected:
   void SetUp() override {
     zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_TESTING_CPP_FIXTURES_BASE_FIXTURE_H_
-#define LIB_DRIVER_TESTING_CPP_FIXTURES_BASE_FIXTURE_H_
+#ifndef LIB_DRIVER_TESTING_CPP_FIXTURE_DRIVER_TEST_FIXTURE_H_
+#define LIB_DRIVER_TESTING_CPP_FIXTURE_DRIVER_TEST_FIXTURE_H_
 
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/testing/cpp/fixtures/internal/fixture_internals.h>
+#include <lib/driver/testing/cpp/fixture/internal/fixture_internals.h>
 
 namespace fdf_testing {
 
@@ -31,6 +31,8 @@ namespace fdf_testing {
 //     If using a custom driver for the test, ensure the DriverType here contains a static function
 //     in the format below. This registration is what the test uses to manage the driver.
 //       `static DriverRegistration GetDriverRegistration()`
+//     If the driver type is not known to the test, or is not needed by the test, then use the
+//     |EmptyDriverType| class as a placeholder.
 //
 //   EnvironmentType: A class that contains custom dependencies for the driver under test.
 //   The environment will always live on a background dispatcher.
@@ -42,6 +44,9 @@ namespace fdf_testing {
 //     This function must serve all of its components into the provided fdf::OutgoingDirectory
 //     object, generally done through the AddService method. This OutgoingDirectory backs the
 //     driver's incoming namespace, hence its name `to_driver_vfs`.
+//
+//     The |Environment| class is provided as a convenience to ensure this override is done
+//     correctly.
 //
 //   kDriverOnForeground: Whether to have the driver under test run on the foreground dispatcher,
 //   or to run it on a dedicated background dispatcher.
@@ -59,7 +64,7 @@ namespace fdf_testing {
 //   and expect a successful stop.
 //
 template <class Configuration>
-class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
+class DriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   using Config = internal::ConfigurationExtractor<Configuration>;
   using Config::kAutoStartDriver;
   using Config::kAutoStopDriver;
@@ -68,7 +73,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   using typename Config::EnvironmentType;
 
  public:
-  BaseDriverTestFixture()
+  DriverTestFixture()
       : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
         env_wrapper_(env_dispatcher_->async_dispatcher(), std::in_place) {
     if constexpr (kAutoStartDriver) {
@@ -77,7 +82,7 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
     }
   }
 
-  virtual ~BaseDriverTestFixture() {
+  virtual ~DriverTestFixture() {
     if constexpr (kAutoStopDriver) {
       auto result = StopDriverImpl();
       ZX_ASSERT_MSG(result.is_ok(), "Failed to StopDriver: %s.", result.status_string());
@@ -424,6 +429,21 @@ class BaseDriverTestFixture : internal::ConfigurationExtractor<Configuration> {
   std::optional<zx::result<>> prepare_stop_result_;
 };
 
+// The Configuration must be given a non-void DriverType, but not all tests need access to a
+// driver type (eg. they don't need to access or call anything on the driver class). This can be
+// user as a placeholder to avoid build errors. The driver lifecycle is managed separately, through
+// the `__fuchsia_driver_registration__` symbol.
+class EmptyDriverType {};
+
+// The EnvironmentType should implement this Class.
+class Environment {
+ public:
+  // This function is called on the dispatcher context of the environment. The class should serve
+  // its elements (eg. compat::DeviceServer, FIDL servers, etc...) to the |to_driver_vfs|.
+  // This object is serving the incoming directory of the driver under test.
+  virtual zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) = 0;
+};
+
 }  // namespace fdf_testing
 
-#endif  // LIB_DRIVER_TESTING_CPP_FIXTURES_BASE_FIXTURE_H_
+#endif  // LIB_DRIVER_TESTING_CPP_FIXTURE_DRIVER_TEST_FIXTURE_H_

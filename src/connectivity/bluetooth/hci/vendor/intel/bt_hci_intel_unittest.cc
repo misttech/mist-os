@@ -9,7 +9,9 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+
+#include <gtest/gtest.h>
 
 #include "device.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
@@ -200,7 +202,8 @@ class FixtureConfig {
   using EnvironmentType = TestEnvironment;
 };
 
-class BtHciIntelTest : public fdf_testing::DriverTestFixture<FixtureConfig> {
+class BtHciIntelTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+                       public ::testing::Test {
  public:
   BtHciIntelTest() = default;
 };

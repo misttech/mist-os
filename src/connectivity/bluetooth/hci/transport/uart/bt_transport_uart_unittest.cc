@@ -9,13 +9,15 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdio/directory.h>
 #include <zircon/device/bt-hci.h>
 
 #include <queue>
+
+#include <gtest/gtest.h>
 
 namespace bt_transport_uart {
 namespace {
@@ -181,7 +183,8 @@ class BackgroundFixtureConfig final {
   using EnvironmentType = FixtureBasedTestEnvironment;
 };
 
-class BtTransportUartTest : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig> {
+class BtTransportUartTest : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig>,
+                            public ::testing::Test {
  public:
   BtTransportUartTest() = default;
 

@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <condition_variable>
+
+#include <gtest/gtest.h>
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/lib/testing/predicates/status.h"
@@ -295,7 +297,7 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class E1000Test : public fdf_testing::DriverTestFixture<TestFixtureConfig> {
+class E1000Test : public fdf_testing::DriverTestFixture<TestFixtureConfig>, public ::testing::Test {
  public:
   void SetUp() override {
     zx::result netdev_impl = Connect<netdriver::Service::NetworkDeviceImpl>();

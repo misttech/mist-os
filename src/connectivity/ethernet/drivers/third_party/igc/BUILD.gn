@@ -35,12 +35,12 @@ source_set("igc_core") {
     ":igc_bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//src/lib/vmo_store",
   ]
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
-    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:logging",  # Used by io-buffer lib for zxlogf
     "//sdk/lib/driver/component/cpp",
     "//src/connectivity/network/drivers/network-device/device:shared_lock",

@@ -1,10 +1,11 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/stdcompat/span.h>
 
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <wlan/drivers/components/frame_container.h>
 #include <wlan/drivers/components/frame_storage.h>
 #include <wlan/drivers/components/network_device.h>
@@ -140,7 +141,8 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-struct BasicNetworkDeviceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig> {
+struct BasicNetworkDeviceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
+                                public ::testing::Test {
   void SetUp() override {
     RunInDriverContext([&](TestDriver& driver) {
       parent_.Bind(std::move(driver.node()), fdf::Dispatcher::GetCurrent()->async_dispatcher());

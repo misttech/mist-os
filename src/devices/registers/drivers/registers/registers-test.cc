@@ -5,8 +5,9 @@
 #include "registers.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
+#include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 
 #include "src/devices/lib/fidl-metadata/registers.h"
@@ -87,7 +88,8 @@ class RegistersDeviceTestConfig final {
   using EnvironmentType = RegistersDeviceTestEnvironment;
 };
 
-class RegistersDeviceTest : public fdf_testing::DriverTestFixture<RegistersDeviceTestConfig> {
+class RegistersDeviceTest : public fdf_testing::DriverTestFixture<RegistersDeviceTestConfig>,
+                            public ::testing::Test {
  public:
   template <typename T>
   void Init(std::vector<fidl_metadata::registers::Register<T>>&& kRegisters) {

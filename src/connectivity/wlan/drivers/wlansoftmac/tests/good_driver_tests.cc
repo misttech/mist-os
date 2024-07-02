@@ -5,7 +5,7 @@
 #include <fidl/fuchsia.wlan.common/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.sme/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/client.h>
 
@@ -28,7 +28,8 @@ class FixtureConfig final {
   using EnvironmentType = CustomEnvironment<BasicWlanSoftmacServer>;
 };
 
-class GoodSoftmacDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig> {};
+class GoodSoftmacDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+                              public ::testing::Test {};
 
 // Verify a clean startup and shutdown when wlansoftmac does not encounter any errors
 // while running.
