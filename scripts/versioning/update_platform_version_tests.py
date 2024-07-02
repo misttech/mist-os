@@ -20,7 +20,7 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
         "api_levels": {
             "1" : {
                 "abi_revision": "0x0000000000000001",
-                "status": "in-development"
+                "status": "supported"
             }
         }
     },

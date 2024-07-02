@@ -80,7 +80,11 @@ def update_version_history(
 
             for level, data in versions.items():
                 if data["status"] == "in-development":
-                    data["status"] = "supported"
+                    print(
+                        f"error: Fuchsia API level {level} is in-development. All API levels must be frozen before bumping.",
+                        file=sys.stderr,
+                    )
+                    return False
 
             abi_revision = generate_random_abi_revision(
                 set(int(v["abi_revision"], 16) for v in versions.values())
