@@ -20,6 +20,7 @@
             from: "#brightness_manager",
             to: "#ui",
             source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.factory.MiscFactoryStoreProvider" ],

@@ -37,7 +37,6 @@
                 "fuchsia.media.sounds.Player",
                 "fuchsia.media.UsageReporter",
                 "fuchsia.stash.Store",
-                "fuchsia.ui.brightness.Control",
             ],
         },
         {
@@ -45,6 +44,7 @@
                 "fuchsia.media.sessions2.Discovery",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.recovery.policy.Device",
+                "fuchsia.ui.brightness.Control",
                 "fuchsia.ui.policy.DeviceListenerRegistry",
             ],
             from: "parent",

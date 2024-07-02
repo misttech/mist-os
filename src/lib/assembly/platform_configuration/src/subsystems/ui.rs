@@ -219,22 +219,29 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             })?;
         }
 
+        let mut manage_display_power = false;
+        let mut power_on_display_millis = 0u16;
+        let mut power_off_display_millis = 0u16;
         if let Some(brightness_manager) = &ui_config.brightness_manager {
             builder.platform_bundle("brightness_manager");
-            let mut brightness_config =
-                builder.package("brightness_manager").component("meta/brightness_manager.cm")?;
             if brightness_manager.with_display_power {
-                brightness_config
-                    .field("manage_display_power", true)?
-                    .field("power_on_delay_millis", 35)?
-                    .field("power_off_delay_millis", 85)?;
-            } else {
-                brightness_config
-                    .field("manage_display_power", false)?
-                    .field("power_on_delay_millis", 0)?
-                    .field("power_off_delay_millis", 0)?;
+                manage_display_power = true;
+                power_on_display_millis = 35;
+                power_off_display_millis = 85;
             }
         }
+        builder.set_config_capability(
+            "fuchsia.ui.ManageDisplayPower",
+            Config::new(ConfigValueType::Bool, manage_display_power.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.ui.PowerOnDelayMillis",
+            Config::new(ConfigValueType::Uint16, power_on_display_millis.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.ui.PowerOffDelayMillis",
+            Config::new(ConfigValueType::Uint16, power_off_display_millis.into()),
+        )?;
 
         Ok(())
     }

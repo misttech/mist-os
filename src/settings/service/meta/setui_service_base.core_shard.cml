@@ -51,6 +51,7 @@
             from: "#brightness_manager",
             to: "#setui_service",
             source_availability: "unknown",
+            availability: "optional",
         },
         {
             protocol: [
