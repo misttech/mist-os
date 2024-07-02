@@ -9,11 +9,14 @@
 use core::num::NonZeroU8;
 use core::time::Duration;
 
+use assert_matches::assert_matches;
+use derivative::Derivative;
 use net_types::ip::Ipv6Addr;
 use net_types::UnicastAddr;
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, RngContext, TimerBindingsTypes,
-    TimerContext, TimerHandler, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, HandleableTimer, RngContext,
+    StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TimerHandler,
+    WeakDeviceIdentifier,
 };
 use packet::{EitherSerializer, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
@@ -52,8 +55,7 @@ pub struct RsTimerId<D: WeakDeviceIdentifier> {
 
 impl<D: WeakDeviceIdentifier> RsTimerId<D> {
     pub(super) fn device_id(&self) -> &D {
-        let Self { device_id } = self;
-        device_id
+        &self.device_id
     }
 
     /// Create a new [`RsTimerId`] for `device_id`.
@@ -64,23 +66,17 @@ impl<D: WeakDeviceIdentifier> RsTimerId<D> {
 }
 
 /// A device's router solicitation state.
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
 pub struct RsState<BT: RsBindingsTypes> {
     remaining: Option<NonZeroU8>,
-    timer: BT::Timer,
-}
-
-impl<BC: RsBindingsTypes + TimerContext> RsState<BC> {
-    /// Constructs a new router solicitation state for `device_id`.
-    pub fn new<D: WeakDeviceIdentifier, CC: CoreTimerContext<RsTimerId<D>, BC>>(
-        bindings_ctx: &mut BC,
-        device_id: D,
-    ) -> Self {
-        Self { remaining: None, timer: CC::new_timer(bindings_ctx, RsTimerId { device_id }) }
-    }
+    timer: Option<BT::Timer>,
 }
 
 /// The execution context for router solicitation.
-pub trait RsContext<BC: RsBindingsTypes>: DeviceIdContext<AnyDevice> {
+pub trait RsContext<BC: RsBindingsTypes>:
+    DeviceIdContext<AnyDevice> + CoreTimerContext<RsTimerId<Self::WeakDeviceId>, BC>
+{
     /// A link-layer address.
     type LinkLayerAddr: AsRef<[u8]>;
 
@@ -94,11 +90,11 @@ pub trait RsContext<BC: RsBindingsTypes>: DeviceIdContext<AnyDevice> {
 
     /// Calls the callback with a mutable reference to the router solicitation
     /// state.
-    fn with_rs_state_mut<F: FnOnce(&mut RsState<BC>)>(
+    fn with_rs_state_mut<O, F: FnOnce(&mut RsState<BC>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
-    ) {
+    ) -> O {
         self.with_rs_state_mut_and_max(device_id, |state, _max| cb(state))
     }
 
@@ -152,6 +148,10 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
             let RsState { remaining, timer } = state;
             *remaining = max;
 
+            // The caller *must call* `stop_router_solicitation` before starting
+            // a new one.
+            assert_matches!(timer, None);
+
             match remaining {
                 None => {}
                 Some(_) => {
@@ -159,9 +159,13 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
                     // random amount of time between 0 and `MAX_RTR_SOLICITATION_DELAY` to
                     // alleviate congestion when many hosts start up on a link at the same
                     // time.
-                    let delay = bindings_ctx
-                        .rng()
-                        .gen_range(Duration::new(0, 0)..MAX_RTR_SOLICITATION_DELAY);
+                    let delay =
+                        bindings_ctx.rng().gen_range(Duration::ZERO..MAX_RTR_SOLICITATION_DELAY);
+
+                    let timer = timer.insert(CC::new_timer(
+                        bindings_ctx,
+                        RsTimerId { device_id: device_id.downgrade() },
+                    ));
                     assert_eq!(bindings_ctx.schedule_timer(delay, timer), None);
                 }
             }
@@ -170,7 +174,10 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
 
     fn stop_router_solicitation(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
         self.with_rs_state_mut(device_id, |state| {
-            let _: Option<BC::Instant> = bindings_ctx.cancel_timer(&mut state.timer);
+            // Get rid of the installed timer if we're stopping solicitations.
+            if let Some(mut timer) = state.timer.take() {
+                let _: Option<BC::Instant> = bindings_ctx.cancel_timer(&mut timer);
+            }
         });
     }
 }
@@ -178,10 +185,10 @@ impl<BC: RsBindingsContext, CC: RsContext<BC>> RsHandler<BC> for CC {
 impl<BC: RsBindingsContext, CC: RsContext<BC>> HandleableTimer<CC, BC>
     for RsTimerId<CC::WeakDeviceId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         let Self { device_id } = self;
         if let Some(device_id) = device_id.upgrade() {
-            do_router_solicitation(core_ctx, bindings_ctx, &device_id)
+            do_router_solicitation(core_ctx, bindings_ctx, &device_id, timer)
         }
     }
 }
@@ -191,7 +198,40 @@ fn do_router_solicitation<BC: RsBindingsContext, CC: RsContext<BC>>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
+    timer_id: BC::UniqueTimerId,
 ) {
+    let send_rs = core_ctx.with_rs_state_mut(device_id, |RsState { remaining, timer }| {
+        let Some(timer) = timer.as_mut() else {
+            // If we don't have a timer then RS has been stopped.
+            return false;
+        };
+        if bindings_ctx.unique_timer_id(timer) != timer_id {
+            // This is an errant request from a previous round of RS enablement,
+            // just ignore it and don't send a solicitation.
+            return false;
+        }
+        *remaining = NonZeroU8::new(
+            remaining
+                .expect("should only send a router solicitations when at least one is remaining")
+                .get()
+                - 1,
+        );
+
+        // Schedule the next timer.
+        match *remaining {
+            None => {}
+            Some(NonZeroU8 { .. }) => {
+                assert_eq!(bindings_ctx.schedule_timer(RTR_SOLICITATION_INTERVAL, timer), None);
+            }
+        }
+
+        true
+    });
+
+    if !send_rs {
+        return;
+    }
+
     let src_ll = core_ctx.get_link_layer_addr_bytes(device_id);
 
     // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
@@ -220,22 +260,6 @@ fn do_router_solicitation<BC: RsBindingsContext, CC: RsContext<BC>>(
                 )
             })
         });
-
-    core_ctx.with_rs_state_mut(device_id, |RsState { remaining, timer }| {
-        *remaining = NonZeroU8::new(
-            remaining
-                .expect("should only send a router solicitations when at least one is remaining")
-                .get()
-                - 1,
-        );
-
-        match *remaining {
-            None => {}
-            Some(NonZeroU8 { .. }) => {
-                assert_eq!(bindings_ctx.schedule_timer(RTR_SOLICITATION_INTERVAL, timer), None);
-            }
-        }
-    });
 }
 
 #[cfg(test)]
@@ -247,7 +271,7 @@ mod tests {
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
-    use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext as _};
+    use netstack3_base::{CtxPair, InstantContext as _, SendFrameContext as _};
     use packet_formats::icmp::ndp::options::NdpOption;
     use packet_formats::icmp::ndp::Options;
     use test_case::test_case;
@@ -269,6 +293,16 @@ mod tests {
     type FakeCoreCtxImpl = FakeCoreCtx<FakeRsContext, RsMessageMeta, FakeDeviceId>;
     type FakeBindingsCtxImpl =
         FakeBindingsCtx<RsTimerId<FakeWeakDeviceId<FakeDeviceId>>, (), (), ()>;
+
+    impl CoreTimerContext<RsTimerId<FakeWeakDeviceId<FakeDeviceId>>, FakeBindingsCtxImpl>
+        for FakeCoreCtxImpl
+    {
+        fn convert_timer(
+            dispatch_id: RsTimerId<FakeWeakDeviceId<FakeDeviceId>>,
+        ) -> <FakeBindingsCtxImpl as TimerBindingsTypes>::DispatchId {
+            dispatch_id
+        }
+    }
 
     impl RsContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         type LinkLayerAddr = Vec<u8>;
@@ -312,17 +346,12 @@ mod tests {
     #[test]
     fn stop_router_solicitation() {
         let CtxPair { mut core_ctx, mut bindings_ctx } =
-            CtxPair::with_default_bindings_ctx(|bindings_ctx| {
-                FakeCoreCtxImpl::with_state(FakeRsContext {
-                    max_router_solicitations: NonZeroU8::new(1),
-                    rs_state: RsState::new::<_, IntoCoreTimerCtx>(
-                        bindings_ctx,
-                        FakeWeakDeviceId(FakeDeviceId),
-                    ),
-                    source_address: None,
-                    link_layer_bytes: None,
-                })
-            });
+            CtxPair::with_core_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
+                max_router_solicitations: NonZeroU8::new(1),
+                rs_state: Default::default(),
+                source_address: None,
+                link_layer_bytes: None,
+            }));
         RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
 
         let now = bindings_ctx.now();
@@ -376,17 +405,12 @@ mod tests {
         expected_sll_bytes: Option<&[u8]>,
     ) {
         let CtxPair { mut core_ctx, mut bindings_ctx } =
-            CtxPair::with_default_bindings_ctx(|bindings_ctx| {
-                FakeCoreCtxImpl::with_state(FakeRsContext {
-                    max_router_solicitations: NonZeroU8::new(max_router_solicitations),
-                    rs_state: RsState::new::<_, IntoCoreTimerCtx>(
-                        bindings_ctx,
-                        FakeWeakDeviceId(FakeDeviceId),
-                    ),
-                    source_address,
-                    link_layer_bytes,
-                })
-            });
+            CtxPair::with_core_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
+                max_router_solicitations: NonZeroU8::new(max_router_solicitations),
+                rs_state: Default::default(),
+                source_address,
+                link_layer_bytes,
+            }));
         RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
 
         assert_eq!(core_ctx.frames(), &[][..]);
@@ -422,5 +446,30 @@ mod tests {
         assert_eq!(core_ctx.state.rs_state.remaining, None);
         let frames = core_ctx.frames();
         assert_eq!(frames.len(), usize::from(max_router_solicitations), "frames = {:?}", frames);
+    }
+
+    // Regression guard for when router solicitations would consider timers for
+    // the previously enabled start request if they were raced against dispatch.
+    #[test]
+    fn previous_cycle_timers_ignored() {
+        let CtxPair { mut core_ctx, mut bindings_ctx } =
+            CtxPair::with_core_ctx(FakeCoreCtxImpl::with_state(FakeRsContext {
+                max_router_solicitations: NonZeroU8::new(1),
+                rs_state: Default::default(),
+                source_address: None,
+                link_layer_bytes: None,
+            }));
+        RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
+        // Get the timer ID for the first instantiation.
+        let timer_id = core_ctx.state.rs_state.timer.as_ref().unwrap().timer_id();
+        RsHandler::stop_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
+        // Attempt to run router solicitation after stopping, nothing is sent out.
+        do_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, timer_id);
+        assert_eq!(core_ctx.frames(), &[][..]);
+        // Start again and if the same timer_id fires it should not cause an RS
+        // to be sent out.
+        RsHandler::start_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
+        do_router_solicitation(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, timer_id);
+        assert_eq!(core_ctx.frames(), &[][..]);
     }
 }
