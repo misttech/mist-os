@@ -598,6 +598,15 @@ sdk_molecule("host_tools") {
 
   _toolchains = []
   if (host_os == "linux" && sdk_cross_compile_host_tools) {
+    _required_target_cpus = [
+      "x64",
+      "arm64",
+    ]
+    _skipped_target_cpus = idk_target_cpus_default - idk_target_cpus
+    assert(
+        _skipped_target_cpus == _skipped_target_cpus + _required_target_cpus -
+                                    _required_target_cpus,
+        "`idk_target_cpus` must include all CPUs for which host tools are being cross-compiled: ${idk_target_cpus} vs. ${_required_target_cpus}")
     _toolchains += [
       host_x64_toolchain,
       host_arm64_toolchain,
