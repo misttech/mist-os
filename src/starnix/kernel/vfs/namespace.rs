@@ -1583,7 +1583,7 @@ impl NamespaceNode {
         L: LockBefore<BeforeFsNodeAppend>,
     {
         self.entry.node.truncate(locked, current_task, &self.mount, length)?;
-        self.notify(InotifyMask::MODIFY);
+        self.entry.notify_ignoring_excl_unlink(InotifyMask::MODIFY);
         Ok(())
     }
 }

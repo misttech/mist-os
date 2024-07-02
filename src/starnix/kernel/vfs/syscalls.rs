@@ -1101,7 +1101,7 @@ pub fn sys_fchmod(
     let mode = mode & FileMode::PERMISSIONS;
     let file = current_task.files.get(fd)?;
     file.name.entry.node.chmod(current_task, &file.name.mount, mode)?;
-    file.notify(InotifyMask::ATTRIB);
+    file.name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -1116,7 +1116,7 @@ pub fn sys_fchmodat(
     let mode = mode & FileMode::PERMISSIONS;
     let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::default())?;
     name.entry.node.chmod(current_task, &name.mount, mode)?;
-    name.notify(InotifyMask::ATTRIB);
+    name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -1142,7 +1142,7 @@ pub fn sys_fchown(
         maybe_uid(owner),
         maybe_uid(group),
     )?;
-    file.notify(InotifyMask::ATTRIB);
+    file.name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -1158,7 +1158,7 @@ pub fn sys_fchownat(
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
     name.entry.node.chown(current_task, &name.mount, maybe_uid(owner), maybe_uid(group))?;
-    name.notify(InotifyMask::ATTRIB);
+    name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -2709,7 +2709,7 @@ pub fn sys_utimensat(
         (TimeUpdateType::Omit, _) => InotifyMask::MODIFY,
         (_, _) => InotifyMask::ATTRIB,
     };
-    name.notify(event_mask);
+    name.entry.notify_ignoring_excl_unlink(event_mask);
     Ok(())
 }
 

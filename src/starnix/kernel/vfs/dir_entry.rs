@@ -703,9 +703,9 @@ impl DirEntry {
 
         let mode = renamed.node.info().mode;
         let cookie = current_task.kernel().get_next_inotify_cookie();
-        old_parent.node.watchers.notify(InotifyMask::MOVE_FROM, cookie, old_basename, mode);
-        new_parent.node.watchers.notify(InotifyMask::MOVE_TO, cookie, new_basename, mode);
-        renamed.node.watchers.notify(InotifyMask::MOVE_SELF, 0, Default::default(), mode);
+        old_parent.node.watchers.notify(InotifyMask::MOVE_FROM, cookie, old_basename, mode, false);
+        new_parent.node.watchers.notify(InotifyMask::MOVE_TO, cookie, new_basename, mode, false);
+        renamed.node.watchers.notify(InotifyMask::MOVE_SELF, 0, Default::default(), mode, false);
 
         Ok(())
     }
@@ -818,11 +818,23 @@ impl DirEntry {
 
     /// Notifies watchers on the current node and its parent about an event.
     pub fn notify(&self, event_mask: InotifyMask) {
+        self.notify_watchers(event_mask, self.is_dead());
+    }
+
+    /// Notifies watchers on the current node and its parent about an event.
+    ///
+    /// Used for FSNOTIFY_EVENT_INODE events, which ignore IN_EXCL_UNLINK.
+    pub fn notify_ignoring_excl_unlink(&self, event_mask: InotifyMask) {
+        // We pretend that this directory entry is not dead to ignore IN_EXCL_UNLINK.
+        self.notify_watchers(event_mask, false);
+    }
+
+    fn notify_watchers(&self, event_mask: InotifyMask, is_dead: bool) {
         let mode = self.node.info().mode;
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(event_mask, 0, self.local_name().as_ref(), mode);
+            parent.node.watchers.notify(event_mask, 0, self.local_name().as_ref(), mode, is_dead);
         }
-        self.node.watchers.notify(event_mask, 0, Default::default(), mode);
+        self.node.watchers.notify(event_mask, 0, Default::default(), mode, is_dead);
     }
 
     /// Notifies parents about creation, and notifies current node about link_count change.
@@ -830,10 +842,16 @@ impl DirEntry {
         let mode = self.node.info().mode;
         if Arc::strong_count(&self.node) > 1 {
             // Notify about link change only if there is already a hardlink.
-            self.node.watchers.notify(InotifyMask::ATTRIB, 0, Default::default(), mode);
+            self.node.watchers.notify(InotifyMask::ATTRIB, 0, Default::default(), mode, false);
         }
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(InotifyMask::CREATE, 0, self.local_name().as_ref(), mode);
+            parent.node.watchers.notify(
+                InotifyMask::CREATE,
+                0,
+                self.local_name().as_ref(),
+                mode,
+                false,
+            );
         }
     }
 
@@ -844,15 +862,21 @@ impl DirEntry {
         let mode = self.node.info().mode;
         if !mode.is_dir() {
             // Linux notifies link count change for non-directories.
-            self.node.watchers.notify(InotifyMask::ATTRIB, 0, Default::default(), mode);
+            self.node.watchers.notify(InotifyMask::ATTRIB, 0, Default::default(), mode, false);
         }
 
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(InotifyMask::DELETE, 0, self.local_name().as_ref(), mode);
+            parent.node.watchers.notify(
+                InotifyMask::DELETE,
+                0,
+                self.local_name().as_ref(),
+                mode,
+                false,
+            );
         }
 
         if Arc::strong_count(&self.node) == 1 {
-            self.node.watchers.notify(InotifyMask::DELETE_SELF, 0, Default::default(), mode);
+            self.node.watchers.notify(InotifyMask::DELETE_SELF, 0, Default::default(), mode, false);
         }
     }
 

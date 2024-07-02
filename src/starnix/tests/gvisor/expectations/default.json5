@@ -372,7 +372,6 @@
                 "Inotify.ExcludeUnlinkDirectory",
                 "Inotify.ExcludeUnlink",
                 "Inotify.IncludeUnlinkedFile",
-                "Inotify.ExcludeUnlinkMultipleChildren",
                 "Inotify.Exec",
 
                 // ioctl_test

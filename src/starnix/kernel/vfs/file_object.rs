@@ -1572,7 +1572,7 @@ impl FileObject {
             return error!(EINVAL);
         }
         self.node().ftruncate(locked, current_task, length)?;
-        self.notify(InotifyMask::MODIFY);
+        self.name.entry.notify_ignoring_excl_unlink(InotifyMask::MODIFY);
         Ok(())
     }
 
