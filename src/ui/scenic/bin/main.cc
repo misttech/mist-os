@@ -20,11 +20,11 @@
 #include "src/ui/scenic/bin/app.h"
 
 int main(int argc, const char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   if (!fxl::SetLogSettingsFromCommandLine(command_line, {"scenic"}))
     return 1;
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
   // This call creates ComponentContext, but does not start serving immediately. Outgoing directory
   // is served by App, after App::InitializeServices() is completed.
