@@ -16,6 +16,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "test_helper.h"
+
 namespace {
 
 constexpr size_t kNumPipeEndsCount = 2;
@@ -89,6 +91,95 @@ TEST(VmspliceTest, ModifyBufferInPipe) {
             static_cast<ssize_t>(sizeof(read_buffer)))
       << strerror(errno);
   EXPECT_THAT(read_buffer, testing::Each(kModifiedByte));
+}
+
+TEST(VmspliceTest, ForkWithBufferInPipe) {
+  constexpr char kParentInitialByte = 'A';
+  constexpr char kParentModifiedByte = 'B';
+  constexpr char kChildInitialByte = 'C';
+  constexpr char kChildModifiedByte = 'D';
+  constexpr size_t kBufSize = 10;
+
+  fbl::unique_fd fds[kNumPipeEndsCount];
+  ASSERT_NO_FATAL_FAILURE(MakePipe(fds));
+
+  fbl::unique_fd child_to_parent_pipe_fds[kNumPipeEndsCount];
+  ASSERT_NO_FATAL_FAILURE(MakePipe(child_to_parent_pipe_fds));
+  fbl::unique_fd parent_to_child_pipe_fds[kNumPipeEndsCount];
+  ASSERT_NO_FATAL_FAILURE(MakePipe(parent_to_child_pipe_fds));
+
+  auto signal_peer = [](const fbl::unique_fd& fd) {
+    constexpr char kByte = 1;
+    ASSERT_EQ(write(fd.get(), &kByte, sizeof(kByte)), static_cast<ssize_t>(sizeof(kByte)))
+        << strerror(errno);
+  };
+
+  auto wait_for_peer = [](const fbl::unique_fd& fd) {
+    char byte;
+    ASSERT_EQ(read(fd.get(), &byte, sizeof(byte)), static_cast<ssize_t>(sizeof(byte)))
+        << strerror(errno);
+  };
+
+  auto do_write = [&](const char initial_byte, const char modified_byte,
+                      const fbl::unique_fd& signal_fd, const fbl::unique_fd& wait_fd) {
+    // Volatile to let the compiler know not to optimize out the final write we
+    // perform to `write_buffer` which is never directly read here.
+    volatile char* write_buffer = reinterpret_cast<volatile char*>(
+        mmap(NULL, kBufSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    ASSERT_NE(write_buffer, MAP_FAILED) << strerror(errno);
+    auto unmap_write_buffer = fit::defer([&]() {
+      EXPECT_EQ(munmap(const_cast<char*>(write_buffer), kBufSize), 0) << strerror(errno);
+    });
+    std::fill_n(write_buffer, kBufSize, initial_byte);
+    iovec iov = {
+        .iov_base = const_cast<char*>(write_buffer),
+        .iov_len = kBufSize,
+    };
+    ASSERT_EQ(vmsplice(fds[1].get(), &iov, 1, 0), static_cast<ssize_t>(kBufSize))
+        << strerror(errno);
+    ASSERT_NO_FATAL_FAILURE(signal_peer(signal_fd));
+
+    // Wait for the peer to wmsplice a payload before we modify our payload.
+    ASSERT_NO_FATAL_FAILURE(wait_for_peer(wait_fd));
+    std::fill_n(write_buffer, kBufSize, modified_byte);
+  };
+
+  auto do_read = [&](const char peer_expected_byte) {
+    char read_buffer[kBufSize] = {};
+    ASSERT_EQ(read(fds[0].get(), read_buffer, sizeof(read_buffer)),
+              static_cast<ssize_t>(sizeof(read_buffer)))
+        << strerror(errno);
+    EXPECT_THAT(read_buffer, testing::Each(peer_expected_byte));
+  };
+
+  // Flow of the test which lets a parent and child vmsplice/modify payloads
+  // to the same pipe then make sure that they are able to observe their peer's
+  // modified payloads:
+  //   - Child starts blocked.
+  //   - Parent vmsplice, unblock child vmsplice, blocked to modify.
+  //   - Child vmsplice, unblock parent modify, blocked to modify.
+  //   - Parent modify, unblock child modify, blocked to read.
+  //   - Child modify, do read, unblock parent read.
+  //   - Parent do read.
+
+  test_helper::ForkHelper fork_helper;
+  fork_helper.RunInForkedProcess([&]() {
+    // Wait for parent to write first.
+    ASSERT_NO_FATAL_FAILURE(wait_for_peer(parent_to_child_pipe_fds[0]));
+
+    ASSERT_NO_FATAL_FAILURE(do_write(kChildInitialByte, kChildModifiedByte,
+                                     child_to_parent_pipe_fds[1], parent_to_child_pipe_fds[0]));
+    ASSERT_NO_FATAL_FAILURE(do_read(kParentModifiedByte));
+    ASSERT_NO_FATAL_FAILURE(signal_peer(child_to_parent_pipe_fds[1]));
+  });
+
+  ASSERT_NO_FATAL_FAILURE(do_write(kParentInitialByte, kParentModifiedByte,
+                                   parent_to_child_pipe_fds[1], child_to_parent_pipe_fds[0]));
+  // Unblock the child from modifying the vmspliced payload.
+  ASSERT_NO_FATAL_FAILURE(signal_peer(parent_to_child_pipe_fds[1]));
+  // Wait for the child to read first.
+  ASSERT_NO_FATAL_FAILURE(wait_for_peer(child_to_parent_pipe_fds[0]));
+  ASSERT_NO_FATAL_FAILURE(do_read(kChildModifiedByte));
 }
 
 TEST(VmspliceTest, FileInPipe) {
