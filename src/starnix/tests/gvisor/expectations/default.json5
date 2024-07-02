@@ -367,15 +367,12 @@
                 "GetrusageTest.IgnoreZombie",
 
                 // inotify_test
-                "Inotify.UtimesGeneratesAttribEvent",
                 "Inotify.UnmatchedEventsAreDiscarded",
                 "Inotify.KernfsBasic",
-                "Inotify.ExcludeUnlinkInodeEvents",
                 "Inotify.ExcludeUnlinkDirectory",
                 "Inotify.ExcludeUnlink",
                 "Inotify.IncludeUnlinkedFile",
                 "Inotify.ExcludeUnlinkMultipleChildren",
-                "Inotify.Utimensat",
                 "Inotify.Exec",
 
                 // ioctl_test

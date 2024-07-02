@@ -2703,7 +2703,14 @@ pub fn sys_utimensat(
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
         lookup_at(current_task, dir_fd, user_path, lookup_flags)?
     };
-    name.entry.node.update_atime_mtime(current_task, &name.mount, atime, mtime)
+    name.entry.node.update_atime_mtime(current_task, &name.mount, atime, mtime)?;
+    let event_mask = match (atime, mtime) {
+        (_, TimeUpdateType::Omit) => InotifyMask::ACCESS,
+        (TimeUpdateType::Omit, _) => InotifyMask::MODIFY,
+        (_, _) => InotifyMask::ATTRIB,
+    };
+    name.notify(event_mask);
+    Ok(())
 }
 
 pub fn sys_splice(
