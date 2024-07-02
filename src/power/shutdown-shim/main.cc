@@ -159,6 +159,13 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
       return;
     }
 
+    auto element_control_endpoints = fidl::CreateEndpoints<broker_fidl::ElementControl>();
+    if (!element_control_endpoints.is_ok()) {
+      fprintf(stderr, "[shutdown-shim]: error creating element_control endpoints: %s\n",
+              element_control_endpoints.status_string());
+      return;
+    }
+
     std::vector<uint8_t> valid_levels{
         static_cast<uint8_t>(ShutdownControlLevel::kInactive),
         static_cast<uint8_t>(ShutdownControlLevel::kActive),
@@ -173,6 +180,7 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
             .dependencies(
                 fidl::VectorView<broker_fidl::wire::LevelDependency>::FromExternal(dependencies))
             .lessor_channel(std::move(lessor_endpoints->server))
+            .element_control(std::move(element_control_endpoints->server))
             .Build();
 
     auto resp = topology_client->AddElement(std::move(shutdown_control_schema));
@@ -187,7 +195,7 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
       return;
     }
 
-    element_control_channel_client_end_ = std::move(resp.value().value()->element_control_channel);
+    element_control_channel_client_end_ = std::move(element_control_endpoints->client);
     lessor_client_ = fidl::WireSyncClient{std::move(lessor_endpoints->client)};
   }
 

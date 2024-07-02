@@ -42,6 +42,14 @@ DeviceServer::DeviceServer() {
     return;
   }
 
+  zx::result<fidl::Endpoints<fuchsia_power_broker::ElementControl>> element_control_endpoints =
+      fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
+  if (element_control_endpoints.is_error()) {
+    FX_LOGS(ERROR) << "Couldn't create FIDL endpoints: "
+                   << element_control_endpoints.status_string();
+    return;
+  }
+
   fuchsia_power_broker::ElementSchema schema;
   schema.element_name(std::string("fake-hrtimer"))
       .initial_current_level(fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOff))
@@ -49,7 +57,8 @@ DeviceServer::DeviceServer() {
           fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOff),
           fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOn),
       }))
-      .lessor_channel(std::move(lessor_endpoints->server));
+      .lessor_channel(std::move(lessor_endpoints->server))
+      .element_control(std::move(element_control_endpoints->server));
 
   fidl::Result<fuchsia_power_broker::Topology::AddElement> element =
       topology->AddElement(std::move(schema));
@@ -59,7 +68,7 @@ DeviceServer::DeviceServer() {
     return;
   }
 
-  element_control_client_ = std::move(element.value().element_control_channel());
+  element_control_client_ = std::move(element_control_endpoints->client);
   lessor_ = fidl::SyncClient{std::move(lessor_endpoints->client)};
 }
 
