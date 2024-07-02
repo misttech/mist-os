@@ -184,10 +184,7 @@ const RESTRICTED_ENTER_OPTIONS: u32 = 0;
 /// TODO(https://fxbug.dev/42068497): Note, cross-process shared resources allocated in this function
 /// that aren't freed by the Zircon kernel upon thread and/or process termination (like mappings in
 /// the shared region) should be freed in `Task::destroy_do_not_use_outside_of_drop_if_possible()`.
-fn run_task(
-    locked: &mut Locked<'_, Unlocked>,
-    current_task: &mut CurrentTask,
-) -> Result<ExitStatus, Error> {
+fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     let mut profiling_guard = ProfileDuration::enter("TaskLoopSetup");
 
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
@@ -263,84 +260,109 @@ fn run_task(
             }
             _ => return Err(format_err!("failed to restricted_enter: {:?} {:?}", state, status)),
         }
-
-        // We just received control back from r-space, start measuring time in normal mode.
-        profiling_guard.pivot("NormalMode");
-
-        // Copy the register state out of the VMO.
-        restricted_state.read_state(&mut state);
-
-        match reason_code {
-            zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
-                profile_duration!("ExecuteSyscall");
-                firehose_trace_duration_begin!(CATEGORY_STARNIX, NAME_EXECUTE_SYSCALL);
-
-                // Store the new register state in the current task before dispatching the system call.
-                current_task.thread_state.registers =
-                    zx::sys::zx_thread_state_general_regs_t::from(&state).into();
-
-                let syscall_decl = SyscallDecl::from_number(
-                    current_task.thread_state.registers.syscall_register(),
-                );
-
-                // Generate CFI directives so the unwinder will be redirected to unwind the restricted
-                // stack.
-                generate_cfi_directives!(state);
-
-                if let Some(new_error_context) = execute_syscall(locked, current_task, syscall_decl)
-                {
-                    error_context = Some(new_error_context);
-                }
-
-                // Restore the CFI directives before continuing.
-                restore_cfi_directives!();
-
-                firehose_trace_duration_end!(
-                    CATEGORY_STARNIX,
-                    NAME_EXECUTE_SYSCALL,
-                    ARG_NAME => syscall_decl.name
-                );
+        match process_restricted_exit(
+            reason_code,
+            current_task,
+            &mut restricted_state,
+            &mut state,
+            &mut profiling_guard,
+            &mut error_context,
+        ) {
+            Ok(None) => {
+                // Keep going.
             }
-            zx::sys::ZX_RESTRICTED_REASON_EXCEPTION => {
-                firehose_trace_duration!(CATEGORY_STARNIX, NAME_HANDLE_EXCEPTION);
-                profile_duration!("HandleException");
-                let restricted_exception = restricted_state.read_exception();
-
-                current_task.thread_state.registers =
-                    zx::sys::zx_thread_state_general_regs_t::from(&restricted_exception.state)
-                        .into();
-                let exception_result =
-                    current_task.process_exception(&restricted_exception.exception);
-                process_completed_exception(current_task, exception_result);
+            Ok(Some(exit_status)) => {
+                return Ok(exit_status);
             }
-            zx::sys::ZX_RESTRICTED_REASON_KICK => {
-                firehose_trace_instant!(
-                    CATEGORY_STARNIX,
-                    NAME_RESTRICTED_KICK,
-                    fuchsia_trace::Scope::Thread
-                );
-                profile_duration!("RestrictedKick");
-
-                // Update the task's register state.
-                current_task.thread_state.registers =
-                    zx::sys::zx_thread_state_general_regs_t::from(&state).into();
-
-                // Fall through to the post-syscall / post-exception handling logic. We were likely kicked because a
-                // signal is pending deliver or the task has exited. Spurious kicks are also possible.
+            Err(error) => {
+                return Err(error);
             }
-            _ => {
-                return Err(format_err!(
-                    "Received unexpected restricted reason code: {}",
-                    reason_code
-                ));
+        };
+    }
+}
+
+fn process_restricted_exit(
+    reason_code: zx::sys::zx_restricted_reason_t,
+    current_task: &mut CurrentTask,
+    restricted_state: &mut RestrictedState,
+    state: &mut zx::sys::zx_restricted_state_t,
+    profiling_guard: &mut ProfileDuration,
+    error_context: &mut Option<super::ErrorContext>,
+) -> Result<Option<ExitStatus>, Error> {
+    // We just received control back from r-space, start measuring time in normal mode.
+    profiling_guard.pivot("NormalMode");
+
+    let mut locked = Unlocked::new(); // We can't hold any locks entering restricted mode so we can't be holding any locks on exit.
+
+    // Copy the register state out of the VMO.
+    restricted_state.read_state(state);
+
+    match reason_code {
+        zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
+            profile_duration!("ExecuteSyscall");
+            firehose_trace_duration_begin!(CATEGORY_STARNIX, NAME_EXECUTE_SYSCALL);
+
+            // Store the new register state in the current task before dispatching the system call.
+            current_task.thread_state.registers =
+                zx::sys::zx_thread_state_general_regs_t::from(&*state).into();
+
+            let syscall_decl =
+                SyscallDecl::from_number(current_task.thread_state.registers.syscall_register());
+
+            // Generate CFI directives so the unwinder will be redirected to unwind the restricted
+            // stack.
+            generate_cfi_directives!(*state);
+
+            if let Some(new_error_context) =
+                execute_syscall(&mut locked, current_task, syscall_decl)
+            {
+                *error_context = Some(new_error_context);
             }
+
+            // Restore the CFI directives before continuing.
+            restore_cfi_directives!();
+
+            firehose_trace_duration_end!(
+                CATEGORY_STARNIX,
+                NAME_EXECUTE_SYSCALL,
+                ARG_NAME => syscall_decl.name
+            );
         }
-        if let Some(exit_status) =
-            process_completed_restricted_exit(current_task, &error_context, &state)?
-        {
-            return Ok(exit_status);
+        zx::sys::ZX_RESTRICTED_REASON_EXCEPTION => {
+            firehose_trace_duration!(CATEGORY_STARNIX, NAME_HANDLE_EXCEPTION);
+            profile_duration!("HandleException");
+            let restricted_exception = restricted_state.read_exception();
+
+            current_task.thread_state.registers =
+                zx::sys::zx_thread_state_general_regs_t::from(&restricted_exception.state).into();
+            let exception_result = current_task.process_exception(&restricted_exception.exception);
+            process_completed_exception(current_task, exception_result);
+        }
+        zx::sys::ZX_RESTRICTED_REASON_KICK => {
+            firehose_trace_instant!(
+                CATEGORY_STARNIX,
+                NAME_RESTRICTED_KICK,
+                fuchsia_trace::Scope::Thread
+            );
+            profile_duration!("RestrictedKick");
+
+            // Update the task's register state.
+            current_task.thread_state.registers =
+                zx::sys::zx_thread_state_general_regs_t::from(&*state).into();
+
+            // Fall through to the post-syscall / post-exception handling logic. We were likely kicked because a
+            // signal is pending deliver or the task has exited. Spurious kicks are also possible.
+        }
+        _ => {
+            return Err(format_err!("Received unexpected restricted reason code: {}", reason_code));
         }
     }
+    if let Some(exit_status) =
+        process_completed_restricted_exit(current_task, &error_context, state)?
+    {
+        return Ok(Some(exit_status));
+    }
+    Ok(None)
 }
 
 pub fn get_core_dump_info(task: &Task) -> CoreDumpInfo {
@@ -477,9 +499,11 @@ pub fn execute_task<F, G>(
     let join_handle = std::thread::Builder::new()
         .name("user-thread".to_string())
         .spawn(move || {
-            let mut locked = Unlocked::new();
             let mut current_task: CurrentTask = task_builder.into();
-            let pre_run_result = pre_run(&mut locked, &mut current_task);
+            let pre_run_result = {
+                let mut locked = Unlocked::new();
+                pre_run(&mut locked, &mut current_task)
+            };
             if pre_run_result.is_err() {
                 log_error!("Pre run failed from {pre_run_result:?}. The task will not be run.");
 
@@ -487,7 +511,7 @@ pub fn execute_task<F, G>(
                 // releasables.
                 std::mem::drop(task_complete);
             } else {
-                let run_result = match run_task(&mut locked, &mut current_task) {
+                let run_result = match run_task(&mut current_task) {
                     Err(error) => {
                         log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
                         let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
@@ -503,6 +527,7 @@ pub fn execute_task<F, G>(
 
             // `release` must be called as the absolute last action on this thread to ensure that
             // any deferred release are done before it.
+            let mut locked = Unlocked::new();
             current_task.release(&mut locked);
 
             // Ensure that no releasables are registered after this point as we unwind the stack.
