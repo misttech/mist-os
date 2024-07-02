@@ -1381,6 +1381,10 @@ async fn serve_fidl<I: IfaceManager>(
     telemetry_sender: TelemetrySender,
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
+    let _inspect_server_task = inspect_runtime::publish(
+        fuchsia_inspect::component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
     let state = Arc::new(Mutex::new(WifiState::default()));
     let _ = fs.dir("svc").add_fidl_service(move |reqs| {
         serve_wlanix(reqs, Arc::clone(&state), Arc::clone(&iface_manager), telemetry_sender.clone())

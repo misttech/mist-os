@@ -32,6 +32,7 @@ rustc_binary("wlanix_bin") {
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/ieee80211",
     "//src/connectivity/wlan/lib/telemetry:wlan-telemetry",
+    "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
