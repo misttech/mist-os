@@ -364,7 +364,11 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> DadHandler<Ipv6
                 let leave_group = match dad_state {
                     Ipv6DadState::Assigned => true,
                     Ipv6DadState::Tentative { dad_transmits_remaining: _, timer } => {
-                        assert_ne!(bindings_ctx.cancel_timer(timer), None);
+                        // Generally we should have a timer installed in the
+                        // tentative state, but we could be racing with the
+                        // timer firing in bindings so we can't assert that it's
+                        // installed here.
+                        let _: Option<_> = bindings_ctx.cancel_timer(timer);
 
                         true
                     }
