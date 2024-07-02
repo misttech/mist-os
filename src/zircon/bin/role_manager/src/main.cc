@@ -4,6 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "profile.h"
@@ -12,7 +13,8 @@
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
-
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(loop.dispatcher()).BuildAndInitialize();
   zx::result create_result = RoleManager::Create();
   if (create_result.is_error()) {
     FX_LOGS(ERROR) << "Failed to create role manager service: " << create_result.status_string();
