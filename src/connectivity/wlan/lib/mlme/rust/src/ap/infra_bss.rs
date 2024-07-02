@@ -570,8 +570,8 @@ impl InfraBss {
             .map_err(|e| Rejection::Client(client.addr, e))
     }
 
-    // TODO(https://fxbug.dev/42170256): Determine whether this is still needed and add an API path if so.
-    #[allow(unused)]
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     pub fn handle_bcn_tx_complete_indication<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,

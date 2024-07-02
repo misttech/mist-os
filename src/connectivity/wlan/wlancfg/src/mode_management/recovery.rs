@@ -31,13 +31,8 @@ const DESTROY_IFACE_FAILURE_RECOVERY_THRESHOLD: usize = 1;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PhyRecoveryOperation {
-    #[allow(unused)]
-    DestroyIface {
-        iface_id: u16,
-    },
-    ResetPhy {
-        phy_id: u16,
-    },
+    DestroyIface { iface_id: u16 },
+    ResetPhy { phy_id: u16 },
 }
 
 impl PartialEq for PhyRecoveryOperation {
@@ -55,9 +50,7 @@ impl PartialEq for PhyRecoveryOperation {
 
 #[derive(Clone, Copy, Debug)]
 pub enum IfaceRecoveryOperation {
-    #[allow(unused)]
     Disconnect { iface_id: u16 },
-    #[allow(unused)]
     StopAp { iface_id: u16 },
 }
 
@@ -77,7 +70,6 @@ impl PartialEq for IfaceRecoveryOperation {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum RecoveryAction {
     PhyRecovery(PhyRecoveryOperation),
-    #[allow(unused)]
     IfaceRecovery(IfaceRecoveryOperation),
 }
 

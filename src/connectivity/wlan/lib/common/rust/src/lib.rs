@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(elided_lifetimes_in_paths)]
-
 //! Crate wlan-common hosts common libraries
 //! to be used for WLAN SME, MLME, and binaries written in Rust.
 
@@ -16,7 +14,6 @@ pub mod buffer_writer;
 pub mod capabilities;
 pub mod channel;
 pub mod data_writer;
-#[allow(unused)]
 pub mod energy;
 pub mod error;
 pub mod ie;
@@ -28,7 +25,6 @@ pub mod security;
 pub mod sequence;
 pub mod sequestered;
 pub mod sink;
-#[allow(unused)]
 pub mod stats;
 #[cfg(target_os = "fuchsia")]
 pub mod test_utils;

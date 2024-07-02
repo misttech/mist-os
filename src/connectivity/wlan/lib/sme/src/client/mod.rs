@@ -59,7 +59,7 @@ mod internal {
         pub(crate) timer: Timer<Event>,
         pub att_id: ConnectionAttemptId,
         pub(crate) inspect: Arc<inspect::SmeTree>,
-        // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+        // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
         #[allow(dead_code)]
         pub mac_sublayer_support: fidl_common::MacSublayerSupport,
         pub security_support: fidl_common::SecuritySupport,

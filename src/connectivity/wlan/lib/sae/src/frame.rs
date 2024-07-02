@@ -48,7 +48,7 @@ fn get_scalar_and_element_len_bytes(group_id: u16) -> Result<(usize, usize), Err
     }
 }
 
-pub fn parse<'a>(frame: &'a AuthFrameRx) -> Result<ParseSuccess<'a>, Error> {
+pub fn parse<'a>(frame: &'a AuthFrameRx<'_>) -> Result<ParseSuccess<'a>, Error> {
     // IEEE 802.11 9.3.3.12 Table 9-36 specifies all SAE auth frame formats.
     match (frame.seq, frame.status_code) {
         (1, StatusCode::Success) => parse_commit(frame.body).map(ParseSuccess::Commit),
@@ -60,7 +60,7 @@ pub fn parse<'a>(frame: &'a AuthFrameRx) -> Result<ParseSuccess<'a>, Error> {
     }
 }
 
-fn parse_anti_clogging_token(body: &[u8]) -> Result<AntiCloggingTokenMsg, Error> {
+fn parse_anti_clogging_token(body: &[u8]) -> Result<AntiCloggingTokenMsg<'_>, Error> {
     let mut reader = BufferReader::new(body);
     let group_id = reader.read_value::<u16>().ok_or(anyhow!("Failed to read group ID"))?;
     if reader.bytes_remaining() == 0 {
@@ -70,7 +70,7 @@ fn parse_anti_clogging_token(body: &[u8]) -> Result<AntiCloggingTokenMsg, Error>
     Ok(AntiCloggingTokenMsg { group_id, anti_clogging_token })
 }
 
-fn parse_commit(body: &[u8]) -> Result<CommitMsg, Error> {
+fn parse_commit(body: &[u8]) -> Result<CommitMsg<'_>, Error> {
     let mut reader = BufferReader::new(body);
     let group_id = reader.read_value::<u16>().ok_or(anyhow!("Failed to read group ID"))?;
 
@@ -94,7 +94,7 @@ fn parse_commit(body: &[u8]) -> Result<CommitMsg, Error> {
 
 const CONFIRM_BYTES: usize = 32;
 
-fn parse_confirm(body: &[u8]) -> Result<ConfirmMsg, Error> {
+fn parse_confirm(body: &[u8]) -> Result<ConfirmMsg<'_>, Error> {
     let mut reader = BufferReader::new(body);
     let send_confirm = reader.read_value::<u16>().ok_or(anyhow!("Failed to read send confirm"))?;
     let confirm = reader.read_bytes(CONFIRM_BYTES).ok_or(anyhow!("Buffer truncated"))?;
@@ -104,6 +104,8 @@ fn parse_confirm(body: &[u8]) -> Result<ConfirmMsg, Error> {
     }
 }
 
+// Allow skipping checks on append_bytes() and append_value()
+#[allow(unused_must_use)]
 pub fn write_commit(
     group_id: u16,
     scalar: &[u8],
@@ -119,6 +121,10 @@ pub fn write_commit(
     AuthFrameTx { seq: 1, status_code: StatusCode::Success, body }
 }
 
+// Allow skipping checks on append_bytes() and append_value()
+#[allow(unused_must_use)]
+// This function is currently unused, but planned for future use
+#[allow(dead_code)]
 pub fn write_token(group_id: u16, token: &[u8]) -> AuthFrameTx {
     let mut body = vec![];
     body.reserve(2 + token.len());
@@ -127,6 +133,8 @@ pub fn write_token(group_id: u16, token: &[u8]) -> AuthFrameTx {
     AuthFrameTx { seq: 1, status_code: StatusCode::AntiCloggingTokenRequired, body }
 }
 
+// Allow skipping checks on append_bytes() and append_value()
+#[allow(unused_must_use)]
 pub fn write_confirm(send_confirm: u16, confirm: &[u8]) -> AuthFrameTx {
     let mut body = vec![];
     body.reserve(2 + confirm.len());

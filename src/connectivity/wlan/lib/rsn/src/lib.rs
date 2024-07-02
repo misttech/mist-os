@@ -3,10 +3,6 @@
 // found in the LICENSE file.
 
 #![cfg_attr(feature = "benchmarks", feature(test))]
-// Remove once Cipher and AKM *_bits() were replaced with *_len() calls.
-#![allow(deprecated)]
-// This crate doesn't comply with all 2018 idioms
-#![allow(elided_lifetimes_in_paths)]
 
 use thiserror::Error;
 

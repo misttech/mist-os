@@ -31,11 +31,13 @@ use std::ops::ControlFlow;
 // This trait provides methods that (at time of writing) are unstable. They must be invoked using
 // fully qualified syntax since they share the same names as their unstable counterparts.
 pub trait ControlFlowExt<B, C> {
+    // TODO(https://fxbug.dev/335283785): Remove or document unused code
     #[allow(dead_code)]
     fn map_break<T, F>(self, f: F) -> ControlFlow<T, C>
     where
         F: FnOnce(B) -> T;
 
+    // TODO(https://fxbug.dev/335283785): Remove or document unused code
     #[allow(dead_code)]
     fn map_continue<T, F>(self, f: F) -> ControlFlow<B, T>
     where

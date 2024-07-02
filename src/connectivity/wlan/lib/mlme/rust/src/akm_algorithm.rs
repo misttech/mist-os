@@ -43,7 +43,6 @@ pub trait AkmAction {
 }
 
 /// An algorithm used to perform authentication and optionally generate a PMK.
-#[allow(unused)]
 pub enum AkmAlgorithm {
     _OpenAp,
     OpenSupplicant,

@@ -64,11 +64,14 @@ impl From<&Nl80211DfsState> for u32 {
     }
 }
 
-#[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Nl80211BandAttr {
     Frequencies(Vec<Vec<Nl80211FrequencyAttr>>),
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     HtCapable,
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     VhtCapable,
 }
 

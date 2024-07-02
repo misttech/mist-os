@@ -99,7 +99,6 @@ fn generate_qr_and_qnr(p: &Bignum, ctx: &BignumCtx) -> Result<(Bignum, Bignum), 
     Ok((qr, qnr))
 }
 
-#[allow(unused)]
 /// IEEE 802.11-2016 12.4.4.2.2
 /// Uses the given quadratic residue and non-quadratic residue to determine whether the given value
 /// is also a residue, without leaving potential timing attacks.
@@ -112,7 +111,7 @@ fn is_quadratic_residue_blind(
 ) -> Result<bool, Error> {
     // r = (random() mod (p - 1)) + 1
     let r = Bignum::rand(&p.sub(Bignum::one()?)?)?.add(Bignum::one()?)?;
-    let mut num = v.mod_mul(&r, p, ctx)?.mod_mul(&r, p, ctx)?;
+    let num = v.mod_mul(&r, p, ctx)?.mod_mul(&r, p, ctx)?;
     if num.is_odd() {
         let num = num.mod_mul(qr, p, ctx)?;
         Ok(legendre(&num, p, ctx)? == LegendreSymbol::QuadResidue)
@@ -188,7 +187,6 @@ impl Group {
             EcGroupId::P256 => Bignum::new_from_u64(10)?.set_negative(),
             EcGroupId::P384 => Bignum::new_from_u64(12)?.set_negative(),
             EcGroupId::P521 => Bignum::new_from_u64(4)?.set_negative(),
-            _ => bail!("No Z value for SAE self id: {}", self.id.to_u16().unwrap_or(0xFFFFu16)),
         };
         let c1 = group_params
             .b
@@ -248,7 +246,7 @@ impl Group {
         let x = if e2 { x1 } else { x2 }; // x = CMOV(x2, x1, e2)
         let y2 = if e2 { gx1 } else { gx2 }; // y2 = CMOV(gx2, gx1, e2)
         let y = y2.mod_sqrt(p, &self.bn_ctx)?; // y = sqrt(y2)
-        let e3 = (u.is_odd() == y.is_odd()); // e3 = sgn0(u) == sgn0(y) (is_odd() in GF(p))
+        let e3 = u.is_odd() == y.is_odd(); // e3 = sgn0(u) == sgn0(y) (is_odd() in GF(p))
         let negative_y = p.sub(y.copy()?)?.mod_nonnegative(p, &self.bn_ctx)?;
         let y = if e3 { y } else { negative_y }; // y = CMOV(-y, y, e3)
 
@@ -373,13 +371,6 @@ impl FiniteCyclicGroup for Group {
         let x = Bignum::new_from_slice(&octets[0..length])?;
         let y = Bignum::new_from_slice(&octets[length..])?;
         Ok(EcPoint::new_from_affine_coords(x, y, &self.group, &self.bn_ctx).ok())
-    }
-
-    // Default implementation for scalar_size.
-
-    fn element_size(&self) -> Result<usize, Error> {
-        let group_params = self.group.get_params(&self.bn_ctx)?;
-        Ok(group_params.p.len() * 2)
     }
 }
 
@@ -604,7 +595,6 @@ mod tests {
     #[test]
     fn generate_pwe_loop_no_pwd_id() {
         let group = make_group();
-        let group_params = group.group.get_params(&group.bn_ctx).unwrap();
         let params = SaeParameters {
             hmac: Box::new(HmacUtilsImpl::<Sha256>::new()),
             pwe_method: PweMethod::Loop,
@@ -648,7 +638,7 @@ mod tests {
         let prime = bn(67);
         let ctx = BignumCtx::new().unwrap();
         let (qr, qnr) = generate_qr_and_qnr(&prime, &ctx).unwrap();
-        qr_table.iter().enumerate().for_each(|(i, is_residue)| {
+        qr_table.iter().enumerate().for_each(|(i, _is_residue)| {
             assert_eq!(
                 qr_table[i],
                 is_quadratic_residue_blind(&bn(i as u64), &prime, &qr, &qnr, &ctx).unwrap()

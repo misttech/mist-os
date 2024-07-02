@@ -6,8 +6,8 @@ use super::boringssl::{Bignum, BignumCtx};
 use super::frame::{write_commit, write_confirm};
 use super::internal::{FiniteCyclicGroup, SaeParameters};
 use super::{
-    AntiCloggingTokenMsg, CommitMsg, ConfirmMsg, Key, PweMethod, RejectReason, SaeHandshake,
-    SaeUpdate, SaeUpdateSink, Timeout,
+    AntiCloggingTokenMsg, CommitMsg, ConfirmMsg, Key, RejectReason, SaeHandshake, SaeUpdate,
+    SaeUpdateSink, Timeout,
 };
 use anyhow::{bail, format_err, Error};
 use tracing::{error, warn};
@@ -238,7 +238,7 @@ impl<E> SaeNew<E> {
     fn handle_commit(
         &self,
         sink: &mut SaeUpdateSink,
-        commit_msg: &CommitMsg,
+        commit_msg: &CommitMsg<'_>,
     ) -> Result<(Vec<u8>, SerializedCommit, SerializedCommit, Kck, Key), RejectReason> {
         let (serialized_rand, serialized_commit) = self.commit()?;
         let commit = serialized_commit.deserialize(&self.config)?;
@@ -275,7 +275,7 @@ impl<E> SaeCommitted<E> {
     fn handle_commit(
         &self,
         sink: &mut SaeUpdateSink,
-        commit_msg: &CommitMsg,
+        commit_msg: &CommitMsg<'_>,
     ) -> Result<FrameResult<(SerializedCommit, Kck, Key)>, RejectReason> {
         if &commit_msg.scalar[..] == &self.commit.scalar[..]
             && &commit_msg.element[..] == &self.commit.element[..]
@@ -321,7 +321,7 @@ impl<E> SaeCommitted<E> {
     fn handle_confirm(
         &mut self,
         sink: &mut SaeUpdateSink,
-        _confirm_msg: &ConfirmMsg,
+        _confirm_msg: &ConfirmMsg<'_>,
     ) -> Result<(), RejectReason> {
         self.resend_last_frame(sink)
     }
@@ -329,7 +329,7 @@ impl<E> SaeCommitted<E> {
     fn handle_anti_clogging_token(
         &mut self,
         sink: &mut SaeUpdateSink,
-        act_msg: &AntiCloggingTokenMsg,
+        act_msg: &AntiCloggingTokenMsg<'_>,
     ) -> Result<(), RejectReason> {
         self.anti_clogging_token = act_msg.anti_clogging_token.to_vec();
         self.resend_last_frame(sink)
@@ -355,7 +355,7 @@ impl<E> SaeConfirmed<E> {
     fn handle_commit(
         &mut self,
         sink: &mut SaeUpdateSink,
-        _commit_msg: &CommitMsg,
+        _commit_msg: &CommitMsg<'_>,
     ) -> Result<(), RejectReason> {
         // The peer did not receive our previous commit or confirm.
         check_sync(&self.sync)?;
@@ -380,7 +380,7 @@ impl<E> SaeConfirmed<E> {
     fn handle_confirm(
         &mut self,
         sink: &mut SaeUpdateSink,
-        confirm_msg: &ConfirmMsg,
+        confirm_msg: &ConfirmMsg<'_>,
     ) -> Result<FrameResult<()>, RejectReason> {
         let verifier = compute_confirm(
             &self.config,
@@ -439,7 +439,7 @@ impl<E> SaeAccepted<E> {
     fn handle_confirm(
         &mut self,
         sink: &mut SaeUpdateSink,
-        confirm_msg: &ConfirmMsg,
+        confirm_msg: &ConfirmMsg<'_>,
     ) -> Result<(), RejectReason> {
         check_sync(&self.0.sync)?;
         // We use u16::max_value() where IEEE specifies 2^16 - 1.
@@ -470,11 +470,7 @@ impl<E> SaeAccepted<E> {
         Ok(())
     }
 
-    fn handle_timeout(
-        &mut self,
-        sink: &mut SaeUpdateSink,
-        timeout: Timeout,
-    ) -> Result<(), RejectReason> {
+    fn handle_timeout(&mut self, timeout: Timeout) -> Result<(), RejectReason> {
         match timeout {
             Timeout::Retransmission => {
                 // This is weird, but probably shouldn't kill our PMKSA.
@@ -514,11 +510,11 @@ impl<E> SaeHandshakeState<E> {
         }
     }
 
-    fn handle_commit(self, sink: &mut SaeUpdateSink, commit_msg: &CommitMsg) -> Self {
+    fn handle_commit(self, sink: &mut SaeUpdateSink, commit_msg: &CommitMsg<'_>) -> Self {
         match self {
             SaeHandshakeState::SaeNew(state) => {
                 match state.handle_commit(sink, commit_msg) {
-                    Ok((rand, commit, peer_commit, kck, key)) => {
+                    Ok((_rand, commit, peer_commit, kck, key)) => {
                         let (transition, state) = state.release_data();
                         transition
                             .to(SaeConfirmed {
@@ -577,7 +573,7 @@ impl<E> SaeHandshakeState<E> {
         }
     }
 
-    fn handle_confirm(self, sink: &mut SaeUpdateSink, confirm_msg: &ConfirmMsg) -> Self {
+    fn handle_confirm(self, sink: &mut SaeUpdateSink, confirm_msg: &ConfirmMsg<'_>) -> Self {
         match self {
             SaeHandshakeState::SaeCommitted(mut state) => {
                 match state.handle_confirm(sink, confirm_msg) {
@@ -591,7 +587,7 @@ impl<E> SaeHandshakeState<E> {
             SaeHandshakeState::SaeConfirmed(mut state) => {
                 match state.handle_confirm(sink, confirm_msg) {
                     Ok(FrameResult::Proceed(())) => {
-                        let (transition, mut state) = state.release_data();
+                        let (transition, state) = state.release_data();
                         transition.to(SaeAccepted(state)).into()
                     }
                     Ok(FrameResult::Drop) => state.into(),
@@ -620,7 +616,7 @@ impl<E> SaeHandshakeState<E> {
     fn handle_anti_clogging_token(
         self,
         sink: &mut SaeUpdateSink,
-        act_msg: &AntiCloggingTokenMsg,
+        act_msg: &AntiCloggingTokenMsg<'_>,
     ) -> Self {
         match self {
             SaeHandshakeState::SaeCommitted(mut state) => {
@@ -659,15 +655,13 @@ impl<E> SaeHandshakeState<E> {
                     }
                 }
             }
-            SaeHandshakeState::SaeAccepted(mut state) => {
-                match state.handle_timeout(sink, timeout) {
-                    Ok(()) => state.into(),
-                    Err(reject) => {
-                        sink.push(SaeUpdate::Reject(reject));
-                        state.transition_to(SaeFailed).into()
-                    }
+            SaeHandshakeState::SaeAccepted(mut state) => match state.handle_timeout(timeout) {
+                Ok(()) => state.into(),
+                Err(reject) => {
+                    sink.push(SaeUpdate::Reject(reject));
+                    state.transition_to(SaeFailed).into()
                 }
-            }
+            },
             _ => {
                 error!("Unexpected SAE timeout triggered");
                 self
@@ -693,18 +687,18 @@ impl<E> SaeHandshake for SaeHandshakeImpl<E> {
         self.0.replace_state(|state| state.initiate_sae(sink));
     }
 
-    fn handle_commit(&mut self, sink: &mut SaeUpdateSink, commit_msg: &CommitMsg) {
+    fn handle_commit(&mut self, sink: &mut SaeUpdateSink, commit_msg: &CommitMsg<'_>) {
         self.0.replace_state(|state| state.handle_commit(sink, commit_msg));
     }
 
-    fn handle_confirm(&mut self, sink: &mut SaeUpdateSink, confirm_msg: &ConfirmMsg) {
+    fn handle_confirm(&mut self, sink: &mut SaeUpdateSink, confirm_msg: &ConfirmMsg<'_>) {
         self.0.replace_state(|state| state.handle_confirm(sink, confirm_msg));
     }
 
     fn handle_anti_clogging_token(
         &mut self,
         sink: &mut SaeUpdateSink,
-        act_msg: &AntiCloggingTokenMsg,
+        act_msg: &AntiCloggingTokenMsg<'_>,
     ) {
         self.0.replace_state(|state| state.handle_anti_clogging_token(sink, act_msg));
     }
@@ -720,7 +714,7 @@ mod test {
     use super::*;
     use crate::boringssl::{Bignum, EcGroupId};
     use crate::hmac_utils::HmacUtilsImpl;
-    use crate::{self as sae, ecc};
+    use crate::{ecc, PweMethod};
     use hex::FromHex;
     use ieee80211::{MacAddr, Ssid};
     use lazy_static::lazy_static;

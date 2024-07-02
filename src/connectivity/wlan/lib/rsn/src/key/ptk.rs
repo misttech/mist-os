@@ -34,6 +34,8 @@ impl Ptk {
         Ok(Ptk { ptk, kck_len, kek_len, tk_len, cipher })
     }
 
+    // Remove once AKM *_bits() are replaced with *_len() calls.
+    #[allow(deprecated)]
     // IEEE 802.11-2016, 12.7.1.3
     pub fn new(
         pmk: &[u8],

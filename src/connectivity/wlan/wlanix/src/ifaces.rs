@@ -554,26 +554,16 @@ pub mod test_utils {
         }
     }
 
+    // Iface IDs are not currently read out of this struct anywhere, but keep them for future tests.
+    #[allow(dead_code)]
     #[derive(Debug, Clone)]
     pub enum IfaceManagerCall {
         ListPhys,
         ListIfaces,
-        QueryIface(
-            // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] u16,
-        ),
-        CreateClientIface(
-            // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] u16,
-        ),
-        GetClientIface(
-            // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] u16,
-        ),
-        DestroyIface(
-            // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] u16,
-        ),
+        QueryIface(u16),
+        CreateClientIface(u16),
+        GetClientIface(u16),
+        DestroyIface(u16),
     }
 
     pub struct TestIfaceManager {

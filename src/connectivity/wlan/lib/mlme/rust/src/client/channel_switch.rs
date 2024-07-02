@@ -294,8 +294,6 @@ pub enum ChannelSwitchError {
     InvalidChannelSwitchMode(u8),
 }
 
-// TODO(https://fxbug.dev/42169213): Remove unused annotation.
-#[allow(unused)]
 impl<B: ByteSlice> ChannelSwitchBuilder<B> {
     // Convert a set of received channel-switch-related IEs into the parameters
     // for a channel switch. Returns an error if the IEs received do not describe

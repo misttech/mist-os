@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 pub mod cmac_aes128;
-#[allow(unused)]
 pub mod hmac_md5;
 pub mod hmac_sha1;
 

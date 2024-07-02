@@ -77,6 +77,8 @@ impl Bignum {
     }
 
     /// Returns a new Bignum with value zero.
+    // TODO(https://fxbug.dev/335283785): Remove or document unused code
+    #[allow(dead_code)]
     pub fn zero() -> Result<Self, Error> {
         let result = Self::new()?;
         unsafe {
@@ -116,6 +118,8 @@ impl Bignum {
 
     /// Returns a new Bignum parsed from the given ascii string. The string may be given as a
     /// decimal value, or as a hex value preceded by '0x'.
+    // TODO(https://fxbug.dev/335283785): Remove or document unused code
+    #[allow(dead_code)]
     pub fn new_from_string(ascii: &str) -> Result<Self, Error> {
         let mut bignum = std::ptr::null_mut();
         let ascii = CString::new(ascii)?;
@@ -556,7 +560,7 @@ mod tests {
 
     #[test]
     fn bignum_mod_nonnegative() {
-        let mut ctx = BignumCtx::new().unwrap();
+        let ctx = BignumCtx::new().unwrap();
         let bn1 = bn("12");
         let bn2 = bn("5");
         let mod_nonnegative = bn1.mod_nonnegative(&bn2, &ctx).unwrap();
@@ -570,7 +574,7 @@ mod tests {
 
     #[test]
     fn bignum_mod_add() {
-        let mut ctx = BignumCtx::new().unwrap();
+        let ctx = BignumCtx::new().unwrap();
         let bn1 = bn("1000000000000000000000");
         let bn2 = bn("1000000000001234567890");
         let m = bn("2000000000000000000000");
@@ -714,8 +718,8 @@ mod tests {
         let ctx = BignumCtx::new().unwrap();
         let result =
             EcPoint::new_from_affine_coords(bn(GIX).add(bn("1")).unwrap(), bn(GIY), &group, &ctx);
-        assert!(result.is_err());
-        result.map_err(|e| assert!(format!("{:?}", e).contains("POINT_IS_NOT_ON_CURVE")));
+        let Err(err) = result else { panic!("Expected error") };
+        assert!(format!("{:?}", err).contains("POINT_IS_NOT_ON_CURVE"));
     }
 
     #[test]

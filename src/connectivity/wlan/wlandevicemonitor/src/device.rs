@@ -46,10 +46,10 @@ pub struct PhyDevice {
 pub struct IfaceDevice {
     pub phy_ownership: PhyOwnership,
     pub generic_sme: fidl_wlan_sme::GenericSmeProxy,
-    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    // This node is never read in our Rust code, but we must hold a reference to it.
     #[allow(dead_code)]
     pub inspect_node: Option<std::sync::Arc<fuchsia_inspect::LazyNode>>,
-    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    // This node is never read in our Rust code, only within the Inspect process.
     #[allow(dead_code)]
     pub inspect_vmo: Option<std::sync::Arc<fuchsia_zircon::Vmo>>,
 }

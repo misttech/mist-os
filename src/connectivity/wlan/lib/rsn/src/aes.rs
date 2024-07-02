@@ -17,11 +17,6 @@
 //! ciphertext can be authenticated. Without authenticated ciphertext, it is possible to introduce
 //! vulnerabilities when using AES.
 
-// NOTE: At the time of commit, some APIs in this module remain unused. However, some of these
-//       APIs remain to inform subsequent usage and changes and to avoid mistakes. This module is
-//       treated as if it were exported, though it is not and must not be.
-#![allow(dead_code)]
-
 use bssl_sys::{
     AES_set_decrypt_key, AES_set_encrypt_key, AES_unwrap_key, AES_wrap_key, AES_CMAC, AES_KEY,
 };
@@ -283,6 +278,8 @@ impl SizedKey {
     }
 
     /// Gets the length of the key in **bits**.
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     pub fn bit_len(&self) -> usize {
         match self {
             SizedKey::Key128Bit(..) => 128,
@@ -376,11 +373,15 @@ where
     }
 
     /// Gets the input buffer.
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     pub fn input(&self) -> &[u8] {
         self.0.input.as_ref()
     }
 
     /// Gets the output buffer.
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     pub fn output(&mut self) -> &mut [u8] {
         self.0.output.as_mut()
     }
@@ -441,11 +442,15 @@ where
     }
 
     /// Gets the input buffer.
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     pub fn input(&self) -> &[u8] {
         self.0.input.as_ref()
     }
 
     /// Gets the output buffer.
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     pub fn output(&mut self) -> &mut [u8] {
         self.0.output.as_mut()
     }

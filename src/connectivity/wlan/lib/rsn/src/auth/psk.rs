@@ -100,6 +100,8 @@ pub fn compute(passphrase: &[u8], ssid: &Ssid) -> Result<Psk, anyhow::Error> {
     let size = 256 / 8;
     let mut psk = vec![0_u8; size];
     const ITERS: NonZeroU32 = const_unwrap::const_unwrap_option(NonZeroU32::new(4096));
+    // PBKDF2-HMAC-SHA1 is considered insecure but required for PSK computation.
+    #[allow(deprecated)]
     insecure_pbkdf2_hmac_sha1(&passphrase[..], &ssid[..], ITERS, &mut psk[..]);
     Ok(psk.into_boxed_slice())
 }

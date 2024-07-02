@@ -5,16 +5,23 @@
 use crate::Error;
 
 use super::Algorithm;
+// RC4 is considered insecure but we require it for this legacy application.
+#[allow(deprecated)]
 use mundane::insecure::InsecureRc4Key;
 
-#[allow(unused, dead_code)]
 pub struct Rc4;
 
 impl Rc4 {
     fn xor_stream_with_skip(key: &[u8], data: &[u8], skip: usize) -> Vec<u8> {
+        // RC4 is considered insecure but we require it for this legacy application.
+        #[allow(deprecated)]
         let mut rc4 = InsecureRc4Key::insecure_new(&key[..]);
         let mut out = vec![0u8; data.len()];
+        // RC4 is considered insecure but we require it for this legacy application.
+        #[allow(deprecated)]
         rc4.insecure_xor_stream(&vec![0u8; skip][..], &mut vec![0u8; skip][..]);
+        // RC4 is considered insecure but we require it for this legacy application.
+        #[allow(deprecated)]
         rc4.insecure_xor_stream(data, &mut out);
         out
     }
