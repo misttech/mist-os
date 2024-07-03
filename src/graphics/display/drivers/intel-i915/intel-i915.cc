@@ -2225,9 +2225,12 @@ zx_status_t Controller::Init() {
   pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
   zxlogf(TRACE, "Device id %x", device_id_);
 
-  zx_status_t status = igd_opregion_.Init(parent_, pci_);
-  if (status != ZX_OK) {
-    if (status != ZX_ERR_NOT_SUPPORTED) {
+  zx::unowned_resource driver_mmio_resource(get_mmio_resource(parent_));
+  if (!driver_mmio_resource->is_valid()) {
+    zxlogf(WARNING, "Failed to get driver MMIO resource. VBT initialization skipped.");
+  } else {
+    zx_status_t status = igd_opregion_.Init(driver_mmio_resource->borrow(), pci_);
+    if (status != ZX_OK && status != ZX_ERR_NOT_SUPPORTED) {
       zxlogf(ERROR, "VBT initializaton failed: %s", zx_status_get_string(status));
       return status;
     }
@@ -2237,7 +2240,7 @@ zx_status_t Controller::Init() {
   // map register window
   uint8_t* regs;
   uint64_t size;
-  status = IntelGpuCoreMapPciMmio(0u, &regs, &size);
+  zx_status_t status = IntelGpuCoreMapPciMmio(0u, &regs, &size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map bar 0: %d", status);
     return status;

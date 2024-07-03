@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_IGD_H_
 
 #include <lib/device-protocol/pci.h>
+#include <lib/zx/resource.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
@@ -232,10 +233,13 @@ class IgdOpRegion {
   IgdOpRegion() = default;
   ~IgdOpRegion();
 
+  // `mmio_resource` must be of kind `ZX_RSRC_KIND_MMIO` and must have access
+  // to all valid physical memory address ranges.
+  //
   // Returns ZX_ERR_NOT_SUPPORTED if the boot firmware doesn't support the
   // OpRegion protocol. The firmware might be completely missing OpRegion
   // support, or may have a broken implementation that reports invalid data.
-  zx_status_t Init(zx_device_t* parent, ddk::Pci& pci);
+  zx_status_t Init(zx::unowned_resource mmio_resource, ddk::Pci& pci);
 
   bool HasDdi(DdiId ddi_id) const { return ddi_features_.find(ddi_id) != ddi_features_.end(); }
   bool SupportsHdmi(DdiId ddi_id) const {
