@@ -42,13 +42,14 @@ use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
     FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
 };
-use cm_types::Name;
+use cm_types::{Name, RelativePath};
 use config_encoder::ConfigFields;
 use errors::{
-    AddChildError, AddDynamicChildError, CreateNamespaceError, DynamicCapabilityError,
-    OpenOutgoingDirError, ResolveActionError, StopError,
+    AddChildError, AddDynamicChildError, CapabilityProviderError, ComponentProviderError,
+    CreateNamespaceError, DynamicCapabilityError, OpenError, OpenOutgoingDirError,
+    ResolveActionError, StopError,
 };
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{create_proxy, ServerEnd};
 use futures::future::BoxFuture;
 use hooks::{CapabilityReceiver, EventPayload};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
@@ -62,10 +63,12 @@ use std::sync::Arc;
 use tracing::warn;
 use vfs::directory::entry::SubNode;
 use vfs::directory::immutable::simple as pfs;
+use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 /// The mutable state of a component instance.
@@ -442,10 +445,16 @@ impl ResolvedInstanceState {
         };
         state.add_static_children(component).await?;
 
-        let (program_output_dict, declared_dictionaries) =
-            build_program_output_dictionary(component, &state.children, &decl, &component_input);
         let child_outgoing_dictionary_routers =
             state.get_child_component_output_dictionary_routers();
+        let (program_output_dict, declared_dictionaries) = build_program_output_dictionary(
+            component,
+            &child_outgoing_dictionary_routers,
+            &decl,
+            &component_input,
+            &new_program_router,
+            &ResolvedInstanceState::make_program_outgoing_router,
+        );
         let (component_sandbox, child_inputs) = build_component_sandbox(
             &component.moniker,
             child_outgoing_dictionary_routers,
@@ -469,13 +478,12 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
-        path: &cm_types::Path,
     ) -> Router {
         if component_decl.program.is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
-        let path = path.to_string();
         let name = capability_decl.name();
+        let path = capability_decl.path().expect("must have path").to_string();
         let path = fuchsia_fs::canonicalize_path(&path);
         let entry_type = ComponentCapability::from(capability_decl.clone()).type_name().into();
         let relative_path = Path::validate_and_split(path).unwrap();
@@ -1291,4 +1299,58 @@ impl Routable for CapabilityRequestedHook {
             Ok(Capability::Instance(WeakInstanceToken::new_component(self.source.clone())))
         }
     }
+}
+
+struct ProgramRouter {
+    component: WeakComponentInstance,
+    source_path: RelativePath,
+}
+
+#[async_trait]
+impl Routable for ProgramRouter {
+    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+        fn open_error(e: OpenOutgoingDirError) -> OpenError {
+            CapabilityProviderError::from(ComponentProviderError::from(e)).into()
+        }
+
+        let component = self.component.upgrade().map_err(|_| {
+            RoutingError::from(ComponentInstanceError::instance_not_found(
+                self.component.moniker.clone(),
+            ))
+        })?;
+        let dir_entry = component.get_outgoing();
+
+        let (inner_router, server_end) = create_proxy::<fsandbox::RouterMarker>().unwrap();
+        dir_entry.open(
+            ExecutionScope::new(),
+            fio::OpenFlags::empty(),
+            vfs::path::Path::validate_and_split(self.source_path.to_string())
+                .expect("path must be valid"),
+            server_end.into_channel(),
+        );
+        let debug = request.debug;
+        let cap = inner_router
+            .route(request.into())
+            .await
+            .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?
+            .map_err(RouterError::from)?;
+        let capability =
+            Capability::try_from(cap).map_err(|_| RoutingError::BedrockRemoteCapability)?;
+        if !matches!(capability, Capability::Dictionary(_)) {
+            Err(RoutingError::BedrockWrongCapabilityType {
+                actual: capability.debug_typename().into(),
+                expected: "Dictionary".into(),
+            })?;
+        }
+        if !debug {
+            Ok(capability)
+        } else {
+            let source = WeakInstanceToken::new_component(component.as_weak());
+            Ok(Capability::Instance(source))
+        }
+    }
+}
+
+fn new_program_router(component: WeakComponentInstance, source_path: RelativePath) -> Router {
+    Router::new(ProgramRouter { component: component, source_path: source_path })
 }

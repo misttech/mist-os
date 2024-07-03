@@ -2,49 +2,51 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
-use crate::model::component::instance::ResolvedInstanceState;
-use crate::model::component::{ComponentInstance, WeakComponentInstance};
-use crate::model::routing::router_ext::WeakInstanceTokenExt;
+use crate::model::component::ComponentInstance;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
-use ::routing::capability_source::ComponentCapability;
-use ::routing::component_instance::ComponentInstanceInterface;
-use ::routing::error::{ComponentInstanceError, RoutingError};
+use ::routing::capability_source::{CapabilitySource, ComponentCapability};
+use ::routing::component_instance::{
+    ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
+};
+use ::routing::error::RoutingError;
 use ::routing::{DictExt, LazyGet};
-use async_trait::async_trait;
-use cm_rust::CapabilityDecl;
 use cm_types::{IterablePath, RelativePath};
-use errors::{CapabilityProviderError, ComponentProviderError, OpenError, OpenOutgoingDirError};
-use fidl::endpoints::create_proxy;
 use futures::FutureExt;
 use itertools::Itertools;
 use moniker::ChildName;
-use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Routable, Router, WeakInstanceToken};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::warn;
-use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
+
+pub type ProgramRouterFn =
+    dyn Fn(WeakComponentInstanceInterface<ComponentInstance>, RelativePath) -> Router;
+pub type OutgoingDirRouterFn =
+    dyn Fn(&Arc<ComponentInstance>, &cm_rust::ComponentDecl, &cm_rust::CapabilityDecl) -> Router;
 
 pub fn build_program_output_dictionary(
     component: &Arc<ComponentInstance>,
-    children: &HashMap<ChildName, Arc<ComponentInstance>>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     decl: &cm_rust::ComponentDecl,
     component_input: &ComponentInput,
+    // This router should forward routing requests to a component's program
+    new_program_router: &ProgramRouterFn,
+    new_outgoing_dir_router: &OutgoingDirRouterFn,
 ) -> (Dict, Dict) {
     let program_output_dict = Dict::new();
     let declared_dictionaries = Dict::new();
     for capability in &decl.capabilities {
         extend_dict_with_capability(
             component,
-            children,
+            child_component_output_dictionary_routers,
             decl,
             capability,
             component_input,
             &program_output_dict,
             &declared_dictionaries,
+            new_program_router,
+            new_outgoing_dir_router,
         );
     }
     (program_output_dict, declared_dictionaries)
@@ -54,23 +56,22 @@ pub fn build_program_output_dictionary(
 /// is a dict of routers, keyed by capability name.
 fn extend_dict_with_capability(
     component: &Arc<ComponentInstance>,
-    children: &HashMap<ChildName, Arc<ComponentInstance>>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     decl: &cm_rust::ComponentDecl,
     capability: &cm_rust::CapabilityDecl,
     component_input: &ComponentInput,
     program_output_dict: &Dict,
     declared_dictionaries: &Dict,
+    new_program_router: &ProgramRouterFn,
+    new_outgoing_dir_router: &OutgoingDirRouterFn,
 ) {
     match capability {
-        CapabilityDecl::Service(_)
-        | CapabilityDecl::Protocol(_)
-        | CapabilityDecl::Directory(_)
-        | CapabilityDecl::Runner(_)
-        | CapabilityDecl::Resolver(_) => {
-            let path = capability.path().expect("must have path");
-            let router = ResolvedInstanceState::make_program_outgoing_router(
-                component, decl, capability, path,
-            );
+        cm_rust::CapabilityDecl::Service(_)
+        | cm_rust::CapabilityDecl::Protocol(_)
+        | cm_rust::CapabilityDecl::Directory(_)
+        | cm_rust::CapabilityDecl::Runner(_)
+        | cm_rust::CapabilityDecl::Resolver(_) => {
+            let router = new_outgoing_dir_router(component, decl, capability);
             let router = router.with_policy_check(
                 CapabilitySource::Component {
                     capability: ComponentCapability::from(capability.clone()),
@@ -88,14 +89,17 @@ fn extend_dict_with_capability(
         cm_rust::CapabilityDecl::Dictionary(d) => {
             extend_dict_with_dictionary(
                 component,
-                children,
+                child_component_output_dictionary_routers,
                 d,
                 component_input,
                 program_output_dict,
                 declared_dictionaries,
+                new_program_router,
             );
         }
-        CapabilityDecl::EventStream(_) | CapabilityDecl::Config(_) | CapabilityDecl::Storage(_) => {
+        cm_rust::CapabilityDecl::EventStream(_)
+        | cm_rust::CapabilityDecl::Config(_)
+        | cm_rust::CapabilityDecl::Storage(_) => {
             // Capabilities not supported in bedrock program output dict yet.
             return;
         }
@@ -104,11 +108,12 @@ fn extend_dict_with_capability(
 
 fn extend_dict_with_dictionary(
     component: &Arc<ComponentInstance>,
-    children: &HashMap<ChildName, Arc<ComponentInstance>>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     decl: &cm_rust::DictionaryDecl,
     component_input: &ComponentInput,
     program_output_dict: &Dict,
     declared_dictionaries: &Dict,
+    new_program_router: &ProgramRouterFn,
 ) {
     let dict = Dict::new();
     let router;
@@ -121,92 +126,44 @@ fn extend_dict_with_dictionary(
             cm_rust::DictionarySource::Parent => component_input.capabilities().lazy_get(
                 source_path.to_owned(),
                 RoutingError::use_from_parent_not_found(
-                    &component.moniker,
+                    component.moniker(),
                     source_path.iter_segments().join("/"),
                 ),
             ),
-            cm_rust::DictionarySource::Self_ => component.program_output().lazy_get(
-                source_path.to_owned(),
-                RoutingError::use_from_self_not_found(
-                    &component.moniker,
-                    source_path.iter_segments().join("/"),
-                ),
-            ),
+            cm_rust::DictionarySource::Self_ => {
+                weak_reference_program_output_router(component.as_weak()).lazy_get(
+                    source_path.to_owned(),
+                    RoutingError::use_from_self_not_found(
+                        component.moniker(),
+                        source_path.iter_segments().join("/"),
+                    ),
+                )
+            }
             cm_rust::DictionarySource::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name =
                     ChildName::parse(child_ref.name.as_str()).expect("invalid child name");
-                match children.get(&child_name) {
-                    Some(child) => child.component_output().lazy_get(
+                match child_component_output_dictionary_routers.get(&child_name) {
+                    Some(output_dictionary_router) => output_dictionary_router.clone().lazy_get(
                         source_path.to_owned(),
                         RoutingError::BedrockSourceDictionaryExposeNotFound,
                     ),
                     None => Router::new_error(RoutingError::use_from_child_instance_not_found(
                         &child_name,
-                        &component.moniker,
+                        component.moniker(),
                         source_path.iter_segments().join("/"),
                     )),
                 }
             }
             cm_rust::DictionarySource::Program => {
-                struct ProgramRouter {
-                    component: WeakComponentInstance,
-                    source_path: RelativePath,
-                }
-                #[async_trait]
-                impl Routable for ProgramRouter {
-                    async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                        fn open_error(e: OpenOutgoingDirError) -> OpenError {
-                            CapabilityProviderError::from(ComponentProviderError::from(e)).into()
-                        }
-
-                        let component = self.component.upgrade().map_err(|_| {
-                            RoutingError::from(ComponentInstanceError::instance_not_found(
-                                self.component.moniker.clone(),
-                            ))
-                        })?;
-                        let dir_entry = component.get_outgoing();
-
-                        let (inner_router, server_end) =
-                            create_proxy::<fsandbox::RouterMarker>().unwrap();
-                        dir_entry.open(
-                            ExecutionScope::new(),
-                            fio::OpenFlags::empty(),
-                            vfs::path::Path::validate_and_split(self.source_path.to_string())
-                                .expect("path must be valid"),
-                            server_end.into_channel(),
-                        );
-                        let debug = request.debug;
-                        let cap = inner_router
-                            .route(request.into())
-                            .await
-                            .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?
-                            .map_err(RouterError::from)?;
-                        let capability = Capability::try_from(cap)
-                            .map_err(|_| RoutingError::BedrockRemoteCapability)?;
-                        if !matches!(capability, Capability::Dictionary(_)) {
-                            Err(RoutingError::BedrockWrongCapabilityType {
-                                actual: capability.debug_typename().into(),
-                                expected: "Dictionary".into(),
-                            })?;
-                        }
-                        if !debug {
-                            Ok(capability)
-                        } else {
-                            let source = WeakInstanceToken::new_component(component.as_weak());
-                            Ok(Capability::Instance(source))
-                        }
-                    }
-                }
-                Router::new(ProgramRouter {
-                    component: component.as_weak(),
-                    source_path: source_path.clone(),
-                })
+                new_program_router(component.as_weak(), source_path.clone())
             }
         };
         router = make_dict_extending_router(
             dict.clone(),
-            WeakInstanceToken::new_component(component.as_weak()),
+            WeakInstanceToken {
+                inner: Arc::new(WeakExtendedInstanceInterface::Component(component.as_weak())),
+            },
             source_dict_router,
         );
     } else {
@@ -269,4 +226,18 @@ fn make_dict_extending_router(
         .boxed()
     };
     Router::new(route_fn)
+}
+
+fn weak_reference_program_output_router(
+    weak_component: WeakComponentInstanceInterface<ComponentInstance>,
+) -> Router {
+    Router::new(move |request: Request| {
+        let weak_component = weak_component.clone();
+        async move {
+            let component = weak_component.upgrade().map_err(RoutingError::from)?;
+            let sandbox = component.component_sandbox().await.map_err(RoutingError::from)?;
+            sandbox.program_output_dict.route(request).await
+        }
+        .boxed()
+    })
 }
