@@ -68,11 +68,18 @@ impl InspectHandle {
     }
 }
 
-#[derive(Default, Debug)]
+struct StoredInspectHandle {
+    handle: Arc<InspectHandle>,
+    // Whenever we delete the stored handle from the map, we can leverage dropping this oneshot to
+    // trigger completion of the Task listening for related handle peer closed.
+    _control: oneshot::Sender<()>,
+}
+
+#[derive(Default)]
 pub struct InspectArtifactsContainer {
     /// One or more proxies that this container is configured for.
-    inspect_handles: HashMap<zx::Koid, Arc<InspectHandle>>,
-    on_closed_tasks: Vec<fasync::Task<()>>,
+    inspect_handles: HashMap<zx::Koid, StoredInspectHandle>,
+    on_closed_tasks: fasync::TaskGroup,
 }
 
 impl InspectArtifactsContainer {
@@ -90,12 +97,13 @@ impl InspectArtifactsContainer {
         if !self.inspect_handles.is_empty() && matches!(handle, InspectHandle::Directory { .. }) {
             return None;
         }
-
+        let (control_snd, control_rcv) = oneshot::channel();
         let handle = Arc::new(handle);
+        let stored = StoredInspectHandle { _control: control_snd, handle: Arc::clone(&handle) };
         let koid = handle.koid();
-        self.inspect_handles.insert(koid, Arc::clone(&handle));
-        let (task, rcv) = Self::on_closed_task(handle, koid);
-        self.on_closed_tasks.push(task);
+        self.inspect_handles.insert(koid, stored);
+        let (task, rcv) = Self::on_closed_task(handle, koid, control_rcv);
+        self.on_closed_tasks.add(task);
         Some(rcv)
     }
 
@@ -112,9 +120,8 @@ impl InspectArtifactsContainer {
         }
 
         // we know there is at least 1
-        let handle = self.inspect_handles.values().next().unwrap();
-
-        match handle.as_ref() {
+        let stored = self.inspect_handles.values().next().unwrap();
+        match stored.handle.as_ref() {
             // there can only be one Directory, semantically
             InspectHandle::Directory { proxy: dir } if self.inspect_handles.len() == 1 => {
                 fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
@@ -132,8 +139,8 @@ impl InspectArtifactsContainer {
                 inspect_handles: self
                     .inspect_handles
                     .values()
-                    .filter(|handle| handle.as_ref().is_tree())
-                    .map(|handle| handle.as_ref().clone())
+                    .filter(|stored| stored.handle.is_tree())
+                    .map(|stored| stored.handle.as_ref().clone())
                     .collect::<Vec<InspectHandle>>(),
             }),
 
@@ -144,12 +151,15 @@ impl InspectArtifactsContainer {
     fn on_closed_task(
         proxy: Arc<InspectHandle>,
         koid: zx::Koid,
+        control_rcv: oneshot::Receiver<()>,
     ) -> (fasync::Task<()>, oneshot::Receiver<zx::Koid>) {
         let (snd, rcv) = oneshot::channel();
         (
             fasync::Task::spawn(async move {
                 if !proxy.is_closed() {
-                    let _ = proxy.on_closed().await;
+                    let closed_fut = proxy.on_closed();
+                    futures::pin_mut!(closed_fut);
+                    let _ = futures::future::select(closed_fut, control_rcv).await;
                 }
                 let _ = snd.send(koid);
             }),
@@ -161,7 +171,7 @@ impl InspectArtifactsContainer {
 #[cfg(test)]
 impl InspectArtifactsContainer {
     pub(crate) fn handles(&self) -> impl ExactSizeIterator<Item = &Arc<InspectHandle>> {
-        self.inspect_handles.values()
+        self.inspect_handles.values().map(|stored| &stored.handle)
     }
 }
 

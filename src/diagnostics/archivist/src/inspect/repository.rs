@@ -253,6 +253,8 @@ impl InspectRepositoryInner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl::endpoints::Proxy;
+    use fidl::AsHandleRef;
     use fidl_fuchsia_inspect as finspect;
     use fuchsia_zircon::DurationNum;
     use selectors::FastError;
@@ -296,6 +298,22 @@ mod tests {
         while data_repo.inner.read().get(&identity).is_some() {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
         }
+    }
+
+    #[fuchsia::test]
+    async fn related_handle_closes_when_repo_handle_is_removed() {
+        let repo = Arc::new(InspectRepository::default());
+        let identity = Arc::new(ComponentIdentity::unknown());
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
+            .expect("create directory proxy");
+        let koid = proxy.as_channel().as_handle_ref().get_koid().unwrap();
+        repo.add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("test")));
+        {
+            let mut guard = repo.inner.write();
+            let container = guard.diagnostics_containers.get_mut(&identity).unwrap();
+            container.remove_handle(koid);
+        }
+        fasync::Channel::from_channel(server_end.into_channel()).on_closed().await.unwrap();
     }
 
     #[fuchsia::test]
