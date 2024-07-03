@@ -67,6 +67,7 @@ var (
 	srcFiles          flagmisc.StringsValue
 	numThreads        int
 	jobs              int
+	malformedOutput   string
 )
 
 func init() {
@@ -101,6 +102,7 @@ func init() {
 		"Multiple files can be specified with multiple instances of this flag.")
 	flag.IntVar(&numThreads, "num-threads", 0, "number of processing threads")
 	flag.IntVar(&jobs, "jobs", runtime.NumCPU(), "number of parallel jobs")
+	flag.StringVar(&malformedOutput, "malformed-output", "", "the path to write malformed profiles/binaries to")
 }
 
 const llvmProfileSinkType = "llvm-profile"
@@ -685,9 +687,11 @@ func process(ctx context.Context) error {
 	}
 
 	// Write the malformed modules/profiles to a file in order to keep track of them.
-	malformed = append(malformed, malformedProfiles...)
-	if err := os.WriteFile(filepath.Join(tempDir, "malformed_binaries.txt"), []byte(strings.Join(malformed, "\n")), os.ModePerm); err != nil {
-		return fmt.Errorf("failed to write malformed binaries to a file: %w", err)
+	if malformedOutput != "" {
+		malformed = append(malformed, malformedProfiles...)
+		if err := os.WriteFile(malformedOutput, []byte(strings.Join(malformed, "\n")), os.ModePerm); err != nil {
+			return fmt.Errorf("failed to write malformed binaries to a file: %w", err)
+		}
 	}
 
 	covFile, err := createLLVMCovResponseFile(tempDir, &modules)
