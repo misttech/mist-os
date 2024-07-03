@@ -9,9 +9,9 @@ ffx_plugin("ffx_package_build") {
   edition = "2021"
   with_unit_tests = true
   deps = [
-    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/sys/pkg/lib/package-tool",
-    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
   ]
   args_deps = [ "//src/sys/pkg/lib/package-tool" ]
 
