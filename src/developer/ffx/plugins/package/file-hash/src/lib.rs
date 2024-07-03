@@ -2,56 +2,93 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
-use ffx_core::ffx_plugin;
+use anyhow::Context;
 use ffx_package_file_hash_args::FileHashCommand;
-use ffx_writer::Writer;
+use fho::{
+    return_user_error, user_error, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
+};
 use fuchsia_merkle::MerkleTree;
 use rayon::prelude::*;
+use schemars::JsonSchema;
 use serde::Serialize;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-#[ffx_plugin()]
-pub async fn cmd_file_hash(
-    cmd: FileHashCommand,
-    #[ffx(machine = Vec<FileHashEntry>)] mut writer: Writer,
-) -> Result<()> {
-    if cmd.paths.is_empty() {
-        if writer.is_machine() {
-            writer.machine::<Vec<FileHashEntry>>(&vec![])?;
-        } else {
-            writer.error("Missing file path")?;
-        }
-        return Ok(());
-    }
+#[derive(FfxTool)]
+pub struct FileHashTool {
+    #[command]
+    pub cmd: FileHashCommand,
+}
 
-    let entries = cmd.paths.into_par_iter().map(FileHashEntry::new);
+fho::embedded_plugin!(FileHashTool);
 
-    if writer.is_machine() {
-        // Fails if any of the files don't exist.
-        let entries: Vec<_> = entries.collect::<Result<_>>()?;
-        writer.machine(&entries)?;
-    } else {
-        // Only fails if writing to stdout/stderr fails.
-        for entry in entries.collect::<Vec<_>>() {
-            match entry {
-                Ok(FileHashEntry { path, hash }) => {
-                    writeln!(writer, "{}  {}", hash, path.display())?;
-                }
-                Err(e) => {
-                    // Display the error and continue.
-                    writer.error(e)?;
-                }
+#[async_trait::async_trait(?Send)]
+impl FfxMain for FileHashTool {
+    type Writer = VerifiedMachineWriter<CommandResult>;
+    async fn main(self, mut writer: <Self as fho::FfxMain>::Writer) -> Result<()> {
+        match self.cmd_file_hash(&mut writer).await {
+            Ok(data) => {
+                writer.machine(&CommandResult::Ok { data })?;
+                Ok(())
+            }
+            Err(e @ Error::User(_)) => {
+                writer.machine(&CommandResult::UserError(e.to_string()))?;
+                Err(e)
+            }
+            Err(e) => {
+                writer.machine(&CommandResult::UnexpectedError(e.to_string()))?;
+                Err(e)
             }
         }
     }
-
-    Ok(())
 }
 
-#[derive(Serialize)]
+impl FileHashTool {
+    pub async fn cmd_file_hash(
+        &self,
+        writer: &mut <Self as fho::FfxMain>::Writer,
+    ) -> Result<Vec<FileHashEntry>> {
+        if self.cmd.paths.is_empty() {
+            return_user_error!("Missing file path");
+        }
+
+        let entries = self.cmd.paths.clone().into_par_iter().map(FileHashEntry::new);
+
+        if writer.is_machine() {
+            // Fails if any of the files don't exist.
+            let entries: Vec<_> = entries.collect::<Result<_>>().map_err(|e| user_error!(e))?;
+            return Ok(entries);
+        } else {
+            // Only fails if writing to stdout/stderr fails.
+            for entry in entries.collect::<Vec<_>>() {
+                match entry {
+                    Ok(FileHashEntry { path, hash }) => {
+                        writeln!(writer, "{}  {}", hash, path.display())
+                            .map_err(|e| user_error!(e))?;
+                    }
+                    Err(e) => {
+                        // Display the error and continue.
+                        writeln!(writer.stderr(), "{e}").map_err(|e| user_error!("{e}"))?;
+                    }
+                }
+            }
+            Ok(vec![])
+        }
+    }
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandResult {
+    /// Success.
+    Ok { data: Vec<FileHashEntry> },
+    /// Unexpected error with string denoting error message.
+    UnexpectedError(String),
+    /// A known error that can be reported to the user.
+    UserError(String),
+}
+#[derive(Serialize, JsonSchema)]
 pub struct FileHashEntry {
     path: PathBuf,
     hash: String,
@@ -61,7 +98,7 @@ impl FileHashEntry {
     /// Compute the merkle root hash of a file.
     fn new(path: PathBuf) -> Result<Self> {
         let file = File::open(&path)
-            .with_context(|| format!("failed to open file: {}", path.display()))?;
+            .map_err(|e| user_error!("failed to open file {}: {e}", path.display()))?;
 
         let tree = MerkleTree::from_reader(file)
             .with_context(|| format!("failed to read file: {}", path.display()))?;
@@ -73,10 +110,10 @@ impl FileHashEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_writer::Format;
+    use fho::{Format, TestBuffers};
     use tempfile::TempDir;
 
-    fn create_test_files(name_content_pairs: &[(&str, &str)]) -> Result<TempDir> {
+    fn create_test_files(name_content_pairs: &[(&str, &str)]) -> anyhow::Result<TempDir> {
         let dir = TempDir::new()?;
 
         for (name, content) in name_content_pairs {
@@ -103,8 +140,12 @@ mod tests {
         let paths = test_data.iter().map(|(name, _)| dir.path().join(name)).collect();
 
         let cmd = FileHashCommand { paths };
-        let writer = Writer::new_test(None);
-        cmd_file_hash(cmd, writer.clone()).await?;
+        let tool = FileHashTool { cmd };
+        let buffers = TestBuffers::default();
+        let writer = <FileHashTool as FfxMain>::Writer::new_test(None, &buffers);
+        tool.main(writer).await.expect("success");
+
+        let (out, err) = &buffers.into_strings();
 
         let expected_output = format!(
             "\
@@ -115,8 +156,8 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
             dir.path().display(),
         );
 
-        assert_eq!(writer.test_output()?, expected_output);
-        assert_eq!(writer.test_error()?, "");
+        assert_eq!(out, &expected_output);
+        assert_eq!(err, "");
 
         // Clean up temp files.
         drop(dir);
@@ -140,22 +181,26 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         let paths = test_data.iter().map(|(name, _)| dir.path().join(name)).collect();
 
         let cmd = FileHashCommand { paths };
-        let writer = Writer::new_test(Some(Format::Json));
-        cmd_file_hash(cmd, writer.clone()).await?;
+        let tool = FileHashTool { cmd };
+        let buffers = TestBuffers::default();
+        let writer = <FileHashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        tool.main(writer).await.expect("success");
 
+        let (out, err) = buffers.into_strings();
         let expected_output = format!(
             concat!(
-                "[",
+                r#"{{"ok":{{"data":["#,
                 r#"{{"path":"{0}/first_file","hash":"15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b"}},"#,
                 r#"{{"path":"{0}/second_file","hash":"e6a73dbd2d88e51ccdaa648cbf49b3939daac8a3e370169bc85e0324a41adbc2"}},"#,
                 r#"{{"path":"{0}/third_file","hash":"f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4"}}"#,
-                "]\n",
+                r#"]}}}}"#,
+                "\n"
             ),
             dir.path().display(),
         );
 
-        assert_eq!(writer.test_output()?, expected_output);
-        assert_eq!(writer.test_error()?, "");
+        assert_eq!(out, expected_output);
+        assert_eq!(err, "");
 
         // Clean up temp files.
         drop(dir);
@@ -170,11 +215,17 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         const NAME: &str = "filename_that_does_not_exist";
 
         let cmd = FileHashCommand { paths: vec![NAME.into()] };
-        let writer = Writer::new_test(None);
-        cmd_file_hash(cmd, writer.clone()).await?;
+        let tool = FileHashTool { cmd };
+        let buffers = TestBuffers::default();
+        let writer = <FileHashTool as FfxMain>::Writer::new_test(None, &buffers);
 
-        assert_eq!(writer.test_output()?, "");
-        assert_eq!(writer.test_error()?, format!("failed to open file: {NAME}\n"));
+        tool.main(writer).await.expect("success");
+        let (out, err) = buffers.into_strings();
+        assert_eq!(
+            err,
+            format!("failed to open file {NAME}: No such file or directory (os error 2)\n")
+        );
+        assert_eq!(out, "");
 
         Ok(())
     }
@@ -186,14 +237,18 @@ f5a0dff4578d0150d3dace71b08733d5cd8cbe63a322633445c9ff0d9041b9c4  {0}/third_file
         const NAME: &str = "filename_that_does_not_exist";
 
         let cmd = FileHashCommand { paths: vec![NAME.into()] };
-        let writer = Writer::new_test(Some(Format::Json));
-        let result = cmd_file_hash(cmd, writer.clone()).await;
+        let tool = FileHashTool { cmd };
+        let buffers = TestBuffers::default();
+        let writer = <FileHashTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
-        let msg = result.unwrap_err().to_string();
-        assert_eq!(msg, format!("failed to open file: {NAME}"));
+        let res = tool.main(writer).await;
+        let (out, err) = buffers.into_strings();
+        match res {
+            Ok(_) => assert!(false,"Unexpected success"),
+            Err(_) => assert_eq!(out, format!("{{\"user_error\":\"failed to open file {NAME}: No such file or directory (os error 2)\"}}\n"))
+        };
 
-        assert_eq!(writer.test_output()?, "");
-        assert_eq!(writer.test_error()?, "");
+        assert_eq!(err, "");
 
         Ok(())
     }
