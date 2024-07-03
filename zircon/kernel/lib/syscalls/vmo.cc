@@ -83,7 +83,7 @@ zx_status_t sys_vmo_read(zx_handle_t handle, user_out_ptr<void> _data, uint64_t 
   if (status != ZX_OK)
     return status;
 
-  return vmo->Read(_data.reinterpret<char>(), len, offset, nullptr);
+  return vmo->Read(_data.reinterpret<char>(), offset, len, nullptr);
 }
 
 // zx_status_t zx_vmo_write
@@ -100,7 +100,7 @@ zx_status_t sys_vmo_write(zx_handle_t handle, user_in_ptr<const void> _data, uin
   if (status != ZX_OK)
     return status;
 
-  return vmo->Write(_data.reinterpret<const char>(), len, offset, nullptr);
+  return vmo->Write(_data.reinterpret<const char>(), offset, len, nullptr);
 }
 
 // zx_status_t zx_vmo_transfer_data

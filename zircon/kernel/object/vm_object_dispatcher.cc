@@ -142,22 +142,22 @@ void VmObjectDispatcher::on_zero_handles() {
   vmo_->SetChildObserver(nullptr);
 }
 
-zx_status_t VmObjectDispatcher::Read(user_out_ptr<char> user_data, size_t length, uint64_t offset,
+zx_status_t VmObjectDispatcher::Read(user_out_ptr<char> user_data, uint64_t offset, size_t length,
                                      size_t* out_actual) {
   canary_.Assert();
 
   return vmo_->ReadUser(user_data, offset, length, VmObjectReadWriteOptions::None, out_actual);
 }
 
-zx_status_t VmObjectDispatcher::ReadVector(user_out_iovec_t user_data, size_t length,
-                                           uint64_t offset, size_t* out_actual) {
+zx_status_t VmObjectDispatcher::ReadVector(user_out_iovec_t user_data, uint64_t offset,
+                                           size_t length, size_t* out_actual) {
   canary_.Assert();
 
   return vmo_->ReadUserVector(user_data, offset, length, out_actual);
 }
 
 zx_status_t VmObjectDispatcher::WriteVector(
-    user_in_iovec_t user_data, size_t length, uint64_t offset, size_t* out_actual,
+    user_in_iovec_t user_data, uint64_t offset, size_t length, size_t* out_actual,
     VmObject::OnWriteBytesTransferredCallback on_bytes_transferred) {
   canary_.Assert();
 
@@ -165,7 +165,7 @@ zx_status_t VmObjectDispatcher::WriteVector(
 }
 
 zx_status_t VmObjectDispatcher::Write(
-    user_in_ptr<const char> user_data, size_t length, uint64_t offset, size_t* out_actual,
+    user_in_ptr<const char> user_data, uint64_t offset, size_t length, size_t* out_actual,
     VmObject::OnWriteBytesTransferredCallback on_bytes_transferred) {
   canary_.Assert();
 

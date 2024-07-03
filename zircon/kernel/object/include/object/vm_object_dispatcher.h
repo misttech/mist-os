@@ -75,14 +75,14 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   ContentSizeManager* content_size_manager() const { return content_size_mgr_.get(); }
 
   // VmObjectDispatcher own methods.
-  zx_status_t Read(user_out_ptr<char> user_data, size_t length, uint64_t offset,
+  zx_status_t Read(user_out_ptr<char> user_data, uint64_t offset, size_t length,
                    size_t* out_actual);
-  zx_status_t ReadVector(user_out_iovec_t user_data, size_t length, uint64_t offset,
+  zx_status_t ReadVector(user_out_iovec_t user_data, uint64_t offset, size_t length,
                          size_t* out_actual);
-  zx_status_t Write(user_in_ptr<const char> user_data, size_t length, uint64_t offset,
+  zx_status_t Write(user_in_ptr<const char> user_data, uint64_t offset, size_t length,
                     size_t* out_actual,
                     VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
-  zx_status_t WriteVector(user_in_iovec_t user_data, size_t length, uint64_t offset,
+  zx_status_t WriteVector(user_in_iovec_t user_data, uint64_t offset, size_t length,
                           size_t* out_actual,
                           VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
   zx_status_t SetSize(uint64_t);
