@@ -1,0 +1,120 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# generate_private_test_workspace GN template.
+#
+# This can be used to generate a workspace that looks like an out-of-tree
+# Bazel-sdk based repository. The name of the output folder is the same as
+# the target name.
+#
+# Parameters: none
+#
+#   template_workspace_dir (optional)
+#     [string] Path to a workspace template directory for copying into the output dir.
+#     default: "//build/bazel_sdk/e2e/utils/generate_test_workspace/workspace"
+#
+#
+template("generate_private_test_workspace") {
+  template_workspace_dir =
+      "//build/bazel_sdk/e2e/utils/generate_test_workspace/workspace"
+  if (defined(invoker.template_workspace_dir)) {
+    template_workspace_dir = invoker.template_workspace_dir
+  }
+
+  out_dir = "$target_out_dir/$target_name"
+
+  # =================================================
+  # Copy dependencies.
+  # These paths are copied over into the resulting test workspace.
+  # =================================================
+
+  template_workspace = {
+    inputs = [ rebase_path(template_workspace_dir, root_build_dir) ]
+    outputs = [ rebase_path(out_dir + "/", root_build_dir) ]
+  }
+  fuchsia_infra = {
+    inputs = [ rebase_path("//third_party/fuchsia-infra-bazel-rules/src",
+                           root_build_dir) ]
+    outputs = [ rebase_path("$out_dir/third_party/fuchsia-infra-bazel-rules",
+                            root_build_dir) ]
+  }
+  bazel_binary = {
+    inputs = [ rebase_path(
+            "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel-real",
+            root_build_dir) ]
+    outputs = [ rebase_path("$out_dir/tools/bazel", root_build_dir) ]
+  }
+  copy_list = [
+    template_workspace,
+    fuchsia_infra,
+    bazel_binary,
+  ]
+  copy_list_filename = "${target_out_dir}/${target_name}_copy_list.json"
+  write_file(copy_list_filename, copy_list, "json")
+
+  # =================================================
+  # Symlink dependencies.
+  # These paths are symlinked into the resulting test workspace.
+  # =================================================
+
+  fuchsia_sdk = {
+    inputs = [ rebase_path("${root_build_dir}/gen/build/bazel/fuchsia_sdk",
+                           root_build_dir) ]
+    outputs =
+        [ rebase_path("$out_dir/third_party/fuchsia_sdk/", root_build_dir) ]
+  }
+  clang = {
+    inputs =
+        [ rebase_path("//prebuilt/third_party/clang/${host_os}-${host_cpu}",
+                      root_build_dir) ]
+    outputs = [ rebase_path("$out_dir/third_party", root_build_dir) ]
+  }
+  tools = {
+    inputs = [
+      "../third_party/fuchsia-infra-bazel-rules/scripts/bootstrap.sh",
+      "../third_party/fuchsia-infra-bazel-rules/scripts/run_sdk_tool.sh",
+      "../third_party/fuchsia-infra-bazel-rules/scripts/run_sdk_tool.sh",
+    ]
+    outputs = [
+      rebase_path("$out_dir/scripts/bootstrap.sh", root_build_dir),
+      rebase_path("$out_dir/tools/ffx", root_build_dir),
+      rebase_path("$out_dir/tools/fssh", root_build_dir),
+    ]
+  }
+  symlink_list = [
+    fuchsia_sdk,
+    clang,
+    tools,
+  ]
+  symlink_list_filename = "${target_out_dir}/${target_name}_symlink_list.json"
+  write_file(symlink_list_filename, symlink_list, "json")
+
+  # ============
+  # Run a python script to perform the copy / symlink commands.
+  # ============
+  action(target_name) {
+    forward_variables_from(invoker, "*")
+    script = "//build/bazel_sdk/e2e/utils/generate_test_workspace/generate.py"
+    depfile = "${target_out_dir}/${target_name}.d"
+
+    inputs = [
+      "$copy_list_filename",
+      "$symlink_list_filename",
+    ]
+    outputs = [ depfile ]
+
+    deps = [ "//build/bazel:generate_fuchsia_sdk_repository(//build/toolchain/fuchsia:x64)" ]
+
+    #data_deps = [ "//build/bazel:generate_fuchsia_sdk_repository(//build/toolchain/fuchsia:x64)" ]
+
+    args = [
+      "--copy-list",
+      rebase_path(copy_list_filename, root_build_dir),
+      "--symlink-list",
+      rebase_path(symlink_list_filename, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+  }
+}

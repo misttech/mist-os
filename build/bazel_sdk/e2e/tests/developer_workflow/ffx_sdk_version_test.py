@@ -3,7 +3,7 @@
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Helper methods for executing SDK developer workflow tests.
+"""Verify that `ffx sdk version` returns the correct version string matching the current SDK.
 """
 
 import json
@@ -12,7 +12,7 @@ import unittest
 import argparse
 import sys
 
-from sdk_test_common import SDKCommands
+from _common import SDKCommands
 
 sdk_id = ""
 

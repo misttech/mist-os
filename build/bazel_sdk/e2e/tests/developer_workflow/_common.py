@@ -7,12 +7,13 @@
 """Helper functions for executing SDK Developer workflow tests.
 """
 
+import os
 import subprocess
 from typing import List
 
 
 class _SDKCommand:
-    def __init__(self, cmd: str):
+    def __init__(self, cmd: str) -> None:
         self.command = cmd
         self.should_capture_output = False
         self.check = True
@@ -33,7 +34,7 @@ class _SDKCommand:
     def captured(self) -> str:
         return self.stdout.strip()
 
-    def execute(self):
+    def execute(self) -> None:
         print("---")
         print("-> {}".format(self.command))
         if "cwd" in self.kwargs:
@@ -51,7 +52,7 @@ class _SDKCommand:
 
 
 class SDKCommands:
-    def __init__(self):
+    def __init__(self) -> None:
         self.command_list = []
 
     def _append(self, c: str):
