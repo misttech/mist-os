@@ -10,6 +10,7 @@ mod notice;
 use anyhow::{bail, Result};
 use futures::lock::Mutex;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
 use std::ops::DerefMut;
@@ -35,7 +36,7 @@ pub async fn init_ga4_metrics_service(
     invoker: Option<String>,
 ) -> Result<Arc<Mutex<GA4MetricsService>>> {
     let metrics_state = MetricsState::from_config(
-        &analytics_folder()?,
+        &PathBuf::from(&analytics_folder()),
         app_name,
         build_version.unwrap_or(UNKNOWN_VERSION.into()),
         sdk_version,
