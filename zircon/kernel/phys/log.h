@@ -59,6 +59,12 @@ class Log {
   }
 
  private:
+  ktl::span<char> buffer_chars() {
+    return {reinterpret_cast<char*>(buffer_.get()), buffer_.size_bytes()};
+  }
+
+  ktl::span<char> buffer_chars_left() { return buffer_chars().subspan(size_); }
+
   Allocation buffer_;
   size_t size_ = 0;
   FILE mirror_;
