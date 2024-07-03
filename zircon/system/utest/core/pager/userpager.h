@@ -211,8 +211,9 @@ class UserPager {
  private:
   bool WaitForPageRequest(uint16_t command, Vmo* vmo, uint64_t page_offset, uint64_t page_count,
                           zx_time_t deadline);
-  bool WaitForRequest(uint64_t key, const zx_packet_page_request_t& request, zx_time_t deadline);
-  bool WaitForRequest(fit::function<bool(const zx_port_packet_t& packet)> cmp_fn,
+  bool WaitForRequest(Vmo* vmo, uint64_t key, const zx_packet_page_request_t& request,
+                      zx_time_t deadline);
+  bool WaitForRequest(Vmo* vmo, fit::function<bool(const zx_port_packet_t& packet)> cmp_fn,
                       zx_time_t deadline);
   void PageFaultHandler();
   bool VerifyDirtyRangesHelper(Vmo* paged_vmo, zx_vmo_dirty_range_t* dirty_ranges_to_verify,

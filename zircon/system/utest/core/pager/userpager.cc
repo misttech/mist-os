@@ -292,16 +292,16 @@ bool UserPager::WaitForPageRequest(uint16_t command, Vmo* vmo, uint64_t page_off
   req.command = command;
   req.offset = page_offset * zx_system_get_page_size();
   req.length = page_count * zx_system_get_page_size();
-  return WaitForRequest(vmo->key(), req, deadline);
+  return WaitForRequest(vmo, vmo->key(), req, deadline);
 }
 
 bool UserPager::WaitForPageComplete(uint64_t key, zx_time_t deadline) {
   zx_packet_page_request_t req = {};
   req.command = ZX_PAGER_VMO_COMPLETE;
-  return WaitForRequest(key, req, deadline);
+  return WaitForRequest(nullptr, key, req, deadline);
 }
 
-bool UserPager::WaitForRequest(uint64_t key, const zx_packet_page_request& req,
+bool UserPager::WaitForRequest(Vmo* vmo, uint64_t key, const zx_packet_page_request& req,
                                zx_time_t deadline) {
   zx_port_packet_t expected = {
       .key = key,
@@ -311,6 +311,7 @@ bool UserPager::WaitForRequest(uint64_t key, const zx_packet_page_request& req,
   };
 
   return WaitForRequest(
+      vmo,
       [expected](const zx_port_packet& actual) -> bool {
         ZX_ASSERT(expected.type == ZX_PKT_TYPE_PAGE_REQUEST);
         if (expected.key != actual.key || ZX_PKT_TYPE_PAGE_REQUEST != actual.type) {
@@ -335,6 +336,7 @@ bool UserPager::GetPageDirtyRequest(Vmo* vmo, zx_time_t deadline, uint64_t* offs
 bool UserPager::GetPageRequest(Vmo* vmo, uint16_t command, zx_time_t deadline, uint64_t* offset,
                                uint64_t* length) {
   return WaitForRequest(
+      vmo,
       [vmo, command, offset, length](const zx_port_packet& packet) -> bool {
         if (packet.key == vmo->key() && packet.type == ZX_PKT_TYPE_PAGE_REQUEST &&
             packet.page_request.command == command) {
@@ -347,7 +349,7 @@ bool UserPager::GetPageRequest(Vmo* vmo, uint16_t command, zx_time_t deadline, u
       deadline);
 }
 
-bool UserPager::WaitForRequest(fit::function<bool(const zx_port_packet_t& packet)> cmp_fn,
+bool UserPager::WaitForRequest(Vmo* vmo, fit::function<bool(const zx_port_packet_t& packet)> cmp_fn,
                                zx_time_t deadline) {
   for (auto& iter : requests_) {
     if (cmp_fn(iter.req)) {
@@ -368,6 +370,17 @@ bool UserPager::WaitForRequest(fit::function<bool(const zx_port_packet_t& packet
     if (status == ZX_OK) {
       if (cmp_fn(actual_packet)) {
         return true;
+      }
+      // Received a message that was not for us. Before continuing to wait check if we were given a
+      // specific related VMO and check it for any committed_change_events. Doing this should catch
+      // some cases where we are waiting for one kind of request, but an unexpected reclamation
+      // happened and hence we received a different event. This check is far from perfect and will
+      // miss many reclamation induced test failures, but should catch some.
+      if (vmo) {
+        zx_info_vmo_t info;
+        status = vmo->vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
+        ZX_ASSERT(status == ZX_OK);
+        ZX_ASSERT(info.committed_change_events == 0);
       }
 
       auto req = std::make_unique<request>();
