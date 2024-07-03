@@ -2,18 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use errors::ffx_bail;
-use ffx_core::ffx_plugin;
 use ffx_package_archive_cat_args::CatCommand;
 use ffx_package_archive_utils::{read_file_entries, FarArchiveReader, FarListReader};
-use ffx_writer::Writer;
+use fho::{bug, return_user_error, FfxMain, FfxTool, Result, SimpleWriter};
 
-#[ffx_plugin()]
-pub async fn cmd_cat(cmd: CatCommand, mut writer: Writer) -> Result<()> {
-    let mut archive_reader = FarArchiveReader::new(&cmd.archive)?;
+#[derive(FfxTool)]
+pub struct ArchiveCatTool {
+    #[command]
+    pub cmd: CatCommand,
+}
 
-    cat_implementation(cmd, &mut writer, &mut archive_reader)
+fho::embedded_plugin!(ArchiveCatTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ArchiveCatTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        let mut archive_reader = FarArchiveReader::new(&self.cmd.archive)?;
+
+        cat_implementation(self.cmd, &mut writer, &mut archive_reader)
+    }
 }
 
 fn cat_implementation<W: std::io::Write>(
@@ -26,9 +34,9 @@ fn cat_implementation<W: std::io::Write>(
     let entries = read_file_entries(reader)?;
     if let Some(entry) = entries.iter().find(|x| x.name == file_name) {
         let data = reader.read_entry(entry)?;
-        writer.write_all(&data)?;
+        writer.write_all(&data).map_err(|e| bug!(e))?;
     } else {
-        ffx_bail!("file {} not found in {}", file_name, cmd.archive.to_string_lossy());
+        return_user_error!("file {} not found in {}", file_name, cmd.archive.to_string_lossy());
     }
 
     Ok(())

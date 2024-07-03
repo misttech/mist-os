@@ -3,16 +3,25 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use errors::ffx_error;
-use ffx_core::ffx_plugin;
+pub use ffx_package_archive_create_args::PackageArchiveCreateCommand;
+use fho::{user_error, FfxMain, FfxTool, SimpleWriter};
 use package_tool::cmd_package_archive_create;
 
-pub use ffx_package_archive_create_args::PackageArchiveCreateCommand;
+#[derive(FfxTool)]
+pub struct ArchiveCreateTool {
+    #[command]
+    pub cmd: PackageArchiveCreateCommand,
+}
 
-#[ffx_plugin()]
-pub async fn cmd_package(cmd: PackageArchiveCreateCommand) -> Result<()> {
-    cmd_package_archive_create(cmd)
-        .await
-        .map_err(|err| ffx_error!("Error: failed to create archive: {err:?}"))?;
-    Ok(())
+fho::embedded_plugin!(ArchiveCreateTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ArchiveCreateTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        cmd_package_archive_create(self.cmd)
+            .await
+            .map_err(|err| user_error!("Error: failed to create archive: {err:?}"))?;
+        Ok(())
+    }
 }
