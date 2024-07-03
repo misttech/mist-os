@@ -201,6 +201,7 @@ template("syscall_test") {
     _test_deps = [
       ":test_utils",
       "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
+      "//sdk/lib/fit",
       "//src/lib/fxl",
       "//src/lib/fxl/test:gtest_main",
       "//third_party/googletest:gmock",
