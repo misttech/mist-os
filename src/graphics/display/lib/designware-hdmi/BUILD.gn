@@ -22,8 +22,10 @@ source_set("hdmi-transmitter-controller-impl") {
     "hdmi-transmitter-controller-impl.cc",
     "hdmi-transmitter-controller-impl.h",
   ]
-  public_deps = [ ":hdmi-transmitter-controller" ]
-  deps = [ "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf" ]
+  public_deps = [
+    ":hdmi-transmitter-controller",
+    "//sdk/lib/driver/logging/cpp",
+  ]
 }
 
 group("tests") {

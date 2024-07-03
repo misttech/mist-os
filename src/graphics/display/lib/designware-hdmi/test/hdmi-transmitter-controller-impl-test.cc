@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
+
 #include <fbl/array.h>
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
@@ -192,6 +194,8 @@ class HdmiTransmitterControllerImplTest : public testing::Test {
   }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
+
   constexpr static int kMmioRangeSize = 0x8000;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k8};
 

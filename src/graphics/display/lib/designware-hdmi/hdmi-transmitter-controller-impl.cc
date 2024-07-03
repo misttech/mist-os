@@ -4,13 +4,13 @@
 
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller-impl.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
 #include "src/graphics/display/lib/designware-hdmi/regs.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace designware_hdmi {
 
@@ -313,7 +313,7 @@ void HdmiTransmitterControllerImpl::Reset() {
 void HdmiTransmitterControllerImpl::SetupScdc(bool is4k) {
   uint8_t scdc_data = 0;
   ScdcRead(0x1, &scdc_data);
-  zxlogf(INFO, "version is %s\n", (scdc_data == 1) ? "2.0" : "<= 1.4");
+  FDF_LOG(INFO, "version is %s\n", (scdc_data == 1) ? "2.0" : "<= 1.4");
   // scdc write is done twice in uboot
   // TODO: find scdc register def
   ScdcWrite(0x2, 0x1);
@@ -601,7 +601,7 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
           timeout++;
         }
         if (timeout == 5) {
-          zxlogf(ERROR, "HDMI DDC TimeOut\n");
+          FDF_LOG(ERROR, "HDMI DDC TimeOut\n");
           return ZX_ERR_TIMED_OUT;
         }
         usleep(1000);
@@ -627,11 +627,11 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
 
 #define PRINT_REG(name) PrintReg(#name, (name))
 void HdmiTransmitterControllerImpl::PrintReg(const char* name, uint32_t address) {
-  zxlogf(INFO, "%s (0x%4x): %u", name, address, ReadReg(address));
+  FDF_LOG(INFO, "%s (0x%4x): %u", name, address, ReadReg(address));
 }
 
 void HdmiTransmitterControllerImpl::PrintRegisters() {
-  zxlogf(INFO, "------------HdmiDw Registers------------");
+  FDF_LOG(INFO, "------------HdmiDw Registers------------");
 
   PRINT_REG(HDMITX_DWC_A_APIINTCLR);
   PRINT_REG(HDMITX_DWC_CSC_CFG);
