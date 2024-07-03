@@ -9,7 +9,7 @@ use crate::mocks::activity_service::MockActivityService;
 use crate::mocks::input_settings_service::MockInputSettingsService;
 use crate::mocks::kernel_service::MockKernelService;
 use crate::mocks::system_controller::MockSystemControllerService;
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServiceMarker};
 use fidl::AsHandleRef as _;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -19,8 +19,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tracing::*;
 use {
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_hardware_power_statecontrol as fpower,
-    fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel,
+    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl,
+    fidl_fuchsia_hardware_power_statecontrol as fpower, fidl_fuchsia_io as fio,
+    fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_powermanager_driver_temperaturecontrol as ftemperaturecontrol,
     fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_testing as ftesting,
 };
@@ -73,6 +74,8 @@ impl TestEnvBuilder {
                 .expect("Failed to create RealmBuilder");
 
         realm_builder.driver_test_realm_setup().await.expect("Failed to setup driver test realm");
+
+        realm_builder.driver_test_realm_add_expose::<fcpu_ctrl::ServiceMarker>().await.unwrap();
 
         let power_manager = realm_builder
             .add_child("power_manager", POWER_MANAGER_URL, ChildOptions::new())
@@ -322,7 +325,7 @@ impl TestEnvBuilder {
         realm_builder
             .add_route(
                 Route::new()
-                    .capability(Capability::directory("dev-topological"))
+                    .capability(Capability::service::<fcpu_ctrl::ServiceMarker>())
                     .from(Ref::child("driver_test_realm"))
                     .to(&cpu_manager),
             )
@@ -361,8 +364,15 @@ impl TestEnvBuilder {
         let realm_instance = realm_builder.build().await.expect("Failed to build RealmInstance");
 
         // Start driver test realm
-        let args =
-            fdt::RealmArgs { root_driver: Some("#meta/root.cm".to_string()), ..Default::default() };
+        let exposes = vec![fdt::Expose {
+            service_name: fcpu_ctrl::ServiceMarker::SERVICE_NAME.to_string(),
+            collection: fdt::Collection::PackageDrivers,
+        }];
+        let args = fdt::RealmArgs {
+            root_driver: Some("#meta/root.cm".to_string()),
+            exposes: Some(exposes),
+            ..Default::default()
+        };
 
         realm_instance
             .driver_test_realm_start(args)
