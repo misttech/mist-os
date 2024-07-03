@@ -1,0 +1,289 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <lib/async/cpp/executor.h>
+#include <lib/async/dispatcher.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
+#include <lib/fidl/cpp/channel.h>
+#include <lib/fidl/cpp/client.h>
+#include <lib/fpromise/promise.h>
+#include <lib/syslog/cpp/macros.h>
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <gtest/gtest.h>
+
+#include "src/developer/forensics/exceptions/constants.h"
+#include "src/developer/forensics/exceptions/handler/wake_lease.h"
+#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+
+namespace forensics::exceptions {
+namespace {
+
+using ::fidl::Client;
+using ::fidl::ClientEnd;
+using ::fidl::Endpoints;
+using ::fidl::ServerEnd;
+using ::fidl::SyncClient;
+using ::forensics::exceptions::handler::WakeLease;
+using ::fuchsia_power_broker::CurrentLevel;
+using ::fuchsia_power_broker::DependencyType;
+using ::fuchsia_power_broker::ElementControl;
+using ::fuchsia_power_broker::ElementInfoProvider;
+using ::fuchsia_power_broker::ElementInfoProviderGetStatusEndpointsResponse;
+using ::fuchsia_power_broker::ElementInfoProviderService;
+using ::fuchsia_power_broker::ElementSchema;
+using ::fuchsia_power_broker::ElementStatusEndpoint;
+using ::fuchsia_power_broker::LeaseControl;
+using ::fuchsia_power_broker::Lessor;
+using ::fuchsia_power_broker::LessorLeaseResponse;
+using ::fuchsia_power_broker::LevelControlChannels;
+using ::fuchsia_power_broker::LevelDependency;
+using ::fuchsia_power_broker::RequiredLevel;
+using ::fuchsia_power_broker::RequiredLevelWatchResponse;
+using ::fuchsia_power_broker::Status;
+using ::fuchsia_power_broker::StatusWatchPowerLevelResponse;
+using ::fuchsia_power_broker::Topology;
+using ::fuchsia_power_broker::TopologyAddElementResponse;
+using ::fuchsia_power_system::ActivityGovernor;
+using ::fuchsia_power_system::ApplicationActivityLevel;
+using ::fuchsia_power_system::ExecutionStateLevel;
+using ::fuchsia_power_system::PowerElements;
+
+constexpr char kApplicationActivity[] = "application_activity";
+constexpr char kExecutionState[] = "execution_state";
+constexpr char kBootCompleteIndicator[] = "boot-complete-indicator";
+
+constexpr uint8_t ToUint(const ApplicationActivityLevel value) {
+  return static_cast<uint8_t>(value);
+}
+constexpr uint8_t ToUint(const ExecutionStateLevel value) { return static_cast<uint8_t>(value); }
+
+// Evaluates |rexpr|. On error, this function check-fails and prints the error. On success, sets the
+// result of |rexpr| to |lhs|. This function exists to check invariants.
+#define ASSIGN_OR_CHECK(lhs, rexpr) \
+  ASSIGN_OR_CHECK_IMPL(RESULT_MACROS_CONCAT_NAME(result, __LINE__), lhs, rexpr)
+
+#define ASSIGN_OR_CHECK_IMPL(result, lhs, rexpr)                     \
+  auto(result) = (rexpr);                                            \
+  FX_CHECK((result).is_ok()) << "Error: " << (result).error_value(); \
+  lhs = std::move(result).value()
+
+#define RESULT_MACROS_CONCAT_NAME(x, y) RESULT_MACROS_CONCAT_IMPL(x, y)
+#define RESULT_MACROS_CONCAT_IMPL(x, y) x##y
+
+template <typename Protocol>
+SyncClient<Protocol> Connect() {
+  zx::result client_end = component::Connect<Protocol>();
+  FX_CHECK(client_end.is_ok());
+  return SyncClient(std::move(client_end).value());
+}
+
+// Returns nullptr if there's an error connecting to required protocols.
+std::unique_ptr<WakeLease> CreateWakeLease(async_dispatcher_t* dispatcher) {
+  zx::result sag_client_end = component::Connect<ActivityGovernor>();
+  if (!sag_client_end.is_ok()) {
+    FX_LOGS(ERROR)
+        << "Synchronous error when connecting to the fuchsia.power.system/ActivityGovernor"
+        << " protocol: " << sag_client_end.status_string();
+    return nullptr;
+  }
+
+  zx::result topology_client_end = component::Connect<Topology>();
+  if (!topology_client_end.is_ok()) {
+    FX_LOGS(ERROR)
+        << "Synchronous error when connecting to the fuchsia.power.broker/Topology protocol: "
+        << topology_client_end.status_string();
+    return nullptr;
+  }
+
+  return std::make_unique<WakeLease>(dispatcher, /*power_element_name=*/"exceptions-element-001",
+                                     std::move(sag_client_end).value(),
+                                     std::move(topology_client_end).value());
+}
+
+ElementSchema BuildAssertiveApplicationActivitySchema(zx::event requires_token,
+                                                      ServerEnd<Lessor> server_end,
+                                                      LevelControlChannels level_control_channels,
+                                                      const std::string& element_name) {
+  LevelDependency dependency(
+      /*dependency_type=*/DependencyType::kAssertive,
+      /*dependent_level=*/kPowerLevelActive,
+      /*requires_token=*/std::move(requires_token),
+      /*requires_level_by_preference=*/
+      std::vector<uint8_t>(1, ToUint(ApplicationActivityLevel::kActive)));
+
+  ElementSchema schema{{
+      .element_name = element_name,
+      .initial_current_level = kPowerLevelActive,
+      .valid_levels = std::vector<uint8_t>({kPowerLevelInactive, kPowerLevelActive}),
+      .level_control_channels = std::move(level_control_channels),
+      .lessor_channel = std::move(server_end),
+  }};
+
+  std::optional<std::vector<LevelDependency>>& dependencies = schema.dependencies();
+  dependencies.emplace().push_back(std::move(dependency));
+
+  return schema;
+}
+
+struct ElementWithLease {
+  ClientEnd<ElementControl> element_control;
+  ClientEnd<LeaseControl> lease_control;
+};
+
+// Adds an element with an assertive dependency on ApplicationActivity and takes a lease on that
+// element. If the required power level fails to become kPowerLevelActive this function will return
+// a fit::error with the currently required power level.
+fit::result<uint8_t, ElementWithLease> RaiseApplicationActivity() {
+  // |required_level| is used later in this function to check if the lease's dependencies are
+  // satisfied. Activity Governor enforces that if a RequiredLevel endpoint is specified, a
+  // CurrentLevel endpoint must also specified in the schema.
+  ClientEnd<RequiredLevel> required_level;
+
+  LevelControlChannels level_control_endpoints{{
+      .current = Endpoints<CurrentLevel>::Create().server,
+      .required = Endpoints<RequiredLevel>::Create(&required_level),
+  }};
+  SyncClient<RequiredLevel> required_level_client(std::move(required_level));
+
+  ASSIGN_OR_CHECK(PowerElements power_elements, Connect<ActivityGovernor>()->GetPowerElements());
+  FX_CHECK(power_elements.application_activity().has_value());
+  FX_CHECK(power_elements.application_activity()->assertive_dependency_token().has_value());
+
+  zx::event aa_token =
+      std::move(power_elements.application_activity()->assertive_dependency_token()).value();
+
+  Endpoints<Lessor> lessor_endpoints = Endpoints<Lessor>::Create();
+  SyncClient<Lessor> lessor_client(std::move(lessor_endpoints.client));
+
+  ElementSchema schema = BuildAssertiveApplicationActivitySchema(
+      std::move(aa_token), std::move(lessor_endpoints.server), std::move(level_control_endpoints),
+      /*element_name=*/kBootCompleteIndicator);
+
+  ASSIGN_OR_CHECK(TopologyAddElementResponse element,
+                  Connect<Topology>()->AddElement(std::move(schema)));
+
+  ASSIGN_OR_CHECK(LessorLeaseResponse aa_lease, lessor_client->Lease(kPowerLevelActive));
+
+  ASSIGN_OR_CHECK(RequiredLevelWatchResponse required_level_result, required_level_client->Watch());
+
+  // SAG may or may not have changed the required level before we called Watch. There's only 2
+  // possible power levels so we shouldn't have to call Watch more than twice.
+  if (required_level_result.required_level() != kPowerLevelActive) {
+    ASSIGN_OR_CHECK(required_level_result, required_level_client->Watch());
+  }
+
+  if (required_level_result.required_level() != kPowerLevelActive) {
+    return fit::error(required_level_result.required_level());
+  }
+
+  return fit::success(ElementWithLease{
+      .element_control = std::move(element.element_control_channel()),
+      .lease_control = std::move(aa_lease.lease_control()),
+  });
+}
+
+std::vector<ElementStatusEndpoint> GetStatusEndpoints() {
+  ASSIGN_OR_CHECK(ElementInfoProviderService::ServiceClient element_info_service,
+                  component::OpenService<ElementInfoProviderService>("system_activity_governor"));
+
+  ASSIGN_OR_CHECK(ClientEnd<ElementInfoProvider> element_info,
+                  element_info_service.connect_status_provider());
+
+  SyncClient<ElementInfoProvider> element_info_client(std::move(element_info));
+  ASSIGN_OR_CHECK(ElementInfoProviderGetStatusEndpointsResponse status_endpoints,
+                  element_info_client->GetStatusEndpoints());
+
+  return std::move(status_endpoints.endpoints());
+}
+
+uint8_t GetCurrentLevel(const std::string& element) {
+  std::vector<ElementStatusEndpoint> status_endpoints = GetStatusEndpoints();
+  auto status = std::find_if(status_endpoints.begin(), status_endpoints.end(),
+                             [&element](const ElementStatusEndpoint& endpoint) {
+                               return endpoint.identifier() == element;
+                             });
+  FX_CHECK(status != status_endpoints.end());
+
+  SyncClient<Status> status_client(std::move(*status->status()));
+  ASSIGN_OR_CHECK(StatusWatchPowerLevelResponse result, status_client->WatchPowerLevel());
+
+  return result.current_level();
+}
+
+// Uses |status_client| to retrieve the current power level. This function will block until the
+// power level changes if the power level has not changed since the last time |status_client| was
+// used to retrieve the power level.
+uint8_t GetCurrentLevel(const SyncClient<Status>& status_client) {
+  ASSIGN_OR_CHECK(StatusWatchPowerLevelResponse result, status_client->WatchPowerLevel());
+  return result.current_level();
+}
+
+using WakeLeaseIntegrationTest = gtest::RealLoopFixture;
+
+TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
+  // Take an assertive dependency on ApplicationActivity to indicate boot complete, allowing SAG to
+  // suspend if it deems appropriate. After we've acquired our wake lease using the WakeLease class,
+  // we'll drop the lease on ApplicationActivity and check that ExecutionState was held at the
+  // kWakeHandling level (the level that WakeLease has an opportunistic dependency on).
+  fit::result<uint8_t, ElementWithLease> aa_element = RaiseApplicationActivity();
+  ASSERT_TRUE(aa_element.is_ok());
+  ASSERT_EQ(GetCurrentLevel(kApplicationActivity), ToUint(ApplicationActivityLevel::kActive));
+
+  std::vector<ElementStatusEndpoint> status_endpoints = GetStatusEndpoints();
+  auto es_status_endpoint = std::find_if(status_endpoints.begin(), status_endpoints.end(),
+                                         [](const ElementStatusEndpoint& endpoint) {
+                                           return endpoint.identifier() == kExecutionState;
+                                         });
+  ASSERT_NE(es_status_endpoint, status_endpoints.end());
+
+  SyncClient<Status> es_status_client(std::move(*es_status_endpoint->status()));
+
+  // Subsequent calls to GetCurrentLevel using |es_status_client| will block until the level has
+  // changed, so we'll reuse |es_status_client| when we want to wait until the power level has
+  // changed.
+  ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kActive));
+
+  Client<LeaseControl> lease;
+  std::unique_ptr<WakeLease> wake_lease = CreateWakeLease(dispatcher());
+
+  fpromise::promise<void, Error> lease_promise =
+      wake_lease->Acquire(kWakeLeaseAcquisitionTimeout)
+          .or_else([](const Error& error) {
+            FX_LOGS(FATAL) << "Wake lease not acquired: " << ToString(error);
+            return fpromise::make_result_promise<Client<LeaseControl>, Error>(
+                fpromise::error(Error::kBadValue));
+          })
+          .and_then([&lease](Client<LeaseControl>& acquired_lease) mutable {
+            lease = std::move(acquired_lease);
+          });
+
+  async::Executor executor(dispatcher());
+  executor.schedule_task(std::move(lease_promise));
+  RunLoopWithTimeoutOrUntil([&lease]() { return lease.is_valid(); },
+                            kWakeLeaseAcquisitionTimeout + zx::sec(1));
+
+  // |aa_element| is still valid, so ApplicationActivity should still be holding ExecutionState at
+  // kActive.
+  ASSERT_TRUE(lease.is_valid());
+  ASSERT_EQ(GetCurrentLevel(kExecutionState), ToUint(ExecutionStateLevel::kActive));
+
+  // Drop the AA lease but leave |lease| intact.
+  aa_element->lease_control.reset();
+  ASSERT_FALSE(aa_element->lease_control.is_valid());
+  ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kWakeHandling));
+
+  // Drop |lease| so nothing is holding the system awake anymore.
+  ASSERT_TRUE(lease.UnbindMaybeGetEndpoint().is_ok());
+  EXPECT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kInactive));
+}
+
+}  // namespace
+}  // namespace forensics::exceptions
