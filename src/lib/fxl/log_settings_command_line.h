@@ -78,12 +78,19 @@ bool ParseLogSettings(const fxl::CommandLine& command_line, fxl::LogSettings* ou
 // error parsing the options.
 //
 // See |ParseLogSettings| for syntax.
-bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line);
-
+#ifdef __Fuchsia__
+bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
+                                   async_dispatcher_t* dispatcher = nullptr);
 // Similar to the method above but uses the given list of tags instead of
 // the default which is the process name. On host |tags| is ignored.
 bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
+                                   const std::initializer_list<std::string>& tags,
+                                   async_dispatcher_t* dispatcher = nullptr);
+#else
+bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line);
+bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
                                    const std::initializer_list<std::string>& tags);
+#endif
 
 // Do the opposite of |ParseLogSettings()|: Convert |settings| to the
 // command line arguments to pass to a program. The result is empty if

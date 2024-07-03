@@ -102,8 +102,13 @@ bool ParseLogSettingsInternal(const fxl::CommandLine& command_line, T* out_setti
 bool ParseLogSettings(const fxl::CommandLine& command_line, fxl::LogSettings* out_settings) {
   return ParseLogSettingsInternal(command_line, out_settings);
 }
-
+#ifdef __Fuchsia__
+bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
+                                   async_dispatcher_t* dispatcher) {
+#else
 bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line) {
+#endif
+
   LogSettings settings;
   if (!ParseLogSettings(command_line, &settings))
     return false;
@@ -112,6 +117,9 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line) {
 #ifndef __Fuchsia__
   builder.WithLogFile(settings.log_file);
 #else
+  if (dispatcher) {
+    builder.WithDispatcher(dispatcher);
+  }
   if (settings.single_threaded_dispatcher) {
     builder.WithDispatcher(settings.single_threaded_dispatcher);
   }
@@ -128,9 +136,14 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line) {
   builder.BuildAndInitialize();
   return true;
 }
-
+#ifdef __Fuchsia__
+bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
+                                   const std::initializer_list<std::string>& tags,
+                                   async_dispatcher_t* dispatcher) {
+#else
 bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
                                    const std::initializer_list<std::string>& tags) {
+#endif
   LogSettings settings;
   if (!ParseLogSettings(command_line, &settings))
     return false;
@@ -139,6 +152,9 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
 #ifndef __Fuchsia__
   builder.WithLogFile(settings.log_file);
 #else
+  if (dispatcher) {
+    builder.WithDispatcher(dispatcher);
+  }
   if (settings.single_threaded_dispatcher) {
     builder.WithDispatcher(settings.single_threaded_dispatcher);
   }

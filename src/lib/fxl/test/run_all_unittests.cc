@@ -4,14 +4,26 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <gtest/gtest.h>
+#ifdef __Fuchsia__
+#include <lib/async-loop/cpp/loop.h>
+#endif
 
 #include "test_settings.h"
 
 int main(int argc, char** argv) {
+#ifdef __Fuchsia__
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  loop.StartThread("test-interest-listener-thread");
+  if (!fxl::SetTestSettings(argc, argv, loop.dispatcher())) {
+    FX_LOGS(ERROR) << "Failed to parse log settings from command-line";
+    return EXIT_FAILURE;
+  }
+#else
   if (!fxl::SetTestSettings(argc, argv)) {
     FX_LOGS(ERROR) << "Failed to parse log settings from command-line";
     return EXIT_FAILURE;
   }
+#endif
 
   // Setting this flag to true causes googletest to *generate* and log the random seed.
   GTEST_FLAG_SET(shuffle, true);
