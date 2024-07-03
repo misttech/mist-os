@@ -68,7 +68,7 @@ impl InspectHandle {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct InspectArtifactsContainer {
     /// One or more proxies that this container is configured for.
     inspect_handles: HashMap<zx::Koid, Arc<InspectHandle>>,
@@ -76,17 +76,6 @@ pub struct InspectArtifactsContainer {
 }
 
 impl InspectArtifactsContainer {
-    /// Create a new `InspectArtifactsContainer`.
-    ///
-    /// Returns itself and a `Receiver` that resolves into the koid of the input `proxy`
-    /// when that proxy closes.
-    pub fn new(proxy: InspectHandle) -> (Self, oneshot::Receiver<zx::Koid>) {
-        let mut this = Self { inspect_handles: HashMap::new(), on_closed_tasks: vec![] };
-        // safe to unwrap as diagnostics_proxy is guaranteed to be empty
-        let rx = this.push_handle(proxy).unwrap();
-        (this, rx)
-    }
-
     /// Remove a handle via its `koid` from the set of proxies managed by `self`.
     pub fn remove_handle(&mut self, koid: zx::Koid) -> usize {
         self.inspect_handles.remove(&koid);
@@ -536,8 +525,8 @@ mod test {
     fn only_one_directory_proxy_is_populated() {
         let _executor = fuchsia_async::LocalExecutor::new();
         let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let (mut container, _rx) =
-            InspectArtifactsContainer::new(InspectHandle::directory(directory));
+        let mut container = InspectArtifactsContainer::default();
+        let _rx = container.push_handle(InspectHandle::directory(directory));
         let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         assert!(container.push_handle(InspectHandle::directory(directory2)).is_none());
     }

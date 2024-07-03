@@ -184,10 +184,10 @@ impl InspectRepositoryInner {
                 // creation of a component lower in the topology before observing this
                 // one. If this is the case, just instantiate as though it's our first
                 // time encountering this moniker segment.
-                let (inspect_container, on_closed_fut) =
-                    InspectArtifactsContainer::new(proxy_handle);
+                let mut inspect_container = InspectArtifactsContainer::default();
+                let fut = inspect_container.push_handle(proxy_handle);
                 self.diagnostics_containers.insert(identity, inspect_container);
-                Some(on_closed_fut)
+                fut
             }
             Some(ref mut artifacts_container) => artifacts_container.push_handle(proxy_handle),
         }
