@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use ffx_core::ffx_plugin;
+
 use ffx_package_far_list_args::ListCommand;
-use ffx_writer::Writer;
+use fho::{FfxMain, FfxTool, MachineWriter, ToolIO as _};
 use fuchsia_archive as far;
 use humansize::{file_size_opts, FileSize};
 use prettytable::{cell, row, Table};
@@ -30,10 +30,25 @@ impl<'a> From<far::Entry<'a>> for FarEntry {
     }
 }
 
-#[ffx_plugin("ffx_package_far_list")]
+#[derive(FfxTool)]
+pub struct FarListTool {
+    #[command]
+    pub cmd: ListCommand,
+}
+
+fho::embedded_plugin!(FarListTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for FarListTool {
+    type Writer = MachineWriter<Vec<FarEntry>>;
+    async fn main(self, writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        cmd_list(self.cmd, writer).await.map_err(Into::into)
+    }
+}
+
 pub async fn cmd_list(
     cmd: ListCommand,
-    #[ffx(machine = Vec<FarEntry>)] mut writer: Writer,
+    mut writer: <FarListTool as FfxMain>::Writer,
 ) -> Result<()> {
     let file = File::open(&cmd.far_file)
         .with_context(|| format!("failed to open file: {}", cmd.far_file.display()))?;
@@ -44,7 +59,7 @@ pub async fn cmd_list(
     entries.sort_by(|e1, e2| e1.path.cmp(&e2.path));
 
     if writer.is_machine() {
-        return writer.machine(&entries);
+        return writer.machine(&entries).map_err(Into::into);
     }
 
     if entries.is_empty() {
@@ -85,7 +100,7 @@ fn format_table(entries: &[FarEntry], display_lengths: bool) -> Table {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_writer::Format;
+    use fho::{Format, TestBuffers};
     use std::collections::BTreeMap;
     use std::io::Read;
     use std::path::PathBuf;
@@ -112,10 +127,12 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let far_path = create_test_far(&tmp_dir, &["foo", "bar", "baz"]).unwrap();
         let cmd = ListCommand { far_file: far_path, long_format: false };
-        let writer = Writer::new_test(None);
-        cmd_list(cmd, writer.clone()).await?;
-        assert_eq!(writer.test_output()?, "+------+\n| path |\n+======+\n| bar  |\n+------+\n| baz  |\n+------+\n| foo  |\n+------+\n");
-        assert_eq!(writer.test_error()?, "");
+        let buffers = TestBuffers::default();
+        let writer = <FarListTool as FfxMain>::Writer::new_test(None, &buffers);
+        cmd_list(cmd, writer).await?;
+        let (stdout, stderr) = buffers.into_strings();
+        assert_eq!(stdout, "+------+\n| path |\n+======+\n| bar  |\n+------+\n| baz  |\n+------+\n| foo  |\n+------+\n");
+        assert_eq!(stderr, "");
         Ok(())
     }
 
@@ -124,10 +141,12 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let far_path = create_test_far(&tmp_dir, &["alpha", "beta", "gamma"]).unwrap();
         let cmd = ListCommand { far_file: far_path, long_format: true };
-        let writer = Writer::new_test(None);
-        cmd_list(cmd, writer.clone()).await?;
-        assert_eq!(writer.test_output()?, "+-------+--------+\n| path  | length |\n+=======+========+\n| alpha | 5 B    |\n+-------+--------+\n| beta  | 4 B    |\n+-------+--------+\n| gamma | 5 B    |\n+-------+--------+\n");
-        assert_eq!(writer.test_error()?, "");
+        let buffers = TestBuffers::default();
+        let writer = <FarListTool as FfxMain>::Writer::new_test(None, &buffers);
+        cmd_list(cmd, writer).await?;
+        let (stdout, stderr) = buffers.into_strings();
+        assert_eq!(stdout, "+-------+--------+\n| path  | length |\n+=======+========+\n| alpha | 5 B    |\n+-------+--------+\n| beta  | 4 B    |\n+-------+--------+\n| gamma | 5 B    |\n+-------+--------+\n");
+        assert_eq!(stderr, "");
         Ok(())
     }
 
@@ -136,10 +155,12 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let far_path = create_test_far(&tmp_dir, &["one", "two", "three"]).unwrap();
         let cmd = ListCommand { far_file: far_path, long_format: false };
-        let writer = Writer::new_test(Some(Format::Json));
-        cmd_list(cmd, writer.clone()).await?;
-        assert_eq!(writer.test_output()?, "[{\"path\":\"one\",\"offset\":4096,\"length\":3},{\"path\":\"three\",\"offset\":8192,\"length\":5},{\"path\":\"two\",\"offset\":12288,\"length\":3}]\n");
-        assert_eq!(writer.test_error()?, "");
+        let buffers = TestBuffers::default();
+        let writer = <FarListTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+        cmd_list(cmd, writer).await?;
+        let (stdout, stderr) = buffers.into_strings();
+        assert_eq!(stdout, "[{\"path\":\"one\",\"offset\":4096,\"length\":3},{\"path\":\"three\",\"offset\":8192,\"length\":5},{\"path\":\"two\",\"offset\":12288,\"length\":3}]\n");
+        assert_eq!(stderr, "");
         Ok(())
     }
 }

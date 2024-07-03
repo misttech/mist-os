@@ -12,8 +12,10 @@ ffx_plugin("ffx_package_far_extract") {
   args_deps = [ "//third_party/rust_crates:camino" ]
 
   deps = [
+    "//src/developer/ffx/lib/fho:lib",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
   ]
 
