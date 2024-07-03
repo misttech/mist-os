@@ -27,8 +27,11 @@ class TestDispatcherBuilder;
 
 namespace fdf {
 
-// C++ wrapper for a dispatcher, with RAII semantics. Automatically shuts down
-// the dispatcher when it goes out of scope.
+// C++ wrapper for a dispatcher, with RAII semantics. Automatically destroys
+// the dispatcher when it goes out of scope. The dispatcher must be completely
+// shutdown before it is destroyed. Shutdown completion is notified by the
+// |ShutdownHandler| passed to |fdf::SynchronizedDispatcher::Create| or
+// |fdf::UnsynchronizedDispatcher::Create|.
 //
 // # Thread safety
 //
@@ -112,6 +115,8 @@ class Dispatcher {
   // i.e. the shutdown handler set in |SynchronizedDispatcher::Create|
   // or |UnsynchronizedDispatcher::Create| has been called.
   // It is safe to call this from that shutdown handler.
+  // TODO(https://fxbug.dev/350026710): consider calling release() automatically
+  // on destruction.
   ~Dispatcher() { close(); }
 
   fdf_dispatcher_t* get() const { return dispatcher_; }
