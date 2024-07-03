@@ -130,16 +130,8 @@ zx::result<std::unique_ptr<PageLoader::Worker>> PageLoader::Worker::Create(
   worker->uncompressed_transfer_buffer_ = std::move(resources->uncompressed_buffer);
   worker->compressed_transfer_buffer_ = std::move(resources->compressed_buffer);
 
-  zx_status_t status = worker->compressed_mapper_.Map(
-      worker->compressed_transfer_buffer_->GetVmo(), 0,
-      worker->compressed_transfer_buffer_->GetSize(), ZX_VM_PERM_READ);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to map the compressed TransferBuffer: "
-                   << zx_status_get_string(status);
-    return zx::error(status);
-  }
-
-  status = zx::vmo::create(worker->decompression_buffer_size_, 0, &worker->decompression_buffer_);
+  zx_status_t status =
+      zx::vmo::create(worker->decompression_buffer_size_, 0, &worker->decompression_buffer_);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to create decompression buffer: " << zx_status_get_string(status);
     return zx::error(status);
