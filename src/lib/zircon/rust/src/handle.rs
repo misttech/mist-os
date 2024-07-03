@@ -419,6 +419,7 @@ assoc_values!(ObjectType, [
     CLOCK           = sys::ZX_OBJ_TYPE_CLOCK;
     STREAM          = sys::ZX_OBJ_TYPE_STREAM;
     MSI             = sys::ZX_OBJ_TYPE_MSI;
+    IOB             = sys::ZX_OBJ_TYPE_IOB;
 ]);
 
 impl ObjectType {
