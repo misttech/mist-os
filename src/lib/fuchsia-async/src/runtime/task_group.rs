@@ -28,6 +28,12 @@ pub struct TaskGroup {
     done: Task<()>,
 }
 
+impl Default for TaskGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskGroup {
     /// Creates a new TaskGroup.
     ///
