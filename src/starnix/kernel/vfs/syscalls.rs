@@ -2781,6 +2781,19 @@ pub fn sys_io_setup(
     nr_events: u32,
     ctx_idp: UserRef<aio_context_t>,
 ) -> Result<(), Errno> {
+    // From https://man7.org/linux/man-pages/man2/io_setup.2.html:
+    //
+    //   EINVAL ctx_idp is not initialized, or the specified nr_events
+    //   exceeds internal limits.  nr_events should be greater than
+    //   0.
+    //
+    // TODO: Determine what "internal limits" means.
+    if nr_events > i32::MAX as u32 {
+        return error!(EINVAL);
+    }
+    if current_task.read_object(ctx_idp)? != 0 {
+        return error!(EINVAL);
+    }
     let mut mm_state = current_task.mm().state.write();
     let ctx_id = mm_state.aio_contexts.setup_context(nr_events)?;
     current_task.write_object(ctx_idp, &ctx_id)?;
