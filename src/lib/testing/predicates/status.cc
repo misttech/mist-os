@@ -25,4 +25,14 @@ namespace testing_predicates {
                                        << "Expected: " << r_expr << "\n"
                                        << "Which is: " << zx_status_get_string(r);
 }
+
+::testing::AssertionResult CmpZxOk(const char* l_expr, const zx::result<>& l) {
+  return CmpZxOk(l_expr, l.status_value());
+}
+
+::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr, const zx::result<>& l,
+                                     const zx::result<>& r) {
+  return CmpStatus(l_expr, r_expr, l.status_value(), r.status_value());
+}
+
 }  // namespace testing_predicates
