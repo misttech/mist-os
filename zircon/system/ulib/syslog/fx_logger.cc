@@ -168,8 +168,10 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
       file = syslog::internal::StripFile(file, severity);
     }
     auto builder = syslog_runtime::LogBufferBuilder(severity);
-    auto buffer =
-        builder.WithFile(file, line).WithMsg(fmt_string).WithSocket(this->socket_.get()).Build();
+    if (file) {
+      builder.WithFile(file, line);
+    }
+    auto buffer = builder.WithMsg(fmt_string).WithSocket(this->socket_.get()).Build();
     {
       fbl::AutoLock tag_lock(&tags_mutex_);
       for (const auto& tag : tags_) {
