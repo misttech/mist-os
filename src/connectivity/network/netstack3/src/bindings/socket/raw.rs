@@ -32,8 +32,8 @@ use {
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::{IntoErrno, IpSockAddrExt, SockAddr};
 use crate::bindings::util::{
-    AllowBindingIdFromWeak, IntoCore, IntoFidl, RemoveResourceResultExt, ResultExt as _,
-    TryFromFidl, TryFromFidlWithContext, TryIntoFidlWithContext,
+    AllowBindingIdFromWeak, IntoCore, IntoFidl, IntoFidlWithContext as _, RemoveResourceResultExt,
+    ResultExt as _, TryFromFidl, TryFromFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
@@ -636,9 +636,7 @@ fn handle_recvmsg<I: IpExt + IpSockAddrExt>(
                 // Opt into infallible conversion to a `BindingId`. We don't
                 // care if the device this packet was received on has since been
                 // removed.
-                AllowBindingIdFromWeak(device)
-                    .try_into_fidl_with_ctx(ctx.bindings_ctx())
-                    .unwrap_or_else(|never| match never {})
+                AllowBindingIdFromWeak(device).into_fidl_with_ctx(ctx.bindings_ctx())
             })
             .into_inner()
         });

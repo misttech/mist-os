@@ -43,8 +43,9 @@ use crate::bindings::socket::{
     ZXSIO_SIGNAL_INCOMING,
 };
 use crate::bindings::util::{
-    AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, NeedsDataNotifier,
-    NeedsDataWatcher, ResultExt as _, TryIntoCoreWithContext, TryIntoFidlWithContext,
+    AllowBindingIdFromWeak, ConversionContext, IntoCore, IntoFidl, IntoFidlWithContext as _,
+    NeedsDataNotifier, NeedsDataWatcher, ResultExt as _, TryIntoCoreWithContext,
+    TryIntoFidlWithContext,
 };
 use crate::bindings::{trace_duration, BindingsCtx, Ctx};
 
@@ -813,8 +814,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         let (accepted, addr, peer) = ctx.api().tcp().accept(id).map_err(IntoErrno::into_errno)?;
         let addr = addr
             .map_zone(AllowBindingIdFromWeak)
-            .try_into_fidl_with_ctx(ctx.bindings_ctx())
-            .unwrap_or_else(|never| match never {})
+            .into_fidl_with_ctx(ctx.bindings_ctx())
             .into_sock_addr();
         let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
         let (client, request_stream) = crate::bindings::socket::create_request_stream();

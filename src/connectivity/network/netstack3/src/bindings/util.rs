@@ -751,6 +751,22 @@ pub(crate) trait TryIntoFidlWithContext<F>: Sized {
     fn try_into_fidl_with_ctx<C: ConversionContext>(self, ctx: &C) -> Result<F, Self::Error>;
 }
 
+/// A core type which can be infallibly converted into the FIDL type `F` given a
+/// [`ConversionContext`].
+pub(crate) trait IntoFidlWithContext<F> {
+    /// Infallibly convert `self` into an instance of `F`.
+    fn into_fidl_with_ctx<X: ConversionContext>(self, ctx: &X) -> F;
+}
+
+impl<C: TryIntoFidlWithContext<F, Error = Never>, F> IntoFidlWithContext<F> for C {
+    fn into_fidl_with_ctx<X: ConversionContext>(self, ctx: &X) -> F {
+        match self.try_into_fidl_with_ctx(ctx) {
+            Ok(f) => f,
+            Err(never) => match never {},
+        }
+    }
+}
+
 /// A FIDL type which can be fallibly converted into the core type `C` given a
 /// context that implements [`ConversionContext`].
 ///
