@@ -21,6 +21,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/stdcompat/string_view.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
 #include <lib/zbi-format/board.h>
@@ -648,6 +649,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(loop.dispatcher()).BuildAndInitialize();
   component::OutgoingDirectory outgoing(loop.dispatcher());
 
   auto config = driver_test_realm_config::Config::TakeFromStartupHandle();
