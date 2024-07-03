@@ -12,8 +12,8 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/ddk/device.h>
-#include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <array>
@@ -58,11 +58,11 @@ class GoldfishDisplayEngineTest : public testing::Test {
   void TearDown() override;
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
+
   fdf_testing::DriverRuntime driver_runtime_;
   fdf::UnownedSynchronizedDispatcher display_event_dispatcher_ =
       driver_runtime_.StartBackgroundDispatcher();
-  fdf::Logger logger_{"test", FUCHSIA_LOG_TRACE, zx::socket{},
-                      fidl::WireClient<fuchsia_logger::LogSink>{}};
 
   std::array<std::array<layer_t, kMaxLayerCount>, kDisplayCount> layer_ = {};
 
@@ -80,8 +80,6 @@ class GoldfishDisplayEngineTest : public testing::Test {
 };
 
 void GoldfishDisplayEngineTest::SetUp() {
-  fdf::Logger::SetGlobalInstance(&logger_);
-
   auto [control_client, control_server] =
       fidl::Endpoints<fuchsia_hardware_goldfish::ControlDevice>::Create();
   auto [pipe_client, pipe_server] =
@@ -106,10 +104,7 @@ void GoldfishDisplayEngineTest::SetUp() {
                                                  kDisplayRefreshRateHz);
 }
 
-void GoldfishDisplayEngineTest::TearDown() {
-  allocator_binding_->Unbind();
-  fdf::Logger::SetGlobalInstance(nullptr);
-}
+void GoldfishDisplayEngineTest::TearDown() { allocator_binding_->Unbind(); }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigNoDisplay) {
   // Test No display
