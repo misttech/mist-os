@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -21,8 +22,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
-
 namespace amlogic_display {
 
 // static
@@ -32,8 +31,8 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
   zx::result<fidl::ClientEnd<fuchsia_hardware_gpio::Gpio>> pin_gpio_result =
       incoming.Connect<fuchsia_hardware_gpio::Service::Device>(kHpdGpioFragmentName);
   if (pin_gpio_result.is_error()) {
-    zxlogf(ERROR, "Failed to get gpio protocol from fragment %s: %s", kHpdGpioFragmentName,
-           pin_gpio_result.status_string());
+    FDF_LOG(ERROR, "Failed to get gpio protocol from fragment %s: %s", kHpdGpioFragmentName,
+            pin_gpio_result.status_string());
     return pin_gpio_result.take_error();
   }
 
@@ -41,15 +40,15 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
 
   fidl::WireResult interrupt_result = pin_gpio->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH);
   if (interrupt_result->is_error()) {
-    zxlogf(ERROR, "Failed to send GetInterrupt request to HPD GPIO: %s",
-           interrupt_result.status_string());
+    FDF_LOG(ERROR, "Failed to send GetInterrupt request to HPD GPIO: %s",
+            interrupt_result.status_string());
     return interrupt_result->take_error();
   }
   fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::GetInterrupt>& interrupt_response =
       interrupt_result.value();
   if (interrupt_response.is_error()) {
-    zxlogf(ERROR, "Failed to get interrupt from HPD GPIO: %s",
-           zx_status_get_string(interrupt_response.error_value()));
+    FDF_LOG(ERROR, "Failed to get interrupt from HPD GPIO: %s",
+            zx_status_get_string(interrupt_response.error_value()));
     return interrupt_response.take_error();
   }
 
@@ -60,8 +59,8 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
                                           /*shutdown_handler=*/[](fdf_dispatcher_t*) {},
                                           /*scheduler_role=*/{});
   if (create_dispatcher_result.is_error()) {
-    zxlogf(ERROR, "Failed to create vsync Dispatcher: %s",
-           create_dispatcher_result.status_string());
+    FDF_LOG(ERROR, "Failed to create vsync Dispatcher: %s",
+            create_dispatcher_result.status_string());
     return create_dispatcher_result.take_error();
   }
   fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
@@ -71,13 +70,13 @@ zx::result<std::unique_ptr<HotPlugDetection>> HotPlugDetection::Create(
       &alloc_checker, pin_gpio.TakeClientEnd(), std::move(interrupt_response->irq),
       std::move(on_state_change), std::move(dispatcher));
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Out of memory while allocating HotPlugDetection");
+    FDF_LOG(ERROR, "Out of memory while allocating HotPlugDetection");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> init_result = hot_plug_detection->Init();
   if (init_result.is_error()) {
-    zxlogf(ERROR, "Failed to initalize HPD: %s", init_result.status_string());
+    FDF_LOG(ERROR, "Failed to initalize HPD: %s", init_result.status_string());
     return init_result.take_error();
   }
 
@@ -102,7 +101,7 @@ HotPlugDetection::~HotPlugDetection() {
   if (pin_gpio_irq_.is_valid()) {
     zx_status_t status = pin_gpio_irq_.destroy();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "GPIO interrupt destroy failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "GPIO interrupt destroy failed: %s", zx_status_get_string(status));
     }
   }
 
@@ -113,13 +112,13 @@ HotPlugDetection::~HotPlugDetection() {
   if (pin_gpio_.is_valid()) {
     fidl::WireResult release_result = pin_gpio_->ReleaseInterrupt();
     if (!release_result.ok()) {
-      zxlogf(ERROR, "Failed to connect to GPIO FIDL protocol: %s", release_result.status_string());
+      FDF_LOG(ERROR, "Failed to connect to GPIO FIDL protocol: %s", release_result.status_string());
     } else {
       fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& release_response =
           release_result.value();
       if (release_response.is_error()) {
-        zxlogf(ERROR, "Failed to release GPIO interrupt: %s",
-               zx_status_get_string(release_response.error_value()));
+        FDF_LOG(ERROR, "Failed to release GPIO interrupt: %s",
+                zx_status_get_string(release_response.error_value()));
       }
     }
   }
@@ -134,22 +133,22 @@ zx::result<> HotPlugDetection::Init() {
   fidl::WireResult<fuchsia_hardware_gpio::Gpio::ConfigIn> config_in_result =
       pin_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
   if (config_in_result->is_error()) {
-    zxlogf(ERROR, "Failed to send ConfigIn request to hpd gpio: %s",
-           config_in_result.status_string());
+    FDF_LOG(ERROR, "Failed to send ConfigIn request to hpd gpio: %s",
+            config_in_result.status_string());
     return zx::error(config_in_result.status());
   }
   fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigIn>& config_in_response =
       config_in_result.value();
   if (config_in_response.is_error()) {
-    zxlogf(ERROR, "Failed to configure hpd gpio to input: %s",
-           zx_status_get_string(config_in_response.error_value()));
+    FDF_LOG(ERROR, "Failed to configure hpd gpio to input: %s",
+            zx_status_get_string(config_in_response.error_value()));
     return config_in_response.take_error();
   }
 
   zx_status_t status = pin_gpio_irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to bind the GPIO IRQ to the loop dispatcher: %s",
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to bind the GPIO IRQ to the loop dispatcher: %s",
+            zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok();
@@ -199,11 +198,11 @@ void HotPlugDetection::InterruptHandler(async_dispatcher_t* dispatcher, async::I
                                         zx_status_t status,
                                         const zx_packet_interrupt_t* interrupt) {
   if (status == ZX_ERR_CANCELED) {
-    zxlogf(INFO, "Hotplug interrupt wait is cancelled.");
+    FDF_LOG(INFO, "Hotplug interrupt wait is cancelled.");
     return;
   }
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Hotplug interrupt wait failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Hotplug interrupt wait failed: %s", zx_status_get_string(status));
     // A failed async interrupt wait doesn't remove the interrupt from the
     // async loop, so we have to manually cancel it.
     irq->Cancel();
@@ -226,14 +225,15 @@ void HotPlugDetection::InterruptHandler(async_dispatcher_t* dispatcher, async::I
 zx::result<HotPlugDetectionState> HotPlugDetection::ReadPinGpioState() {
   fidl::WireResult<fuchsia_hardware_gpio::Gpio::Read> read_result = pin_gpio_->Read();
   if (!read_result.ok()) {
-    zxlogf(ERROR, "Failed to send Read request to pin GPIO: %s", read_result.status_string());
+    FDF_LOG(ERROR, "Failed to send Read request to pin GPIO: %s", read_result.status_string());
     return zx::error(read_result.status());
   }
 
   fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::Read>& read_response =
       read_result.value();
   if (read_response.is_error()) {
-    zxlogf(ERROR, "Failed to read pin GPIO: %s", zx_status_get_string(read_response.error_value()));
+    FDF_LOG(ERROR, "Failed to read pin GPIO: %s",
+            zx_status_get_string(read_response.error_value()));
     return read_response.take_error();
   }
   return zx::ok(GpioValueToState(read_response->value));
@@ -242,14 +242,14 @@ zx::result<HotPlugDetectionState> HotPlugDetection::ReadPinGpioState() {
 zx::result<> HotPlugDetection::SetPinGpioPolarity(fuchsia_hardware_gpio::GpioPolarity polarity) {
   fidl::WireResult result = pin_gpio_->SetPolarity(polarity);
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send SetPolarity request to hpd gpio: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to send SetPolarity request to hpd gpio: %s", result.status_string());
     return result->take_error();
   }
 
   fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::SetPolarity>& response = result.value();
   if (response.is_error()) {
-    zxlogf(ERROR, "Failed to set polarity of hpd gpio: %s",
-           zx_status_get_string(response.error_value()));
+    FDF_LOG(ERROR, "Failed to set polarity of hpd gpio: %s",
+            zx_status_get_string(response.error_value()));
     return response.take_error();
   }
   return zx::ok();

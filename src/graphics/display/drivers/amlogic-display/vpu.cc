@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -23,7 +24,6 @@
 #include "src/graphics/display/drivers/amlogic-display/video-input-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
@@ -108,7 +108,7 @@ zx::result<std::unique_ptr<Vpu>> Vpu::Create(
   auto vpu = fbl::make_unique_checked<Vpu>(&alloc_checker, std::move(vpu_mmio), std::move(hhi_mmio),
                                            std::move(aobus_mmio), std::move(reset_mmio));
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for Vpu");
+    FDF_LOG(ERROR, "Failed to allocate memory for Vpu");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -417,7 +417,7 @@ void Vpu::AfbcPower(bool power_on) {
 zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t stride) {
   fbl::AutoLock lock(&capture_mutex_);
   if (capture_state_ == CAPTURE_ACTIVE) {
-    zxlogf(ERROR, "Capture in progress");
+    FDF_LOG(ERROR, "Capture in progress");
     return ZX_ERR_UNAVAILABLE;
   }
 
@@ -545,7 +545,7 @@ zx_status_t Vpu::CaptureInit(uint8_t canvas_idx, uint32_t height, uint32_t strid
 zx_status_t Vpu::CaptureStart() {
   fbl::AutoLock lock(&capture_mutex_);
   if (capture_state_ != CAPTURE_IDLE) {
-    zxlogf(ERROR, "Capture state is not idle! (%d)", capture_state_);
+    FDF_LOG(ERROR, "Capture state is not idle! (%d)", capture_state_);
     return ZX_ERR_BAD_STATE;
   }
 
@@ -610,41 +610,47 @@ zx_status_t Vpu::CaptureDone() {
 }
 
 void Vpu::CapturePrintRegisters() {
-  zxlogf(INFO, "** Display Loopback Register Dump **");
-  zxlogf(INFO, "VdInComCtrl0Reg = 0x%x",
-         VideoInputCommandControl::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInComStatus0Reg = 0x%x",
-         VideoInputCommandStatus0::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInMatrixCtrlReg = 0x%x",
-         VdInMatrixCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinCoef00_01Reg = 0x%x", VdinCoef00_01Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinCoef02_10Reg = 0x%x", VdinCoef02_10Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinCoef11_12Reg = 0x%x", VdinCoef11_12Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinCoef20_21Reg = 0x%x", VdinCoef20_21Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinCoef22Reg = 0x%x", VdinCoef22Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinOffset0_1Reg = 0x%x", VdinOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinOffset2Reg = 0x%x", VdinOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinPreOffset0_1Reg = 0x%x",
-         VdinPreOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinPreOffset2Reg = 0x%x",
-         VdinPreOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinLFifoCtrlReg = 0x%x", VdinLFifoCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdinIntfWidthM1Reg = 0x%x",
-         VdinIntfWidthM1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInWrCtrlReg = 0x%x", VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInWrHStartEndReg = 0x%x",
-         VdInWrHStartEndReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInWrVStartEndReg = 0x%x",
-         VdInWrVStartEndReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInAFifoCtrl3Reg = 0x%x",
-         VideoInputChannelFifoControl3::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInMiscCtrlReg = 0x%x", VdInMiscCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
-  zxlogf(INFO, "VdInIfMuxCtrlReg = 0x%x",
-         WritebackMuxControl::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "** Display Loopback Register Dump **");
+  FDF_LOG(INFO, "VdInComCtrl0Reg = 0x%x",
+          VideoInputCommandControl::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInComStatus0Reg = 0x%x",
+          VideoInputCommandStatus0::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInMatrixCtrlReg = 0x%x",
+          VdInMatrixCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinCoef00_01Reg = 0x%x",
+          VdinCoef00_01Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinCoef02_10Reg = 0x%x",
+          VdinCoef02_10Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinCoef11_12Reg = 0x%x",
+          VdinCoef11_12Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinCoef20_21Reg = 0x%x",
+          VdinCoef20_21Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinCoef22Reg = 0x%x", VdinCoef22Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinOffset0_1Reg = 0x%x",
+          VdinOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinOffset2Reg = 0x%x", VdinOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinPreOffset0_1Reg = 0x%x",
+          VdinPreOffset0_1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinPreOffset2Reg = 0x%x",
+          VdinPreOffset2Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinLFifoCtrlReg = 0x%x",
+          VdinLFifoCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdinIntfWidthM1Reg = 0x%x",
+          VdinIntfWidthM1Reg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInWrCtrlReg = 0x%x", VdInWrCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInWrHStartEndReg = 0x%x",
+          VdInWrHStartEndReg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInWrVStartEndReg = 0x%x",
+          VdInWrVStartEndReg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInAFifoCtrl3Reg = 0x%x",
+          VideoInputChannelFifoControl3::Get(kVideoInputModuleId).ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInMiscCtrlReg = 0x%x", VdInMiscCtrlReg::Get().ReadFrom(&vpu_mmio_).reg_value());
+  FDF_LOG(INFO, "VdInIfMuxCtrlReg = 0x%x",
+          WritebackMuxControl::Get().ReadFrom(&vpu_mmio_).reg_value());
 
-  zxlogf(INFO, "Dumping from 0x1300 to 0x1373");
+  FDF_LOG(INFO, "Dumping from 0x1300 to 0x1373");
   for (int i = 0x1300; i <= 0x1373; i++) {
-    zxlogf(INFO, "reg[0x%x] = 0x%x", i, vpu_mmio_.Read32(i << 2));
+    FDF_LOG(INFO, "reg[0x%x] = 0x%x", i, vpu_mmio_.Read32(i << 2));
   }
 }
 

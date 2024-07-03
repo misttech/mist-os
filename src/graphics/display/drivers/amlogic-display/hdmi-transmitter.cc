@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <unistd.h>
@@ -21,7 +22,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
 #include "src/graphics/display/lib/designware-hdmi/hdmi-transmitter-controller.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 // References
 //
@@ -54,7 +54,7 @@ zx::result<> HdmiTransmitter::Reset() {
   // reset hdmi related blocks (HIU, HDMI SYS, HDMI_TX)
   // auto reset0_result = display->reset_register_.WriteRegister32(PRESET0_REGISTER, 1 << 19, 1 <<
   // 19); if ((reset0_result.status() != ZX_OK) || reset0_result->is_error()) {
-  //   zxlogf(ERROR, "Reset0 Write failed\n");
+  //   FDF_LOG(ERROR, "Reset0 Write failed\n");
   // }
 
   /* FIXME: This will reset the entire HDMI subsystem including the HDCP engine.
@@ -64,12 +64,12 @@ zx::result<> HdmiTransmitter::Reset() {
   // auto reset2_result = display->reset_register_.WriteRegister32(PRESET2_REGISTER, 1 << 15, 1 <<
   // 15); // Will mess up hdcp stuff if ((reset2_result.status() != ZX_OK) ||
   // reset2_result->is_error()) {
-  //   zxlogf(ERROR, "Reset2 Write failed\n");
+  //   FDF_LOG(ERROR, "Reset2 Write failed\n");
   // }
 
   // auto reset2_result = display->reset_register_.WriteRegister32(PRESET2_REGISTER, 1 << 2, 1 <<
   // 2); if ((reset2_result.status() != ZX_OK) || reset2_result->is_error()) {
-  //   zxlogf(ERROR, "Reset2 Write failed\n");
+  //   FDF_LOG(ERROR, "Reset2 Write failed\n");
   // }
 
   // Bring HDMI out of reset
@@ -146,8 +146,8 @@ zx::result<> HdmiTransmitter::ModeSet(const display::DisplayTiming& timing,
   if (silicon_provider_service_smc_.is_valid()) {
     zx::result<> hdcp_initialization_result = InitializeHdcp14();
     if (hdcp_initialization_result.is_error()) {
-      zxlogf(ERROR, "Failed to initialize HDCP 1.4: %s",
-             hdcp_initialization_result.status_string());
+      FDF_LOG(ERROR, "Failed to initialize HDCP 1.4: %s",
+              hdcp_initialization_result.status_string());
       return hdcp_initialization_result;
     }
   } else {
@@ -155,9 +155,9 @@ zx::result<> HdmiTransmitter::ModeSet(const display::DisplayTiming& timing,
     // resource objects are not yet supported. Once fake SMC is supported, we
     // should enforce `smc_` to be always valid and always issue a
     // `zx_smc_call()` syscall.
-    zxlogf(WARNING,
-           "Secure monitor call (SMC) resource is not available. "
-           "Skipping initializing HDCP 1.4.");
+    FDF_LOG(WARNING,
+            "Secure monitor call (SMC) resource is not available. "
+            "Skipping initializing HDCP 1.4.");
   }
 
   WriteTopLevelReg(HDMITX_TOP_INTR_STAT_CLR, 0x0000001f);
@@ -189,7 +189,7 @@ zx::result<> HdmiTransmitter::I2cTransact(const i2c_impl_op_t* i2c_ops, size_t i
   fbl::AutoLock lock(&dw_lock_);
   zx_status_t status = designware_controller_->EdidTransfer(i2c_ops, i2c_op_count);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to transfer EDID: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to transfer EDID: %s", zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok();
@@ -204,12 +204,12 @@ uint32_t HdmiTransmitter::ReadTopLevelReg(uint32_t addr) {
 }
 
 void HdmiTransmitter::PrintRegister(const char* register_name, uint32_t register_address) {
-  zxlogf(INFO, "%s (0x%04" PRIx32 "): %" PRIu32, register_name, register_address,
-         ReadTopLevelReg(register_address));
+  FDF_LOG(INFO, "%s (0x%04" PRIx32 "): %" PRIu32, register_name, register_address,
+          ReadTopLevelReg(register_address));
 }
 
 void HdmiTransmitter::PrintTopLevelRegisters() {
-  zxlogf(INFO, "------------Top Registers------------");
+  FDF_LOG(INFO, "------------Top Registers------------");
   PrintRegister("HDMITX_TOP_SW_RESET", HDMITX_TOP_SW_RESET);
   PrintRegister("HDMITX_TOP_CLK_CNTL", HDMITX_TOP_CLK_CNTL);
   PrintRegister("HDMITX_TOP_INTR_MASKN", HDMITX_TOP_INTR_MASKN);
@@ -235,7 +235,7 @@ zx::result<> HdmiTransmitter::InitializeHdcp14() {
   zx_smc_result_t result = {};
   zx_status_t status = zx_smc_call(silicon_provider_service_smc_.get(), &params, &result);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize HDCP 1.4: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to initialize HDCP 1.4: %s", zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok();

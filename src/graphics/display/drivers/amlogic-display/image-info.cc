@@ -5,19 +5,19 @@
 #include "src/graphics/display/drivers/amlogic-display/image-info.h"
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire.h>
-
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
+#include <lib/driver/logging/cpp/logger.h>
 
 namespace amlogic_display {
 
 ImageInfo::~ImageInfo() {
-  zxlogf(INFO, "Destroying image on canvas %d", canvas_idx);
+  FDF_LOG(INFO, "Destroying image on canvas %d", canvas_idx);
   if (canvas.has_value()) {
     fidl::WireResult result = fidl::WireCall(canvas.value())->Free(canvas_idx);
     if (!result.ok()) {
-      zxlogf(WARNING, "Failed to call Canvas Free: %s", result.error().FormatDescription().c_str());
+      FDF_LOG(WARNING, "Failed to call Canvas Free: %s",
+              result.error().FormatDescription().c_str());
     } else if (result->is_error()) {
-      zxlogf(WARNING, "Canvas Free failed: %s", zx_status_get_string(result->error_value()));
+      FDF_LOG(WARNING, "Canvas Free failed: %s", zx_status_get_string(result->error_value()));
     }
   }
   if (pmt) {

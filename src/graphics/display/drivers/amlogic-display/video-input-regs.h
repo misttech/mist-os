@@ -5,13 +5,12 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_VIDEO_INPUT_REGS_H_
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
 
 #include <hwreg/bitfields.h>
-
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
@@ -442,8 +441,8 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
     WritebackMuxSource clock = mux1_clock_selection();
     WritebackMuxSource data = mux1_data_selection();
     if (clock != data) {
-      zxlogf(WARNING, "Writeback mux1 clock selection %" PRIu32 " != data selection %" PRIu32,
-             static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
+      FDF_LOG(WARNING, "Writeback mux1 clock selection %" PRIu32 " != data selection %" PRIu32,
+              static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
     }
     return clock;
   }
@@ -473,8 +472,8 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
     WritebackMuxSource clock = mux0_clock_selection();
     WritebackMuxSource data = mux0_data_selection();
     if (clock != data) {
-      zxlogf(WARNING, "Writeback mux0 clock selection %" PRIu32 " != data selection %" PRIu32,
-             static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
+      FDF_LOG(WARNING, "Writeback mux0 clock selection %" PRIu32 " != data selection %" PRIu32,
+              static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
     }
     return clock;
   }
