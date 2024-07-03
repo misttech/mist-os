@@ -2805,7 +2805,7 @@ pub fn sys_io_submit(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     nr: i32,
-    iocbpp: UserAddress,
+    mut iocb_addrs: UserRef<UserAddress>,
 ) -> Result<i32, Errno> {
     if nr < 0 {
         return error!(EINVAL);
@@ -2819,7 +2819,6 @@ pub fn sys_io_submit(
     };
 
     // `iocbpp` is an array of addresses to iocb's.
-    let mut iocb_addrs: UserRef<UserAddress> = UserRef::new(iocbpp);
     let mut num_submitted: i32 = 0;
     loop {
         let iocb_addr = current_task.read_object(iocb_addrs)?;
@@ -2944,11 +2943,15 @@ pub fn sys_io_getevents(
 
 pub fn sys_io_cancel(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _ctx_id: aio_context_t,
-    _control_block: UserRef<iocb>,
+    current_task: &CurrentTask,
+    ctx_id: aio_context_t,
+    user_iocb: UserRef<iocb>,
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
+    let _iocb = current_task.read_object(user_iocb)?;
+    let mm_state = current_task.mm().state.read();
+    let _ctx = mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?;
+
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
     return error!(ENOSYS);
 }
