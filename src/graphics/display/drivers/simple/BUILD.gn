@@ -50,6 +50,7 @@ test("simple-display-test-bin") {
     ":shared",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/devices/testing/fake-mmio-reg",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
@@ -61,6 +62,12 @@ test("simple-display-test-bin") {
 fuchsia_unittest_package("simple-display-test") {
   package_name = "simple-display-test"
   deps = [ ":simple-display-test-bin" ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 # Creates a Fuchsia driver assuming the driver's files start with the same
