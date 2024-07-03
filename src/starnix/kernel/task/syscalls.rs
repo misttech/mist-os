@@ -25,7 +25,7 @@ use crate::vfs::{
     VecOutputBuffer,
 };
 use starnix_logging::{log_error, log_info, log_trace, set_zx_name, track_stub};
-use starnix_sync::{MmDumpable, TaskRelease};
+use starnix_sync::{MmDumpable, ProcessGroupState, TaskRelease};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::auth::{
     Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
@@ -68,6 +68,7 @@ pub fn do_clone<L>(
 where
     L: LockBefore<MmDumpable>,
     L: LockBefore<TaskRelease>,
+    L: LockBefore<ProcessGroupState>,
 {
     security::check_task_create_access(current_task)?;
 

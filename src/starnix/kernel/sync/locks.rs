@@ -228,31 +228,22 @@ mod test {
     }
 
     mod lock_levels {
-        pub enum A {}
-        pub enum B {}
-        pub enum C {}
-        pub enum D {}
-        pub enum E {}
-        pub enum F {}
-    }
-
-    use lock_levels::{A, B, C, D, E, F};
-
-    mod lock_ordering {
         //! Lock ordering tree:
         //! Unlocked -> A -> B -> C
         //!          -> D -> E -> F
-        use super::{A, B, C, D, E, F};
-        use crate::{impl_lock_after, Unlocked};
-
-        impl_lock_after!(Unlocked => A);
-        impl_lock_after!(A => B);
-        impl_lock_after!(B => C);
-
-        impl_lock_after!(Unlocked => D);
-        impl_lock_after!(D => E);
-        impl_lock_after!(E => F);
+        use crate::Unlocked;
+        use lock_ordering_macro::lock_ordering;
+        lock_ordering! {
+            Unlocked => A,
+            A => B,
+            B => C,
+            Unlocked => D,
+            D => E,
+            E => F,
+        }
     }
+
+    use lock_levels::{A, B, C, D, E, F};
 
     #[test]
     fn test_ordered_mutex() {

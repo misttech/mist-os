@@ -25,7 +25,7 @@
 //!
 //! ```
 //! use std::sync::Mutex;
-//! use starnix_sync::{impl_lock_after, lock_level, lock::LockFor, relation::LockAfter, Unlocked};
+//! use starnix_sync::{lock_ordering, lock::LockFor, relation::LockAfter, Unlocked};
 //!
 //! #[derive(Default)]
 //! struct HoldsLocks {
@@ -33,8 +33,12 @@
 //!    b: Mutex<u32>,
 //! }
 //!
-//! lock_level!(A);
-//! lock_level!(B);
+//! lock_ordering! {
+//!    // LockA is the top of the lock hierarchy.
+//!    Unlocked => LevelA,
+//!    // LockA can be acquired before LockB.
+//!    LevelA => LevelB,
+//! }
 //!
 //! impl LockFor<LockA> for HoldsLocks {
 //!    type Data = u8;
@@ -54,11 +58,6 @@
 //!    }
 //! }
 //!
-//! // LockA is the top of the lock hierarchy.
-//! impl LockAfter<Unlocked> for LockA {}
-//! // LockA can be acquired before LockB.
-//! impl_lock_after!(LockA => LockB);
-//!
 //! // Accessing locked state looks like this:
 //!
 //! let state = HoldsLocks::default();
@@ -69,18 +68,19 @@
 //! let b = locked_a.lock::<LockB, _>(&state);
 //! ```
 //!
-//! The [impl_lock_after] macro provides implementations of [LockAfter] for
-//! a pair of locks. The complete lock ordering graph can be spelled out by
-//! calling `impl_lock_after` for each parent and child in the hierarchy. One
-//! of the upsides to using `impl_lock_after` is that it also prevents
-//! accidental lock ordering inversion introduced while defining the graph.
+//! The [lock_ordering] macro provides definitions for lock levels and
+//! implementations of [LockAfter] for all the locks that are connected
+//! in the graph (one can be locked after another). It also prevents
+//! accidental lock ordering inversion introduced while defining the graph
+//! by detecting cycles in it.
+//!
 //! This won't compile:
 //! ```compile_fail
-//! lock_level!(A);
-//! lock_level!(B);
-//!
-//! impl_lock_after(LockA => LockB);
-//! impl_lock_after(LockB => LockA);
+//! lock_ordering!{
+//!     Unlocked => A,
+//!     A => B,
+//!     B => A,
+//! }
 //! ```
 //!
 //! The methods on [Locked] prevent out-of-order locking according to the
@@ -89,7 +89,7 @@
 //! This won't compile because `LockB` does not implement `LockBefore<LockA>`:
 //! ```compile_fail
 //! # use std::sync::Mutex;
-//! # use lock_order::{impl_lock_after, lock::LockFor, relation::LockAfter, Locked, Unlocked};
+//! # use starnix_sync::{lock_ordering, lock::LockFor, Locked, Unlocked};
 //! #
 //! # #[derive(Default)]
 //! # struct HoldsLocks {
@@ -97,8 +97,12 @@
 //! #    b: Mutex<u32>,
 //! # }
 //! #
-//! # lock_level!(A);
-//! # lock_level!(B);
+//! # lock_ordering! {
+//! #    // LockA is the top of the lock hierarchy.
+//! #    Unlocked => LockA,
+//! #    // LockA can be acquired before LockB.
+//! #    LockA => LockB,
+//! # }
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #    type Data = u8;
@@ -118,10 +122,6 @@
 //! #     }
 //! # }
 //! #
-//! # // LockA is the top of the lock hierarchy.
-//! # impl LockAfter<Unlocked> for LockA {}
-//! # // LockA can be acquired before LockB.
-//! # impl_lock_after!(LockA => LockB);
 //!
 //! let state = HoldsLocks::default();
 //! let mut locked = Unlocked::new();
@@ -138,7 +138,7 @@
 //!
 //! ```compile_fail
 //! # use std::sync::Mutex;
-//! # use lock_order::{impl_lock_after, lock_level, lock::LockFor, relation::LockAfter, Locked, Unlocked};
+//! # use starnix_sync::{lock_ordering, lock::LockFor, Locked, Unlocked};
 //! #
 //! # #[derive(Default)]
 //! # struct HoldsLocks {
@@ -146,8 +146,12 @@
 //! #     b: Mutex<u32>,
 //! # }
 //! #
-//! # lock_level!(A);
-//! # lock_level!(B);
+//! # lock_ordering! {
+//! #    // LockA is the top of the lock hierarchy.
+//! #    Unlocked => LockA,
+//! #    // LockA can be acquired before LockB.
+//! #    LockA => LockB,
+//! # }
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #     type Data = u8;
@@ -166,11 +170,6 @@
 //! #         self.b.lock().unwrap()
 //! #     }
 //! # }
-//! #
-//! # // LockA is the top of the lock hierarchy.
-//! # impl LockAfter<Unlocked> for LockA {}
-//! # // LockA can be acquired before LockB.
-//! # impl_lock_after!(LockA => LockB);
 //!
 //! let state = HoldsLocks::default();
 //! let mut locked = Unlocked::new();
@@ -388,7 +387,7 @@ mod test {
 
     #[test]
     fn example() {
-        use crate::{impl_lock_after, lock_level, LockAfter, Unlocked};
+        use crate::{lock_ordering, Unlocked};
 
         #[derive(Default)]
         pub struct HoldsLocks {
@@ -396,8 +395,12 @@ mod test {
             b: Mutex<u32>,
         }
 
-        lock_level!(LockA);
-        lock_level!(LockB);
+        lock_ordering! {
+            // LockA is the top of the lock hierarchy.
+            Unlocked => LockA,
+            // LockA can be acquired before LockB.
+            LockA => LockB,
+        }
 
         impl LockFor<LockA> for HoldsLocks {
             type Data = u8;
@@ -417,11 +420,6 @@ mod test {
             }
         }
 
-        // LockA is the top of the lock hierarchy.
-        impl LockAfter<Unlocked> for LockA {}
-        // LockA can be acquired before LockB.
-        impl_lock_after!(LockA => LockB);
-
         // Accessing locked state looks like this:
 
         let state = HoldsLocks::default();
@@ -433,28 +431,20 @@ mod test {
     }
 
     mod lock_levels {
-        //! Lock ordering tree:
-        //! A -> B -> {C, D, E -> F, G -> H}
-
-        use crate::{impl_lock_after, lock_level, LockAfter, Unlocked};
-
-        lock_level!(A);
-        lock_level!(B);
-        lock_level!(C);
-        lock_level!(D);
-        lock_level!(E);
-        lock_level!(F);
-        lock_level!(G);
-        lock_level!(H);
-
-        impl LockAfter<Unlocked> for A {}
-        impl_lock_after!(A => B);
-        impl_lock_after!(B => C);
-        impl_lock_after!(B => D);
-        impl_lock_after!(B => E);
-        impl_lock_after!(E => F);
-        impl_lock_after!(B => G);
-        impl_lock_after!(G => H);
+        use crate::Unlocked;
+        use lock_ordering_macro::lock_ordering;
+        // Lock ordering tree:
+        // A -> B -> {C, D, E -> F, G -> H}
+        lock_ordering! {
+            Unlocked => A,
+            A => B,
+            B => C,
+            B => D,
+            B => E,
+            E => F,
+            B => G,
+            G => H,
+        }
     }
 
     use crate::{LockFor, RwLockFor, Unlocked};

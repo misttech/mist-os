@@ -956,6 +956,7 @@ impl OverlayFs {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
         match mount_options.get("redirect_dir".as_bytes()) {
@@ -1128,6 +1129,7 @@ fn resolve_dir_param<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     let path = mount_options.get(&**name).ok_or_else(|| {
         log_error!("overlayfs: {name} was not specified");

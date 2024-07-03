@@ -28,7 +28,7 @@ use fuchsia_zircon::{self as zx};
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
-    RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
+    ProcessGroupState, RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -439,6 +439,7 @@ impl CurrentTask {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         if flags.contains(OpenFlags::CREAT) {
             // In order to support OpenFlags::CREAT we would need to take a
@@ -819,6 +820,7 @@ impl CurrentTask {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         // Executable must be a regular file
         if !executable.name.entry.node.is_reg() {
@@ -1161,6 +1163,7 @@ impl CurrentTask {
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
@@ -1223,6 +1226,7 @@ impl CurrentTask {
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let initial_name_bytes = initial_name.as_bytes().to_owned();
         let pids = kernel.pids.write();
@@ -1267,6 +1271,7 @@ impl CurrentTask {
     ) -> Result<CurrentTask, Errno>
     where
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let builder = Self::create_task(
             locked,
@@ -1301,6 +1306,7 @@ impl CurrentTask {
     where
         F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let mut pids = kernel.pids.write();
         let pid = pids.allocate_pid();
@@ -1331,6 +1337,7 @@ impl CurrentTask {
     where
         F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         debug_assert!(pids.get_task(pid).upgrade().is_none());
 
@@ -1466,6 +1473,7 @@ impl CurrentTask {
     where
         L: LockBefore<MmDumpable>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         const IMPLEMENTED_FLAGS: u64 = (CLONE_VM
             | CLONE_FS
@@ -1866,6 +1874,7 @@ impl CurrentTask {
     where
         L: LockBefore<MmDumpable>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let result = self
             .clone_task(locked, flags, exit_signal, UserRef::default(), UserRef::default())

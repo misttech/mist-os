@@ -27,7 +27,7 @@ use crate::vfs::{
     FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr,
 };
 use starnix_logging::{log_trace, trace_instant, TraceScope, CATEGORY_STARNIX};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore};
+use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore};
 use starnix_syscalls::decls::{Syscall, SyscallDecl};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::errno;
@@ -260,6 +260,7 @@ pub fn create_filesystem_from_spec<'a, L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     let kernel = creator.kernel();
 

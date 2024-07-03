@@ -17,7 +17,8 @@ use crate::vfs::{
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
-    DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked, WriteOps,
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked,
+    WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::FsCred;
@@ -75,6 +76,7 @@ pub fn create_main_and_replica<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     let pty_file = current_task.open_file(locked, "/dev/ptmx".into(), OpenFlags::RDWR)?;
     let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;

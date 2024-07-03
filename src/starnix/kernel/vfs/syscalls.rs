@@ -24,7 +24,9 @@ use crate::vfs::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
     CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, PTRACE_MODE_ATTACH_REALCREDS,
@@ -1731,6 +1733,7 @@ fn do_mount_create<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let source = if source_addr.is_null() {

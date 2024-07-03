@@ -17,7 +17,7 @@ use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use starnix_logging::track_stub;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
@@ -62,6 +62,7 @@ impl ExtFilesystem {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         let mut open_flags = OpenFlags::RDWR;
         let mut prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE | ProtectionFlags::EXEC;
