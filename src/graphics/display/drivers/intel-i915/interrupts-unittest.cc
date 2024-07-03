@@ -61,8 +61,8 @@ TEST_F(InterruptTest, InitErrorWithoutAvailablePciInterrupt) {
   async_patterns::TestDispatcherBound<Interrupts> interrupts(
       interrupt_dispatcher_->async_dispatcher(), std::in_place);
   zx_status_t init_status = interrupts.SyncCall([&](Interrupts* interrupts) {
-    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, parent.get(), pci_,
-                            &mmio_buffer_, kTestDeviceDid);
+    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, pci_, &mmio_buffer_,
+                            kTestDeviceDid);
   });
   EXPECT_EQ(ZX_ERR_INTERNAL, init_status);
 }
@@ -74,8 +74,8 @@ TEST_F(InterruptTest, InitWithLegacyInterrupt) {
   async_patterns::TestDispatcherBound<Interrupts> interrupts(
       interrupt_dispatcher_->async_dispatcher(), std::in_place);
   zx_status_t init_status = interrupts.SyncCall([&](Interrupts* interrupts) {
-    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, parent.get(), pci_,
-                            &mmio_buffer_, kTestDeviceDid);
+    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, pci_, &mmio_buffer_,
+                            kTestDeviceDid);
   });
   EXPECT_OK(init_status);
 }
@@ -87,8 +87,8 @@ TEST_F(InterruptTest, InitWithMsiInterrupt) {
   async_patterns::TestDispatcherBound<Interrupts> interrupts(
       interrupt_dispatcher_->async_dispatcher(), std::in_place);
   zx_status_t init_status = interrupts.SyncCall([&](Interrupts* interrupts) {
-    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, parent.get(), pci_,
-                            &mmio_buffer_, kTestDeviceDid);
+    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, pci_, &mmio_buffer_,
+                            kTestDeviceDid);
   });
   EXPECT_OK(init_status);
 
@@ -108,8 +108,8 @@ TEST_F(InterruptTest, InitWithMsiAndLegacyInterrupts) {
   async_patterns::TestDispatcherBound<Interrupts> interrupts(
       interrupt_dispatcher_->async_dispatcher(), std::in_place);
   zx_status_t init_status = interrupts.SyncCall([&](Interrupts* interrupts) {
-    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, parent.get(), pci_,
-                            &mmio_buffer_, kTestDeviceDid);
+    return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, pci_, &mmio_buffer_,
+                            kTestDeviceDid);
   });
   EXPECT_OK(init_status);
 

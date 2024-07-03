@@ -46,11 +46,10 @@ class Interrupts {
   // Must be called exactly once.
   // Must be called from a driver-runtime managed dispatcher.
   //
-  // `dev` and `mmio_space` must be non-null and outlive the initialized
-  // `Interrupts` instance.
+  // `mmio_space` must be non-null and outlive the initialized `Interrupts`
+  // instance.
   zx_status_t Init(PipeVsyncCallback pipe_vsync_callback, HotplugCallback hotplug_callback,
-                   zx_device_t* dev, const ddk::Pci& pci, fdf::MmioBuffer* mmio_space,
-                   uint16_t device_id);
+                   const ddk::Pci& pci, fdf::MmioBuffer* mmio_space, uint16_t device_id);
   void FinishInit();
   void Resume();
   void Destroy();

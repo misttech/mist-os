@@ -358,11 +358,10 @@ zx_status_t Interrupts::SetGpuInterruptCallback(
 }
 
 zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
-                             HotplugCallback hotplug_callback, zx_device_t* dev,
-                             const ddk::Pci& pci, fdf::MmioBuffer* mmio_space, uint16_t device_id) {
+                             HotplugCallback hotplug_callback, const ddk::Pci& pci,
+                             fdf::MmioBuffer* mmio_space, uint16_t device_id) {
   ZX_DEBUG_ASSERT(pipe_vsync_callback);
   ZX_DEBUG_ASSERT(hotplug_callback);
-  ZX_DEBUG_ASSERT(dev);
   ZX_DEBUG_ASSERT(mmio_space);
   ZX_DEBUG_ASSERT(!irq_.is_valid());
 
