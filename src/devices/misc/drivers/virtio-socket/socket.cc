@@ -335,19 +335,10 @@ void SocketDevice::ProcessRxDescriptor(virtio_vsock_hdr_t* header, void* data, u
     if (conn == connections_.end()) {
       SendRstLocked(key);
     } else {
-      if (!conn->Rx(data, data_len)) {
-        NotifyAndCleanupConLocked(conn.CopyPointer());
+      if (conn->Rx(data, data_len)) {
+        conn->UpdateTxThreshold();
       } else {
-        // We send a credit update here to help report changes in buffer space
-        // during periods of high write (incoming) data traffic. Without some
-        // credit updates the device may stop sending as it believes our buffer
-        // has been filled up.
-        //
-        // TODO(b/300933744): This should instead be implemented using
-        // ZX_SOCKET_WRITE_THRESHOLD such that we can send credit updates once
-        // buffer space drops below some low-water mark.
-        zx::nanosleep(zx::deadline_after(zx::msec(1)));
-        SendOpLocked(conn.CopyPointer(), VIRTIO_VSOCK_OP_CREDIT_UPDATE);
+        NotifyAndCleanupConLocked(conn.CopyPointer());
       }
     }
   } else {
@@ -459,7 +450,8 @@ bool SocketDevice::SendOp_RawLocked(const ConnectionKey& key, uint16_t op,
   return true;
 }
 
-void SocketDevice::SendOpLocked(fbl::RefPtr<Connection> conn, uint16_t op) {
+void SocketDevice::SendOpLocked(fbl::RefPtr<Connection> conn, uint16_t op,
+                                std::optional<CreditInfo> known_credit) {
   // If there's a queue then keep queueing.
   if (!has_pending_op_.is_empty()) {
     // Store the op, updating if already queued.
@@ -467,8 +459,7 @@ void SocketDevice::SendOpLocked(fbl::RefPtr<Connection> conn, uint16_t op) {
     QueueForOpLocked(conn);
     return;
   }
-
-  CreditInfo credit = conn->GetCreditInfo();
+  CreditInfo credit = known_credit.value_or(conn->GetCreditInfo());
   if (!SendOp_RawLocked(conn->GetKey(), op, credit)) {
     conn->QueueOp(op);
     QueueForOpLocked(conn);
@@ -628,6 +619,11 @@ void SocketDevice::ConnectionSocketSignalled(zx_status_t status, const zx_packet
   }
   if (signal->observed & ZX_SOCKET_PEER_CLOSED) {
     NotifyAndCleanupConLocked(conn);
+    return;
+  }
+  if (signal->observed & ZX_SOCKET_WRITE_THRESHOLD) {
+    CreditInfo credit = conn->ContinueRx(dispatcher_);
+    SendOpLocked(conn, VIRTIO_VSOCK_OP_CREDIT_UPDATE, credit);
     return;
   }
 }
@@ -822,7 +818,8 @@ SocketDevice::Connection::Connection(const ConnectionKey& key, zx::socket data,
       buf_alloc_(0),
       fwd_cnt_(0),
       data_(std::move(data)),
-      wait_handler_(data_.get(), ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED, 0,
+      wait_handler_(data_.get(),
+                    ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED | ZX_SOCKET_WRITE_THRESHOLD, 0,
                     async::Wait::Handler([this, wait_handler = std::move(wait_handler)](
                                              async_dispatcher_t* dispatcher, async::Wait* wait,
                                              zx_status_t status, const zx_packet_signal_t* signal) {
@@ -889,6 +886,40 @@ bool SocketDevice::Connection::Rx(void* data, size_t len) {
   return status == ZX_OK && written == len;
 }
 
+void SocketDevice::Connection::UpdateTxThreshold() {
+  CreditInfo info = GetCreditInfo();
+  if (info.in_socket != 0) {
+    SetSocketTxThreshold(info.buf_alloc);
+  }
+}
+
+SocketDevice::CreditInfo SocketDevice::Connection::ContinueRx(async_dispatcher_t* disp) {
+  CreditInfo info = GetCreditInfo();
+  if (info.in_socket == 0) {
+    SetSocketTxThreshold(0);
+  }
+  BeginWait(disp);
+  return info;
+}
+
+void SocketDevice::Connection::SetSocketTxThreshold(uint32_t threshold) {
+  // Note: A value of 0 here effectively disables threshold watching.
+  size_t s_threshold = static_cast<size_t>(threshold);
+  zx_status_t status =
+      data_.set_property(ZX_PROP_SOCKET_TX_THRESHOLD, &s_threshold, sizeof(s_threshold));
+  switch (status) {
+    case ZX_OK:
+    // Ignore peer closed, this is handled in the signal waiter.
+    case ZX_ERR_PEER_CLOSED:
+      break;
+    // Any other errors are not really expected to happen here.
+    default:
+      zxlogf(ERROR, "failed to set socket tx threshold to %d: %s", threshold,
+             zx_status_get_string(status));
+      break;
+  }
+}
+
 SocketDevice::CreditInfo SocketDevice::Connection::GetCreditInfo() {
   zx_info_socket_t info;
   zx_status_t status = data_.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr);
@@ -898,10 +929,12 @@ SocketDevice::CreditInfo SocketDevice::Connection::GetCreditInfo() {
   // We want to find the number of bytes that have been received.
   // We can do this by taking the total number of bytes written to the socket, and subtract
   // the bytes still sitting in the buffer.
-  uint32_t fwd_count = rx_count_ - static_cast<uint32_t>(info.tx_buf_size);
+  uint32_t in_socket = static_cast<uint32_t>(info.tx_buf_size);
+  uint32_t fwd_count = rx_count_ - in_socket;
   return CreditInfo{
       .buf_alloc = static_cast<uint32_t>(info.tx_buf_max),
       .fwd_count = fwd_count,
+      .in_socket = in_socket,
   };
 }
 
