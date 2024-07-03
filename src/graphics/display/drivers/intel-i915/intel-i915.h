@@ -10,7 +10,10 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/component/cpp/prepare_stop_completer.h>
+#include <lib/driver/component/cpp/start_completer.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -51,28 +54,26 @@ typedef struct buffer_allocation {
   uint16_t end;
 } buffer_allocation_t;
 
-class Controller;
-using DeviceType = ddk::Device<Controller, ddk::Initializable, ddk::Unbindable, ddk::Suspendable>;
-
-class Controller : public DeviceType,
-                   public ddk::DisplayControllerImplProtocol<Controller, ddk::base_protocol>,
+class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                    public ddk::IntelGpuCoreProtocol<Controller> {
  public:
   explicit Controller(zx_device_t* parent);
   ~Controller();
 
-  // Perform short-running initialization of all subcomponents and instruct the DDK to publish the
-  // device. On success, returns ZX_OK and the owernship of the Controller instance is claimed by
-  // the DDK.
+  // Creates a `Controller` instance and performs short-running initialization
+  // of all subcomponents.
   //
-  // Long-running initialization is performed in the DdkInit hook.
-  static zx_status_t Create(zx_device_t* parent);
+  // Long-running initialization is performed in the Start() hook.
+  static zx::result<std::unique_ptr<Controller>> Create(zx_device_t* parent);
 
-  // DDK ops
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-  void DdkSuspend(ddk::SuspendTxn txn);
+  // Corresponds to DFv1 `DdkInit()` and DFv2 `Start()`.
+  void Start(fdf::StartCompleter completer);
+
+  // Corresponds to DFv1 `DdkUnbind()` and DFv2 `PrepareStop()`.
+  void PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer);
+
+  // Corresponds to DFv1 `DdkSuspend()` and DFv2 `PrepareStop()`.
+  void PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer);
 
   // display controller protocol ops
   void DisplayControllerImplSetDisplayControllerInterface(
@@ -181,6 +182,10 @@ class Controller : public DeviceType,
   // was not released.
   PixelFormatAndModifier GetImportedImagePixelFormat(display::DriverImageId image_id) const;
 
+  zx::result<ddk::AnyProtocol> GetProtocol(uint32_t proto_id);
+
+  inspect::Inspector& inspector() { return inspector_; }
+
  private:
   // Perform short-running initialization of all subcomponents and instruct the DDK to publish the
   // device. On success, returns ZX_OK and the ownership of the Controller instance is claimed by
@@ -207,6 +212,8 @@ class Controller : public DeviceType,
 
   // Disables the PCU (power controller)'s automated voltage adjustments.
   void DisableSystemAgentGeyserville();
+
+  zx_device_t* const parent_;
 
   std::unique_ptr<DisplayDevice> QueryDisplay(DdiId ddi_id, display::DisplayId display_id)
       __TA_REQUIRES(display_lock_);
@@ -260,9 +267,6 @@ class Controller : public DeviceType,
   // This number depends on the display engine and the number of DBUF slices
   // that are powered up.
   uint16_t DataBufferBlockCount() const;
-
-  zx_device_t* zx_gpu_dev_ = nullptr;
-  zx_device_t* display_controller_dev_ = nullptr;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;

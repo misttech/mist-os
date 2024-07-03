@@ -30,12 +30,11 @@
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/graphics/display/drivers/intel-i915/intel-display-driver.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
-
-#define ASSERT_OK(x) ASSERT_EQ(ZX_OK, (x))
-#define EXPECT_OK(x) EXPECT_EQ(ZX_OK, (x))
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 constexpr uint32_t kBytesPerRowDivisor = 1024;
@@ -562,10 +561,11 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
 // Tests that DDK basic DDK lifecycle hooks function as expected.
 TEST_F(IntegrationTest, BindAndInit) {
   async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  zx_status_t create_status = ZX_ERR_INTERNAL;
-  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  zx::result<> create_status = zx::error(ZX_ERR_INTERNAL);
+  async::PostTask(current_dispatcher,
+                  [&] { create_status = IntelDisplayDriver::Create(parent()); });
   driver_runtime_->RunUntilIdle();
-  ASSERT_OK(create_status);
+  ASSERT_OK(create_status.status_value());
 
   // There should be two published devices: one "intel_i915" device rooted at |parent()|, and a
   // grandchild "intel-gpu-core" device.
@@ -592,16 +592,19 @@ TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
 
   async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  zx_status_t create_status = ZX_ERR_INTERNAL;
-  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+
+  zx::result<> create_status = zx::error(ZX_ERR_INTERNAL);
+  async::PostTask(current_dispatcher,
+                  [&] { create_status = IntelDisplayDriver::Create(parent()); });
   driver_runtime_->RunUntilIdle();
-  ASSERT_OK(create_status);
+  ASSERT_OK(create_status.status_value());
 
   auto dev = parent()->GetLatestChild();
-  Controller* ctx = dev->GetDeviceContext<Controller>();
+  IntelDisplayDriver* intel_display_driver = dev->GetDeviceContext<IntelDisplayDriver>();
+  Controller* controller = intel_display_driver->controller();
 
   uint64_t addr;
-  EXPECT_EQ(ZX_OK, ctx->IntelGpuCoreGttAlloc(1, &addr));
+  EXPECT_EQ(ZX_OK, controller->IntelGpuCoreGttAlloc(1, &addr));
   EXPECT_EQ(0u, addr);
 }
 
@@ -624,34 +627,38 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   });
 
   async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  zx_status_t create_status = ZX_ERR_INTERNAL;
-  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  zx::result<> create_status = zx::error(ZX_ERR_INTERNAL);
+  async::PostTask(current_dispatcher,
+                  [&] { create_status = IntelDisplayDriver::Create(parent()); });
   driver_runtime_->RunUntilIdle();
-  ASSERT_OK(create_status);
+  ASSERT_OK(create_status.status_value());
 
   // There should be two published devices: one "intel_i915" device rooted at |parent()|, and a
   // grandchild "intel-gpu-core" device.
   ASSERT_EQ(1u, parent()->child_count());
   auto dev = parent()->GetLatestChild();
-  Controller* ctx = dev->GetDeviceContext<Controller>();
+  IntelDisplayDriver* intel_display_driver = dev->GetDeviceContext<IntelDisplayDriver>();
+  Controller* controller = intel_display_driver->controller();
 
   uint64_t addr;
-  EXPECT_EQ(ZX_OK, ctx->IntelGpuCoreGttAlloc(1, &addr));
+  EXPECT_EQ(ZX_OK, controller->IntelGpuCoreGttAlloc(1, &addr));
   EXPECT_EQ(ZX_ROUNDUP(kHeight * kStride * 3, PAGE_SIZE), addr);
 }
 
 TEST_F(IntegrationTest, SysmemImport) {
   async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  zx_status_t create_status = ZX_ERR_INTERNAL;
-  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  zx::result<> create_status = zx::error(ZX_ERR_INTERNAL);
+  async::PostTask(current_dispatcher,
+                  [&] { create_status = IntelDisplayDriver::Create(parent()); });
   driver_runtime_->RunUntilIdle();
-  ASSERT_OK(create_status);
+  ASSERT_OK(create_status.status_value());
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
   // grandchild "intel-gpu-core" device.
   ASSERT_EQ(1u, parent()->child_count());
   auto dev = parent()->GetLatestChild();
-  Controller* ctx = dev->GetDeviceContext<Controller>();
+  IntelDisplayDriver* intel_display_driver = dev->GetDeviceContext<IntelDisplayDriver>();
+  Controller* controller = intel_display_driver->controller();
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -659,14 +666,14 @@ TEST_F(IntegrationTest, SysmemImport) {
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
-  EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
+  EXPECT_OK(controller->DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                     kBanjoBufferCollectionId));
+  EXPECT_OK(controller->DisplayControllerImplSetBufferCollectionConstraints(
+      &kDisplayUsage, kBanjoBufferCollectionId));
   MockAllocator& allocator = *sysmem();
   driver_runtime_->RunUntil([&] {
     MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
@@ -680,28 +687,31 @@ TEST_F(IntegrationTest, SysmemImport) {
   };
   uint64_t image_handle = 0;
 
-  EXPECT_OK(ctx->DisplayControllerImplImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
-                                                  /*index=*/0, &image_handle));
+  EXPECT_OK(controller->DisplayControllerImplImportImage(&kDisplayImageMetadata,
+                                                         kBanjoBufferCollectionId,
+                                                         /*index=*/0, &image_handle));
 
   const GttRegion& region =
-      ctx->SetupGttImage(kDisplayImageMetadata, image_handle, FRAME_TRANSFORM_IDENTITY);
+      controller->SetupGttImage(kDisplayImageMetadata, image_handle, FRAME_TRANSFORM_IDENTITY);
   EXPECT_LT(kDisplayImageMetadata.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, region.bytes_per_row());
-  ctx->DisplayControllerImplReleaseImage(image_handle);
+  controller->DisplayControllerImplReleaseImage(image_handle);
 }
 
 TEST_F(IntegrationTest, SysmemRotated) {
   async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  zx_status_t create_status = ZX_ERR_INTERNAL;
-  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  zx::result<> create_status = zx::error(ZX_ERR_INTERNAL);
+  async::PostTask(current_dispatcher,
+                  [&] { create_status = IntelDisplayDriver::Create(parent()); });
   driver_runtime_->RunUntilIdle();
-  ASSERT_OK(create_status);
+  ASSERT_OK(create_status.status_value());
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
   // grandchild "intel-gpu-core" device.
   ASSERT_EQ(1u, parent()->child_count());
   auto dev = parent()->GetLatestChild();
-  Controller* ctx = dev->GetDeviceContext<Controller>();
+  IntelDisplayDriver* intel_display_driver = dev->GetDeviceContext<IntelDisplayDriver>();
+  Controller* controller = intel_display_driver->controller();
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -709,7 +719,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
-  EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
+  EXPECT_OK(controller->DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
   MockAllocator& allocator = *sysmem();
@@ -724,8 +734,8 @@ TEST_F(IntegrationTest, SysmemRotated) {
       // Must be y or yf tiled so rotation is allowed.
       .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
   };
-  EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&kTiledDisplayUsage,
-                                                                     kBanjoBufferCollectionId));
+  EXPECT_OK(controller->DisplayControllerImplSetBufferCollectionConstraints(
+      &kTiledDisplayUsage, kBanjoBufferCollectionId));
 
   driver_runtime_->RunUntil([&] { return collection->set_constraints_called(); });
 
@@ -736,16 +746,17 @@ TEST_F(IntegrationTest, SysmemRotated) {
   };
   uint64_t image_handle = 0;
   driver_runtime_->PerformBlockingWork([&]() mutable {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(&kTiledImageMetadata, kBanjoBufferCollectionId,
-                                                    /*index=*/0, &image_handle));
+    EXPECT_OK(controller->DisplayControllerImplImportImage(&kTiledImageMetadata,
+                                                           kBanjoBufferCollectionId,
+                                                           /*index=*/0, &image_handle));
   });
 
   // Check that rotating the image doesn't hang.
   const GttRegion& region =
-      ctx->SetupGttImage(kTiledImageMetadata, image_handle, FRAME_TRANSFORM_ROT_90);
+      controller->SetupGttImage(kTiledImageMetadata, image_handle, FRAME_TRANSFORM_ROT_90);
   EXPECT_LT(kTiledImageMetadata.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, region.bytes_per_row());
-  ctx->DisplayControllerImplReleaseImage(image_handle);
+  controller->DisplayControllerImplReleaseImage(image_handle);
 }
 
 }  // namespace
