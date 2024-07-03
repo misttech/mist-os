@@ -60,6 +60,7 @@ fn get_dir() -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
 }
 
 /// An implementation of the `Rtc` trait that connects to an RTC device in /dev/class/rtc.
+#[derive(Debug)]
 pub struct RtcImpl {
     proxy: frtc::DeviceProxy,
 }
@@ -67,11 +68,22 @@ pub struct RtcImpl {
 impl RtcImpl {
     /// Returns a new `RtcImpl` connected to the only available RTC device. Returns an Error if no
     /// devices were found, multiple devices were found, or the connection failed.
+    ///
+    /// Args:
+    /// - `has_rtc`: set to true if the board is configured with an RTC.
     pub async fn only_device(has_rtc: bool) -> Result<RtcImpl, RtcCreationError> {
         Self::only_device_for_test(has_rtc, get_dir).await
     }
 
     // Call directly only for tests.
+    //
+    // Args:
+    // See `Self::only_device`.
+    //
+    // Generics:
+    // - `F`: a closure that maybe provides a `DirectoryProxy` to be used as
+    //   `/dev/class/rtc` directory.  Normally this is only set to non-default
+    //   value in tests.
     async fn only_device_for_test<F>(
         has_rtc: bool,
         rtc_dir_source: F,
@@ -400,5 +412,53 @@ mod test {
         assert!(fake.set(DIFFERENT_ZX_TIME).await.is_ok());
         assert_eq!(fake.last_set(), Some(DIFFERENT_ZX_TIME));
         assert_eq!(&fake.get().await.unwrap_err().to_string(), &message);
+    }
+
+    use assert_matches::assert_matches;
+    use vfs::directory::entry_container::Directory;
+    use vfs::{execution_scope, pseudo_directory};
+
+    fn serve_dir(root: Arc<impl Directory>) -> fio::DirectoryProxy {
+        let (dir_proxy, dir_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        root.open(
+            execution_scope::ExecutionScope::new(),
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+            vfs::path::Path::dot().into(),
+            fidl::endpoints::ServerEnd::new(dir_server.into_channel()),
+        );
+        dir_proxy
+    }
+
+    #[fuchsia::test]
+    async fn no_rtc_configured() {
+        let dir = pseudo_directory! {};
+        let dir_proxy = serve_dir(dir);
+        let dir_provider = || Ok(dir_proxy);
+        let result = RtcImpl::only_device_for_test(/*has_rtc*/ false, dir_provider).await;
+        assert_matches!(result, Err(RtcCreationError::NotConfigured))
+    }
+
+    #[fuchsia::test]
+    async fn no_rtc_detected() {
+        let dir = pseudo_directory! {};
+        let dir_proxy = serve_dir(dir);
+        let dir_provider = || Ok(dir_proxy);
+        let result = RtcImpl::only_device_for_test(/*has_rtc*/ true, dir_provider).await;
+        assert_matches!(result, Err(RtcCreationError::NoDevices))
+    }
+
+    #[fuchsia::test]
+    async fn rtc_configured_and_detected() {
+        let dir = pseudo_directory! {
+                "deadbeef" => pseudo_directory! {
+            },
+        };
+        let dir_proxy = serve_dir(dir);
+        let dir_provider = || Ok(dir_proxy);
+        let result = RtcImpl::only_device_for_test(/*has_rtc*/ true, dir_provider).await;
+        // Connection fails because it's a dir, not a service, but we expected
+        // that.
+        assert_matches!(result, Err(RtcCreationError::ConnectionFailed(_)))
     }
 }
