@@ -14,8 +14,11 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/driver.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zircon-internal/align.h>
@@ -227,13 +230,8 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 
-class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
- protected:
-  IntegrationTest()
-      : pci_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        sysmem_(dispatcher()),
-        outgoing_(dispatcher()) {}
-
+class IntegrationTest : public ::testing::Test {
+ public:
   void SetUp() final {
     SetFramebuffer({});
 
@@ -252,17 +250,23 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
     });
 
     parent_ = MockDevice::FakeRootParent();
+    parent_->AddNsProtocol<fuchsia_sysmem2::Allocator>(
+        sysmem_.bind_handler(env_dispatcher_->async_dispatcher()));
 
-    parent_->AddNsProtocol<fuchsia_sysmem2::Allocator>(sysmem_.bind_handler(dispatcher()));
-
-    zx::result service_result = outgoing_.AddService<fuchsia_hardware_pci::Service>(
-        fuchsia_hardware_pci::Service::InstanceHandler(
-            {.device = pci_.bind_handler(pci_loop_.dispatcher())}));
-    ZX_ASSERT(service_result.is_ok());
+    zx::result<> add_service_result =
+        outgoing_.SyncCall([this](component::OutgoingDirectory* outgoing) {
+          return outgoing->AddService<fuchsia_hardware_pci::Service>(
+              fuchsia_hardware_pci::Service::InstanceHandler(
+                  {.device = pci_.bind_handler(pci_loop_.dispatcher())}));
+        });
+    ASSERT_EQ(add_service_result.status_value(), ZX_OK);
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    ASSERT_EQ(outgoing_.Serve(std::move(endpoints->server)).status_value(), ZX_OK);
+
+    zx::result<> serve_result =
+        outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server));
+    ASSERT_EQ(serve_result.status_value(), ZX_OK);
 
     parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
                             "pci");
@@ -270,22 +274,28 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
   }
 
   void TearDown() override {
-    loop().Shutdown();
+    outgoing_.reset();
     pci_loop_.Shutdown();
-
     parent_ = nullptr;
+
+    mock_ddk::GetDriverRuntime()->ShutdownAllDispatchers(/*dut_initial_dispatcher=*/nullptr);
   }
 
   MockDevice* parent() const { return parent_.get(); }
 
   MockAllocator* sysmem() { return &sysmem_; }
 
- private:
-  async::Loop pci_loop_;
+ protected:
+  std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_ = mock_ddk::GetDriverRuntime();
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = driver_runtime_->StartBackgroundDispatcher();
+
+  async::Loop pci_loop_{&kAsyncLoopConfigNeverAttachToThread};
   // Emulated parent protocols.
   pci::FakePciProtocol pci_;
-  MockAllocator sysmem_;
-  component::OutgoingDirectory outgoing_;
+
+  MockAllocator sysmem_{env_dispatcher_->async_dispatcher()};
+  async_patterns::TestDispatcherBound<component::OutgoingDirectory> outgoing_{
+      env_dispatcher_->async_dispatcher(), std::in_place, async_patterns::PassDispatcher};
 
   // mock-ddk parent device of the Controller under test.
   std::shared_ptr<MockDevice> parent_;
@@ -551,7 +561,11 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
 
 // Tests that DDK basic DDK lifecycle hooks function as expected.
 TEST_F(IntegrationTest, BindAndInit) {
-  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
+  async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  zx_status_t create_status = ZX_ERR_INTERNAL;
+  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  driver_runtime_->RunUntilIdle();
+  ASSERT_OK(create_status);
 
   // There should be two published devices: one "intel_i915" device rooted at |parent()|, and a
   // grandchild "intel-gpu-core" device.
@@ -560,14 +574,15 @@ TEST_F(IntegrationTest, BindAndInit) {
   ASSERT_EQ(2u, dev->child_count());
 
   // Perform the async initialization and wait for a response.
-  dev->InitOp();
-  EXPECT_EQ(ZX_OK, dev->WaitUntilInitReplyCalled());
+  async::PostTask(current_dispatcher, [&] { dev->InitOp(); });
+  driver_runtime_->PerformBlockingWork([&] { EXPECT_EQ(ZX_OK, dev->WaitUntilInitReplyCalled()); });
 
   // Unbind the device and ensure it completes synchronously.
-  dev->UnbindOp();
-  EXPECT_TRUE(dev->UnbindReplyCalled());
+  async::PostTask(current_dispatcher, [&] { dev->UnbindOp(); });
+  driver_runtime_->RunUntil([&] { return dev->UnbindReplyCalled(); });
 
-  mock_ddk::ReleaseFlaggedDevices(parent());
+  async::PostTask(current_dispatcher, [&] { mock_ddk::ReleaseFlaggedDevices(parent()); });
+  driver_runtime_->RunUntilIdle();
   EXPECT_EQ(0u, dev->child_count());
 }
 
@@ -576,7 +591,12 @@ TEST_F(IntegrationTest, BindAndInit) {
 TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
 
-  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
+  async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  zx_status_t create_status = ZX_ERR_INTERNAL;
+  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  driver_runtime_->RunUntilIdle();
+  ASSERT_OK(create_status);
+
   auto dev = parent()->GetLatestChild();
   Controller* ctx = dev->GetDeviceContext<Controller>();
 
@@ -602,7 +622,12 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
       .height = kHeight,
       .stride = kStride,
   });
-  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
+
+  async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  zx_status_t create_status = ZX_ERR_INTERNAL;
+  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  driver_runtime_->RunUntilIdle();
+  ASSERT_OK(create_status);
 
   // There should be two published devices: one "intel_i915" device rooted at |parent()|, and a
   // grandchild "intel-gpu-core" device.
@@ -616,7 +641,11 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
 }
 
 TEST_F(IntegrationTest, SysmemImport) {
-  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
+  async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  zx_status_t create_status = ZX_ERR_INTERNAL;
+  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  driver_runtime_->RunUntilIdle();
+  ASSERT_OK(create_status);
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
   // grandchild "intel-gpu-core" device.
@@ -638,13 +667,11 @@ TEST_F(IntegrationTest, SysmemImport) {
   };
   EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
                                                                      kBanjoBufferCollectionId));
-
-  RunLoopUntilIdle();
-
   MockAllocator& allocator = *sysmem();
-  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
-  ASSERT_TRUE(collection);
-  EXPECT_TRUE(collection->set_constraints_called());
+  driver_runtime_->RunUntil([&] {
+    MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+    return collection && collection->set_constraints_called();
+  });
 
   static constexpr image_metadata_t kDisplayImageMetadata = {
       .width = 128,
@@ -652,10 +679,9 @@ TEST_F(IntegrationTest, SysmemImport) {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   uint64_t image_handle = 0;
-  PerformBlockingWork([&] {
-    EXPECT_OK(ctx->DisplayControllerImplImportImage(
-        &kDisplayImageMetadata, kBanjoBufferCollectionId, /*index=*/0, &image_handle));
-  });
+
+  EXPECT_OK(ctx->DisplayControllerImplImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
+                                                  /*index=*/0, &image_handle));
 
   const GttRegion& region =
       ctx->SetupGttImage(kDisplayImageMetadata, image_handle, FRAME_TRANSFORM_IDENTITY);
@@ -665,7 +691,11 @@ TEST_F(IntegrationTest, SysmemImport) {
 }
 
 TEST_F(IntegrationTest, SysmemRotated) {
-  PerformBlockingWork([&] { ASSERT_OK(Controller::Create(parent())); });
+  async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  zx_status_t create_status = ZX_ERR_INTERNAL;
+  async::PostTask(current_dispatcher, [&] { create_status = Controller::Create(parent()); });
+  driver_runtime_->RunUntilIdle();
+  ASSERT_OK(create_status);
 
   // There should be two published devices: one "intel_i915" device rooted at `parent()`, and a
   // grandchild "intel-gpu-core" device.
@@ -682,11 +712,12 @@ TEST_F(IntegrationTest, SysmemRotated) {
   EXPECT_OK(ctx->DisplayControllerImplImportBufferCollection(
       kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
 
-  RunLoopUntilIdle();
-
   MockAllocator& allocator = *sysmem();
+  driver_runtime_->RunUntil([&] {
+    MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+    return collection != nullptr;
+  });
   MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
-  ASSERT_TRUE(collection);
   collection->set_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled);
 
   static constexpr image_buffer_usage_t kTiledDisplayUsage = {
@@ -696,8 +727,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   EXPECT_OK(ctx->DisplayControllerImplSetBufferCollectionConstraints(&kTiledDisplayUsage,
                                                                      kBanjoBufferCollectionId));
 
-  RunLoopUntilIdle();
-  EXPECT_TRUE(collection->set_constraints_called());
+  driver_runtime_->RunUntil([&] { return collection->set_constraints_called(); });
 
   static constexpr image_metadata_t kTiledImageMetadata = {
       .width = 128,
@@ -705,7 +735,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
       .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
   };
   uint64_t image_handle = 0;
-  PerformBlockingWork([&]() mutable {
+  driver_runtime_->PerformBlockingWork([&]() mutable {
     EXPECT_OK(ctx->DisplayControllerImplImportImage(&kTiledImageMetadata, kBanjoBufferCollectionId,
                                                     /*index=*/0, &image_handle));
   });

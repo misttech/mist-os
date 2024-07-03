@@ -4,8 +4,10 @@
 
 #include "src/graphics/display/drivers/intel-i915/interrupts.h"
 
-#include <lib/async-loop/loop.h>
+#include <lib/async/cpp/task.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/sync/cpp/completion.h>
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -205,12 +207,6 @@ void EnableHotplugInterruptsTigerLake(fdf::MmioBuffer* mmio_space) {
   }
 }
 
-async_loop_config_t CreateIrqHandlerAsyncLoopConfig() {
-  async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
-  config.irq_support = true;
-  return config;
-}
-
 }  // namespace
 
 Interrupts::Interrupts() { mtx_init(&lock_, mtx_plain); }
@@ -218,14 +214,9 @@ Interrupts::Interrupts() { mtx_init(&lock_, mtx_plain); }
 Interrupts::~Interrupts() { Destroy(); }
 
 void Interrupts::Destroy() {
-  zx_status_t cancel_status = irq_handler_.Cancel();
-  if (cancel_status != ZX_OK) {
-    zxlogf(WARNING, "Failed to cancel irq handler: %s", zx_status_get_string(cancel_status));
-  }
-
-  if (irq_loop_ != nullptr) {
-    irq_loop_->Shutdown();
-    irq_loop_.reset();
+  if (irq_handler_dispatcher_.get() != nullptr) {
+    irq_handler_dispatcher_.ShutdownAsync();
+    irq_handler_dispatcher_shutdown_completed_.Wait();
   }
 
   if (irq_.is_valid()) {
@@ -406,29 +397,21 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
   }
   irq_handler_.set_object(irq_.get());
 
-  const auto irq_loop_config = CreateIrqHandlerAsyncLoopConfig();
-  fbl::AllocChecker alloc_checker;
-  irq_loop_ = fbl::make_unique_checked<async::Loop>(&alloc_checker, &irq_loop_config);
-  if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for Loop");
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  thrd_t irq_loop_thread;
-  status = irq_loop_->StartThread("i915-irq-thread", &irq_loop_thread);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to start irq thread: %s", zx_status_get_string(status));
-    return status;
-  }
-
   const char* kRoleName = "fuchsia.graphics.display.drivers.intel-i915.interrupt";
-  status = device_set_profile_by_role(dev, thrd_get_zx_handle(irq_loop_thread), kRoleName,
-                                      strlen(kRoleName));
-  if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "i915-irq-thread",
+          /*shutdown_handler=*/
+          [this](fdf_dispatcher_t*) { irq_handler_dispatcher_shutdown_completed_.Signal(); },
+          kRoleName);
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create vsync Dispatcher: %s",
+           create_dispatcher_result.status_string());
+    return create_dispatcher_result.status_value();
   }
+  irq_handler_dispatcher_ = std::move(create_dispatcher_result).value();
 
-  status = irq_handler_.Begin(irq_loop_->dispatcher());
+  status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to begin IRQ handler wait: %s", zx_status_get_string(status));
     return status;

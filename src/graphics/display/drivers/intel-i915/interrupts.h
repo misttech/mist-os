@@ -11,6 +11,7 @@
 #include <lib/device-protocol/pci.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/interrupt.h>
 #include <threads.h>
 #include <zircon/types.h>
@@ -43,6 +44,7 @@ class Interrupts {
   Interrupts& operator=(Interrupts&&) = delete;
 
   // Must be called exactly once.
+  // Must be called from a driver-runtime managed dispatcher.
   //
   // `dev` and `mmio_space` must be non-null and outlive the initialized
   // `Interrupts` instance.
@@ -82,6 +84,8 @@ class Interrupts {
   void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                         const zx_packet_interrupt_t* interrupt);
 
+  zx::result<> CancelInterruptHandler();
+
   PipeVsyncCallback pipe_vsync_callback_;
   HotplugCallback hotplug_callback_;
   fdf::MmioBuffer* mmio_space_ = nullptr;
@@ -92,10 +96,11 @@ class Interrupts {
   zx::interrupt irq_;
   fuchsia_hardware_pci::InterruptMode irq_mode_;
 
-  // The `irq_loop_` and `irq_handler_` are constant between `Init()` and
-  // instance destruction. Only accessed on the threads used for class
-  // initialization and destruction.
-  std::unique_ptr<async::Loop> irq_loop_;
+  // The `irq_handler_dispatcher_` and `irq_handler_` are constant between
+  // `Init()` and instance destruction. Only accessed on the threads used for
+  // class initialization and destruction.
+  fdf::SynchronizedDispatcher irq_handler_dispatcher_;
+  libsync::Completion irq_handler_dispatcher_shutdown_completed_;
   async::IrqMethod<Interrupts, &Interrupts::InterruptHandler> irq_handler_{this};
 
   uint16_t device_id_;
