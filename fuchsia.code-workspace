@@ -48,6 +48,9 @@
       // Fuchsia's own FIDL LSP extension
       "fuchsia-authors.language-fidl",
 
+      // Official Go support
+      "golang.go",
+
       // The official LSP for Rust, rust-analyzer.
       "rust-lang.rust-analyzer",
 
