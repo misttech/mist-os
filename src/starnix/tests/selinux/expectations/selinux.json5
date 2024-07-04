@@ -48,6 +48,7 @@
                 "*selinux_mac_admin*",
                 "*selinux_atsecure*",
                 "*selinux_netlink_socket*",
+                "*selinux_prlimit*",
                 "*selinux_bpf*",
                 "*selinux_keys*",
                 "*selinux_key_socket*",
