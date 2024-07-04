@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::config::{OperatingSystem, PreflightConfig};
 use anyhow::{anyhow, Result};
 use check::{summarize_results, PreflightCheck, PreflightCheckResult, RunSummary};
-use config::*;
-use errors::ffx_bail;
-use ffx_core::ffx_plugin;
 use ffx_preflight_args::PreflightCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use regex::Regex;
 use std::fmt;
-use std::io::{stdout, Write};
+use std::io::Write;
 use termion::color;
 
 mod analytics;
@@ -59,9 +58,20 @@ fn get_operating_system_macos(
     Ok(OperatingSystem::MacOS(major, minor))
 }
 
-#[ffx_plugin()]
-pub async fn preflight_cmd(cmd: PreflightCommand) -> Result<()> {
-    preflight_cmd_impl(cmd, &mut stdout()).await
+#[derive(FfxTool)]
+pub struct PreflightTool {
+    #[command]
+    pub cmd: PreflightCommand,
+}
+
+fho::embedded_plugin!(PreflightTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for PreflightTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        preflight_cmd_impl(self.cmd, &mut writer).await.map_err(Into::into)
+    }
 }
 
 pub async fn preflight_cmd_impl<W: Write>(cmd: PreflightCommand, writer: &mut W) -> Result<()> {
@@ -130,10 +140,10 @@ fn write_preflight_results<W: Write>(
             writeln!(writer, "{}", EVERYTING_CHECKS_OUT_WITH_WARNINGS)?;
         }
         RunSummary::RecoverableFailure => {
-            ffx_bail!("{}", SOME_CHECKS_FAILED_RECOVERABLE);
+            anyhow::bail!("{}", SOME_CHECKS_FAILED_RECOVERABLE);
         }
         RunSummary::Failure => {
-            ffx_bail!("{}", SOME_CHECKS_FAILED_FATAL);
+            anyhow::bail!("{}", SOME_CHECKS_FAILED_FATAL);
         }
     };
     Ok(())
