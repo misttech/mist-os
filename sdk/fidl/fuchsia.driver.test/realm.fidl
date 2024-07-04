@@ -6,6 +6,7 @@ library fuchsia.driver.test;
 
 using zx;
 using fuchsia.io;
+using fuchsia.component.test;
 using fuchsia.diagnostics;
 
 /// A driver name is the name defined in ZIRCON_DRIVER_BEGIN begin macro
@@ -87,15 +88,13 @@ type RealmArgs = resource table {
     /// Default: driver-integration-test
     10: board_name string:MAX;
 
-    // TODO(https://fxbug.dev/42073139): This parameter should either be updated
-    // or removed.
+    /// DEPRECATED: Use dtr_offers.
     /// Specify additional offers from the test to a driver collection
     /// Default: empty
     @available(added=HEAD)
     11: offers vector<Offer>:MAX;
 
-    // TODO(https://fxbug.dev/42073139): This parameter should either be updated
-    // or removed.
+    /// DEPRECATED: Use dtr_exposes.
     /// Specify services to expose from the test to a driver collection
     /// Default: empty
     @available(added=HEAD)
@@ -116,6 +115,18 @@ type RealmArgs = resource table {
     /// Default: DriverTestRealm's package directory.
     @available(added=HEAD)
     13: pkg client_end:fuchsia.io.Directory;
+
+    /// Specify offers from the test to the driver test realm.
+    /// The driver test realm will forward these to the driver collections.
+    /// Default: empty
+    @available(added=NEXT)
+    14: dtr_offers vector<fuchsia.component.test.Capability>:MAX;
+
+    /// Specify exposes from the driver test realm to the test.
+    /// The driver test realm will forward these from the driver collections.
+    /// Default: empty
+    @available(added=NEXT)
+    15: dtr_exposes vector<fuchsia.component.test.Capability>:MAX;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

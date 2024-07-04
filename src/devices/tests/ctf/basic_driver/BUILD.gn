@@ -63,6 +63,7 @@ rustc_test("bin") {
   name = "basic_driver_test"
   deps = [
     ":fuchsia.basicdriver.ctftest_rust",
+    "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/lib/device-watcher/rust",
