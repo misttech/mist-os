@@ -4,7 +4,7 @@
 
 use crate::device::{BinderDriver, DeviceOps, RemoteBinderConnection};
 use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
-use crate::task::{with_current_task, CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
+use crate::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString, NamespaceNode};
 use anyhow::{Context, Error};
@@ -80,15 +80,15 @@ impl DeviceOps for RemoteBinderDevice {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(RemoteBinderFileOps::new(&current_task.thread_group))
+        Ok(RemoteBinderFileOps::new(current_task))
     }
 }
 
 struct RemoteBinderFileOps(Arc<RemoteBinderHandle<DefaultRemoteControllerConnector>>);
 
 impl RemoteBinderFileOps {
-    fn new(thread_group: &Arc<ThreadGroup>) -> Box<Self> {
-        Box::new(Self(RemoteBinderHandle::<DefaultRemoteControllerConnector>::new(thread_group)))
+    fn new(current_task: &CurrentTask) -> Box<Self> {
+        Box::new(Self(RemoteBinderHandle::<DefaultRemoteControllerConnector>::new(current_task)))
     }
 }
 
@@ -252,6 +252,7 @@ fn must_interrupt<R>(result: &Result<R, Errno>) -> Option<Errno> {
 /// Connection to the remote binder device. One connection is associated to one instance of a
 /// remote fuchsia component.
 struct RemoteBinderHandle<F: RemoteControllerConnector> {
+    kernel: Arc<Kernel>,
     state: Mutex<RemoteBinderHandleState>,
 
     /// Marker struct, needed because the struct is parametrized by `F`.
@@ -440,10 +441,11 @@ impl RemoteBinderHandleState {
 }
 
 impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
-    fn new(thread_group: &Arc<ThreadGroup>) -> Arc<Self> {
+    fn new(current_task: &CurrentTask) -> Arc<Self> {
         Arc::new(Self {
+            kernel: current_task.kernel().clone(),
             state: Mutex::new(RemoteBinderHandleState {
-                thread_group: Arc::downgrade(thread_group),
+                thread_group: Arc::downgrade(&current_task.thread_group),
                 koid_to_task: Default::default(),
                 unassigned_tasks: Default::default(),
                 unassigned_requests: Default::default(),
@@ -678,13 +680,12 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             TaskRequest::Open { path, process_accessor, process, responder: sender },
         );
         let remote_binder_connection = receiver.await??;
+        let remote_binder_connection_for_close = remote_binder_connection.clone();
 
         scopeguard::defer! {
             // When leaving the current scope, close the connection, even if some operation are in
             // progress. This should kick the tasks back with an error.
-            with_current_task(|current_task| {
-              remote_binder_connection.close(current_task);
-            });
+            remote_binder_connection_for_close.close(&self.kernel);
         }
 
         // Register a receiver to be notified of exit
@@ -1117,7 +1118,7 @@ mod tests {
                 .into();
 
                 let remote_binder_handle =
-                    RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task.thread_group);
+                    RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);
 
                 let service_name_string =
                     CString::new(service_name.as_bytes()).expect("CString::new");
