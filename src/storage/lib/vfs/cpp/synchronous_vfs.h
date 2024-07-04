@@ -22,44 +22,32 @@
 
 namespace fs {
 
-// A specialization of |FuchsiaVfs| which can be trivially dropped.
+// A specialization of |FuchsiaVfs| which can be dropped.
 //
-// During its destruction connections are *usually* destroyed on the destroying thread, though this
-// is inherently racy with channel-initiated teardown, meaning that connections may be torn down on
-// the dispatcher thread as well. Connections may even outlive the SynchronousVfs in such cases.
+// During destruction connections are destroyed asynchronously, so they will outlast the VFS.
 //
 // This class is NOT thread-safe and it must be used with a single-threaded asynchronous dispatcher.
-class SynchronousVfs : public FuchsiaVfs {
+//
+// This class is final because of its destructor and the semi-complex shutdown behaviour it relies
+// on that might not work if the instance is partially destroyed (which would be the case if when
+// the SynchronousVfs destructor is running for a derived instance).
+class SynchronousVfs final : public FuchsiaVfs {
  public:
   explicit SynchronousVfs(async_dispatcher_t* dispatcher = nullptr);
-
-  // The SynchronousVfs destructor terminates all open connections.
   ~SynchronousVfs() override;
 
   // FuchsiaVfs overrides.
   void CloseAllConnectionsForVnode(const Vnode& node,
                                    CloseAllConnectionsForVnodeCallback callback) final;
-  bool IsTerminating() const final;
 
  private:
-  // Synchronously drop all connections managed by the VFS.
-  //
-  // Invokes |handler| once when all connections are destroyed. It is safe to delete SynchronousVfs
-  // from within the closure.
   void Shutdown(ShutdownCallback handler) override;
 
   // On success, consumes |channel|.
   zx::result<> RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                   zx::channel& channel) final;
 
-  struct Connections {
-    std::mutex lock;
-    fbl::DoublyLinkedList<std::unique_ptr<internal::Connection>> inner __TA_GUARDED(lock);
-  };
-
-  // Held by shared_ptr to allow connections to unbind asynchronously even as the VFS is being
-  // destroyed. Reset when the VFS is shutting down.
-  std::shared_ptr<Connections> connections_{std::make_shared<Connections>()};
+  fbl::DoublyLinkedList<internal::Connection*> connections_ __TA_GUARDED(vfs_lock_);
 };
 
 }  // namespace fs

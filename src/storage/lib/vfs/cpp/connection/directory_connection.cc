@@ -105,34 +105,31 @@ DirectoryConnection::DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vn
   ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kDirectory) == rights);
 }
 
-DirectoryConnection::~DirectoryConnection() {
-  [[maybe_unused]] zx::result result = Unbind();
-  vnode()->DeleteFileLockInTeardown(koid_);
-}
-
 void DirectoryConnection::BindImpl(zx::channel channel, OnUnbound on_unbound) {
   ZX_DEBUG_ASSERT(!binding_);
   binding_.emplace(fidl::BindServer(
       vfs()->dispatcher(), fidl::ServerEnd<fuchsia_io::Directory>{std::move(channel)}, this,
       [on_unbound = std::move(on_unbound)](DirectoryConnection* self, fidl::UnbindInfo,
                                            fidl::ServerEnd<fuchsia_io::Directory>) {
+        [[maybe_unused]] zx::result<> result = self->CloseVnode(self->koid_);
         on_unbound(self);
       }));
 }
 
-zx::result<> DirectoryConnection::Unbind() {
-  if (std::optional binding = std::exchange(binding_, std::nullopt); binding) {
-    binding->Unbind();
-    return zx::make_result(vnode()->Close());
-  }
-  return zx::ok();
+void DirectoryConnection::Unbind() {
+  // NOTE: This needs to be thread-safe!
+  if (binding_)
+    binding_->Unbind();
 }
 
 void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   Connection::NodeClone(request->flags, VnodeProtocol::kDirectory, std::move(request->object));
 }
 
-void DirectoryConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
+void DirectoryConnection::Close(CloseCompleter::Sync& completer) {
+  completer.Reply(CloseVnode(koid_));
+  Unbind();
+}
 
 void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
   std::string_view protocol = fio::kDirectoryProtocolName;
@@ -233,8 +230,11 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
       return ZX_ERR_ACCESS_DENIED;
     }
 
-    return vfs()
-        ->Open(vnode(), path, *open_options, rights())
+    auto fs = vfs();
+    if (!fs)
+      return ZX_ERR_CANCELED;
+
+    return fs->Open(vnode(), path, *open_options, rights())
         .visit([&](auto&& result) -> zx_status_t {
           using ResultT = std::decay_t<decltype(result)>;
           if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Error>) {
@@ -245,7 +245,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
                                      std::move(request->object));
             return ZX_OK;
           } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Ok>) {
-            return vfs()->Serve(result.vnode, request->object.TakeChannel(), result.options);
+            return fs->Serve(result.vnode, request->object.TakeChannel(), result.options);
           }
         });
   }();
@@ -283,8 +283,13 @@ void DirectoryConnection::Open2(fuchsia_io::wire::Directory2Open2Request* reques
     // The rights for the new connection must never exceed those of this connection.
     ZX_DEBUG_ASSERT((rights - this->rights()) == fio::Rights());
     ZX_DEBUG_ASSERT((optional_rights - this->rights()) == fio::Rights());
+
+    auto fs = vfs();
+    if (!fs)
+      return zx::error(ZX_ERR_CANCELED);
+
     // Handle opening (or creating) the vnode.
-    zx::result open_result = vfs()->Open2(vnode(), path, request->protocols, rights);
+    zx::result open_result = fs->Open2(vnode(), path, request->protocols, rights);
     if (open_result.is_error()) {
       FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open2] Vfs::Open2 failed: ",
                             open_result.status_string());
@@ -297,15 +302,15 @@ void DirectoryConnection::Open2(fuchsia_io::wire::Directory2Open2Request* reques
     }
     // Expand optional rights if we negotiated the directory protocol.
     if (open_result->protocol() == fs::VnodeProtocol::kDirectory && optional_rights) {
-      if (vfs()->IsReadonly()) {
+      if (fs->IsReadonly()) {
         // Ensure that we don't grant the ability to modify the filesystem if it's read only.
         optional_rights &= ~fs::kAllMutableIo2Rights;
       }
       rights |= optional_rights;
     }
     // Serve a new connection to the vnode.
-    return vfs()->Serve2(*std::move(open_result), rights, std::move(request->object_request),
-                         &request->protocols);
+    return fs->Serve2(*std::move(open_result), rights, std::move(request->object_request),
+                      &request->protocols);
   }();
 
   // On any errors, if the channel wasn't consumed, we try closing it with an epitaph.
@@ -331,11 +336,13 @@ void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Syn
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
+  auto fs = vfs();
   zx_status_t status =
-      vfs()->Unlink(vnode(), name_str,
-                    request->options.has_flags() &&
-                        static_cast<bool>((request->options.flags() &
-                                           fuchsia_io::wire::UnlinkFlags::kMustBeDirectory)));
+      fs ? fs->Unlink(vnode(), name_str,
+                      request->options.has_flags() &&
+                          static_cast<bool>((request->options.flags() &
+                                             fuchsia_io::wire::UnlinkFlags::kMustBeDirectory)))
+         : ZX_ERR_CANCELED;
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -353,8 +360,10 @@ void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
   }
   uint8_t data[request->max_bytes];
   size_t actual = 0;
+  auto fs = vfs();
   zx_status_t status =
-      vfs()->Readdir(vnode().get(), &dircookie_, data, request->max_bytes, &actual);
+      fs ? fs->Readdir(vnode().get(), &dircookie_, data, request->max_bytes, &actual)
+         : ZX_ERR_CANCELED;
   completer.Reply(status, fidl::VectorView<uint8_t>::FromExternal(data, actual));
 }
 
@@ -373,7 +382,8 @@ void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
     return;
   }
   zx::event returned_token;
-  zx_status_t status = vfs()->VnodeToToken(vnode(), &token(), &returned_token);
+  auto fs = vfs();
+  zx_status_t status = fs ? fs->VnodeToToken(vnode(), &token(), &returned_token) : ZX_ERR_CANCELED;
   completer.Reply(status, std::move(returned_token));
 }
 
@@ -390,9 +400,11 @@ void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Syn
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
     return;
   }
-  zx_status_t status = vfs()->Rename(std::move(request->dst_parent_token), vnode(),
-                                     std::string_view(request->src.data(), request->src.size()),
-                                     std::string_view(request->dst.data(), request->dst.size()));
+  auto fs = vfs();
+  zx_status_t status = fs ? fs->Rename(std::move(request->dst_parent_token), vnode(),
+                                       std::string_view(request->src.data(), request->src.size()),
+                                       std::string_view(request->dst.data(), request->dst.size()))
+                          : ZX_ERR_CANCELED;
   if (status == ZX_OK) {
     completer.ReplySuccess();
   } else {
@@ -415,17 +427,21 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
     completer.Reply(ZX_ERR_BAD_HANDLE);
     return;
   }
-  zx_status_t status = vfs()->Link(std::move(token), vnode(),
-                                   std::string_view(request->src.data(), request->src.size()),
-                                   std::string_view(request->dst.data(), request->dst.size()));
+  auto fs = vfs();
+  zx_status_t status = fs ? fs->Link(std::move(token), vnode(),
+                                     std::string_view(request->src.data(), request->src.size()),
+                                     std::string_view(request->dst.data(), request->dst.size()))
+                          : ZX_ERR_CANCELED;
   completer.Reply(status);
 }
 
 void DirectoryConnection::Watch(WatchRequestView request, WatchCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryWatch] our rights: ", rights());
   // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
+  auto fs = vfs();
   zx_status_t status =
-      vnode()->WatchDir(vfs(), request->mask, request->options, std::move(request->watcher));
+      fs ? vnode()->WatchDir(fs.get(), request->mask, request->options, std::move(request->watcher))
+         : ZX_ERR_CANCELED;
   completer.Reply(status);
 }
 

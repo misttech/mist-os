@@ -5,11 +5,9 @@
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 #include <lib/async/cpp/task.h>
-#include <lib/sync/completion.h>
 
 #include <memory>
 #include <mutex>
-#include <utility>
 
 #include "src/storage/lib/vfs/cpp/connection/connection.h"
 
@@ -17,32 +15,32 @@ namespace fs {
 
 SynchronousVfs::SynchronousVfs(async_dispatcher_t* dispatcher) : FuchsiaVfs(dispatcher) {}
 
-SynchronousVfs::~SynchronousVfs() {
-  Shutdown(nullptr);
-  ZX_DEBUG_ASSERT(connections_ == nullptr);
-}
+SynchronousVfs::~SynchronousVfs() { Shutdown(nullptr); }
 
 void SynchronousVfs::Shutdown(ShutdownCallback handler) {
-  ZX_DEBUG_ASSERT(connections_ != nullptr);
+  // Arrange for connections to be unbound asynchronously.
   {
-    std::lock_guard<std::mutex> lock(connections_->lock);
-    std::for_each(connections_->inner.begin(), connections_->inner.end(),
-                  std::mem_fn(&internal::Connection::Unbind));
+    std::lock_guard lock(vfs_lock_);
+    for (internal::Connection& connection : connections_) {
+      connection.Unbind();
+    }
+    connections_.clear();
+    WillDestroy();
   }
-  connections_.reset();
-  if (handler) {
+
+  WaitTillDone();
+
+  if (handler)
     handler(ZX_OK);
-  }
 }
 
 void SynchronousVfs::CloseAllConnectionsForVnode(const Vnode& node,
                                                  CloseAllConnectionsForVnodeCallback callback) {
-  ZX_DEBUG_ASSERT(connections_ != nullptr);
   {
-    std::lock_guard<std::mutex> lock(connections_->lock);
-    for (internal::Connection& connection : connections_->inner) {
+    std::lock_guard lock(vfs_lock_);
+    for (internal::Connection& connection : connections_) {
       if (connection.vnode().get() == &node) {
-        [[maybe_unused]] zx::result result = connection.Unbind();
+        connection.Unbind();
       }
     }
   }
@@ -53,40 +51,28 @@ void SynchronousVfs::CloseAllConnectionsForVnode(const Vnode& node,
 
 zx::result<> SynchronousVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                                 zx::channel& channel) {
-  ZX_DEBUG_ASSERT(connections_ != nullptr);
-  // Release the lock before doing additional work on the connection.
-  internal::Connection& added = [&]() -> internal::Connection& {
-    std::lock_guard<std::mutex> lock(connections_->lock);
-    connections_->inner.push_back(std::move(connection));
-    return connections_->inner.back();
-  }();
+  internal::Connection* ptr;
 
-  // Subtle behavior warning.
-  //
-  // Connections must not outlive the VFS; this is because they may call into the VFS during normal
-  // operations, including during their destructors.
-  //
-  // Callbacks are provided weak references to the connections container as a best-effort attempt to
-  // ensure this; destroying the VFS drops the strong reference, nullifying the callback.
-  //
-  // However if a callback has already upgraded its reference when the VFS is destroyed then a race
-  // results; the VFS attempts to iterate over the connections to call
-  // `internal::Connection::Unbind` at the same time that (a) the connections container is being
-  // modified and (b) a particular connection is being destroyed. Access to the connections
-  // container is guarded by a lock to mitigate this.
-  auto on_unbound = [weak = std::weak_ptr(connections_)](internal::Connection* connection) {
-    if (std::shared_ptr connections = weak.lock(); connections != nullptr) {
-      // Release the lock before dropping the connection.
-      std::unique_ptr removed = [&]() {
-        std::lock_guard<std::mutex> lock(connections->lock);
-        return connections->inner.erase(*connection);
-      }();
+  {
+    std::lock_guard lock(vfs_lock_);
+    if (IsTerminating())
+      return zx::error(ZX_ERR_CANCELED);
+    ptr = connection.get();
+    connections_.push_back(connection.release());
+  }
+
+  ptr->Bind(std::move(channel), [](internal::Connection* connection) {
+    auto vfs = connection->vfs();
+    if (vfs) {
+      SynchronousVfs* sync_vfs = static_cast<SynchronousVfs*>(vfs.get());
+      std::lock_guard lock(sync_vfs->vfs_lock_);
+      if (!vfs->IsTerminating())
+        sync_vfs->connections_.erase(*connection);
     }
-  };
-  added.Bind(std::move(channel), std::move(on_unbound));
+    delete connection;
+  });
+
   return zx::ok();
 }
-
-bool SynchronousVfs::IsTerminating() const { return connections_ == nullptr; }
 
 }  // namespace fs

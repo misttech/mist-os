@@ -41,8 +41,8 @@ namespace fs::internal {
 // The Vnode's methods will be invoked in response to FIDL protocol messages received over the
 // channel.
 //
-// This class is thread-safe.
-class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>> {
+// This class is thread-safe, although only a single-threaded dispatcher is supported.
+class Connection : public fbl::DoublyLinkedListable<Connection*> {
  public:
   // Closes the connection.
   //
@@ -70,7 +70,8 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   // Triggers asynchronous closure of the receiver. Will invoke the |on_unbound| callback passed to
   // |Bind| after unbinding the FIDL server from the channel. Implementations should close the vnode
   // if required once unbinding the server. If not bound or already unbound, has no effect.
-  virtual zx::result<> Unbind() = 0;
+  // Implementations *must* be thread-safe.
+  virtual void Unbind() = 0;
 
   // Invokes |handler| with the Representation event for this connection. |query| specifies which
   // attributes, if any, should be included with the event. Returns the result of |handler| once
@@ -85,6 +86,8 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
 
   const fbl::RefPtr<fs::Vnode>& vnode() const { return vnode_; }
 
+  FuchsiaVfs::SharedPtr vfs() const { return vfs_.Upgrade(); }
+
  protected:
   // Create a connection bound to a particular vnode.
   //
@@ -96,8 +99,6 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   Connection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights);
 
   const fuchsia_io::Rights& rights() const { return rights_; }
-
-  FuchsiaVfs* vfs() { return vfs_; }
 
   zx::event& token() { return token_; }
 
@@ -114,12 +115,23 @@ class Connection : public fbl::DoublyLinkedListable<std::unique_ptr<Connection>>
   zx::result<> NodeUpdateAttributes(const VnodeAttributesUpdate& update);
   zx::result<fuchsia_io::wire::FilesystemInfo> NodeQueryFilesystem() const;
 
- private:
-  // The Vfs instance which owns this connection. Connections must not outlive the Vfs, hence this
-  // borrowing is safe.
-  fs::FuchsiaVfs* const vfs_;
+  // Closes the vnode.  Safe to be called if the vnode has already been closed.  This should only be
+  // called from the dispatcher thread.
+  zx::result<> CloseVnode(zx_koid_t file_lock_koid) {
+    zx::result<> result = zx::ok();
+    if (vnode_) {
+      vnode_->DeleteFileLockInTeardown(file_lock_koid);
+      result = zx::make_result(vnode_->Close());
+      vnode_ = nullptr;
+    }
+    return result;
+  }
 
-  fbl::RefPtr<fs::Vnode> const vnode_;
+ private:
+  // The Vfs instance which owns this connection.
+  FuchsiaVfs::WeakPtr vfs_;
+
+  fbl::RefPtr<fs::Vnode> vnode_;
 
   // Rights are hierarchical over Open/Clone. It is never allowed to derive a Connection with more
   // rights than the originating connection.

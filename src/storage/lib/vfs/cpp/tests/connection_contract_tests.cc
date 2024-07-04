@@ -20,16 +20,13 @@ namespace {
 class NoOpVfs : public fs::FuchsiaVfs {
  public:
   using FuchsiaVfs::FuchsiaVfs;
+  ~NoOpVfs() { connections_.clear(); }
 
  protected:
-  fbl::DoublyLinkedList<std::unique_ptr<fs::internal::Connection>> connections_;
+  fbl::DoublyLinkedList<fs::internal::Connection*> connections_;
 
  private:
   void Shutdown(ShutdownCallback handler) override { FAIL("Should never be reached in this test"); }
-  bool IsTerminating() const final {
-    ADD_FAILURE("Should never be reached in this test");
-    return false;
-  }
   void CloseAllConnectionsForVnode(const fs::Vnode& node,
                                    CloseAllConnectionsForVnodeCallback callback) final {
     FAIL("Should never be reached in this test");
@@ -45,8 +42,9 @@ class NoOpVfsGood : public NoOpVfs {
  private:
   zx::result<> RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
                                   zx::channel& server_end) final {
-    connections_.push_back(std::move(connection));
-    connections_.back().Bind(std::move(server_end), [](fs::internal::Connection*) {});
+    connections_.push_back(connection.release());
+    connections_.back().Bind(std::move(server_end),
+                             [](fs::internal::Connection* connection) { delete connection; });
     return zx::ok();
   }
 };
@@ -61,8 +59,9 @@ class NoOpVfsBad : public NoOpVfs {
  private:
   zx::result<> RegisterConnection(std::unique_ptr<fs::internal::Connection> connection,
                                   zx::channel& server_end) final {
-    connection->Bind(std::move(server_end), [](fs::internal::Connection*) {});
-    connections_.push_back(std::move(connection));
+    connection->Bind(std::move(server_end),
+                     [](fs::internal::Connection* connection) { delete connection; });
+    connections_.push_back(connection.release());
     return zx::ok();
   }
 };

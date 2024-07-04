@@ -23,15 +23,13 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   // Refer to documentation for |Connection::Connection|.
   NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights);
 
-  ~NodeConnection() final;
-
  private:
   //
   // |fs::Connection| Implementation
   //
 
   void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
-  zx::result<> Unbind() final;
+  void Unbind() final;
   zx::result<> WithRepresentation(
       fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
       std::optional<fuchsia_io::NodeAttributesQuery> query) const final;

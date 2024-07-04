@@ -28,8 +28,6 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights,
                  bool append, zx_koid_t koid);
 
-  ~FileConnection() override;
-
  protected:
   bool& append() { return append_; }
   bool append() const { return append_; }
@@ -40,7 +38,7 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   //
 
   void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
-  zx::result<> Unbind() final;
+  void Unbind() final;
   zx::result<> WithRepresentation(
       fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
       std::optional<fuchsia_io::NodeAttributesQuery> query) const final;

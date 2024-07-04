@@ -32,26 +32,21 @@ FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode
   ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kFile) == rights);
 }
 
-FileConnection::~FileConnection() {
-  [[maybe_unused]] zx::result result = Unbind();
-  vnode()->DeleteFileLockInTeardown(koid_);
-}
-
 void FileConnection::BindImpl(zx::channel channel, OnUnbound on_unbound) {
   ZX_DEBUG_ASSERT(!binding_);
-  binding_.emplace(fidl::BindServer(vfs()->dispatcher(),
-                                    fidl::ServerEnd<fuchsia_io::File>{std::move(channel)}, this,
-                                    [on_unbound = std::move(on_unbound)](
-                                        FileConnection* self, fidl::UnbindInfo,
-                                        fidl::ServerEnd<fuchsia_io::File>) { on_unbound(self); }));
+  binding_.emplace(fidl::BindServer(
+      vfs()->dispatcher(), fidl::ServerEnd<fuchsia_io::File>{std::move(channel)}, this,
+      [on_unbound = std::move(on_unbound)](FileConnection* self, fidl::UnbindInfo,
+                                           fidl::ServerEnd<fuchsia_io::File>) {
+        [[maybe_unused]] zx::result result = self->CloseVnode(self->koid_);
+        on_unbound(self);
+      }));
 }
 
-zx::result<> FileConnection::Unbind() {
-  if (std::optional binding = std::exchange(binding_, std::nullopt); binding) {
-    binding->Unbind();
-    return zx::make_result(vnode()->Close());
-  }
-  return zx::ok();
+void FileConnection::Unbind() {
+  // NOTE: This needs to be thread-safe!
+  if (binding_)
+    binding_->Unbind();
 }
 
 void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
@@ -64,7 +59,10 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
                         std::move(request->object));
 }
 
-void FileConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
+void FileConnection::Close(CloseCompleter::Sync& completer) {
+  completer.Reply(CloseVnode(koid_));
+  Unbind();
+}
 
 void FileConnection::Query(QueryCompleter::Sync& completer) {
   std::string_view protocol = fio::kFileProtocolName;

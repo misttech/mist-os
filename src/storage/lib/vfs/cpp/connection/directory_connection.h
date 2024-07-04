@@ -25,15 +25,13 @@ class DirectoryConnection final : public Connection,
   DirectoryConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode, fuchsia_io::Rights rights,
                       zx_koid_t koid);
 
-  ~DirectoryConnection() final;
-
  private:
   //
   // |fs::Connection| Implementation
   //
 
   void BindImpl(zx::channel channel, OnUnbound on_unbound) final;
-  zx::result<> Unbind() final;
+  void Unbind() final;
   zx::result<> WithRepresentation(
       fit::callback<zx::result<>(fuchsia_io::wire::Representation)> handler,
       std::optional<fuchsia_io::NodeAttributesQuery> query) const final;

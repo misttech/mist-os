@@ -58,22 +58,81 @@ struct FilesystemInfo {
 
 // Vfs specialization that adds Fuchsia-specific
 class FuchsiaVfs : public Vfs {
+ private:
+  // To deal with the lifetime issues with connections, we roll our own (limited) shared/weak
+  // pointers.  We can't easily use shared_ptr because that would involve changing all the clients,
+  // or would incur some overheads that we don't need.  Connections cannot be terminated
+  // synchronously (FIDL doesn't provide a synchronous unbind), so we have to allow connections to
+  // outlive the VFS.  To avoid connections making bad calls into the VFS instance after it has been
+  // destroyed, connections hold weak references to the VFS instance and upgrade when they need to.
+  // The VFS instance will block destruction whilst there are strong references.  This Ref struct
+  // stores the reference counts and can outlive the VFS instance.  When there are no strong or weak
+  // references the Ref instance is destroyed.
+  struct Ref {
+    std::atomic<int> strong_count;
+    std::atomic<int> weak_count;
+    FuchsiaVfs* vfs;
+  };
+
  public:
+  class SharedPtr {
+   public:
+    SharedPtr(const SharedPtr& other) { *this = other; }
+    SharedPtr& operator=(const SharedPtr& other);
+    ~SharedPtr() { Reset(); }
+    void Reset();
+
+    FuchsiaVfs& operator*() const { return *vfs_; }
+    FuchsiaVfs* operator->() const { return vfs_; }
+    explicit operator bool() const { return !!vfs_; }
+    FuchsiaVfs* get() const { return vfs_; }
+
+   private:
+    friend class FuchsiaVfs;
+
+    // Adopts a strong reference.
+    SharedPtr(FuchsiaVfs* vfs) : vfs_(vfs) {}
+
+    FuchsiaVfs* vfs_ = nullptr;
+  };
+
+  class WeakPtr {
+   public:
+    WeakPtr(FuchsiaVfs* vfs) : ref_(vfs->ref_) { ref_->weak_count.fetch_add(1); }
+    WeakPtr(const SharedPtr& ptr) : ref_(ptr->ref_) { ref_->weak_count.fetch_add(1); }
+    WeakPtr(const WeakPtr&) = delete;
+    WeakPtr& operator=(const WeakPtr&) = delete;
+    ~WeakPtr() {
+      // The last weak count also means no more strong counts because we hold an implicit weak
+      // reference whilst there are strong references.
+      if (ref_->weak_count.fetch_sub(1) == 1)
+        delete ref_;
+    }
+    SharedPtr Upgrade() const;
+
+   private:
+    friend class FuchsiaVfs;
+
+    // Adopts a weak reference.
+    WeakPtr(Ref* ref) : ref_(ref) {}
+
+    Ref* ref_;
+  };
+
   explicit FuchsiaVfs(async_dispatcher_t* dispatcher = nullptr);
+
+  // Not copyable or movable
+  FuchsiaVfs(const FuchsiaVfs&) = delete;
+  FuchsiaVfs& operator=(const FuchsiaVfs&) = delete;
+
   ~FuchsiaVfs() override;
 
   using ShutdownCallback = fit::callback<void(zx_status_t status)>;
   using CloseAllConnectionsForVnodeCallback = fit::callback<void()>;
 
-  // Unmounts the underlying filesystem. The result of shutdown is delivered via calling |closure|.
-  //
-  // |Shutdown| may be synchronous or asynchronous. The closure may be invoked before or after
-  // |Shutdown| returns.
-  virtual void Shutdown(ShutdownCallback closure) = 0;
-
   // Identifies if the filesystem is in the process of terminating. May be checked by active
   // connections, which, upon reading new port packets, should ignore them and close immediately.
-  virtual bool IsTerminating() const = 0;
+  bool IsTerminating() const { return is_terminating_; }
 
   // Vfs overrides.
   zx_status_t Unlink(fbl::RefPtr<Vnode> vn, std::string_view name, bool must_be_dir) override
@@ -135,6 +194,12 @@ class FuchsiaVfs : public Vfs {
   bool IsTokenAssociatedWithVnode(zx::event token) __TA_EXCLUDES(vfs_lock_);
 
  protected:
+  // Unmounts the underlying filesystem. The result of shutdown is delivered via calling |closure|.
+  //
+  // |Shutdown| may be synchronous or asynchronous. The closure may be invoked before or after
+  // |Shutdown| returns.
+  virtual void Shutdown(ShutdownCallback closure) = 0;
+
   // On success, starts handling requests for |vnode| over |server_end|. On failure, callers are
   // responsible for closing |vnode| and |server_end|.
   zx_status_t ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& server_end,
@@ -152,12 +217,33 @@ class FuchsiaVfs : public Vfs {
   virtual zx::result<> RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                           zx::channel& channel) = 0;
 
+  // Indicates this VFS instance is soon to be destroyed.  After calling this, `WaitTillDone` can be
+  // called to wait until there are no strong references remaining.  It is not safe to call this
+  // more than once.
+  void WillDestroy() {
+    ZX_ASSERT(!is_terminating_);
+    is_terminating_.store(true);
+    // Return the strong count taken in the constructor.
+    SharedPtr strong(this);
+  }
+
+  // Waits till there are no strong references.
+  void WaitTillDone() { sync_completion_wait(&done_, ZX_TIME_INFINITE); }
+
  private:
   zx_status_t TokenToVnode(zx::event token, fbl::RefPtr<Vnode>* out) __TA_REQUIRES(vfs_lock_);
 
   fbl::HashTable<zx_koid_t, std::unique_ptr<VnodeToken>> vnode_tokens_;
 
   async_dispatcher_t* dispatcher_ = nullptr;
+
+  std::atomic<bool> is_terminating_ = false;
+
+  // Signalled when there are no more strong references.
+  sync_completion_t done_;
+
+  // Holds the reference counts.
+  Ref* ref_;
 };
 
 }  // namespace fs

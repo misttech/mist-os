@@ -22,20 +22,18 @@ ManagedVfs::ManagedVfs(async_dispatcher_t* dispatcher) : FuchsiaVfs(dispatcher) 
 
 ManagedVfs::~ManagedVfs() { ZX_DEBUG_ASSERT(connections_.is_empty()); }
 
-bool ManagedVfs::NoMoreClients() const {
-  return is_shutting_down_.load() && connections_.is_empty();
-}
+bool ManagedVfs::NoMoreClients() const { return IsTerminating() && connections_.is_empty(); }
 
 // Asynchronously drop all connections.
 void ManagedVfs::Shutdown(ShutdownCallback handler) {
   ZX_DEBUG_ASSERT(handler);
-  ZX_DEBUG_ASSERT(!is_shutting_down_.load());
+  ZX_DEBUG_ASSERT(!IsTerminating());
   zx_status_t status =
       async::PostTask(dispatcher(), [this, closure = std::move(handler)]() mutable {
         std::lock_guard lock(lock_);
         ZX_DEBUG_ASSERT(!shutdown_handler_);
         shutdown_handler_ = std::move(closure);
-        is_shutting_down_.store(true);
+        WillDestroy();
 
         // Signal the teardown on channels in a way that doesn't potentially pull them out from
         // underneath async callbacks.
@@ -62,7 +60,7 @@ void ManagedVfs::CloseAllConnectionsForVnode(const Vnode& node,
     std::lock_guard lock(lock_);
     for (internal::Connection& connection : connections_) {
       if (connection.vnode().get() == &node) {
-        [[maybe_unused]] zx::result result = connection.Unbind();
+        connection.Unbind();
         closing_connections_.emplace(&connection, closer);
       }
     }
@@ -97,10 +95,10 @@ void ManagedVfs::FinishShutdown(async_dispatcher_t*, async::TaskBase*,
 zx::result<> ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                             zx::channel& channel) {
   std::lock_guard lock(lock_);
-  if (is_shutting_down_.load()) {
+  if (IsTerminating()) {
     return zx::error(ZX_ERR_CANCELED);
   }
-  connections_.push_back(std::move(connection));
+  connections_.push_back(connection.release());
   connections_.back().Bind(std::move(channel), [this](internal::Connection* connection) {
     std::shared_ptr<fit::deferred_action<fit::callback<void()>>> closer;  // Must go before lock.
     std::lock_guard lock(lock_);
@@ -111,9 +109,9 @@ zx::result<> ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection
       closing_connections_.erase(iter);
     }
 
-    // We drop the result of |erase| on the floor, effectively destroying the connection when all
-    // other references (like async callbacks) have completed.
     connections_.erase(*connection);
+    delete connection;
+
     MaybeAsyncFinishShutdown();
 
     if (connections_.is_empty()) {
@@ -124,7 +122,5 @@ zx::result<> ManagedVfs::RegisterConnection(std::unique_ptr<internal::Connection
   });
   return zx::ok();
 }
-
-bool ManagedVfs::IsTerminating() const { return is_shutting_down_.load(); }
 
 }  // namespace fs
