@@ -174,6 +174,37 @@ pub(super) fn check_signal_access(
     }
 }
 
+/// Checks if the task with `source_sid` has the permission to get and/or set limits on the task with `target_sid`.
+pub(super) fn task_prlimit(
+    permission_check: &impl PermissionCheck,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    check_get_rlimit: bool,
+    check_set_rlimit: bool,
+) -> Result<(), Errno> {
+    match (check_get_rlimit, check_set_rlimit) {
+        (true, true) => check_permissions(
+            permission_check,
+            source_sid,
+            target_sid,
+            &[ProcessPermission::GetRlimit, ProcessPermission::SetRlimit],
+        ),
+        (true, false) => check_permissions(
+            permission_check,
+            source_sid,
+            target_sid,
+            &[ProcessPermission::GetRlimit],
+        ),
+        (false, true) => check_permissions(
+            permission_check,
+            source_sid,
+            target_sid,
+            &[ProcessPermission::SetRlimit],
+        ),
+        (false, false) => Ok(()),
+    }
+}
+
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
 pub(super) fn ptrace_access_check(
     permission_check: &impl PermissionCheck,
