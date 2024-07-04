@@ -221,7 +221,7 @@ PagerErrorStatus PageLoader::Worker::TransferUncompressedPages(
     // |rounded_length| is greater than |length| then |length| isn't block aligned because it's at
     // the end of the blob.  In the compact layout the Merkle tree can share the last block of the
     // data and may have been read into the transfer buffer.  The Merkle tree needs to be removed
-    // before transfering the pages to the destination VMO.
+    // before transferring the pages to the destination VMO.
     static_assert(kBlobfsBlockSize % PAGE_SIZE == 0);
     if (rounded_length > length) {
       zx_status_t status = uncompressed_transfer_buffer_->GetVmo().op_range(
@@ -237,13 +237,9 @@ PagerErrorStatus PageLoader::Worker::TransferUncompressedPages(
     // Verify the pages read in.
     {
       fzl::VmoMapper mapping;
-      // We need to unmap the transfer VMO before its pages can be transferred to the destination
-      // VMO, via |zx_pager_supply_pages|.
-      auto unmap = fit::defer([&]() { mapping.Unmap(); });
-
       // Map the transfer VMO in order to pass the verifier a pointer to the data.
-      zx_status_t status =
-          mapping.Map(uncompressed_transfer_buffer_->GetVmo(), 0, rounded_length, ZX_VM_PERM_READ);
+      zx_status_t status = mapping.Map(uncompressed_transfer_buffer_->GetVmo(), 0, rounded_length,
+                                       ZX_VM_PERM_READ | ZX_VM_MAP_RANGE);
       if (status != ZX_OK) {
         FX_LOGS(ERROR) << "TransferUncompressed: Failed to map transfer buffer: "
                        << zx_status_get_string(status);
@@ -348,88 +344,85 @@ PagerErrorStatus PageLoader::Worker::TransferChunkedPages(
       return PagerErrorStatus::kErrIO;
     }
 
-    auto decommit_decompressed = fit::defer([this, length = mapping.decompressed_length]() {
+    fs::Ticker ticker;
+    const uint64_t page_aligned_decompressed_length =
+        fbl::round_up<uint64_t, uint64_t>(mapping.decompressed_length, PAGE_SIZE);
+    ZX_DEBUG_ASSERT(sandbox_buffer_.is_valid());
+    // Try to commit all of the pages ahead of time to avoid page faulting on each one while
+    // decompressing.
+    if (zx_status_t status = sandbox_buffer_.op_range(ZX_VMO_OP_COMMIT, 0,
+                                                      page_aligned_decompressed_length, nullptr, 0);
+        status != ZX_OK) {
+      FX_LOGS(INFO) << "Failed to pre-commit sandbox buffer pages: "
+                    << zx_status_get_string(status);
+      ZX_DEBUG_ASSERT(false);
+    }
+    auto decommit_sandbox = fit::defer([this, length = page_aligned_decompressed_length]() {
+      // Decommit pages in the sandbox buffer that might have been populated. All blobs share
+      // the same sandbox buffer - this prevents data leaks between different blobs.
+      sandbox_buffer_.op_range(ZX_VMO_OP_DECOMMIT, 0, length, nullptr, 0);
+    });
+    ExternalSeekableDecompressor decompressor(decompressor_client_.get(),
+                                              info.decompressor->algorithm());
+    if (zx_status_t status = decompressor.DecompressRange(
+            offset_of_compressed_data, mapping.compressed_length, mapping.decompressed_length);
+        status != ZX_OK) {
+      FX_LOGS(ERROR) << "TransferChunked: Failed to decompress for blob " << info.verifier->digest()
+                     << ": " << zx_status_get_string(status);
+      return ToPagerErrorStatus(status);
+    }
+    metrics_->paged_read_metrics().IncrementDecompression(
+        CompressionAlgorithm::kChunked, mapping.decompressed_length, ticker.End());
+
+    auto decommit_decompressed = fit::defer([this, length = page_aligned_decompressed_length]() {
       // Decommit pages in the decompression buffer that might have been populated. All blobs share
       // the same transfer buffer - this prevents data leaks between different blobs.
-      decompression_buffer_.op_range(ZX_VMO_OP_DECOMMIT, 0, fbl::round_up(length, kBlobfsBlockSize),
-                                     nullptr, 0);
+      decompression_buffer_.op_range(ZX_VMO_OP_DECOMMIT, 0, length, nullptr, 0);
     });
+    if (zx_status_t status = decompression_buffer_.transfer_data(
+            0, 0, page_aligned_decompressed_length, &sandbox_buffer_, 0);
+        status != ZX_OK) {
+      FX_LOGS(ERROR) << "TransferChunked: Failed to transfer from sandbox buffer: "
+                     << zx_status_get_string(status);
+      return ToPagerErrorStatus(status);
+    }
+    // All of the pages were transferred out of the sandbox buffer, they no longer need to be
+    // decommitted.
+    decommit_sandbox.cancel();
 
     // Map the decompression VMO.
     fzl::VmoMapper decompressed_mapper;
     if (zx_status_t status =
-            decompressed_mapper.Map(decompression_buffer_, 0, mapping.decompressed_length,
-                                    ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+            decompressed_mapper.Map(decompression_buffer_, 0, page_aligned_decompressed_length,
+                                    ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_MAP_RANGE);
         status != ZX_OK) {
       FX_LOGS(ERROR) << "TransferChunked: Failed to map decompress buffer: "
                      << zx_status_get_string(status);
       return ToPagerErrorStatus(status);
     }
-    auto unmap_decompression = fit::defer([&]() { decompressed_mapper.Unmap(); });
-
-    fs::Ticker ticker;
-    size_t decompressed_size = mapping.decompressed_length;
-    zx_status_t decompress_status;
-    ZX_DEBUG_ASSERT(sandbox_buffer_.is_valid());
-    // Try to commit all of the pages ahead of time to avoid page faulting on each one while
-    // decompressing.
-    if (zx_status_t status = sandbox_buffer_.op_range(
-            ZX_VMO_OP_COMMIT, 0, fbl::round_up(mapping.decompressed_length, kBlobfsBlockSize),
-            nullptr, 0);
-        status != ZX_OK) {
-      FX_LOGS(INFO) << "Failed to pre-commit sanboxed buffer pages: "
-                    << zx_status_get_string(status);
-      ZX_DEBUG_ASSERT(false);
-    }
-    auto decommit_sandbox = fit::defer([this, length = mapping.decompressed_length]() {
-      // Decommit pages in the sandbox buffer that might have been populated. All blobs share
-      // the same sandbox buffer - this prevents data leaks between different blobs.
-      sandbox_buffer_.op_range(ZX_VMO_OP_DECOMMIT, 0, fbl::round_up(length, kBlobfsBlockSize),
-                               nullptr, 0);
-    });
-    ExternalSeekableDecompressor decompressor(decompressor_client_.get(),
-                                              info.decompressor->algorithm());
-    decompress_status = decompressor.DecompressRange(
-        offset_of_compressed_data, mapping.compressed_length, mapping.decompressed_length);
-    if (decompress_status == ZX_OK) {
-      zx_status_t read_status =
-          sandbox_buffer_.read(decompressed_mapper.start(), 0, mapping.decompressed_length);
-      if (read_status != ZX_OK) {
-        FX_LOGS(ERROR) << "TransferChunked: Failed to copy from sandbox buffer: "
-                       << zx_status_get_string(read_status);
-        return ToPagerErrorStatus(read_status);
-      }
-    }
-    if (decompress_status != ZX_OK) {
-      FX_LOGS(ERROR) << "TransferChunked: Failed to decompress for blob " << info.verifier->digest()
-                     << ": " << zx_status_get_string(decompress_status);
-      return ToPagerErrorStatus(decompress_status);
-    }
-    metrics_->paged_read_metrics().IncrementDecompression(CompressionAlgorithm::kChunked,
-                                                          decompressed_size, ticker.End());
 
     // Verify the decompressed pages.
-    const uint64_t rounded_length =
-        fbl::round_up<uint64_t, uint64_t>(mapping.decompressed_length, PAGE_SIZE);
     zx_status_t status =
         info.verifier->VerifyPartial(decompressed_mapper.start(), mapping.decompressed_length,
-                                     mapping.decompressed_offset, rounded_length);
+                                     mapping.decompressed_offset, page_aligned_decompressed_length);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "TransferChunked: Failed to verify data for blob "
                      << info.verifier->digest() << ": " << zx_status_get_string(status);
       return ToPagerErrorStatus(status);
     }
-
     decompressed_mapper.Unmap();
 
     // Move the pages from the decompression buffer to the destination VMO.
-    if (auto status =
-            page_supplier(mapping.decompressed_offset, rounded_length, decompression_buffer_, 0);
+    if (auto status = page_supplier(mapping.decompressed_offset, page_aligned_decompressed_length,
+                                    decompression_buffer_, 0);
         status.is_error()) {
       FX_LOGS(ERROR) << "TransferChunked: Failed to supply pages to paged VMO for blob "
                      << info.verifier->digest() << ": " << status.status_string();
       return ToPagerErrorStatus(status.error_value());
     }
+    // All of the pages were transferred out of the decompressed buffer, they no longer need to be
+    // decommitted.
+    decommit_decompressed.cancel();
     metrics_->IncrementPageIn(merkle_root_hash, read_offset, read_len);
 
     // Advance the required decompressed offset based on how much has already been populated.
