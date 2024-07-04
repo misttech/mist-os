@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{selinux_hooks, ResolvedElfState, ThreadGroupState};
-use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
+use super::{selinux_hooks, ResolvedElfState, TaskState};
+use crate::task::{CurrentTask, Task};
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, ValueOrSize};
 
 use selinux::security_server::SecurityServer;
@@ -83,17 +83,27 @@ where
     })
 }
 
-/// Returns an `ThreadGroupState` instance for a new task.
-pub fn alloc_security(kernel: &Kernel, parent: Option<&ThreadGroupState>) -> ThreadGroupState {
-    ThreadGroupState(if kernel.security_server.is_none() {
-        selinux_hooks::ThreadGroupState::for_selinux_disabled()
-    } else {
-        selinux_hooks::alloc_security(parent.map(|tgs| &tgs.0))
-    })
+/// Return `TaskState` for specific kinds of kernel task.
+// Ideally we'd have a single `task_alloc()` that updates a target `Task` based on optional `CurrentTask`, PID, etc.
+pub fn task_alloc_for_kernel() -> TaskState {
+    TaskState(selinux_hooks::TaskState::for_kernel())
+}
+pub fn task_alloc_for_init() -> TaskState {
+    // TODO(b/350975345): Return value based on the "init" initial SID.
+    TaskState(selinux_hooks::TaskState::for_kernel())
 }
 
-fn get_current_sid(thread_group: &Arc<ThreadGroup>) -> SecurityId {
-    thread_group.read().security_state.0.current_sid
+/// Returns `TaskState` for a new `Task`, based on that of the current `Task`, and the specified clone flags.
+pub fn task_alloc(current_task: &CurrentTask, clone_flags: u64) -> TaskState {
+    TaskState(run_if_selinux_else(
+        current_task,
+        |_| selinux_hooks::task_alloc(&current_task.read().security_state.0, clone_flags),
+        || selinux_hooks::TaskState::for_selinux_disabled(),
+    ))
+}
+
+fn get_current_sid(task: &Task) -> SecurityId {
+    task.read().security_state.0.current_sid
 }
 
 /// Returns the serialized Security Context associated with the specified task.
@@ -103,7 +113,7 @@ pub fn get_task_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
     run_if_selinux_else(
         current_task,
         |security_server| {
-            let sid = get_current_sid(&target.thread_group);
+            let sid = get_current_sid(&target);
             Ok(security_server.sid_to_security_context(sid).unwrap_or_default())
         },
         || error!(ENOTSUP),
@@ -113,7 +123,7 @@ pub fn get_task_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
 /// Check if creating a task is allowed.
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
     check_if_selinux(current_task, |security_server| {
-        let sid = get_current_sid(&current_task.thread_group);
+        let sid = get_current_sid(&current_task);
         selinux_hooks::check_task_create_access(&security_server.as_permission_check(), sid)
     })
 }
@@ -125,7 +135,7 @@ pub fn check_exec_access(
 ) -> Result<Option<ResolvedElfState>, Errno> {
     check_if_selinux(current_task, |security_server| {
         let executable_sid = executable_node.effective_sid(current_task);
-        let group_state = current_task.thread_group.read();
+        let group_state = current_task.read();
         selinux_hooks::check_exec_access(
             &security_server,
             &group_state.security_state.0,
@@ -141,9 +151,9 @@ pub fn update_state_on_exec(
     elf_security_state: &Option<ResolvedElfState>,
 ) {
     run_if_selinux(current_task, |_| {
-        let mut thread_group_state = current_task.thread_group.write();
+        let mut task_state = current_task.write();
         selinux_hooks::update_state_on_exec(
-            &mut thread_group_state.security_state.0,
+            &mut task_state.security_state.0,
             elf_security_state.as_ref().map(|s| s.0),
         );
     });
@@ -152,10 +162,10 @@ pub fn update_state_on_exec(
 /// Checks if `source` may exercise the "getsched" permission on `target`.
 pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        // TODO(b/323856891): Consider holding `source.thread_group` and `target.thread_group`
+        // TODO(b/323856891): Consider holding `source` and `target`
         // read locks for duration of access check.
-        let source_sid = get_current_sid(&source.thread_group);
-        let target_sid = get_current_sid(&target.thread_group);
+        let source_sid = get_current_sid(&source);
+        let target_sid = get_current_sid(&target);
         selinux_hooks::check_getsched_access(
             &security_server.as_permission_check(),
             source_sid,
@@ -167,8 +177,8 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 /// Checks if setsched is allowed.
 pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source.thread_group);
-        let target_sid = get_current_sid(&target.thread_group);
+        let source_sid = get_current_sid(&source);
+        let target_sid = get_current_sid(&target);
         selinux_hooks::check_setsched_access(
             &security_server.as_permission_check(),
             source_sid,
@@ -180,8 +190,8 @@ pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 /// Checks if getpgid is allowed.
 pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source.thread_group);
-        let target_sid = get_current_sid(&target.thread_group);
+        let source_sid = get_current_sid(&source);
+        let target_sid = get_current_sid(&target);
         selinux_hooks::check_getpgid_access(
             &security_server.as_permission_check(),
             source_sid,
@@ -193,8 +203,8 @@ pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 /// Checks if setpgid is allowed.
 pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source.thread_group);
-        let target_sid = get_current_sid(&target.thread_group);
+        let source_sid = get_current_sid(&source);
+        let target_sid = get_current_sid(&target);
         selinux_hooks::check_setpgid_access(
             &security_server.as_permission_check(),
             source_sid,
@@ -207,8 +217,8 @@ pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 /// Corresponds to the `task_getsid` LSM hook.
 pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source.thread_group);
-        let target_sid = get_current_sid(&target.thread_group);
+        let source_sid = get_current_sid(&source);
+        let target_sid = get_current_sid(&target);
         selinux_hooks::check_permissions(
             &security_server.as_permission_check(),
             source_sid,
@@ -225,8 +235,8 @@ pub fn check_signal_access(
     signal: Signal,
 ) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source.thread_group);
-        let target_sid = get_current_sid(&target.thread_group);
+        let source_sid = get_current_sid(&source);
+        let target_sid = get_current_sid(&target);
         selinux_hooks::check_signal_access(
             &security_server.as_permission_check(),
             source_sid,
@@ -239,11 +249,11 @@ pub fn check_signal_access(
 /// Checks if sending a signal is allowed.
 pub fn check_signal_access_tg(
     source: &CurrentTask,
-    target: &Arc<ThreadGroup>,
+    target: &Task,
     signal: Signal,
 ) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source.thread_group);
+        let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(target);
         selinux_hooks::check_signal_access(
             &security_server.as_permission_check(),
@@ -254,45 +264,37 @@ pub fn check_signal_access_tg(
     })
 }
 
-/// Checks if tracing the current task is allowed, and update the thread group SELinux state to
-/// store the tracer SID.
-pub fn check_ptrace_traceme_access_and_update_state(
-    parent: &Arc<ThreadGroup>,
-    current_task: &CurrentTask,
-) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
-        let tracer_sid = get_current_sid(parent);
-        let mut thread_group_state = current_task.thread_group.write();
-        selinux_hooks::check_ptrace_access_and_update_state(
+// Checks whether the `parent_tracer_task` is allowed to trace the current `tracee_task`.
+pub fn ptrace_traceme(tracee_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
+    check_if_selinux(tracee_task, |security_server| {
+        selinux_hooks::ptrace_access_check(
             &security_server.as_permission_check(),
-            tracer_sid,
-            &mut thread_group_state.security_state.0,
+            get_current_sid(&parent_tracer_task),
+            &mut tracee_task.write().security_state.0,
         )
     })
 }
 
-/// Checks if `current_task` is allowed to trace `tracee_task`, and update the thread group SELinux
-/// state to store the tracer SID.
-pub fn check_ptrace_attach_access_and_update_state(
-    current_task: &CurrentTask,
-    tracee_task: &Task,
-) -> Result<(), Errno> {
-    check_if_selinux(current_task, |security_server| {
-        let tracer_sid = get_current_sid(&current_task.thread_group);
-        let mut thread_group_state = tracee_task.thread_group.write();
-        selinux_hooks::check_ptrace_access_and_update_state(
+/// Checks whether the current `tracer_task` is allowed to trace `tracee_task`.
+/// This fills the role of both of the LSM `ptrace_traceme` and `ptrace_access_check` hooks.
+pub fn ptrace_access_check(tracer_task: &CurrentTask, tracee_task: &Task) -> Result<(), Errno> {
+    check_if_selinux(tracer_task, |security_server| {
+        let tracer_sid = get_current_sid(&tracer_task);
+        let mut task_state = tracee_task.write();
+        selinux_hooks::ptrace_access_check(
             &security_server.as_permission_check(),
             tracer_sid,
-            &mut thread_group_state.security_state.0,
+            &mut task_state.security_state.0,
         )
     })
 }
 
 /// Clears the `ptrace_sid` for `tracee_task`.
+// TODO: Fix ptrace checks to rely on `Task::ptrace` state, and remove this.
 pub fn clear_ptracer_sid(tracee_task: &Task) {
     run_if_selinux(tracee_task, |_| {
-        let mut thread_group_state = tracee_task.thread_group.write();
-        thread_group_state.security_state.0.ptracer_sid = None;
+        let mut task_state = tracee_task.write();
+        task_state.security_state.0.ptracer_sid = None;
     });
 }
 
@@ -338,8 +340,8 @@ pub fn get_procattr(
         |security_server| {
             selinux_hooks::get_procattr(
                 security_server,
-                get_current_sid(&current_task.thread_group),
-                &target.thread_group.read().security_state.0,
+                get_current_sid(&current_task),
+                &target.read().security_state.0,
                 attr,
             )
         },
@@ -364,11 +366,11 @@ pub fn set_procattr(
     check_if_selinux_else(
         current_task,
         |security_server| {
-            let mut thread_group_state = current_task.thread_group.write();
+            let mut task_state = current_task.write();
             selinux_hooks::set_procattr(
                 security_server,
-                thread_group_state.security_state.0.current_sid,
-                &mut thread_group_state.security_state.0,
+                task_state.security_state.0.current_sid,
+                &mut task_state.security_state.0,
                 attr,
                 context,
             )
@@ -554,10 +556,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn alloc_security_selinux_disabled() {
-        let (kernel, _current_task) = create_kernel_and_task();
+    async fn task_alloc_selinux_disabled() {
+        let (_kernel, current_task) = create_kernel_and_task();
 
-        alloc_security(&kernel, None);
+        task_alloc(&current_task, 0);
     }
 
     fn failing_hook(_: &Arc<SecurityServer>) -> Result<(), Errno> {
@@ -656,14 +658,14 @@ mod tests {
 
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
-        let kernel_sid = SecurityId::initial(InitialSid::Kernel);
-        let elf_state = ResolvedElfState(kernel_sid);
+        let target_sid = SecurityId::initial(InitialSid::Unlabeled);
+        let elf_state = ResolvedElfState(target_sid);
 
-        assert!(task.thread_group.read().security_state.0.current_sid != kernel_sid);
+        assert!(task.read().security_state.0.current_sid != target_sid);
 
-        let before_hook_sid = task.thread_group.read().security_state.0.current_sid;
+        let before_hook_sid = task.read().security_state.0.current_sid;
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(task.thread_group.read().security_state.0.current_sid, before_hook_sid);
+        assert_eq!(task.read().security_state.0.current_sid, before_hook_sid);
     }
 
     #[fuchsia::test]
@@ -674,21 +676,21 @@ mod tests {
 
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
-        let initial_state = selinux_hooks::ThreadGroupState::for_kernel();
+        let initial_state = selinux_hooks::TaskState::for_kernel();
         let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
         let elf_state = ResolvedElfState(elf_sid);
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(task.thread_group.read().security_state.0, initial_state);
+        assert_eq!(task.read().security_state.0, initial_state);
     }
 
     #[fuchsia::test]
     async fn state_update_for_fake_mode() {
         let security_server = security_server_with_policy(Mode::Fake);
-        let initial_state = selinux_hooks::ThreadGroupState::for_kernel();
+        let initial_state = selinux_hooks::TaskState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
         let mut task = task;
-        task.thread_group.write().security_state.0 = initial_state.clone();
+        task.write().security_state.0 = initial_state.clone();
 
         let elf_sid = kernel
             .security_server
@@ -699,17 +701,17 @@ mod tests {
         let elf_state = ResolvedElfState(elf_sid);
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(task.thread_group.read().security_state.0.current_sid, elf_sid);
+        assert_eq!(task.read().security_state.0.current_sid, elf_sid);
     }
 
     #[fuchsia::test]
     async fn state_update_for_permissive_mode() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
-        let initial_state = selinux_hooks::ThreadGroupState::for_kernel();
+        let initial_state = selinux_hooks::TaskState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
         let mut task = task;
-        task.thread_group.write().security_state.0 = initial_state.clone();
+        task.write().security_state.0 = initial_state.clone();
         let elf_sid = kernel
             .security_server
             .as_ref()
@@ -719,7 +721,7 @@ mod tests {
         let elf_state = ResolvedElfState(elf_sid);
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut task, &Some(elf_state));
-        assert_eq!(task.thread_group.read().security_state.0.current_sid, elf_sid);
+        assert_eq!(task.read().security_state.0.current_sid, elf_sid);
     }
 
     #[fuchsia::test]
@@ -833,46 +835,37 @@ mod tests {
     #[fuchsia::test]
     async fn ptrace_traceme_access_allowed_for_selinux_disabled() {
         let (tracee_task, tracer_task) = create_task_pair_with_selinux_disabled();
-        assert_eq!(
-            check_ptrace_traceme_access_and_update_state(&tracer_task.thread_group, &tracee_task),
-            Ok(())
-        );
+        assert_eq!(ptrace_traceme(&tracee_task, &tracer_task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn ptrace_traceme_access_allowed_for_fake_mode() {
         let (tracee_task, tracer_task) = create_task_pair_with_fake_selinux();
-        assert_eq!(
-            check_ptrace_traceme_access_and_update_state(&tracer_task.thread_group, &tracee_task),
-            Ok(())
-        );
+        assert_eq!(ptrace_traceme(&tracee_task, &tracer_task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn ptrace_traceme_access_allowed_for_permissive_mode() {
         let (tracee_task, tracer_task) = create_task_pair_with_permissive_selinux();
-        assert_eq!(
-            check_ptrace_traceme_access_and_update_state(&tracer_task.thread_group, &tracee_task),
-            Ok(())
-        );
+        assert_eq!(ptrace_traceme(&tracee_task, &tracer_task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn ptrace_attach_access_allowed_for_selinux_disabled() {
         let (tracer_task, tracee_task) = create_task_pair_with_selinux_disabled();
-        assert_eq!(check_ptrace_attach_access_and_update_state(&tracer_task, &tracee_task), Ok(()));
+        assert_eq!(ptrace_access_check(&tracer_task, &tracee_task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn ptrace_attach_access_allowed_for_fake_mode() {
         let (tracer_task, tracee_task) = create_task_pair_with_fake_selinux();
-        assert_eq!(check_ptrace_attach_access_and_update_state(&tracer_task, &tracee_task), Ok(()));
+        assert_eq!(ptrace_access_check(&tracer_task, &tracee_task), Ok(()));
     }
 
     #[fuchsia::test]
     async fn ptrace_attach_access_allowed_for_permissive_mode() {
         let (tracer_task, tracee_task) = create_task_pair_with_permissive_selinux();
-        assert_eq!(check_ptrace_attach_access_and_update_state(&tracer_task, &tracee_task), Ok(()));
+        assert_eq!(ptrace_access_check(&tracer_task, &tracee_task), Ok(()));
     }
 
     #[fuchsia::test]
@@ -880,11 +873,11 @@ mod tests {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, tracee_task) = create_kernel_and_task_with_selinux(security_server);
-        tracee_task.thread_group.write().security_state.0.ptracer_sid =
+        tracee_task.write().security_state.0.ptracer_sid =
             Some(SecurityId::initial(InitialSid::Unlabeled));
 
         clear_ptracer_sid(tracee_task.as_ref());
-        assert!(tracee_task.thread_group.read().security_state.0.ptracer_sid.is_none());
+        assert!(tracee_task.read().security_state.0.ptracer_sid.is_none());
     }
 
     #[fuchsia::test]
@@ -1155,11 +1148,11 @@ mod tests {
 
         // Clear the "exec" context with a write containing a single null octet.
         assert_eq!(set_procattr(&current_task, ProcAttr::Exec, b"\0"), Ok(()));
-        assert_eq!(current_task.thread_group.read().security_state.0.exec_sid, None);
+        assert_eq!(current_task.read().security_state.0.exec_sid, None);
 
         // Clear the "fscreate" context with a write containing a single newline.
         assert_eq!(set_procattr(&current_task, ProcAttr::Exec, b"\x0a"), Ok(()));
-        assert_eq!(current_task.thread_group.read().security_state.0.fscreate_sid, None);
+        assert_eq!(current_task.read().security_state.0.fscreate_sid, None);
     }
 
     #[fuchsia::test]

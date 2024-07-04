@@ -4,6 +4,7 @@
 
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
 use crate::mutable_state::{state_accessor, state_implementation};
+use crate::security;
 use crate::signals::{RunState, SignalInfo, SignalState};
 use crate::task::{
     set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
@@ -384,6 +385,9 @@ pub struct TaskMutableState {
 
     /// Information that a tracer needs to inspect this process.
     pub captured_thread_state: Option<CapturedThreadState>,
+
+    /// The Linux Security Modules state for this thread group.
+    pub security_state: security::TaskState,
 }
 
 impl TaskMutableState {
@@ -1058,6 +1062,7 @@ impl Task {
         seccomp_filters: SeccompFilterContainer,
         robust_list_head: UserRef<robust_list_head>,
         timerslack_ns: u64,
+        security_state: security::TaskState,
     ) -> Self {
         let pid = thread_group.leader;
         let task = Task {
@@ -1087,6 +1092,7 @@ impl Task {
                 default_timerslack_ns: timerslack_ns,
                 ptrace: None,
                 captured_thread_state: None,
+                security_state,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,

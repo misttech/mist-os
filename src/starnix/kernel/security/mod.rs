@@ -24,7 +24,7 @@ pub use hooks::*;
 
 /// Opaque structure encapsulating security state for a `ThreadGroup`.
 #[derive(Debug)]
-pub struct ThreadGroupState(selinux_hooks::ThreadGroupState);
+pub struct TaskState(selinux_hooks::TaskState);
 
 /// Opaque structure holding security state associated with a `ResolvedElf` instance.
 #[derive(Debug, PartialEq)]

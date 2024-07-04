@@ -31,7 +31,7 @@ pub(super) fn check_task_create_access(
 /// elf if all required permissions are allowed.
 pub(super) fn check_exec_access(
     security_server: &Arc<SecurityServer>,
-    security_state: &ThreadGroupState,
+    security_state: &TaskState,
     executable_sid: SecurityId,
 ) -> Result<Option<SecurityId>, Errno> {
     let current_sid = security_state.current_sid;
@@ -69,6 +69,7 @@ pub(super) fn check_exec_access(
             log_debug!("entrypoint permission is denied, ignoring.");
         }
         // Check that ptrace permission is allowed if the process is traced.
+        // TODO: Perform this check based on the `Task::ptrace` state.
         if let Some(ptracer_sid) = security_state.ptracer_sid {
             if !security_server.has_permissions(ptracer_sid, new_sid, &[ProcessPermission::Ptrace])
             {
@@ -82,7 +83,7 @@ pub(super) fn check_exec_access(
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
 pub(super) fn update_state_on_exec(
-    security_state: &mut ThreadGroupState,
+    security_state: &mut TaskState,
     elf_security_state: Option<SecurityId>,
 ) {
     // TODO(http://b/316181721): check if the previous state needs to be updated regardless.
@@ -174,10 +175,10 @@ pub(super) fn check_signal_access(
 }
 
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.
-pub(super) fn check_ptrace_access_and_update_state(
+pub(super) fn ptrace_access_check(
     permission_check: &impl PermissionCheck,
     tracer_sid: SecurityId,
-    tracee_security_state: &mut ThreadGroupState,
+    tracee_security_state: &mut TaskState,
 ) -> Result<(), Errno> {
     check_permissions(
         permission_check,
@@ -187,6 +188,7 @@ pub(super) fn check_ptrace_access_and_update_state(
     )
     .and_then(|_| {
         // If tracing is allowed, set the `ptracer_sid` of the tracee with the tracer's SID.
+        // TODO: Remove this, and rely on `Task::ptrace` instead.
         tracee_security_state.ptracer_sid = Some(tracer_sid);
         Ok(())
     })
@@ -197,7 +199,7 @@ pub(super) fn check_ptrace_access_and_update_state(
 pub fn get_procattr(
     security_server: &SecurityServer,
     _source: SecurityId,
-    target: &ThreadGroupState,
+    target: &TaskState,
     attr: ProcAttr,
 ) -> Result<Vec<u8>, Errno> {
     // TODO(b/322849067): Validate that the `source` has the required access.
@@ -219,7 +221,7 @@ pub fn get_procattr(
 pub fn set_procattr(
     security_server: &Arc<SecurityServer>,
     source: SecurityId,
-    target: &mut ThreadGroupState,
+    target: &mut TaskState,
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
@@ -285,17 +287,14 @@ pub(super) fn check_permissions<P: ClassPermission + Into<Permission> + Clone + 
     }
 }
 
-/// Returns a `ThreadGroupState` instance for a new task.
-pub(super) fn alloc_security(parent: Option<&ThreadGroupState>) -> ThreadGroupState {
-    match parent {
-        Some(parent) => parent.clone(),
-        None => ThreadGroupState::for_kernel(),
-    }
+/// Returns `TaskState` for a new `Task`, based on the `parent` state, and the specified clone flags.
+pub(super) fn task_alloc(parent: &TaskState, _clone_flags: u64) -> TaskState {
+    parent.clone()
 }
 
 /// The SELinux security structure for `ThreadGroup`.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct ThreadGroupState {
+pub(super) struct TaskState {
     /// Current SID for the task.
     pub current_sid: SecurityId,
 
@@ -318,7 +317,7 @@ pub(super) struct ThreadGroupState {
     pub ptracer_sid: Option<SecurityId>,
 }
 
-impl ThreadGroupState {
+impl TaskState {
     /// Returns initial state for the kernel's root thread group.
     pub(super) fn for_kernel() -> Self {
         Self {
@@ -398,7 +397,7 @@ mod tests {
         let executable_sid = security_server
             .security_context_to_sid(b"u:object_r:executable_file_trans_t:s0")
             .expect("invalid security context");
-        let security_state = ThreadGroupState {
+        let security_state = TaskState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -426,7 +425,7 @@ mod tests {
         let executable_sid = security_server
             .security_context_to_sid(b"u:object_r:executable_file_trans_t:s0")
             .expect("invalid security context");
-        let security_state = ThreadGroupState {
+        let security_state = TaskState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -456,7 +455,7 @@ mod tests {
         let executable_sid = security_server
             .security_context_to_sid(b"u:object_r:executable_file_trans_no_entrypoint_t:s0")
             .expect("invalid security context");
-        let security_state = ThreadGroupState {
+        let security_state = TaskState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -482,7 +481,7 @@ mod tests {
         let executable_sid = security_server
             .security_context_to_sid(b"u:object_r:executable_file_no_trans_t:s0")
             .expect("invalid security context");
-        let security_state = ThreadGroupState {
+        let security_state = TaskState {
             current_sid: current_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -509,7 +508,7 @@ mod tests {
         let executable_sid = security_server
             .security_context_to_sid(b"u:object_r:executable_file_no_trans_t:s0")
             .expect("invalid security context");
-        let security_state = ThreadGroupState {
+        let security_state = TaskState {
             current_sid: current_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -529,7 +528,7 @@ mod tests {
 
     #[fuchsia::test]
     fn no_state_update_if_no_elf_state() {
-        let initial_state = ThreadGroupState::for_kernel();
+        let initial_state = TaskState::for_kernel();
         let mut security_state = initial_state.clone();
         update_state_on_exec(&mut security_state, None);
         assert_eq!(security_state, initial_state);
@@ -538,7 +537,7 @@ mod tests {
     #[fuchsia::test]
     fn state_is_updated_on_exec() {
         let security_server = security_server_with_policy();
-        let initial_state = ThreadGroupState::for_kernel();
+        let initial_state = TaskState::for_kernel();
         let mut security_state = initial_state.clone();
 
         let elf_sid = security_server
@@ -548,7 +547,7 @@ mod tests {
         update_state_on_exec(&mut security_state, Some(elf_sid));
         assert_eq!(
             security_state,
-            ThreadGroupState {
+            TaskState {
                 current_sid: elf_sid,
                 exec_sid: initial_state.exec_sid,
                 fscreate_sid: initial_state.fscreate_sid,
@@ -774,8 +773,8 @@ mod tests {
         let tracee_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
             .expect("invalid security context");
-        let initial_state = ThreadGroupState {
-            current_sid: tracee_sid.clone(),
+        let initial_state = TaskState {
+            current_sid: tracee_sid,
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
@@ -786,16 +785,16 @@ mod tests {
         let mut tracee_state = initial_state.clone();
 
         assert_eq!(
-            check_ptrace_access_and_update_state(
+            ptrace_access_check(
                 &security_server.as_permission_check(),
-                tracer_sid.clone(),
+                tracer_sid,
                 &mut tracee_state
             ),
             Ok(())
         );
         assert_eq!(
             tracee_state,
-            ThreadGroupState {
+            TaskState {
                 current_sid: initial_state.current_sid,
                 exec_sid: initial_state.exec_sid,
                 fscreate_sid: initial_state.fscreate_sid,
@@ -816,8 +815,8 @@ mod tests {
         let tracee_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
             .expect("invalid security context");
-        let initial_state = ThreadGroupState {
-            current_sid: tracee_sid.clone(),
+        let initial_state = TaskState {
+            current_sid: tracee_sid,
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
@@ -828,7 +827,7 @@ mod tests {
         let mut tracee_state = initial_state.clone();
 
         assert_eq!(
-            check_ptrace_access_and_update_state(
+            ptrace_access_check(
                 &security_server.as_permission_check(),
                 tracer_sid,
                 &mut tracee_state
@@ -839,33 +838,31 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn alloc_security_no_parent() {
-        let security_state = alloc_security(None);
-        assert_eq!(
-            security_state,
-            ThreadGroupState {
-                current_sid: SecurityId::initial(InitialSid::Kernel),
-                previous_sid: SecurityId::initial(InitialSid::Kernel),
-                exec_sid: None,
-                fscreate_sid: None,
-                keycreate_sid: None,
-                sockcreate_sid: None,
-                ptracer_sid: None,
-            }
-        );
+    fn task_alloc_from_parent() {
+        // Create a fake parent state, with values for some fields, to check for.
+        let parent_security_state = TaskState {
+            current_sid: SecurityId::initial(InitialSid::Unlabeled),
+            previous_sid: SecurityId::initial(InitialSid::Kernel),
+            exec_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
+            fscreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
+            keycreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
+            sockcreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
+            ptracer_sid: None,
+        };
+
+        let security_state = task_alloc(&parent_security_state, 0);
+        assert_eq!(security_state, parent_security_state);
     }
 
     #[fuchsia::test]
-    async fn alloc_security_from_parent() {
-        // Create a fake parent state, with values for some fields, to check for.
-        let mut parent_security_state = alloc_security(None);
-        parent_security_state.current_sid = SecurityId::initial(InitialSid::Unlabeled);
-        parent_security_state.exec_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-        parent_security_state.fscreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-        parent_security_state.keycreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-        parent_security_state.sockcreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-
-        let security_state = alloc_security(Some(&parent_security_state));
-        assert_eq!(security_state, parent_security_state);
+    fn task_alloc_for() {
+        let for_kernel = TaskState::for_kernel();
+        assert_eq!(for_kernel.current_sid, SecurityId::initial(InitialSid::Kernel));
+        assert_eq!(for_kernel.previous_sid, for_kernel.current_sid);
+        assert_eq!(for_kernel.exec_sid, None);
+        assert_eq!(for_kernel.fscreate_sid, None);
+        assert_eq!(for_kernel.keycreate_sid, None);
+        assert_eq!(for_kernel.sockcreate_sid, None);
+        assert_eq!(for_kernel.ptracer_sid, None);
     }
 }

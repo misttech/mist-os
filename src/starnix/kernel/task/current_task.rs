@@ -1184,6 +1184,8 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
+            // TODO: Validate whether we need to use `task_alloc()` with the `init_task` state here.
+            security::task_alloc_for_init(),
         )?;
         {
             let mut init_writer = init_task.thread_group.write();
@@ -1250,6 +1252,7 @@ impl CurrentTask {
             },
             Credentials::root(),
             rlimits,
+            security::task_alloc_for_init(),
         )
     }
 
@@ -1292,6 +1295,7 @@ impl CurrentTask {
                 );
                 Ok(TaskInfo { thread: None, thread_group, memory_manager })
             },
+            security::task_alloc_for_kernel(),
         )?;
         Ok(builder.into())
     }
@@ -1302,6 +1306,7 @@ impl CurrentTask {
         initial_name: CString,
         root_fs: Arc<FsContext>,
         task_info_factory: F,
+        security_state: security::TaskState,
     ) -> Result<TaskBuilder, Errno>
     where
         F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
@@ -1320,6 +1325,7 @@ impl CurrentTask {
             task_info_factory,
             Credentials::root(),
             &[],
+            security_state,
         )
     }
 
@@ -1333,6 +1339,7 @@ impl CurrentTask {
         task_info_factory: F,
         creds: Credentials,
         rlimits: &[(Resource, u64)],
+        security_state: security::TaskState,
     ) -> Result<TaskBuilder, Errno>
     where
         F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
@@ -1376,6 +1383,7 @@ impl CurrentTask {
                 SeccompFilterContainer::default(),
                 UserAddress::NULL.into(),
                 default_timerslack,
+                security_state,
             )),
             thread_state: Default::default(),
         };
@@ -1414,11 +1422,13 @@ impl CurrentTask {
         let scheduler_policy;
         let uts_ns;
         let default_timerslack_ns;
+        let security_state;
         {
             let state = system_task.read();
             scheduler_policy = state.scheduler_policy;
             uts_ns = state.uts_ns.clone();
             default_timerslack_ns = state.default_timerslack_ns;
+            security_state = security::task_alloc_for_kernel();
         }
 
         let current_task: CurrentTask = TaskBuilder::new(Task::new(
@@ -1442,6 +1452,7 @@ impl CurrentTask {
             SeccompFilterContainer::default(),
             UserAddress::NULL.into(),
             default_timerslack_ns,
+            security_state,
         ))
         .into();
         release_on_error!(current_task, locked, {
@@ -1574,6 +1585,7 @@ impl CurrentTask {
         let robust_list_head = UserAddress::NULL.into();
         let child_signal_mask;
         let timerslack_ns;
+        let security_state = security::task_alloc(&self, flags);
 
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
@@ -1654,6 +1666,7 @@ impl CurrentTask {
             seccomp_filters,
             robust_list_head,
             timerslack_ns,
+            security_state,
         ));
 
         release_on_error!(child, locked, {

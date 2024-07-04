@@ -105,9 +105,6 @@ pub struct ThreadGroupMutableState {
 
     pub terminating: bool,
 
-    /// The Linux Security Modules state for this thread group.
-    pub security_state: security::ThreadGroupState,
-
     /// Time statistics accumulated from the children.
     pub children_time_stats: TaskTimeStats,
 
@@ -372,8 +369,7 @@ impl ThreadGroup {
     {
         let timers = TimerTable::new();
         let itimer_real_id = timers.create(Timeline::RealTime, None).unwrap();
-        let security_state =
-            security::alloc_security(&kernel, parent.as_ref().map(|p| &p.security_state));
+
         let mut thread_group = ThreadGroup {
             kernel,
             process,
@@ -406,7 +402,6 @@ impl ThreadGroup {
                 last_signal: None,
                 leader_exit_info: None,
                 terminating: false,
-                security_state,
                 children_time_stats: Default::default(),
                 personality: parent.as_ref().map(|p| p.personality).unwrap_or(Default::default()),
                 allowed_ptracers: PtraceAllowedPtracers::None,
@@ -1367,21 +1362,19 @@ impl ThreadGroup {
         // Pick an arbitrary task in thread_group to check permissions.
         //
         // Tasks can technically have different credentials, but in practice they are kept in sync.
-        {
-            let state = self.read();
-            let target_task = state.get_live_task()?;
-            if !current_task.can_signal(&target_task, unchecked_signal) {
-                return error!(EPERM);
-            }
+        let state = self.read();
+        let target_task = state.get_live_task()?;
+        if !current_task.can_signal(&target_task, unchecked_signal) {
+            return error!(EPERM);
+        }
 
-            // 0 is a sentinel value used to do permission checks.
-            if unchecked_signal.is_zero() {
-                return Ok(None);
-            }
+        // 0 is a sentinel value used to do permission checks.
+        if unchecked_signal.is_zero() {
+            return Ok(None);
         }
 
         let signal = Signal::try_from(unchecked_signal)?;
-        security::check_signal_access_tg(current_task, self, signal)?;
+        security::check_signal_access_tg(current_task, &target_task, signal)?;
 
         Ok(Some(signal))
     }
