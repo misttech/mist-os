@@ -345,6 +345,7 @@ class VnodeF2fs : public fs::PagedVnode,
   const VmoManager &GetVmoManager() const { return vmo_manager(); }
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
   zx_status_t InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
+  void CleanupPages();
 
   // for testing
   void ResetFileCache() { file_cache_->Reset(); }

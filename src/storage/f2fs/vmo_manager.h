@@ -106,7 +106,7 @@ class VmoManager {
   ~VmoManager() { Reset(true); }
 
   zx::result<bool> CreateAndLockVmo(pgoff_t index, void **out = nullptr) __TA_EXCLUDES(mutex_);
-  zx_status_t UnlockVmo(pgoff_t index, bool evict) __TA_EXCLUDES(mutex_);
+  zx_status_t UnlockVmo(pgoff_t index) __TA_EXCLUDES(mutex_);
   void ZeroBlocks(fs::PagedVfs &vfs, pgoff_t start, pgoff_t end) __TA_EXCLUDES(mutex_);
   zx::result<> WritebackBegin(fs::PagedVfs &vfs, const size_t start = 0,
                               const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
@@ -154,28 +154,6 @@ class VmoManager {
   const size_t node_size_ = 0;
   // a copy of paged vmo
   zx::vmo vmo_ __TA_GUARDED(mutex_);
-};
-
-// A utility class to hold a reference to vmo node for |index_| in |manager_|.
-class VmoHolder final {
- public:
-  VmoHolder() = delete;
-  VmoHolder(const VmoHolder &) = delete;
-  VmoHolder &operator=(const VmoHolder &) = delete;
-  VmoHolder(VmoHolder &&) = delete;
-  VmoHolder &operator=(VmoHolder &&) = delete;
-  explicit VmoHolder(VmoManager &manager, const pgoff_t index) : manager_(manager), index_(index) {
-    auto ret = manager_.CreateAndLockVmo(index_);
-    ZX_ASSERT_MSG(ret.is_ok(), "failed to get vmo node at %lu. %s", index_, ret.status_string());
-  }
-  ~VmoHolder() { ZX_ASSERT(manager_.UnlockVmo(index_, true) == ZX_OK); }
-
-  zx_status_t Read(void *data, uint64_t offset, size_t len);
-  zx_status_t Write(const void *data, uint64_t offset, size_t len);
-
- private:
-  VmoManager &manager_;
-  const pgoff_t index_;
 };
 
 // A utility class to notify kernel of start and end of writeback for a file vnode.

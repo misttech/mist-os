@@ -40,7 +40,7 @@ pgoff_t F2fs::FlushDirtyMetaPages(bool is_commit) {
   if (superblock_info_->GetPageCount(CountType::kDirtyMeta) == 0) {
     return 0;
   }
-  WritebackOperation operation;
+  WritebackOperation operation = {.bReleasePages = HasNotEnoughMemory()};
   if (is_commit) {
     operation.bSync = true;
     operation.page_cb = [](fbl::RefPtr<Page> page, bool is_last_page) {
@@ -325,7 +325,7 @@ zx::result<pgoff_t> F2fs::FlushDirtyNodePages(WritebackOperation &operation) {
 void F2fs::FlushDirsAndNodes() {
   do {
     // Write out all dirty dentry pages and remove orphans from dirty list.
-    WritebackOperation op;
+    WritebackOperation op = {.bReleasePages = HasNotEnoughMemory()};
     op.if_vnode = [](fbl::RefPtr<VnodeF2fs> &vnode) {
       if (vnode->IsDir() || !vnode->IsValid()) {
         return ZX_OK;
@@ -338,7 +338,7 @@ void F2fs::FlushDirsAndNodes() {
   // POR: we should ensure that there is no dirty node pages
   // until finishing nat/sit flush.
   do {
-    WritebackOperation op;
+    WritebackOperation op = {.bReleasePages = HasNotEnoughMemory()};
     auto ret = FlushDirtyNodePages(op);
     ZX_ASSERT_MSG(ret.is_ok(), "Failed to flush node pages (%ul) %s",
                   superblock_info_->GetPageCount(CountType::kDirtyNodes), ret.status_string());
@@ -475,7 +475,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     }
     GetSegmentManager().ClearPrefreeSegments();
     superblock_info.ClearDirty();
-    meta_vnode_->InvalidatePages();
+    meta_vnode_->CleanupPages();
     ClearVnodeSet();
   }
   return ZX_OK;
@@ -520,6 +520,10 @@ zx_status_t F2fs::WriteCheckpoint(bool blocked, bool is_umount) {
   }
   ZX_DEBUG_ASSERT(segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages());
   FlushDirsAndNodes();
+
+  if (is_umount) {
+    GetVCache().EvictInactiveVnodes();
+  }
 
   // update checkpoint pack index
   // Increase the version number so that

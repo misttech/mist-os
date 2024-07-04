@@ -19,24 +19,24 @@ class VnodeCache {
   // When a caller tries to look up a vnode that is being recyclyed,
   // it will be blocked until it gets inactive (deactivated) and
   // valid ref_count.
-  zx_status_t Lookup(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out);
+  zx_status_t Lookup(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out) __TA_EXCLUDES(table_lock_);
   zx_status_t LookupUnsafe(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out)
       __TA_REQUIRES(table_lock_);
 
   // It tries to evict |vnode| from vnode_table_.
   // It returns ZX_ERR_NOT_FOUND if it cannot find |vnode| in the table.
   // A caller should ensure that |vnode| does not exist in dirty_list_.
-  zx_status_t Evict(VnodeF2fs* vnode);
+  zx_status_t Evict(VnodeF2fs* vnode) __TA_EXCLUDES(table_lock_);
   zx_status_t EvictUnsafe(VnodeF2fs* vnode) __TA_REQUIRES(table_lock_);
 
   // It tries to add |vnode| to vnode_table_.
   // It returns ZX_ERR_ALREADY_EXISTS if it is already in the table.
-  zx_status_t Add(VnodeF2fs* vnode);
+  zx_status_t Add(VnodeF2fs* vnode) __TA_EXCLUDES(table_lock_);
 
   // It tries to add |vnode| to vnode_list_.
   // It returns ZX_ERR_ALREADY_EXISTS if |vnode| is already in the list.
-  zx_status_t AddDirty(VnodeF2fs& vnode);
-  bool IsDirty(VnodeF2fs& vnode);
+  zx_status_t AddDirty(VnodeF2fs& vnode) __TA_EXCLUDES(list_lock_);
+  bool IsDirty(VnodeF2fs& vnode) __TA_EXCLUDES(list_lock_);
   // It tries to remove |vnode| from dirty_list_.
   zx_status_t RemoveDirty(VnodeF2fs* vnode) __TA_EXCLUDES(list_lock_);
   zx_status_t RemoveDirtyUnsafe(VnodeF2fs* vnode) __TA_REQUIRES(list_lock_);
@@ -48,23 +48,26 @@ class VnodeCache {
 
   // It traverses dirty_lists and executes cb for the dirty vnodes with
   // which cb_if returns ZX_OK.
-  zx_status_t ForDirtyVnodesIf(VnodeCallback cb, VnodeCallback cb_if = nullptr);
+  zx_status_t ForDirtyVnodesIf(VnodeCallback cb, VnodeCallback cb_if = nullptr)
+      __TA_EXCLUDES(list_lock_);
 
   // It traverses vnode_tables and execute cb with every vnode.
-  zx_status_t ForAllVnodes(VnodeCallback callback);
+  zx_status_t ForAllVnodes(VnodeCallback callback) __TA_EXCLUDES(table_lock_);
+
+  // It evicts every inactive vnode.
+  void EvictInactiveVnodes() __TA_EXCLUDES(table_lock_);
 
   bool IsDirtyListEmpty() __TA_EXCLUDES(list_lock_) {
     bool ret = false;
     fs::SharedLock lock(list_lock_);
     ret = dirty_list_.is_empty();
-    ZX_ASSERT(ret == (ndirty_ == 0));
+    ZX_DEBUG_ASSERT(ret == (ndirty_ == 0));
     return ret;
   }
 
  private:
   // All vnode raw pointers including dirty vnodes are kept in vnode_table_, and invalid vnodes
   // (nlink_ = 0) are evicted in VnodeF2fs::Recycle() when they have no connection anymore.
-  // TODO(https://fxbug.dev/42070947): Eviction policy needs to consider memory pressure.
   using VnodeTableTraits = fbl::DefaultKeyedObjectTraits<ino_t, VnodeF2fs>;
   using VnodeTable = fbl::WAVLTree<ino_t, VnodeF2fs*, VnodeTableTraits>;
 

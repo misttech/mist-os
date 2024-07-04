@@ -68,7 +68,7 @@ void F2fs::StartMemoryPressureWatcher() {
           // release-acquire ordering with HasNotEnoughMemory() and NeedToWriteback().
           current_memory_pressure_level_.store(level, std::memory_order_release);
           if (level > prev_level) {
-            ScheduleWriteback();
+            ScheduleWritebackAndReclaimPages();
           }
           FX_LOGS(INFO) << "Memory pressure level: " << MemoryPressureWatcher::ToString(level);
         });
@@ -211,7 +211,7 @@ void F2fs::PutSuper() {
   Reset();
 }
 
-void F2fs::ScheduleWriteback(size_t num_pages) {
+void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
   // Schedule a Writer task for kernel to reclaim memory pages until the current memory pressure
   // becomes normal. If memory pressure events are not available, the task runs until the number of
   // dirty Pages is less than kMaxDirtyDataPages / 4. |writeback_flag_| ensures that neither
@@ -233,6 +233,8 @@ void F2fs::ScheduleWriteback(size_t num_pages) {
               return ZX_ERR_NEXT;
             });
       }
+      node_vnode_->CleanupPages();
+      GetVCache().EvictInactiveVnodes();
       // Wake waiters of WaitForWriteback().
       writeback_flag_.release();
       return fpromise::ok();

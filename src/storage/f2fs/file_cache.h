@@ -369,6 +369,8 @@ class FileCache {
   // It returns a set of locked dirty Pages that meet |operation|.
   std::vector<LockedPage> GetLockedDirtyPages(const WritebackOperation &operation)
       __TA_EXCLUDES(tree_lock_);
+  // It evicts every clean, inactive  page.
+  void EvictCleanPages() __TA_EXCLUDES(tree_lock_);
 
  private:
   // If |page| is unlocked, it returns a locked |page|. If |page| is already locked,

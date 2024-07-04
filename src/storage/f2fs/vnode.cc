@@ -307,7 +307,9 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
                        << (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag) ? "set."
                                                                               : "not set.");
     }
-    file_cache_->Reset();
+    if (!IsDir()) {
+      file_cache_->Reset();
+    }
     fs()->GetVCache().Downgrade(this);
   } else {
     // During PagedVfs::Teardown, f2fs object is not available. In this case, we purge orphans at
@@ -1262,6 +1264,11 @@ pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
     }
   }
   return nwritten;
+}
+
+void VnodeF2fs::CleanupPages() {
+  file_cache_->EvictCleanPages();
+  vmo_manager_->Reset();
 }
 
 // Set multimedia files as cold files for hot/cold data separation

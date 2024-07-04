@@ -127,9 +127,6 @@ void VnodeCache::Downgrade(VnodeF2fs* raw_vnode) {
     return;
   }
 
-  // TODO(https://fxbug.dev/42070947): Need to adjust the size of vnode_table_ according to memory
-  // pressure
-
   // It is leaked to keep alive in vnode_table
   [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&vnode);
   raw_vnode->Deactivate();
@@ -236,6 +233,16 @@ zx_status_t VnodeCache::RemoveDirtyUnsafe(VnodeF2fs* vnode) {
   }
   --ndirty_;
   return ZX_OK;
+}
+
+void VnodeCache::EvictInactiveVnodes() {
+  ForAllVnodes([this](fbl::RefPtr<VnodeF2fs>& vnode) {
+    vnode->CleanupPages();
+    if (!vnode->IsActive()) {
+      return Evict(vnode.get());
+    }
+    return ZX_OK;
+  });
 }
 
 }  // namespace f2fs
