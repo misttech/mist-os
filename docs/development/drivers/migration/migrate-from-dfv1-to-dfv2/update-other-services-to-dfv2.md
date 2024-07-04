@@ -382,27 +382,18 @@ phrase).
 ## Use the DFv2 inspect {:#use-the-dfv2-inspect}
 
 To set up driver-maintained [inspect][driver-inspect] metrics in DFv2,
-you need to create an `inspect::ComponentInspector` object, for example:
+you may use the `ComponentInspector` provided by `fdf::DriverBase::inspector()`:
 
 ```cpp
-component_inspector_ =
-    std::make_unique<inspect::ComponentInspector>(out, dispatcher, *inspector_);
+inspect::Node& root = inspector().root();
 ```
 
-(Source: [`driver-inspector.cc`][driver-inspector])
+If a custom Inspector should be used, call `fdf::DriverBase::InitInspectorExactlyOnce(inspector)`
+before accessing the `inspector()` method.
 
-Creating an `inspect::ComponentInspector` object needs the following
-three input items:
+DFv2 inspect does not require passing the VMO of `inspect::Inspector` to the driver framework.
 
-- The `component::OutgoingDirectory` object from the
-  `Context().outgoing()->component()` call
-
-- A dispatcher
-
-- The original `inspect::Inspector` object
-
-However, the DFv2 inspect does not require passing the VMO of
-`inspect::Inspector` to the driver framework.
+<!-- TODO(b/324637276): explain where to find Driver's Inspect -->
 
 ## (Optional) Implement your own load_firmware method {:#implement-your-own-load-firmware-method}
 
@@ -514,7 +505,6 @@ All the **source code files** mentioned in this section:
 - [`//src/devices/tests/v2/compat-runtime/root-driver.cc`][root-driver-cc]
 - [`//src/lib/ddk/include/lib/ddk/device.h`][ddk-device-h-77]
 - [`//src/lib/ddk/include/lib/ddk/driver.h`][load-firmware]
-- [`//third_party/iwlwifi/platform/driver-inspector.cc`][driver-inspector]
 
 All the **documentation pages** mentioned in this section:
 
@@ -570,7 +560,6 @@ All the **documentation pages** mentioned in this section:
 [use-non-default-dispatchers]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/convert-banjo-protocols-to-fidl-protocols.md#update-the-dfv1-driver-to-use-non-default-dispatchers
 [aml-ethernet]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/ethernet/drivers/aml-ethernet/aml-ethernet.cc;l=181
 [driver-inspect]: /docs/development/drivers/diagnostics/inspect.md
-[driver-inspector]: https://fuchsia.googlesource.com/drivers/wlan/intel/iwlwifi/+/refs/heads/main/third_party/iwlwifi/platform/driver-inspector.cc#25
 [wlantap-driver]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/testing/wlantap-driver/wlantap-driver.cc;l=61
 [logger-h]: https://source.corp.google.com/h/turquoise-internal/turquoise/+/main:sdk/lib/driver/logging/cpp/logger.h;l=15
 [load-firmware]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/ddk/include/lib/ddk/driver.h;l=408
