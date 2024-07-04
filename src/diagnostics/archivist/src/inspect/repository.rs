@@ -9,9 +9,8 @@ use crate::inspect::container::{
 use crate::pipeline::Pipeline;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::Selector;
-use fuchsia_async as fasync;
+use flyweights::FlyStr;
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::Koid;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
@@ -19,6 +18,7 @@ use selectors::SelectorExt;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct InspectRepository {
     inner: RwLock<InspectRepositoryInner>,
@@ -60,14 +60,17 @@ impl InspectRepository {
         self: &Arc<Self>,
         identity: Arc<ComponentIdentity>,
         proxy_handle: InspectHandle,
+        remove_associated: Option<zx::Koid>,
     ) {
         // Hold the lock while we insert and update pipelines.
         let mut guard = self.inner.write();
         // insert_inspect_artifact_container returns None when we were already tracking the
         // directory for this component. If that's the case we can return early.
-        let Some(on_closed_fut) =
-            guard.insert_inspect_artifact_container(Arc::clone(&identity), proxy_handle)
-        else {
+        let Some(on_closed_fut) = guard.insert_inspect_artifact_container(
+            Arc::clone(&identity),
+            proxy_handle,
+            remove_associated,
+        ) else {
             return;
         };
 
@@ -108,6 +111,19 @@ impl InspectRepository {
         }
     }
 
+    pub(crate) fn escrow_handle<T: Into<FlyStr>>(
+        self: &Arc<Self>,
+        component: Arc<ComponentIdentity>,
+        vmo: zx::Vmo,
+        token: finspect::EscrowToken,
+        name: Option<T>,
+        tree: Option<zx::Koid>,
+    ) {
+        debug!(identity = %component, "Escrow inspect handle.");
+        let handle = InspectHandle::escrow(vmo, token, name);
+        self.add_inspect_artifacts(Arc::clone(&component), handle, tree);
+    }
+
     pub(crate) fn add_inspect_handle(
         self: &Arc<Self>,
         component: Arc<ComponentIdentity>,
@@ -115,7 +131,7 @@ impl InspectRepository {
     ) {
         debug!(identity = %component, "Added inspect handle.");
         // Update the central repository to reference the new diagnostics source.
-        self.add_inspect_artifacts(Arc::clone(&component), handle);
+        self.add_inspect_artifacts(Arc::clone(&component), handle, None);
     }
 }
 
@@ -176,7 +192,8 @@ impl InspectRepositoryInner {
         &mut self,
         identity: Arc<ComponentIdentity>,
         proxy_handle: InspectHandle,
-    ) -> Option<oneshot::Receiver<Koid>> {
+        remove_associated: Option<zx::Koid>,
+    ) -> Option<oneshot::Receiver<zx::Koid>> {
         let mut diag_repo_entry_opt = self.diagnostics_containers.get_mut(&identity);
         match diag_repo_entry_opt {
             None => {
@@ -189,7 +206,15 @@ impl InspectRepositoryInner {
                 self.diagnostics_containers.insert(identity, inspect_container);
                 fut
             }
-            Some(ref mut artifacts_container) => artifacts_container.push_handle(proxy_handle),
+            Some(ref mut artifacts_container) => {
+                // When we escrow a vmo handle and provide an associated tree koid, we wwant to
+                // ensure we atomically insert and remove. That's why we provide this optional koid
+                // here and remove it under the same lock as the insertion of the escrowed data.
+                if let Some(koid) = remove_associated {
+                    artifacts_container.remove_handle(koid);
+                }
+                artifacts_container.push_handle(proxy_handle)
+            }
         }
     }
 
@@ -253,9 +278,11 @@ impl InspectRepositoryInner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
     use fidl::AsHandleRef;
     use fidl_fuchsia_inspect as finspect;
+    use fuchsia_inspect::Inspector;
     use fuchsia_zircon::DurationNum;
     use selectors::FastError;
 
@@ -374,5 +401,61 @@ mod tests {
         let selectors =
             Some(vec![selectors::parse_selector::<FastError>("foo:root").expect("parse selector")]);
         assert_eq!(0, data_repo.inner.read().fetch_inspect_data(&selectors, None).len());
+    }
+
+    #[fuchsia::test]
+    async fn repo_removes_escrowed_data_on_token_peer_closed() {
+        let repo = Arc::new(InspectRepository::default());
+        let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
+
+        let inspector = Inspector::default();
+        let (ep0, ep1) = zx::EventPair::create();
+        repo.escrow_handle(
+            Arc::clone(&identity),
+            inspector.duplicate_vmo().unwrap(),
+            finspect::EscrowToken { token: ep1 },
+            Some("escrow"),
+            None,
+        );
+        drop(ep0);
+        while repo.inner.read().get(&identity).is_some() {
+            fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
+        }
+    }
+
+    #[fuchsia::test]
+    async fn repo_overwrites_tree_on_escrow() {
+        let repo = Arc::new(InspectRepository::default());
+        let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<finspect::TreeMarker>()
+            .expect("create directory proxy");
+        let koid = proxy.as_channel().as_handle_ref().get_koid().unwrap();
+
+        repo.add_inspect_handle(Arc::clone(&identity), InspectHandle::tree(proxy, Some("tree")));
+        {
+            let guard = repo.inner.read();
+            let mut handles = guard.get(&identity).unwrap().handles();
+            assert_eq!(handles.len(), 1);
+            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Tree { .. });
+        }
+
+        let inspector = Inspector::default();
+        let (_ep0, ep1) = zx::EventPair::create();
+        repo.escrow_handle(
+            Arc::clone(&identity),
+            inspector.duplicate_vmo().unwrap(),
+            finspect::EscrowToken { token: ep1 },
+            Some("escrow"),
+            Some(koid),
+        );
+        {
+            let guard = repo.inner.read();
+            let mut handles = guard.get(&identity).unwrap().handles();
+            assert_eq!(handles.len(), 1);
+            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Escrow { .. });
+        }
+        fasync::Channel::from_channel(server_end.into_channel()).on_closed().await.unwrap();
     }
 }

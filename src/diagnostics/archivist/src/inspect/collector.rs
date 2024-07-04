@@ -10,6 +10,7 @@ use fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy};
 use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::pin::pin;
+use std::sync::Arc;
 use tracing::error;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
@@ -22,7 +23,7 @@ pub type DataMap = HashMap<Option<InspectHandleName>, InspectData>;
 #[derive(Debug)]
 pub enum InspectData {
     /// A VMO containing data associated with the event.
-    Vmo(zx::Vmo),
+    Vmo(Arc<zx::Vmo>),
 
     /// A file containing data associated with the event.
     ///
@@ -53,10 +54,10 @@ fn maybe_load_service<P: DiscoverableProtocolMarker>(
     Ok(None)
 }
 
-pub async fn populate_data_map(inspect_handles: &[InspectHandle]) -> DataMap {
+pub async fn populate_data_map(inspect_handles: &[Arc<InspectHandle>]) -> DataMap {
     let mut data_map = DataMap::new();
     for inspect_handle in inspect_handles {
-        match inspect_handle {
+        match inspect_handle.as_ref() {
             InspectHandle::Directory { proxy: ref dir } => {
                 return populate_data_map_from_dir(dir).await
             }
@@ -64,6 +65,12 @@ pub async fn populate_data_map(inspect_handles: &[InspectHandle]) -> DataMap {
                 data_map.insert(
                     name.as_ref().map(|name| InspectHandleName::name(name.clone())),
                     InspectData::Tree(proxy.clone()),
+                );
+            }
+            InspectHandle::Escrow { vmo, name, .. } => {
+                data_map.insert(
+                    name.as_ref().map(|name| InspectHandleName::name(name.clone())),
+                    InspectData::Vmo(Arc::clone(vmo)),
                 );
             }
         }
@@ -81,7 +88,8 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
         pin!(fuchsia_fs::directory::readdir_recursive(inspect_proxy, /* timeout= */ None)
             .filter_map(|result| {
                 async move {
-                    // TODO(https://fxbug.dev/42126094): decide how to show directories that we failed to read.
+                    // TODO(https://fxbug.dev/42126094): decide how to show directories that we
+                    // failed to read.
                     result.ok()
                 }
             }));
@@ -134,7 +142,7 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
         };
 
         let data = match vmo.map_err(zx::Status::from_raw) {
-            Ok(vmo) => InspectData::Vmo(vmo),
+            Ok(vmo) => InspectData::Vmo(Arc::new(vmo)),
             Err(err) => {
                 match err {
                     zx::Status::NOT_SUPPORTED => {}
@@ -205,9 +213,15 @@ mod tests {
         let name3 = None;
 
         let data = populate_data_map(&[
-            InspectHandle::Tree { proxy: tree1.into_proxy().unwrap(), name: Some("tree1".into()) },
-            InspectHandle::Tree { proxy: tree2.into_proxy().unwrap(), name: Some("tree2".into()) },
-            InspectHandle::Tree { proxy: tree3.into_proxy().unwrap(), name: None },
+            Arc::new(InspectHandle::Tree {
+                proxy: tree1.into_proxy().unwrap(),
+                name: Some("tree1".into()),
+            }),
+            Arc::new(InspectHandle::Tree {
+                proxy: tree2.into_proxy().unwrap(),
+                name: Some("tree2".into()),
+            }),
+            Arc::new(InspectHandle::Tree { proxy: tree3.into_proxy().unwrap(), name: None }),
         ])
         .await;
 
@@ -300,6 +314,6 @@ mod tests {
         let inspect_proxy =
             fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
                 .expect("Failed to open directory");
-        populate_data_map(&[InspectHandle::directory(inspect_proxy)]).await
+        populate_data_map(&[Arc::new(InspectHandle::directory(inspect_proxy))]).await
     }
 }

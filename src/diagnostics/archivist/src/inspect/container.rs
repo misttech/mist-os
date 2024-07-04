@@ -9,7 +9,6 @@ use crate::inspect::collector::{self as collector, InspectData};
 use diagnostics_data::{self as schema, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_inspect::TreeProxy;
 use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
@@ -21,12 +20,26 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::warn;
-use {fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect};
+use {
+    fidl_fuchsia_inspect as finspect, fidl_fuchsia_io as fio, fuchsia_trace as ftrace,
+    inspect_fidl_load as deprecated_inspect,
+};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum InspectHandle {
-    Tree { proxy: TreeProxy, name: Option<FlyStr> },
-    Directory { proxy: fio::DirectoryProxy },
+    Tree {
+        proxy: finspect::TreeProxy,
+        name: Option<FlyStr>,
+    },
+    Directory {
+        proxy: fio::DirectoryProxy,
+    },
+    Escrow {
+        vmo: Arc<zx::Vmo>,
+        name: Option<FlyStr>,
+        token: finspect::EscrowToken,
+        related_koid: zx::Koid,
+    },
 }
 
 impl InspectHandle {
@@ -34,6 +47,7 @@ impl InspectHandle {
         match self {
             Self::Directory { proxy } => proxy.as_channel().is_closed(),
             Self::Tree { proxy, .. } => proxy.as_channel().is_closed(),
+            Self::Escrow { .. } => false,
         }
     }
 
@@ -41,6 +55,9 @@ impl InspectHandle {
         match self {
             Self::Tree { proxy, .. } => proxy.on_closed().await,
             Self::Directory { proxy, .. } => proxy.on_closed().await,
+            Self::Escrow { token, .. } => {
+                fasync::OnSignals::new(&token.token, fidl::Signals::OBJECT_PEER_CLOSED).await
+            }
         }
     }
 
@@ -52,11 +69,28 @@ impl InspectHandle {
             Self::Tree { proxy, .. } => {
                 proxy.as_channel().as_handle_ref().get_koid().expect("TreeProxy has koid")
             }
+            // We return the related koid to index based on it so that the retrieval is more
+            // efficient.
+            Self::Escrow { related_koid, .. } => *related_koid,
         }
     }
 
-    pub fn tree<T: Into<FlyStr>>(proxy: TreeProxy, name: Option<T>) -> Self {
+    pub fn tree<T: Into<FlyStr>>(proxy: finspect::TreeProxy, name: Option<T>) -> Self {
         InspectHandle::Tree { proxy, name: name.map(|n| n.into()) }
+    }
+
+    pub fn escrow<T: Into<FlyStr>>(
+        vmo: zx::Vmo,
+        token: finspect::EscrowToken,
+        name: Option<T>,
+    ) -> Self {
+        let related_koid = token.token.basic_info().unwrap().related_koid;
+        InspectHandle::Escrow {
+            vmo: Arc::new(vmo),
+            name: name.map(|n| n.into()),
+            token,
+            related_koid,
+        }
     }
 
     pub fn directory(proxy: fio::DirectoryProxy) -> Self {
@@ -127,7 +161,7 @@ impl InspectArtifactsContainer {
                 fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
                     UnpopulatedInspectDataContainer {
                         identity: Arc::clone(identity),
-                        inspect_handles: vec![InspectHandle::directory(directory)],
+                        inspect_handles: vec![Arc::new(InspectHandle::directory(directory))],
                         inspect_matcher: matcher,
                     }
                 })
@@ -140,8 +174,8 @@ impl InspectArtifactsContainer {
                     .inspect_handles
                     .values()
                     .filter(|stored| stored.handle.is_tree())
-                    .map(|stored| stored.handle.as_ref().clone())
-                    .collect::<Vec<InspectHandle>>(),
+                    .map(|stored| Arc::clone(&stored.handle))
+                    .collect::<Vec<_>>(),
             }),
 
             _ => None,
@@ -254,7 +288,7 @@ impl SnapshotData {
                     ),
                 }
             }
-            InspectData::Vmo(vmo) => match Snapshot::try_from(&vmo) {
+            InspectData::Vmo(vmo) => match Snapshot::try_from(vmo.as_ref()) {
                 Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), name),
                 Err(e) => {
                     SnapshotData::failed(schema::InspectError { message: format!("{e:?}") }, name)
@@ -393,7 +427,7 @@ pub struct UnpopulatedInspectDataContainer {
     pub identity: Arc<ComponentIdentity>,
     /// Proxies configured for container. It is an invariant that if any value is an
     /// InspectHandle::Directory, then there is exactly one value.
-    pub inspect_handles: Vec<InspectHandle>,
+    pub inspect_handles: Vec<Arc<InspectHandle>>,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
     pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
@@ -497,7 +531,7 @@ mod test {
 
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![InspectHandle::directory(directory)],
+            inspect_handles: vec![Arc::new(InspectHandle::directory(directory))],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
@@ -520,7 +554,7 @@ mod test {
                 .unwrap();
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![InspectHandle::directory(directory)],
+            inspect_handles: vec![Arc::new(InspectHandle::directory(directory))],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
