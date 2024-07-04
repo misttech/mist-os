@@ -62,6 +62,7 @@ rustc_library("routing") {
     "src/bedrock/dict_ext.rs",
     "src/bedrock/lazy_get.rs",
     "src/bedrock/mod.rs",
+    "src/bedrock/program_output_dict.rs",
     "src/bedrock/sandbox_construction.rs",
     "src/bedrock/structured_dict.rs",
     "src/bedrock/with_availability.rs",

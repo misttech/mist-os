@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::sandbox_construction::ComponentSandbox;
 use crate::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
 use crate::environment;
 use crate::error::ComponentInstanceError;
@@ -63,6 +64,11 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,
     ) -> Result<Box<dyn ResolvedInstanceInterface<Component = Self> + 'a>, ComponentInstanceError>;
+
+    /// Returns a clone of this component's sandbox. This may resolve the component if necessary.
+    async fn component_sandbox(
+        self: &Arc<Self>,
+    ) -> Result<ComponentSandbox, ComponentInstanceError>;
 }
 
 /// A trait providing a representation of a resolved component instance.
@@ -293,6 +299,7 @@ pub trait TopInstanceInterface: Sized + std::fmt::Debug {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::bedrock::sandbox_construction::ComponentSandbox;
 
     #[derive(Debug)]
     pub struct TestTopInstance {}
@@ -351,6 +358,12 @@ pub mod tests {
             self: &'a Arc<Self>,
         ) -> Result<Box<dyn ResolvedInstanceInterface<Component = Self> + 'a>, ComponentInstanceError>
         {
+            todo!()
+        }
+
+        async fn component_sandbox(
+            self: &Arc<Self>,
+        ) -> Result<ComponentSandbox, ComponentInstanceError> {
             todo!()
         }
     }

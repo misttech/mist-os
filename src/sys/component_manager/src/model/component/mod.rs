@@ -1297,21 +1297,6 @@ impl ComponentInstance {
             payload,
         }
     }
-
-    pub async fn component_sandbox(
-        self: &Arc<Self>,
-    ) -> Result<ComponentSandbox, ComponentInstanceError> {
-        ComponentInstance::lock_resolved_state(self)
-            .await
-            .map(|state| state.sandbox.clone())
-            .map_err(|err| {
-                let err: anyhow::Error = err.into();
-                ComponentInstanceError::ResolveFailed {
-                    moniker: self.moniker.clone(),
-                    err: err.into(),
-                }
-            })
-    }
 }
 
 impl DirectoryEntry for ComponentInstance {
@@ -1375,6 +1360,21 @@ impl ComponentInstanceInterface for ComponentInstance {
             let err: anyhow::Error = err.into();
             ComponentInstanceError::ResolveFailed { moniker: self.moniker.clone(), err: err.into() }
         })?))
+    }
+
+    async fn component_sandbox(
+        self: &Arc<Self>,
+    ) -> Result<ComponentSandbox, ComponentInstanceError> {
+        ComponentInstance::lock_resolved_state(self)
+            .await
+            .map(|state| state.sandbox.clone())
+            .map_err(|err| {
+                let err: anyhow::Error = err.into();
+                ComponentInstanceError::ResolveFailed {
+                    moniker: self.moniker.clone(),
+                    err: err.into(),
+                }
+            })
     }
 }
 

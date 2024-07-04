@@ -49,7 +49,7 @@ impl<T: StructuredDict> StructuredDict for StructuredDictMap<T> {
 
 #[allow(private_bounds)]
 impl<T: StructuredDict> StructuredDictMap<T> {
-    pub fn insert(&mut self, key: Name, value: T) -> Result<(), fsandbox::DictionaryError> {
+    pub fn insert(&self, key: Name, value: T) -> Result<(), fsandbox::DictionaryError> {
         let dict: Dict = value.into();
         self.inner.insert(key, dict.into())
     }
@@ -63,12 +63,20 @@ impl<T: StructuredDict> StructuredDictMap<T> {
         })
     }
 
-    pub fn remove(&mut self, key: &Name) -> Option<T> {
+    pub fn remove(&self, key: &Name) -> Option<T> {
         self.inner.remove(key).map(|cap| {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
             };
             T::from_dict(dict.clone())
+        })
+    }
+
+    pub fn enumerate(&self) -> impl Iterator<Item = (Name, T)> {
+        self.inner.enumerate().map(|(key, capability_res)| match capability_res {
+            Ok(Capability::Dictionary(dict)) => (key, T::from_dict(dict)),
+            Ok(cap) => unreachable!("structured map entry must be a dict: {cap:?}"),
+            Err(_) => panic!("structured map entry must be cloneable"),
         })
     }
 }
@@ -248,7 +256,7 @@ mod tests {
         let name1 = Name::new("1").unwrap();
         let name2 = Name::new("2").unwrap();
 
-        let mut map: StructuredDictMap<Dict> = Default::default();
+        let map: StructuredDictMap<Dict> = Default::default();
         assert_matches!(map.get(&name1), None);
         assert!(map.insert(name1.clone(), dict1).is_ok());
         let d = map.get(&name1).unwrap();

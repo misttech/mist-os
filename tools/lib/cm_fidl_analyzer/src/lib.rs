@@ -4,6 +4,7 @@
 
 pub mod component_instance;
 pub mod component_model;
+mod component_sandbox;
 pub mod environment;
 pub mod route;
 

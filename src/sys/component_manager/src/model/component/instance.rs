@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess};
-use crate::bedrock::program_output_dict::build_program_output_dictionary;
 use crate::framework::{build_framework_dictionary, controller};
 use crate::model::actions::{shutdown, ActionsManager, DiscoverAction, StopAction};
 use crate::model::component::{
@@ -22,6 +21,7 @@ use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
 use crate::model::token::{InstanceToken, InstanceTokenState};
 use crate::sandbox_util::RoutableExt;
+use ::routing::bedrock::program_output_dict::build_program_output_dictionary;
 use ::routing::bedrock::sandbox_construction::{
     self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
 };
@@ -455,6 +455,7 @@ impl ResolvedInstanceState {
             &new_program_router,
             &ResolvedInstanceState::make_program_outgoing_router,
         );
+
         let (component_sandbox, child_inputs) = build_component_sandbox(
             &component.moniker,
             child_outgoing_dictionary_routers,
@@ -1028,7 +1029,7 @@ impl ResolvedInstanceState {
         Ok(())
     }
 
-    async fn discover_static_children(&self, mut child_inputs: StructuredDictMap<ComponentInput>) {
+    async fn discover_static_children(&self, child_inputs: StructuredDictMap<ComponentInput>) {
         for (child_name, child_instance) in &self.children {
             if let Some(_) = child_name.collection {
                 continue;
@@ -1309,6 +1310,10 @@ struct ProgramRouter {
 #[async_trait]
 impl Routable for ProgramRouter {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+        if request.debug {
+            let source = WeakInstanceToken::new_component(self.component.clone());
+            return Ok(Capability::Instance(source));
+        }
         fn open_error(e: OpenOutgoingDirError) -> OpenError {
             CapabilityProviderError::from(ComponentProviderError::from(e)).into()
         }
@@ -1328,7 +1333,6 @@ impl Routable for ProgramRouter {
                 .expect("path must be valid"),
             server_end.into_channel(),
         );
-        let debug = request.debug;
         let cap = inner_router
             .route(request.into())
             .await
@@ -1342,12 +1346,7 @@ impl Routable for ProgramRouter {
                 expected: "Dictionary".into(),
             })?;
         }
-        if !debug {
-            Ok(capability)
-        } else {
-            let source = WeakInstanceToken::new_component(component.as_weak());
-            Ok(Capability::Instance(source))
-        }
+        Ok(capability)
     }
 }
 

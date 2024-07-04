@@ -81,6 +81,7 @@ rustc_library("sandbox") {
     "//src/sys/component_manager/*",
     "//src/sys/lib/elf_runner/*",
     "//src/sys/lib/routing/*",
+    "//tools/lib/cm_fidl_analyzer/*",
   ]
 }
 

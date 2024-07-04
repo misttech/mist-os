@@ -7,9 +7,7 @@ use crate::component_model::{BuildAnalyzerModelError, Child};
 use cm_config::RuntimeConfig;
 use cm_rust::{EnvironmentDecl, RegistrationSource, ResolverRegistration};
 use fidl_fuchsia_component_internal as component_internal;
-use routing::component_instance::{
-    ComponentInstanceInterface, ExtendedInstanceInterface, WeakExtendedInstanceInterface,
-};
+use routing::component_instance::{ExtendedInstanceInterface, WeakExtendedInstanceInterface};
 use routing::environment::{DebugRegistry, EnvironmentExtends, RunnerRegistry};
 use routing::error::ComponentInstanceError;
 use std::collections::HashMap;

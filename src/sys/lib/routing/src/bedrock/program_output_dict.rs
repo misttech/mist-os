@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::component::ComponentInstance;
-use ::routing::bedrock::structured_dict::ComponentInput;
-use ::routing::bedrock::with_policy_check::WithPolicyCheck;
-use ::routing::capability_source::{CapabilitySource, ComponentCapability};
-use ::routing::component_instance::{
+use crate::bedrock::structured_dict::ComponentInput;
+use crate::bedrock::with_policy_check::WithPolicyCheck;
+use crate::capability_source::{CapabilitySource, ComponentCapability};
+use crate::component_instance::{
     ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
 };
-use ::routing::error::RoutingError;
-use ::routing::{DictExt, LazyGet};
+use crate::error::RoutingError;
+use crate::{DictExt, LazyGet};
 use cm_types::{IterablePath, RelativePath};
 use futures::FutureExt;
 use itertools::Itertools;
@@ -20,19 +19,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::warn;
 
-pub type ProgramRouterFn =
-    dyn Fn(WeakComponentInstanceInterface<ComponentInstance>, RelativePath) -> Router;
-pub type OutgoingDirRouterFn =
-    dyn Fn(&Arc<ComponentInstance>, &cm_rust::ComponentDecl, &cm_rust::CapabilityDecl) -> Router;
+pub type ProgramRouterFn<C> = dyn Fn(WeakComponentInstanceInterface<C>, RelativePath) -> Router;
+pub type OutgoingDirRouterFn<C> =
+    dyn Fn(&Arc<C>, &cm_rust::ComponentDecl, &cm_rust::CapabilityDecl) -> Router;
 
-pub fn build_program_output_dictionary(
-    component: &Arc<ComponentInstance>,
+pub fn build_program_output_dictionary<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     decl: &cm_rust::ComponentDecl,
     component_input: &ComponentInput,
     // This router should forward routing requests to a component's program
-    new_program_router: &ProgramRouterFn,
-    new_outgoing_dir_router: &OutgoingDirRouterFn,
+    new_program_router: &ProgramRouterFn<C>,
+    new_outgoing_dir_router: &OutgoingDirRouterFn<C>,
 ) -> (Dict, Dict) {
     let program_output_dict = Dict::new();
     let declared_dictionaries = Dict::new();
@@ -54,16 +52,16 @@ pub fn build_program_output_dictionary(
 
 /// Adds `capability` to the program output dict given the resolved `decl`. The program output dict
 /// is a dict of routers, keyed by capability name.
-fn extend_dict_with_capability(
-    component: &Arc<ComponentInstance>,
+fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     decl: &cm_rust::ComponentDecl,
     capability: &cm_rust::CapabilityDecl,
     component_input: &ComponentInput,
     program_output_dict: &Dict,
     declared_dictionaries: &Dict,
-    new_program_router: &ProgramRouterFn,
-    new_outgoing_dir_router: &OutgoingDirRouterFn,
+    new_program_router: &ProgramRouterFn<C>,
+    new_outgoing_dir_router: &OutgoingDirRouterFn<C>,
 ) {
     match capability {
         cm_rust::CapabilityDecl::Service(_)
@@ -106,14 +104,14 @@ fn extend_dict_with_capability(
     }
 }
 
-fn extend_dict_with_dictionary(
-    component: &Arc<ComponentInstance>,
+fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     decl: &cm_rust::DictionaryDecl,
     component_input: &ComponentInput,
     program_output_dict: &Dict,
     declared_dictionaries: &Dict,
-    new_program_router: &ProgramRouterFn,
+    new_program_router: &ProgramRouterFn<C>,
 ) {
     let dict = Dict::new();
     let router;
@@ -228,8 +226,8 @@ fn make_dict_extending_router(
     Router::new(route_fn)
 }
 
-fn weak_reference_program_output_router(
-    weak_component: WeakComponentInstanceInterface<ComponentInstance>,
+fn weak_reference_program_output_router<C: ComponentInstanceInterface + 'static>(
+    weak_component: WeakComponentInstanceInterface<C>,
 ) -> Router {
     Router::new(move |request: Request| {
         let weak_component = weak_component.clone();

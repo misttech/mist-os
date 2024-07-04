@@ -21,7 +21,7 @@ use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 /// A component's sandbox holds all the routing dictionaries that a component has once its been
 /// resolved.
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct ComponentSandbox {
     /// The dictionary containing all capabilities that a component's parent provided to it.
     pub component_input: ComponentInput,
@@ -47,6 +47,42 @@ pub struct ComponentSandbox {
     pub collection_inputs: StructuredDictMap<ComponentInput>,
 }
 
+impl ComponentSandbox {
+    /// Copies all of the entries from the given sandbox into this one. Panics if the given sandbox
+    /// is holding any entries that cannot be copied. Panics if there are any duplicate entries.
+    pub fn append(&self, sandbox: &ComponentSandbox) {
+        // We destructure the sandbox here to ensure that this code is updated if the contents of
+        // the sandbox change.
+        let ComponentSandbox {
+            component_input,
+            component_output_dict,
+            program_input_dict,
+            program_output_dict,
+            framework_dict,
+            capability_sourced_capabilities_dict,
+            collection_inputs,
+        } = sandbox;
+        for (copy_from, copy_to) in &[
+            (&component_input.capabilities(), &self.component_input.capabilities()),
+            (&component_input.environment().debug(), &self.component_input.environment().debug()),
+            (&component_output_dict, &self.component_output_dict),
+            (&program_input_dict, &self.program_input_dict),
+            (&program_output_dict, &self.program_output_dict),
+            (&framework_dict, &self.framework_dict),
+            (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
+        ] {
+            for (key, capability_res) in copy_from.enumerate() {
+                copy_to
+                    .insert(key, capability_res.expect("sandbox capability is not cloneable"))
+                    .unwrap();
+            }
+        }
+        for (key, component_input) in collection_inputs.enumerate() {
+            self.collection_inputs.insert(key, component_input).unwrap();
+        }
+    }
+}
+
 /// This set holds a dictionary for each child declared by a component. Each dictionary contains
 /// all capabilities the component has made available to that child.
 pub type ChildInputs = StructuredDictMap<ComponentInput>;
@@ -67,9 +103,9 @@ pub fn build_component_sandbox(
 ) -> (ComponentSandbox, ChildInputs) {
     let component_output_dict = Dict::new();
     let program_input_dict = Dict::new();
-    let mut environments: StructuredDictMap<ComponentEnvironment> = Default::default();
-    let mut child_inputs: StructuredDictMap<ComponentInput> = Default::default();
-    let mut collection_inputs: StructuredDictMap<ComponentInput> = Default::default();
+    let environments: StructuredDictMap<ComponentEnvironment> = Default::default();
+    let child_inputs: StructuredDictMap<ComponentInput> = Default::default();
+    let collection_inputs: StructuredDictMap<ComponentInput> = Default::default();
 
     for environment_decl in &decl.environments {
         environments
