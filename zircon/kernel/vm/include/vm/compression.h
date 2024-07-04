@@ -233,7 +233,7 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   // Perform an information dump of the internal state to the debuglog.
   void Dump() const;
 
-  static constexpr int kNumLogBuckets = 8;
+  static constexpr size_t kNumLogBuckets = 8;
   struct Stats {
     VmCompressedStorage::MemoryUsage memory_usage;
     zx_duration_t compression_time = 0;

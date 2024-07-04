@@ -26,13 +26,12 @@ constexpr size_t ensure_threshold(size_t threshold) {
   return threshold;
 }
 
-constexpr int bucket_for_ticks(zx_ticks_t start, zx_ticks_t end) {
+constexpr size_t bucket_for_ticks(zx_ticks_t start, zx_ticks_t end) {
   // Turn the ticks range into seconds. As we want whole seconds we are happy to tolerate the
   // rounding behavior of integer division here.
   const uint64_t seconds = end > start ? (end - start) / ticks_per_second() : 0;
   // Calculate the bucket and return it, clamping to the maximum number of buckets.
-  return ktl::min(seconds == 0 ? 0 : __builtin_ctzl(seconds) + 1,
-                  VmCompression::kNumLogBuckets - 1);
+  return ktl::min(log2_floor(seconds), VmCompression::kNumLogBuckets - 1);
 }
 
 }  // namespace
@@ -141,7 +140,7 @@ void VmCompression::Decompress(CompressedRef ref, void* page_dest, zx_ticks_t no
   DEBUG_ASSERT(len >= sizeof(zx_ticks_t));
   const zx_ticks_t compressed_ticks =
       *reinterpret_cast<zx_ticks_t*>(reinterpret_cast<uintptr_t>(src) + len - sizeof(zx_ticks_t));
-  const int bucket = bucket_for_ticks(compressed_ticks, now);
+  const size_t bucket = bucket_for_ticks(compressed_ticks, now);
   decompressions_within_log_seconds_[bucket].fetch_add(1);
 
   // Decompress the data, excluding our timestamp, and measure how long decompression takes.
@@ -174,7 +173,7 @@ VmCompression::Stats VmCompression::GetStats() const {
                            .failed_page_compression_attempts = compression_fail_,
                            .total_page_decompressions = decompressions_,
                            .compressed_page_evictions = decompression_skipped_};
-  for (int i = 0; i < kNumLogBuckets; i++) {
+  for (size_t i = 0; i < kNumLogBuckets; i++) {
     stats.pages_decompressed_within_log_seconds[i] = decompressions_within_log_seconds_[i];
   }
   return stats;
