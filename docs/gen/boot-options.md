@@ -661,47 +661,48 @@ When `never`, page tables are never evicted.
 When `always`, Unused page tables are evicted periodically. The period can be controlled by
 `kernel.page-scanner.page-table-eviction-period`.
 
-### kernel.page-scanner.page-table-eviction-period=\<uint32_t>
+### kernel.page-scanner.page-table-eviction-period-ms=\<uint32_t>
 
-**Default:** `0xa`
+**Default:** `0x2710`
 
-Sets the rate, in seconds, that page tables will be scanned. Any page tables not used between two
-successive scans are candidates for eviction.
+Sets the rate, in milliseconds, that page tables will be scanned. Any page tables not used between
+two successive scans are candidates for eviction.
 
 This option only has an effect if `kernel.page-scanner.page-table-eviction-policy=always`.
 
-### kernel.page-scanner.min-aging-interval=\<uint32_t>
+### kernel.page-scanner.min-aging-interval-ms=\<uint32_t>
 
-**Default:** `0x2`
+**Default:** `0x7d0`
 
-Sets the minimum time, in seconds, between successive aging events. Higher values here will provide
-a more stable active set with less chance of thrashing like behavior and less time spent harvesting
-page access information. Lower values will allow for smaller active sets, increasing opportunities
-for eviction.
+Sets the minimum time, in milliseconds, between successive aging events. Higher values here will
+provide a more stable active set with less chance of thrashing like behavior and less time spent
+harvesting page access information. Lower values will allow for smaller active sets, increasing
+opportunities for eviction.
 
-This value should be less than or equal to `kernel.page-scanner.max-aging-interval`.
+This value should be less than or equal to `kernel.page-scanner.max-aging-interval-ms`.
 
-### kernel.page-scanner.max-aging-interval=\<uint32_t>
+### kernel.page-scanner.max-aging-interval-ms=\<uint32_t>
 
-**Default:** `0xf`
+**Default:** `0x3a98`
 
-Sets the maximum time, in seconds, between successive aging events. This time is the potential worst
-case coarseness of page age information, and higher values can result in not having sufficient age
-information to perform eviction if system behavior rapidly changes. Lower values will cause pages to
-lose fidelity information by accumulating in the oldest bucket increasing the chance that when
-eviction happens a sub-optimal page is chosen.
+Sets the maximum time, in milliseconds, between successive aging events. This time is the potential
+worst case coarseness of page age information, and higher values can result in not having
+sufficient age information to perform eviction if system behavior rapidly changes. Lower values
+will cause pages to lose fidelity information by accumulating in the oldest bucket increasing the
+chance that when eviction happens a sub-optimal page is chosen.
 
-This value should be greater than or equal to `kernel.page-scanner.min-aging-interval`.
+This value should be greater than or equal to `kernel.page-scanner.min-aging-interval-ms`.
 
-### kernel.page-scanner.accessed-scan-interval=\<uint32_t>
+### kernel.page-scanner.accessed-scan-interval-ms=\<uint32_t>
 
-**Default:** `0x3`
+**Default:** `0xbb8`
 
-Sets the time, in seconds, between harvesting page access information. Lower values provide greater
-age fidelity and will improve accuracy of page reclamation choices at the expense of increased CPU
-time spent harvesting.
+Sets the time, in milliseconds, between harvesting page access information. Lower values provide
+greater age fidelity and will improve accuracy of page reclamation choices at the expense of
+increased CPU time spent harvesting.
 
-There is no benefit to setting this to be lower than the `kernel.page-scanner.min-aging-interval`.
+There is no benefit to setting this to be lower than the
+`kernel.page-scanner.min-aging-interval-ms`.
 
 ### kernel.page-scanner.active-ratio-multiplier=\<uint32_t>
 
@@ -713,9 +714,9 @@ The ratio is represented as a multiplier to simplify the kernel algorithm which 
 will result in more frequent aging events and hence less pages being in the active set. A multiplier
 of 0 will disable aging based on the active page ratio.
 
-The active ratio only triggers aging in the period between the `kernel.page-scanner.min-aging-interval`
-and the `kernel.page-scanner.max-aging-interval`, and as such has no effect if the intervals are
-equal.
+The active ratio only triggers aging in the period between the
+`kernel.page-scanner.min-aging-interval-ms` and the `kernel.page-scanner.max-aging-interval-ms`,
+and as such has no effect if the intervals are equal.
 
 ### kernel.page-scanner.eviction-interval-seconds=\<uint32_t>
 
