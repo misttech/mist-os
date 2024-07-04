@@ -631,6 +631,12 @@ func infraToolLogChecks() []FailureModeCheck {
 			OnlyOnStates: []string{"TIMED_OUT"},
 		},
 		&stringInLogCheck{
+			// LINT.IfChange(syslog_failed)
+			String: fmt.Sprintf("botanist ERROR: failed to stream syslog multiple times"),
+			// LINT.ThenChange(/tools/botanist/targets/target.go:syslog_failed)
+			Type: swarmingOutputType,
+		},
+		&stringInLogCheck{
 			String:          fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToCaptureSyslogMsg),
 			Type:            swarmingOutputType,
 			AlwaysFlake:     true,

@@ -427,7 +427,7 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 	syslogCtx, cancel := context.WithCancel(t.targetCtx)
 	defer cancel()
 	errs := syslogger.Stream(syslogCtx, syslogWriter)
-	maxAttempts := 5
+	maxAttempts := 20
 	startTime := time.Now()
 	attempt := 0
 	for range errs {
@@ -435,7 +435,9 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 		if attempt == maxAttempts && time.Since(startTime) < time.Minute {
 			// If we failed maxAttempts times within a minute of starting to stream,
 			// then there's likely an issue with the syslogger so return an err.
-			return fmt.Errorf("failed to capture syslog %d times within 1 minute", maxAttempts)
+			// LINT.IfChange(syslog_failed)
+			return fmt.Errorf("failed to stream syslog multiple times within 1 minute: %d attempts", maxAttempts)
+			// LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:syslog_failed)
 		}
 		if !syslogger.IsRunning() {
 			return nil
