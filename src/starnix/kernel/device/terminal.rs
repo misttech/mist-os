@@ -24,7 +24,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     cc_t, error, pid_t, tcflag_t, uapi, ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT,
     ICANON, ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY,
-    VEOF, VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, XTABS,
+    VEOF, VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, VWERASE, XTABS,
 };
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of
@@ -757,13 +757,22 @@ impl TerminalMutableState<Base = Terminal> {
                 break;
             }
 
-            if self.termios.has_local_flags(ICANON) && self.termios.is_erase(first_byte) {
-                let erase_count =
-                    compute_last_character_size(&queue.read_buffer[..], &self.termios);
-                if erase_count == 0 {
+            let mut maybe_erase_span = None;
+            if self.termios.has_local_flags(ICANON) {
+                if self.termios.is_erase(first_byte) {
+                    maybe_erase_span =
+                        Some(compute_last_character_span(&queue.read_buffer[..], &self.termios));
+                } else if self.termios.is_werase(first_byte) {
+                    maybe_erase_span =
+                        Some(compute_last_word_span(&queue.read_buffer[..], &self.termios));
+                }
+            }
+
+            if let Some(erase_span) = maybe_erase_span {
+                if erase_span.bytes == 0 {
                     continue;
                 }
-                queue.read_buffer.truncate(queue.read_buffer.len() - erase_count);
+                queue.read_buffer.truncate(queue.read_buffer.len() - erase_span.bytes);
             } else {
                 queue.read_buffer.extend_from_slice(&character_bytes);
             }
@@ -784,8 +793,14 @@ impl TerminalMutableState<Base = Terminal> {
             // Anything written to the read buffer will have to be echoed.
             let mut echo_bytes = vec![];
             if self.termios.has_local_flags(ECHO) {
-                if self.termios.is_erase(first_byte) {
-                    echo_bytes = vec![BACKSPACE_CHAR, b' ', BACKSPACE_CHAR];
+                if let Some(erase_span) = maybe_erase_span {
+                    let erase_echo = vec![BACKSPACE_CHAR, b' ', BACKSPACE_CHAR];
+                    echo_bytes = erase_echo
+                        .iter()
+                        .cycle()
+                        .take(erase_echo.len() * erase_span.characters)
+                        .map(|c| *c)
+                        .collect();
                 } else if self.termios.has_local_flags(ECHOCTL)
                     && matches!(first_byte, 0..=0x8 | 0xB..=0xC | 0xE..=0x1F)
                 {
@@ -867,6 +882,7 @@ trait TermIOS {
     fn has_local_flags(&self, flags: tcflag_t) -> bool;
     fn is_eof(&self, c: RawByte) -> bool;
     fn is_erase(&self, c: RawByte) -> bool;
+    fn is_werase(&self, c: RawByte) -> bool;
     fn is_terminating(&self, character_bytes: &[RawByte]) -> bool;
     fn signal(&self, c: RawByte) -> Option<Signal>;
 }
@@ -886,6 +902,11 @@ impl TermIOS for uapi::termios {
     }
     fn is_erase(&self, c: RawByte) -> bool {
         c == self.c_cc[VERASE as usize] && self.c_cc[VERASE as usize] != DISABLED_CHAR
+    }
+    fn is_werase(&self, c: RawByte) -> bool {
+        c == self.c_cc[VWERASE as usize]
+            && self.c_cc[VWERASE as usize] != DISABLED_CHAR
+            && self.has_local_flags(IEXTEN)
     }
     fn is_terminating(&self, character_bytes: &[RawByte]) -> bool {
         // All terminating characters are 1 byte.
@@ -966,52 +987,82 @@ fn compute_next_character_size(buffer: &[RawByte], termios: &uapi::termios) -> u
     }
 }
 
-/// Returns the number of bytes of the next character in `buffer`.
+fn is_ascii(c: RawByte) -> bool {
+    c & 0x80 == 0
+}
+
+fn is_utf8_start(c: RawByte) -> bool {
+    c & 0xC0 == 0xC0
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+struct BufferSpan {
+    bytes: usize,
+    characters: usize,
+}
+
+impl std::ops::AddAssign<Self> for BufferSpan {
+    // Required method
+    fn add_assign(&mut self, rhs: Self) {
+        self.bytes += rhs.bytes;
+        self.characters += rhs.characters;
+    }
+}
+
+/// Returns size of the last character in `buffer`.
 ///
 /// Depending on `termios`, this might consider ASCII or UTF8 encoding.
-///
-/// This will return 1 if the encoding is UTF8 and the first bytes of buffer are not a valid utf8
-/// sequence.
-fn compute_last_character_size(buffer: &[RawByte], termios: &uapi::termios) -> usize {
+fn compute_last_character_span(buffer: &[RawByte], termios: &uapi::termios) -> BufferSpan {
     if buffer.is_empty() {
-        return 0;
+        return BufferSpan::default();
     }
-    if !termios.has_input_flags(IUTF8) {
-        return 1;
+    if termios.has_input_flags(IUTF8) {
+        let mut bytes = 0;
+        for c in buffer.iter().rev() {
+            bytes += 1;
+            if is_ascii(*c) || is_utf8_start(*c) {
+                return BufferSpan { bytes, characters: 1 };
+            }
+        }
+        BufferSpan::default()
+    } else {
+        BufferSpan { bytes: 1, characters: 1 }
+    }
+}
+
+/// Returns size of the last word in `buffer`.
+///
+/// Depending on `termios`, this might consider ASCII or UTF8 encoding.
+fn compute_last_word_span(buffer: &[RawByte], termios: &uapi::termios) -> BufferSpan {
+    fn is_whitespace(c: RawByte) -> bool {
+        c == b' ' || c == b'\t'
     }
 
-    #[derive(Default)]
-    struct Receiver {
-        /// Whether the byte most recently processed was either a complete code
-        /// point or an invalid sequence.
-        ///
-        /// This approach matches compute_next_character_size, which treats
-        /// invalid sequences as individual bytes.
-        is_boundary: bool,
+    let mut in_word = false;
+    let mut word_span = BufferSpan::default();
+    let mut remaining = buffer.len();
+    loop {
+        let span = compute_last_character_span(&buffer[..remaining], termios);
+        if span.bytes == 0 {
+            break;
+        }
+        if span.bytes == 1 {
+            let c = buffer[remaining - 1];
+            if in_word {
+                if is_whitespace(c) {
+                    break;
+                }
+            } else {
+                if !is_whitespace(c) {
+                    in_word = true;
+                }
+            }
+        }
+        remaining -= span.bytes;
+        word_span += span;
     }
 
-    impl utf8parse::Receiver for Receiver {
-        fn codepoint(&mut self, _c: char) {
-            self.is_boundary = true;
-        }
-        fn invalid_sequence(&mut self) {
-            self.is_boundary = true;
-        }
-    }
-
-    let mut byte_count = 0;
-    let mut last_boundary = 0;
-    let mut receiver = Receiver::default();
-    let mut parser = utf8parse::Parser::new();
-    while byte_count < buffer.len() {
-        parser.advance(&mut receiver, buffer[byte_count]);
-        if receiver.is_boundary {
-            last_boundary = byte_count;
-            receiver.is_boundary = false;
-        }
-        byte_count += 1;
-    }
-    buffer.len() - last_boundary
+    word_span
 }
 
 /// Alias used to mark bytes in the queues that have not yet been processed and pushed into the
