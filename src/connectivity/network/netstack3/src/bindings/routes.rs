@@ -31,7 +31,7 @@ use net_types::ip::{
 use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
 
-use crate::bindings::util::{EntryAndTableId, TryIntoFidlWithContext};
+use crate::bindings::util::{EntryAndTableId, IntoFidlWithContext as _, TryIntoFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
@@ -499,7 +499,12 @@ where
                         continue;
                     };
                     let is_removal = matches!(op, RuleOp::RemoveSet { .. });
-                    let result = Self::handle_rule_op(rules, op, rule_update_dispatcher);
+                    let result = Self::handle_rule_op(
+                        ctx.bindings_ctx(),
+                        rules,
+                        op,
+                        rule_update_dispatcher
+                    );
                     if is_removal {
                         // We must close the channel so that the rule set
                         // can no longer send RuleOps. Note that we make
@@ -580,13 +585,14 @@ where
     }
 
     fn handle_rule_op(
+        ctx: &BindingsCtx,
         table: &mut RuleTable<I>,
         op: RuleOp<I>,
         rules_update_dispatcher: &rules_state::RuleUpdateDispatcher<I>,
     ) -> Result<(), fnet_routes_admin::RuleSetError> {
         match op {
             RuleOp::RemoveSet { priority } => {
-                let removed = table.remove_rule_set(priority);
+                let removed = table.remove_rule_set(ctx, priority);
                 for rule in removed {
                     rules_update_dispatcher
                         .notify(watcher::Update::Removed(rule))
@@ -600,14 +606,14 @@ where
                     .notify(watcher::Update::Added(InstalledRule {
                         priority,
                         index,
-                        selector,
+                        selector: selector.into_fidl_with_ctx(ctx),
                         action,
                     }))
                     .expect("failed to notify an added rule");
                 Ok(())
             }
             RuleOp::Remove { priority, index } => {
-                let removed = table.remove_rule(priority, index)?;
+                let removed = table.remove_rule(ctx, priority, index)?;
                 rules_update_dispatcher
                     .notify(watcher::Update::Removed(removed))
                     .expect("failed to notify a removed rule");
