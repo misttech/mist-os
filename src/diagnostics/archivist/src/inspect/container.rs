@@ -17,7 +17,7 @@ use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::warn;
 use {
@@ -157,16 +157,13 @@ impl InspectArtifactsContainer {
         let stored = self.inspect_handles.values().next().unwrap();
         match stored.handle.as_ref() {
             // there can only be one Directory, semantically
-            InspectHandle::Directory { proxy: dir } if self.inspect_handles.len() == 1 => {
-                fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
-                    UnpopulatedInspectDataContainer {
-                        identity: Arc::clone(identity),
-                        inspect_handles: vec![Arc::new(InspectHandle::directory(directory))],
-                        inspect_matcher: matcher,
-                    }
+            InspectHandle::Directory { .. } if self.inspect_handles.len() == 1 => {
+                Some(UnpopulatedInspectDataContainer {
+                    identity: Arc::clone(identity),
+                    inspect_handles: vec![Arc::downgrade(&stored.handle)],
+                    inspect_matcher: matcher,
                 })
             }
-
             InspectHandle::Tree { .. } => Some(UnpopulatedInspectDataContainer {
                 identity: Arc::clone(identity),
                 inspect_matcher: matcher,
@@ -174,7 +171,7 @@ impl InspectArtifactsContainer {
                     .inspect_handles
                     .values()
                     .filter(|stored| stored.handle.is_tree())
-                    .map(|stored| Arc::clone(&stored.handle))
+                    .map(|s| Arc::downgrade(&s.handle))
                     .collect::<Vec<_>>(),
             }),
 
@@ -204,8 +201,8 @@ impl InspectArtifactsContainer {
 
 #[cfg(test)]
 impl InspectArtifactsContainer {
-    pub(crate) fn handles(&self) -> impl ExactSizeIterator<Item = &Arc<InspectHandle>> {
-        self.inspect_handles.values().map(|stored| &stored.handle)
+    pub(crate) fn handles(&self) -> impl ExactSizeIterator<Item = &InspectHandle> {
+        self.inspect_handles.values().map(|stored| stored.handle.as_ref())
     }
 }
 
@@ -427,7 +424,7 @@ pub struct UnpopulatedInspectDataContainer {
     pub identity: Arc<ComponentIdentity>,
     /// Proxies configured for container. It is an invariant that if any value is an
     /// InspectHandle::Directory, then there is exactly one value.
-    pub inspect_handles: Vec<Arc<InspectHandle>>,
+    pub inspect_handles: Vec<Weak<InspectHandle>>,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
     pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
@@ -529,9 +526,10 @@ mod test {
         })
         .detach();
 
+        let handle = Arc::new(InspectHandle::directory(directory));
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![Arc::new(InspectHandle::directory(directory))],
+            inspect_handles: vec![Arc::downgrade(&handle)],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
@@ -549,12 +547,13 @@ mod test {
 
     #[fuchsia::test]
     async fn no_inspect_files_do_not_give_an_error_response() {
-        let directory =
+        let directory = Arc::new(InspectHandle::directory(
             fuchsia_fs::directory::open_in_namespace("/tmp", fuchsia_fs::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+                .unwrap(),
+        ));
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![Arc::new(InspectHandle::directory(directory))],
+            inspect_handles: vec![Arc::downgrade(&directory)],
             inspect_matcher: None,
         };
         let mut stream = container.populate(

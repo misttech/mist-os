@@ -10,7 +10,7 @@ use fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy};
 use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::pin::pin;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use tracing::error;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
@@ -54,10 +54,13 @@ fn maybe_load_service<P: DiscoverableProtocolMarker>(
     Ok(None)
 }
 
-pub async fn populate_data_map(inspect_handles: &[Arc<InspectHandle>]) -> DataMap {
+pub async fn populate_data_map(inspect_handles: &[Weak<InspectHandle>]) -> DataMap {
     let mut data_map = DataMap::new();
     for inspect_handle in inspect_handles {
-        match inspect_handle.as_ref() {
+        let Some(handle) = inspect_handle.upgrade() else {
+            continue;
+        };
+        match handle.as_ref() {
             InspectHandle::Directory { proxy: ref dir } => {
                 return populate_data_map_from_dir(dir).await
             }
@@ -212,7 +215,7 @@ mod tests {
         let name2 = Some(InspectHandleName::name("tree2"));
         let name3 = None;
 
-        let data = populate_data_map(&[
+        let handles = [
             Arc::new(InspectHandle::Tree {
                 proxy: tree1.into_proxy().unwrap(),
                 name: Some("tree1".into()),
@@ -222,9 +225,8 @@ mod tests {
                 name: Some("tree2".into()),
             }),
             Arc::new(InspectHandle::Tree { proxy: tree3.into_proxy().unwrap(), name: None }),
-        ])
-        .await;
-
+        ];
+        let data = populate_data_map(&handles.iter().map(Arc::downgrade).collect::<Vec<_>>()).await;
         assert_eq!(data.len(), 3);
 
         assert_matches!(data.get(&name1), Some(InspectData::Tree(t)) => {
@@ -279,7 +281,14 @@ mod tests {
             let mut executor = fasync::LocalExecutor::new();
 
             executor.run_singlethreaded(async {
-                let extra_data = collect(&format!("{path}/diagnostics")).await;
+                let inspect_proxy = Arc::new(InspectHandle::directory(
+                    fuchsia_fs::directory::open_in_namespace(
+                        &format!("{path}/diagnostics"),
+                        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                    )
+                    .expect("Failed to open directory"),
+                ));
+                let extra_data = populate_data_map(&[Arc::downgrade(&inspect_proxy)]).await;
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
@@ -308,12 +317,5 @@ mod tests {
 
         fasync::OnSignals::new(&done0, zx::Signals::USER_0).await.unwrap();
         ns.unbind(path).unwrap();
-    }
-
-    async fn collect(path: &str) -> DataMap {
-        let inspect_proxy =
-            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
-                .expect("Failed to open directory");
-        populate_data_map(&[Arc::new(InspectHandle::directory(inspect_proxy))]).await
     }
 }

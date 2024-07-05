@@ -322,10 +322,10 @@ mod tests {
                         containers[0]
                             .inspect_handles
                             .iter()
+                            .filter_map(|h| h.upgrade())
                             .find(|handle| handle.koid() == *koid)
                             .unwrap()
                     })
-                    .cloned()
                     .collect::<Vec<_>>()
                     .try_into()
                     .unwrap(),

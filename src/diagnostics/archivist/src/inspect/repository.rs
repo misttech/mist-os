@@ -466,7 +466,7 @@ mod tests {
             assert!(container.is_some());
             let mut handles = container.unwrap().handles();
             assert_eq!(handles.len(), 1);
-            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Escrow { .. });
+            assert_matches!(handles.next().unwrap(), InspectHandle::Escrow { .. });
         }
         drop(ep0);
         while repo.inner.read().get(&identity).is_some() {
@@ -488,7 +488,7 @@ mod tests {
             let guard = repo.inner.read();
             let mut handles = guard.get(&identity).unwrap().handles();
             assert_eq!(handles.len(), 1);
-            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Tree { .. });
+            assert_matches!(handles.next().unwrap(), InspectHandle::Tree { .. });
         }
 
         let inspector = Inspector::default();
@@ -504,7 +504,7 @@ mod tests {
             let guard = repo.inner.read();
             let mut handles = guard.get(&identity).unwrap().handles();
             assert_eq!(handles.len(), 1);
-            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Escrow { .. });
+            assert_matches!(handles.next().unwrap(), InspectHandle::Escrow { .. });
         }
         fasync::Channel::from_channel(server_end.into_channel()).on_closed().await.unwrap();
     }
@@ -570,7 +570,7 @@ mod tests {
             assert!(container.is_some());
             let mut handles = container.unwrap().handles();
             assert_eq!(handles.len(), 1);
-            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Escrow { .. });
+            assert_matches!(handles.next().unwrap(), InspectHandle::Escrow { .. });
         }
 
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<finspect::TreeMarker>();
@@ -584,7 +584,7 @@ mod tests {
             let guard = repo.inner.read();
             let mut handles = guard.get(&identity).unwrap().handles();
             assert_eq!(handles.len(), 1);
-            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Tree { .. });
+            assert_matches!(handles.next().unwrap(), InspectHandle::Tree { .. });
         }
         assert!(!fasync::Channel::from_channel(server_end.into_channel()).is_closed());
     }
