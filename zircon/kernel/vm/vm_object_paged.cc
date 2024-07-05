@@ -1457,6 +1457,16 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
   // construct and deconstruct it each iteration. It is tolerant of being reused and will
   // reinitialize itself if needed.
   __UNINITIALIZED LazyPageRequest page_request;
+  // Copy loop uses a custom status variant to track its state so that it easily create an
+  // unambiguous distinction between no error and no error but the lock has been dropped.
+  // Overloading one of the zx_status_t values (such as ZX_ERR_NEXT or ZX_ERR_SHOULD_WAIT) to mean
+  // this is confusing and error prone. The downside to this approach is the StatusType is 8 bytes
+  // versus the 4 bytes of a zx_status_t.
+  struct LockDroppedTag {
+    bool operator==(const LockDroppedTag& other) const { return true; }
+    bool operator!=(const LockDroppedTag& other) const { return false; }
+  };
+  using StatusType = ktl::variant<zx_status_t, LockDroppedTag>;
   while (src_offset < end_offset) {
     const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
     const size_t last_page_offset = ROUNDDOWN(end_offset - 1, PAGE_SIZE);
@@ -1471,7 +1481,11 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     cursor->DisableZeroFork();
     AssertHeld(cursor->lock_ref());
 
+    StatusType status = ZX_OK;
     while (remaining_pages > 0) {
+      const size_t page_offset = src_offset % PAGE_SIZE;
+      const size_t tocopy = ktl::min(PAGE_SIZE - page_offset, end_offset - src_offset);
+
       // If we need to wait on pages then we would like to wait on as many as possible, up to the
       // actual limit of the read/write operation. As we would otherwise have to wait for all pages
       // before resuming the copy, cap the maximum number to limit the latency before we start
@@ -1483,49 +1497,34 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
       __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
           cursor->RequirePage(write, static_cast<uint>(max_waitable_pages), &page_request);
 
-      zx_status_t status = result.status_value();
-      if (status == ZX_ERR_SHOULD_WAIT) {
+      status = result.status_value();
+      if (status == StatusType(ZX_OK)) {
+        // Compute the kernel mapping of this page.
+        const paddr_t pa = result->page->paddr();
+        char* page_ptr = reinterpret_cast<char*>(paddr_to_physmap(pa));
+
+        // Call the copy routine. If the copy was successful then ZX_OK is returned, otherwise
+        // ZX_ERR_SHOULD_WAIT may be returned to indicate the copy failed but we can retry it.
+        status = copyfunc(page_ptr + page_offset, dest_offset, tocopy, guard);
+        if (status == StatusType(ZX_ERR_SHOULD_WAIT)) {
+          status = LockDroppedTag{};
+        }
+      } else if (status == StatusType(ZX_ERR_SHOULD_WAIT)) {
+        // RequirePage 'failed', but told us that it had filled out the page request, so we should
+        // wait on it. Waiting on the page request must be done with the lock dropped.
         DEBUG_ASSERT(can_block_on_page_requests());
         guard->CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
-        if (status != ZX_OK) {
-          if (status == ZX_ERR_TIMED_OUT) {
-            DumpLocked(0, false);
-          }
-          return status;
-        }
-        // Recheck properties and if all is good go back to the top of the outer loop to attempt
-        // to acquire a fresh cursor and try again.
-        status = check_and_trim();
-        if (status == ZX_OK) {
-          break;
+        if (likely(status == StatusType(ZX_OK))) {
+          // page request waiting succeeded, but indicate that the lock has been dropped.
+          status = LockDroppedTag{};
+        } else if (status == StatusType(ZX_ERR_TIMED_OUT)) {
+          DumpLocked(0, false);
         }
       }
-      if (status != ZX_OK) {
-        return status;
-      }
-      const paddr_t pa = result->page->paddr();
-      const size_t page_offset = src_offset % PAGE_SIZE;
-      const size_t tocopy = ktl::min(PAGE_SIZE - page_offset, end_offset - src_offset);
-
-      // Compute the kernel mapping of this page.
-      char* page_ptr = reinterpret_cast<char*>(paddr_to_physmap(pa));
-
-      // Call the copy routine. If the copy was successful then ZX_OK is returned, otherwise
-      // ZX_ERR_SHOULD_WAIT may be returned to indicate the copy failed but we can retry it.
-      status = copyfunc(page_ptr + page_offset, dest_offset, tocopy, guard);
-
-      if (status == ZX_ERR_SHOULD_WAIT) {
-        // Although we can retry, as the lock was dropped we must re-check any properties, and then
-        // if all is good go back to the top of the outer loop to attempt to acquire a fresh cursor
-        // and try again.
-        status = check_and_trim();
-        if (status == ZX_OK) {
-          break;
-        }
-        return status;
-      }
-      if (status != ZX_OK) {
-        return status;
+      // If any 'errors', including having dropped the lock, exit back to the outer loop to handle
+      // and/or retry.
+      if (status != StatusType(ZX_OK)) {
+        break;
       }
 
       // Advance the copy location.
@@ -1557,14 +1556,18 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
           // Thus, there is no danger of thrashing here. The other thread will
           // always get the Mutex, even without an explicit yield.
           guard->CallUnlocked([]() {});
-
-          status = check_and_trim();
-          if (status == ZX_OK) {
-            break;
-          }
-          return status;
+          status = LockDroppedTag{};
+          break;
         }
       }
+    }
+    // Whenever the lock is dropped we need to re-check the properties before going back around
+    // for a new cursor.
+    if (status == StatusType(LockDroppedTag{})) {
+      status = check_and_trim();
+    }
+    if (status != StatusType(ZX_OK)) {
+      return ktl::get<zx_status_t>(status);
     }
   }
 
