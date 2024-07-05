@@ -118,9 +118,9 @@ pub struct InspectArtifactsContainer {
 
 impl InspectArtifactsContainer {
     /// Remove a handle via its `koid` from the set of proxies managed by `self`.
-    pub fn remove_handle(&mut self, koid: zx::Koid) -> usize {
-        self.inspect_handles.remove(&koid);
-        self.inspect_handles.len()
+    pub fn remove_handle(&mut self, koid: zx::Koid) -> (Option<Arc<InspectHandle>>, usize) {
+        let stored = self.inspect_handles.remove(&koid);
+        (stored.map(|stored| stored.handle), self.inspect_handles.len())
     }
 
     /// Push a new handle into the container.

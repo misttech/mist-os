@@ -8,9 +8,11 @@ use crate::inspect::container::{
 };
 use crate::pipeline::Pipeline;
 use diagnostics_hierarchy::HierarchyMatcher;
+use fidl::endpoints::ClientEnd;
+use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_diagnostics::Selector;
 use flyweights::FlyStr;
-use fuchsia_sync::RwLock;
+use fuchsia_sync::{RwLock, RwLockWriteGuard};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
@@ -58,12 +60,11 @@ impl InspectRepository {
 
     fn add_inspect_artifacts(
         self: &Arc<Self>,
+        mut guard: RwLockWriteGuard<'_, InspectRepositoryInner>,
         identity: Arc<ComponentIdentity>,
         proxy_handle: InspectHandle,
         remove_associated: Option<zx::Koid>,
     ) {
-        // Hold the lock while we insert and update pipelines.
-        let mut guard = self.inner.write();
         // insert_inspect_artifact_container returns None when we were already tracking the
         // directory for this component. If that's the case we can return early.
         let Some(on_closed_fut) = guard.insert_inspect_artifact_container(
@@ -74,30 +75,11 @@ impl InspectRepository {
             return;
         };
 
-        let identity_clone = Arc::clone(&identity);
-        let this_weak = Arc::downgrade(self);
-        let _ = guard.inspect_handle_closed_snd.unbounded_send(fasync::Task::spawn(async move {
-            if let Ok(koid_to_remove) = on_closed_fut.await {
-                if let Some(this) = this_weak.upgrade() {
-                    // Hold the lock while we remove and update pipelines.
-                    let mut guard = this.inner.write();
-
-                    if let Some(container) = guard.diagnostics_containers.get_mut(&identity_clone) {
-                        if container.remove_handle(koid_to_remove) != 0 {
-                            return;
-                        }
-                    }
-
-                    guard.diagnostics_containers.remove(&identity_clone);
-
-                    for pipeline_weak in &this.pipelines {
-                        if let Some(pipeline) = pipeline_weak.upgrade() {
-                            pipeline.remove_component(&identity_clone.moniker);
-                        }
-                    }
-                }
-            }
-        }));
+        let _ = guard.inspect_handle_closed_snd.unbounded_send(spawn_on_closed_task(
+            Arc::clone(&identity),
+            Arc::downgrade(self),
+            on_closed_fut,
+        ));
 
         // Let each pipeline know that a new component arrived, and allow the pipeline
         // to eagerly bucket static selectors based on that component's moniker.
@@ -121,7 +103,34 @@ impl InspectRepository {
     ) {
         debug!(identity = %component, "Escrow inspect handle.");
         let handle = InspectHandle::escrow(vmo, token, name);
-        self.add_inspect_artifacts(Arc::clone(&component), handle, tree);
+        let guard = self.inner.write();
+        self.add_inspect_artifacts(guard, Arc::clone(&component), handle, tree);
+    }
+
+    pub(crate) fn fetch_escrow(
+        self: &Arc<Self>,
+        component: Arc<ComponentIdentity>,
+        token: finspect::EscrowToken,
+        tree: Option<ClientEnd<finspect::TreeMarker>>,
+    ) -> Option<zx::Vmo> {
+        debug!(identity = %component, "Fetch Escrowed inspect handle.");
+        let koid = token.token.as_handle_ref().get_koid().unwrap();
+        let mut guard = self.inner.write();
+        let container = guard.diagnostics_containers.get_mut(&component)?;
+        let (handle, _) = container.remove_handle(koid);
+        let handle = handle?;
+        let InspectHandle::Escrow { vmo, name, .. } = handle.as_ref() else {
+            return None;
+        };
+        if let Some(tree) = tree {
+            self.add_inspect_artifacts(
+                guard,
+                component,
+                InspectHandle::tree(tree.into_proxy().unwrap(), name.clone()),
+                None,
+            );
+        }
+        Some(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
     }
 
     pub(crate) fn add_inspect_handle(
@@ -130,9 +139,41 @@ impl InspectRepository {
         handle: InspectHandle,
     ) {
         debug!(identity = %component, "Added inspect handle.");
-        // Update the central repository to reference the new diagnostics source.
-        self.add_inspect_artifacts(Arc::clone(&component), handle, None);
+        let guard = self.inner.write();
+        self.add_inspect_artifacts(guard, Arc::clone(&component), handle, None);
     }
+}
+
+fn spawn_on_closed_task<E, F>(
+    identity: Arc<ComponentIdentity>,
+    repo: Weak<InspectRepository>,
+    on_closed_fut: F,
+) -> fasync::Task<()>
+where
+    F: Future<Output = Result<zx::Koid, E>> + Send + 'static,
+{
+    fasync::Task::spawn(async move {
+        if let Ok(koid_to_remove) = on_closed_fut.await {
+            if let Some(this) = repo.upgrade() {
+                // Hold the lock while we remove and update pipelines.
+                let mut guard = this.inner.write();
+
+                if let Some(container) = guard.diagnostics_containers.get_mut(&identity) {
+                    if container.remove_handle(koid_to_remove).1 != 0 {
+                        return;
+                    }
+                }
+
+                guard.diagnostics_containers.remove(&identity);
+
+                for pipeline_weak in &this.pipelines {
+                    if let Some(pipeline) = pipeline_weak.upgrade() {
+                        pipeline.remove_component(&identity.moniker);
+                    }
+                }
+            }
+        }
+    })
 }
 
 #[cfg(test)]
@@ -279,10 +320,11 @@ impl InspectRepositoryInner {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::Proxy;
     use fidl::AsHandleRef;
     use fidl_fuchsia_inspect as finspect;
-    use fuchsia_inspect::Inspector;
+    use fuchsia_inspect::{Inspector, InspectorConfig};
     use fuchsia_zircon::DurationNum;
     use selectors::FastError;
 
@@ -418,6 +460,14 @@ mod tests {
             Some("escrow"),
             None,
         );
+        {
+            let guard = repo.inner.read();
+            let container = guard.get(&identity);
+            assert!(container.is_some());
+            let mut handles = container.unwrap().handles();
+            assert_eq!(handles.len(), 1);
+            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Escrow { .. });
+        }
         drop(ep0);
         while repo.inner.read().get(&identity).is_some() {
             fasync::Timer::new(fasync::Time::after(100_i64.millis())).await;
@@ -457,5 +507,85 @@ mod tests {
             assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Escrow { .. });
         }
         fasync::Channel::from_channel(server_end.into_channel()).on_closed().await.unwrap();
+    }
+
+    #[fuchsia::test]
+    fn repo_fetch_escrow_removes_data() {
+        let _exec = fuchsia_async::LocalExecutor::new();
+        let repo = Arc::new(InspectRepository::default());
+        let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
+
+        let inspector = Inspector::default();
+        inspector.root().record_int("foo", 3);
+        let (ep0, ep1) = zx::EventPair::create();
+        repo.escrow_handle(
+            Arc::clone(&identity),
+            inspector.duplicate_vmo().unwrap(),
+            finspect::EscrowToken { token: ep1 },
+            Some("escrow"),
+            None,
+        );
+        {
+            let guard = repo.inner.read();
+            let container = guard.get(&identity);
+            assert!(container.is_some());
+            assert_eq!(container.unwrap().handles().len(), 1);
+        }
+
+        let vmo =
+            repo.fetch_escrow(Arc::clone(&identity), finspect::EscrowToken { token: ep0 }, None);
+        assert!(vmo.is_some());
+        let inspector_loaded = Inspector::new(InspectorConfig::default().vmo(vmo.unwrap()));
+        assert_data_tree!(inspector_loaded, root: {
+            foo: 3i64,
+        });
+
+        let guard = repo.inner.read();
+        let container = guard.get(&identity);
+        assert!(container.is_some());
+        assert_eq!(container.unwrap().handles().len(), 0);
+    }
+
+    #[fuchsia::test]
+    fn repo_fetch_escrow_with_tree_returns_data_keeps_tree() {
+        let _exec = fuchsia_async::LocalExecutor::new();
+        let repo = Arc::new(InspectRepository::default());
+        let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
+        let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));
+
+        let inspector = Inspector::default();
+        inspector.root().record_int("foo", 3);
+        let (ep0, ep1) = zx::EventPair::create();
+        repo.escrow_handle(
+            Arc::clone(&identity),
+            inspector.duplicate_vmo().unwrap(),
+            finspect::EscrowToken { token: ep1 },
+            Some("escrow"),
+            None,
+        );
+        {
+            let guard = repo.inner.read();
+            let container = guard.get(&identity);
+            assert!(container.is_some());
+            let mut handles = container.unwrap().handles();
+            assert_eq!(handles.len(), 1);
+            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Escrow { .. });
+        }
+
+        let (client_end, server_end) = fidl::endpoints::create_endpoints::<finspect::TreeMarker>();
+        let vmo = repo.fetch_escrow(
+            Arc::clone(&identity),
+            finspect::EscrowToken { token: ep0 },
+            Some(client_end),
+        );
+        assert!(vmo.is_some());
+        {
+            let guard = repo.inner.read();
+            let mut handles = guard.get(&identity).unwrap().handles();
+            assert_eq!(handles.len(), 1);
+            assert_matches!(handles.next().unwrap().as_ref(), InspectHandle::Tree { .. });
+        }
+        assert!(!fasync::Channel::from_channel(server_end.into_channel()).is_closed());
     }
 }

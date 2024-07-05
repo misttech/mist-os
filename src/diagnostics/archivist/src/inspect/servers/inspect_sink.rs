@@ -13,7 +13,7 @@ use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct InspectSinkServer {
@@ -108,8 +108,22 @@ impl InspectSinkServer {
                     );
                     control_handle.shutdown();
                 }
-                finspect::InspectSinkRequest::FetchEscrow { responder, .. } => {
-                    error!("https://fxbug.dev/346589931: Escrowing inspect is not yet implemented");
+                finspect::InspectSinkRequest::FetchEscrow {
+                    responder,
+                    payload:
+                        finspect::InspectSinkFetchEscrowRequest { tree, token: Some(token), .. },
+                } => {
+                    let vmo = repo.fetch_escrow(Arc::clone(&component), token, tree);
+                    let _ = responder.send(finspect::InspectSinkFetchEscrowResponse {
+                        vmo,
+                        ..Default::default()
+                    });
+                }
+                finspect::InspectSinkRequest::FetchEscrow {
+                    responder,
+                    payload: finspect::InspectSinkFetchEscrowRequest { token: None, .. },
+                } => {
+                    warn!(%component, "Attempted to fetch escrowed inspect with invalid data");
                     responder.control_handle().shutdown();
                 }
                 finspect::InspectSinkRequest::_UnknownMethod {
