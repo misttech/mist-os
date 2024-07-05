@@ -2,20 +2,41 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use errors::{ffx_bail, ffx_error};
-use ffx_core::ffx_plugin;
 use ffx_repository_add_args::AddCommand;
+use fho::{
+    bug, daemon_protocol, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter,
+};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_repo::repository::RepoProvider;
 use fuchsia_url::RepositoryUrl;
 use sdk_metadata::get_repositories;
+use std::io::Write as _;
+#[derive(FfxTool)]
+pub struct RepoAddTool {
+    #[command]
+    pub cmd: AddCommand,
+    #[with(daemon_protocol())]
+    repos: RepositoryRegistryProxy,
+}
 
-#[ffx_plugin("ffx-repo-add", RepositoryRegistryProxy = "daemon::protocol")]
-pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -> Result<()> {
+fho::embedded_plugin!(RepoAddTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for RepoAddTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
+        add_from_product(self.cmd, self.repos, &mut writer).await
+    }
+}
+
+pub async fn add_from_product(
+    cmd: AddCommand,
+    repos: RepositoryRegistryProxy,
+    writer: &mut <RepoAddTool as FfxMain>::Writer,
+) -> Result<()> {
     if cmd.prefix.is_empty() {
-        ffx_bail!("name cannot be empty");
+        return_user_error!("name cannot be empty");
     }
     let repositories = get_repositories(cmd.product_bundle_dir)?;
     for repository in repositories {
@@ -23,7 +44,7 @@ pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -
         let repo_alias = repository.aliases().first().unwrap();
         let repo_url = RepositoryUrl::parse_host(format!("{}.{}", cmd.prefix, &repo_alias))
             .map_err(|err| {
-                ffx_error!(
+                user_error!(
                     "invalid repository name for {:?} {:?}: {}",
                     cmd.prefix,
                     &repo_alias,
@@ -35,13 +56,13 @@ pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -
 
         let repo_spec = RepositorySpec::from(repository.spec().clone()).into();
 
-        match repos.add_repository(repo_name, &repo_spec).await? {
+        match repos.add_repository(repo_name, &repo_spec).await.map_err(|e| bug!(e))? {
             Ok(()) => {
-                println!("added repository {}", repo_name);
+                writeln!(writer, "added repository {}", repo_name).map_err(|e| bug!(e))?;
             }
             Err(err) => {
                 let err = RepositoryError::from(err);
-                ffx_bail!("Adding repository {} failed: {}", repo_name, err);
+                return_user_error!("Adding repository {} failed: {}", repo_name, err);
             }
         }
     }
@@ -55,18 +76,19 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use assert_matches::assert_matches;
     use camino::Utf8Path;
+    use fho::TestBuffers;
     use fidl_fuchsia_developer_ffx::{
         FileSystemRepositorySpec, RepositoryRegistryMarker, RepositoryRegistryRequest,
         RepositorySpec,
     };
-    use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
     use pretty_assertions::assert_eq;
     use sdk_metadata::{ProductBundle, ProductBundleV2, Repository};
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_from_product() {
+        let _test_env = ffx_config::test_init().await.expect("test initialization");
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap().canonicalize_utf8().unwrap();
 
@@ -126,9 +148,13 @@ mod tests {
         });
         pb.write(&dir).unwrap();
 
+        let buffers = TestBuffers::default();
+        let mut writer = <RepoAddTool as FfxMain>::Writer::new_test(&buffers);
+
         add_from_product(
             AddCommand { prefix: "my-repo".to_owned(), product_bundle_dir: dir.to_path_buf() },
             repos,
+            &mut writer,
         )
         .await
         .unwrap();
@@ -161,8 +187,9 @@ mod tests {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_from_product_rejects_invalid_names() {
+        let _test_env = ffx_config::test_init().await.expect("test initialization");
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
@@ -205,14 +232,20 @@ mod tests {
         });
         pb.write(&dir).unwrap();
 
-        let repos =
-            setup_fake_repos(move |req| panic!("should not receive any requests: {:?}", req));
+        let buffers = TestBuffers::default();
+        let mut writer = <RepoAddTool as FfxMain>::Writer::new_test(&buffers);
+
+        let repos: RepositoryRegistryProxy =
+            fho::testing::fake_proxy(move |req: RepositoryRegistryRequest| {
+                panic!("should not receive any requests: {:?}", req)
+            });
 
         for prefix in ["", "my_repo", "MyRepo", "😀"] {
             assert_matches!(
                 add_from_product(
                     AddCommand { prefix: prefix.to_owned(), product_bundle_dir: dir.to_path_buf() },
                     repos.clone(),
+                    &mut writer
                 )
                 .await,
                 Err(_)

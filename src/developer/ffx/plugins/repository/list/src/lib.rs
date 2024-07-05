@@ -2,57 +2,72 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
-use ffx_core::ffx_plugin;
 use ffx_repository_list_args::ListCommand;
-use ffx_writer::Writer;
+use fho::{bug, daemon_protocol, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
 use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec};
 use prettytable::format::TableFormat;
 use prettytable::{cell, row, table, Cell, Table};
 use std::collections::BTreeSet;
 
-#[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
-pub async fn list(
-    cmd: ListCommand,
+#[derive(FfxTool)]
+pub struct RepoListTool {
+    #[command]
+    pub cmd: ListCommand,
+    #[with(daemon_protocol())]
     repos: RepositoryRegistryProxy,
-    #[ffx(machine = Vec<RepositoryConfig>)] mut writer: Writer,
-) -> Result<()> {
-    list_impl(cmd, repos, None, &mut writer).await
+}
+
+fho::embedded_plugin!(RepoListTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for RepoListTool {
+    type Writer = MachineWriter<Vec<RepositoryConfig>>;
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
+        list_impl(self.cmd, self.repos, None, &mut writer).await
+    }
 }
 
 async fn list_impl(
     _cmd: ListCommand,
     repos_proxy: RepositoryRegistryProxy,
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut <RepoListTool as FfxMain>::Writer,
 ) -> Result<()> {
     let (client, server) = fidl::endpoints::create_endpoints::<RepositoryIteratorMarker>();
-    repos_proxy.list_repositories(server).context("listing repositories")?;
-    let client = client.into_proxy().context("creating repository iterator proxy")?;
+    repos_proxy.list_repositories(server).map_err(|e| bug!("error listing repositories: {e}"))?;
+    let client =
+        client.into_proxy().map_err(|e| bug!("error creating repository iterator proxy: {e}"))?;
 
-    let default_repo =
-        pkg::config::get_default_repository().await.context("getting default repository")?;
+    let default_repo = pkg::config::get_default_repository()
+        .await
+        .map_err(|e| bug!("error getting default repository: {e}"))?;
 
     let mut repos = vec![];
     loop {
-        let batch = client.next().await.context("fetching next batch of repositories")?;
+        let batch = client
+            .next()
+            .await
+            .map_err(|e| bug!("error fetching next batch of repositories: {e}"))?;
         if batch.is_empty() {
             break;
         }
 
         for repo in batch {
-            repos.push(repo.try_into().context("converting repository config")?);
+            repos
+                .push(repo.try_into().map_err(|e| bug!("error converting repository config {e}"))?);
         }
     }
 
     repos.sort();
 
     if writer.is_machine() {
-        writer.machine(&repos).context("writing machine representation of repositories")?;
+        writer
+            .machine(&repos)
+            .map_err(|e| bug!("error writing machine representation of repositories {e}"))?;
     } else {
         print_table(&repos, default_repo, table_format, writer)
-            .context("printing repository table")?
+            .map_err(|e| bug!("error printing repository table {e}"))?
     }
 
     Ok(())
@@ -62,7 +77,7 @@ fn print_table(
     repos: &[RepositoryConfig],
     default_repo: Option<String>,
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut <RepoListTool as FfxMain>::Writer,
 ) -> Result<()> {
     let mut table = Table::new();
     table.set_titles(row!("NAME", "TYPE", "ALIASES", "EXTRA"));
@@ -120,7 +135,7 @@ fn print_table(
         table.add_row(row);
     }
 
-    table.print(writer).context("printing table to writer")?;
+    table.print(writer).map_err(|e| bug!("error printing table to writer: {e}"))?;
 
     return Ok(());
 }
@@ -136,6 +151,7 @@ fn cell_for_aliases(aliases: &BTreeSet<String>) -> Cell {
 #[cfg(test)]
 mod test {
     use super::*;
+    use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         FileSystemRepositorySpec, PmRepositorySpec, RepositoryConfig, RepositoryIteratorRequest,
         RepositoryRegistryRequest, RepositorySpec,
@@ -145,7 +161,7 @@ mod test {
     use pretty_assertions::assert_eq;
 
     fn fake_repos() -> RepositoryRegistryProxy {
-        setup_fake_repos(move |req| {
+        fho::testing::fake_proxy(move |req| {
             fasync::Task::spawn(async move {
                 let mut sent = false;
                 match req {
@@ -199,15 +215,17 @@ mod test {
         })
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_list() {
         let _env = ffx_config::test_init().await.unwrap();
         let repos = fake_repos();
-        let mut out = Writer::new_test(None);
+
+        let buffers = TestBuffers::default();
+        let mut out = MachineWriter::new_test(None, &buffers);
         list_impl(ListCommand {}, repos, None, &mut out).await.unwrap();
 
         assert_eq!(
-            &out.test_output().unwrap(),
+            buffers.into_stdout_str(),
             "\
             +-------+------------+-----------------+--------------------------+\n\
             | NAME  | TYPE       | ALIASES         | EXTRA                    |\n\
@@ -227,15 +245,16 @@ mod test {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_machine() {
         let _env = ffx_config::test_init().await.unwrap();
         let repos = fake_repos();
-        let mut out = Writer::new_test(Some(ffx_writer::Format::Json));
+        let buffers = TestBuffers::default();
+        let mut out = MachineWriter::new_test(Some(Format::Json), &buffers);
         list_impl(ListCommand {}, repos, None, &mut out).await.unwrap();
 
         assert_eq!(
-            serde_json::from_str::<serde_json::Value>(&out.test_output().unwrap()).unwrap(),
+            serde_json::from_str::<serde_json::Value>(&buffers.into_stdout_str()).unwrap(),
             serde_json::json!([
                 {
                     "name": "Test1",

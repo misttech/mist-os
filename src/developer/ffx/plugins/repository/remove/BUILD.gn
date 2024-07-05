@@ -10,11 +10,12 @@ ffx_plugin("ffx_repository_remove") {
   with_unit_tests = true
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//src/developer/ffx/lib/errors:lib",
-    "//third_party/rust_crates:anyhow",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
   ]
   test_deps = [
-    "//src/lib/fuchsia-async",
+    "//src/developer/ffx/config:lib",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:futures",
   ]
 

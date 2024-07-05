@@ -2,16 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use errors::ffx_bail;
-use ffx_core::ffx_plugin;
 use ffx_repository_remove_args::RemoveCommand;
+use fho::{bug, daemon_protocol, return_user_error, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 
-#[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
+#[derive(FfxTool)]
+pub struct RepoRemoveTool {
+    #[command]
+    pub cmd: RemoveCommand,
+    #[with(daemon_protocol())]
+    repos: RepositoryRegistryProxy,
+}
+
+fho::embedded_plugin!(RepoRemoveTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for RepoRemoveTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> Result<()> {
+        remove(self.cmd, self.repos).await
+    }
+}
+
 pub async fn remove(cmd: RemoveCommand, repos: RepositoryRegistryProxy) -> Result<()> {
-    if !repos.remove_repository(&cmd.name).await? {
-        ffx_bail!("No repository named \"{}\".", cmd.name);
+    if !repos.remove_repository(&cmd.name).await.map_err(|e| bug!(e))? {
+        return_user_error!("No repository named \"{}\".", cmd.name);
     }
 
     Ok(())
@@ -21,14 +36,15 @@ pub async fn remove(cmd: RemoveCommand, repos: RepositoryRegistryProxy) -> Resul
 mod test {
     use super::*;
     use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
-    use fuchsia_async as fasync;
     use futures::channel::oneshot::channel;
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_remove() {
+        let _test_env = ffx_config::test_init().await.expect("test initialization");
+
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = setup_fake_repos(move |req| match req {
+        let repos = fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { name, responder } => {
                 sender.take().unwrap().send(name).unwrap();
                 responder.send(true).unwrap()
@@ -39,9 +55,10 @@ mod test {
         assert_eq!(receiver.await.unwrap(), "MyRepo".to_owned());
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_remove_fail() {
-        let repos = setup_fake_repos(move |req| match req {
+        let _test_env = ffx_config::test_init().await.expect("test initialization");
+        let repos = fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RemoveRepository { responder, .. } => {
                 responder.send(false).unwrap()
             }
