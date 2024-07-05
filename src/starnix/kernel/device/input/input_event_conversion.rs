@@ -526,10 +526,14 @@ impl FuchsiaTouchEventToLinuxTouchEventConverter {
 
         let time = timeval_from_time(zx::Time::from_nanos(time_nanos));
 
+        let no_contact_before_process_events = self.pointer_id_to_slot_id.is_empty();
+        let mut need_btn_touch_down = false;
+        let mut need_btn_touch_up = false;
+
         // TODO(https://fxbug.dev/314151713): use event.device_info to route event to different
         // device file.
 
-        for event in events.iter() {
+        for (index, event) in events.iter().enumerate() {
             let pointer_id = event.pointer_id;
             let slot_id = self.pointer_id_to_slot_id.get(&pointer_id).copied();
 
@@ -542,6 +546,10 @@ impl FuchsiaTouchEventToLinuxTouchEventConverter {
                                 return Err(TouchEventConversionError::NoMoreAvailableSlotId);
                             }
                         };
+
+                        if no_contact_before_process_events {
+                            need_btn_touch_down = true;
+                        }
 
                         self.pointer_id_to_slot_id.insert(pointer_id, new_slot_id);
 
@@ -611,6 +619,13 @@ impl FuchsiaTouchEventToLinuxTouchEventConverter {
                     Some(slot_id) => {
                         self.pointer_id_to_slot_id.remove(&pointer_id);
 
+                        // Ensure BTN_TOUCH up event is only sent when the last pointer is lifted.
+                        // Here check if the event is the last event from the vec prevents a false
+                        // BTN_TOUCH up event if any error reset_state of this converter.
+                        if index == events.len() - 1 && self.pointer_id_to_slot_id.is_empty() {
+                            need_btn_touch_up = true;
+                        }
+
                         existing_slot.push_back(uapi::input_event {
                             time,
                             type_: uapi::EV_ABS as u16,
@@ -633,6 +648,23 @@ impl FuchsiaTouchEventToLinuxTouchEventConverter {
         }
 
         let mut result: VecDeque<uapi::input_event> = VecDeque::new();
+
+        if need_btn_touch_down {
+            result.push_back(uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::BTN_TOUCH as u16,
+                value: 1,
+            });
+        } else if need_btn_touch_up {
+            result.push_back(uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::BTN_TOUCH as u16,
+                value: 0,
+            });
+        }
+
         result.append(&mut existing_slot);
         result.append(&mut new_slots);
 
@@ -1911,6 +1943,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10),
@@ -1988,6 +2021,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1),
                 make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
@@ -2151,6 +2185,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1),
                 make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
@@ -2177,6 +2212,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10),
@@ -2236,6 +2272,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event_with_time(uapi::EV_KEY, uapi::BTN_TOUCH, 1, 1),
                 make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 1),
                 make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1, 1),
                 make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10, 1),
@@ -2271,6 +2308,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event_with_time(uapi::EV_KEY, uapi::BTN_TOUCH, 1, 1),
                 make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 1),
                 make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1, 1),
                 make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10, 1),
