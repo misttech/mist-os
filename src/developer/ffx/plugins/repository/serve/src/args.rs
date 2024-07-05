@@ -15,7 +15,7 @@ use std::path::PathBuf;
 #[argh(
     subcommand,
     name = "serve",
-    description = "(EXPERIMENTAL) serve the repository server, registering repositories to device"
+    description = "serve repositories and product bundles, and register repositories to device"
 )]
 pub struct ServeCommand {
     #[argh(option, short = 'r')]
