@@ -289,6 +289,27 @@ pub fn ptrace_access_check(tracer_task: &CurrentTask, tracee_task: &Task) -> Res
     })
 }
 
+/// Called when the current task calls prlimit on a different task.
+/// Corresponds to the `security_task_prlimit` hook.
+pub fn task_prlimit(
+    source: &CurrentTask,
+    target: &Task,
+    check_get_rlimit: bool,
+    check_set_rlimit: bool,
+) -> Result<(), Errno> {
+    check_if_selinux(source, |security_server| {
+        let source_sid = get_current_sid(&source);
+        let target_sid = get_current_sid(&target);
+        selinux_hooks::task_prlimit(
+            &security_server.as_permission_check(),
+            source_sid,
+            target_sid,
+            check_get_rlimit,
+            check_set_rlimit,
+        )
+    })
+}
+
 /// Clears the `ptrace_sid` for `tracee_task`.
 // TODO: Fix ptrace checks to rely on `Task::ptrace` state, and remove this.
 pub fn clear_ptracer_sid(tracee_task: &Task) {
@@ -866,6 +887,24 @@ mod tests {
     async fn ptrace_attach_access_allowed_for_permissive_mode() {
         let (tracer_task, tracee_task) = create_task_pair_with_permissive_selinux();
         assert_eq!(ptrace_access_check(&tracer_task, &tracee_task), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn task_prlimit_access_allowed_for_selinux_disabled() {
+        let (tracer_task, tracee_task) = create_task_pair_with_selinux_disabled();
+        assert_eq!(task_prlimit(&tracer_task, &tracee_task, true, true), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn task_prlimit_access_allowed_for_fake_mode() {
+        let (tracer_task, tracee_task) = create_task_pair_with_fake_selinux();
+        assert_eq!(task_prlimit(&tracer_task, &tracee_task, true, true), Ok(()));
+    }
+
+    #[fuchsia::test]
+    async fn task_prlimit_access_allowed_for_permissive_mode() {
+        let (tracer_task, tracee_task) = create_task_pair_with_permissive_selinux();
+        assert_eq!(task_prlimit(&tracer_task, &tracee_task, true, true), Ok(()));
     }
 
     #[fuchsia::test]

@@ -1246,6 +1246,12 @@ pub fn sys_prlimit64(
                 return error!(EPERM);
             }
         }
+        security::task_prlimit(
+            current_task,
+            &target_task,
+            !user_old_limit.is_null(),
+            !user_new_limit.is_null(),
+        )?;
     }
 
     let resource = Resource::from_raw(user_resource)?;

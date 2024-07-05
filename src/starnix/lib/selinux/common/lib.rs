@@ -262,6 +262,10 @@ class_permission_enum! {
         SetKeyCreate("setkeycreate"),
         /// Permission to set the Security Context used when creating new labeled sockets.
         SetSockCreate("setsockcreate"),
+        /// Permission to get the resource limits on a process.
+        GetRlimit("getrlimit"),
+        /// Permission to set the resource limits on a process.
+        SetRlimit("setrlimit"),
     }
 }
 
