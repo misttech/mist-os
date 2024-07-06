@@ -33,6 +33,11 @@ pub struct InspectStatus {
     /// The number of FIDL events ignored to this module’s representation of TouchEvent.
     pub fidl_events_ignored_count: fuchsia_inspect::UintProperty,
 
+    /// The unexpected number of FIDL events reached to this module should be filtered out
+    /// earlier in the UI stack.
+    /// It maybe unexpected format or unexpected order.
+    pub fidl_events_unexpected_count: fuchsia_inspect::UintProperty,
+
     /// The number of FIDL events converted to this module’s representation of TouchEvent.
     pub fidl_events_converted_count: fuchsia_inspect::UintProperty,
 
@@ -47,6 +52,7 @@ impl InspectStatus {
     fn new(node: fuchsia_inspect::Node) -> Self {
         let fidl_events_received_count = node.create_uint("fidl_events_received_count", 0);
         let fidl_events_ignored_count = node.create_uint("fidl_events_ignored_count", 0);
+        let fidl_events_unexpected_count = node.create_uint("fidl_events_unexpected_count", 0);
         let fidl_events_converted_count = node.create_uint("fidl_events_converted_count", 0);
         let uapi_events_generated_count = node.create_uint("uapi_events_generated_count", 0);
         let uapi_events_read_count = node.create_uint("uapi_events_read_count", 0);
@@ -54,6 +60,7 @@ impl InspectStatus {
             _inspect_node: node,
             fidl_events_received_count,
             fidl_events_ignored_count,
+            fidl_events_unexpected_count,
             fidl_events_converted_count,
             uapi_events_generated_count,
             uapi_events_read_count,
@@ -66,6 +73,10 @@ impl InspectStatus {
 
     pub fn count_ignored_events(&self, count: u64) {
         self.fidl_events_ignored_count.add(count);
+    }
+
+    pub fn count_unexpected_events(&self, count: u64) {
+        self.fidl_events_unexpected_count.add(count);
     }
 
     pub fn count_converted_events(&self, count: u64) {

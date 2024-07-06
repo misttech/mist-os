@@ -1298,6 +1298,7 @@ mod test {
             touch_input_file: {
                 fidl_events_received_count: 0u64,
                 fidl_events_ignored_count: 0u64,
+                fidl_events_unexpected_count: 0u64,
                 fidl_events_converted_count: 0u64,
                 uapi_events_generated_count: 0u64,
                 uapi_events_read_count: 0u64,
@@ -1354,6 +1355,7 @@ mod test {
                 touch_file: {
                     fidl_events_received_count: 7u64,
                     fidl_events_ignored_count: 2u64,
+                    fidl_events_unexpected_count: 0u64,
                     fidl_events_converted_count: 5u64,
                     uapi_events_generated_count: 19u64,
                     uapi_events_read_count: 19u64,
