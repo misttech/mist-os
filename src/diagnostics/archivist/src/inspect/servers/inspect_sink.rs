@@ -13,8 +13,8 @@ use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
-use tracing::{debug, error, warn};
-use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
+use tracing::{debug, warn};
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct InspectSinkServer {
     /// Shared repository holding the Inspect handles.
@@ -69,7 +69,7 @@ impl InspectSinkServer {
                     ..
                 } => repo.add_inspect_handle(
                     Arc::clone(&component),
-                    InspectHandle::from_named_tree_proxy(tree.into_proxy()?, name),
+                    InspectHandle::tree(tree.into_proxy()?, name),
                 ),
                 finspect::InspectSinkRequest::Publish {
                     payload: finspect::InspectSinkPublishRequest { tree: None, name, .. },
@@ -77,12 +77,53 @@ impl InspectSinkServer {
                 } => {
                     debug!(name, %component, "InspectSink/Publish without a tree");
                 }
-                finspect::InspectSinkRequest::Escrow { control_handle, .. } => {
-                    error!("https://fxbug.dev/346589931: Escrowing inspect is not yet implemented");
+                finspect::InspectSinkRequest::Escrow {
+                    payload:
+                        finspect::InspectSinkEscrowRequest {
+                            vmo: Some(vmo),
+                            name,
+                            token: Some(token),
+                            tree,
+                            ..
+                        },
+                    ..
+                } => {
+                    repo.escrow_handle(
+                        Arc::clone(&component),
+                        vmo,
+                        token,
+                        name,
+                        tree.map(zx::Koid::from_raw),
+                    );
+                }
+                finspect::InspectSinkRequest::Escrow {
+                    control_handle,
+                    payload: finspect::InspectSinkEscrowRequest { vmo, token, .. },
+                } => {
+                    warn!(
+                        %component,
+                        has_vmo = vmo.is_some(),
+                        has_token = token.is_some(),
+                        "Attempted to escrow inspect without required data"
+                    );
                     control_handle.shutdown();
                 }
-                finspect::InspectSinkRequest::FetchEscrow { responder, .. } => {
-                    error!("https://fxbug.dev/346589931: Escrowing inspect is not yet implemented");
+                finspect::InspectSinkRequest::FetchEscrow {
+                    responder,
+                    payload:
+                        finspect::InspectSinkFetchEscrowRequest { tree, token: Some(token), .. },
+                } => {
+                    let vmo = repo.fetch_escrow(Arc::clone(&component), token, tree);
+                    let _ = responder.send(finspect::InspectSinkFetchEscrowResponse {
+                        vmo,
+                        ..Default::default()
+                    });
+                }
+                finspect::InspectSinkRequest::FetchEscrow {
+                    responder,
+                    payload: finspect::InspectSinkFetchEscrowRequest { token: None, .. },
+                } => {
+                    warn!(%component, "Attempted to fetch escrowed inspect with invalid data");
                     responder.control_handle().shutdown();
                 }
                 finspect::InspectSinkRequest::_UnknownMethod {
@@ -264,7 +305,7 @@ mod tests {
             koids: [zx::Koid; N],
             assertions: F,
         ) where
-            F: FnOnce([InspectHandle; N]) -> Fut,
+            F: FnOnce([Arc<InspectHandle>; N]) -> Fut,
             Fut: Future<Output = ()>,
         {
             self.repo.wait_for_artifact(identity).await;
@@ -281,10 +322,10 @@ mod tests {
                         containers[0]
                             .inspect_handles
                             .iter()
+                            .filter_map(|h| h.upgrade())
                             .find(|handle| handle.koid() == *koid)
                             .unwrap()
                     })
-                    .cloned()
                     .collect::<Vec<_>>()
                     .try_into()
                     .unwrap(),
@@ -322,7 +363,7 @@ mod tests {
 
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
-                &handles[0],
+                handles[0].as_ref(),
                 InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
@@ -356,7 +397,7 @@ mod tests {
 
         test.assert(&identity, [koid0, koid1], |handles| async move {
             assert_matches!(
-                &handles[0],
+                handles[0].as_ref(),
                 InspectHandle::Tree { proxy: tree, ..} => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
@@ -365,7 +406,7 @@ mod tests {
             });
 
             assert_matches!(
-                &handles[1],
+                handles[1].as_ref(),
                 InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
@@ -391,7 +432,7 @@ mod tests {
 
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
-                &handles[0],
+                handles[0].as_ref(),
                 InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
@@ -406,7 +447,7 @@ mod tests {
         // the data must remain present as long as the tree server started above is alive
         test.assert(&identity, [koid], |handles| async move {
             assert_matches!(
-                &handles[0],
+                handles[0].as_ref(),
                 InspectHandle::Tree { proxy: tree, ..} => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
@@ -444,7 +485,7 @@ mod tests {
 
         test.assert(&identities[0], [koid_component_0], |handles| async move {
             assert_matches!(
-                &handles[0],
+                handles[0].as_ref(),
                 InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {
@@ -456,7 +497,7 @@ mod tests {
 
         test.assert(&identities[1], [koid_component_1], |handles| async move {
             assert_matches!(
-                &handles[0],
+                handles[0].as_ref(),
                 InspectHandle::Tree { proxy: tree, .. } => {
                    let hierarchy = read(tree).await.unwrap();
                    assert_json_diff!(hierarchy, root: {

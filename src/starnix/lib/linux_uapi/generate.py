@@ -130,6 +130,12 @@ AUTO_DERIVE_TRAITS = [
     (r"ip6?t_entry", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
     (r"ip6?t_get_entries", ["FromBytes", "NoCell", "FromZeros"]),
     (r"ip6?t_replace", ["AsBytes", "FromBytes", "NoCell", "FromZeros"]),
+    (r"nf_conntrack_man_proto", ["FromBytes", "NoCell", "FromZeros"]),
+    (r"nf_inet_addr", ["FromBytes", "NoCell", "FromZeros"]),
+    (
+        r"nf_nat(_ipv4)?(_multi)?_range(_compat)?",
+        ["FromBytes", "NoCell", "FromZeros"],
+    ),
     (r"robust_list_head", ["FromBytes", "NoCell", "FromZeros"]),
     (r"robust_list", ["FromBytes", "NoCell", "FromZeros"]),
     (r"sigevent", ["FromBytes", "NoCell", "FromZeros"]),
@@ -142,6 +148,7 @@ AUTO_DERIVE_TRAITS = [
     (r"sysinfo", ["AsBytes", "NoCell"]),
     (r"timeval", ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"]),
     (r"xt_counters_info", ["FromBytes", "NoCell", "FromZeros"]),
+    (r"xt_tproxy_target_info_v1", ["FromBytes", "NoCell", "FromZeros"]),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of

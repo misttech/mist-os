@@ -80,7 +80,11 @@ def update_version_history(
 
             for level, data in versions.items():
                 if data["status"] == "in-development":
-                    data["status"] = "supported"
+                    print(
+                        f"error: Fuchsia API level {level} is in-development. All API levels must be frozen before bumping.",
+                        file=sys.stderr,
+                    )
+                    return False
 
             abi_revision = generate_random_abi_revision(
                 set(int(v["abi_revision"], 16) for v in versions.values())
@@ -162,19 +166,19 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    if not update_version_history(
-        args.fuchsia_api_level, args.sdk_version_history
-    ):
+    new_level = args.fuchsia_api_level
+
+    if not update_version_history(new_level, args.sdk_version_history):
         return 1
 
     if not update_fidl_compatibility_doc(
-        args.fuchsia_api_level, args.fidl_compatibility_doc_path
+        new_level, args.fidl_compatibility_doc_path
     ):
         return 1
 
     if args.update_goldens:
         level_dir_path = os.path.join(
-            args.root_source_dir, "sdk", "history", str(args.fuchsia_api_level)
+            args.root_source_dir, "sdk", "history", str(new_level)
         )
         try:
             os.mkdir(level_dir_path)
@@ -189,6 +193,24 @@ def main() -> int:
         ):
             return 1
 
+    # TODO(https://fxbug.dev/349622444): Automate this.
+    # TODO(https://fxbug.dev/326277078): Move this to the instructions for
+    # promoting "NEXT" to a stable API level.
+    levels_file = "zircon/system/public/zircon/availability_levels.inc"
+    sysroot_api_file = "zircon/public/sysroot/sdk/sysroot.api"
+    print(
+        f"Add `#define FUCHSIA_INTERNAL_LEVEL_{new_level}_() {new_level}` to `//{levels_file}`, run `fx build zircon/public/sysroot/sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//{sysroot_api_file}`."
+    )
+
+    # Before printing, rebase the paths to what a developer would use from `//`.
+    history = os.path.relpath(args.sdk_version_history, args.root_source_dir)
+    compatibility = os.path.relpath(
+        args.fidl_compatibility_doc_path, args.root_source_dir
+    )
+    level_dir = os.path.relpath(level_dir_path, args.root_source_dir)
+    print(
+        f"Then run `git add -u {history} {compatibility} {levels_file} {sysroot_api_file} && git add {level_dir}`."
+    )
     return 0
 
 

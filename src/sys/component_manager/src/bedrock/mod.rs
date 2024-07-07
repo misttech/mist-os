@@ -9,4 +9,3 @@
 //! module/library layout over time.
 
 pub mod program;
-pub mod program_output_dict;

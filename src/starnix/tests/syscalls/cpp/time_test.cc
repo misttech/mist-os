@@ -32,7 +32,8 @@ TEST(TimeTest, ClockGetResSyscallFail) {
   ASSERT_THAT(clock_getres(clockid, &tp), SyscallFails());
 }
 
-TEST(TimeTest, GetTimeOfDayNullTvSomeTz) {
+// TODO(https://fxbug.dev/350763590) remove no_sanitize attribute and diagnostic suppression
+TEST(TimeTest, GetTimeOfDayNullTvSomeTz) __attribute__((no_sanitize("nonnull-attribute"))) {
   struct timezone tz;
 // glibc adds nonnull attribute to the tv argument in getttimeofday.
 // gettimeofday, however, does allow the tv argument to be NULL.
@@ -55,7 +56,8 @@ TEST(TimeTest, GetTimeOfDaySomeTvSomeTz) {
   ASSERT_THAT(gettimeofday(&tv, &tz), SyscallSucceeds());
 }
 
-TEST(TimeTest, GetTimeOfDayNullTvNullTz) {
+// TODO(https://fxbug.dev/350763590) remove no_sanitize attribute and diagnostic suppression
+TEST(TimeTest, GetTimeOfDayNullTvNullTz) __attribute__((no_sanitize("nonnull-attribute"))) {
 // glibc adds nonnull attribute to the tv argument in getttimeofday.
 // gettimeofday, however, does allow the tv argument to be NULL.
 // To test that the vdso gettimeofday function allows tv to be NULL, the nonnull warning is

@@ -156,9 +156,6 @@ class PageLoader {
     // |zx_pager_supply_pages| on the |decompression_buffer_|.
     std::unique_ptr<TransferBuffer> compressed_transfer_buffer_;
 
-    // A persistent mapping for |compressed_transfer_buffer_|.
-    fzl::VmoMapper compressed_mapper_;
-
     // This is the buffer that can be written to by the other end of the
     // |decompressor_client_| connection. The contents are not to be trusted and
     // may be changed at any time, so they need to be copied out prior to

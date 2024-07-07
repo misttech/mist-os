@@ -232,7 +232,7 @@ class F2fs final {
   }
   void ScheduleWriter(fpromise::promise<> task) { writer_->ScheduleTask(std::move(task)); }
 
-  void ScheduleWriteback(size_t num_pages = kDefaultBlocksPerSegment);
+  void ScheduleWritebackAndReclaimPages(size_t num_pages = kDefaultBlocksPerSegment);
   zx::result<> WaitForWriteback() {
     if (!writeback_flag_.try_acquire_for(std::chrono::seconds(kWriteTimeOut))) {
       return zx::error(ZX_ERR_TIMED_OUT);
@@ -262,7 +262,7 @@ class F2fs final {
 
   void WaitForAvailableMemory() {
     while (HasNotEnoughMemory()) {
-      ScheduleWriteback();
+      ScheduleWritebackAndReclaimPages();
       ZX_ASSERT(WaitForWriteback().is_ok());
     }
   }

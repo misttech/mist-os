@@ -4,7 +4,7 @@
 
 use crate::device::{BinderDriver, DeviceOps, RemoteBinderConnection};
 use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
-use crate::task::{with_current_task, CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
+use crate::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString, NamespaceNode};
 use anyhow::{Context, Error};
@@ -80,15 +80,15 @@ impl DeviceOps for RemoteBinderDevice {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(RemoteBinderFileOps::new(&current_task.thread_group))
+        Ok(RemoteBinderFileOps::new(current_task))
     }
 }
 
 struct RemoteBinderFileOps(Arc<RemoteBinderHandle<DefaultRemoteControllerConnector>>);
 
 impl RemoteBinderFileOps {
-    fn new(thread_group: &Arc<ThreadGroup>) -> Box<Self> {
-        Box::new(Self(RemoteBinderHandle::<DefaultRemoteControllerConnector>::new(thread_group)))
+    fn new(current_task: &CurrentTask) -> Box<Self> {
+        Box::new(Self(RemoteBinderHandle::<DefaultRemoteControllerConnector>::new(current_task)))
     }
 }
 
@@ -130,6 +130,7 @@ impl FileOps for RemoteBinderFileOps {
 
     fn mmap(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _addr: DesiredAddress,
@@ -251,6 +252,7 @@ fn must_interrupt<R>(result: &Result<R, Errno>) -> Option<Errno> {
 /// Connection to the remote binder device. One connection is associated to one instance of a
 /// remote fuchsia component.
 struct RemoteBinderHandle<F: RemoteControllerConnector> {
+    kernel: Arc<Kernel>,
     state: Mutex<RemoteBinderHandleState>,
 
     /// Marker struct, needed because the struct is parametrized by `F`.
@@ -439,10 +441,11 @@ impl RemoteBinderHandleState {
 }
 
 impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
-    fn new(thread_group: &Arc<ThreadGroup>) -> Arc<Self> {
+    fn new(current_task: &CurrentTask) -> Arc<Self> {
         Arc::new(Self {
+            kernel: current_task.kernel().clone(),
             state: Mutex::new(RemoteBinderHandleState {
-                thread_group: Arc::downgrade(thread_group),
+                thread_group: Arc::downgrade(&current_task.thread_group),
                 koid_to_task: Default::default(),
                 unassigned_tasks: Default::default(),
                 unassigned_requests: Default::default(),
@@ -677,13 +680,12 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             TaskRequest::Open { path, process_accessor, process, responder: sender },
         );
         let remote_binder_connection = receiver.await??;
+        let remote_binder_connection_for_close = remote_binder_connection.clone();
 
         scopeguard::defer! {
             // When leaving the current scope, close the connection, even if some operation are in
             // progress. This should kick the tasks back with an error.
-            with_current_task(|current_task| {
-              remote_binder_connection.close(current_task);
-            });
+            remote_binder_connection_for_close.close(&self.kernel);
         }
 
         // Register a receiver to be notified of exit
@@ -1116,21 +1118,30 @@ mod tests {
                 .into();
 
                 let remote_binder_handle =
-                    RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task.thread_group);
+                    RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task);
 
                 let service_name_string =
                     CString::new(service_name.as_bytes()).expect("CString::new");
                 let service_name_bytes = service_name_string.as_bytes_with_nul();
-                let service_name_address =
-                    map_memory(&task, UserAddress::default(), service_name_bytes.len() as u64);
+                let service_name_address = map_memory(
+                    locked,
+                    &task,
+                    UserAddress::default(),
+                    service_name_bytes.len() as u64,
+                );
                 task.write_memory(service_name_address, service_name_bytes).expect("write_memory");
 
-                let start_command_address =
-                    map_memory(&task, UserAddress::default(), std::mem::size_of::<u64>() as u64);
+                let start_command_address = map_memory(
+                    locked,
+                    &task,
+                    UserAddress::default(),
+                    std::mem::size_of::<u64>() as u64,
+                );
                 task.write_object(start_command_address.into(), &service_name_address.ptr())
                     .expect("write_object");
 
                 let wait_command_address = map_memory(
+                    locked,
                     &task,
                     UserAddress::default(),
                     std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,

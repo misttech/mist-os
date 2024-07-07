@@ -81,11 +81,13 @@ zx::result<std::unique_ptr<Logger>> Logger::Create(const Namespace& ns,
 }
 
 Logger* Logger::GlobalInstance() {
-  ZX_DEBUG_ASSERT(g_instance != nullptr);
+  ZX_DEBUG_ASSERT(HasGlobalInstance());
   return g_instance.load();
 }
 
 void Logger::SetGlobalInstance(Logger* logger) { g_instance = logger; }
+
+bool Logger::HasGlobalInstance() { return g_instance != nullptr; }
 
 Logger::~Logger() = default;
 

@@ -9,6 +9,8 @@ import("//src/connectivity/bluetooth/core/bt-host/build/bt_gtest_package.gni")
 
 static_library("fidl") {
   sources = [
+    "bredr_connection_server.cc",
+    "bredr_connection_server.h",
     "gatt2_client_server.cc",
     "gatt2_client_server.h",
     "gatt2_remote_service_server.cc",
@@ -142,6 +144,7 @@ source_set("tests") {
   testonly = true
 
   sources = [
+    "bredr_connection_server_test.cc",
     "gatt2_client_server_test.cc",
     "gatt2_remote_service_server_test.cc",
     "gatt2_server_server_test.cc",
@@ -164,6 +167,7 @@ source_set("tests") {
     "measure_tape:peer_hlcpp",
     "//src/connectivity/bluetooth/core/bt-host/gap:testing",
     "//src/connectivity/bluetooth/core/bt-host/gatt:testing",
+    "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
     "//src/connectivity/bluetooth/core/bt-host/testing",
     "//src/connectivity/bluetooth/core/bt-host/testing:fake_controller",
     "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",

@@ -18,6 +18,10 @@ primary node "platform-device" {
   }
 }
 
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
+
 optional node "mic-privacy" {
     fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
     fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.MIC_MUTE;

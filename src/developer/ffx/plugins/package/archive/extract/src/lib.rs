@@ -3,16 +3,25 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use errors::ffx_error;
-use ffx_core::ffx_plugin;
+pub use ffx_package_archive_extract_args::PackageArchiveExtractCommand;
+use fho::{user_error, FfxMain, FfxTool, SimpleWriter};
 use package_tool::cmd_package_archive_extract;
 
-pub use ffx_package_archive_extract_args::PackageArchiveExtractCommand;
+#[derive(FfxTool)]
+pub struct ArchiveExtractTool {
+    #[command]
+    pub cmd: PackageArchiveExtractCommand,
+}
 
-#[ffx_plugin()]
-pub async fn cmd_package(cmd: PackageArchiveExtractCommand) -> Result<()> {
-    cmd_package_archive_extract(cmd)
-        .await
-        .map_err(|err| ffx_error!("Error: failed to extract archive: {err:?}"))?;
-    Ok(())
+fho::embedded_plugin!(ArchiveExtractTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ArchiveExtractTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        cmd_package_archive_extract(self.cmd)
+            .await
+            .map_err(|err| user_error!("Error: failed to extract archive: {err:?}"))?;
+        Ok(())
+    }
 }

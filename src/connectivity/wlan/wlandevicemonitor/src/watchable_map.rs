@@ -23,7 +23,6 @@ where
     inner: Mutex<Inner<K, V>>,
 }
 
-#[allow(unused)]
 #[derive(Debug)]
 pub enum MapEvent<K, V>
 where

@@ -27,10 +27,14 @@ Options:
   --dev: if set, use the locally built ninjatrace binary, instead of the prebuilt one.
   --rbe-rpl-path: when provided, interleave remote execution stats from RBE into
       the main trace
+  --save-temps: if set, keep the intermediate compdb.json and graph.dot files
+      in each build directory.  The are only needed temporarily to produce the
+      final ninjatrace.json, and can be large at O(100)s of MBs.
 EOF
 }
 
 dev=0
+save_temps=0
 rbe_rpl_path=''
 # Extract script options before --
 for opt; do
@@ -54,6 +58,7 @@ for opt; do
     --dev) dev=1 ;;
     --rbe-rpl-path=*) rbe_rpl_path="$optarg" ;;
     --rbe-rpl-path) prev_opt='rbe_rpl_path' ;;
+    --save-temps) save_temps=1 ;;
     *)
       echo "Unknown option ${opt}"
       usage
@@ -68,33 +73,62 @@ test -z "$prev_opt" || {
   exit 1
 }
 
-TMP_DIR="$(mktemp -d)"
-readonly TMP_DIR
-trap 'rm -rf "${TMP_DIR}"' EXIT
-
-"${PREBUILT_NINJA}" -C "${FUCHSIA_BUILD_DIR}" -t compdb > "${TMP_DIR}/compdb.json"
-"${PREBUILT_NINJA}" -C "${FUCHSIA_BUILD_DIR}" -t graph > "${TMP_DIR}/graph.dot"
-
-ninjatrace_args=(
-  -ninjalog "${FUCHSIA_BUILD_DIR}/.ninja_log"
-  -compdb "${TMP_DIR}/compdb.json"
-  -graph "${TMP_DIR}/graph.dot"
-  -trace-json "${FUCHSIA_BUILD_DIR}/ninjatrace.json"
-  -critical-path
-)
-
-test -z "${rbe_rpl_path}" || {
-  ninjatrace_args+=(
-    -rbe-rpl-path "${rbe_rpl_path}"
-    '-rpl2trace-path' "${PREBUILT_RECLIENT_DIR}/rpl2trace"
-  )
-}
-
 ninjatrace="${PREBUILT_NINJATRACE}"
 if [[ "$dev" == 1 ]]; then
   ninjatrace="${HOST_OUT_DIR}/ninjatrace"
 fi
 
-"${ninjatrace}" "${ninjatrace_args[@]}"
+ninja_logs=($(find ${FUCHSIA_BUILD_DIR} -name .ninja_log -type f))
+build_dirs=("${ninja_logs[@]%/.ninja_log}")  # dirname
+
+function cleanup() {
+  if [[ "$save_temps" != 1 ]]; then
+    for d in "${build_dirs[@]}"
+    do
+      rm -f "$d/compdb.json" "$d/graph.dot"
+    done
+  fi
+}
+
+trap cleanup EXIT
+
+function trace_one_build_dir() {
+  local build_dir="$1"
+  local log="$build_dir/.ninja_log"
+  local compdb="$build_dir/compdb.json"
+  local graph="$build_dir/graph.dot"
+  local trace="$build_dir/ninjatrace.json"
+  if [[ -f "$trace" && "$trace" -nt "$log" ]]; then
+    # treat ninjatrace as already cached
+    echo "Using cached $trace (not regenerating)"
+    return
+  fi
+  "${PREBUILT_NINJA}" -C "$build_dir" -t compdb > "$compdb"
+  "${PREBUILT_NINJA}" -C "$build_dir" -t graph > "$graph"
+
+  local ninjatrace_args=(
+    -ninjalog "$log"
+    -compdb "$compdb"
+    -graph "$graph"
+    -trace-json "$trace"
+    -critical-path
+  )
+
+  if [[ -n "${rbe_rpl_path}" ]]; then
+    ninjatrace_args+=(
+      -rbe-rpl-path "${rbe_rpl_path}"
+      '-rpl2trace-path' "${PREBUILT_RECLIENT_DIR}/rpl2trace"
+    )
+  fi
+
+  "${ninjatrace}" "${ninjatrace_args[@]}"
+}
+
+# Process each build dir in parallel.
+for build_dir in "${build_dirs[@]}"; do
+  trace_one_build_dir "$build_dir" &
+done
+
+wait
 
 echo "Now visit chrome://tracing and load ${FUCHSIA_BUILD_DIR}/ninjatrace.json"

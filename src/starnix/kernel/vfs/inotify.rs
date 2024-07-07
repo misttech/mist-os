@@ -439,7 +439,14 @@ impl InotifyWatchers {
     /// If event_mask is IN_DELETE_SELF, all watchers are removed after this event.
     /// cookie is used to link a pair of IN_MOVE_FROM/IN_MOVE_TO events only.
     /// mode is used to check whether IN_ISDIR should be combined with event_mask.
-    pub fn notify(&self, mut event_mask: InotifyMask, cookie: u32, name: &FsStr, mode: FileMode) {
+    pub fn notify(
+        &self,
+        mut event_mask: InotifyMask,
+        cookie: u32,
+        name: &FsStr,
+        mode: FileMode,
+        is_dead: bool,
+    ) {
         if cookie != 0 {
             // From https://man7.org/linux/man-pages/man7/inotify.7.html,
             // cookie is only used for rename events.
@@ -459,7 +466,9 @@ impl InotifyWatchers {
             let mut watchers = self.watchers.lock();
             watchers.retain(|inotify, watcher| {
                 let mut should_remove = event_mask == InotifyMask::DELETE_SELF;
-                if watcher.mask.contains(event_mask) {
+                if watcher.mask.contains(event_mask)
+                    && !(is_dead && watcher.mask.contains(InotifyMask::EXCL_UNLINK))
+                {
                     should_remove = should_remove || watcher.mask.contains(InotifyMask::ONESHOT);
                     if let Some(file) = inotify.0.upgrade() {
                         watches.push(InotifyWatch {
@@ -718,7 +727,13 @@ mod tests {
         }
 
         // Generate 1 event.
-        root.node.watchers.notify(InotifyMask::ACCESS, 0, Default::default(), FileMode::IFREG);
+        root.node.watchers.notify(
+            InotifyMask::ACCESS,
+            0,
+            Default::default(),
+            FileMode::IFREG,
+            false,
+        );
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {
@@ -728,7 +743,13 @@ mod tests {
         }
 
         // Generate another event.
-        root.node.watchers.notify(InotifyMask::ATTRIB, 0, Default::default(), FileMode::IFREG);
+        root.node.watchers.notify(
+            InotifyMask::ATTRIB,
+            0,
+            Default::default(),
+            FileMode::IFREG,
+            false,
+        );
 
         assert_eq!(inotify.available(), DATA_SIZE * 2);
         {
@@ -778,7 +799,13 @@ mod tests {
             assert_eq!(watchers.len(), 1);
         }
 
-        root.node.watchers.notify(InotifyMask::DELETE_SELF, 0, Default::default(), FileMode::IFREG);
+        root.node.watchers.notify(
+            InotifyMask::DELETE_SELF,
+            0,
+            Default::default(),
+            FileMode::IFREG,
+            false,
+        );
 
         {
             let watchers = root.node.watchers.watchers.lock();
@@ -867,8 +894,20 @@ mod tests {
         }
 
         // Generate 2 identical events. They should combine into 1.
-        root.node.watchers.notify(InotifyMask::ACCESS, 0, Default::default(), FileMode::IFREG);
-        root.node.watchers.notify(InotifyMask::ACCESS, 0, Default::default(), FileMode::IFREG);
+        root.node.watchers.notify(
+            InotifyMask::ACCESS,
+            0,
+            Default::default(),
+            FileMode::IFREG,
+            false,
+        );
+        root.node.watchers.notify(
+            InotifyMask::ACCESS,
+            0,
+            Default::default(),
+            FileMode::IFREG,
+            false,
+        );
 
         assert_eq!(inotify.available(), DATA_SIZE);
         {

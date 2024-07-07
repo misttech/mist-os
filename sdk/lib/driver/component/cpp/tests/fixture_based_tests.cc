@@ -5,7 +5,10 @@
 #include <fidl/fuchsia.driver.component.test/cpp/driver/wire.h>
 #include <fidl/fuchsia.driver.component.test/cpp/wire.h>
 #include <lib/driver/component/cpp/tests/test_driver.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/fixture/minimal_compat_environment.h>
+
+#include <gtest/gtest.h>
 
 class ZirconProtocolServer
     : public fidl::WireServer<fuchsia_driver_component_test::ZirconProtocol> {
@@ -77,8 +80,8 @@ class BackgroundFixtureConfig final {
 // Demonstrates a test fixture that puts the driver on a background context. Using the driver
 // requires going through |RunInDriverContext()| but sync client tasks can be ran directly on the
 // main test thread.
-class FixtureBasedTestBackground : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig> {
-};
+class FixtureBasedTestBackground : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig>,
+                                   public ::testing::Test {};
 
 TEST_F(FixtureBasedTestBackground, GetNameFromEnv) {
   RunInEnvironmentTypeContext([](FixtureBasedTestEnvironment& env) {
@@ -159,7 +162,8 @@ class FixtureConfig final {
   using EnvironmentType = FixtureBasedTestEnvironment;
 };
 
-class FixtureBasedTest : public fdf_testing::DriverTestFixture<FixtureConfig> {};
+class FixtureBasedTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+                         public ::testing::Test {};
 
 TEST_F(FixtureBasedTest, GetNameFromEnv) {
   RunInEnvironmentTypeContext([](FixtureBasedTestEnvironment& env) {
@@ -242,8 +246,8 @@ class ManualStopFixtureConfig final {
 
 // Demonstrates a test fixture that tests out the manual stop and shutdown feature. Validates by
 // checking the a global that gets set in the driver header.
-class FixtureBasedTestManualStop : public fdf_testing::DriverTestFixture<ManualStopFixtureConfig> {
-};
+class FixtureBasedTestManualStop : public fdf_testing::DriverTestFixture<ManualStopFixtureConfig>,
+                                   public ::testing::Test {};
 
 TEST_F(FixtureBasedTestManualStop, ShutdownAndCheckLogger) {
   ASSERT_EQ(false, g_driver_stopped);
@@ -260,11 +264,12 @@ class AddChildFixtureConfig final {
   static constexpr bool kAutoStopDriver = true;
 
   using DriverType = TestDriver;
-  using EnvironmentType = fdf_testing::MinimalEnvironment;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
 // Checks that adding a child and then managing it by the driver works.
-class FixtureBasedTestAddChild : public fdf_testing::DriverTestFixture<AddChildFixtureConfig> {};
+class FixtureBasedTestAddChild : public fdf_testing::DriverTestFixture<AddChildFixtureConfig>,
+                                 public ::testing::Test {};
 
 TEST_F(FixtureBasedTestAddChild, AddChild) {
   EXPECT_EQ(ZX_OK, driver()->InitSyncCompat().status_value());
@@ -280,10 +285,11 @@ class FailStartFixtureConfig final {
   static constexpr bool kAutoStopDriver = false;
 
   using DriverType = StartFailTestDriver;
-  using EnvironmentType = fdf_testing::MinimalEnvironment;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
-class FixtureBasedTestFailStart : public fdf_testing::DriverTestFixture<FailStartFixtureConfig> {};
+class FixtureBasedTestFailStart : public fdf_testing::DriverTestFixture<FailStartFixtureConfig>,
+                                  public ::testing::Test {};
 
 TEST_F(FixtureBasedTestFailStart, FailStart) {
   auto start_result = StartDriver();
@@ -312,7 +318,8 @@ class ManualBackgroundFixtureConfig final {
 };
 
 class FixtureBasedTestManualBackground
-    : public fdf_testing::DriverTestFixture<ManualBackgroundFixtureConfig> {};
+    : public fdf_testing::DriverTestFixture<ManualBackgroundFixtureConfig>,
+      public ::testing::Test {};
 
 TEST_F(FixtureBasedTestManualBackground, MultiStart) {
   auto start_result = StartDriver();
@@ -344,7 +351,8 @@ class ManualForegroundFixtureConfig final {
 };
 
 class FixtureBasedTestManualForeground
-    : public fdf_testing::DriverTestFixture<ManualForegroundFixtureConfig> {};
+    : public fdf_testing::DriverTestFixture<ManualForegroundFixtureConfig>,
+      public ::testing::Test {};
 
 TEST_F(FixtureBasedTestManualForeground, MultiStartAndValidateIncoming) {
   auto start_result = StartDriver();

@@ -247,7 +247,8 @@ impl<A: IpAddress, LI: Into<NonZeroU16>> Into<(Option<SpecifiedAddr<A>>, NonZero
 }
 
 /// The address of a listening socket.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, GenericOverIp)]
+#[generic_over_ip(A, GenericOverIp)]
 pub struct ListenerAddr<A, D> {
     /// The IP address of the listening socket.
     pub ip: A,

@@ -22,6 +22,10 @@
             // test component exists yet.
         },
         {
+            name: "scene_manager_config",
+            url: "#meta/scene_manager_config.cm",
+        },
+        {
             name: "mock_cobalt",
             url: "#meta/mock_cobalt.cm",
         },

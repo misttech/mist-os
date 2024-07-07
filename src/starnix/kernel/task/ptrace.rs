@@ -1037,7 +1037,16 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
 
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
-        security::check_ptrace_traceme_access_and_update_state(&parent, current_task)?;
+        // TODO: Move this check into `do_attach()` so that there is a single `ptrace_access_check(tracer, tracee)`?
+        {
+            let pids = current_task.kernel().pids.read();
+            let parent_task = pids.get_task(parent.leader);
+            security::ptrace_traceme(
+                current_task,
+                parent_task.upgrade().ok_or(errno!(EINVAL))?.as_ref(),
+            )?;
+        }
+
         let task_ref = OwnedRef::temp(&current_task.task);
         do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach, PtraceOptions::empty())?;
         Ok(starnix_syscalls::SUCCESS)
@@ -1061,7 +1070,7 @@ where
 
     let weak_task = current_task.kernel().pids.read().get_task(pid);
     let tracee = weak_task.upgrade().ok_or_else(|| errno!(ESRCH))?;
-    security::check_ptrace_attach_access_and_update_state(&current_task, &tracee)?;
+    security::ptrace_access_check(&current_task, &tracee)?;
 
     if tracee.thread_group == current_task.thread_group {
         return error!(EPERM);

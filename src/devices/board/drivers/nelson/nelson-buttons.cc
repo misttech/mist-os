@@ -23,6 +23,7 @@
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "lib/fidl_driver/cpp/wire_messaging_declarations.h"
+#include "nelson-gpios.h"
 #include "src/devices/board/drivers/nelson/nelson.h"
 
 namespace nelson {
@@ -55,6 +56,18 @@ static const buttons_gpio_config_t gpios[] = {
 };
 
 zx_status_t Nelson::ButtonsInit() {
+  gpio_init_steps_.push_back(GpioConfigIn(GPIO_VOL_UP_L, GpioFlags::kPullUp));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOL_UP_L, 0));
+
+  gpio_init_steps_.push_back(GpioConfigIn(GPIO_VOL_DN_L, GpioFlags::kPullUp));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOL_DN_L, 0));
+
+  gpio_init_steps_.push_back(GpioConfigIn(GPIO_FDR_L, GpioFlags::kNoPull));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_FDR_L, 0));
+
+  gpio_init_steps_.push_back(GpioConfigIn(GPIO_MUTE_SOC, GpioFlags::kNoPull));
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_MUTE_SOC, 0));
+
   fidl::Arena<> fidl_arena;
   fdf::Arena buttons_arena('BTTN');
 
@@ -71,6 +84,13 @@ zx_status_t Nelson::ButtonsInit() {
                             .data = std::vector<uint8_t>(
                                 reinterpret_cast<const uint8_t*>(&gpios),
                                 reinterpret_cast<const uint8_t*>(&gpios) + sizeof(gpios))}}}}};
+
+  const std::vector<fuchsia_driver_framework::BindRule> kGpioInitRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kGpioInitProps = {
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
 
   const std::vector<fuchsia_driver_framework::BindRule> kVolUpRules = {
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
@@ -117,6 +137,10 @@ zx_status_t Nelson::ButtonsInit() {
   };
 
   std::vector<fuchsia_driver_framework::ParentSpec> parents = {
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = std::move(kGpioInitRules),
+          .properties = std::move(kGpioInitProps),
+      }},
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = std::move(kVolUpRules),
           .properties = std::move(kVolUpProps),

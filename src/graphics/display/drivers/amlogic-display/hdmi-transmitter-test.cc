@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/zx/result.h>
 
 #include <algorithm>
@@ -92,6 +93,8 @@ class HdmiTransmitterTest : public testing::Test {
   void TearDown() override { top_level_mmio_range_.CheckAllAccessesReplayed(); }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
+
   constexpr static int kTopLevelMmioRangeSize = 0x8000;
   ddk_mock::MockMmioRange top_level_mmio_range_{kTopLevelMmioRangeSize,
                                                 ddk_mock::MockMmioRange::Size::k32};

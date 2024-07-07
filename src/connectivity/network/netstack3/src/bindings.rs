@@ -36,7 +36,7 @@ use std::convert::{Infallible as Never, TryFrom as _};
 use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
-use std::num::NonZeroU16;
+use std::num::{NonZeroU16, TryFromIntError};
 use std::ops::Deref;
 use std::pin::pin;
 use std::sync::Arc;
@@ -335,21 +335,11 @@ where
 pub(crate) struct StackTime(fasync::Time);
 
 impl netstack3_core::Instant for StackTime {
-    fn duration_since(&self, earlier: StackTime) -> Duration {
-        assert!(self.0 >= earlier.0);
-        // guaranteed not to panic because the assertion ensures that the
-        // difference is non-negative, and all non-negative i64 values are also
-        // valid u64 values
-        Duration::from_nanos(u64::try_from(self.0.into_nanos() - earlier.0.into_nanos()).unwrap())
-    }
-
-    fn saturating_duration_since(&self, earlier: StackTime) -> Duration {
-        // Guaranteed not to panic because we are doing a saturating
-        // subtraction, which means the difference will be >= 0, and all i64
-        // values >=0 are also valid u64 values.
-        Duration::from_nanos(
-            u64::try_from(self.0.into_nanos().saturating_sub(earlier.0.into_nanos())).unwrap(),
-        )
+    fn checked_duration_since(&self, earlier: StackTime) -> Option<Duration> {
+        match u64::try_from(self.0.into_nanos() - earlier.0.into_nanos()) {
+            Ok(nanos) => Some(Duration::from_nanos(nanos)),
+            Err(TryFromIntError { .. }) => None,
+        }
     }
 
     fn checked_add(&self, duration: Duration) -> Option<StackTime> {
@@ -463,6 +453,7 @@ impl RngContext for BindingsCtx {
 impl TimerBindingsTypes for BindingsCtx {
     type Timer = timers::Timer<TimerId<BindingsCtx>>;
     type DispatchId = TimerId<BindingsCtx>;
+    type UniqueTimerId = timers::UniqueTimerId<TimerId<BindingsCtx>>;
 }
 
 impl TimerContext for BindingsCtx {
@@ -484,6 +475,10 @@ impl TimerContext for BindingsCtx {
 
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant> {
         timer.scheduled_time().map(Into::into)
+    }
+
+    fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
+        timer.unique_id()
     }
 }
 
@@ -1193,8 +1188,8 @@ impl NetstackSeed {
         let mut timer_handler_ctx = netstack.ctx.clone();
         let timers_task = NamedTask::new(
             "timers",
-            netstack.ctx.bindings_ctx().timers.spawn(move |timer| {
-                timer_handler_ctx.api().handle_timer(timer);
+            netstack.ctx.bindings_ctx().timers.spawn(move |dispatch, timer| {
+                timer_handler_ctx.api().handle_timer(dispatch, timer);
             }),
         );
 

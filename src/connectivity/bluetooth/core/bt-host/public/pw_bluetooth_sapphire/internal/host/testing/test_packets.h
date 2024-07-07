@@ -87,6 +87,9 @@ DynamicByteBuffer ReadRemoteSupportedFeaturesPacket(
 DynamicByteBuffer ReadRemoteSupportedFeaturesCompletePacket(
     hci_spec::ConnectionHandle conn, bool extended_features);
 
+DynamicByteBuffer ReadScanEnable();
+DynamicByteBuffer ReadScanEnableResponse(uint8_t scan_enable);
+
 DynamicByteBuffer RejectSynchronousConnectionRequest(
     DeviceAddress address, pw::bluetooth::emboss::StatusCode status_code);
 
@@ -143,6 +146,9 @@ DynamicByteBuffer WriteAutomaticFlushTimeoutPacket(
     hci_spec::ConnectionHandle conn, uint16_t flush_timeout);
 
 DynamicByteBuffer WritePageTimeoutPacket(uint16_t page_timeout);
+
+DynamicByteBuffer WriteScanEnable(uint8_t scan_enable);
+DynamicByteBuffer WriteScanEnableResponse();
 
 DynamicByteBuffer ScoDataPacket(
     hci_spec::ConnectionHandle conn,

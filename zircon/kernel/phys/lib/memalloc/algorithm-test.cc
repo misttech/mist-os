@@ -432,7 +432,7 @@ TEST(MemallocFindTests, OverlapPrecedence) {
       // peripheral: [40, 50), dominated by no other range.
       {.addr = 30, .size = 20, .type = Type::kPeripheral},
 
-      // RAM: [50, 60), dominated by the next range of extended type.
+      // RAM: [50, 60), dominated by the next range of allocated type.
       {.addr = 50, .size = 10, .type = Type::kFreeRam},
       // phys kernel image: [50, 70), dominated by no other range.
       {.addr = 50, .size = 20, .type = Type::kPhysKernel},
@@ -472,7 +472,7 @@ TEST(MemallocFindTests, OverlapPrecedence) {
 }
 
 TEST(MemallocFindTests, BadOverlaps) {
-  // Extended with extended.
+  // Extended with allocated.
   {
     memalloc::Range ranges[] = {
         // phys kernel image: [0, 10)

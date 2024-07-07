@@ -209,9 +209,6 @@ async fn init_telemetry_channel() -> Result<fidl_fuchsia_metrics::MetricEventLog
 
 #[cfg(test)]
 mod tests {
-    #![allow(unused_variables)]
-    #![allow(unused_imports)]
-
     use super::*;
     use crate::tests::{network_id, rand_string};
     use fidl::endpoints::create_request_stream;
@@ -220,8 +217,7 @@ mod tests {
     use futures::task::Poll;
     use futures::{StreamExt, TryStreamExt};
     use ieee80211::Ssid;
-    use rand::distributions::{Alphanumeric, DistString as _};
-    use rand::thread_rng;
+
     use std::convert::TryFrom;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
@@ -236,7 +232,6 @@ mod tests {
     #[fuchsia::test]
     async fn write_and_read() {
         let mut store = new_storage(&rand_string()).await;
-        let stash_id = rand_string();
         let cfg = PersistentStorageData {
             ssid: Ssid::try_from("foo").unwrap().to_vec(),
             security_type: SecurityType::Wpa2,
@@ -271,7 +266,6 @@ mod tests {
     #[fuchsia::test]
     async fn write_read_security_types() {
         let mut store = new_storage(&rand_string()).await;
-        let stash_id = rand_string();
         let password = Credential::Password(b"config-password".to_vec());
 
         // create and write configs with each security type
@@ -331,7 +325,6 @@ mod tests {
     #[fuchsia::test]
     async fn write_read_credentials() {
         let mut store = new_storage(&rand_string()).await;
-        let stash_id = rand_string();
 
         // Create and write configs with each type credential.
         let password = Credential::Password(b"config-password".to_vec());
@@ -375,7 +368,6 @@ mod tests {
     #[fuchsia::test]
     async fn write_persists() {
         let path = rand_string();
-        let stash_id = rand_string();
         let store = new_storage(&path).await;
         let cfg = PersistentStorageData {
             ssid: Ssid::try_from("foo").unwrap().to_vec(),
@@ -399,7 +391,6 @@ mod tests {
     #[fuchsia::test]
     async fn load_storage() {
         let mut store = new_storage(&rand_string()).await;
-        let stash_id = rand_string();
         let cfg_foo = PersistentStorageData {
             ssid: Ssid::try_from("foo").unwrap().to_vec(),
             security_type: SecurityType::Wpa2,
@@ -432,7 +423,6 @@ mod tests {
         store.write(vec![]).expect("failed to write value");
 
         // recreate the storage to load it
-        let stash = new_storage(&store_id).await;
         let loaded_configs = store.load().await.expect("failed to load store");
         assert!(loaded_configs.is_empty());
     }
@@ -492,7 +482,6 @@ mod tests {
     #[fuchsia::test]
     async fn clear_storage() {
         let storage_id = &rand_string();
-        let stash_id = rand_string();
         let mut storage = new_storage(&storage_id).await;
 
         // add some configs to the storage
@@ -678,7 +667,7 @@ mod tests {
         } => {
             assert_eq!(events.len(), 1);
             let event = events.pop().unwrap();
-            assert_variant!(event, fidl_fuchsia_metrics::MetricEvent { metric_id, event_codes, payload } => {
+            assert_variant!(event, fidl_fuchsia_metrics::MetricEvent { metric_id, event_codes, payload: _payload } => {
                 assert_eq!(metric_id, wlan_metrics_registry::STASH_MIGRATION_RESULTS_METRIC_ID);
                 assert_eq!(event_codes, [expected_event as u32]);
             });

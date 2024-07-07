@@ -87,7 +87,7 @@ template("sdk_fuchsia_package") {
   assert(defined(invoker.api_level_added),
          "Must specify the API level at which the package was added")
 
-  if (override_target_api_level == "PLATFORM") {
+  if (current_build_target_api_level == "PLATFORM") {
     # While we do not ship packages targeting "PLATFORM" in the SDK, they can be
     # built. See //sdk:sdk for an example.
 
@@ -105,14 +105,14 @@ template("sdk_fuchsia_package") {
   } else {
     # Build the package for supported API levels.
     package_in_target_api_level =
-        invoker.api_level_added <= override_target_api_level
+        invoker.api_level_added <= current_build_target_api_level
 
     if (package_in_target_api_level && defined(invoker.api_level_removed)) {
       package_in_target_api_level =
-          override_target_api_level < invoker.api_level_removed
+          current_build_target_api_level < invoker.api_level_removed
     }
 
-    _api_level_arg_for_manifest_script = override_target_api_level
+    _api_level_arg_for_manifest_script = current_build_target_api_level
   }
 
   if (package_in_target_api_level && current_toolchain == target_toolchain) {

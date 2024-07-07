@@ -5,8 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_H_
 
-#include <lib/ddk/driver.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
@@ -21,12 +21,15 @@ class AcpiMemoryRegion {
  public:
   // Creates a memory region of `region_size` bytes starting at `region_base`.
   //
+  // `mmio_resource` must be of kind `ZX_RSRC_KIND_MMIO` and must have access
+  // to [region_base, region_base + region_size).
+  //
   // The `region_base` and `region_size` should refer to memory that is entirely
   // contained within a memory region in the system's ACPI (Advanced
   // Configuration and Power Interface) tables that is marked as NVS (saved
   // during the Non-Volatile Sleep state)
-  static zx::result<AcpiMemoryRegion> Create(zx_device_t* parent, zx_paddr_t region_base,
-                                             size_t region_size);
+  static zx::result<AcpiMemoryRegion> Create(zx::unowned_resource mmio_resource,
+                                             zx_paddr_t region_base, size_t region_size);
 
   // Creates an empty memory region without any backing VMO.
   constexpr AcpiMemoryRegion() = default;

@@ -111,10 +111,10 @@ where
     BT: DeviceLayerTypes,
     CC: TimerHandler<BT, EthernetTimerId<EthernetWeakDeviceId<BT>>>,
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BT, timer: BT::UniqueTimerId) {
         let Self(id) = self;
         match id {
-            DeviceLayerTimerIdInner::Ethernet(id) => core_ctx.handle_timer(bindings_ctx, id),
+            DeviceLayerTimerIdInner::Ethernet(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
         }
     }
 }

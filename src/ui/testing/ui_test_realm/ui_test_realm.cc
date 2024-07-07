@@ -391,13 +391,35 @@ void UITestRealm::ConfigureSceneOwner() {
   auto display_pixel_density = kLowResolutionDisplayPixelDensity * config_.device_pixel_ratio;
 
   // Load config for Scene Manager.
-  realm_builder_.InitMutableConfigFromPackage(kSceneManagerName);
-  realm_builder_.SetConfigValue(kSceneManagerName, "display_pixel_density",
-                                ConfigValue(std::to_string(display_pixel_density)));
-  realm_builder_.SetConfigValue(kSceneManagerName, "display_rotation",
-                                ConfigValue::Uint64(config_.display_rotation));
-  realm_builder_.SetConfigValue(kSceneManagerName, "idle_threshold_ms",
-                                ConfigValue::Uint64(config_.idle_threshold_ms));
+  realm_builder_.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.ui.SupportedInputDevices"},
+              component_testing::Config{.name = "fuchsia.ui.ViewingDistance"},
+          },
+      .source = component_testing::ChildRef{"scene_manager_config"},
+      .targets = {component_testing::ChildRef{kSceneManagerName}},
+  });
+  std::vector<component_testing::ConfigCapability> configurations;
+  configurations.push_back({
+      .name = "fuchsia.ui.DisplayPixelDensity",
+      .value = ConfigValue(std::to_string(display_pixel_density)),
+  });
+  configurations.push_back({
+      .name = "fuchsia.ui.IdleThresholdMs",
+      .value = ConfigValue::Uint64(config_.idle_threshold_ms),
+  });
+  realm_builder_.AddConfiguration(std::move(configurations));
+  realm_builder_.AddRoute({
+      .capabilities =
+          {
+              component_testing::Config{.name = "fuchsia.ui.DisplayPixelDensity"},
+              component_testing::Config{.name = "fuchsia.scenic.DisplayRotation"},
+              component_testing::Config{.name = "fuchsia.ui.IdleThresholdMs"},
+          },
+      .source = component_testing::SelfRef{},
+      .targets = {component_testing::ChildRef{kSceneManagerName}},
+  });
 }
 
 void UITestRealm::Build() {

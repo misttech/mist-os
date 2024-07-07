@@ -17,17 +17,17 @@
 
 namespace memalloc {
 
-constexpr uint64_t kMinExtendedTypeValue =
+constexpr uint64_t kMinAllocatedTypeValue =
     static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 1;
 
 // The type of a physical memory range. Represented by 64 bits, the lower 2^32
 // values in the space are reserved for memory range types defined in the ZBI
 // spec, the "base types"; the types in the upper half are referred to as
-// "extended types", and increment from kMinExtendedTypeValue in value.
+// "allocated types", and increment from kMinAllocatedTypeValue in value.
 //
 // As is detailed in the ZBI spec regarding overlaps, among the base types,
 // kReserved and kPeripheral ranges have the highest precedence, in that order.
-// Further, by definition here, an extended type is only permitted to overlap
+// Further, by definition here, an allocated type is only permitted to overlap
 // with kFreeRam or the same type.
 enum class Type : uint64_t {
   //
@@ -39,11 +39,11 @@ enum class Type : uint64_t {
   kReserved = ZBI_MEM_TYPE_RESERVED,
 
   //
-  // Extended types:
+  // Allocated types:
   //
 
   // Reserved for internal bookkeeping.
-  kPoolBookkeeping = kMinExtendedTypeValue,
+  kPoolBookkeeping = kMinAllocatedTypeValue,
 
   // The phys ZBI kernel memory image.
   kPhysKernel,
@@ -101,29 +101,29 @@ enum class Type : uint64_t {
   // below 1MiB in the case of PCs).
   kReservedLow,
 
-  // A placeholder value signifying the last extended type. It must not be used
+  // A placeholder value signifying the last allocated type. It must not be used
   // as an actual type value.
-  kMaxExtended,
+  kMaxAllocated,
 };
 
-static_assert(static_cast<uint64_t>(Type::kFreeRam) < kMinExtendedTypeValue);
-static_assert(static_cast<uint64_t>(Type::kPeripheral) < kMinExtendedTypeValue);
-static_assert(static_cast<uint64_t>(Type::kReserved) < kMinExtendedTypeValue);
+static_assert(static_cast<uint64_t>(Type::kFreeRam) < kMinAllocatedTypeValue);
+static_assert(static_cast<uint64_t>(Type::kPeripheral) < kMinAllocatedTypeValue);
+static_assert(static_cast<uint64_t>(Type::kReserved) < kMinAllocatedTypeValue);
 
-constexpr uint64_t kMaxExtendedTypeValue = static_cast<uint64_t>(Type::kMaxExtended);
-constexpr size_t kNumExtendedTypes = kMaxExtendedTypeValue - kMinExtendedTypeValue;
+constexpr uint64_t kMaxAllocatedTypeValue = static_cast<uint64_t>(Type::kMaxAllocated);
+constexpr size_t kNumAllocatedTypes = kMaxAllocatedTypeValue - kMinAllocatedTypeValue;
 constexpr size_t kNumBaseTypes = 3;
 
 std::string_view ToString(Type type);
 
-constexpr bool IsExtendedType(Type type) {
-  return static_cast<uint64_t>(type) >= kMinExtendedTypeValue;
+constexpr bool IsAllocatedType(Type type) {
+  return static_cast<uint64_t>(type) >= kMinAllocatedTypeValue;
 }
 
-constexpr bool IsRamType(Type type) { return type == Type::kFreeRam || IsExtendedType(type); }
+constexpr bool IsRamType(Type type) { return type == Type::kFreeRam || IsAllocatedType(type); }
 
 // A memory range type that is layout-compatible to zbi_mem_range_t, but with
-// the benefit of being able to use extended types.
+// the benefit of being able to use allocated types.
 struct Range {
   uint64_t addr;
   uint64_t size;

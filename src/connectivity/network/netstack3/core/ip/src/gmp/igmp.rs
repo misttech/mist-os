@@ -349,7 +349,7 @@ impl<D: WeakDeviceIdentifier> From<GmpDelayedReportTimerId<Ipv4, D>> for IgmpTim
 impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> HandleableTimer<CC, BC>
     for IgmpTimerId<CC::WeakDeviceId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         match self {
             IgmpTimerId::Gmp(id) => gmp_handle_timer(core_ctx, bindings_ctx, id),
             IgmpTimerId::V1RouterPresent { device } => {

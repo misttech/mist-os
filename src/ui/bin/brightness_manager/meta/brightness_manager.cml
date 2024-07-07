@@ -34,6 +34,21 @@
             protocol: "fuchsia.ui.display.internal.DisplayPower",
             availability: "optional",
         },
+        {
+            config: "fuchsia.ui.ManageDisplayPower",
+            key: "manage_display_power",
+            type: "bool",
+        },
+        {
+            config: "fuchsia.ui.PowerOnDelayMillis",
+            key: "power_on_delay_millis",
+            type: "uint16",
+        },
+        {
+            config: "fuchsia.ui.PowerOffDelayMillis",
+            key: "power_off_delay_millis",
+            type: "uint16",
+        },
     ],
     expose: [
         {
@@ -41,9 +56,4 @@
             from: "self",
         },
     ],
-    config: {
-        manage_display_power: { type: "bool" },
-        power_on_delay_millis: { type: "uint16" },
-        power_off_delay_millis: { type: "uint16" },
-    },
 }

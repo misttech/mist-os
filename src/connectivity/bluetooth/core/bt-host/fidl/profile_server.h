@@ -9,6 +9,7 @@
 
 #include "lib/fidl/cpp/binding.h"
 #include "pw_intrusive_ptr/intrusive_ptr.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/bredr_connection_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
@@ -23,6 +24,10 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   ProfileServer(bt::gap::Adapter::WeakPtr adapter,
                 fidl::InterfaceRequest<fuchsia::bluetooth::bredr::Profile> request);
   ~ProfileServer() override;
+
+  // If true, use Channel.socket. If false, use Channel.connection.
+  // TODO(https://fxbug.dev/330590954): Remove once migration to Connection is complete.
+  void set_use_sockets(bool enable) { use_sockets_ = enable; }
 
  private:
   class AudioDirectionExt;
@@ -226,9 +231,16 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
   fidl::InterfaceHandle<fuchsia::bluetooth::bredr::AudioOffloadExt> BindAudioOffloadExtServer(
       bt::l2cap::Channel::WeakPtr channel);
 
-  // Create a FIDL Channel from an l2cap::Channel. A socket channel relay is created from |channel|
+  // Create an Connection server for the given channel and set up callbacks.
+  // Returns the client end of the channel, or null on failure.
+  std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::bredr::Connection>>
+  BindBrEdrConnectionServer(bt::l2cap::Channel::WeakPtr channel,
+                            fit::callback<void()> closed_callback);
+
+  // Create a FIDL Channel from an l2cap::Channel. A Connection relay is created from |channel|
   // and returned in the FIDL Channel.
-  fuchsia::bluetooth::bredr::Channel ChannelToFidl(bt::l2cap::Channel::WeakPtr channel);
+  std::optional<fuchsia::bluetooth::bredr::Channel> ChannelToFidl(
+      bt::l2cap::Channel::WeakPtr channel);
 
   const bt::gap::Adapter::WeakPtr& adapter() const { return adapter_; }
 
@@ -290,8 +302,14 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
 
   bt::gap::Adapter::WeakPtr adapter_;
 
+  // If true, use Channel.socket. If false, use Channel.connection.
+  bool use_sockets_ = true;
+
   // Creates sockets that bridge L2CAP channels to profile processes.
   bt::socket::SocketFactory<bt::l2cap::Channel> l2cap_socket_factory_;
+
+  std::unordered_map<bt::l2cap::Channel::UniqueId, std::unique_ptr<BrEdrConnectionServer>>
+      bredr_connection_servers_;
 
   std::unordered_map<ScoConnectionServer*, std::unique_ptr<ScoConnectionServer>>
       sco_connection_servers_;

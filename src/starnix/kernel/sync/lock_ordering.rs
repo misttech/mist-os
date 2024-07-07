@@ -2,53 +2,42 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{impl_lock_after, lock_level, Unlocked};
+use crate::Unlocked;
+use lock_ordering_macro::lock_ordering;
 
-lock_level!(BpfHelperOps);
-lock_level!(BpfMapEntries);
-lock_level!(KernelIpTables);
-lock_level!(KernelSwapFiles);
-lock_level!(DiagnosticsCoreDumpList);
-
-lock_level!(MmDumpable);
-
-lock_level!(BeforeFsNodeAppend);
-lock_level!(FsNodeAppend);
-
-// Artificial lock level that is used when releasing a Task
-lock_level!(TaskRelease);
-lock_level!(ProcessGroupState);
-
-// These lock levels are use to denote operations on FileOps, SocketOps and FsNodeOps
-// TODO(https://fxbug.dev/324065824): FsNode.create_file_ops, FsNode.mknod, FsNode.unlink, FileOps.read,
-// SocketOps.read use the same level because of the circular dependencies between them.
-lock_level!(FileOpsCore);
-lock_level!(WriteOps);
-lock_level!(FileOpsToHandle);
-
-// Lock levels for binder operations
-lock_level!(ResourceAccessorAddFile);
-
-// Lock level for DeviceOps.open. Must be before FileOpsCore because of get_or_create_loop_device
-lock_level!(DeviceOpen);
-
-// This file defines a hierarchy of locks, that is, the order in which
-// the locks must be acquired. Unlocked is a highest level and represents
-// a state in which no locks are held.
-
-impl_lock_after!(Unlocked => KernelIpTables);
-impl_lock_after!(Unlocked => KernelSwapFiles);
-impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
-impl_lock_after!(Unlocked => MmDumpable);
-
-impl_lock_after!(Unlocked => TaskRelease);
-impl_lock_after!(TaskRelease => ResourceAccessorAddFile);
-impl_lock_after!(ResourceAccessorAddFile => FileOpsToHandle);
-impl_lock_after!(FileOpsToHandle => DeviceOpen);
-impl_lock_after!(DeviceOpen => BeforeFsNodeAppend);
-impl_lock_after!(BeforeFsNodeAppend => FsNodeAppend);
-impl_lock_after!(FsNodeAppend => FileOpsCore);
-impl_lock_after!(FileOpsCore => WriteOps);
-impl_lock_after!(WriteOps => ProcessGroupState);
-impl_lock_after!(WriteOps => BpfHelperOps);
-impl_lock_after!(BpfHelperOps => BpfMapEntries);
+lock_ordering! {
+    // Kernel.iptables
+    Unlocked => KernelIpTables,
+    // Kernel.swap_files
+    Unlocked => KernelSwapFiles,
+    // MemoryManager.dumpable
+    Unlocked => MmDumpable,
+    // Artificial lock level for {Task, CurrentTask}.release()
+    Unlocked => TaskRelease,
+    // ProcessGroup.mutable_state.
+    // Needs to be before TaskRelease because of the dependency in CurrentTask.release()
+    TaskRelease => ProcessGroupState,
+    // Artificial level for ResourceAccessor.add_file_with_flags(..)
+    Unlocked => ResourceAccessorAddFile,
+    // Artificial level for FileOps.to_handle(..)
+    ResourceAccessorAddFile => FileOpsToHandle,
+    // Artificial level for DeviceOps.open(..)
+    FileOpsToHandle => DeviceOpen,
+    // Artificial level for several FileOps and FsNodeOps method forming a connected group
+    // because of dependencies between them: FileOps.read, FsNode.create_file_ops, ...
+    DeviceOpen => FileOpsCore,
+    // Artificial level for {FileOps, SocketOps}.write(..)
+    FileOpsCore => WriteOps,
+    // ProcessGroup.mutable_state. Artificial locks above need to be before it because of
+    // dependencies in DevPtsFile.{read, write, ioctl}.
+    WriteOps => ProcessGroupState,
+    // Bpf locks
+    WriteOps => BpfHelperOps,
+    BpfHelperOps => BpfMapEntries,
+    // Artificial level for methods in FsNodeOps/FileOps that require access to the
+    // FsNode.append_lock
+    Unlocked => BeforeFsNodeAppend,
+    // FsNode.append_lock
+    BeforeFsNodeAppend => FsNodeAppend,
+    FsNodeAppend => FileOpsCore,
+}

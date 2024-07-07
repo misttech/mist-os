@@ -3624,6 +3624,17 @@ assembly_input_bundle("sensors_playback") {
 assembly_input_bundle("brightness_manager") {
   flexible_packages =
       [ "//src/ui/bin/brightness_manager:brightness_manager_pkg" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/ui/bin/brightness_manager/meta/brightness_manager.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
 }
 
 # Legacy Power Framework support. Avoids including more modern power framework components.

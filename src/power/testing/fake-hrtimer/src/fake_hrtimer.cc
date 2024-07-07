@@ -13,8 +13,8 @@
 #include "src/power/testing/fake-hrtimer/src/device_server.h"
 
 int main() {
-  FX_LOGS(INFO) << "Start fake hrtimer component";
   async::Loop loop{&kAsyncLoopConfigAttachToCurrentThread};
+  FX_LOGS(INFO) << "Start fake hrtimer component";
   component::OutgoingDirectory outgoing(loop.dispatcher());
 
   auto hrtimer_device = std::make_shared<std::vector<fuchsia_hardware_hrtimer::Device>>();

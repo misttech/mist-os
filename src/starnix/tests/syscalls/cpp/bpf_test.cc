@@ -71,13 +71,16 @@ namespace {
 int bpf(int cmd, union bpf_attr attr) { return (int)syscall(__NR_bpf, cmd, &attr, sizeof(attr)); }
 
 TEST(BpfTest, ArraySizeOverflow) {
-  int result = SAFE_SYSCALL_SKIP_ON_EPERM(bpf(BPF_MAP_CREATE, (union bpf_attr){
-                                                                  .map_type = BPF_MAP_TYPE_ARRAY,
-                                                                  .key_size = sizeof(int),
-                                                                  .value_size = 1024,
-                                                                  .max_entries = INT_MAX / 8,
-                                                              }));
+  int result = bpf(BPF_MAP_CREATE, (union bpf_attr){
+                                       .map_type = BPF_MAP_TYPE_ARRAY,
+                                       .key_size = sizeof(int),
+                                       .value_size = 1024,
+                                       .max_entries = INT_MAX / 8,
+                                   });
   EXPECT_EQ(result, -1);
+  if (errno == EPERM) {
+    GTEST_SKIP() << "Permission denied.";
+  }
   EXPECT_EQ(errno, ENOMEM);
 }
 

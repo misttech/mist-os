@@ -50,7 +50,7 @@ zx_status_t VmoDiscardable::Zero(pgoff_t start, pgoff_t len) {
 }
 
 zx::result<bool> VmoDiscardable::Lock(pgoff_t offset) {
-  ZX_ASSERT(offset < get_size());
+  ZX_DEBUG_ASSERT(offset < get_size());
   if (!active_pages()) {
     auto size = page_to_address(get_size());
     zx_status_t status = vmo().op_range(ZX_VMO_OP_TRY_LOCK, 0, size, nullptr, 0);
@@ -134,36 +134,34 @@ zx::result<bool> VmoManager::CreateAndLockVmo(const pgoff_t index, void **out)
   return vmo_node_or.value()->Lock(GetOffsetInVmoNode(index));
 }
 
-zx_status_t VmoManager::UnlockVmo(const pgoff_t index, const bool evict) {
+zx_status_t VmoManager::UnlockVmo(const pgoff_t index) {
   if (mode_ != VmoMode::kDiscardable) {
     return ZX_OK;
   }
-  if (evict) {
-    fs::SharedLock tree_lock(mutex_);
-    ZX_ASSERT(index < size_in_blocks_);
-    auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(index));
-    if (vmo_node_or.is_ok()) {
-      if (auto status = vmo_node_or.value()->Unlock(index); status != ZX_OK) {
-        return status;
-      }
-      // TODO(https://fxbug.dev/42070947): consider removing a vmo_node when all regarding pages are
-      // invalidated.
+  fs::SharedLock tree_lock(mutex_);
+  ZX_ASSERT(index < size_in_blocks_);
+  auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(index));
+  if (vmo_node_or.is_ok()) {
+    if (auto status = vmo_node_or.value()->Unlock(index); status != ZX_OK) {
+      return status;
     }
-    return vmo_node_or.status_value();
   }
-  return ZX_OK;
+  return vmo_node_or.status_value();
 }
 
 void VmoManager::Reset(bool shutdown) {
   std::lock_guard tree_lock(mutex_);
   auto current = vmo_tree_.begin();
+  [[maybe_unused]] size_t reference_count = 0;
   while (!vmo_tree_.is_empty() && current != vmo_tree_.end()) {
     auto node = current;
     ++current;
+    reference_count += node->GetActivePages();
     if (shutdown || !node->GetActivePages()) {
       vmo_tree_.erase(*node);
     }
   }
+  ZX_DEBUG_ASSERT(reference_count || vmo_tree_.is_empty());
 }
 
 zx::result<VmoMapping *> VmoManager::FindVmoNodeUnsafe(const pgoff_t index) {
@@ -356,14 +354,6 @@ pgoff_t VmoManager::GetOffsetInVmoNode(pgoff_t page_index) const {
 
 pgoff_t VmoManager::GetVmoNodeKey(pgoff_t page_index) const {
   return fbl::round_down(page_index, node_size_in_blocks_);
-}
-
-zx_status_t VmoHolder::Read(void *data, uint64_t offset, size_t len) {
-  return manager_.Read(data, page_to_address(index_) + offset, len);
-}
-
-zx_status_t VmoHolder::Write(const void *data, uint64_t offset, size_t len) {
-  return manager_.Write(data, page_to_address(index_) + offset, len);
 }
 
 VmoCleaner::VmoCleaner(bool bSync, fbl::RefPtr<VnodeF2fs> vnode, const pgoff_t start,

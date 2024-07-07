@@ -5,7 +5,7 @@
 #include "src/devices/adc/drivers/adc/adc.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <gtest/gtest.h>
 
@@ -103,7 +103,7 @@ class AdcTestConfig final {
   using EnvironmentType = AdcTestEnvironment;
 };
 
-class AdcTest : public fdf_testing::DriverTestFixture<AdcTestConfig> {
+class AdcTest : public fdf_testing::DriverTestFixture<AdcTestConfig>, public ::testing::Test {
  public:
   zx::result<> Init(const std::vector<fidl_metadata::adc::Channel>& kAdcChannels) {
     RunInEnvironmentTypeContext(

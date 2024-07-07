@@ -8,6 +8,7 @@
 #include <climits>
 #include <iterator>
 #include <limits>
+#include <utility>
 
 #include <hwreg/bitfields.h>
 #include <hwreg/mmio.h>
@@ -259,19 +260,22 @@ struct ConditionalSubfieldTestReg {
   static constexpr bool kB = Condition == ConditionalSubfieldTestRegEnum::kB;
   static constexpr bool kC = Condition == ConditionalSubfieldTestRegEnum::kC;
 
-  uint8_t field;
+  uint16_t field;
 
   // Conditional kA fields.
+  DEF_COND_SUBFIELD(field, 15, 8, same, kA);
   DEF_COND_SUBBIT(field, 7, a_7, kA);
   DEF_COND_SUBFIELD(field, 6, 4, a_6_4, kA);
   DEF_COND_SUBBIT(field, 3, a_3, kA);
 
   // Conditional kB fields.
+  DEF_COND_SUBFIELD(field, 12, 10, same, kB);
   DEF_COND_UNSHIFTED_SUBFIELD(field, 7, 5, b_7_5, kB);
   DEF_COND_SUBFIELD(field, 4, 3, b_4_3, kB);
 
   // Conditional kC fields.
   enum class Rsvp { kNo = 0, kYes = 0b1111 };
+  DEF_COND_SUBFIELD(field, 13, 12, same, kC);
   DEF_COND_ENUM_SUBFIELD(field, Rsvp, 7, 4, c_7_4, kC);
   DEF_COND_SUBBIT(field, 3, c_3, kC);
 
@@ -284,7 +288,9 @@ TEST(StructConditionalSubfieldsTestCase, ConditionalSubfields) {
   {
     using RegA = ConditionalSubfieldTestReg<Enum::kA>;
 
-    RegA reg{.field = 0xff};
+    RegA reg{.field = 0xffff};
+    EXPECT_EQ(0xff, reg.same());
+    reg.set_same(0);
     EXPECT_EQ(0b1, reg.a_7());
     reg.set_a_7(0);
     EXPECT_EQ(0b111, reg.a_6_4());
@@ -299,28 +305,32 @@ TEST(StructConditionalSubfieldsTestCase, ConditionalSubfields) {
   {
     using RegB = ConditionalSubfieldTestReg<Enum::kB>;
 
-    RegB reg{.field = 0xff};
+    RegB reg{.field = 0xffff};
+    EXPECT_EQ(0b111, reg.same());
+    reg.set_same(0);
     EXPECT_EQ(0b11100000, reg.b_7_5());
     reg.set_b_7_5(0);
     EXPECT_EQ(0b11, reg.b_4_3());
     reg.set_b_4_3(0);
     EXPECT_EQ(0b111, reg.common());
     reg.set_common(0);
-    EXPECT_EQ(0, reg.field);
+    EXPECT_EQ(0xe300, reg.field);
   }
 
   {
     using RegC = ConditionalSubfieldTestReg<Enum::kC>;
     using Rsvp = typename RegC::Rsvp;
 
-    RegC reg{.field = 0xff};
+    RegC reg{.field = 0xffff};
+    EXPECT_EQ(0b11, reg.same());
+    reg.set_same(0);
     EXPECT_EQ(Rsvp::kYes, reg.c_7_4());
     reg.set_c_7_4(Rsvp::kNo);
     EXPECT_EQ(0b1, reg.c_3());
     reg.set_c_3(0);
     EXPECT_EQ(0b111, reg.common());
     reg.set_common(0);
-    EXPECT_EQ(0, reg.field);
+    EXPECT_EQ(0xcf00, reg.field);
   }
 }
 
@@ -835,7 +845,8 @@ struct ConditionalFieldTestReg
 // This definition amounts to a compilation test.
 template <bool Condition>
 struct ConditionalFieldsWithSameNameTestReg
-    : hwreg::RegisterBase<ConditionalFieldsWithSameNameTestReg<Condition>, uint16_t> {
+    : hwreg::RegisterBase<ConditionalFieldsWithSameNameTestReg<Condition>, uint16_t,
+                          hwreg::EnablePrinter> {
   using SelfType = ConditionalFieldsWithSameNameTestReg<Condition>;
 
   enum class Enum { kA = 0b00, kB = 0b11 };
@@ -849,6 +860,28 @@ struct ConditionalFieldsWithSameNameTestReg
   DEF_COND_UNSHIFTED_FIELD(5, 4, c, !Condition);
   DEF_COND_FIELD(3, 1, b, !Condition);
   DEF_COND_BIT(0, a, !Condition);
+
+  static auto Get() { return hwreg::RegisterAddr<SelfType>(0); }
+};
+
+template <int Variant>
+class RegisterWithConditional
+    : public hwreg::RegisterBase<RegisterWithConditional<Variant>, uint32_t, hwreg::EnablePrinter> {
+ public:
+  using SelfType = RegisterWithConditional<Variant>;
+  static_assert(Variant < 15 && Variant > 10);
+  DEF_COND_BIT(14, xmit, Variant == 14);
+  DEF_COND_BIT(13, xmit, Variant == 13);
+  DEF_COND_BIT(12, xmit, Variant == 12);
+  DEF_COND_BIT(11, xmit, Variant == 11);
+  DEF_RSVDZ_FIELD(31, Variant + 1);
+  DEF_BIT(4, a);
+  DEF_BIT(3, b);
+  DEF_BIT(2, c);
+  DEF_BIT(1, d);
+  DEF_BIT(0, e);
+
+  static auto Get() { return hwreg::RegisterAddr<RegisterWithConditional>(0); }
 };
 
 TEST(RegisterTestCase, ConditionalFields) {
@@ -883,7 +916,7 @@ TEST(RegisterTestCase, ConditionalFields) {
     using RegC = ConditionalFieldTestReg<ConditionalFieldTestRegEnum::kC>;
     using Rsvp = typename RegC::Rsvp;
 
-    volatile uint8_t fake_reg = 0xff;
+    volatile uint16_t fake_reg = 0xffff;
     hwreg::RegisterMmio mmio(&fake_reg);
 
     auto reg = RegC::Get().ReadFrom(&mmio);
@@ -892,6 +925,64 @@ TEST(RegisterTestCase, ConditionalFields) {
     EXPECT_EQ(0b111, reg.common());
     reg = reg.WriteTo(&mmio).ReadFrom(&mmio);
     EXPECT_EQ(0xff, reg.reg_value());
+  }
+
+  {
+    using Reg = ConditionalFieldsWithSameNameTestReg<true>;
+
+    volatile uint16_t fake_reg = 0xffff;
+    hwreg::RegisterMmio mmio(&fake_reg);
+
+    auto reg = Reg::Get().ReadFrom(&mmio);
+    reg.set_a(0).set_b(0).set_c(0x0c00).set_d(Reg::Enum::kA).WriteTo(&mmio);
+    uint16_t expected_reg = 0x0cff;
+    EXPECT_EQ(expected_reg, static_cast<uint16_t>(fake_reg));
+  }
+
+  {
+    using Reg = ConditionalFieldsWithSameNameTestReg<false>;
+
+    volatile uint16_t fake_reg = 0xffff;
+    hwreg::RegisterMmio mmio(&fake_reg);
+
+    auto reg = Reg::Get().ReadFrom(&mmio);
+    reg.set_a(0).set_b(0).set_c(0x0030).set_d(Reg::Enum::kA).WriteTo(&mmio);
+    uint16_t expected_reg = 0xff30;
+    EXPECT_EQ(static_cast<uint16_t>(fake_reg), expected_reg);
+  }
+
+  // Check conditionals work as expected, depending on the condition, the right
+  // bit should be set.
+  // 14 -> false
+  // 12 -> true
+  {
+    volatile uint16_t fake_reg = 0;
+    hwreg::RegisterMmio mmio(&fake_reg);
+    auto reg = RegisterWithConditional<14>::Get().FromValue(0);
+    reg.set_xmit(1).WriteTo(&mmio);
+    EXPECT_NE(fake_reg & (1 << 14), 0u);
+  }
+
+  {
+    volatile uint16_t fake_reg = 0;
+    hwreg::RegisterMmio mmio(&fake_reg);
+    auto reg = RegisterWithConditional<13>::Get().FromValue(0);
+    reg.set_xmit(1).WriteTo(&mmio);
+    EXPECT_NE(fake_reg & (1 << 13), 0u);
+  }
+  {
+    volatile uint16_t fake_reg = 0;
+    hwreg::RegisterMmio mmio(&fake_reg);
+    auto reg = RegisterWithConditional<12>::Get().FromValue(0);
+    reg.set_xmit(1).WriteTo(&mmio);
+    EXPECT_NE(fake_reg & (1 << 12), 0u);
+  }
+  {
+    volatile uint16_t fake_reg = 0;
+    hwreg::RegisterMmio mmio(&fake_reg);
+    auto reg = RegisterWithConditional<11>::Get().FromValue(0);
+    reg.set_xmit(1).WriteTo(&mmio);
+    EXPECT_NE(fake_reg & (1 << 11), 0u);
   }
 }
 

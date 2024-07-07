@@ -68,17 +68,12 @@ const device_bind_prop_t kPwmProperties[] = {
                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
 };
 
-const ddk::BindRule kGpioWifiRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
-                            static_cast<uint32_t>(GPIO_SOC_WIFI_LPO_32k768)),
+const ddk::BindRule kGpioInitRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
-const device_bind_prop_t kGpioWifiProperties[] = {
-    ddk::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_WIFI_LPO),
+const device_bind_prop_t kGpioInitProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 const ddk::BindRule kGpioBtRules[] = {
@@ -94,6 +89,8 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Sherlock::PwmInit() {
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_WIFI_LPO_32k768, T931_WIFI_LPO_CLK_FN));
+
   // T931_PWM_AO_B controls VDDEE_800 which is configured by the bootloader.
   // Marked as protect so we don't try to initialize it.
   fuchsia_hardware_pwm::PwmChannelsMetadata metadata = {{{{
@@ -140,7 +137,7 @@ zx_status_t Sherlock::PwmInit() {
 
   zx_status_t status =
       DdkAddCompositeNodeSpec("pwm_init", ddk::CompositeNodeSpec(kPwmRules, kPwmProperties)
-                                              .AddParentSpec(kGpioWifiRules, kGpioWifiProperties)
+                                              .AddParentSpec(kGpioInitRules, kGpioInitProperties)
                                               .AddParentSpec(kGpioBtRules, kGpioBtProperties));
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));

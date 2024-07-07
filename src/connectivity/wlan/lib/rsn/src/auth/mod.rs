@@ -301,14 +301,18 @@ mod test {
                 body: vec![],
             }));
         }
-        fn handle_commit(&mut self, _sink: &mut sae::SaeUpdateSink, _commit_msg: &sae::CommitMsg) {
+        fn handle_commit(
+            &mut self,
+            _sink: &mut sae::SaeUpdateSink,
+            _commit_msg: &sae::CommitMsg<'_>,
+        ) {
             assert!(self.0.lock().unwrap().initiated);
             self.0.lock().unwrap().handled_commits += 1;
         }
         fn handle_confirm(
             &mut self,
             sink: &mut sae::SaeUpdateSink,
-            _confirm_msg: &sae::ConfirmMsg,
+            _confirm_msg: &sae::ConfirmMsg<'_>,
         ) {
             assert!(self.0.lock().unwrap().initiated);
             self.0.lock().unwrap().handled_confirms += 1;
@@ -322,7 +326,7 @@ mod test {
         fn handle_anti_clogging_token(
             &mut self,
             _sink: &mut sae::SaeUpdateSink,
-            _msg: &sae::AntiCloggingTokenMsg,
+            _msg: &sae::AntiCloggingTokenMsg<'_>,
         ) {
             panic!("The SAE initiator should never receive an anti-clogging token.");
         }

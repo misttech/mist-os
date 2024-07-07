@@ -62,7 +62,7 @@ class PoolMemConfig {
     friend PoolMemConfig;
 
     static constexpr uint32_t ReduceType(const Range& range) {
-      return memalloc::IsExtendedType(range.type)  // Reduce to basic types.
+      return memalloc::IsAllocatedType(range.type)  // Reduce to basic types.
                  ? ZBI_MEM_TYPE_RAM
                  : static_cast<uint32_t>(range.type);
     }

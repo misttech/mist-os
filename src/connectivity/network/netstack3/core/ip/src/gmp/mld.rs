@@ -357,7 +357,7 @@ impl<D: WeakDeviceIdentifier> From<GmpDelayedReportTimerId<Ipv6, D>> for MldTime
 impl<BC: MldBindingsContext, CC: MldContext<BC>> HandleableTimer<CC, BC>
     for MldTimerId<CC::WeakDeviceId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self(id) = self;
         gmp_handle_timer(core_ctx, bindings_ctx, id);
     }

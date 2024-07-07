@@ -25,7 +25,7 @@ use crate::vfs::{
     VecOutputBuffer,
 };
 use starnix_logging::{log_error, log_info, log_trace, set_zx_name, track_stub};
-use starnix_sync::{MmDumpable, TaskRelease};
+use starnix_sync::{MmDumpable, ProcessGroupState, TaskRelease};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::auth::{
     Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
@@ -44,20 +44,20 @@ use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
-    gid_t, pid_t, rlimit, rusage, sched_param, uid_t, AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW,
-    CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1, CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS,
-    CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP,
-    PR_CAPBSET_READ, PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET,
-    PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE,
-    PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECCOMP, PR_GET_SECUREBITS,
-    PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS,
-    PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK,
-    PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
-    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW,
-    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL,
-    SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER,
-    SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2,
-    _LINUX_CAPABILITY_VERSION_3,
+    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uid_t, AT_EMPTY_PATH,
+    AT_SYMLINK_NOFOLLOW, BPF_MAXINSNS, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
+    CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
+    NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
+    PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE,
+    PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS,
+    PR_GET_SECCOMP, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS,
+    PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP,
+    PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH,
+    PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN, SECCOMP_FILTER_FLAG_LOG,
+    SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC,
+    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES,
+    SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT,
+    _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 
 pub fn do_clone<L>(
@@ -68,6 +68,7 @@ pub fn do_clone<L>(
 where
     L: LockBefore<MmDumpable>,
     L: LockBefore<TaskRelease>,
+    L: LockBefore<ProcessGroupState>,
 {
     security::check_task_create_access(current_task)?;
 
@@ -1245,6 +1246,12 @@ pub fn sys_prlimit64(
                 return error!(EPERM);
             }
         }
+        security::task_prlimit(
+            current_task,
+            &target_task,
+            !user_old_limit.is_null(),
+            !user_new_limit.is_null(),
+        )?;
     }
 
     let resource = Resource::from_raw(user_resource)?;
@@ -1456,15 +1463,19 @@ pub fn sys_seccomp(
             {
                 return error!(EINVAL);
             }
+            let fprog: sock_fprog = current_task.read_object(UserRef::new(args))?;
+            if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
+                return error!(EINVAL);
+            }
+            let code: Vec<sock_filter> =
+                current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+
             if !current_task.read().no_new_privs()
                 && !current_task.creds().has_capability(CAP_SYS_ADMIN)
             {
                 return error!(EACCES);
             }
-            if args.is_null() {
-                return error!(EFAULT);
-            }
-            current_task.add_seccomp_filter(args, flags)
+            current_task.add_seccomp_filter(code, flags)
         }
         SECCOMP_GET_ACTION_AVAIL => {
             if flags != 0 || args.is_null() {
@@ -1887,7 +1898,8 @@ mod tests {
     async fn test_prctl_set_vma_anon_name() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let name_addr = mapped_address + 128u64;
         let name = "test-name\0";
         current_task.write_memory(name_addr, name.as_bytes()).expect("failed to write name");
@@ -1918,9 +1930,10 @@ mod tests {
     async fn test_set_vma_name_special_chars() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         for c in 1..255 {
             let vma_name = CString::new([c]).unwrap();
@@ -1955,9 +1968,10 @@ mod tests {
     async fn test_set_vma_name_long() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let name_too_long = CString::new(vec![b'a'; 256]).unwrap();
 
@@ -1997,9 +2011,10 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_vma_name_misaligned() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let name = CString::new("name").unwrap();
         current_task.write_memory(name_addr, name.as_bytes_with_nul()).unwrap();
@@ -2073,7 +2088,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_get_affinity_size() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let pid = current_task.get_pid();
         assert_eq!(
             sys_sched_getaffinity(&mut locked, &current_task, pid, 16, mapped_address),
@@ -2092,7 +2108,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_affinity_size() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
         let pid = current_task.get_pid();
         assert_eq!(
@@ -2108,7 +2125,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_task_name() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let name = "my-task-name\0";
         current_task.write_memory(mapped_address, name.as_bytes()).expect("failed to write name");
 
@@ -2124,7 +2142,8 @@ mod tests {
         .unwrap();
         assert_eq!(SUCCESS, result);
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let result = sys_prctl(
             &mut locked,
             &mut current_task,
@@ -2180,7 +2199,8 @@ mod tests {
         let scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
         assert_eq!(scheduler, SCHED_NORMAL, "tasks should have normal scheduler by default");
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let requested_params = sched_param { sched_priority: 15 };
         current_task.write_object(mapped_address.into(), &requested_params).unwrap();
 
@@ -2189,7 +2209,8 @@ mod tests {
         let new_scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();
         assert_eq!(new_scheduler, SCHED_FIFO, "task should have been assigned fifo scheduler");
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
@@ -2199,7 +2220,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sched_getparam() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         sys_sched_getparam(&mut locked, &current_task, 0, mapped_address).expect("sched_getparam");
         let param_value: sched_param =
             current_task.read_object(mapped_address.into()).expect("read_object");
@@ -2259,15 +2281,15 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_c_string_vector() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let arg_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let arg_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let arg = b"test-arg\0";
         current_task.write_memory(arg_addr, arg).expect("failed to write test arg");
         let arg_usercstr = UserCString::new(arg_addr);
         let null_usercstr = UserCString::default();
 
-        let argv_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let argv_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_object(argv_addr.into(), &arg_usercstr)
             .expect("failed to write UserCString");

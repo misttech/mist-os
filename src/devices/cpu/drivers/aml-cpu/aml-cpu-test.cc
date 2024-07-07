@@ -4,7 +4,8 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
@@ -261,7 +262,8 @@ class AmlCpuBindingConfiguration final {
   using EnvironmentType = AmlCpuEnvironment;
 };
 
-class AmlCpuTest : public fdf_testing::DriverTestFixture<AmlCpuBindingConfiguration> {
+class AmlCpuTest : public fdf_testing::DriverTestFixture<AmlCpuBindingConfiguration>,
+                   public ::testing::Test {
  public:
   void StartWithMetadata(const std::vector<perf_domain_t>& perf_domains,
                          const std::vector<operating_point_t>& op_points) {

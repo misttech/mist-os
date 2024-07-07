@@ -28,9 +28,9 @@
 // the |acpi_spinlock_lock|.
 //
 // Non-contested mode needs to apply to both spin locks and mutexes to prevent deadlock.
-// TODO(https://fxbug.dev/42159282): remove this, and replace it with a higher-level lock on the ACPI FIDL
-// protocol. This is risky because pthread timeouts use CLOCK_REALTIME, which makes no forward
-// progress in early boot.
+// TODO(https://fxbug.dev/42159282): remove this, and replace it with a higher-level lock on the
+// ACPI FIDL protocol. This is risky because pthread timeouts use CLOCK_REALTIME, which makes no
+// forward progress in early boot.
 static pthread_rwlock_t acpi_spinlock_lock = PTHREAD_RWLOCK_INITIALIZER;
 static thread_local uint64_t acpi_spinlocks_held = 0;
 
@@ -97,7 +97,12 @@ void AcpiOsDeleteMutex(ACPI_MUTEX Handle) { delete Handle; }
  * @return AE_TIME The mutex could not be acquired within the specified time.
  */
 ACPI_STATUS AcpiOsAcquireMutex(ACPI_MUTEX Handle, UINT16 Timeout)
-    TA_TRY_ACQ(AE_OK, Handle) TA_NO_THREAD_SAFETY_ANALYSIS {
+    TA_TRY_ACQ(/*AE_OK*/ 0, Handle) TA_NO_THREAD_SAFETY_ANALYSIS {
+  // In the TA_TRY_ACQ statement above we would have liked to use the AE_OK constant, however due to
+  // the way it is defined it has a cast in it, and this can result in the clang analysis not always
+  // believing it is a literal value. The solution is to place the value 0 directly in TA_TRY_ACQ
+  // and then have this static_assert to ensure it's the correct value.
+  static_assert(AE_OK == 0);
   if (Timeout == UINT16_MAX) {
     if (acpi_spinlocks_held == 0) {
       int ret = pthread_rwlock_rdlock(&acpi_spinlock_lock);

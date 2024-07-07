@@ -27,6 +27,9 @@ toc:
 - title: "FIDL bindings"
   section:
   - include: /docs/reference/fidl/bindings/_toc.yaml
+- title: "FIDL library API"
+  section:
+  - include: /reference/fidl/_toc.yaml
 - title: "Rust"
   section:
   - include: /docs/reference/rust/_toc.yaml
@@ -39,6 +42,9 @@ toc:
 - title: "Platform specifications"
   section:
   - include: /docs/reference/platform-spec/_toc.yaml
+- title: "Product configuration"
+  section:
+  - include: /reference/assembly/_toc.yaml
 - title: "Testing"
   section:
   - include: /docs/reference/testing/_toc.yaml

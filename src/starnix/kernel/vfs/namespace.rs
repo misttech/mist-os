@@ -664,7 +664,8 @@ pub trait FileSystemCreator {
     ) -> Result<FileSystemHandle, Errno>
     where
         L: LockBefore<DeviceOpen>,
-        L: LockBefore<FileOpsCore>;
+        L: LockBefore<FileOpsCore>,
+        L: LockBefore<BeforeFsNodeAppend>;
 }
 
 impl Kernel {
@@ -740,6 +741,7 @@ impl FileSystemCreator for CurrentTask {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         let kernel = self.kernel();
 
@@ -1582,7 +1584,9 @@ impl NamespaceNode {
     where
         L: LockBefore<BeforeFsNodeAppend>,
     {
-        self.entry.node.truncate(locked, current_task, &self.mount, length)
+        self.entry.node.truncate(locked, current_task, &self.mount, length)?;
+        self.entry.notify_ignoring_excl_unlink(InotifyMask::MODIFY);
+        Ok(())
     }
 }
 

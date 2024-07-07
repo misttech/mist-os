@@ -95,6 +95,8 @@ TEST(SignalHandling, UseSigaltstackSucceeds) {
   ASSERT_EQ(0, sigaltstack(&ss, nullptr));
 }
 
+// This intentionally creates deadly signals which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
 TEST(SignalHandlingDeathTest, ExitsKilledBySignal) {
   std::vector<int> term_signals = {SIGABRT, SIGALRM, SIGBUS,  SIGFPE,  SIGHUP,  SIGILL,
                                    SIGINT,  SIGPIPE, SIGPOLL, SIGPROF, SIGQUIT, SIGSEGV,
@@ -140,6 +142,7 @@ TEST(SignalHandlingDeathTest, ExitsKilledBySignal) {
       }(),
       testing::KilledBySignal(SIGSEGV), "");
 }
+#endif
 
 // Issues a `kill` syscall with a given signal, setting the stack to a given
 // address.
@@ -187,6 +190,8 @@ void raise_with_stack(int signal, uintptr_t stack) {
 #endif
 }
 
+// This intentionally creates a segfault which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
 TEST(SignalHandlingDeathTest, GetSIGSEGVOnMainStackUnderflow) {
   // If we have an underflow while setting the signal stack,
   // we will receive a SIGSEGV.
@@ -203,6 +208,7 @@ TEST(SignalHandlingDeathTest, GetSIGSEGVOnMainStackUnderflow) {
       }(),
       testing::KilledBySignal(SIGSEGV), "");
 }
+#endif
 
 // Check that if the stack pointer calculation for the main stack underflows,
 // we get a SIGSEGV signal in the alt stack.
@@ -402,6 +408,8 @@ TEST(SignalHandlingDeathTest, InvalidSigcontextCausesSIGSEGV) {
 }
 #endif  // defined(__aarch64__)
 
+// This intentionally creates a segfault which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
 TEST(SignalHandlingDeathTest, SignalStackUnmappedDeliversSIGSEGV) {
   constexpr size_t kStackSize = 0x20000;
   void *temp_stack = mmap(NULL, kStackSize, PROT_READ | PROT_WRITE,
@@ -436,6 +444,7 @@ TEST(SignalHandlingDeathTest, SignalStackUnmappedDeliversSIGSEGV) {
 
   ASSERT_EQ(0, munmap(temp_stack, kStackSize));
 }
+#endif
 
 TEST(SignalHandlingDeathTest, SignalAltStackUnmappedDeliversSIGSEGV) {
   constexpr size_t kStackSize = 0x20000;
@@ -471,6 +480,8 @@ TEST(SignalHandlingDeathTest, SignalAltStackUnmappedDeliversSIGSEGV) {
   ASSERT_EQ(0, munmap(temp_stack, kStackSize));
 }
 
+// This intentionally creates a segfault which can't pass on sanitizer runs.
+#if (!__has_feature(address_sanitizer))
 TEST(SignalHandlingDeathTest, SignalStackErrorsDeliversSIGSEGV) {
   std::vector<uint64_t> stack_addrs = {0x0, kRedzoneSize, kRedzoneSize + 1, UINT64_MAX,
                                        UINT64_MAX - 1};
@@ -491,6 +502,7 @@ TEST(SignalHandlingDeathTest, SignalStackErrorsDeliversSIGSEGV) {
         testing::KilledBySignal(SIGSEGV), "");
   }
 }
+#endif
 
 constexpr size_t kSigAltStackMmapSize = 0x20000;
 

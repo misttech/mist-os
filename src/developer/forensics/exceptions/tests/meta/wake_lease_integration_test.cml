@@ -1,0 +1,44 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/wake_lease_integration_test_exe",
+    },
+    children: [
+        {
+            name: "test-power-broker",
+            url: "#meta/power-broker.cm",
+        },
+        {
+            name: "test-system-activity-governor",
+            url: "#meta/system-activity-governor.cm",
+        },
+    ],
+    use: [
+        {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "#test-system-activity-governor",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#test-power-broker",
+        },
+        {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "#test-system-activity-governor",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.power.broker.Topology",
+            from: "#test-power-broker",
+            to: [ "#test-system-activity-governor" ],
+        },
+    ],
+}

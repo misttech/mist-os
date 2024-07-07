@@ -104,8 +104,8 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
 
   zx_device_t* device_ = nullptr;
 
-  Ring control_ring_ TA_GUARDED(lock_) = {this};
-  Ring request_queue_ = {this};
+  Ring control_ring_ TA_GUARDED(lock_){this};
+  Ring request_queue_{this};
 
   thrd_t worker_thread_;
   bool worker_thread_should_exit_ TA_GUARDED(lock_) = {};

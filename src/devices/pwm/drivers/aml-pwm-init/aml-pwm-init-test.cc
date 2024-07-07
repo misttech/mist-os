@@ -90,14 +90,11 @@ TEST(PwmInitDeviceTest, InitTest) {
 
   async::Loop fidl_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<MockPwmServer> pwm{fidl_loop.dispatcher(), std::in_place};
-  async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> wifi_gpio{fidl_loop.dispatcher(),
-                                                                     std::in_place};
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> bt_gpio{fidl_loop.dispatcher(),
                                                                    std::in_place};
   EXPECT_OK(fidl_loop.StartThread("fidl-servers"));
 
   auto pwm_client = pwm.SyncCall(&MockPwmServer::BindServer);
-  auto wifi_gpio_client = wifi_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
   auto bt_gpio_client = bt_gpio.SyncCall(&fake_gpio::FakeGpio::Connect);
   // Create a clock connection, but don't connect it to anything.
   auto clock_endpoints = fidl::Endpoints<fuchsia_hardware_clock::Clock>::Create();
@@ -123,11 +120,9 @@ TEST(PwmInitDeviceTest, InitTest) {
                                                              sizeof(two_timer))};
   pwm.SyncCall(&MockPwmServer::ExpectSetConfig, init_cfg);
 
-  PwmInitDevice dev(std::move(clock), std::move(pwm_client), std::move(wifi_gpio_client),
-                    std::move(bt_gpio_client));
+  PwmInitDevice dev(std::move(clock), std::move(pwm_client), std::move(bt_gpio_client));
   EXPECT_OK(dev.Init());
 
-  ASSERT_EQ(1, wifi_gpio.SyncCall(&fake_gpio::FakeGpio::GetAltFunction));
   std::vector states = bt_gpio.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
   ASSERT_EQ(2, states.size());
   ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, states[0].sub_state);

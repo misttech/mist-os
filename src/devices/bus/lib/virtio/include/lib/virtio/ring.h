@@ -18,11 +18,14 @@ class Device;
 
 class Ring {
  public:
-  Ring(Device* device);
-  Ring(Ring&& other) noexcept;
-  ~Ring();
+  explicit Ring(Device* device);
 
+  Ring(const Ring& other) = delete;
+  Ring& operator=(const Ring& other) = delete;
+  Ring(Ring&& other) noexcept;
   Ring& operator=(Ring&& other) noexcept;
+
+  ~Ring();
 
   // Initialize ring |index| with default (device-offered) size.
   zx_status_t Init(uint16_t index);

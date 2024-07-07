@@ -44,6 +44,19 @@ type ScoPacket = struct {
     packet vector<byte>:SCO_PACKET_MAX;
 };
 
+type SnoopPacket = flexible union {
+    1: event vector<byte>:EVENT_MAX;
+    2: command vector<byte>:COMMAND_MAX;
+    3: acl vector<byte>:ACL_PACKET_MAX;
+    4: sco vector<byte>:SCO_PACKET_MAX;
+    5: iso vector<byte>:ISO_PACKET_MAX;
+};
+
+type PacketDirection = strict enum {
+    HOST_TO_CONTROLLER = 1;
+    CONTROLLER_TO_HOST = 2;
+};
+
 open protocol ScoConnection {
     /// More than one Send can be pending simultaneously.
     /// Prefer to limit the number of pending calls to avoid overflow.
@@ -69,9 +82,8 @@ open protocol Snoop {
         /// Monotonically increasing packet count. Used for flow control in conjunction with
         /// `OnAcknowledgePackets`.
         1: sequence uint64;
-        /// Either `sent` or `received` will be set, but not both.
-        2: sent SentPacket;
-        3: received ReceivedPacket;
+        2: direction PacketDirection;
+        3: packet SnoopPacket;
     });
 
     /// Acknowledge packets have been received up to `sequence`.

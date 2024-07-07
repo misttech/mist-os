@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/amlogic-display/clock.h"
 
 #include <lib/device-protocol/display-panel.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 
@@ -36,8 +37,13 @@ const std::vector<const PanelConfig*> kPanelConfigsForTesting = [] {
   return panel_configs;
 }();
 
+class AmlogicDisplayClockTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
 // For now, simply test that timing calculations don't segfault.
-TEST(AmlogicDisplayClock, PanelTiming) {
+TEST_F(AmlogicDisplayClockTest, PanelTiming) {
   for (const PanelConfig* panel_config : kPanelConfigsForTesting) {
     ASSERT_NE(panel_config, nullptr);
     SCOPED_TRACE(::testing::Message() << panel_config->name);
@@ -45,7 +51,7 @@ TEST(AmlogicDisplayClock, PanelTiming) {
   }
 }
 
-TEST(AmlogicDisplayClock, PllTiming_ValidMode) {
+TEST_F(AmlogicDisplayClockTest, PllTiming_ValidMode) {
   for (const PanelConfig* panel_config : kPanelConfigsForTesting) {
     ASSERT_NE(panel_config, nullptr);
     SCOPED_TRACE(::testing::Message() << panel_config->name);
@@ -63,7 +69,12 @@ TEST(AmlogicDisplayClock, PllTiming_ValidMode) {
 // The following tests ensure that the calculated clock ratios match the
 // hardcoded values removed in Ie2c4721b14a92977ef31dd2951dc4cac207cb60e.
 
-TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364Astro) {
+class PllTimingHdmiPllClockRatioCalculatedCorrectly : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364Astro) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =
@@ -74,7 +85,7 @@ TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364As
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
 }
 
-TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd9364) {
+TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd9364) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =
@@ -85,7 +96,7 @@ TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd936
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
 }
 
-TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd9364) {
+TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd9364) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =
@@ -96,7 +107,7 @@ TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd936
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
 }
 
-TEST(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv101wxmFitipowerJd9364) {
+TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv101wxmFitipowerJd9364) {
   const PanelConfig* panel_config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
   ASSERT_NE(panel_config, nullptr);
   zx::result<HdmiPllConfigForMipiDsi> pll_config =

@@ -275,7 +275,9 @@ impl Node for CpuDeviceHandler {
         // Connect to the cpu-ctrl driver. Typically this is None, but it may be set by tests.
         let cpu_ctrl_proxy = match &self.mutable_inner.borrow().cpu_ctrl_proxy {
             Some(p) => p.clone(),
-            None => get_cpu_ctrl_proxy(self.total_domain_count, self.perf_rank).await?,
+            None => {
+                get_cpu_ctrl_proxy(&self.name(), self.total_domain_count, self.perf_rank).await?
+            }
         };
 
         // Query the CPU opps

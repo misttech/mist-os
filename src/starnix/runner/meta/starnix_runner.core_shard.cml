@@ -149,6 +149,11 @@
             availability: "optional",
         },
         {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "parent",
+            to: "#starnix_runner",
+        },
+        {
             from: "parent",
             to: "#starnix_runner",
             config: "fuchsia.starnix.runner.EnableDataCollection",

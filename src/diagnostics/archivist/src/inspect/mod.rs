@@ -482,7 +482,7 @@ mod tests {
             for (i, handle) in handles.into_iter().enumerate() {
                 inspect_repo.add_inspect_handle(
                     Arc::clone(&identity),
-                    InspectHandle::from_named_tree_proxy(handle, Some(format!("tree_{i}"))),
+                    InspectHandle::tree(handle, Some(format!("tree_{i}"))),
                 );
             }
         }

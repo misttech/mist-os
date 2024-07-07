@@ -85,12 +85,12 @@ class InputDevice
   // The input device's event virtqueue, or `eventq`.
   //
   // Defined in the VIRTIO spec Section 5.8.2 "Input Device" > "Virtqueues".
-  Ring eventq_vring_ = {this};
+  Ring eventq_vring_{this};
 
   // The input device's status virtqueue, or `statusq`.
   //
   // Defined in the VIRTIO spec Section 5.8.2 "Input Device" > "Virtqueues".
-  Ring statusq_vring_ = {this};
+  Ring statusq_vring_{this};
 
   inspect::Inspector inspector_;
   inspect::Node metrics_root_;

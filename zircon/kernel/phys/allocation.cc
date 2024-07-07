@@ -63,7 +63,7 @@ void Allocation::reset() {
 void Allocation::Resize(fbl::AllocChecker& ac, size_t new_size) {
   ZX_ASSERT(!data_.empty());
   ZX_ASSERT(new_size > 0);
-  ZX_ASSERT(type_ != memalloc::Type::kMaxExtended);
+  ZX_ASSERT(type_ != memalloc::Type::kMaxAllocated);
 
   if (new_size == size_bytes()) {
     return;

@@ -419,7 +419,6 @@ fn derive_wpa1_vendor_ies(protection_cfg: FakeProtectionCfg) -> Option<Vec<u8>> 
 #[macro_export]
 macro_rules! fake_fidl_bss_description__ {
     ($build_fake_bss_description_creator__:path, $fake_protection_cfg:expr $(, $bss_key:ident: $bss_value:expr)*) => {{
-        #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
         let bss_description_creator = $crate::test_utils::fake_stas::BssDescriptionCreator {
             $(
                 $bss_key: $bss_value,

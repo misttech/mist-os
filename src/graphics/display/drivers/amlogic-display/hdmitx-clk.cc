@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 
@@ -12,7 +13,6 @@
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace amlogic_display {
 
@@ -33,7 +33,7 @@ void HdmiHost::WaitForPllLocked() {
         HhiHdmiPllCntlReg::Get().ReadFrom(&hhi_mmio_).set_hdmi_dpll_reset(0).WriteTo(&hhi_mmio_);
       }
     }
-    zxlogf(ERROR, "pll[0x%x] reset %d times", HHI_HDMI_PLL_CNTL0, 10000 - cnt);
+    FDF_LOG(ERROR, "pll[0x%x] reset %d times", HHI_HDMI_PLL_CNTL0, 10000 - cnt);
     if (cnt <= 0)
       err = true;
   } while (err);
@@ -52,7 +52,7 @@ VideoInputUnitEncoderMuxControl::Encoder EncoderSelectionFromViuType(viu_type ty
     case VIU_ENCT:
       return VideoInputUnitEncoderMuxControl::Encoder::kTvPanel;
   }
-  zxlogf(ERROR, "Incorrect VIU type: %u", type);
+  FDF_LOG(ERROR, "Incorrect VIU type: %u", type);
   return VideoInputUnitEncoderMuxControl::Encoder::kLcd;
 }
 
@@ -172,11 +172,11 @@ void HdmiHost::ConfigureHpllClkOut(int64_t expected_hdmi_pll_vco_output_frequenc
       (expected_hdmi_pll_vco_output_frequency_hz % kExternalOscillatorFrequencyHz) *
       kPllMultiplierFractionScalingRatio / kExternalOscillatorFrequencyHz);
 
-  zxlogf(DEBUG,
-         "HDMI PLL VCO configured: desired multiplier = %" PRId32 " + %" PRId32 " / %" PRId32,
-         pll_multiplier_integer, pll_multiplier_fraction, kPllMultiplierFractionScalingRatio);
-  zxlogf(DEBUG, "HDMI PLL VCO output frequency: %" PRId64 " Hz",
-         expected_hdmi_pll_vco_output_frequency_hz);
+  FDF_LOG(DEBUG,
+          "HDMI PLL VCO configured: desired multiplier = %" PRId32 " + %" PRId32 " / %" PRId32,
+          pll_multiplier_integer, pll_multiplier_fraction, kPllMultiplierFractionScalingRatio);
+  FDF_LOG(DEBUG, "HDMI PLL VCO output frequency: %" PRId64 " Hz",
+          expected_hdmi_pll_vco_output_frequency_hz);
 
   HhiHdmiPllCntlReg::Get()
       .FromValue(0x0b3a0400)

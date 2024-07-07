@@ -149,6 +149,10 @@ impl Method {
         !self.server_initiated()
     }
 
+    fn is_one_way(&self) -> bool {
+        matches!(self.payload, MethodPayload::OneWay(_))
+    }
+
     pub fn compatible(client: &Self, server: &Self) -> Result<CompatibilityProblems> {
         let mut problems = CompatibilityProblems::default();
         if client.kind() != server.kind() {
@@ -307,17 +311,26 @@ impl Protocol {
         for ordinal in client_ordinals.difference(&server_ordinals) {
             let method = client.methods.get(ordinal).expect("Unexpectedly missing client method");
             if method.client_initiated() {
-                // TODO: open/ajar/closed + strict/flexible
-                problems.protocol(
-                    &method.path,
-                    &server.path,
-                    format!(
-                        "Server(@{}) missing method {}.{}",
-                        server.path.api_level(),
-                        client.name,
-                        method.name
-                    ),
-                );
+                let client_sets_unknown_bit = method.flexibility == Flexibility::Flexible;
+                let server_allows_unknown = server.openness == Openness::Open
+                    || method.is_one_way() && server.openness == Openness::Ajar;
+                if client_sets_unknown_bit && server_allows_unknown {
+                    // The server doesn't know about this method but: (a) the
+                    // client sets the "unknown" header bit indicating that it's
+                    // fine with the server not recognizing it, and (b) the
+                    // server is expecting messages with the "unknown" bit set.
+                } else {
+                    problems.protocol(
+                        &method.path,
+                        &server.path,
+                        format!(
+                            "Server(@{}) missing method {}.{}",
+                            server.path.api_level(),
+                            client.name,
+                            method.name
+                        ),
+                    );
+                }
             }
         }
 
@@ -325,17 +338,22 @@ impl Protocol {
         for ordinal in server_ordinals.difference(&client_ordinals) {
             let method = server.methods.get(ordinal).expect("Unexpectedly missing server method");
             if method.server_initiated() {
-                // TODO: open/ajar/closed + strict/flexible
-                problems.protocol(
-                    &client.path,
-                    &method.path,
-                    format!(
-                        "Client(@{}) missing event {}.{}",
-                        client.path.api_level(),
-                        server.name,
-                        method.name
-                    ),
-                );
+                if method.flexibility == Flexibility::Flexible
+                    && (server.openness == Openness::Open || server.openness == Openness::Ajar)
+                {
+                    // The server thinks the event is flexible and the client thinks the protocol is open enough.
+                } else {
+                    problems.protocol(
+                        &client.path,
+                        &method.path,
+                        format!(
+                            "Client(@{}) missing event {}.{}",
+                            client.path.api_level(),
+                            server.name,
+                            method.name
+                        ),
+                    );
+                }
             }
         }
 

@@ -90,6 +90,7 @@ foreach(variant, e1000_variants) {
     ]
     public_deps = [
       "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
+      "//sdk/lib/driver/compat/cpp",
       "//src/devices/pci/lib/pci",
       "//src/lib/vmo_store",
     ]
@@ -97,7 +98,6 @@ foreach(variant, e1000_variants) {
       ":e1000_bind",
       ":e1000_osdep",
       "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-      "//sdk/lib/driver/compat/cpp",
       "//sdk/lib/driver/compat/cpp:logging",
       "//sdk/lib/driver/component/cpp",
       "//sdk/lib/syslog/structured_backend",

@@ -3,16 +3,25 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use errors::ffx_error;
-use ffx_core::ffx_plugin;
+pub use ffx_package_archive_remove_args::PackageArchiveRemoveCommand;
+use fho::{user_error, FfxMain, FfxTool, SimpleWriter};
 use package_tool::cmd_package_archive_remove;
 
-pub use ffx_package_archive_remove_args::PackageArchiveRemoveCommand;
+#[derive(FfxTool)]
+pub struct ArchiveRemoveTool {
+    #[command]
+    pub cmd: PackageArchiveRemoveCommand,
+}
 
-#[ffx_plugin()]
-pub async fn cmd_package(cmd: PackageArchiveRemoveCommand) -> Result<()> {
-    cmd_package_archive_remove(cmd)
-        .await
-        .map_err(|err| ffx_error!("Error: failed to remove from archive: {err:?}"))?;
-    Ok(())
+fho::embedded_plugin!(ArchiveRemoveTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ArchiveRemoveTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        cmd_package_archive_remove(self.cmd)
+            .await
+            .map_err(|err| user_error!("Error: failed to remove from archive: {err:?}"))?;
+        Ok(())
+    }
 }

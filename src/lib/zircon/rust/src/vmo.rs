@@ -386,6 +386,7 @@ bitflags! {
         const SLICE = sys::ZX_VMO_CHILD_SLICE;
         const NO_WRITE = sys::ZX_VMO_CHILD_NO_WRITE;
         const REFERENCE = sys::ZX_VMO_CHILD_REFERENCE;
+        const SNAPSHOT_MODIFIED = sys::ZX_VMO_CHILD_SNAPSHOT_MODIFIED;
     }
 }
 

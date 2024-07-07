@@ -3,6 +3,11 @@
 // found in the LICENSE file.
 
 use crate::component_model::{BuildAnalyzerModelError, Child};
+use crate::component_sandbox::{
+    build_capability_sourced_capabilities_dictionary, build_framework_dictionary,
+    new_outgoing_dir_router, new_program_router, program_output_router,
+    static_children_component_output_dictionary_routers,
+};
 use crate::environment::EnvironmentForAnalyzer;
 use async_trait::async_trait;
 use cm_config::RuntimeConfig;
@@ -10,6 +15,9 @@ use cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDe
 use cm_types::{Name, Url};
 use config_encoder::ConfigFields;
 use moniker::{ChildName, Moniker};
+use routing::bedrock::program_output_dict::build_program_output_dictionary;
+use routing::bedrock::sandbox_construction::{build_component_sandbox, ComponentSandbox};
+use routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
 use routing::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
 use routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
@@ -19,6 +27,7 @@ use routing::environment::RunnerRegistry;
 use routing::error::ComponentInstanceError;
 use routing::policy::GlobalPolicyChecker;
 use routing::resolving::{ComponentAddress, ComponentResolutionContext};
+use sandbox::Dict;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -30,10 +39,12 @@ pub struct ComponentInstanceForAnalyzer {
     config: Option<ConfigFields>,
     url: Url,
     parent: WeakExtendedInstanceInterface<Self>,
-    children: RwLock<HashMap<ChildName, Arc<Self>>>,
+    pub(crate) children: RwLock<HashMap<ChildName, Arc<Self>>>,
     pub(crate) environment: Arc<EnvironmentForAnalyzer>,
     policy_checker: GlobalPolicyChecker,
     component_id_index: Arc<component_id_index::Index>,
+    pub(crate) sandbox: ComponentSandbox,
+    child_inputs: StructuredDictMap<ComponentInput>,
 }
 
 impl ComponentInstanceForAnalyzer {
@@ -49,58 +60,114 @@ impl ComponentInstanceForAnalyzer {
         url: Url,
         top_instance: Arc<TopInstanceForAnalyzer>,
         runtime_config: Arc<RuntimeConfig>,
-        policy_checker: GlobalPolicyChecker,
-        component_id_index: Arc<component_id_index::Index>,
+        policy: GlobalPolicyChecker,
+        id_index: Arc<component_id_index::Index>,
         runner_registry: RunnerRegistry,
     ) -> Arc<Self> {
         let environment =
             EnvironmentForAnalyzer::new_root(runner_registry, &runtime_config, &top_instance);
         let moniker = Moniker::root();
-        Arc::new(Self {
-            moniker,
-            decl,
-            config,
-            url,
-            parent: WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
-                top_instance,
-            )),
-            children: RwLock::new(HashMap::new()),
-            environment,
-            policy_checker,
-            component_id_index,
-        })
+        let parent = WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
+            top_instance,
+        ));
+        let input = Default::default();
+        Self::new_internal(moniker, decl, config, url, parent, policy, id_index, environment, input)
     }
 
     // Creates a new non-root component instance as a child of `parent`.
     pub(crate) fn new_for_child(
         child: &Child,
-        child_component_decl: ComponentDecl,
+        decl: ComponentDecl,
         config: Option<ConfigFields>,
         parent: Arc<Self>,
-        policy_checker: GlobalPolicyChecker,
-        component_id_index: Arc<component_id_index::Index>,
+        policy: GlobalPolicyChecker,
+        id_index: Arc<component_id_index::Index>,
     ) -> Result<Arc<Self>, BuildAnalyzerModelError> {
         let environment = EnvironmentForAnalyzer::new_for_child(&parent, child)?;
-        let moniker = parent.moniker.child(
-            ChildName::try_new(
-                child.child_moniker.name().as_str(),
-                child.child_moniker.collection().map(|c| c.as_str()),
-            )
-            .expect("child moniker is guaranteed to be valid"),
-        );
-        Ok(Arc::new(Self {
+        let child_name = ChildName::try_new(
+            child.child_moniker.name().as_str(),
+            child.child_moniker.collection().map(|c| c.as_str()),
+        )
+        .expect("child moniker is guaranteed to be valid");
+        let url = child.url.clone();
+        let input = if let Some(collection_name) = child.child_moniker.collection() {
+            parent.sandbox.collection_inputs.get(collection_name).expect("missing collection input")
+        } else {
+            parent
+                .child_inputs
+                .get(
+                    &cm_types::Name::new(child.child_moniker.name().as_str())
+                        .expect("child is static so name is not long"),
+                )
+                .expect("missing child input")
+        };
+        let moniker = parent.moniker.child(child_name);
+        let parent =
+            WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::Component(parent));
+        Ok(Self::new_internal(
             moniker,
-            decl: child_component_decl,
+            decl,
             config,
-            url: child.url.clone(),
-            parent: WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::Component(
-                parent,
-            )),
+            url,
+            parent,
+            policy,
+            id_index,
+            environment,
+            input,
+        ))
+    }
+
+    fn new_internal(
+        moniker: Moniker,
+        decl: ComponentDecl,
+        config: Option<ConfigFields>,
+        url: Url,
+        parent: WeakExtendedInstanceInterface<ComponentInstanceForAnalyzer>,
+        policy_checker: GlobalPolicyChecker,
+        component_id_index: Arc<component_id_index::Index>,
+        environment: Arc<EnvironmentForAnalyzer>,
+        input: ComponentInput,
+    ) -> Arc<Self> {
+        let self_ = Arc::new(Self {
+            moniker: moniker.clone(),
+            decl: decl.clone(),
+            config,
+            url,
+            parent,
             children: RwLock::new(HashMap::new()),
             environment,
             policy_checker,
             component_id_index,
-        }))
+            sandbox: Default::default(),
+            child_inputs: Default::default(),
+        });
+        let children_component_output_dictionary_routers =
+            static_children_component_output_dictionary_routers(&self_, &decl);
+        let (program_output_dict, declared_dictionaries) = build_program_output_dictionary(
+            &self_,
+            &children_component_output_dictionary_routers,
+            &decl,
+            &input,
+            &new_program_router,
+            &new_outgoing_dir_router,
+        );
+        let (sandbox, child_inputs) = build_component_sandbox(
+            &moniker,
+            children_component_output_dictionary_routers,
+            &decl,
+            input,
+            &Dict::new(), // progam_input_dict_additions
+            program_output_dict,
+            program_output_router(&self_),
+            build_framework_dictionary(),
+            build_capability_sourced_capabilities_dictionary(&decl),
+            declared_dictionaries,
+        );
+        self_.sandbox.append(&sandbox);
+        for (key, child_input) in child_inputs.enumerate() {
+            self_.child_inputs.insert(key, child_input).unwrap();
+        }
+        self_
     }
 
     // Returns all children of the component instance.
@@ -116,6 +183,10 @@ impl ComponentInstanceForAnalyzer {
     // Adds a new child to this component instance.
     pub(crate) fn add_child(&self, child_moniker: ChildName, child: Arc<Self>) {
         self.children.write().expect("failed to acquire write lock").insert(child_moniker, child);
+    }
+
+    pub(crate) fn moniker(&self) -> &Moniker {
+        &self.moniker
     }
 
     // A (nearly) no-op sync function used to implement the async trait method `lock_resolved_instance`
@@ -187,6 +258,12 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         ComponentInstanceError,
     > {
         self.resolve()
+    }
+
+    async fn component_sandbox(
+        self: &Arc<Self>,
+    ) -> Result<ComponentSandbox, ComponentInstanceError> {
+        Ok(self.sandbox.clone())
     }
 }
 

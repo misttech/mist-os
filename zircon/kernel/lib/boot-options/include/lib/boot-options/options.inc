@@ -559,42 +559,43 @@ When `always`, Unused page tables are evicted periodically. The period can be co
 `kernel.page-scanner.page-table-eviction-period`.
 )""")
 
-DEFINE_OPTION("kernel.page-scanner.page-table-eviction-period", uint32_t,
-              page_scanner_page_table_eviction_period, {10}, R"""(
-Sets the rate, in seconds, that page tables will be scanned. Any page tables not used between two
-successive scans are candidates for eviction.
+DEFINE_OPTION("kernel.page-scanner.page-table-eviction-period-ms", uint32_t,
+              page_scanner_page_table_eviction_period_ms, {10000}, R"""(
+Sets the rate, in milliseconds, that page tables will be scanned. Any page tables not used between
+two successive scans are candidates for eviction.
 
 This option only has an effect if `kernel.page-scanner.page-table-eviction-policy=always`.
 )""")
 
-DEFINE_OPTION("kernel.page-scanner.min-aging-interval", uint32_t, page_scanner_min_aging_interval,
-              {2}, R"""(
-Sets the minimum time, in seconds, between successive aging events. Higher values here will provide
-a more stable active set with less chance of thrashing like behavior and less time spent harvesting
-page access information. Lower values will allow for smaller active sets, increasing opportunities
-for eviction.
+DEFINE_OPTION("kernel.page-scanner.min-aging-interval-ms", uint32_t,
+              page_scanner_min_aging_interval_ms, {2000}, R"""(
+Sets the minimum time, in milliseconds, between successive aging events. Higher values here will
+provide a more stable active set with less chance of thrashing like behavior and less time spent
+harvesting page access information. Lower values will allow for smaller active sets, increasing
+opportunities for eviction.
 
-This value should be less than or equal to `kernel.page-scanner.max-aging-interval`.
+This value should be less than or equal to `kernel.page-scanner.max-aging-interval-ms`.
 )""")
 
-DEFINE_OPTION("kernel.page-scanner.max-aging-interval", uint32_t, page_scanner_max_aging_interval,
-              {15}, R"""(
-Sets the maximum time, in seconds, between successive aging events. This time is the potential worst
-case coarseness of page age information, and higher values can result in not having sufficient age
-information to perform eviction if system behavior rapidly changes. Lower values will cause pages to
-lose fidelity information by accumulating in the oldest bucket increasing the chance that when
-eviction happens a sub-optimal page is chosen.
+DEFINE_OPTION("kernel.page-scanner.max-aging-interval-ms", uint32_t,
+              page_scanner_max_aging_interval_ms, {15000}, R"""(
+Sets the maximum time, in milliseconds, between successive aging events. This time is the potential
+worst case coarseness of page age information, and higher values can result in not having
+sufficient age information to perform eviction if system behavior rapidly changes. Lower values
+will cause pages to lose fidelity information by accumulating in the oldest bucket increasing the
+chance that when eviction happens a sub-optimal page is chosen.
 
-This value should be greater than or equal to `kernel.page-scanner.min-aging-interval`.
+This value should be greater than or equal to `kernel.page-scanner.min-aging-interval-ms`.
 )""")
 
-DEFINE_OPTION("kernel.page-scanner.accessed-scan-interval", uint32_t,
-              page_scanner_accessed_scan_interval, {3}, R"""(
-Sets the time, in seconds, between harvesting page access information. Lower values provide greater
-age fidelity and will improve accuracy of page reclamation choices at the expense of increased CPU
-time spent harvesting.
+DEFINE_OPTION("kernel.page-scanner.accessed-scan-interval-ms", uint32_t,
+              page_scanner_accessed_scan_interval_ms, {3000}, R"""(
+Sets the time, in milliseconds, between harvesting page access information. Lower values provide
+greater age fidelity and will improve accuracy of page reclamation choices at the expense of
+increased CPU time spent harvesting.
 
-There is no benefit to setting this to be lower than the `kernel.page-scanner.min-aging-interval`.
+There is no benefit to setting this to be lower than the
+`kernel.page-scanner.min-aging-interval-ms`.
 )""")
 
 DEFINE_OPTION("kernel.page-scanner.active-ratio-multiplier", uint32_t,
@@ -605,9 +606,9 @@ The ratio is represented as a multiplier to simplify the kernel algorithm which 
 will result in more frequent aging events and hence less pages being in the active set. A multiplier
 of 0 will disable aging based on the active page ratio.
 
-The active ratio only triggers aging in the period between the `kernel.page-scanner.min-aging-interval`
-and the `kernel.page-scanner.max-aging-interval`, and as such has no effect if the intervals are
-equal.
+The active ratio only triggers aging in the period between the
+`kernel.page-scanner.min-aging-interval-ms` and the `kernel.page-scanner.max-aging-interval-ms`,
+and as such has no effect if the intervals are equal.
 )""")
 
 DEFINE_OPTION("kernel.page-scanner.eviction-interval-seconds", uint32_t,

@@ -327,20 +327,19 @@ From //build/bazel/logging.gni:9
 Set to true to populate the @fuchsia_sdk external repository with prebuilt
 binaries for all API levels, or a subset of them. Possible values are:
 
-  false: The default, which is to only build for the current PLATFORM
-      API level, unless `override_target_api_level` is set.
-      See //build/config/fuchsia/override_target_api_level.gni.
+  false: The default, which is to only build targets for which the IDK
+      contains artifacts built at "PLATFORM".
 
   true: To build for all API levels listed in
       platform_version.build_time_supported_api_levels, which defaults to
-      all supported API levels, including the PLATFORM one, unless
-      `override_build_time_supported_api_levels` is also set.
+      all Supported API levels plus the current in-development API level,
+      unless `override_build_time_supported_api_levels` is also set.
       See //build/config/fuchsia/platform_versions.gni.
 
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_fuchsia_sdk.gni:29
+From //build/bazel/bazel_fuchsia_sdk.gni:28
 
 ### bazel_fuchsia_sdk_all_cpus
 
@@ -1235,6 +1234,23 @@ that we want the legacy AIB packaged and archived for a given product:
 **Current value (from the default):** `false`
 
 From //build/images/fuchsia/BUILD.gn:26
+
+### current_build_target_api_level
+
+The target API level of the current build.
+
+For the default platform build, the API level is "PLATFORM".
+
+If this is _not_ set to "PLATFORM", then it must be set to a positive
+integer corresponding to a currently Supported (not Sunset) API level. In
+that case, the build will target the given API level.
+
+This is intended for use with code that is included in IDK sub-builds. Not
+all targets support the non-default value, and other uses are unsupported.
+
+**Current value (from the default):** `"PLATFORM"`
+
+From //build/config/fuchsia/target_api_level.gni:16
 
 ### current_cpu
 
@@ -5384,21 +5400,25 @@ From //build/config/BUILDCONFIG.gn:30
 
 ### override_build_time_supported_api_levels
 
-Overrides the set of API levels for which the build will provide build-time
+Overrides the set of API levels for which this build will provide build-time
 support in the IDK/SDK. The default (`false`) set is all `supported` and
-`in development` API levels in //sdk/version_history.json. Other valid
-values are a list containing a subset of the default set. To build
-artifacts targeting API level PLATFORM, set to `[]`.
+`in development` non-special API levels in //sdk/version_history.json.
+Other valid values are a list containing a subset of the default set.If
+empty, only targets for which the IDK contains artifacts built at "PLATFORM"
+will be built.
 
 This is useful for reducing the overall build time of any build that
 includes the IDK/SDK in exchange for reduced coverage of API level support.
-This includes `fx build final_fuchsia_idk` and products built in-tree.
+For example, `fx build //sdk:final_fuchsia_idk`.
+
+Note: The in-tree Bazel SDK ignores this variable and the variable it
+overrides unless `bazel_fuchsia_sdk_all_api_levels` is true.
 
 To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:52
+From //build/config/fuchsia/platform_version.gni:56
 
 ### override_idk_target_cpus
 
@@ -5409,32 +5429,27 @@ containing a subset of that list that includes the current `target_cpu.
 
 This is useful for reducing the overall build time of any build that
 includes the IDK/SDK in exchange for reduced coverage of target CPU
-architecture support. This includes `fx build final_fuchsia_idk`.
+architecture support. For example, `fx build //sdk:final_fuchsia_idk`.
+
+Note: The in-tree Bazel SDK ignores this variable and the variable it
+overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
 
 To override the set of API levels, see
 `override_build_time_supported_api_levels`.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:65
+From //build/sdk/config.gni:68
 
 ### override_target_api_level
 
-Specify a specific target API level for the platform build.
+Deprecated name for the variable above that is still used by obsolete bots.
+TODO(https://fxbug.dev/330709069): Remove after turning down the
+core.x64-sdk_source_sets_and_shlibs-api*-build_only bots.
 
-For the normal platform build, the API level is "PLATFORM", which is greater
-than (that is to say: "newer than") all other API levels.
+**Current value (from the default):** `false`
 
-If this is _not_ set to "PLATFORM", then it must be set to a positive
-integer corresponding to a currently supported (not sunset) API level. In
-that case, the build will target the given API level.
-
-This is primarily used by the IDK. Not all targets support the non-default
-value. In particular, `:default` currently fails.
-
-**Current value (from the default):** `"PLATFORM"`
-
-From //build/config/fuchsia/target_api_level.gni:17
+From //build/config/fuchsia/target_api_level.gni:21
 
 ### package_flavor_selections
 
@@ -7112,9 +7127,9 @@ From //build/toolchain/rbe.gni:30
 The overall mode for RBE to be operating in.  The valid values are:
  * 'off' => RBE is fully disabled. This is suitable for offline building
             using only local resources.
- * 'default' => The standard RBE configuration used if not otherwise
-                specified. This contains a mix of enabled/disabled remote
-                services.
+ * 'legacy_default' => The standard RBE configuration used if not otherwise
+                       specified. This contains a mix of enabled/disabled
+                       remote services.
  * 'cloudtop' => An RBE configuration that's optimized for running on a
                  cloudtop. Suitable for high-bandwidth connections to
                  remote services.
@@ -7124,7 +7139,7 @@ The overall mode for RBE to be operating in.  The valid values are:
  * 'low_bandwidth' => An RBE configuration for developers that have a
                       powerful workstations, but low bandwidth.
 
-**Current value (from the default):** `"default"`
+**Current value (from the default):** `"legacy_default"`
 
 From //build/toolchain/rbe_modes.gni:34
 
@@ -7468,7 +7483,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"3VvCiWbTMS4xenuM83IRa-G-xU7QLNpdgGqycF2BQegC"`
+**Current value (from the default):** `"FwJNmCIbbweuTE2kC-y8jly7X2dsTnn6ubfEuGFdsuwC"`
 
 From //build/rust/config.gni:38
 

@@ -21,6 +21,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/stdcompat/string_view.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/syslog/global.h>
 #include <lib/zbi-format/board.h>
@@ -410,12 +411,115 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       }
     }
 
+    if (request.args().dtr_offers()) {
+      for (const auto& offer_cap : *request.args().dtr_offers()) {
+        std::optional<Capability> converted;
+        switch (offer_cap.Which()) {
+          case fuchsia_component_test::Capability::Tag::kProtocol: {
+            const auto& offer_cap_proto = offer_cap.protocol().value();
+            converted.emplace(Protocol{
+                offer_cap_proto.name().value(),
+                offer_cap_proto.as(),
+                offer_cap_proto.type().has_value() ? std::make_optional(static_cast<DependencyType>(
+                                                         offer_cap_proto.type().value()))
+                                                   : std::nullopt,
+                offer_cap_proto.path(),
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+                offer_cap_proto.from_dictionary(),
+#endif
+            });
+            break;
+          }
+          case fuchsia_component_test::Capability::Tag::kDirectory:
+          case fuchsia_component_test::Capability::Tag::kStorage:
+          case fuchsia_component_test::Capability::Tag::kService:
+          case fuchsia_component_test::Capability::Tag::kEventStream:
+          case fuchsia_component_test::Capability::Tag::kConfig:
+          case fuchsia_component_test::Capability::Tag::kDictionary:
+          default:
+            FX_SLOG(WARNING, "Skipping unsupported offer capability.",
+                    FX_KV("type", static_cast<uint64_t>(offer_cap.Which())));
+            break;
+        }
+
+        if (converted.has_value()) {
+          realm_builder_.AddRoute(Route{
+              .capabilities = {converted.value()},
+              .source = {ParentRef()},
+              .targets =
+                  {
+                      CollectionRef{"boot-drivers"},
+                      CollectionRef{"pkg-drivers"},
+                      CollectionRef{"full-pkg-drivers"},
+                  },
+          });
+        }
+      }
+    }
+
     if (request.args().exposes().has_value()) {
       for (const auto& expose : *request.args().exposes()) {
         for (const auto& ref : kMap[expose.collection()]) {
           realm_builder_.AddRoute(Route{.capabilities = {Service{expose.service_name()}},
                                         .source = ref,
                                         .targets = {ParentRef()}});
+        }
+      }
+    }
+
+    if (request.args().dtr_exposes()) {
+      for (const auto& expose_cap : *request.args().dtr_exposes()) {
+        std::optional<Capability> converted;
+        switch (expose_cap.Which()) {
+          case fuchsia_component_test::Capability::Tag::kService: {
+            const auto& expose_cap_service = expose_cap.service().value();
+            converted.emplace(Service{
+                expose_cap_service.name().value(),
+                expose_cap_service.as(),
+                expose_cap_service.path(),
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+                expose_cap_service.from_dictionary(),
+#endif
+            });
+            break;
+          }
+          case fuchsia_component_test::Capability::Tag::kProtocol:
+          case fuchsia_component_test::Capability::Tag::kDirectory:
+          case fuchsia_component_test::Capability::Tag::kStorage:
+          case fuchsia_component_test::Capability::Tag::kEventStream:
+          case fuchsia_component_test::Capability::Tag::kConfig:
+          case fuchsia_component_test::Capability::Tag::kDictionary:
+          default:
+            FX_SLOG(WARNING, "Skipping unsupported expose capability.",
+                    FX_KV("type", static_cast<uint64_t>(expose_cap.Which())));
+            break;
+        }
+
+        if (converted.has_value()) {
+          realm_builder_.AddRoute(Route{
+              .capabilities = {converted.value()},
+              .source =
+                  {
+                      CollectionRef{"boot-drivers"},
+                  },
+              .targets = {ParentRef()},
+          });
+          realm_builder_.AddRoute(Route{
+              .capabilities = {converted.value()},
+              .source =
+                  {
+                      CollectionRef{"pkg-drivers"},
+                  },
+              .targets = {ParentRef()},
+          });
+          realm_builder_.AddRoute(Route{
+              .capabilities = {converted.value()},
+              .source =
+                  {
+                      CollectionRef{"full-pkg-drivers"},
+                  },
+              .targets = {ParentRef()},
+          });
         }
       }
     }
@@ -648,6 +752,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(loop.dispatcher()).BuildAndInitialize();
   component::OutgoingDirectory outgoing(loop.dispatcher());
 
   auto config = driver_test_realm_config::Config::TakeFromStartupHandle();

@@ -26,6 +26,11 @@
                 // TODO(https://fxbug.dev/42124055): Implement ICMP sockets in Netstack3.
                 "AllInetTests/UdpSocketTest.ConnectWriteToInvalidPort/*",
                 "AllInetTests/UdpSocketTest.ConnectAndSendNoReceiver/*",
+
+                // This test is very flaky on Fuchsia because of propagation
+                // time over loopback, there's no good way to observe dropped
+                // packets entirely from the POSIX API.
+                "AllInetTests/UdpSocketTest.RecvBufLimits/*",
             ],
         },
         {
@@ -42,7 +47,6 @@
                 "AllInetTests/UdpSocketTest.FIONREADZeroLengthWriteShutdown/*",
                 "AllInetTests/UdpSocketTest.Fionread/*",
                 "AllInetTests/UdpSocketTest.ReadShutdownNonblockPendingData/*",
-                "AllInetTests/UdpSocketTest.RecvBufLimits/*",
                 "AllInetTests/UdpSocketTest.SoNoCheck/*",
                 "AllInetTests/UdpSocketTest.SoNoCheckOffByDefault/*",
 

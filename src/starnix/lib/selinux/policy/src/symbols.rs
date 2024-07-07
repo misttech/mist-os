@@ -983,7 +983,11 @@ impl Validate for ClassMetadata {
 
     /// TODO: Should there be an upper bound `u32` values in [`ClassMetadata`]?
     fn validate(&self) -> Result<(), Self::Error> {
-        Ok(())
+        if self.id.get() == 0 {
+            return Err(ValidateError::NonOptionalIdIsZero.into());
+        } else {
+            Ok(())
+        }
     }
 }
 

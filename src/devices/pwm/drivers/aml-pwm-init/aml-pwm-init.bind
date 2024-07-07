@@ -12,9 +12,8 @@ primary node "pwm" {
   fuchsia.hardware.pwm.Service == fuchsia.hardware.pwm.Service.ZirconTransport;
 }
 
-node "gpio-wifi" {
-  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.WIFI_LPO;
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }
 
 node "gpio-bt" {

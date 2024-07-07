@@ -5,7 +5,7 @@
 
 #### CATEGORY=Run, inspect and debug
 #### DEPRECATED
-### [deprecated] alias for fx log
+### deprecated alias for fx log
 
 ## usage: fx syslog [--raw] [flags]
 ##

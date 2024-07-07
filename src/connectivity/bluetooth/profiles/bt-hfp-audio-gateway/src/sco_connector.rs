@@ -18,6 +18,8 @@ use crate::features::CodecId;
 /// Dropping this struct will close the SCO connection.
 #[derive(Debug)]
 pub struct ScoConnection {
+    /// The peer this is connected to.
+    pub peer_id: PeerId,
     /// The parameters that this connection was set up with.
     pub params: ValidScoConnectionParameters,
     /// Proxy for this connection.  Used to read/write to the connection.
@@ -45,8 +47,12 @@ impl ScoConnection {
     }
 
     #[cfg(test)]
-    pub fn build(params: bredr::ScoConnectionParameters, proxy: bredr::ScoConnectionProxy) -> Self {
-        ScoConnection { params: params.try_into().unwrap(), proxy }
+    pub fn build(
+        peer_id: PeerId,
+        params: bredr::ScoConnectionParameters,
+        proxy: bredr::ScoConnectionProxy,
+    ) -> Self {
+        ScoConnection { peer_id, params: params.try_into().unwrap(), proxy }
     }
 }
 
@@ -180,7 +186,7 @@ impl ScoConnector {
                     bredr::ScoConnectionOnConnectionCompleteRequest::ConnectedParams(params) => {
                         let params =
                             params.try_into().map_err(|_| ScoConnectError::ScoInvalidArguments)?;
-                        Ok(ScoConnection { params, proxy: connection_proxy })
+                        Ok(ScoConnection { peer_id, params, proxy: connection_proxy })
                     }
                     bredr::ScoConnectionOnConnectionCompleteRequest::Error(err) => Err(err.into()),
                     _ => {
@@ -259,13 +265,14 @@ pub(crate) mod tests {
 
     #[track_caller]
     pub fn connection_for_codec(
+        peer_id: PeerId,
         codec_id: CodecId,
         in_band: bool,
     ) -> (ScoConnection, bredr::ScoConnectionRequestStream) {
         let sco_params = parameter_sets_for_codec(codec_id, in_band).pop().unwrap();
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<ScoConnectionMarker>().unwrap();
-        let connection = ScoConnection::build(sco_params, proxy);
+        let connection = ScoConnection::build(peer_id, sco_params, proxy);
         (connection, stream)
     }
 

@@ -49,10 +49,72 @@ macro_rules! block_until_inspect_matches {
     }};
 }
 
+macro_rules! block_until_power_elements_match {
+    ($moniker:expr, [ $(($id1:ident = $value1:expr, $id2:ident = $value2:expr)),* ]) => {{
+        let mut reader = ArchiveReader::new();
+
+        reader
+            .select_all_for_moniker($moniker)
+            .with_minimum_schema_count(1);
+
+        let mut tree_assertions = Vec::new();
+        $(
+            let tree_assertion = $crate::tree_assertion!(meta: contains {
+                $id1: $value1,
+                $id2: $value2,
+            });
+            tree_assertions.push(tree_assertion);
+        )*
+
+        for i in 0.. {
+            let Ok(data) = reader
+                .snapshot::<Inspect>()
+                .await?
+                .into_iter()
+                .next()
+                .and_then(|result| result.payload)
+                .ok_or(anyhow::anyhow!("expected one inspect hierarchy")) else {
+                continue;
+            };
+            let topology = data
+                .children.iter().filter(|p| p.name == "broker").next().unwrap()
+                .children.iter().filter(|p| p.name == "topology").next().unwrap()
+                .children.iter().filter(|p| p.name == "fuchsia.inspect.Graph").next().unwrap()
+                .children.iter().filter(|p| p.name == "topology").next().unwrap();
+
+            let mut matched_count = 0;
+            for tree_assertion in tree_assertions.iter() {
+                'inner: for element in topology.children.iter() {
+                    let element_meta = element.children.iter().filter(|p| p.name == "meta").next().unwrap();
+
+                    match tree_assertion.run(&element_meta) {
+                        // Matched one tree_assertion. Go to next one.
+                        Ok(_) => {
+                            matched_count = matched_count + 1;
+                            break 'inner
+                        },
+                        Err(error) => {
+                            if i == 10 {
+                                tracing::warn!(?error, "Still awaiting inspect match after 10 tries");
+                            }
+                            if MACRO_LOOP_EXIT && i == 50 {
+                                return Err(error.into())
+                            }
+                        }
+                    }
+                }
+            }
+            if matched_count == tree_assertions.len() {
+                break;
+            }
+        }
+    }};
+}
+
 struct TestEnv {
     realm_instance: RealmInstance,
     sag_moniker: String,
-    ttd_moniker: String,
+    broker_moniker: String,
 }
 impl TestEnv {
     /// Connects to a protocol exposed by a component within the RealmInstance.
@@ -153,14 +215,14 @@ async fn create_test_env() -> TestEnv {
         realm_instance.root.child_name(),
         "system-activity-governor"
     );
-    let ttd_moniker = format!(
+    let broker_moniker = format!(
         "{}:{}/{}",
         DEFAULT_COLLECTION_NAME,
         realm_instance.root.child_name(),
-        "topology-test-daemon"
+        "power-broker"
     );
 
-    TestEnv { realm_instance, sag_moniker, ttd_moniker }
+    TestEnv { realm_instance, sag_moniker, broker_moniker }
 }
 
 #[fuchsia::test]
@@ -366,118 +428,62 @@ async fn test_topology_control() -> Result<()> {
         },
     ];
     let _ = topology_control.create(&element).await.unwrap();
-
-    block_until_inspect_matches!(
-        &env.ttd_moniker,
-        root: {
-            C1: {
-                power_level: 0u64,
-            },
-            C2: {
-                power_level: 0u64,
-            },
-            P: {
-                power_level: 0u64,
-            },
-            GP: {
-                power_level: 10u64,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [
+            (name = "C1", current_level = 0u64),
+            (name = "C2", current_level = 0u64),
+            (name = "P", current_level = 0u64),
+            (name = "GP", current_level = 10u64)
+        ]
     );
 
     // Acquire lease for C1 @ 5.
     let _ = topology_control.acquire_lease("C1", 5).await.unwrap();
-    block_until_inspect_matches!(
-        &env.ttd_moniker,
-        root: {
-            C1: {
-                power_level: 5u64,
-            },
-            C2: {
-                power_level: 0u64,
-            },
-            P: {
-                power_level: 50u64,
-            },
-            GP: {
-                power_level: 200u64,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [
+            (name = "C1", current_level = 5u64),
+            (name = "C2", current_level = 0u64),
+            (name = "P", current_level = 50u64),
+            (name = "GP", current_level = 200u64)
+        ]
     );
 
     // Acquire lease for C2 @ 3.
     let _ = topology_control.acquire_lease("C2", 3).await.unwrap();
-    block_until_inspect_matches!(
-        &env.ttd_moniker,
-        root: {
-            C1: {
-                power_level: 5u64,
-            },
-            C2: {
-                power_level: 3u64,
-            },
-            P: {
-                power_level: 50u64,
-            },
-            GP: {
-                power_level: 200u64,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [
+            (name = "C1", current_level = 5u64),
+            (name = "C2", current_level = 3u64),
+            (name = "P", current_level = 50u64),
+            (name = "GP", current_level = 200u64)
+        ]
     );
 
     // Drop lease for C1.
     let _ = topology_control.drop_lease("C1").await.unwrap();
-    block_until_inspect_matches!(
-        &env.ttd_moniker,
-        root: {
-            C1: {
-                power_level: 0u64,
-            },
-            C2: {
-                power_level: 3u64,
-            },
-            P: {
-                power_level: 30u64,
-            },
-            GP: {
-                power_level: 90u64,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [
+            (name = "C1", current_level = 0u64),
+            (name = "C2", current_level = 3u64),
+            (name = "P", current_level = 30u64),
+            (name = "GP", current_level = 90u64)
+        ]
     );
 
     // Drop lease for C2.
     let _ = topology_control.drop_lease("C2").await.unwrap();
-    block_until_inspect_matches!(
-        &env.ttd_moniker,
-        root: {
-            C1: {
-                power_level: 0u64,
-            },
-            C2: {
-                power_level: 0u64,
-            },
-            P: {
-                power_level: 0u64,
-            },
-            GP: {
-                power_level: 10u64,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [
+            (name = "C1", current_level = 0u64),
+            (name = "C2", current_level = 0u64),
+            (name = "P", current_level = 0u64),
+            (name = "GP", current_level = 10u64)
+        ]
     );
 
     Ok(())

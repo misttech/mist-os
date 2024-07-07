@@ -138,3 +138,7 @@ class BluetoothError(HoneydewError):
 
 class BluetoothStateError(HoneydewError):
     """Exception to be raised for unexpected Bluetooth states."""
+
+
+class InspectError(HoneydewError):
+    """Exception to be raised for Inspect affordance related failures."""

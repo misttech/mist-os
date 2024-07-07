@@ -6,6 +6,7 @@ use crate::mm::MemoryAccessorExt;
 use crate::signals::{RunState, SignalEvent};
 use crate::task::{ClockId, CurrentTask, TimerId};
 use crate::time::utc::utc_now;
+use crate::timer::Timeline;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
     Task, {self as zx},
@@ -389,8 +390,37 @@ pub fn sys_timer_create(
         }
         checked_signal_event = Some(signal_event);
     }
+    let timeline = match clock_id as u32 {
+        CLOCK_REALTIME => Timeline::RealTime,
+        CLOCK_MONOTONIC => Timeline::Monotonic,
+        CLOCK_BOOTTIME => Timeline::BootTime,
+        CLOCK_REALTIME_ALARM => {
+            track_stub!(TODO("https://fxbug.dev/349190823"), "timers w/ CLOCK_REALTIME_ALARM");
+            return error!(ENOTSUP);
+        }
+        CLOCK_BOOTTIME_ALARM => {
+            track_stub!(TODO("https://fxbug.dev/349191846"), "timers w/ CLOCK_BOOTTIME_ALARM");
+            return error!(ENOTSUP);
+        }
+        CLOCK_TAI => {
+            track_stub!(TODO("https://fxbug.dev/349191834"), "timers w/ TAI");
+            return error!(ENOTSUP);
+        }
+        CLOCK_PROCESS_CPUTIME_ID => {
+            track_stub!(TODO("https://fxbug.dev/349188105"), "timers w/ calling process cpu time");
+            return error!(ENOTSUP);
+        }
+        CLOCK_THREAD_CPUTIME_ID => {
+            track_stub!(TODO("https://fxbug.dev/349188105"), "timers w/ calling thread cpu time");
+            return error!(ENOTSUP);
+        }
+        _ => {
+            track_stub!(TODO("https://fxbug.dev/349188105"), "timers w/ dynamic process clocks");
+            return error!(ENOTSUP);
+        }
+    };
 
-    let id = &thread_group.timers.create(clock_id, checked_signal_event)?;
+    let id = &thread_group.timers.create(timeline, checked_signal_event)?;
     current_task.write_object(timerid, &id)?;
     Ok(())
 }
@@ -529,6 +559,7 @@ mod test {
 
         let duration = timespec_from_duration(zx::Duration::from_seconds(60));
         let address = map_memory(
+            &mut locked,
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<timespec>() as u64,
@@ -571,7 +602,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clock_nanosleep_interrupted_relative_to_fast_utc_clock() {
-        let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
@@ -587,7 +618,7 @@ mod test {
         let tv = timespec { tv_sec: 2, tv_nsec: 0 };
 
         let remaining = {
-            let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+            let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
             UserRef::new(addr)
         };
 

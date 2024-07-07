@@ -131,7 +131,7 @@ __NO_RETURN void TEE_Panic(TEE_Result panicCode);
 
 // 4.9.1 TEE_OpenTASession
 TEE_Result TEE_OpenTASession(
-    /* in */ TEE_UUID* destination, uint32_t cancellationRequestTimeout, uint32_t paramTypes,
+    /* in */ const TEE_UUID* destination, uint32_t cancellationRequestTimeout, uint32_t paramTypes,
     /* inout */ TEE_Param params[4],
     /* out */ TEE_TASessionHandle* session,
     /* out */ uint32_t* returnOrigin);
@@ -180,10 +180,10 @@ void* TEE_Realloc(
 void TEE_Free(void* buffer);
 
 // 4.11.7 TEE_MemMove
-void TEE_MemMove(/* outbuf(size) */ void* dest, /* inbuf(size) */ void* src, size_t size);
+void TEE_MemMove(/* outbuf(size) */ void* dest, /* inbuf(size) */ const void* src, size_t size);
 
 // 4.11.8 TEE_MemCompare
-int32_t TEE_MemCompare(/* inbuf(size) */ void* buffer1, /* inbuf(size) */ void* buffer2,
+int32_t TEE_MemCompare(/* inbuf(size) */ const void* buffer1, /* inbuf(size) */ const void* buffer2,
                        size_t size);
 
 // 4.11.9 TEE_MemFill
@@ -444,7 +444,7 @@ TEE_Result TEE_GetTAPersistentTime(
 
 // 7.2.4 TEE_SetTAPersistentTime
 TEE_Result TEE_SetTAPersistentTime(
-    /* in */ TEE_Time* time);
+    /* in */ const TEE_Time* time);
 
 // 7.2.5 TEE_GetREETime
 void TEE_GetREETime(

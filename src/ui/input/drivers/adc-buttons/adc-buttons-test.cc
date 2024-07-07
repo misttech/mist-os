@@ -6,7 +6,7 @@
 
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <gtest/gtest.h>
 
@@ -99,7 +99,8 @@ class TestConfig final {
   using EnvironmentType = TestEnv;
 };
 
-class AdcButtonsDeviceTest : public fdf_testing::DriverTestFixture<TestConfig> {
+class AdcButtonsDeviceTest : public fdf_testing::DriverTestFixture<TestConfig>,
+                             public ::testing::Test {
  public:
   void SetUp() override {
     // Connect to InputDevice.

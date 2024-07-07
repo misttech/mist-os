@@ -10,13 +10,11 @@ source_set("dsi-host-controller") {
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
+    "//sdk/lib/driver/logging/cpp",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/mipi-dsi",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
   ]
-  deps = [
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
-    "//zircon/system/ulib/hwreg",
-  ]
+  deps = [ "//zircon/system/ulib/hwreg" ]
 }

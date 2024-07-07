@@ -14,6 +14,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -425,6 +426,8 @@ class FakeSysmemTest : public testing::Test {
   }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
+
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
   async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{

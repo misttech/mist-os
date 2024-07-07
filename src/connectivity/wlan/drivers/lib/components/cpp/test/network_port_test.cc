@@ -1,9 +1,11 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/fixture/minimal_compat_environment.h>
 
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <wlan/drivers/components/network_port.h>
 
 #include "src/lib/testing/predicates/status.h"
@@ -42,10 +44,11 @@ struct TestFixtureConfig {
   static constexpr bool kAutoStopDriver = false;
 
   using DriverType = wlan::drivers::components::test::TestDriver;
-  using EnvironmentType = fdf_testing::MinimalEnvironment;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
-struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig> {
+struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
+                         public ::testing::Test {
   static constexpr uint8_t kPortId = 13;
 
   void SetUp() override {

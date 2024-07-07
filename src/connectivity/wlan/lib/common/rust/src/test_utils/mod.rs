@@ -172,7 +172,8 @@ mod tests {
         A(u8),
         B {
             named: u8,
-            // TODO(https://fxbug.dev/42165549)
+            // We never read this field, but it is used in tests to ensure we can extract `named`
+            // when there is another field in the struct next to it.
             #[allow(unused)]
             bar: u16,
         },

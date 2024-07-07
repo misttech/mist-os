@@ -94,7 +94,7 @@ fuchsia_cc_test(
     deps = [
         "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "//sdk/lib/driver/compat/cpp",
-        "//sdk/lib/driver/testing/cpp:driver_testing_cpp_gtest_fixture",
+        "//sdk/lib/driver/testing/cpp/fixture:driver_testing_cpp_fixture",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "@com_google_googletest//:gtest",

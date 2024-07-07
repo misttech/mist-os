@@ -48,6 +48,9 @@
       // Fuchsia's own FIDL LSP extension
       "fuchsia-authors.language-fidl",
 
+      // Official Go support
+      "golang.go",
+
       // The official LSP for Rust, rust-analyzer.
       "rust-lang.rust-analyzer",
 
@@ -115,6 +118,11 @@
       "*.yaml.golden": "yaml",
     },
 
+    // Matches the default Fuchsia code style.
+    "editor.rulers": [
+        100
+    ],
+
     ////////
     // Dart
     //
@@ -155,6 +163,12 @@
 
     ////////
     // C/C++
+
+    "clangd.arguments": [
+        "--clang-tidy",
+        "--background-index"
+    ],
+    "clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/linux-x64/bin/clangd",
 
     // Formats C/C++ include guards to match Fuchsia style.
     "C/C++ Include Guard.Comment Style": "Line",
@@ -201,6 +215,16 @@
       "--config",
       "${workspaceFolder}/pyproject.toml"
     ],
+
+    ////////
+    // Markdown
+    //
+    "[markdown]": {
+        // Matches our static checks in infra.
+        "editor.rulers": [
+            80
+        ]
+    },
 
     ////////
     // VSCode file exclusions

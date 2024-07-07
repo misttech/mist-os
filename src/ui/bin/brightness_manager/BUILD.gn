@@ -160,45 +160,13 @@ fuchsia_component("brightness_manager_component") {
   deps = [ ":bin" ]
 }
 
-fuchsia_structured_config_values("config_with_display_power") {
-  cm_label = ":brightness_manager_manifest"
-  values_source = "config/with-display-power.json5"
-}
-
-fuchsia_structured_config_values("config_without_display_power") {
-  cm_label = ":brightness_manager_manifest"
-  values_source = "config/without-display-power.json5"
-}
-
 fuchsia_structured_config_rust_lib("brightness_manager_config") {
   cm_label = ":brightness_manager_manifest"
 }
 
 fuchsia_package("brightness_manager_pkg") {
   package_name = "brightness_manager"
-  validate_structured_config = false
   deps = [ ":brightness_manager_component" ]
-}
-
-fuchsia_package("brightness_manager_with_display_power") {
-  package_name = "brightness_manager"
-  deps = [
-    ":brightness_manager_component",
-    ":config_with_display_power",
-  ]
-}
-
-fuchsia_package("brightness_manager_without_display_power") {
-  package_name = "brightness_manager"
-  deps = [
-    ":brightness_manager_component",
-    ":config_without_display_power",
-  ]
-}
-
-# Temporarily an alias for ":brightness_manager_without_display_power".
-group("brightness_manager") {
-  deps = [ ":brightness_manager_without_display_power" ]
 }
 
 fuchsia_component("brightness_manager_test_driver") {

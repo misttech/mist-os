@@ -8,7 +8,7 @@ Follow this quick start to write a driver unit test based on the
 Include this library dependency:
 
 ```cpp
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 ```
 
 The [DriverTestFixture](#drivertestfixture-configuration-arguments)
@@ -45,13 +45,16 @@ The `EnvironmentType` must be an isolated class
 that provides your driver’s custom dependencies.
 It does not need to provide framework dependencies (except for `compat::DeviceServer`),
 as the fixture does that already.
-If no extra dependencies are needed, use `fdf_testing::MinimalEnvironment`
+If no extra dependencies are needed, use `fdf_testing::MinimalCompatEnvironment`
 which provides a default `compat::DeviceServer`.
 
 Here's an example of a basic test with the minimal environment:
 
 ```cpp
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/fixture/minimal_compat_environment.h>
+
+#include <gtest/gtest.h>
 
 class FixtureConfig final {
  public:
@@ -60,10 +63,11 @@ class FixtureConfig final {
   static constexpr bool kAutoStopDriver = true;
 
   using DriverType = MyDriverType;
-  using EnvironmentType = fdf_testing::MinimalEnvironment;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
-class MyFixture : public fdf_testing::DriverTestFixture<FixtureConfiguration> {};
+class MyFixture : public fdf_testing::DriverTestFixture<FixtureConfiguration>,
+                  public ::testing::Test {};
 
 TEST_F(MyFixture, MyTest) {
   driver().DoSomething();

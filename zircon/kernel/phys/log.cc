@@ -37,30 +37,34 @@ void Log::RestoreStdout() {
 }
 
 void Log::AppendToLog(ktl::string_view str) {
-  // Use the remaining space in the existing buffer.
-  constexpr auto as_chars = [](ktl::span<ktl::byte> bytes) -> ktl::span<char> {
-    return {reinterpret_cast<char*>(bytes.data()), bytes.size()};
-  };
-  ktl::span<char> space = as_chars(buffer_->subspan(size_));
+  // Use the remaining space in the existing buffer, or make more space.
+  auto make_space = [this](size_t needed) -> ktl::span<char> {
+    if (ktl::span space = buffer_chars_left(); space.size() >= needed) {
+      return space;
+    }
 
-  // Expand (or initially allocate) the buffer if it's too small.
-  if (space.size() < str.size()) {
+    // Expand (or initially allocate) the buffer if it's too small.
     // The buffer is always allocated in whole pages.
     constexpr size_t kPageSize = ZX_PAGE_SIZE;
+    const size_t expand_size = (needed + kPageSize - 1) & -kPageSize;
     fbl::AllocChecker ac;
     if (buffer_) {
-      buffer_.Resize(ac, buffer_.size_bytes() + kPageSize);
+      buffer_.Resize(ac, buffer_.size_bytes() + expand_size);
     } else {
-      buffer_ = Allocation::New(ac, memalloc::Type::kPhysLog, kPageSize, kPageSize);
+      buffer_ = Allocation::New(ac, memalloc::Type::kPhysLog, expand_size, kPageSize);
     }
     if (!ac.check()) {
       RestoreStdout();
       ZX_PANIC("failed to increase phys log from %#zx to %#zx bytes", buffer_.size_bytes(),
-               buffer_.size_bytes() + kPageSize);
+               buffer_.size_bytes() + expand_size);
     }
-  }
+    return buffer_chars_left();
+  };
 
-  size_ += str.copy(space.data(), space.size());
+  ktl::span<char> space = make_space(str.size());
+  size_t copied = str.copy(space.data(), space.size());
+  ZX_DEBUG_ASSERT(copied == str.size());
+  size_ += copied;
 }
 
 FILE Log::LogOnlyFile() {

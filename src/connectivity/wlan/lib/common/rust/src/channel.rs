@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(dead_code)]
 use crate::ie;
 use anyhow::format_err;
 use std::fmt;
@@ -267,6 +266,8 @@ impl Channel {
         self.is_primary_5ghz()
     }
 
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     fn is_unii1(&self) -> bool {
         let p = self.primary;
         p >= 32 && p <= 50
@@ -283,6 +284,8 @@ impl Channel {
         p >= 96 && p <= 144
     }
 
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
+    #[allow(dead_code)]
     fn is_unii3(&self) -> bool {
         let p = self.primary;
         // Note the overlap with U-NII-2C

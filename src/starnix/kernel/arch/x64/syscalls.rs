@@ -495,7 +495,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_creat() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let path = "newfile.txt";
         current_task.write_memory(path_addr, path.as_bytes())?;
         let fd = sys_creat(
@@ -515,6 +515,7 @@ mod tests {
         let time1 = sys_time(&mut locked, &current_task, Default::default()).expect("time");
         assert!(time1 > 0);
         let address = map_memory(
+            &mut locked,
             &current_task,
             UserAddress::default(),
             std::mem::size_of::<__kernel_time_t>() as u64,

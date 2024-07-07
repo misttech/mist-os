@@ -4,7 +4,9 @@
 
 #include "examples/drivers/transport/zircon/v2/child-driver.h"
 
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+
+#include <gtest/gtest.h>
 
 namespace testing {
 
@@ -53,7 +55,8 @@ class FixtureConfig final {
   using EnvironmentType = ZirconTransportTestEnvironment;
 };
 
-class ChildZirconTransportDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig> {};
+class ChildZirconTransportDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+                                       public ::testing::Test {};
 
 TEST_F(ChildZirconTransportDriverTest, VerifyQueryValues) {
   // Verify that the queried values match the fake parent driver server.

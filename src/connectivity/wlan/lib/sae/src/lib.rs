@@ -1,11 +1,6 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-// This crate doesn't comply with all 2018 idioms
-#![allow(elided_lifetimes_in_paths)]
-#![allow(unused)]
-
 mod boringssl;
 mod ecc;
 mod frame;
@@ -21,7 +16,7 @@ use ieee80211::{MacAddr, Ssid};
 use mundane::hash::Sha256;
 use num::FromPrimitive;
 use tracing::warn;
-use wlan_common::ie::rsn::akm::{self, Akm, AKM_PSK, AKM_SAE};
+use wlan_common::ie::rsn::akm::{self, Akm};
 
 /// Maximum number of incorrect frames sent before SAE fails.
 const MAX_RETRIES_PER_EXCHANGE: u16 = 3;
@@ -126,16 +121,16 @@ pub trait SaeHandshake: Send {
     /// message, handle_commit should be called first and initiate_sae should never be called.
     fn initiate_sae(&mut self, sink: &mut SaeUpdateSink);
 
-    fn handle_commit(&mut self, sink: &mut SaeUpdateSink, commit_msg: &CommitMsg);
-    fn handle_confirm(&mut self, sink: &mut SaeUpdateSink, confirm_msg: &ConfirmMsg);
+    fn handle_commit(&mut self, sink: &mut SaeUpdateSink, commit_msg: &CommitMsg<'_>);
+    fn handle_confirm(&mut self, sink: &mut SaeUpdateSink, confirm_msg: &ConfirmMsg<'_>);
     fn handle_anti_clogging_token(
         &mut self,
         sink: &mut SaeUpdateSink,
-        act_msg: &AntiCloggingTokenMsg,
+        act_msg: &AntiCloggingTokenMsg<'_>,
     );
     fn handle_timeout(&mut self, sink: &mut SaeUpdateSink, timeout: Timeout);
 
-    fn handle_frame(&mut self, sink: &mut SaeUpdateSink, frame: &AuthFrameRx) {
+    fn handle_frame(&mut self, sink: &mut SaeUpdateSink, frame: &AuthFrameRx<'_>) {
         match frame::parse(frame) {
             Ok(parse) => match parse {
                 frame::ParseSuccess::Commit(commit) => self.handle_commit(sink, &commit),
@@ -202,7 +197,7 @@ pub fn new_sae_handshake(
 /// Confirm to the given update sink.
 pub fn join_sae_handshake(
     sink: &mut SaeUpdateSink,
-    first_frame: &AuthFrameRx,
+    first_frame: &AuthFrameRx<'_>,
     akm: Akm,
     ssid: Ssid,
     password: Vec<u8>,
@@ -284,7 +279,6 @@ mod internal {
         fn scalar_size(&self) -> Result<usize, Error> {
             self.order().map(|order| order.len())
         }
-        fn element_size(&self) -> Result<usize, Error>;
     }
 
     pub struct SaeParameters {
@@ -304,11 +298,12 @@ mod internal {
 
 #[cfg(test)]
 mod tests {
-    use super::internal::*;
+    #![allow(unused_variables)] // Allow unused variables in tests.
     use super::*;
     use lazy_static::lazy_static;
     use std::convert::TryFrom;
     use wlan_common::assert_variant;
+    use wlan_common::ie::rsn::akm::{AKM_PSK, AKM_SAE};
 
     // IEEE 802.11-2016 Annex J.10 SAE test vector
     const TEST_SSID: &'static str = "SSID not in 802.11-2016";
@@ -368,18 +363,18 @@ mod tests {
     struct CommitRx<'a>(AuthFrameRx<'a>);
     struct ConfirmRx<'a>(AuthFrameRx<'a>);
 
-    fn to_rx(frame: &AuthFrameTx) -> AuthFrameRx {
+    fn to_rx(frame: &AuthFrameTx) -> AuthFrameRx<'_> {
         AuthFrameRx { seq: frame.seq, status_code: frame.status_code, body: &frame.body[..] }
     }
 
     impl CommitTx {
-        fn to_rx(&self) -> CommitRx {
+        fn to_rx(&self) -> CommitRx<'_> {
             CommitRx(to_rx(&self.0))
         }
     }
 
     impl ConfirmTx {
-        fn to_rx(&self) -> ConfirmRx {
+        fn to_rx(&self) -> ConfirmRx<'_> {
             ConfirmRx(to_rx(&self.0))
         }
     }
@@ -399,13 +394,13 @@ mod tests {
     }
 
     fn expect_commit(sink: &mut Vec<SaeUpdate>) -> CommitTx {
-        let mut commit = assert_variant!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
+        let commit = assert_variant!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
         assert_variant!(frame::parse(&to_rx(&commit)), Ok(frame::ParseSuccess::Commit(msg)));
         CommitTx(commit)
     }
 
     fn expect_confirm(sink: &mut Vec<SaeUpdate>) -> ConfirmTx {
-        let mut confirm = assert_variant!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
+        let confirm = assert_variant!(sink.remove(0), SaeUpdate::SendFrame(frame) => frame);
         assert_variant!(frame::parse(&to_rx(&confirm)), Ok(frame::ParseSuccess::Confirm(msg)));
         ConfirmTx(confirm)
     }
@@ -422,7 +417,7 @@ mod tests {
     impl TestHandshake {
         fn new() -> Self {
             let akm = AKM_SAE;
-            let mut sta1 = new_sae_handshake(
+            let sta1 = new_sae_handshake(
                 19,
                 akm.clone(),
                 PweMethod::Loop,
@@ -433,7 +428,7 @@ mod tests {
                 *TEST_STA_B,
             )
             .unwrap();
-            let mut sta2 = new_sae_handshake(
+            let sta2 = new_sae_handshake(
                 19,
                 akm,
                 PweMethod::Loop,
@@ -456,7 +451,7 @@ mod tests {
             commit
         }
 
-        fn sta2_handle_commit(&mut self, commit1: CommitRx) -> (CommitTx, ConfirmTx) {
+        fn sta2_handle_commit(&mut self, commit1: CommitRx<'_>) -> (CommitTx, ConfirmTx) {
             let mut sink = vec![];
             self.sta2.handle_commit(&mut sink, &commit1.msg());
             assert_eq!(sink.len(), 3);
@@ -466,7 +461,7 @@ mod tests {
             (commit2, confirm2)
         }
 
-        fn sta1_handle_commit(&mut self, commit2: CommitRx) -> ConfirmTx {
+        fn sta1_handle_commit(&mut self, commit2: CommitRx<'_>) -> ConfirmTx {
             let mut sink = vec![];
             self.sta1.handle_commit(&mut sink, &commit2.msg());
             assert_eq!(sink.len(), 2);
@@ -475,15 +470,18 @@ mod tests {
             confirm1
         }
 
-        fn sta1_handle_confirm(&mut self, confirm2: ConfirmRx) -> Key {
+        fn sta1_handle_confirm(&mut self, confirm2: ConfirmRx<'_>) -> Key {
             Self::__internal_handle_confirm(&mut self.sta1, confirm2.msg())
         }
 
-        fn sta2_handle_confirm(&mut self, confirm1: ConfirmRx) -> Key {
+        fn sta2_handle_confirm(&mut self, confirm1: ConfirmRx<'_>) -> Key {
             Self::__internal_handle_confirm(&mut self.sta2, confirm1.msg())
         }
 
-        fn __internal_handle_confirm(sta: &mut Box<dyn SaeHandshake>, confirm: ConfirmMsg) -> Key {
+        fn __internal_handle_confirm(
+            sta: &mut Box<dyn SaeHandshake>,
+            confirm: ConfirmMsg<'_>,
+        ) -> Key {
             let mut sink = vec![];
             sta.handle_confirm(&mut sink, &confirm);
             assert_eq!(sink.len(), 3);
@@ -507,7 +505,7 @@ mod tests {
     #[test]
     fn password_mismatch() {
         let akm = AKM_SAE;
-        let mut sta1 = new_sae_handshake(
+        let sta1 = new_sae_handshake(
             19,
             akm.clone(),
             PweMethod::Loop,
@@ -518,7 +516,7 @@ mod tests {
             *TEST_STA_B,
         )
         .unwrap();
-        let mut sta2 = new_sae_handshake(
+        let sta2 = new_sae_handshake(
             19,
             akm,
             PweMethod::Loop,
@@ -597,7 +595,7 @@ mod tests {
         let confirm1 = handshake.sta1_handle_commit(commit2.to_rx());
 
         let mut sink = vec![];
-        let mut confirm2_wrong = ConfirmTx(frame::write_confirm(1, &[1; 32][..]));
+        let confirm2_wrong = ConfirmTx(frame::write_confirm(1, &[1; 32][..]));
         handshake.sta1.handle_confirm(&mut sink, &confirm2_wrong.to_rx().msg());
         assert_eq!(sink.len(), 0); // Ignored.
 
@@ -693,7 +691,7 @@ mod tests {
     #[test]
     fn bad_second_commit_ignored() {
         let mut handshake = TestHandshake::new();
-        let mut commit1 = handshake.sta1_init();
+        let commit1 = handshake.sta1_init();
         let (_commit1, _confirm2) = handshake.sta2_handle_commit(commit1.to_rx());
         let commit2_wrong = CommitMsg {
             group_id: 19,
@@ -709,7 +707,7 @@ mod tests {
     #[test]
     fn reflected_commit_discarded() {
         let mut handshake = TestHandshake::new();
-        let mut commit1 = handshake.sta1_init();
+        let commit1 = handshake.sta1_init();
 
         let mut sink = vec![];
         handshake.sta1.handle_commit(&mut sink, &commit1.to_rx().msg());
@@ -720,7 +718,7 @@ mod tests {
     #[test]
     fn maximum_commit_retries() {
         let mut handshake = TestHandshake::new();
-        let mut commit1 = handshake.sta1_init();
+        let commit1 = handshake.sta1_init();
         let (commit2, confirm2) = handshake.sta2_handle_commit(commit1.clone().to_rx());
 
         // STA2 should allow MAX_RETRIES_PER_EXCHANGE retry operations before giving up.
@@ -738,9 +736,10 @@ mod tests {
         assert_variant!(sink.remove(0), SaeUpdate::Reject(RejectReason::TooManyRetries));
     }
 
+    #[test]
     fn completed_exchange_fails_after_retries() {
         let mut handshake = TestHandshake::new();
-        let mut commit1 = handshake.sta1_init();
+        let commit1 = handshake.sta1_init();
         let (commit2, confirm2) = handshake.sta2_handle_commit(commit1.clone().to_rx());
 
         // STA2 should allow MAX_RETRIES_PER_EXCHANGE retry operations before giving up. We subtract 1

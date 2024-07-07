@@ -16,6 +16,7 @@ use crate::model::environment::Environment;
 use crate::model::routing::{self, RoutingError};
 use crate::model::start::Start;
 use ::namespace::Entry as NamespaceEntry;
+use ::routing::bedrock::sandbox_construction::ComponentSandbox;
 use ::routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
     WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
@@ -1359,6 +1360,21 @@ impl ComponentInstanceInterface for ComponentInstance {
             let err: anyhow::Error = err.into();
             ComponentInstanceError::ResolveFailed { moniker: self.moniker.clone(), err: err.into() }
         })?))
+    }
+
+    async fn component_sandbox(
+        self: &Arc<Self>,
+    ) -> Result<ComponentSandbox, ComponentInstanceError> {
+        ComponentInstance::lock_resolved_state(self)
+            .await
+            .map(|state| state.sandbox.clone())
+            .map_err(|err| {
+                let err: anyhow::Error = err.into();
+                ComponentInstanceError::ResolveFailed {
+                    moniker: self.moniker.clone(),
+                    err: err.into(),
+                }
+            })
     }
 }
 

@@ -16,7 +16,7 @@ use fuchsia_zircon::{
 };
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::SCHEDULER_CLOCK_HZ;
@@ -284,6 +284,7 @@ pub fn resolve_executable<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     resolve_executable_impl(locked, current_task, file, path, argv, environ, 0, security_state)
 }
@@ -303,6 +304,7 @@ fn resolve_executable_impl<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
@@ -346,6 +348,7 @@ fn resolve_script<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     // All VMOs have sizes in multiple of the system page size, so as long as we only read a page or
     // less, we should never read past the end of the VMO.
@@ -430,6 +433,7 @@ fn resolve_elf<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     let elf_headers = elf_parse::Elf64Headers::from_vmo(&vmo).map_err(elf_parse_error_to_errno)?;
     let interp = if let Some(interp_hdr) = elf_headers
@@ -711,6 +715,7 @@ mod tests {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         let argv = vec![CString::new("bin/hello_starnix").unwrap()];
         let executable =

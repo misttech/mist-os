@@ -33,6 +33,7 @@ python_library("honeydew_no_testonly") {
     "__init__.py",
     "affordances/__init__.py",
     "affordances/ffx/__init__.py",
+    "affordances/ffx/inspect.py",
     "affordances/ffx/session.py",
     "affordances/ffx/ui/__init__.py",
     "affordances/ffx/ui/screenshot.py",
@@ -70,6 +71,7 @@ python_library("honeydew_no_testonly") {
     "interfaces/affordances/bluetooth/bluetooth_common.py",
     "interfaces/affordances/bluetooth/profiles/bluetooth_avrcp.py",
     "interfaces/affordances/bluetooth/profiles/bluetooth_gap.py",
+    "interfaces/affordances/inspect.py",
     "interfaces/affordances/rtc.py",
     "interfaces/affordances/session.py",
     "interfaces/affordances/system_power_state_controller.py",
@@ -160,6 +162,7 @@ group("honeydew_ffx_tool_deps") {
   testonly = false
 
   deps = [
+    "//src/developer/ffx/plugins/inspect:ffx_inspect_tool_test_data",
     "//src/developer/ffx/plugins/log:ffx_log_tool_test_data",
     "//src/developer/ffx/plugins/test:ffx_test_tool_test_data",
     "//src/developer/ffx/tools/starnix:ffx_starnix_test_data",

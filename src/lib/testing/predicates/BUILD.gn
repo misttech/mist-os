@@ -17,6 +17,9 @@ source_set("predicates") {
 
     # "status.h" has #include <zircon/status.h>.
     "//src/zircon/lib/zircon:headers",
+
+    # "status.h" has #include <lib/zx/result.h>
+    "//zircon/system/ulib/zx",
   ]
 }
 

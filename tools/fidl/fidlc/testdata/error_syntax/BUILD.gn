@@ -2,22 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fidl/fidl.gni")
+import("//tools/fidl/fidlc/testdata/fidl_golden_library.gni")
 
-fidl("test.errorsyntax.parent") {
-  testonly = true
+fidl_golden_library("test.errorsyntax.parent") {
   sources = [ "parent.test.fidl" ]
-  enable_hlcpp = true
-  golden_fuzzer = true
-  disable_rustdoc = true
 }
 
-fidl("test.errorsyntax") {
-  testonly = true
+fidl_golden_library("test.errorsyntax") {
   experimental_flags = [ "output_index_json" ]
   sources = [ "child.test.fidl" ]
   public_deps = [ ":test.errorsyntax.parent" ]
-  enable_hlcpp = true
-  golden_fuzzer = true
-  disable_rustdoc = true
 }

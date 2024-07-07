@@ -105,7 +105,7 @@ executable("debug_test") {
   testonly = true
   sources = [ "debug_test.cc" ]
   deps = [
-    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2_test_helpers",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -120,8 +120,8 @@ executable("device_inspect_test") {
     "windowed_uint_property_test.cc",
   ]
   deps = [
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/inspect/testing/cpp",
-    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2_test_helpers",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:device_inspect_utils",

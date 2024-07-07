@@ -12,6 +12,7 @@
 #include <fidl/fuchsia.examples/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 // [END includes]
 
@@ -124,6 +125,8 @@ int main(int argc, const char** argv) {
   // implementation to a channel.
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithDispatcher(dispatcher).BuildAndInitialize();
 
   // Create an |OutgoingDirectory| instance.
   //

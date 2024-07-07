@@ -51,6 +51,7 @@ fuchsia_unittest_package("inspect-runtime-tests") {
   manifest = "meta/inspect_runtime_lib_test.cml"
   deps = [
     ":inspect_test_component",
+    ":inspect_test_component_default_config",
     ":lib_test",
   ]
 }
@@ -61,19 +62,45 @@ rustc_binary("inspect_test_component_bin") {
   source_root = "test/main.rs"
 
   deps = [
+    ":inspect_test_component_config_bindings",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]
 
   sources = [ "test/main.rs" ]
 }
 
+fuchsia_component_manifest("inspect_test_component_manifest") {
+  component_name = "inspect_test_component"
+  manifest = "meta/inspect_test_component.cml"
+}
+
+fuchsia_structured_config_values("inspect_test_component_default_config") {
+  cm_label = ":inspect_test_component_manifest"
+  values = {
+    publish_n_trees = 1
+  }
+}
+
+fuchsia_structured_config_rust_lib("inspect_test_component_config_bindings") {
+  cm_label = ":inspect_test_component_manifest"
+}
+
 fuchsia_component("inspect_test_component") {
   testonly = true
   deps = [ ":inspect_test_component_bin" ]
-  manifest = "meta/inspect_test_component.cml"
+  cm_label = ":inspect_test_component_manifest"
+}
+
+group("inspect_test_component_default") {
+  testonly = true
+  public_deps = [
+    ":inspect_test_component",
+    ":inspect_test_component_default_config",
+  ]
 }
 
 group("tests") {

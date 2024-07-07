@@ -13,9 +13,9 @@
 #include "codec_factory_app.h"
 
 int main(int argc, char* argv[]) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   fuchsia_logging::SetTags({"codec_factory"});
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "codec_factory trace provider");
 
   CodecFactoryApp app(loop.dispatcher(), CodecFactoryApp::ProdOrTest::kProduction);

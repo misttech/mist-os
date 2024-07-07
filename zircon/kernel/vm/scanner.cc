@@ -380,7 +380,7 @@ static void scanner_init_func(uint level) {
   }
   page_table_reclaim_policy = gBootOptions->page_scanner_page_table_eviction_policy;
   page_table_evict_time =
-      ZX_SEC(ktl::max(gBootOptions->page_scanner_page_table_eviction_period, 1u));
+      ktl::max(ZX_MSEC(gBootOptions->page_scanner_page_table_eviction_period_ms), ZX_SEC(1));
 
   if (gBootOptions->page_scanner_enable_eviction) {
     pmm_evictor()->EnableEviction(gBootOptions->compression_at_memory_pressure);
@@ -389,13 +389,13 @@ static void scanner_init_func(uint level) {
   pmm_evictor()->SetContinuousEvictionInterval(eviction_interval);
 
   pmm_page_queues()->SetActiveRatioMultiplier(gBootOptions->page_scanner_active_ratio_multiplier);
-  pmm_page_queues()->StartThreads(ZX_SEC(gBootOptions->page_scanner_min_aging_interval),
-                                  ZX_SEC(gBootOptions->page_scanner_max_aging_interval));
+  pmm_page_queues()->StartThreads(ZX_MSEC(gBootOptions->page_scanner_min_aging_interval_ms),
+                                  ZX_MSEC(gBootOptions->page_scanner_max_aging_interval_ms));
   // Set the access scan to at least 1 second over the min page scanning interval. This both ensures
   // that the access scan period is never 0 and that redundant scanning before the page queues can
   // age does not occur.
-  accessed_scan_period = ZX_SEC(ktl::max(gBootOptions->page_scanner_min_aging_interval + 1u,
-                                         gBootOptions->page_scanner_accessed_scan_interval));
+  accessed_scan_period = ZX_MSEC(ktl::max(gBootOptions->page_scanner_min_aging_interval_ms + 1000u,
+                                          gBootOptions->page_scanner_accessed_scan_interval_ms));
 
   if (fbl::RefPtr<VmCompression> compression = VmCompression::CreateDefault()) {
     zx_status_t status = pmm_set_page_compression(ktl::move(compression));

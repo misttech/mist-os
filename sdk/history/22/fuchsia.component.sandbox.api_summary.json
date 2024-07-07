@@ -1,0 +1,18 @@
+[
+    {
+        "kind": "protocol",
+        "name": "fuchsia.component.sandbox/Dictionary",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.component.sandbox/MAX_DATA_LENGTH",
+        "type": "uint32",
+        "value": "8192"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.component.sandbox"
+    }
+]

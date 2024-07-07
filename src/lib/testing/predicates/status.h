@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_TESTING_PREDICATES_STATUS_H_
 #define SRC_LIB_TESTING_PREDICATES_STATUS_H_
 
+#include <lib/zx/result.h>
 #include <zircon/status.h>
 
 #include <gtest/gtest.h>
@@ -30,6 +31,29 @@ namespace testing_predicates {
 ::testing::AssertionResult CmpZxOk(const char* l_expr, zx_status_t l);
 ::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr, zx_status_t l,
                                      zx_status_t r);
+
+::testing::AssertionResult CmpZxOk(const char* l_expr, const zx::result<>& l);
+
+template <typename T>
+::testing::AssertionResult CmpZxOk(const char* l_expr, const zx::result<T>& l) {
+  return CmpZxOk(l_expr, l.status_value());
+}
+
+::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr, const zx::result<>& l,
+                                     const zx::result<>& r);
+
+template <typename T>
+::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr, const zx::result<T>& l,
+                                     const zx::result<>& r) {
+  return CmpStatus(l_expr, r_expr, l.status_value(), r.status_value());
+}
+
+template <typename T>
+::testing::AssertionResult CmpStatus(const char* l_expr, const char* r_expr, const zx::result<>& l,
+                                     const zx::result<T>& r) {
+  return CmpStatus(l_expr, r_expr, l.status_value(), r.status_value());
+}
+
 }  // namespace testing_predicates
 
 #endif  // SRC_LIB_TESTING_PREDICATES_STATUS_H_

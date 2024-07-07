@@ -68,8 +68,8 @@ struct Endpoints {
   //     auto server_end = fidl::Endpoints<Protocol>::Create(&client_end_);
   static fidl::ServerEnd<Protocol> Create(fidl::ClientEnd<Protocol>* out_client) {
     Endpoints<Protocol> endpoints = Create();
-    *out_client = fidl::ClientEnd<Protocol>(std::move(endpoints->client));
-    return fidl::ServerEnd<Protocol>(std::move(endpoints->server));
+    *out_client = fidl::ClientEnd<Protocol>(std::move(endpoints.client));
+    return fidl::ServerEnd<Protocol>(std::move(endpoints.server));
   }
   // Creates a pair of Zircon channel endpoints speaking the |Protocol| protocol.
   // Whenever interacting with FIDL, using this method should be encouraged over
@@ -85,8 +85,8 @@ struct Endpoints {
   //     auto client_end = fidl::Endpoints<Protocol>::Create(&server_end_);
   static fidl::ClientEnd<Protocol> Create(fidl::ServerEnd<Protocol>* out_server) {
     Endpoints<Protocol> endpoints = Create();
-    *out_server = fidl::ServerEnd<Protocol>(std::move(endpoints->server));
-    return fidl::ClientEnd<Protocol>(std::move(endpoints->client));
+    *out_server = fidl::ServerEnd<Protocol>(std::move(endpoints.server));
+    return fidl::ClientEnd<Protocol>(std::move(endpoints.client));
   }
 };
 

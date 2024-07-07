@@ -236,7 +236,7 @@ template("package_tool_package_build") {
       "--repository",
       repository,
       "--api-level",
-      "${override_target_api_level}",
+      "${current_build_target_api_level}",
     ]
 
     if (defined(meta_subpackages_file)) {

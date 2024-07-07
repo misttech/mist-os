@@ -51,11 +51,6 @@
             url: "fuchsia-pkg://fuchsia.com/activity#meta/activity.cm",
         },
         {
-            name: "brightness_manager",
-            url: "fuchsia-pkg://fuchsia.com/brightness_manager#meta/brightness_manager.cm",
-            environment: "#core-env",
-        },
-        {
             name: "cobalt",
             url: "fuchsia-pkg://fuchsia.com/cobalt#meta/cobalt.cm",
         },
@@ -316,32 +311,6 @@
             protocol: "fuchsia.kernel.Stats",
             from: "parent",
             to: "#cobalt_system_metrics",
-        },
-        {
-            protocol: [ "fuchsia.ui.display.internal.DisplayPower" ],
-            from: "#ui",
-            to: "#brightness_manager",
-            dependency: "weak",
-            source_availability: "unknown",
-        },
-        {
-            storage: "data",
-            from: "self",
-            to: "#brightness_manager",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-backlight",
-            to: "#brightness_manager",
-            subdir: "backlight",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-input-report",
-            to: "#brightness_manager",
-            subdir: "input-report",
         },
         {
             directory: "dev-class",

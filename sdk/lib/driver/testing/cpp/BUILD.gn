@@ -54,30 +54,16 @@ sdk_source_set("cpp") {
   ]
 }
 
-source_set("base_fixture") {
-  public_configs = [ ":includes" ]
-
+source_set("scoped_global_logger") {
+  testonly = true
   sources = [
-    "include/lib/driver/testing/cpp/fixtures/base_fixture.h",
-    "include/lib/driver/testing/cpp/fixtures/internal/fixture_internals.h",
+    "scoped_global_logger.cc",
+    "scoped_global_logger.h",
   ]
+  deps = [ "//zircon/system/ulib/sync:sync-cpp" ]
   public_deps = [
-    ":cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
-}
-
-source_set("gtest_fixture") {
-  public_configs = [ ":includes" ]
-
-  sources = [ "include/lib/driver/testing/cpp/fixtures/gtest_fixture.h" ]
-  public_deps = [
-    ":base_fixture",
-    "//sdk/lib/driver/compat/cpp",
-    "//third_party/googletest:gtest_no_testonly",
-  ]
-}
-
-config("includes") {
-  include_dirs = [ "include" ]
 }

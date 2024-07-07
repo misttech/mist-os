@@ -40,7 +40,8 @@ class AmlSpiBtiPaddrFixtureConfig final {
   using EnvironmentType = AmlSpiBtiPaddrEnvironment;
 };
 
-class AmlSpiBtiPaddrTest : public fdf_testing::DriverTestFixture<AmlSpiBtiPaddrFixtureConfig> {};
+class AmlSpiBtiPaddrTest : public fdf_testing::DriverTestFixture<AmlSpiBtiPaddrFixtureConfig>,
+                           public ::testing::Test {};
 
 TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   constexpr uint8_t kTxData[24] = {
@@ -155,7 +156,8 @@ class AmlSpiBtiEmptyFixtureConfig final {
   using EnvironmentType = AmlSpiBtiPaddrEnvironment;
 };
 
-class AmlSpiBtiEmptyTest : public fdf_testing::DriverTestFixture<AmlSpiBtiEmptyFixtureConfig> {};
+class AmlSpiBtiEmptyTest : public fdf_testing::DriverTestFixture<AmlSpiBtiEmptyFixtureConfig>,
+                           public ::testing::Test {};
 
 TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   constexpr uint8_t kTxData[15] = {
@@ -250,7 +252,8 @@ class AmlSpiExchangeDmaClientReversesBufferConfig final {
 };
 
 class AmlSpiExchangeDmaClientReversesBufferTest
-    : public fdf_testing::DriverTestFixture<AmlSpiExchangeDmaClientReversesBufferConfig> {};
+    : public fdf_testing::DriverTestFixture<AmlSpiExchangeDmaClientReversesBufferConfig>,
+      public ::testing::Test {};
 
 TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   constexpr uint8_t kTxData[24] = {

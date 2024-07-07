@@ -28,8 +28,6 @@ NodeConnection::NodeConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode
   ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kNode) == rights);
 }
 
-NodeConnection::~NodeConnection() { [[maybe_unused]] zx::result result = Unbind(); }
-
 void NodeConnection::BindImpl(zx::channel channel, OnUnbound on_unbound) {
   ZX_DEBUG_ASSERT(!binding_);
   binding_.emplace(fidl::BindServer(vfs()->dispatcher(),
@@ -39,18 +37,20 @@ void NodeConnection::BindImpl(zx::channel channel, OnUnbound on_unbound) {
                                         fidl::ServerEnd<fuchsia_io::Node>) { on_unbound(self); }));
 }
 
-zx::result<> NodeConnection::Unbind() {
-  if (std::optional binding = std::exchange(binding_, std::nullopt); binding) {
-    binding->Unbind();
-  }
-  return zx::ok();
+void NodeConnection::Unbind() {
+  // NOTE: This needs to be thread-safe!
+  if (binding_)
+    binding_->Unbind();
 }
 
 void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   Connection::NodeClone(request->flags, VnodeProtocol::kNode, std::move(request->object));
 }
 
-void NodeConnection::Close(CloseCompleter::Sync& completer) { completer.Reply(Unbind()); }
+void NodeConnection::Close(CloseCompleter::Sync& completer) {
+  completer.Reply(zx::ok());
+  Unbind();
+}
 
 void NodeConnection::Query(QueryCompleter::Sync& completer) {
   std::string_view protocol = fio::kNodeProtocolName;

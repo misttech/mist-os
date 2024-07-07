@@ -44,6 +44,7 @@ use std::sync::Arc;
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};
+use zx::VmarInfo;
 
 const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
     zx::VmarFlags::from_bits_retain(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits());
@@ -2563,7 +2564,7 @@ pub struct MemoryManager {
     ///
     /// Instead of mapping memory directly in this VMAR, we map the memory in
     /// `state.user_vmar`.
-    pub root_vmar: zx::Vmar,
+    root_vmar: zx::Vmar,
 
     /// The base address of the root_vmar.
     pub base_addr: UserAddress,
@@ -3510,6 +3511,14 @@ impl MemoryManager {
             Ok(())
         }
     }
+
+    pub fn get_restricted_vmar_info(&self) -> Option<VmarInfo> {
+        use zx::HandleBased;
+        if self.root_vmar.is_invalid_handle() {
+            return None;
+        }
+        Some(VmarInfo { base: USER_ASPACE_BASE, len: USER_RESTRICTED_ASPACE_SIZE })
+    }
 }
 
 /// The user-space address at which a mapping should be placed. Used by [`MemoryManager::map`].
@@ -3760,6 +3769,7 @@ mod tests {
     use crate::vfs::FdNumber;
     use assert_matches::assert_matches;
     use itertools::assert_equal;
+    use starnix_sync::{FileOpsCore, LockEqualOrBefore};
     use starnix_uapi::{
         MAP_ANONYMOUS, MAP_FIXED, MAP_GROWSDOWN, MAP_PRIVATE, PROT_NONE, PR_SET_VMA,
         PR_SET_VMA_ANON_NAME,
@@ -3770,7 +3780,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_brk() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
         // Look up the given addr in the mappings table.
@@ -3833,7 +3843,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_mm_exec() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
         let has = |addr: &UserAddress| -> bool {
@@ -3850,7 +3860,8 @@ mod tests {
         let _ = mm.set_brk(&current_task, brk_addr + 1u64).expect("failed to grow program break");
         assert!(has(&brk_addr));
 
-        let mapped_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert!(mapped_addr > UserAddress::default());
         assert!(has(&mapped_addr));
 
@@ -3861,15 +3872,15 @@ mod tests {
         assert!(!has(&mapped_addr));
 
         // Check that the old addresses are actually available for mapping.
-        let brk_addr2 = map_memory(&current_task, brk_addr, *PAGE_SIZE);
+        let brk_addr2 = map_memory(&mut locked, &current_task, brk_addr, *PAGE_SIZE);
         assert_eq!(brk_addr, brk_addr2);
-        let mapped_addr2 = map_memory(&current_task, mapped_addr, *PAGE_SIZE);
+        let mapped_addr2 = map_memory(&mut locked, &current_task, mapped_addr, *PAGE_SIZE);
         assert_eq!(mapped_addr, mapped_addr2);
     }
 
     #[::fuchsia::test]
     async fn test_get_contiguous_mappings_at() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
         // Create four one-page mappings with a hole between the third one and the fourth one.
@@ -3878,10 +3889,10 @@ mod tests {
         let addr_b = mm.base_addr + 11 * page_size;
         let addr_c = mm.base_addr + 12 * page_size;
         let addr_d = mm.base_addr + 14 * page_size;
-        assert_eq!(map_memory(&current_task, addr_a, *PAGE_SIZE), addr_a);
-        assert_eq!(map_memory(&current_task, addr_b, *PAGE_SIZE), addr_b);
-        assert_eq!(map_memory(&current_task, addr_c, *PAGE_SIZE), addr_c);
-        assert_eq!(map_memory(&current_task, addr_d, *PAGE_SIZE), addr_d);
+        assert_eq!(map_memory(&mut locked, &current_task, addr_a, *PAGE_SIZE), addr_a);
+        assert_eq!(map_memory(&mut locked, &current_task, addr_b, *PAGE_SIZE), addr_b);
+        assert_eq!(map_memory(&mut locked, &current_task, addr_c, *PAGE_SIZE), addr_c);
+        assert_eq!(map_memory(&mut locked, &current_task, addr_d, *PAGE_SIZE), addr_d);
 
         {
             let mm_state = mm.state.read();
@@ -4039,15 +4050,18 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_write_crossing_mappings() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
         let ma = current_task.deref();
 
         // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
         let page_size = *PAGE_SIZE;
         let addr = mm.base_addr + 10 * page_size;
-        assert_eq!(map_memory(&current_task, addr, page_size), addr);
-        assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
+        assert_eq!(map_memory(&mut locked, &current_task, addr, page_size), addr);
+        assert_eq!(
+            map_memory(&mut locked, &current_task, addr + page_size, page_size),
+            addr + page_size
+        );
         #[cfg(feature = "alternate_anon_allocs")]
         assert_eq!(mm.get_mapping_count(), 1);
         #[cfg(not(feature = "alternate_anon_allocs"))]
@@ -4066,11 +4080,11 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_write_errors() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let ma = current_task.deref();
 
         let page_size = *PAGE_SIZE;
-        let addr = map_memory(&current_task, UserAddress::default(), page_size);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), page_size);
         let buf = vec![0u8; page_size as usize];
 
         // Verify that accessing data that is only partially mapped is an error.
@@ -4093,7 +4107,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_c_string_to_vec_large() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
         let ma = current_task.deref();
 
@@ -4101,7 +4115,7 @@ mod tests {
         let max_size = 4 * page_size as usize;
         let addr = mm.base_addr + 10 * page_size;
 
-        assert_eq!(map_memory(&current_task, addr, max_size as u64), addr);
+        assert_eq!(map_memory(&mut locked, &current_task, addr, max_size as u64), addr);
 
         let mut random_data = vec![0; max_size];
         zx::cprng_draw(&mut random_data);
@@ -4123,7 +4137,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_c_string_to_vec() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
         let ma = current_task.deref();
 
@@ -4132,7 +4146,7 @@ mod tests {
         let addr = mm.base_addr + 10 * page_size;
 
         // Map a page at a fixed address and write an unterminated string at the end of it.
-        assert_eq!(map_memory(&current_task, addr, page_size), addr);
+        assert_eq!(map_memory(&mut locked, &current_task, addr, page_size), addr);
         let test_str = b"foo!";
         let test_addr = addr + page_size - test_str.len();
         ma.write_memory(test_addr, test_str).expect("failed to write test string");
@@ -4148,7 +4162,10 @@ mod tests {
         assert_eq!(ma.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(), "foo");
 
         // Expect success if the string spans over two mappings.
-        assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
+        assert_eq!(
+            map_memory(&mut locked, &current_task, addr + page_size, page_size),
+            addr + page_size
+        );
         // TODO: Adjacent private anonymous mappings are collapsed. To test this case this test needs to
         // provide a backing for the second mapping.
         // assert_eq!(mm.get_mapping_count(), 2);
@@ -4167,12 +4184,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn can_read_argv_like_regions() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let ma = current_task.deref();
 
         // Map a page.
         let page_size = *PAGE_SIZE;
-        let addr = map_memory_anywhere(&current_task, page_size);
+        let addr = map_memory_anywhere(&mut locked, &current_task, page_size);
         assert!(!addr.is_null());
 
         // Write an unterminated string.
@@ -4212,7 +4229,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_c_string() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
         let ma = current_task.deref();
 
@@ -4225,7 +4242,7 @@ mod tests {
         let addr = mm.base_addr + 10 * page_size;
 
         // Map a page at a fixed address and write an unterminated string at the end of it.
-        assert_eq!(map_memory(&current_task, addr, page_size), addr);
+        assert_eq!(map_memory(&mut locked, &current_task, addr, page_size), addr);
         let test_str = b"foo!";
         let test_addr = addr + page_size - test_str.len();
         ma.write_memory(test_addr, test_str).expect("failed to write test string");
@@ -4238,7 +4255,10 @@ mod tests {
         assert_eq!(ma.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foo");
 
         // Expect success if the string spans over two mappings.
-        assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
+        assert_eq!(
+            map_memory(&mut locked, &current_task, addr + page_size, page_size),
+            addr + page_size
+        );
         // TODO: To be multiple mappings we need to provide a file backing for the next page or the
         // mappings will be collapsed.
         //assert_eq!(mm.get_mapping_count(), 2);
@@ -4257,10 +4277,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_unmap_returned_mappings() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
         let mut released_mappings = vec![];
         let unmap_result =
@@ -4271,11 +4291,11 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_unmap_returns_multiple_mappings() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        let _ = map_memory(&current_task, addr + 2 * *PAGE_SIZE, *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let _ = map_memory(&mut locked, &current_task, addr + 2 * *PAGE_SIZE, *PAGE_SIZE);
 
         let mut released_mappings = vec![];
         let unmap_result =
@@ -4288,10 +4308,10 @@ mod tests {
     /// The second page should be re-mapped with a new child COW VMO.
     #[::fuchsia::test]
     async fn test_unmap_beginning() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
         let state = mm.state.read();
         let (range, mapping) = state.mappings.get(&addr).expect("mapping");
@@ -4342,10 +4362,10 @@ mod tests {
     /// The first page's VMO should be shrunk.
     #[::fuchsia::test]
     async fn test_unmap_end() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
         let state = mm.state.read();
         let (range, mapping) = state.mappings.get(&addr).expect("mapping");
@@ -4397,10 +4417,10 @@ mod tests {
     /// The first page's VMO should be shrunk,
     #[::fuchsia::test]
     async fn test_unmap_middle() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
 
         let state = mm.state.read();
         let (range, mapping) = state.mappings.get(&addr).expect("mapping");
@@ -4465,9 +4485,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_write_objects() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let ma = current_task.deref();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let items_ref = UserRef::<i32>::new(addr);
 
         let items_written = vec![0, 2, 3, 7, 1];
@@ -4482,7 +4502,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_read_write_objects_null() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let ma = current_task.deref();
         let items_ref = UserRef::<i32>::new(UserAddress::default());
 
@@ -4503,9 +4523,9 @@ mod tests {
             val: [i32; 4],
         }
 
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let ma = current_task.deref();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let items_array_ref = UserRef::<i32>::new(addr);
 
         // Populate some values.
@@ -4543,12 +4563,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_partial_read() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
         let ma = current_task.deref();
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        let second_map = map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let second_map = map_memory(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
 
         let bytes = vec![0xf; (*PAGE_SIZE * 2) as usize];
         assert!(ma.write_memory(addr, &bytes).is_ok());
@@ -4562,8 +4582,16 @@ mod tests {
         );
     }
 
-    fn map_memory_growsdown(current_task: &CurrentTask, length: u64) -> UserAddress {
+    fn map_memory_growsdown<L>(
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        length: u64,
+    ) -> UserAddress
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         map_memory_with_flags(
+            locked,
             current_task,
             UserAddress::default(),
             length,
@@ -4573,7 +4601,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_grow_mapping_empty_mm() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
         let addr = UserAddress::from(0x100000);
@@ -4583,20 +4611,21 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_grow_inside_mapping() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
     }
 
     #[::fuchsia::test]
     async fn test_grow_write_fault_inside_read_only_mapping() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
         let addr = do_mmap(
+            &mut locked,
             &current_task,
             UserAddress::default(),
             *PAGE_SIZE as usize,
@@ -4613,10 +4642,11 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_grow_fault_inside_prot_none_mapping() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
         let addr = do_mmap(
+            &mut locked,
             &current_task,
             UserAddress::default(),
             *PAGE_SIZE as usize,
@@ -4633,10 +4663,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_grow_below_mapping() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory_growsdown(&current_task, *PAGE_SIZE) - *PAGE_SIZE;
+        let addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE) - *PAGE_SIZE;
 
         assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(true));
 
@@ -4646,20 +4676,20 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_grow_above_mapping() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let addr = map_memory_growsdown(&current_task, *PAGE_SIZE) + *PAGE_SIZE;
+        let addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE) + *PAGE_SIZE;
 
         assert_matches!(mm.extend_growsdown_mapping_to_address(addr, false), Ok(false));
     }
 
     #[::fuchsia::test]
     async fn test_grow_write_fault_below_read_only_mapping() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm();
 
-        let mapped_addr = map_memory_growsdown(&current_task, *PAGE_SIZE);
+        let mapped_addr = map_memory_growsdown(&mut locked, &current_task, *PAGE_SIZE);
 
         mm.protect(mapped_addr, *PAGE_SIZE as usize, ProtectionFlags::READ).unwrap();
 
@@ -4761,12 +4791,13 @@ mod tests {
     async fn test_set_vma_name() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let vma_name = "vma name";
         current_task.write_memory(name_addr, vma_name.as_bytes()).unwrap();
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         sys_prctl(
             &mut locked,
@@ -4786,13 +4817,15 @@ mod tests {
     async fn test_set_vma_name_adjacent_mappings() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
-        let first_mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let first_mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let second_mapping_addr = map_memory_with_flags(
+            &mut locked,
             &current_task,
             first_mapping_addr + *PAGE_SIZE,
             *PAGE_SIZE,
@@ -4828,12 +4861,13 @@ mod tests {
     async fn test_set_vma_name_beyond_end() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
         current_task.mm().unmap(second_page, *PAGE_SIZE as usize).unwrap();
@@ -4865,12 +4899,13 @@ mod tests {
     async fn test_set_vma_name_before_start() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
         current_task.mm().unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
@@ -4903,12 +4938,13 @@ mod tests {
     async fn test_set_vma_name_partial() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), 3 * *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), 3 * *PAGE_SIZE);
 
         assert_eq!(
             sys_prctl(
@@ -4942,12 +4978,13 @@ mod tests {
     async fn test_preserve_name_snapshot() {
         let (kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let name_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
-        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapping_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         assert_eq!(
             sys_prctl(

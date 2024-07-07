@@ -60,8 +60,9 @@ class LogState {
 
   fidl::WireSharedClient<fuchsia_logger::LogSink> log_sink_;
   void (*on_severity_changed_)(fuchsia_logging::LogSeverity severity);
-  // TODO(b/b/299996898): Remove this once everyone has been migrated.
-  async::Loop deprecated_loop_;
+  // Loop that never runs any code, but is needed so FIDL
+  // doesn't crash if we have no dispatcher thread.
+  async::Loop unused_loop_;
   std::atomic<fuchsia_logging::LogSeverity> min_severity_;
   const fuchsia_logging::LogSeverity default_severity_;
   mutable cpp17::variant<zx::socket, std::ofstream> logsink_socket_ = zx::socket();
@@ -231,9 +232,10 @@ void LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
 
 void LogState::Connect() {
   auto default_dispatcher = async_get_default_dispatcher();
+  bool missing_dispatcher = false;
   if (interest_listener_config_ != fuchsia_logging::Disabled) {
     if (!interest_listener_dispatcher_ && !default_dispatcher) {
-      deprecated_loop_.StartThread("log-interest-listener-thread");
+      missing_dispatcher = true;
     }
   }
   // Regardless of whether or not we need to do anything async, FIDL async bindings
@@ -242,7 +244,7 @@ void LogState::Connect() {
     if (default_dispatcher) {
       interest_listener_dispatcher_ = default_dispatcher;
     } else {
-      interest_listener_dispatcher_ = deprecated_loop_.dispatcher();
+      interest_listener_dispatcher_ = unused_loop_.dispatcher();
     }
   }
   fidl::ClientEnd<fuchsia_logger::LogSink> client_end;
@@ -256,7 +258,7 @@ void LogState::Connect() {
     client_end = std::move(*provided_log_sink_);
   }
   log_sink_.Bind(std::move(client_end), interest_listener_dispatcher_);
-  if (interest_listener_config_ == fuchsia_logging::Enabled) {
+  if (interest_listener_config_ == fuchsia_logging::Enabled && !missing_dispatcher) {
     auto interest_result = log_sink_.sync()->WaitForInterestChange();
     if (interest_result->is_ok()) {
       HandleInterest(interest_result->value()->data);
@@ -325,7 +327,7 @@ void LogState::Set(const fuchsia_logging::LogSettings& settings,
 
 LogState::LogState(const fuchsia_logging::LogSettings& settings,
                    const std::initializer_list<std::string>& tags)
-    : deprecated_loop_(&kAsyncLoopConfigNeverAttachToThread),
+    : unused_loop_(&kAsyncLoopConfigNeverAttachToThread),
       min_severity_(settings.min_log_level),
       default_severity_(settings.min_log_level) {
   interest_listener_dispatcher_ =

@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fidl/fidl.gni")
+import("//tools/fidl/fidlc/testdata/fidl_golden_library.gni")
 
 standalone_libraries = [
   "anonymous.test.fidl",
@@ -51,51 +51,28 @@ foreach(filename, standalone_libraries) {
   library = "test." +
             string_replace(string_replace(filename, ".test.fidl", ""), "_", "")
 
-  # TODO(https://fxbug.dev/42179004): Make a special template for golden FIDL libraries so
-  # that they are configured consistently here and in the subdirectories used
-  # for multi-library goldens.
-  fidl(library) {
-    testonly = true
+  fidl_golden_library(library) {
     sources = [ filename ]
+
     public_deps = [ "//zircon/vdso/zx" ]
     if (filename == "handles.test.fidl") {
       public_deps += [ "//sdk/fidl/fdf" ]
     }
 
     experimental_flags = []
-
     if (filename == "new_type.test.fidl") {
       experimental_flags += [ "allow_new_types" ]
-    }
-
-    if (filename == "experimental_zx_c_types.test.fidl") {
+    } else if (filename == "experimental_zx_c_types.test.fidl") {
       experimental_flags += [ "zx_c_types" ]
-    }
-
-    if (filename == "string_arrays.test.fidl") {
+    } else if (filename == "string_arrays.test.fidl") {
       experimental_flags += [ "zx_c_types" ]
-    }
-    if (filename == "overlay.test.fidl") {
+    } else if (filename == "overlay.test.fidl") {
       experimental_flags += [ "zx_c_types" ]
     }
 
     if (filename == "versions.test.fidl") {
       versioned = "test:1"
-      available = [
-        "fuchsia:HEAD",
-        "test:HEAD",
-      ]
     }
-
-    # To output index jsons
-    experimental_flags += [ "output_index_json" ]
-
-    # Some test files use the driver transport.
-    contains_drivers = true
-
-    # Generate fuzzers to make sure they build.
-    golden_fuzzer = true
-    disable_rustdoc = true
   }
 }
 

@@ -11,3 +11,5 @@ toc:
 - include: /docs/reference/troubleshooting/_toc.yaml
 - heading: "Hardware"
 - include: /docs/reference/tools/hardware/_toc.yaml
+- heading: "fx developer tools"
+- include: /reference/tools/fx/_toc.yaml

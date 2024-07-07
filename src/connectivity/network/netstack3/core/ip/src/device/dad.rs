@@ -364,7 +364,11 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> DadHandler<Ipv6
                 let leave_group = match dad_state {
                     Ipv6DadState::Assigned => true,
                     Ipv6DadState::Tentative { dad_transmits_remaining: _, timer } => {
-                        assert_ne!(bindings_ctx.cancel_timer(timer), None);
+                        // Generally we should have a timer installed in the
+                        // tentative state, but we could be racing with the
+                        // timer firing in bindings so we can't assert that it's
+                        // installed here.
+                        let _: Option<_> = bindings_ctx.cancel_timer(timer);
 
                         true
                     }
@@ -394,7 +398,7 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> DadHandler<Ipv6
 impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> HandleableTimer<CC, BC>
     for DadTimerId<CC::WeakDeviceId, CC::WeakAddressId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self { device_id, addr } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
@@ -589,7 +593,12 @@ mod tests {
                     groups: HashMap::default(),
                 }),
             }));
-        TimerHandler::handle_timer(&mut core_ctx, &mut bindings_ctx, dad_timer_id());
+        TimerHandler::handle_timer(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            dad_timer_id(),
+            Default::default(),
+        );
     }
 
     #[test]

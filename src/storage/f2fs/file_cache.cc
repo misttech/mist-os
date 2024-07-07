@@ -177,11 +177,12 @@ bool Page::ClearColdData() {
 
 zx_status_t Page::VmoOpUnlock(bool evict) {
   ZX_DEBUG_ASSERT(InTreeContainer());
-  // |evict| can be true only when the Page is clean or subject to invalidation.
-  if (((!IsDirty() && !file_cache_->IsOrphan()) || evict) && IsVmoLocked()) {
+  // Only clean pages can be subject to eviction
+  if (evict && IsVmoLocked()) {
+    ZX_DEBUG_ASSERT(!IsDirty());
     WaitOnWriteback();
     ClearFlag(PageFlag::kPageVmoLocked);
-    return GetVmoManager().UnlockVmo(index_, evict);
+    return GetVmoManager().UnlockVmo(index_);
   }
   return ZX_OK;
 }
@@ -498,8 +499,8 @@ std::vector<LockedPage> FileCache::GetLockedPagesUnsafe(const std::vector<pgoff_
 std::vector<LockedPage> FileCache::CleanupPagesUnsafe(pgoff_t start, pgoff_t end) {
   std::vector<LockedPage> pages = GetLockedPagesUnsafe(start, end);
   for (auto &page : pages) {
-    EvictUnsafe(page.get());
     page->Invalidate();
+    EvictUnsafe(page.get());
   }
   return pages;
 }
@@ -614,6 +615,23 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPages(const WritebackOperation 
     }
   }
   return pages;
+}
+
+void FileCache::EvictCleanPages() {
+  std::lock_guard tree_lock(tree_lock_);
+  auto current = page_tree_.lower_bound(0);
+  while (current != page_tree_.end()) {
+    auto raw_page = current.CopyPointer();
+    ++current;
+    if (!raw_page->IsActive()) {
+      ZX_DEBUG_ASSERT(!raw_page->IsLocked());
+      ZX_DEBUG_ASSERT(!raw_page->IsWriteback());
+      if (!raw_page->IsDirty()) {
+        fbl::RefPtr<Page> evicted = fbl::ImportFromRawPtr(raw_page);
+        EvictUnsafe(raw_page);
+      }
+    }
+  }
 }
 
 }  // namespace f2fs

@@ -28,7 +28,7 @@ use fuchsia_zircon::{self as zx};
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
-    RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
+    ProcessGroupState, RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -43,12 +43,12 @@ use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SI
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
-    clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter, sock_fprog,
-    BPF_MAXINSNS, CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS,
-    CLONE_INTO_CGROUP, CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS,
-    CLONE_SIGHAND, CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED,
-    FUTEX_TID_MASK, ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
-    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
+    clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
+    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
+    CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
+    CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK, ROBUST_LIST_LIMIT,
+    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
+    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
 use std::ffi::CString;
 use std::fmt;
@@ -439,6 +439,7 @@ impl CurrentTask {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         if flags.contains(OpenFlags::CREAT) {
             // In order to support OpenFlags::CREAT we would need to take a
@@ -819,6 +820,7 @@ impl CurrentTask {
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
+        L: LockBefore<BeforeFsNodeAppend>,
     {
         // Executable must be a regular file
         if !executable.name.entry.node.is_reg() {
@@ -939,18 +941,9 @@ impl CurrentTask {
 
     pub fn add_seccomp_filter(
         &mut self,
-        bpf_filter: UserAddress,
+        code: Vec<sock_filter>,
         flags: u32,
     ) -> Result<SyscallResult, Errno> {
-        let fprog: sock_fprog = self.read_object(UserRef::new(bpf_filter))?;
-
-        if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
-            return Err(errno!(EINVAL));
-        }
-
-        let code: Vec<sock_filter> =
-            self.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
-
         let new_filter = Arc::new(SeccompFilter::from_cbpf(
             &code,
             self.thread_group.next_seccomp_filter_id.add(1),
@@ -998,7 +991,7 @@ impl CurrentTask {
             }
 
             // Now that we're sure we're allowed to do so, add the filter to all threads.
-            filters.add_filter(new_filter, fprog.len)?;
+            filters.add_filter(new_filter, code.len() as u16)?;
 
             for task in &tasks {
                 let mut other_task_state = task.write();
@@ -1010,7 +1003,7 @@ impl CurrentTask {
         } else {
             let mut task_state = self.task.write();
 
-            task_state.seccomp_filters.add_filter(new_filter, fprog.len)?;
+            task_state.seccomp_filters.add_filter(new_filter, code.len() as u16)?;
             self.set_seccomp_state(SeccompStateValue::UserDefined)?;
         }
 
@@ -1170,6 +1163,7 @@ impl CurrentTask {
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
@@ -1190,6 +1184,8 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
+            // TODO: Validate whether we need to use `task_alloc()` with the `init_task` state here.
+            security::task_alloc_for_init(),
         )?;
         {
             let mut init_writer = init_task.thread_group.write();
@@ -1232,6 +1228,7 @@ impl CurrentTask {
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let initial_name_bytes = initial_name.as_bytes().to_owned();
         let pids = kernel.pids.write();
@@ -1255,6 +1252,7 @@ impl CurrentTask {
             },
             Credentials::root(),
             rlimits,
+            security::task_alloc_for_init(),
         )
     }
 
@@ -1276,6 +1274,7 @@ impl CurrentTask {
     ) -> Result<CurrentTask, Errno>
     where
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let builder = Self::create_task(
             locked,
@@ -1296,6 +1295,7 @@ impl CurrentTask {
                 );
                 Ok(TaskInfo { thread: None, thread_group, memory_manager })
             },
+            security::task_alloc_for_kernel(),
         )?;
         Ok(builder.into())
     }
@@ -1306,10 +1306,12 @@ impl CurrentTask {
         initial_name: CString,
         root_fs: Arc<FsContext>,
         task_info_factory: F,
+        security_state: security::TaskState,
     ) -> Result<TaskBuilder, Errno>
     where
         F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let mut pids = kernel.pids.write();
         let pid = pids.allocate_pid();
@@ -1323,6 +1325,7 @@ impl CurrentTask {
             task_info_factory,
             Credentials::root(),
             &[],
+            security_state,
         )
     }
 
@@ -1336,10 +1339,12 @@ impl CurrentTask {
         task_info_factory: F,
         creds: Credentials,
         rlimits: &[(Resource, u64)],
+        security_state: security::TaskState,
     ) -> Result<TaskBuilder, Errno>
     where
         F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         debug_assert!(pids.get_task(pid).upgrade().is_none());
 
@@ -1378,6 +1383,7 @@ impl CurrentTask {
                 SeccompFilterContainer::default(),
                 UserAddress::NULL.into(),
                 default_timerslack,
+                security_state,
             )),
             thread_state: Default::default(),
         };
@@ -1416,11 +1422,13 @@ impl CurrentTask {
         let scheduler_policy;
         let uts_ns;
         let default_timerslack_ns;
+        let security_state;
         {
             let state = system_task.read();
             scheduler_policy = state.scheduler_policy;
             uts_ns = state.uts_ns.clone();
             default_timerslack_ns = state.default_timerslack_ns;
+            security_state = security::task_alloc_for_kernel();
         }
 
         let current_task: CurrentTask = TaskBuilder::new(Task::new(
@@ -1444,6 +1452,7 @@ impl CurrentTask {
             SeccompFilterContainer::default(),
             UserAddress::NULL.into(),
             default_timerslack_ns,
+            security_state,
         ))
         .into();
         release_on_error!(current_task, locked, {
@@ -1475,6 +1484,7 @@ impl CurrentTask {
     where
         L: LockBefore<MmDumpable>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         const IMPLEMENTED_FLAGS: u64 = (CLONE_VM
             | CLONE_FS
@@ -1575,6 +1585,7 @@ impl CurrentTask {
         let robust_list_head = UserAddress::NULL.into();
         let child_signal_mask;
         let timerslack_ns;
+        let security_state = security::task_alloc(&self, flags);
 
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
@@ -1655,6 +1666,7 @@ impl CurrentTask {
             seccomp_filters,
             robust_list_head,
             timerslack_ns,
+            security_state,
         ));
 
         release_on_error!(child, locked, {
@@ -1875,6 +1887,7 @@ impl CurrentTask {
     where
         L: LockBefore<MmDumpable>,
         L: LockBefore<TaskRelease>,
+        L: LockBefore<ProcessGroupState>,
     {
         let result = self
             .clone_task(locked, flags, exit_signal, UserRef::default(), UserRef::default())

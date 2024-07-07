@@ -295,7 +295,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
 
     let directory = PathBuf::new().join("/custom_artifacts").join(&formatted_moniker);
     std::fs::create_dir_all(&directory)?;
-    let mut file = File::create(directory.join("readall.fuchsiaperf.json"))?;
+    let mut file = File::create(directory.join("readall.fuchsiaperf.fyi.json"))?;
     metrics.write_fuchsiaperf(&formatted_moniker, &file)?;
     file.flush()?;
 

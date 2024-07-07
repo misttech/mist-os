@@ -8,7 +8,7 @@ test("firmware_test") {
   output_name = "firmware_test"
   sources = [ "firmware_test.cc" ]
   deps = [
-    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2_test_helpers",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/chipset",
     "//zircon/system/ulib/zxtest",
   ]

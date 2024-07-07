@@ -100,18 +100,6 @@ zx::result<fio::wire::NodeInfoDeprecated> GetOnOpenResponse(
   if (!response.info.has_value()) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
-  // In the success case, dispatch a trivial method to synchronize with the VFS; at the time of
-  // writing, the VFS implementation sends the event *before* starting to service the channel. This
-  // can lead to races with test teardown where binding the channel happens after the dispatcher has
-  // been shutdown, which results in a panic in the FIDL runtime.
-  {
-    const fidl::WireResult result = fidl::WireCall(channel)->GetFlags();
-    zx_status_t status = result.ok() ? zx_status_t{result.value().s} : result.status();
-    if (status != ZX_OK) {
-      ADD_FAILURE("fuchisa.io/Node.GetFlags failed unexpectedly: %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-  }
   return zx::ok(std::move(response.info.value()));
 }
 

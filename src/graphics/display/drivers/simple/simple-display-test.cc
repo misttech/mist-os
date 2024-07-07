@@ -10,7 +10,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
-#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/object.h>
 #include <zircon/assert.h>
@@ -233,15 +233,8 @@ class FakeMmio {
 };
 
 class SimpleDisplayTest : public ::testing::Test {
- public:
-  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
-  void TearDown() override { fdf::Logger::SetGlobalInstance(nullptr); }
-
  private:
-  // TODO(https://fxbug.dev/348954412): Create a logger that connects to the
-  // component LogSink service.
-  fdf::Logger logger_{"test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                      fidl::WireClient<fuchsia_logger::LogSink>{}};
+  fdf_testing::ScopedGlobalLogger logger_;
 };
 
 void ExpectHandlesArePaired(zx_handle_t lhs, zx_handle_t rhs) {
@@ -346,14 +339,6 @@ TEST_F(SimpleDisplayTest, ImportBufferCollection) {
 }
 
 TEST_F(SimpleDisplayTest, ImportKernelFramebufferImage) {
-  // TODO(https://fxbug.dev/348954412): Create a logger that connects to the
-  // component LogSink service.
-  fdf::Logger logger("test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                     fidl::WireClient<fuchsia_logger::LogSink>{});
-  fdf::Logger::SetGlobalInstance(&logger);
-  fit::deferred_action unset_global_instance =
-      fit::defer([&] { fdf::Logger::SetGlobalInstance(nullptr); });
-
   constexpr int32_t kWidthPx = 800;
   constexpr int32_t kHeightPx = 600;
   constexpr int32_t kStridePx = 800;

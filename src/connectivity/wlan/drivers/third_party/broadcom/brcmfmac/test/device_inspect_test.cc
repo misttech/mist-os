@@ -17,6 +17,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect/device_inspect.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/zx/time.h>
 
 #include <functional>
@@ -24,7 +25,6 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <wlan/drivers/testing/test_helpers.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/device_inspect_test_utils.h"
@@ -76,7 +76,7 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
     *out_property = uint_property->value();
   }
 
-  wlan::drivers::log::testing::UnitTestLogContext logging_{"DeviceInspectTest"};
+  fdf_testing::ScopedGlobalLogger logging_;
   std::unique_ptr<DeviceInspect> device_inspect_;
   // Defining properties which will be covered in the test cases.
   const PropertyTestUnit uint_properties_[kUintPropertyNum] = {

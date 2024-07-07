@@ -16,6 +16,12 @@ use {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct PrincipalIdentifier(pub u64);
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum Resource {
+    KernelObject(zx::Koid),
+    Vmar { process: zx::Koid, base: usize, len: usize },
+}
+
 /// A simple tree breakdown of resource usage useful for tests.
 #[derive(Debug, Clone)]
 pub struct Principal {
@@ -26,7 +32,7 @@ pub struct Principal {
     pub name: String,
 
     /// Resources used by this principal.
-    pub resources: Vec<zx::Koid>,
+    pub resources: Vec<Resource>,
 
     /// Children of the principal.
     pub children: Vec<Principal>,
@@ -135,12 +141,16 @@ async fn handle_update(
             };
             child.resources = raw_resources
                 .into_iter()
-                .filter_map(|r| {
-                    if let fattribution::Resource::KernelObject(koid) = r {
-                        Some(zx::Koid::from_raw(koid))
-                    } else {
-                        None
+                .filter_map(|r| match r {
+                    fattribution::Resource::KernelObject(koid) => {
+                        Some(Resource::KernelObject(zx::Koid::from_raw(koid)))
                     }
+                    fattribution::Resource::ProcessMapped(vmar) => Some(Resource::Vmar {
+                        process: zx::Koid::from_raw(vmar.process),
+                        base: vmar.base as usize,
+                        len: vmar.len as usize,
+                    }),
+                    _ => todo!("unimplemented"),
                 })
                 .collect();
         }

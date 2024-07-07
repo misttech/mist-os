@@ -224,8 +224,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
     fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
 
-    device_ = std::make_unique<DisplayEngine>(nullptr, &coordinator_events_,
-                                              std::move(sysmem_client), std::move(gpu_device));
+    device_ = std::make_unique<DisplayEngine>(&coordinator_events_, std::move(sysmem_client),
+                                              std::move(gpu_device));
 
     banjo_controller_ =
         std::make_unique<DisplayControllerBanjo>(device_.get(), &coordinator_events_);

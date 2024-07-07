@@ -1,64 +1,71 @@
-# Commands and interaction model
+# Get started with zxdb
 
-The Fuchsia debugger (`zxdb`) has a built-in help system:
+Zxdb is an asynchronous debugger that allows the user to interact with the
+debugger while processes or threads are running or stopped.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] help
-```
+Zxdb uses a noun, verb, and command model for typed commands. This document
+highlights the main functionality of the zxdb debugger.
 
-To get help on a specific command or topic (in this case, the `step` command):
+## Debugger model
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] help step
-```
+When working with zxdb, you can perform most actions by combining a `noun` and
+a `verb`.
 
-## Interaction model
+* [Noun](#noun)
+* [Verbs](#verbs)
 
-Most command-line debuggers use an exclusive model for input: you’re either interacting with the
-debugged process’ stdin and stdout, or you’re interacting with the debugger. In contrast, zxdb has
-an asynchronous model similar to most GUI debuggers. In this model, the user is exclusively
-interacting with the debugger while arbitrary processes or threads are running or stopped.
-
-When the debugger itself launches a program it will print the program's stdout and stderr to the
-console. When you attach (either with a filter or with the `attach` command) they will go to the
-original place. Currently there is no way to interact with a process’ stdin.
-
-Zxdb has a regular noun/verb model for typed commands. The rest of this section gives an overview of
-the syntax that applies to all commands. Specific commands will be covered in the “Task guide”
-section below.
-
-## Nouns
+## Noun {#noun}
 
 The possible nouns (and their abbreviations) are:
 
-  * `process` (`pr`)
-  * `thread` (`t`)
-  * `frame` (`f`)
-  * `breakpoint` (`bp`)
+* `breakpoint` (`bp`)
+
+  Select or list breakpoints.
+
+* `filter`
+
+  Select or list process filters.
+
+* `frame` (`f`)
+
+  Select or list stack frames.
+
+* `global` (`gl`)
+
+  Global override for commands.
+
+* `process` (`pr`)
+
+  Select or list process contexts.
+
+* `sym-server`
+
+  Select or list symbol servers.
+
+* `thread` (`t`)
+
+  Select or list threads.
 
 ### Listing nouns
 
-If you type a noun by itself, it lists the available objects of that type:
+If you type a noun by itself, it lists the available objects of that type. For
+example:
 
-  * List attached processes
+  * {breakpoint}
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] process
-      # State       Koid Name
-    ▶ 1 Not running 3471 debug_agent_unit_tests.cm
-    ```
-
-  * List threads in the current process:
+    List all of the breakpoints in the session:
 
     ```none {:.devsite-disable-click-to-copy}
-    [zxdb] thread
-      # State   Koid Name
-    ▶ 1 Blocked 1348 initial-thread
-      2 Blocked 1356 some-other-thread
+    [zxdb] breakpoint
+    # scope  stop enabled type     Condition                       #addrs hit-count location
+    1 global all  true    software command_line.has_argv0 == false      1         0 ../../src/cobalt/bin/app/cobalt_main.cc:352
     ```
 
-  * List stack frames in the current thread (the thread must be stopped—see
-    `pause` below):
+  * {frame}
+
+    List stack frames in the current thread:
+
+    Note: You must `pause` the thread before you can list the stack frames.
 
     ```none {:.devsite-disable-click-to-copy}
     [zxdb] frame
@@ -67,19 +74,46 @@ If you type a noun by itself, it lists the available objects of that type:
       2 main() • main.cc:174
     ```
 
-### Selecting defaults
+  * {process}
 
-If you type a noun and its index, you select that as the default for subsequent commands. It also
-tells you the stats about the new default.
+    List attached processes:
 
-  * Select thread 3 to be the default for future commands:
+    ```none {:.devsite-disable-click-to-copy}
+    [zxdb] process
+      # State       Koid Name
+    ▶ 1 Not running 3471 debug_agent_unit_tests.cm
+    ```
+
+  * {thread}
+
+    List threads in the current process:
+
+    ```none {:.devsite-disable-click-to-copy}
+    [zxdb] thread
+      # State   Koid Name
+    ▶ 1 Blocked 1348 initial-thread
+      2 Blocked 1356 some-other-thread
+    ```
+
+
+### Selecting active nouns {#selecting-active-nouns}
+
+You can select a noun and its respective index to make it the active noun for
+subsequent commands. When you set a new active noun, it returns information
+about the new active noun. For example:
+
+  * {thread}
+
+    Select thread 3 to be the active noun for future commands:
 
     ```none {:.devsite-disable-click-to-copy}
     [zxdb] thread 3
     Thread 3 Blocked koid=9940 worker-thread
     ```
 
-  * Select breakpoint 2 to be the default:
+  * {breakpoint}
+
+    Select breakpoint 2 to be the active noun:
 
     ```none {:.devsite-disable-click-to-copy}
     [zxdb] breakpoint 2
@@ -88,84 +122,145 @@ tells you the stats about the new default.
 
 ## Verbs
 
-By default, a verb (`run`, `next`, `print`, etc.) applies to the current defaults. So to evaluate an
-expression in the context of the current stack frame, just type `print` by itself:
+In zxdb, verbs are used in conjunction with nouns, which specify a zxdb object,
+to perform debugging actions. For a full list of zxdb verbs, see
+[`verbs.h`][zxdb-verbs-code].
+
+By default, a verb  such as `run`, `next`, `print`, etc... applies to the
+current active nouns (for more information on active nouns, see
+[Selecting active nouns](#selecting-active-nouns)).
+
+### Data display verbs
+
+  * Memory display verbs are covered in [memory](memory.md).
+  * Register display verbs are covered in [assembly](assembly.md).
+
+## Help
+
+The zxdb debugger has a built-in help system:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] print argv[1]
-"--foo=bar"
+[zxdb] help
 ```
 
-You can override the default context by prefixing the verb with a noun and its index. So to evaluate
-an expression in the context of a specific stack frame (in this case, frame 2 of the current
-thread):
+You can also get help on a specific command. For example, to see the help of the
+`step` command:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] frame 2 print argv[1]
-"--foo=bar"
-```
-
-You can keep adding different types of context. This specifies the process, thread, and frame for
-the print command:
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] process 1 thread 1 frame 2 print argv[1]
-"--foo=bar"
+[zxdb] help step
 ```
 
 ## Attributes and settings
 
-Debugger objects have settings associated with them. Use the "get" verb to list the settings for
-a given object:
+zxdb debugger objects have settings associated with them. You can specify some
+of these settings to personalize zxdb.
+
+### Retrieve
+
+You can use the `get` verb to list the settings for a given object.
+
+For example, you can get the attributes of the active `process`:
+
+Note: The `get` command can be used on all zxdb nouns. When using `get`, you can
+also specify a specific process such as `process 1 get`.
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 1 get
-  enabled  true
-  location main
-  one-shot false
-  scope    global
-  stop     all
-  type     software
+[zxdb] process get
+  debug-stepping false
+  display        <empty>
+  show-stdout    true
+  source-map     • /b/s/w/ir/x/w/fuchsia-third_party-rust=/usr/local/home/user/fuchsia/out/default/host_x64/../../../prebuilt/third_party/rust/linux-x64/lib/rustlib/src/rust
+  vector-format  double
 ```
 
-The "get" command with a specific attribute will list the attribute and help associated with it:
+You can also use the `get` verb with a specific attribute to list the attribute
+and help associated with it.
+
+For example, to get the help of the `debug-stepping` attribute:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 1 get scope
+[zxdb] process get debug-stepping
+debug-stepping (bool)
 
-  ... help text here ...
+  Enable very verbose debug logging for thread stepping.
 
-scope = global
+  This is used by developers working on the debugger's internal thread
+  controllers.
+
+debug-stepping = false
 ```
 
-The "set" command sets a value:
+### Set
+
+You can use the `set` verb to set the settings or attributes of a given object.
+
+For example, you can set the `show-stdout` attribute of the active `process` to
+`true`:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 1 set scope="process 1 thread 2"
-[zxdb] breakpoint 1 set enabled=false
+[zxdb] process set show-stdout true
+Set process 1 show-stdout = true
 ```
 
-Some settings are hierarchical. A thread inherits settings from its process, which in turn inherits
-settings from the global scope. The "get" command with no context or parameters will list the
-global settings and the ones for the current process and thread. You can set a global setting to
-apply to all threads and processes without specific overrides, or override a specific context:
+Some settings are hierarchical. A thread inherits settings from its process,
+which in turn inherits settings from the global scope. If you use the `get` verb
+without context or parameters, it lists the global settings and the specific
+settings for the current process and thread.
+
+You can set a global setting to apply to all threads and processes without
+specific overrides, or override a specific context.
+
+For example, you can set the `show-stdout` global setting to `false`:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] set show-stdout = false            # Applies to all processes with no override.
-[zxdb] process 2 set show-stdout = true   # Overrides a specific process.
+[zxdb] set show-stdout false       # Applies to all processes with no override.
+Set global show-stdout = false
 ```
 
-Some settings are lists. You can use += to append, or specify a new value with "=". List elements
-are space-separated (quote strings with spaces).
+Some settings are stored as lists. For example, you can use any of these
+examples to set your `symbol-paths`:
+
+Note: Elements in a list are space-separated. You can use double quotes
+to specify a path that contains a space.
+
+* Use `=` to specify a new value:
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] set symbol-paths = /tmp/symbols /fuchsia-settings/symbols "/fuchsia settings/symbols"
+  Set global symbol-paths =
+    • /tmp/symbols
+    • /fuchsia-settings/symbols
+    • "/fuchsia settings/symbols"
+  ```
+
+* Use `+=` to append to the existing values:
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] set symbol-paths += /tmp/symbols2
+  Set global symbol-paths =
+    • /tmp/symbols
+    • /fuchsia-settings/symbols
+    • "/fuchsia settings/symbols"
+    • /tmp/symbols2
+  ```
+
+### Languages
+
+Note: C++ and Rust are supported.
+
+zxdb evaluates expressions based on the programming language from the current
+stack frame. If the current frame's language is different, zxdb defaults to C++.
+
+By default zxdb uses a language of `auto`. You can overwrite the default
+language with the `set` verb.
+
+Note: You should rarely need to set the language.
+
+For example, to set the default language to `rust`:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] set symbol-paths = /foo/bar/baz "/home/Dr. Strangelove/cache"
-[zxdb] set symbol-paths += /tmp
-[zxdb] get symbol-paths
-  ... help text ...
-
-symbol-paths =
-  • /foo/bar/baz
-  • "/home/Dr. Strangelove/cache"
-  • /tmp
+[zxdb] set language rust
+Set global language = rust
 ```
+
+[zxdb-verbs-code]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/debug/zxdb/console/verbs.h;l=36

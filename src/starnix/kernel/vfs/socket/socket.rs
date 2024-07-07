@@ -1028,7 +1028,8 @@ mod tests {
         .expect("Failed to create socket.");
         let passcred: u32 = 1;
         let opt_size = std::mem::size_of::<u32>();
-        let user_address = map_memory(&current_task, UserAddress::default(), opt_size as u64);
+        let user_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), opt_size as u64);
         let opt_ref = UserRef::<u32>::new(user_address);
         current_task.write_object(opt_ref, &passcred).unwrap();
         let opt_buf = UserBuffer { address: user_address, length: opt_size };

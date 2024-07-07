@@ -24,7 +24,6 @@ pub enum InitialClockState {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum InitializeRtcOutcome {
     NoDevices,
-    MultipleDevices,
     ConnectionFailed,
     ReadNotAttempted,
     ReadFailed,
@@ -41,8 +40,8 @@ impl From<RtcCreationError> for InitializeRtcOutcome {
     fn from(other: RtcCreationError) -> InitializeRtcOutcome {
         match other {
             RtcCreationError::NoDevices => Self::NoDevices,
-            RtcCreationError::MultipleDevices(_) => Self::MultipleDevices,
             RtcCreationError::ConnectionFailed(_) => Self::ConnectionFailed,
+            RtcCreationError::NotConfigured => Self::NoDevices,
         }
     }
 }
@@ -51,7 +50,6 @@ impl Into<CobaltRtcEvent> for InitializeRtcOutcome {
     fn into(self) -> CobaltRtcEvent {
         match self {
             Self::NoDevices => CobaltRtcEvent::NoDevices,
-            Self::MultipleDevices => CobaltRtcEvent::MultipleDevices,
             Self::ConnectionFailed => CobaltRtcEvent::ConnectionFailed,
             Self::ReadFailed => CobaltRtcEvent::ReadFailed,
             // TODO(jsankey): Define a better Cobalt enum for this case

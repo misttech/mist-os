@@ -72,7 +72,9 @@ void output_compare_helper(const zx::socket& local, fx_log_severity_t severity, 
     ASSERT_EQ(messages[0].metadata().tags[i], tags[i]);
   }
   EXPECT_EQ(messages[0].message(), std::string(msg));
-  EXPECT_EQ(messages[0].metadata().file, std::string(file));
+  if (messages[0].metadata().file.has_value()) {
+    EXPECT_EQ(messages[0].metadata().file, std::string(file));
+  }
   EXPECT_EQ(messages[0].metadata().line, line);
 }
 
@@ -225,6 +227,17 @@ TEST(SyslogSocketTests, TestVlogSimpleWrite) {
   int line = __LINE__ + 1;
   FX_VLOG(1, nullptr, msg);
   output_compare_helper(local, (FX_LOG_INFO - 1), msg, line);
+}
+
+TEST(SyslogSocketTests, TestWriteWithNullptrFile) {
+  // Ensure that we support nullptr filenames. See b/350577005 for justification.
+  zx::socket local, remote;
+  EXPECT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
+  ASSERT_OK(init_helper(remote.release()));
+  const char* msg = "test message";
+  fx_logger_t* logger = fx_log_get_logger();
+  fx_logger_log(logger, FX_LOG_INFO, nullptr, msg);
+  output_compare_helper(local, FX_LOG_INFO, msg, 0);
 }
 
 TEST(SyslogSocketTests, TestVlogWrite) {

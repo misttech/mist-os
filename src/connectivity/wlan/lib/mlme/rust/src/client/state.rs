@@ -527,10 +527,10 @@ pub struct Association {
     /// A closed controlled port only processes EAP frames while an open one processes any frames.
     pub controlled_port_open: bool,
 
-    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
     #[allow(dead_code)]
     pub ap_ht_op: Option<ie::HtOperation>,
-    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
     #[allow(dead_code)]
     pub ap_vht_op: Option<ie::VhtOperation>,
 
@@ -549,7 +549,7 @@ pub struct Association {
     pub status_check_timeout: StatusCheckTimeout,
     pub signal_strength_average: SignalStrengthAverage,
 
-    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
+    // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
     #[allow(dead_code)]
     pub block_ack_state: StateMachine<BlockAckState>,
 }
@@ -3392,7 +3392,6 @@ mod tests {
         );
     }
 
-    #[allow(deprecated)] // Raw MLME messages are deprecated.
     #[fuchsia::test(allow_stalls = false)]
     async fn joined_sme_deauth() {
         let mut m = MockObjects::new().await;

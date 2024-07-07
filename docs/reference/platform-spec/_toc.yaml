@@ -8,7 +8,7 @@
 toc:
 - heading: "Component Framework"
 - title: "Component manifest (.cml)"
-  path: /reference/cml.md
+  path: /reference/cml/index.md
 - title: "Component structured configuration"
   path: /docs/reference/components/structured_config.md
 - title: "Component moniker"

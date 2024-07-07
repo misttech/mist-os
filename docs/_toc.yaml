@@ -50,3 +50,6 @@ toc:
   path: /docs/go/README.md
 - title: "Deprecation notice"
   path: /docs/contribute/docs/deprecation-notice.md
+- name: "Generated reference documentation"
+  contents:
+  - include: /reference/_toc.yaml

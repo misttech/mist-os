@@ -97,6 +97,9 @@ class SocketDevice : public Device,
 
     // The number of bytes that have been received.
     uint32_t fwd_count = 0;
+
+    // The number of received bytes that are currently in the zircon socket.
+    uint32_t in_socket = 0;
   };
 
   // Wrapper around a virtio Ring that uses a single contiguous io_buffer to
@@ -253,6 +256,15 @@ class SocketDevice : public Device,
     // and the connection should be RST.
     bool Rx(void* data, size_t len);
 
+    // Evaluates if we have enough credits to continue receiving data and
+    // schedules a later update to credit info if not.
+    void UpdateTxThreshold();
+
+    // Analogous to ContinueTx, ContinueRx acknowledges the observation of the
+    // ZX_SOCKET_WRITE_THRESHOLD signal and clears the threshold value before
+    // starting a new wait on `disp`.
+    CreditInfo ContinueRx(async_dispatcher_t* disp);
+
     // Returns the credit information for this connection.
     CreditInfo GetCreditInfo();
 
@@ -314,6 +326,7 @@ class SocketDevice : public Device,
                            async_dispatcher_t* dispatcher);
     void BeginWait(async_dispatcher_t* disp);
     uint32_t GetPeerFree(bool request_credit);
+    void SetSocketTxThreshold(uint32_t threshold);
 
     // Reference to the lock that we will hold when performing BeginWait.
     fbl::Mutex& lock_;
@@ -360,7 +373,8 @@ class SocketDevice : public Device,
 
   bool SendOp_RawLocked(const ConnectionKey& key, uint16_t op, const CreditInfo& credit)
       TA_REQ(lock_);
-  void SendOpLocked(fbl::RefPtr<Connection> conn, uint16_t op) TA_REQ(lock_);
+  void SendOpLocked(fbl::RefPtr<Connection> conn, uint16_t op,
+                    std::optional<CreditInfo> known_credit = std::nullopt) TA_REQ(lock_);
 
   void RetryTxLocked(bool ask_for_credit) TA_REQ(lock_);
   void ContinueTxLocked(bool force_credit_request, fbl::RefPtr<Connection> conn) TA_REQ(lock_);

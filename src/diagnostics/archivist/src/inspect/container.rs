@@ -9,7 +9,6 @@ use crate::inspect::collector::{self as collector, InspectData};
 use diagnostics_data::{self as schema, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_inspect::TreeProxy;
 use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
@@ -18,15 +17,29 @@ use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
 use lazy_static::lazy_static;
 use std::collections::{HashMap, VecDeque};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::warn;
-use {fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect};
+use {
+    fidl_fuchsia_inspect as finspect, fidl_fuchsia_io as fio, fuchsia_trace as ftrace,
+    inspect_fidl_load as deprecated_inspect,
+};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum InspectHandle {
-    Tree { proxy: TreeProxy, name: Option<FlyStr> },
-    Directory { proxy: fio::DirectoryProxy },
+    Tree {
+        proxy: finspect::TreeProxy,
+        name: Option<FlyStr>,
+    },
+    Directory {
+        proxy: fio::DirectoryProxy,
+    },
+    Escrow {
+        vmo: Arc<zx::Vmo>,
+        name: Option<FlyStr>,
+        token: finspect::EscrowToken,
+        related_koid: zx::Koid,
+    },
 }
 
 impl InspectHandle {
@@ -34,6 +47,7 @@ impl InspectHandle {
         match self {
             Self::Directory { proxy } => proxy.as_channel().is_closed(),
             Self::Tree { proxy, .. } => proxy.as_channel().is_closed(),
+            Self::Escrow { .. } => false,
         }
     }
 
@@ -41,6 +55,9 @@ impl InspectHandle {
         match self {
             Self::Tree { proxy, .. } => proxy.on_closed().await,
             Self::Directory { proxy, .. } => proxy.on_closed().await,
+            Self::Escrow { token, .. } => {
+                fasync::OnSignals::new(&token.token, fidl::Signals::OBJECT_PEER_CLOSED).await
+            }
         }
     }
 
@@ -52,11 +69,32 @@ impl InspectHandle {
             Self::Tree { proxy, .. } => {
                 proxy.as_channel().as_handle_ref().get_koid().expect("TreeProxy has koid")
             }
+            // We return the related koid to index based on it so that the retrieval is more
+            // efficient.
+            Self::Escrow { related_koid, .. } => *related_koid,
         }
     }
 
-    pub fn from_named_tree_proxy<T: Into<FlyStr>>(proxy: TreeProxy, name: Option<T>) -> Self {
+    pub fn tree<T: Into<FlyStr>>(proxy: finspect::TreeProxy, name: Option<T>) -> Self {
         InspectHandle::Tree { proxy, name: name.map(|n| n.into()) }
+    }
+
+    pub fn escrow<T: Into<FlyStr>>(
+        vmo: zx::Vmo,
+        token: finspect::EscrowToken,
+        name: Option<T>,
+    ) -> Self {
+        let related_koid = token.token.basic_info().unwrap().related_koid;
+        InspectHandle::Escrow {
+            vmo: Arc::new(vmo),
+            name: name.map(|n| n.into()),
+            token,
+            related_koid,
+        }
+    }
+
+    pub fn directory(proxy: fio::DirectoryProxy) -> Self {
+        InspectHandle::Directory { proxy }
     }
 
     pub fn is_tree(&self) -> bool {
@@ -64,61 +102,42 @@ impl InspectHandle {
     }
 }
 
-impl From<fio::DirectoryProxy> for InspectHandle {
-    fn from(proxy: fio::DirectoryProxy) -> Self {
-        InspectHandle::Directory { proxy }
-    }
+struct StoredInspectHandle {
+    handle: Arc<InspectHandle>,
+    // Whenever we delete the stored handle from the map, we can leverage dropping this oneshot to
+    // trigger completion of the Task listening for related handle peer closed.
+    _control: oneshot::Sender<()>,
 }
 
-impl From<TreeProxy> for InspectHandle {
-    fn from(proxy: TreeProxy) -> Self {
-        InspectHandle::Tree { proxy, name: None }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Default)]
 pub struct InspectArtifactsContainer {
     /// One or more proxies that this container is configured for.
-    inspect_handles: HashMap<zx::Koid, Arc<InspectHandle>>,
-    on_closed_tasks: Vec<fasync::Task<()>>,
+    inspect_handles: HashMap<zx::Koid, StoredInspectHandle>,
+    on_closed_tasks: fasync::TaskGroup,
 }
 
 impl InspectArtifactsContainer {
-    /// Create a new `InspectArtifactsContainer`.
-    ///
-    /// Returns itself and a `Receiver` that resolves into the koid of the input `proxy`
-    /// when that proxy closes.
-    pub fn new(proxy: impl Into<InspectHandle>) -> (Self, oneshot::Receiver<zx::Koid>) {
-        let mut this = Self { inspect_handles: HashMap::new(), on_closed_tasks: vec![] };
-        // safe to unwrap as diagnostics_proxy is guaranteed to be empty
-        let rx = this.push_handle(proxy).unwrap();
-        (this, rx)
-    }
-
     /// Remove a handle via its `koid` from the set of proxies managed by `self`.
-    pub fn remove_handle(&mut self, koid: zx::Koid) -> usize {
-        self.inspect_handles.remove(&koid);
-        self.inspect_handles.len()
+    pub fn remove_handle(&mut self, koid: zx::Koid) -> (Option<Arc<InspectHandle>>, usize) {
+        let stored = self.inspect_handles.remove(&koid);
+        (stored.map(|stored| stored.handle), self.inspect_handles.len())
     }
 
     /// Push a new handle into the container.
     ///
     /// Returns `None` if the handle is a DirectoryProxy and there is already one tracked,
     /// as only single handles are supported in the DirectoryProxy case.
-    pub fn push_handle(
-        &mut self,
-        new_handle: impl Into<InspectHandle>,
-    ) -> Option<oneshot::Receiver<zx::Koid>> {
-        let handle = new_handle.into();
+    pub fn push_handle(&mut self, handle: InspectHandle) -> Option<oneshot::Receiver<zx::Koid>> {
         if !self.inspect_handles.is_empty() && matches!(handle, InspectHandle::Directory { .. }) {
             return None;
         }
-
+        let (control_snd, control_rcv) = oneshot::channel();
         let handle = Arc::new(handle);
+        let stored = StoredInspectHandle { _control: control_snd, handle: Arc::clone(&handle) };
         let koid = handle.koid();
-        self.inspect_handles.insert(koid, Arc::clone(&handle));
-        let (task, rcv) = Self::on_closed_task(handle, koid);
-        self.on_closed_tasks.push(task);
+        self.inspect_handles.insert(koid, stored);
+        let (task, rcv) = Self::on_closed_task(handle, koid, control_rcv);
+        self.on_closed_tasks.add(task);
         Some(rcv)
     }
 
@@ -135,29 +154,25 @@ impl InspectArtifactsContainer {
         }
 
         // we know there is at least 1
-        let handle = self.inspect_handles.values().next().unwrap();
-
-        match handle.as_ref() {
+        let stored = self.inspect_handles.values().next().unwrap();
+        match stored.handle.as_ref() {
             // there can only be one Directory, semantically
-            InspectHandle::Directory { proxy: dir } if self.inspect_handles.len() == 1 => {
-                fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
-                    UnpopulatedInspectDataContainer {
-                        identity: Arc::clone(identity),
-                        inspect_handles: vec![directory.into()],
-                        inspect_matcher: matcher,
-                    }
+            InspectHandle::Directory { .. } if self.inspect_handles.len() == 1 => {
+                Some(UnpopulatedInspectDataContainer {
+                    identity: Arc::clone(identity),
+                    inspect_handles: vec![Arc::downgrade(&stored.handle)],
+                    inspect_matcher: matcher,
                 })
             }
-
             InspectHandle::Tree { .. } => Some(UnpopulatedInspectDataContainer {
                 identity: Arc::clone(identity),
                 inspect_matcher: matcher,
                 inspect_handles: self
                     .inspect_handles
                     .values()
-                    .filter(|handle| handle.as_ref().is_tree())
-                    .map(|handle| handle.as_ref().clone())
-                    .collect::<Vec<InspectHandle>>(),
+                    .filter(|stored| stored.handle.is_tree())
+                    .map(|s| Arc::downgrade(&s.handle))
+                    .collect::<Vec<_>>(),
             }),
 
             _ => None,
@@ -167,12 +182,15 @@ impl InspectArtifactsContainer {
     fn on_closed_task(
         proxy: Arc<InspectHandle>,
         koid: zx::Koid,
+        control_rcv: oneshot::Receiver<()>,
     ) -> (fasync::Task<()>, oneshot::Receiver<zx::Koid>) {
         let (snd, rcv) = oneshot::channel();
         (
             fasync::Task::spawn(async move {
                 if !proxy.is_closed() {
-                    let _ = proxy.on_closed().await;
+                    let closed_fut = proxy.on_closed();
+                    futures::pin_mut!(closed_fut);
+                    let _ = futures::future::select(closed_fut, control_rcv).await;
                 }
                 let _ = snd.send(koid);
             }),
@@ -183,8 +201,8 @@ impl InspectArtifactsContainer {
 
 #[cfg(test)]
 impl InspectArtifactsContainer {
-    pub(crate) fn handles(&self) -> impl ExactSizeIterator<Item = &Arc<InspectHandle>> {
-        self.inspect_handles.values()
+    pub(crate) fn handles(&self) -> impl ExactSizeIterator<Item = &InspectHandle> {
+        self.inspect_handles.values().map(|stored| stored.handle.as_ref())
     }
 }
 
@@ -267,7 +285,7 @@ impl SnapshotData {
                     ),
                 }
             }
-            InspectData::Vmo(vmo) => match Snapshot::try_from(&vmo) {
+            InspectData::Vmo(vmo) => match Snapshot::try_from(vmo.as_ref()) {
                 Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), name),
                 Err(e) => {
                     SnapshotData::failed(schema::InspectError { message: format!("{e:?}") }, name)
@@ -406,7 +424,7 @@ pub struct UnpopulatedInspectDataContainer {
     pub identity: Arc<ComponentIdentity>,
     /// Proxies configured for container. It is an invariant that if any value is an
     /// InspectHandle::Directory, then there is exactly one value.
-    pub inspect_handles: Vec<InspectHandle>,
+    pub inspect_handles: Vec<Weak<InspectHandle>>,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
     pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
@@ -508,9 +526,10 @@ mod test {
         })
         .detach();
 
+        let handle = Arc::new(InspectHandle::directory(directory));
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![directory.into()],
+            inspect_handles: vec![Arc::downgrade(&handle)],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
@@ -528,12 +547,13 @@ mod test {
 
     #[fuchsia::test]
     async fn no_inspect_files_do_not_give_an_error_response() {
-        let directory =
+        let directory = Arc::new(InspectHandle::directory(
             fuchsia_fs::directory::open_in_namespace("/tmp", fuchsia_fs::OpenFlags::RIGHT_READABLE)
-                .unwrap();
+                .unwrap(),
+        ));
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            inspect_handles: vec![directory.into()],
+            inspect_handles: vec![Arc::downgrade(&directory)],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
@@ -548,8 +568,9 @@ mod test {
     fn only_one_directory_proxy_is_populated() {
         let _executor = fuchsia_async::LocalExecutor::new();
         let (directory, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let (mut container, _rx) = InspectArtifactsContainer::new(directory);
+        let mut container = InspectArtifactsContainer::default();
+        let _rx = container.push_handle(InspectHandle::directory(directory));
         let (directory2, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        assert!(container.push_handle(directory2).is_none());
+        assert!(container.push_handle(InspectHandle::directory(directory2)).is_none());
     }
 }

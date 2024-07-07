@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Error, Result};
+use fidl::endpoints::{ClientEnd, Proxy};
+use fidl_test_powerelementrunner::ControlMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_zircon::{HandleBased, Rights};
 use futures::StreamExt;
-use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
+use power_broker_client::PowerElementContext;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
@@ -25,31 +29,38 @@ enum IncomingRequest {
     TopologyControl(fpt::TopologyControlRequestStream),
 }
 
-async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::LeaseControlProxy> {
-    let lease_control = controller
-        .lessor
-        .lease(level)
-        .await?
-        .map_err(|e| anyhow::anyhow!("{e:?}"))?
-        .into_proxy()?;
+async fn lease(lessor: &fbroker::LessorProxy, level: u8) -> Result<fbroker::LeaseControlProxy> {
+    let lease_control =
+        lessor.lease(level).await?.map_err(|e| anyhow::anyhow!("{e:?}"))?.into_proxy()?;
 
     Ok(lease_control)
 }
 
+/// This struct does not wrap a PowerElementContext because the required_level and current_level
+/// proxies need to be converted to client ends. This struct temporarily stores the client ends
+/// after the power element is created. Then, after the realm builder finishes adding all the child
+/// components, the client ends are taken and sent to the designated component for the power element
+/// to run on.
 struct PowerElement {
-    power_element_context: PowerElementContext,
+    _element_control: fbroker::ElementControlProxy,
+    lessor: fbroker::LessorProxy,
+    required_level: RefCell<Option<ClientEnd<fbroker::RequiredLevelMarker>>>,
+    current_level: RefCell<Option<ClientEnd<fbroker::CurrentLevelMarker>>>,
+    assertive_dependency_token: fbroker::DependencyToken,
+    opportunistic_dependency_token: fbroker::DependencyToken,
+    initial_level: fbroker::PowerLevel,
     lease: RefCell<Option<fbroker::LeaseControlProxy>>,
 }
 
 impl PowerElement {
     async fn new(
+        builder: &RealmBuilder,
         topology: &fbroker::TopologyProxy,
         element_name: &str,
         valid_levels: &[fbroker::PowerLevel],
         initial_current_level: fbroker::PowerLevel,
         dependencies: Vec<fbroker::LevelDependency>,
-        inspect_node: fuchsia_inspect::Node,
-    ) -> Result<Rc<Self>> {
+    ) -> Result<Self> {
         let power_element_context =
             PowerElementContext::builder(topology, element_name, valid_levels)
                 .initial_current_level(initial_current_level)
@@ -57,32 +68,84 @@ impl PowerElement {
                 .build()
                 .await?;
 
-        let this = Rc::new(Self { power_element_context, lease: RefCell::new(None) });
-        let this_clone = this.clone();
+        let assertive_dependency_token = power_element_context.assertive_dependency_token();
+        let opportunistic_dependency_token = power_element_context.opportunistic_dependency_token();
 
-        fasync::Task::local(async move {
-            run_power_element(
-                &this_clone.power_element_context.name(),
-                &this_clone.power_element_context.required_level,
-                initial_current_level,
-                Some(inspect_node),
-                basic_update_fn_factory(&this_clone.power_element_context),
+        // Destructure PowerElementContext and convert current_level and required_level proxies to
+        // client ends. `into_client_end` will only succeed if there are no active clones of the
+        // proxy.
+        let PowerElementContext { element_control, lessor, required_level, current_level, .. } =
+            power_element_context;
+
+        let child_ref = builder
+            .add_child(element_name, "#meta/power-element-runner.cm", ChildOptions::new().eager())
+            .await
+            .expect("failed to add a new component");
+
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
+                        Capability::protocol_by_name("test.powerelementrunner.Control")
+                            .as_(element_name),
+                    )
+                    .from(&child_ref)
+                    .to(Ref::parent()),
             )
-            .await;
-        })
-        .detach();
+            .await
+            .unwrap();
 
-        Ok(this)
+        Ok(Self {
+            _element_control: element_control,
+            lessor,
+            required_level: RefCell::new(Some(required_level.into_client_end().unwrap())),
+            current_level: RefCell::new(Some(current_level.into_client_end().unwrap())),
+            assertive_dependency_token,
+            opportunistic_dependency_token,
+            initial_level: initial_current_level,
+            lease: RefCell::new(None),
+        })
     }
 }
 
 struct PowerTopology {
-    elements: RefCell<HashMap<String, Rc<PowerElement>>>,
+    realm_instance: RefCell<Option<RealmInstance>>,
+    elements: RefCell<HashMap<String, PowerElement>>,
+}
+
+impl PowerTopology {
+    async fn run_power_elements(&self) -> Result<(), Error> {
+        let realm_instance = self.realm_instance.borrow();
+        let instance = realm_instance.as_ref().ok_or(anyhow!("realm instance not added"))?;
+        for (element_name, element) in self.elements.borrow().iter() {
+            let current_level = element
+                .current_level
+                .borrow_mut()
+                .take()
+                .ok_or(anyhow!("Element ({element_name}) not added"))?;
+            let required_level = element
+                .required_level
+                .borrow_mut()
+                .take()
+                .ok_or(anyhow!("Element ({element_name}) not added"))?;
+            let initial_current_level = element.initial_level;
+            let proxy = instance
+                .root
+                .connect_to_named_protocol_at_exposed_dir::<ControlMarker>(&element_name)?;
+            if let Err(_) = proxy
+                .start(&element_name, initial_current_level, required_level, current_level)
+                .await?
+            {
+                error!(element_name, "Failed to run power element");
+                return Err(anyhow!("Failed to run power element: {}", element_name));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// TopologyTestDaemon runs the server for test.power.topology FIDL APIs.
 pub struct TopologyTestDaemon {
-    inspect_root: fuchsia_inspect::Node,
     topology_proxy: fbroker::TopologyProxy,
     // Holds elements and their leases for test.power.topology.SystemActivityControl.
     system_activity_topology: PowerTopology,
@@ -91,17 +154,18 @@ pub struct TopologyTestDaemon {
 }
 
 impl TopologyTestDaemon {
-    pub async fn new(inspect_root: fuchsia_inspect::Node) -> Result<Rc<Self>> {
+    pub async fn new() -> Result<Rc<Self>> {
         let topology_proxy = connect_to_protocol::<fbroker::TopologyMarker>()?;
-        let system_activity_topology = PowerTopology { elements: RefCell::new(HashMap::new()) };
-        let internal_topology = PowerTopology { elements: RefCell::new(HashMap::new()) };
+        let system_activity_topology = PowerTopology {
+            realm_instance: RefCell::new(None),
+            elements: RefCell::new(HashMap::new()),
+        };
+        let internal_topology = PowerTopology {
+            realm_instance: RefCell::new(None),
+            elements: RefCell::new(HashMap::new()),
+        };
 
-        Ok(Rc::new(Self {
-            inspect_root,
-            topology_proxy,
-            system_activity_topology,
-            internal_topology,
-        }))
+        Ok(Rc::new(Self { topology_proxy, system_activity_topology, internal_topology }))
     }
 
     pub async fn run(self: Rc<Self>) -> Result<()> {
@@ -218,19 +282,38 @@ impl TopologyTestDaemon {
         mut elements: Vec<fpt::Element>,
     ) -> fpt::TopologyControlCreateResult {
         // Clear old topology when creating a new topology.
+        if let Some(r) = self.internal_topology.realm_instance.borrow_mut().take() {
+            r.destroy().await.expect("Failed to destroy old realm instance");
+        }
         self.internal_topology.elements.borrow_mut().clear();
+
+        let builder = RealmBuilder::new().await.expect("Failed to create a new realm instance");
+
         while elements.len() > 0 {
             let element = elements.pop().unwrap();
-            self.clone().create_element_recursive(element, &mut elements).await?
+            self.clone().create_element_recursive(&builder, element, &mut elements).await?
         }
+
+        let realm_instance = builder.build().await.map_err(|err| {
+            error!(%err, "Failed to create a realm instance");
+            fpt::CreateTopologyGraphError::Internal
+        })?;
+        let _ = self.internal_topology.realm_instance.borrow_mut().insert(realm_instance);
+
+        self.internal_topology.run_power_elements().await.map_err(|err| {
+            error!(%err, "Failed to run power elements on separate components");
+            fpt::CreateTopologyGraphError::Internal
+        })?;
+
         Ok(())
     }
 
-    fn create_element_recursive(
+    fn create_element_recursive<'a>(
         self: Rc<Self>,
+        builder: &'a RealmBuilder,
         element: fpt::Element,
-        elements: &mut Vec<fpt::Element>,
-    ) -> Pin<Box<dyn Future<Output = fpt::TopologyControlCreateResult> + '_>> {
+        elements: &'a mut Vec<fpt::Element>,
+    ) -> Pin<Box<dyn Future<Output = fpt::TopologyControlCreateResult> + 'a>> {
         Box::pin(async move {
             let mut dependencies = Vec::new();
             for dependency in element.dependencies {
@@ -241,20 +324,26 @@ impl TopologyTestDaemon {
                         elements.iter().position(|e| e.element_name == required_element_name)
                     {
                         let new_element = elements.swap_remove(index);
-                        self.clone().create_element_recursive(new_element, elements).await?;
+                        self.clone()
+                            .create_element_recursive(builder, new_element, elements)
+                            .await?;
                     } else {
                         return Err(fpt::CreateTopologyGraphError::InvalidTopology);
                     }
                 }
                 let internal_topology_elements = &self.internal_topology.elements.borrow();
-                let power_element_context = &internal_topology_elements
-                    .get(&required_element_name)
-                    .unwrap()
-                    .power_element_context;
+                let power_element =
+                    &internal_topology_elements.get(&required_element_name).unwrap();
                 let token = if dependency.dependency_type == fpt::DependencyType::Assertive {
-                    power_element_context.assertive_dependency_token()
+                    power_element
+                        .assertive_dependency_token
+                        .duplicate_handle(Rights::SAME_RIGHTS)
+                        .expect("failed to duplicate token")
                 } else {
-                    power_element_context.opportunistic_dependency_token()
+                    power_element
+                        .opportunistic_dependency_token
+                        .duplicate_handle(Rights::SAME_RIGHTS)
+                        .expect("failed to duplicate token")
                 };
                 dependencies.push(fbroker::LevelDependency {
                     dependency_type: dependency.dependency_type,
@@ -265,12 +354,12 @@ impl TopologyTestDaemon {
             }
             let element_name = element.element_name;
             let power_element = PowerElement::new(
+                builder,
                 &self.topology_proxy,
                 &element_name,
                 &element.valid_levels,
                 element.initial_current_level,
                 dependencies,
-                self.inspect_root.create_child(&element_name),
             )
             .await
             .map_err(|err| {
@@ -293,12 +382,12 @@ impl TopologyTestDaemon {
             warn!(element_name, "Failed to find element name in the created topology graph");
             fpt::LeaseControlError::InvalidElement
         })?;
-        let _ = element.lease.borrow_mut().replace(
-            lease(&element.power_element_context, level).await.map_err(|err| {
+        let _ = element.lease.borrow_mut().replace(lease(&element.lessor, level).await.map_err(
+            |err| {
                 warn!(%err, element_name, level, "Failed to acquire a lease");
                 fpt::LeaseControlError::Internal
-            })?,
-        );
+            },
+        )?);
 
         Ok(())
     }
@@ -345,7 +434,10 @@ impl TopologyTestDaemon {
                     error!("Failed to get assertive_dependency_token of application_activity");
                     fpt::SystemActivityControlError::Internal
                 })?;
+
+            let builder = RealmBuilder::new().await.expect("Failed to create a new realm instance");
             let aa_controller = PowerElement::new(
+                &builder,
                 &self.topology_proxy,
                 APPLICATION_ACTIVITY_CONTROLLER,
                 &[0, 1],
@@ -356,27 +448,40 @@ impl TopologyTestDaemon {
                     requires_token: aa_token,
                     requires_level_by_preference: vec![1],
                 }],
-                self.inspect_root.create_child(APPLICATION_ACTIVITY_CONTROLLER),
             )
             .await
             .map_err(|err| {
                 error!(%err, "Failed to create application activity controller");
                 fpt::SystemActivityControlError::Internal
             })?;
+            let realm_instance = builder.build().await.map_err(|err| {
+                error!(%err, "Failed to create a realm instance");
+                fpt::SystemActivityControlError::Internal
+            })?;
+            let _ =
+                self.system_activity_topology.realm_instance.borrow_mut().insert(realm_instance);
+
             self.system_activity_topology
                 .elements
                 .borrow_mut()
                 .insert(APPLICATION_ACTIVITY_CONTROLLER.to_string(), aa_controller);
+
+            self.system_activity_topology.run_power_elements().await.map_err(|err| {
+                error!(%err, "Failed to run power elements on separate components");
+                fpt::SystemActivityControlError::Internal
+            })?;
         }
         let elements = self.system_activity_topology.elements.borrow_mut();
         let aa_controller_element = elements.get(APPLICATION_ACTIVITY_CONTROLLER).unwrap();
         if aa_controller_element.lease.borrow().is_none() {
-            let _ = aa_controller_element.lease.borrow_mut().insert(
-                lease(&aa_controller_element.power_element_context, 1).await.map_err(|err| {
+            let _ =
+                aa_controller_element
+                    .lease
+                    .borrow_mut()
+                    .insert(lease(&aa_controller_element.lessor, 1).await.map_err(|err| {
                     error!(%err, "Failed to require a lease for application activity controller");
                     fpt::SystemActivityControlError::Internal
-                })?,
-            );
+                })?);
         }
 
         Ok(())

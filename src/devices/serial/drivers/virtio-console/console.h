@@ -115,11 +115,11 @@ class ConsoleDevice : public Device,
 
   TransferBuffer port0_receive_buffer_ TA_GUARDED(request_lock_);
   TransferQueue port0_receive_descriptors_ TA_GUARDED(request_lock_);
-  Ring port0_receive_queue_ TA_GUARDED(request_lock_) = {this};
+  Ring port0_receive_queue_ TA_GUARDED(request_lock_){this};
 
   TransferBuffer port0_transmit_buffer_ TA_GUARDED(request_lock_);
   TransferQueue port0_transmit_descriptors_ TA_GUARDED(request_lock_);
-  Ring port0_transmit_queue_ TA_GUARDED(request_lock_) = {this};
+  Ring port0_transmit_queue_ TA_GUARDED(request_lock_){this};
 
   zx::eventpair event_, event_remote_;
 

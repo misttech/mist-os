@@ -14,16 +14,18 @@ ffx_plugin("ffx_repository_add") {
   deps = [
     "//build/sdk/meta:rust",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/fuchsia-repo",
-    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
   ]
 
   test_deps = [
+    "//src/developer/ffx/config:lib",
     "//src/lib/assembly/partitions_config",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:camino",

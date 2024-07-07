@@ -487,7 +487,6 @@ pub struct MinstrelRateSelector<T: TimerManager> {
     outdated_peers: HashSet<MacAddr>,
 }
 
-#[allow(unused)]
 impl<T: TimerManager> MinstrelRateSelector<T> {
     pub fn new(timer_manager: T, update_interval: Duration, probe_sequence: ProbeSequence) -> Self {
         Self {

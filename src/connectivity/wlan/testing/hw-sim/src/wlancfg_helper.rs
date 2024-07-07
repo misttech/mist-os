@@ -214,9 +214,11 @@ pub async fn wait_until_client_state<F: Fn(fidl_policy::ClientStateSummary) -> b
         let (update, responder) =
             update_request.into_on_client_state_update().expect("converting to state update");
         let _ = responder.send();
-        if continue_fn(update) {
+        if continue_fn(update.clone()) {
             return;
-        };
+        } else {
+            info!("No matching state found: {:?}", update);
+        }
     }
     panic!("The stream unexpectedly terminated");
 }
@@ -227,8 +229,8 @@ pub fn has_id_and_state(
     state_to_match: fidl_policy::ConnectionState,
 ) -> bool {
     for net_state in update.networks.expect("getting client networks") {
-        let id = net_state.id.expect("empty network ID");
-        let state = net_state.state.expect("empty network state");
+        let id = net_state.id.clone().expect("empty network ID");
+        let state = net_state.state.clone().expect("empty network state");
 
         if &id == id_to_match && state == state_to_match {
             return true;

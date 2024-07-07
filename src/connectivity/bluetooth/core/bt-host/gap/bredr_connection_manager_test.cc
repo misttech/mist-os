@@ -75,39 +75,17 @@ const uint16_t PDU_MAX = 0xFFF;
 
 #define TEST_DEV_ADDR_BYTES_LE 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
 
-const StaticByteBuffer kReadScanEnable(LowerBits(hci_spec::kReadScanEnable),
-                                       UpperBits(hci_spec::kReadScanEnable),
-                                       0x00  // No parameters
-);
+const auto kReadScanEnable = testing::ReadScanEnable();
+const auto kReadScanEnableRspNone = testing::ReadScanEnableResponse(0x00);
+const auto kReadScanEnableRspInquiry = testing::ReadScanEnableResponse(0x01);
+const auto kReadScanEnableRspPage = testing::ReadScanEnableResponse(0x02);
+const auto kReadScanEnableRspBoth = testing::ReadScanEnableResponse(0x03);
 
-#define READ_SCAN_ENABLE_RSP(scan_enable)                      \
-  StaticByteBuffer(hci_spec::kCommandCompleteEventCode,        \
-                   0x05,                                       \
-                   0xF0,                                       \
-                   LowerBits(hci_spec::kReadScanEnable),       \
-                   UpperBits(hci_spec::kReadScanEnable),       \
-                   pw::bluetooth::emboss::StatusCode::SUCCESS, \
-                   (scan_enable))
-
-const auto kReadScanEnableRspNone = READ_SCAN_ENABLE_RSP(0x00);
-const auto kReadScanEnableRspInquiry = READ_SCAN_ENABLE_RSP(0x01);
-const auto kReadScanEnableRspPage = READ_SCAN_ENABLE_RSP(0x02);
-const auto kReadScanEnableRspBoth = READ_SCAN_ENABLE_RSP(0x03);
-
-#undef READ_SCAN_ENABLE_RSP
-
-#define WRITE_SCAN_ENABLE_CMD(scan_enable)                \
-  StaticByteBuffer(LowerBits(hci_spec::kWriteScanEnable), \
-                   UpperBits(hci_spec::kWriteScanEnable), \
-                   0x01,                                  \
-                   (scan_enable))
-
-const auto kWriteScanEnableNone = WRITE_SCAN_ENABLE_CMD(0x00);
-const auto kWriteScanEnableInq = WRITE_SCAN_ENABLE_CMD(0x01);
-const auto kWriteScanEnablePage = WRITE_SCAN_ENABLE_CMD(0x02);
-const auto kWriteScanEnableBoth = WRITE_SCAN_ENABLE_CMD(0x03);
-
-#undef WRITE_SCAN_ENABLE_CMD
+const auto kWriteScanEnableNone = testing::WriteScanEnable(0x00);
+const auto kWriteScanEnableInq = testing::WriteScanEnable(0x01);
+const auto kWriteScanEnablePage = testing::WriteScanEnable(0x02);
+const auto kWriteScanEnableBoth = testing::WriteScanEnable(0x03);
+const auto kWriteScanEnableRsp = testing::WriteScanEnableResponse();
 
 #define COMMAND_COMPLETE_RSP(opcode)                    \
   StaticByteBuffer(hci_spec::kCommandCompleteEventCode, \
@@ -116,9 +94,6 @@ const auto kWriteScanEnableBoth = WRITE_SCAN_ENABLE_CMD(0x03);
                    LowerBits((opcode)),                 \
                    UpperBits((opcode)),                 \
                    pw::bluetooth::emboss::StatusCode::SUCCESS)
-
-const auto kWriteScanEnableRsp =
-    COMMAND_COMPLETE_RSP(hci_spec::kWriteScanEnable);
 
 const StaticByteBuffer kWritePageScanActivity(
     LowerBits(hci_spec::kWritePageScanActivity),

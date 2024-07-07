@@ -39,9 +39,8 @@ void AddPublicService(sys::ComponentContext* context,
 }
 
 int run_test_ui_stack(int argc, const char** argv) {
-  FX_LOGS(INFO) << "Test UI stack starting";
-
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  FX_LOGS(INFO) << "Test UI stack starting";
   auto context = sys::ComponentContext::Create();
 
   // Read component configuration, and convert to UITestRealm::Config.

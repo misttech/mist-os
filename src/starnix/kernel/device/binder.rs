@@ -148,7 +148,7 @@ impl BinderConnection {
         if process.pid == current_task.get_pid() {
             Ok(process)
         } else {
-            process.release(&current_task);
+            process.release(current_task.kernel());
             error!(EINVAL)
         }
     }
@@ -160,11 +160,11 @@ impl BinderConnection {
         }
     }
 
-    fn close(&self, current_task: &CurrentTask) {
+    fn close(&self, kernel: &Kernel) {
         log_trace!("closing BinderConnection id={}", self.identifier);
         if let Some(binder_process) = self.device.procs.write().remove(&self.identifier) {
             binder_process.close();
-            binder_process.release(current_task);
+            binder_process.release(kernel);
         }
     }
 }
@@ -173,7 +173,7 @@ impl FileOps for BinderConnection {
     fileops_impl_nonseekable!();
 
     fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
-        self.close(current_task);
+        self.close(current_task.kernel());
     }
 
     fn query_events(
@@ -182,12 +182,12 @@ impl FileOps for BinderConnection {
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let binder_process = self.proc(current_task);
-        release_after!(binder_process, current_task, {
+        release_after!(binder_process, current_task.kernel(), {
             Ok(match &binder_process {
                 Ok(binder_process) => {
                     let binder_thread =
                         binder_process.lock().find_or_register_thread(current_task.get_tid());
-                    release_after!(binder_thread, current_task, {
+                    release_after!(binder_thread, current_task.kernel(), {
                         let mut thread_state = binder_thread.lock();
                         let mut process_command_queue = binder_process.command_queue.lock();
                         BinderDriver::get_active_queue(
@@ -212,12 +212,12 @@ impl FileOps for BinderConnection {
     ) -> Option<WaitCanceler> {
         log_trace!("binder wait_async");
         let binder_process = self.proc(current_task);
-        release_after!(binder_process, current_task, {
+        release_after!(binder_process, current_task.kernel(), {
             match &binder_process {
                 Ok(binder_process) => {
                     let binder_thread =
                         binder_process.lock().find_or_register_thread(current_task.get_tid());
-                    release_after!(binder_thread, current_task, {
+                    release_after!(binder_thread, current_task.kernel(), {
                         Some(self.device.wait_async(
                             &binder_process,
                             &binder_thread,
@@ -244,7 +244,7 @@ impl FileOps for BinderConnection {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         let binder_process = self.proc(current_task)?;
-        release_after!(binder_process, current_task, {
+        release_after!(binder_process, current_task.kernel(), {
             self.device.ioctl(locked, current_task, &binder_process, request, arg)
         })
     }
@@ -261,6 +261,7 @@ impl FileOps for BinderConnection {
 
     fn mmap(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -271,7 +272,7 @@ impl FileOps for BinderConnection {
         filename: NamespaceNode,
     ) -> Result<UserAddress, Errno> {
         let binder_process = self.proc(current_task)?;
-        release_after!(binder_process, current_task, {
+        release_after!(binder_process, current_task.kernel(), {
             self.device.mmap(
                 current_task,
                 &binder_process,
@@ -311,7 +312,9 @@ impl FileOps for BinderConnection {
     fn flush(&self, _file: &FileObject, current_task: &CurrentTask) {
         // Errors are not meaningful on flush.
         let Ok(binder_process) = self.proc(current_task) else { return };
-        release_after!(binder_process, current_task, { binder_process.kick_all_threads() });
+        release_after!(binder_process, current_task.kernel(), {
+            binder_process.kick_all_threads()
+        });
     }
 }
 
@@ -329,7 +332,7 @@ impl RemoteBinderConnection {
         mapped_address: u64,
     ) -> Result<(), Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
-        release_after!(binder_process, current_task, {
+        release_after!(binder_process, current_task.kernel(), {
             binder_process.map_external_vmo(vmo, mapped_address)
         })
     }
@@ -342,7 +345,7 @@ impl RemoteBinderConnection {
         arg: SyscallArg,
     ) -> Result<(), Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
-        release_after!(binder_process, current_task, {
+        release_after!(binder_process, current_task.kernel(), {
             self.binder_connection
                 .device
                 .ioctl(locked, current_task, &binder_process, request, arg)
@@ -354,8 +357,8 @@ impl RemoteBinderConnection {
         self.binder_connection.interrupt();
     }
 
-    pub fn close(&self, current_task: &CurrentTask) {
-        self.binder_connection.close(current_task);
+    pub fn close(&self, kernel: &Kernel) {
+        self.binder_connection.close(kernel);
     }
 }
 
@@ -448,7 +451,7 @@ struct ActiveTransaction {
 }
 
 impl Releasable for ActiveTransaction {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a> = ();
 
     fn release(self, context: Self::Context<'_>) {
         self.state.release(context);
@@ -477,7 +480,7 @@ struct TransactionState {
 }
 
 impl Releasable for TransactionState {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a> = ();
 
     fn release(self, _: Self::Context<'_>) {
         log_trace!("Releasing binder TransactionState");
@@ -542,12 +545,12 @@ struct TransientTransactionState<'a> {
 }
 
 impl<'a> Releasable for TransientTransactionState<'a> {
-    type Context<'b> = &'b CurrentTask;
-    fn release(self, context: Self::Context<'_>) {
+    type Context<'b> = ();
+    fn release(self, _: Self::Context<'_>) {
         for fd in &self.transient_fds {
             let _: Result<(), Errno> = self.accessor.close_fd(*fd);
         }
-        self.state.release(context);
+        self.state.release(());
         self.drop_guard.disarm();
     }
 }
@@ -609,11 +612,11 @@ impl<'a> TransientTransactionState<'a> {
         self.transient_fds.push(fd)
     }
 
-    fn into_state(mut self, context: &CurrentTask) -> ReleaseGuard<TransactionState> {
+    fn into_state(mut self) -> ReleaseGuard<TransactionState> {
         // Clear the transient FD list, so that these FDs no longer get closed.
         self.transient_fds.clear();
         let result = self.state.take().unwrap();
-        self.release(context);
+        self.release(());
         result
     }
 }
@@ -745,15 +748,11 @@ impl BinderProcess {
 
     /// A binder thread is done reading a buffer allocated to a transaction. The binder
     /// driver can reclaim this buffer.
-    fn handle_free_buffer(
-        &self,
-        current_task: &CurrentTask,
-        buffer_ptr: UserAddress,
-    ) -> Result<(), Errno> {
+    fn handle_free_buffer(&self, buffer_ptr: UserAddress) -> Result<(), Errno> {
         log_trace!("BinderProcess id={} freeing buffer {:?}", self.identifier, buffer_ptr);
         // Drop the state associated with the now completed transaction.
         let active_transaction = self.lock().active_transactions.remove(&buffer_ptr);
-        release_after!(active_transaction, current_task, {
+        release_after!(active_transaction, (), {
             // Check if this was a oneway transaction and schedule the next oneway if this is the case.
             if let Some(ActiveTransaction {
                 request_type: RequestType::Oneway { object }, ..
@@ -910,7 +909,7 @@ impl<'a> BinderProcessGuard<'a> {
 
     /// Unregister the `BinderThread` with the given `tid`.
     fn unregister_thread(&mut self, current_task: &CurrentTask, tid: pid_t) {
-        self.thread_pool.0.remove(&tid).release(current_task);
+        self.thread_pool.0.remove(&tid).release(current_task.kernel());
     }
 
     /// Inserts a reference to a binder object, returning a handle that represents it.
@@ -1038,7 +1037,7 @@ impl<'a> BinderProcessGuard<'a> {
 }
 
 impl Releasable for BinderProcess {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a> = &'a Kernel;
 
     fn release(self, context: Self::Context<'_>) {
         log_trace!("Releasing BinderProcess id={}", self.identifier);
@@ -1063,10 +1062,10 @@ impl Releasable for BinderProcess {
         }
 
         for transaction in state.active_transactions.into_values() {
-            transaction.release(context)
+            transaction.release(());
         }
 
-        state.handles.release(context);
+        state.handles.release(());
 
         for thread in state.thread_pool.0.into_values() {
             thread.release(context);
@@ -1352,8 +1351,8 @@ struct HandleTable {
 /// The HandleTable is released at the time the BinderProcess is released. At this moment, any
 /// reference to object owned by another BinderProcess need to be clean.
 impl Releasable for HandleTable {
-    type Context<'a> = &'a CurrentTask;
-    fn release(self, _: Self::Context<'_>) {
+    type Context<'a> = ();
+    fn release(self, _: ()) {
         for (_, r) in self.table.into_iter() {
             let mut actions = RefCountActions::default();
             r.clean_refs(&mut actions);
@@ -1687,7 +1686,7 @@ impl BinderThread {
 }
 
 impl Releasable for BinderThread {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a> = &'a Kernel;
 
     fn release(self, context: Self::Context<'_>) {
         self.state.into_inner().release(context);
@@ -1807,7 +1806,7 @@ impl BinderThreadState {
 }
 
 impl Releasable for BinderThreadState {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a> = &'a Kernel;
 
     fn release(self, context: Self::Context<'_>) {
         log_trace!("Dropping BinderThreadState id={}", self.tid);
@@ -2583,8 +2582,8 @@ enum TransactionRole {
 struct SchedulerGuard(Option<ReleaseGuard<SchedulerPolicy>>);
 
 impl SchedulerGuard {
-    fn release_for_task(self, current_task: &CurrentTask, tid: pid_t) -> bool {
-        let task = current_task.kernel().pids.read().get_task(tid);
+    fn release_for_task(self, kernel: &Kernel, tid: pid_t) -> bool {
+        let task = kernel.pids.read().get_task(tid);
         if let Some(task) = task.upgrade() {
             self.release(&task);
             return true;
@@ -3062,7 +3061,7 @@ impl Releasable for BinderDriver {
 
     fn release(mut self, context: Self::Context<'_>) {
         for binder_process in std::mem::take(self.procs.get_mut()).into_values() {
-            binder_process.release(context);
+            binder_process.release(context.kernel());
         }
     }
 }
@@ -3187,7 +3186,7 @@ impl BinderDriver {
         trace_duration!(CATEGORY_STARNIX, NAME_BINDER_IOCTL, "request" => request);
         let user_arg = UserAddress::from(arg);
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
-        release_after!(binder_thread, current_task, {
+        release_after!(binder_thread, current_task.kernel(), {
             match request {
                 uapi::BINDER_VERSION => {
                     // A thread is requesting the version of this binder driver.
@@ -3392,7 +3391,7 @@ impl BinderDriver {
             binder_driver_command_protocol_BC_FREE_BUFFER => {
                 profile_duration!("FreeBuffer");
                 let buffer_ptr = UserAddress::from(cursor.read_object::<binder_uintptr_t>()?);
-                binder_proc.handle_free_buffer(current_task, buffer_ptr)
+                binder_proc.handle_free_buffer(buffer_ptr)
             }
             binder_driver_command_protocol_BC_REQUEST_DEATH_NOTIFICATION => {
                 profile_duration!("RequestDeathNotif");
@@ -3556,7 +3555,7 @@ impl BinderDriver {
                             buffers.data.address,
                             ActiveTransaction {
                                 request_type: RequestType::Oneway { object: object.clone() },
-                                state: transaction_state.into_state(current_task),
+                                state: transaction_state.into_state(),
                             }
                             .into(),
                         );
@@ -3599,7 +3598,7 @@ impl BinderDriver {
                             buffers.data.address,
                             ActiveTransaction {
                                 request_type: RequestType::RequestResponse,
-                                state: transaction_state.into_state(current_task),
+                                state: transaction_state.into_state(),
                             }
                             .into(),
                         );
@@ -3676,7 +3675,7 @@ impl BinderDriver {
                 buffers.data.address,
                 ActiveTransaction {
                     request_type: RequestType::RequestResponse,
-                    state: transaction_state.into_state(current_task),
+                    state: transaction_state.into_state(),
                 }
                 .into(),
             );
@@ -3952,7 +3951,7 @@ impl BinderDriver {
 
         let mut transaction_state =
             TransientTransactionState::new(target_resource_accessor, target_proc);
-        release_on_error!(transaction_state, current_task, {
+        release_on_error!(transaction_state, (), {
             let mut sg_remaining_buffer = sg_buffer.user_buffer();
             let mut sg_buffer_offset = 0;
             for (offset_idx, object_offset) in offsets.iter().map(|o| *o as usize).enumerate() {
@@ -4661,11 +4660,11 @@ pub mod tests {
 
     impl Drop for BinderProcessFixture {
         fn drop(&mut self) {
-            OwnedRef::take(&mut self.thread).release(&self.task);
+            OwnedRef::take(&mut self.thread).release(self.task.kernel());
             if let Some(device) = self.device.upgrade() {
-                device.procs.write().remove(&self.proc.identifier).release(&self.task);
+                device.procs.write().remove(&self.proc.identifier).release(self.task.kernel());
             }
-            OwnedRef::take(&mut self.proc).release(&self.task);
+            OwnedRef::take(&mut self.proc).release(self.task.kernel());
         }
     }
 
@@ -5640,7 +5639,7 @@ pub mod tests {
         );
 
         // Map some memory for process 1.
-        let data_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let data_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
 
         // Write transaction data in process 1.
         const BINDER_DATA: &[u8; 8] = b"binder!!";
@@ -5730,7 +5729,7 @@ pub mod tests {
         vmo.read(&mut buffer[..], (security_context_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read security_context");
         assert_eq!(&buffer[..], security_context);
-        transaction_state.release(&sender.task);
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -5809,7 +5808,7 @@ pub mod tests {
             &sender.thread.lock().command_queue.commands.front(),
             Some(Command::AcquireRef(BINDER_OBJECT))
         );
-        transaction_state.release(&sender.task);
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -5868,7 +5867,7 @@ pub mod tests {
                 &mut allocations.scatter_gather_buffer,
             )
             .expect("failed to translate handles")
-            .release(&sender.task);
+            .release(());
 
         // Verify that the transaction data was mutated.
         let mut expected_transaction_data = vec![];
@@ -5975,7 +5974,7 @@ pub mod tests {
         guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&owner.proc));
         assert_eq!(object.local, binder_object);
-        transaction_state.release(&sender.task);
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -6110,7 +6109,7 @@ pub mod tests {
         guard.release(&mut RefCountActions::default_released());
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&other_proc.proc));
         assert_eq!(object.local, binder_object_addr);
-        transaction_state.release(&sender.task);
+        transaction_state.release(());
     }
 
     /// Tests that hwbinder's scatter-gather buffer-fix-up implementation is correct.
@@ -6122,7 +6121,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a string into memory.
@@ -6212,7 +6211,7 @@ pub mod tests {
                 None,
             )
             .expect("copy_transaction_buffers");
-        transaction_state.release(&sender.task);
+        transaction_state.release(());
         let data_buffer = buffers.data;
 
         // Read back the translated objects from the receiver's memory.
@@ -6244,7 +6243,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a series of buffers that point to empty data. Each successive buffer is smaller
@@ -6329,7 +6328,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Write the data for two buffer objects.
@@ -6433,7 +6432,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -6570,10 +6569,7 @@ pub mod tests {
         assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
 
         // Release the buffer in the receiver and verify that the associated FDs have been closed.
-        receiver
-            .proc
-            .handle_free_buffer(&receiver.task, data_buffer.address)
-            .expect("failed to free buffer");
+        receiver.proc.handle_free_buffer(data_buffer.address).expect("failed to free buffer");
         assert!(
             receiver
                 .task
@@ -6626,7 +6622,8 @@ pub mod tests {
 
             // Allocate memory in the sender to hold all the buffers that will get submitted to the
             // binder driver.
-            let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+            let sender_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
             let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
             // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -6746,7 +6743,7 @@ pub mod tests {
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
         let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
         // Serialize a simple buffer. This will ensure that the FD array being translated is not at
@@ -6844,7 +6841,7 @@ pub mod tests {
         assert!(receiver.task.files.get_allowing_opath(fd).is_ok(), "file should be translated");
 
         // Release the result, which should close the fds in the receiver.
-        transient_state.release(&sender.task);
+        transient_state.release(());
         assert!(
             receiver.task.files.get_allowing_opath(fd).expect_err("file should be closed") == EBADF
         );
@@ -7015,7 +7012,7 @@ pub mod tests {
         binder_driver
             .find_process(identifier)
             .expect("failed to find process")
-            .release(&current_task);
+            .release(current_task.kernel());
 
         // Close the file descriptor.
         std::mem::drop(binder_fd);
@@ -7061,7 +7058,8 @@ pub mod tests {
             }
         });
 
-        let read_buffer_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let read_buffer_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let bytes_read = binder_driver
             .handle_thread_read(
                 &current_task,
@@ -7072,8 +7070,8 @@ pub mod tests {
             .unwrap();
         assert_eq!(bytes_read, 0);
         thread.join().expect("join");
-        binder_thread.release(&current_task);
-        binder_proc.release(&current_task);
+        binder_thread.release(current_task.kernel());
+        binder_proc.release(current_task.kernel());
     }
 
     #[fuchsia::test]
@@ -7340,7 +7338,7 @@ pub mod tests {
             .expect("failed to translate handles");
 
         // Simulate success by converting the transient state.
-        let transaction_state = transient_transaction_state.into_state(&sender.task);
+        let transaction_state = transient_transaction_state.into_state();
 
         // The receiver should now have a file.
         let receiver_fd =
@@ -7373,7 +7371,7 @@ pub mod tests {
         });
 
         assert_eq!(expected_transaction_data, transaction_data);
-        transaction_state.release(&sender.task);
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -7419,7 +7417,7 @@ pub mod tests {
         assert!(!receiver.task.files.get_all_fds().is_empty(), "receiver should have a file");
 
         // Simulate an error, which will release the transaction state.
-        transaction_state.release(&sender.task);
+        transaction_state.release(());
 
         assert!(receiver.task.files.get_all_fds().is_empty(), "receiver should not have any files");
     }
@@ -7486,8 +7484,8 @@ pub mod tests {
         sender.thread.lock().command_queue.commands.pop_front().unwrap();
 
         // Simulate a successful transaction by converting the transient state.
-        let transaction_state = transaction_state.into_state(&sender.task);
-        transaction_state.release(&sender.task);
+        let transaction_state = transaction_state.into_state();
+        transaction_state.release(());
 
         // Verify that a strong release command is sent to the sender process.
         assert_matches!(
@@ -7612,10 +7610,7 @@ pub mod tests {
 
         // Now the receiver issues the `BC_FREE_BUFFER` command, which should queue up the next
         // oneway transaction, guaranteeing sequential execution.
-        receiver
-            .proc
-            .handle_free_buffer(&receiver.task, buffer_addr)
-            .expect("failed to free buffer");
+        receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
 
         assert!(object.lock().oneway_transactions.is_empty(), "oneway queue should now be empty");
         assert!(
@@ -7641,10 +7636,7 @@ pub mod tests {
         };
 
         // Now the receiver issues the `BC_FREE_BUFFER` command, which should end oneway handling.
-        receiver
-            .proc
-            .handle_free_buffer(&receiver.task, buffer_addr)
-            .expect("failed to free buffer");
+        receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
 
         assert!(object.lock().oneway_transactions.is_empty(), "oneway queue should still be empty");
         assert!(
@@ -7925,7 +7917,8 @@ pub mod tests {
         );
 
         // Have the thread dequeue the command.
-        let read_buffer_addr = map_memory(&receiver.task, UserAddress::default(), *PAGE_SIZE);
+        let read_buffer_addr =
+            map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
         test.device
             .handle_thread_read(
                 &receiver.task,
@@ -8006,7 +7999,8 @@ pub mod tests {
         );
 
         // Have the thread dequeue the command.
-        let read_buffer_addr = map_memory(&receiver.task, UserAddress::default(), *PAGE_SIZE);
+        let read_buffer_addr =
+            map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
         test.device
             .handle_thread_read(
                 &receiver.task,

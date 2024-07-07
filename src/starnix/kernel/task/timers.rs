@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use crate::signals::{SignalEvent, SignalEventNotify, SignalEventValue};
 use crate::task::interval_timer::{IntervalTimer, IntervalTimerHandle};
 use crate::task::CurrentTask;
+use crate::timer::Timeline;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::SIGALRM;
 use starnix_uapi::{__kernel_timer_t, error, itimerspec, uapi, TIMER_ABSTIME};
@@ -39,7 +40,7 @@ impl TimerTable {
     /// The new timer is initially disarmed.
     pub fn create(
         &self,
-        clock_id: ClockId,
+        timeline: Timeline,
         signal_event: Option<SignalEvent>,
     ) -> Result<TimerId, Errno> {
         let mut state = self.state.lock();
@@ -67,7 +68,7 @@ impl TimerTable {
             timer_id,
             IntervalTimer::new(
                 timer_id,
-                clock_id,
+                timeline,
                 signal_event.unwrap_or(SignalEvent::new(
                     SignalEventValue(timer_id as u64),
                     SIGALRM,

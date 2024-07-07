@@ -3,16 +3,25 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use errors::ffx_error;
-use ffx_core::ffx_plugin;
+pub use ffx_package_archive_add_args::PackageArchiveAddCommand;
+use fho::{user_error, FfxMain, FfxTool, SimpleWriter};
 use package_tool::cmd_package_archive_add;
 
-pub use ffx_package_archive_add_args::PackageArchiveAddCommand;
+#[derive(FfxTool)]
+pub struct ArchiveAddTool {
+    #[command]
+    pub cmd: PackageArchiveAddCommand,
+}
 
-#[ffx_plugin()]
-pub async fn cmd_package(cmd: PackageArchiveAddCommand) -> Result<()> {
-    cmd_package_archive_add(cmd)
-        .await
-        .map_err(|err| ffx_error!("Error: failed to add to archive: {err:?}"))?;
-    Ok(())
+fho::embedded_plugin!(ArchiveAddTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ArchiveAddTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        cmd_package_archive_add(self.cmd)
+            .await
+            .map_err(|err| user_error!("Error: failed to add to archive: {err:?}"))?;
+        Ok(())
+    }
 }

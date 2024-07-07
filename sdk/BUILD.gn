@@ -48,11 +48,11 @@ if (current_toolchain == default_toolchain) {
   }
 }
 
-# Verify that `override_target_api_level` is actually supported.
-if (override_target_api_level != "PLATFORM") {
+# Verify that `current_build_target_api_level` is actually supported.
+if (current_build_target_api_level != "PLATFORM") {
   _override_is_supported = false
   foreach(supported_level, platform_version.build_time_supported_api_levels) {
-    if (supported_level == override_target_api_level) {
+    if (supported_level == current_build_target_api_level) {
       _override_is_supported = true
     }
   }
@@ -62,7 +62,7 @@ if (override_target_api_level != "PLATFORM") {
   # should remove those builders and make this an assertion.
   if (!_override_is_supported) {
     print(
-        "`override_target_api_level` (${override_target_api_level}) is not one of the supported API levels: ${platform_version.build_time_supported_api_levels}")
+        "`current_build_target_api_level` (${current_build_target_api_level}) is not one of the supported API levels: ${platform_version.build_time_supported_api_levels}")
     print("Attempting to build anyways, but this may not go well...")
   }
 }
@@ -290,7 +290,7 @@ sdk_molecule("fuchsia_idk_atoms") {
 
   deps = [ ":fuchsia_idk_atoms_for_each_api_level_and_platform" ]
 
-  if (override_target_api_level == "PLATFORM") {
+  if (current_build_target_api_level == "PLATFORM") {
     deps += [
       # Do not add to this list. Instead, add new items to
       # fuchsia_idk_atoms_independent_of_api_level, which verifies there are no
@@ -343,7 +343,7 @@ sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
   deps = [ ":core_packages" ]
 }
 
-if (override_target_api_level == "PLATFORM") {
+if (current_build_target_api_level == "PLATFORM") {
   # Do not add dependencies to this target without a really good reason.
   # Most dependencies should be built at every API level (add to
   # :fuchsia_idk_atoms_for_each_api_level) or be verifiably independent of the
@@ -598,6 +598,15 @@ sdk_molecule("host_tools") {
 
   _toolchains = []
   if (host_os == "linux" && sdk_cross_compile_host_tools) {
+    _required_target_cpus = [
+      "x64",
+      "arm64",
+    ]
+    _skipped_target_cpus = idk_target_cpus_default - idk_target_cpus
+    assert(
+        _skipped_target_cpus == _skipped_target_cpus + _required_target_cpus -
+                                    _required_target_cpus,
+        "`idk_target_cpus` must include all CPUs for which host tools are being cross-compiled: ${idk_target_cpus} vs. ${_required_target_cpus}")
     _toolchains += [
       host_x64_toolchain,
       host_arm64_toolchain,
@@ -877,6 +886,7 @@ sdk_molecule("platform_libs") {
     "//src/devices/testing/fake-bti:fake-bti_sdk",
     "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
     "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
+    "//zircon/system/ulib/fzl:fzl_sdk",
   ]
 }
 

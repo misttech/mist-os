@@ -3,26 +3,37 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use ffx_core::ffx_plugin;
 use ffx_package_archive_list_args::ListCommand;
 use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader, FarListReader};
-use ffx_writer::Writer;
+use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
 use humansize::{file_size_opts, FileSize as _};
 use prettytable::format::TableFormat;
 use prettytable::{cell, row, Row, Table};
 
-#[ffx_plugin()]
-pub async fn cmd_list(cmd: ListCommand, mut writer: Writer) -> Result<()> {
-    let mut archive_reader = FarArchiveReader::new(&cmd.archive)?;
-    list_implementaion(cmd, /*table_format=*/ None, &mut writer, &mut archive_reader)
+#[derive(FfxTool)]
+pub struct ArchiveListTool {
+    #[command]
+    pub cmd: ListCommand,
+}
+
+fho::embedded_plugin!(ArchiveListTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ArchiveListTool {
+    type Writer = MachineWriter<Vec<ArchiveEntry>>;
+    async fn main(self, mut writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        let mut archive_reader = FarArchiveReader::new(&self.cmd.archive)?;
+        list_implementation(self.cmd, /*table_format=*/ None, &mut writer, &mut archive_reader)
+            .map_err(Into::into)
+    }
 }
 
 // internal implementation to allow injection of a mock
 // archive reader.
-fn list_implementaion(
+fn list_implementation(
     cmd: ListCommand,
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut <ArchiveListTool as FfxMain>::Writer,
     reader: &mut dyn FarListReader,
 ) -> Result<()> {
     let mut entries = read_file_entries(reader)?;
@@ -46,7 +57,7 @@ fn print_list_table(
     cmd: &ListCommand,
     entries: &Vec<ArchiveEntry>,
     table_format: Option<TableFormat>,
-    writer: &mut Writer,
+    writer: &mut <ArchiveListTool as FfxMain>::Writer,
 ) -> Result<()> {
     if entries.is_empty() {
         writer.line("")?;
@@ -88,7 +99,7 @@ mod test {
     use super::*;
     use ffx_package_archive_utils::test_utils::create_mockreader;
     use ffx_package_archive_utils::MockFarListReader;
-    use ffx_writer::Format;
+    use fho::{Format, TestBuffers};
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -100,10 +111,11 @@ mod test {
 
         let cmd = ListCommand { archive: PathBuf::from("some_empty.far"), long_format: false };
 
-        let mut writer = Writer::new_test(None);
-        list_implementaion(cmd, None, &mut writer, &mut mockreader)?;
+        let buffers = TestBuffers::default();
+        let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
+        list_implementation(cmd, None, &mut writer, &mut mockreader)?;
 
-        assert_eq!(writer.test_output()?, "\n".to_string());
+        assert_eq!(buffers.into_stdout_str(), "\n".to_string());
         Ok(())
     }
 
@@ -135,8 +147,9 @@ mod test {
 
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: false };
 
-        let mut writer = Writer::new_test(None);
-        list_implementaion(cmd, None, &mut writer, &mut mockreader)?;
+        let buffers = TestBuffers::default();
+        let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
+        list_implementation(cmd, None, &mut writer, &mut mockreader)?;
 
         let expected = r#"
 +-----------------------+
@@ -151,7 +164,7 @@ mod test {
 "#[1..]
             .to_string();
 
-        assert_eq!(writer.test_output()?, expected);
+        assert_eq!(buffers.into_stdout_str(), expected);
         Ok(())
     }
 
@@ -159,8 +172,9 @@ mod test {
     fn test_list_with_meta() -> Result<()> {
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: false };
 
-        let mut writer = Writer::new_test(None);
-        list_implementaion(cmd, None, &mut writer, &mut create_mockreader())?;
+        let buffers = TestBuffers::default();
+        let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
+        list_implementation(cmd, None, &mut writer, &mut create_mockreader())?;
 
         let expected = r#"
 +-----------------------+
@@ -185,7 +199,7 @@ mod test {
 "#[1..]
             .to_string();
 
-        assert_eq!(writer.test_output()?, expected);
+        assert_eq!(buffers.into_stdout_str(), expected);
         Ok(())
     }
 
@@ -193,8 +207,9 @@ mod test {
     fn test_list_long_format() -> Result<()> {
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: true };
 
-        let mut writer = Writer::new_test(None);
-        list_implementaion(cmd, None, &mut writer, &mut create_mockreader())?;
+        let buffers = TestBuffers::default();
+        let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
+        list_implementation(cmd, None, &mut writer, &mut create_mockreader())?;
 
         let expected = "\
 +-----------------------+------------------------------------------------------------------+----------------------+
@@ -218,7 +233,7 @@ mod test {
 +-----------------------+------------------------------------------------------------------+----------------------+
 ".to_owned();
 
-        assert_eq!(writer.test_output()?, expected);
+        assert_eq!(buffers.into_stdout_str(), expected);
         Ok(())
     }
 
@@ -226,8 +241,10 @@ mod test {
     fn test_list_machine() -> Result<()> {
         let cmd = ListCommand { archive: PathBuf::from("just_meta.far"), long_format: false };
 
-        let mut writer = Writer::new_test(Some(Format::JsonPretty));
-        list_implementaion(cmd, None, &mut writer, &mut create_mockreader())?;
+        let buffers = TestBuffers::default();
+        let mut writer =
+            <ArchiveListTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &buffers);
+        list_implementation(cmd, None, &mut writer, &mut create_mockreader())?;
 
         let expected = r#"
 [
@@ -274,7 +291,7 @@ mod test {
 ]"#[1..]
             .to_string();
 
-        assert_eq!(writer.test_output()?, expected);
+        assert_eq!(buffers.into_stdout_str(), expected);
         Ok(())
     }
 }

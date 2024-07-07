@@ -82,7 +82,7 @@ where
         };
         result.extend_from_slice(&digest.bytes().as_ref()[..to_copy]);
         copied += to_copy;
-        prev_digest.insert(digest);
+        let _ = prev_digest.insert(digest);
     }
     result
 }
@@ -167,7 +167,7 @@ where
 mod tests {
     use super::*;
     use crate::boringssl::{Bignum, BignumCtx, EcGroup, EcGroupId};
-    use hex::{decode, encode};
+
     use mundane::hash::Sha256;
     use std::convert::TryFrom;
 

@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::{TimerFile, TimerFileClock, TimerWakeup};
+use crate::fs::fuchsia::TimerFile;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter,
 };
+use crate::timer::{Timeline, TimerWakeup};
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
 use crate::vfs::inotify::InotifyFileObject;
@@ -23,11 +24,12 @@ use crate::vfs::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
-    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM,
-    PTRACE_MODE_ATTACH_REALCREDS,
+    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, PTRACE_MODE_ATTACH_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
@@ -1101,7 +1103,7 @@ pub fn sys_fchmod(
     let mode = mode & FileMode::PERMISSIONS;
     let file = current_task.files.get(fd)?;
     file.name.entry.node.chmod(current_task, &file.name.mount, mode)?;
-    file.notify(InotifyMask::ATTRIB);
+    file.name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -1116,7 +1118,7 @@ pub fn sys_fchmodat(
     let mode = mode & FileMode::PERMISSIONS;
     let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::default())?;
     name.entry.node.chmod(current_task, &name.mount, mode)?;
-    name.notify(InotifyMask::ATTRIB);
+    name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -1142,7 +1144,7 @@ pub fn sys_fchown(
         maybe_uid(owner),
         maybe_uid(group),
     )?;
-    file.notify(InotifyMask::ATTRIB);
+    file.name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -1158,7 +1160,7 @@ pub fn sys_fchownat(
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
     name.entry.node.chown(current_task, &name.mount, maybe_uid(owner), maybe_uid(group))?;
-    name.notify(InotifyMask::ATTRIB);
+    name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
@@ -1731,6 +1733,7 @@ fn do_mount_create<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let source = if source_addr.is_null() {
@@ -1854,21 +1857,15 @@ pub fn sys_timerfd_create(
     clock_id: u32,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
-    let (timer_file_clock, timer_type) = match clock_id {
-        CLOCK_MONOTONIC | CLOCK_BOOTTIME => (TimerFileClock::Monotonic, TimerWakeup::Regular),
-        CLOCK_BOOTTIME_ALARM => {
-            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
-                return error!(EPERM);
-            }
-            (TimerFileClock::Monotonic, TimerWakeup::Alarm)
-        }
-        CLOCK_REALTIME_ALARM => {
-            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
-                return error!(EPERM);
-            }
-            (TimerFileClock::Realtime, TimerWakeup::Alarm)
-        }
-        CLOCK_REALTIME => (TimerFileClock::Realtime, TimerWakeup::Regular),
+    let timeline = match clock_id {
+        CLOCK_MONOTONIC => Timeline::Monotonic,
+        CLOCK_BOOTTIME | CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
+        CLOCK_REALTIME | CLOCK_REALTIME_ALARM => Timeline::RealTime,
+        _ => return error!(EINVAL),
+    };
+    let timer_type = match clock_id {
+        CLOCK_MONOTONIC | CLOCK_BOOTTIME | CLOCK_REALTIME => TimerWakeup::Regular,
+        CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => TimerWakeup::Alarm,
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
@@ -1887,7 +1884,7 @@ pub fn sys_timerfd_create(
         fd_flags |= FdFlags::CLOEXEC;
     };
 
-    let timer = TimerFile::new_file(current_task, timer_type, timer_file_clock, open_flags)?;
+    let timer = TimerFile::new_file(current_task, timer_type, timeline, open_flags)?;
     let fd = current_task.add_file(timer, fd_flags)?;
     Ok(fd)
 }
@@ -2645,8 +2642,15 @@ pub fn sys_inotify_add_watch(
     }
     let file = current_task.files.get(fd)?;
     let inotify_file = file.downcast_file::<InotifyFileObject>().ok_or_else(|| errno!(EINVAL))?;
-    let watched_node =
-        lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let options = if mask.contains(InotifyMask::DONT_FOLLOW) {
+        LookupFlags::no_follow()
+    } else {
+        LookupFlags::default()
+    };
+    let watched_node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, options)?;
+    if mask.contains(InotifyMask::ONLYDIR) && !watched_node.entry.node.is_dir() {
+        return error!(ENOTDIR);
+    }
     inotify_file.add_watch(watched_node.entry, mask, &file)
 }
 
@@ -2702,7 +2706,14 @@ pub fn sys_utimensat(
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
         lookup_at(current_task, dir_fd, user_path, lookup_flags)?
     };
-    name.entry.node.update_atime_mtime(current_task, &name.mount, atime, mtime)
+    name.entry.node.update_atime_mtime(current_task, &name.mount, atime, mtime)?;
+    let event_mask = match (atime, mtime) {
+        (_, TimeUpdateType::Omit) => InotifyMask::ACCESS,
+        (TimeUpdateType::Omit, _) => InotifyMask::MODIFY,
+        (_, _) => InotifyMask::ATTRIB,
+    };
+    name.entry.notify_ignoring_excl_unlink(event_mask);
+    Ok(())
 }
 
 pub fn sys_splice(
@@ -2773,6 +2784,19 @@ pub fn sys_io_setup(
     nr_events: u32,
     ctx_idp: UserRef<aio_context_t>,
 ) -> Result<(), Errno> {
+    // From https://man7.org/linux/man-pages/man2/io_setup.2.html:
+    //
+    //   EINVAL ctx_idp is not initialized, or the specified nr_events
+    //   exceeds internal limits.  nr_events should be greater than
+    //   0.
+    //
+    // TODO: Determine what "internal limits" means.
+    if nr_events > i32::MAX as u32 {
+        return error!(EINVAL);
+    }
+    if current_task.read_object(ctx_idp)? != 0 {
+        return error!(EINVAL);
+    }
     let mut mm_state = current_task.mm().state.write();
     let ctx_id = mm_state.aio_contexts.setup_context(nr_events)?;
     current_task.write_object(ctx_idp, &ctx_id)?;
@@ -2784,7 +2808,7 @@ pub fn sys_io_submit(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     nr: i32,
-    iocbpp: UserAddress,
+    mut iocb_addrs: UserRef<UserAddress>,
 ) -> Result<i32, Errno> {
     if nr < 0 {
         return error!(EINVAL);
@@ -2798,7 +2822,6 @@ pub fn sys_io_submit(
     };
 
     // `iocbpp` is an array of addresses to iocb's.
-    let mut iocb_addrs: UserRef<UserAddress> = UserRef::new(iocbpp);
     let mut num_submitted: i32 = 0;
     loop {
         let iocb_addr = current_task.read_object(iocb_addrs)?;
@@ -2923,11 +2946,15 @@ pub fn sys_io_getevents(
 
 pub fn sys_io_cancel(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-    _ctx_id: aio_context_t,
-    _control_block: UserRef<iocb>,
+    current_task: &CurrentTask,
+    ctx_id: aio_context_t,
+    user_iocb: UserRef<iocb>,
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
+    let _iocb = current_task.read_object(user_iocb)?;
+    let mm_state = current_task.mm().state.read();
+    let _ctx = mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?;
+
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
     return error!(ENOSYS);
 }
@@ -3033,7 +3060,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sys_open_cloexec() -> Result<(), Errno> {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let path = b"data/testfile.txt\0";
         current_task.write_memory(path_addr, path)?;
         let fd = sys_openat(
@@ -3069,7 +3096,7 @@ mod tests {
             current_task.open_file(&mut locked, file_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let path_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
         let user_stat = UserRef::new(path_addr + file_path.len());
@@ -3092,7 +3119,8 @@ mod tests {
 
         // Create the dir that we will attempt to unlink later.
         let no_slash_path = b"testdir";
-        let no_slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let no_slash_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(no_slash_path_addr, no_slash_path).expect("failed to write path");
         let no_slash_user_path = UserCString::new(no_slash_path_addr);
         sys_mkdirat(
@@ -3105,7 +3133,8 @@ mod tests {
         .unwrap();
 
         let slash_path = b"testdir/";
-        let slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let slash_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(slash_path_addr, slash_path).expect("failed to write path");
         let slash_user_path = UserCString::new(slash_path_addr);
 
@@ -3135,7 +3164,8 @@ mod tests {
             current_task.open_file(&mut locked, old_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let old_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let old_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(old_path_addr, old_user_path.as_bytes())
             .expect("failed to clear struct");
@@ -3146,7 +3176,8 @@ mod tests {
             current_task.open_file(&mut locked, new_user_path.into(), OpenFlags::RDONLY).unwrap();
 
         // Write the path to user memory.
-        let new_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let new_path_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(new_path_addr, new_user_path.as_bytes())
             .expect("failed to clear struct");

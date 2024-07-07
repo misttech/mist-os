@@ -197,8 +197,7 @@ TEST_F(FileCacheTest, WritebackOperation) {
   }
 
   // Release clean Pages
-  op.bReleasePages = true;
-  ASSERT_EQ(file.Writeback(op), 0UL);
+  file.CleanupPages();
 
   {
     fbl::RefPtr<Page> page;
@@ -451,7 +450,9 @@ TEST_F(FileCacheTest, LockedPageBasic) {
 
 TEST_F(FileCacheTest, LockedPageRelease) {
   auto &file = vnode<File>();
-  { LockedPage page = GetPage(0); }
+  {
+    LockedPage page = GetPage(0);
+  }
 
   fbl::RefPtr<Page> page;
   ASSERT_EQ(file.FindPage(0, &page), ZX_OK);

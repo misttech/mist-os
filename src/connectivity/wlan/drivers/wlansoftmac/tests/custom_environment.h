@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
 #include <lib/driver/outgoing/cpp/handlers.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 namespace wlan::drivers::wlansoftmac {
 

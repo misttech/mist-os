@@ -82,11 +82,11 @@ pub mod socket {
         SocketIpAddr, StrictlyZonedAddr,
     };
     pub use base::{
-        AddrEntry, AddrVec, Bound, BoundSocketMap, DualStackIpExt, EitherStack, FoundSockets,
-        IncompatibleError, InsertError, Inserter, Listener, ListenerAddrInfo, MaybeDualStack,
-        NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, Shutdown, ShutdownType,
-        SocketAddrType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError, SocketIpAddrExt,
-        SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        AddrEntry, AddrVec, Bound, BoundSocketMap, DualStackIpExt, DualStackTuple, EitherStack,
+        FoundSockets, IncompatibleError, InsertError, Inserter, Listener, ListenerAddrInfo,
+        MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, Shutdown,
+        ShutdownType, SocketAddrType, SocketDeviceUpdate, SocketDeviceUpdateNotAllowedError,
+        SocketIpAddrExt, SocketIpExt, SocketMapAddrSpec, SocketMapAddrStateSpec,
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
     };
@@ -133,7 +133,7 @@ pub mod testutil {
     pub use crate::frame::testutil::{FakeFrameCtx, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
     pub use crate::time::testutil::{
-        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, InstantAndData,
+        FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId, InstantAndData,
         WithFakeTimerContext,
     };
     pub use crate::trace::testutil::FakeTracingCtx;

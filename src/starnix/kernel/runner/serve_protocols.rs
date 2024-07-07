@@ -19,7 +19,7 @@ use starnix_core::vfs::file_server::serve_file_at;
 use starnix_core::vfs::socket::VsockSocket;
 use starnix_core::vfs::{FdFlags, FileHandle};
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::uapi;
 use std::ffi::CString;
@@ -42,6 +42,7 @@ pub fn expose_root<L>(
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
+    L: LockBefore<BeforeFsNodeAppend>,
 {
     let root_file = system_task.open_file(locked, "/".into(), OpenFlags::RDONLY)?;
     serve_file_at(locked, server_end.into_channel().into(), system_task, &root_file)?;

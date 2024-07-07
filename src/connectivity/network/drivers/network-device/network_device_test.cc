@@ -4,7 +4,9 @@
 
 #include "network_device.h"
 
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+
+#include <gtest/gtest.h>
 
 #include "device/test_session.h"
 #include "device/test_util.h"
@@ -47,7 +49,8 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class NetDeviceDriverTest : public fdf_testing::DriverTestFixture<TestFixtureConfig> {
+class NetDeviceDriverTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
+                            public ::testing::Test {
  public:
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;

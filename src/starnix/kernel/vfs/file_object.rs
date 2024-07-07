@@ -207,6 +207,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// a VMO gets mapped.
     fn mmap(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -452,6 +453,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn mmap(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -462,6 +464,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
         filename: NamespaceNode,
     ) -> Result<UserAddress, Errno> {
         self.deref().mmap(
+            locked,
             file,
             current_task,
             addr,
@@ -961,17 +964,6 @@ impl FileOps for ProxyFileOps {
             _length: Option<usize>,
             _prot: ProtectionFlags,
         ) -> Result<Arc<zx::Vmo>, Errno>;
-        fn mmap(
-            &self,
-            file: &FileObject,
-            current_task: &CurrentTask,
-            addr: DesiredAddress,
-            vmo_offset: u64,
-            length: usize,
-            prot_flags: ProtectionFlags,
-            options: MappingOptions,
-            filename: NamespaceNode,
-        ) -> Result<UserAddress, Errno>;
         fn wait_async(
             &self,
             _file: &FileObject,
@@ -1041,6 +1033,30 @@ impl FileOps for ProxyFileOps {
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         self.0.ops().readdir(locked, &self.0, current_task, sink)
+    }
+    fn mmap(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        addr: DesiredAddress,
+        vmo_offset: u64,
+        length: usize,
+        prot_flags: ProtectionFlags,
+        options: MappingOptions,
+        filename: NamespaceNode,
+    ) -> Result<UserAddress, Errno> {
+        self.0.ops.mmap(
+            locked,
+            &self.0,
+            current_task,
+            addr,
+            vmo_offset,
+            length,
+            prot_flags,
+            options,
+            filename,
+        )
     }
 }
 
@@ -1463,8 +1479,9 @@ impl FileObject {
         self.ops().get_vmo(self, current_task, length, prot)
     }
 
-    pub fn mmap(
+    pub fn mmap<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         addr: DesiredAddress,
         vmo_offset: u64,
@@ -1472,7 +1489,11 @@ impl FileObject {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
         filename: NamespaceNode,
-    ) -> Result<UserAddress, Errno> {
+    ) -> Result<UserAddress, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         if prot_flags.intersects(ProtectionFlags::READ | ProtectionFlags::WRITE) && !self.can_read()
         {
             return error!(EACCES);
@@ -1484,7 +1505,17 @@ impl FileObject {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().mmap(self, current_task, addr, vmo_offset, length, prot_flags, options, filename)
+        self.ops().mmap(
+            &mut locked,
+            self,
+            current_task,
+            addr,
+            vmo_offset,
+            length,
+            prot_flags,
+            options,
+            filename,
+        )
     }
 
     pub fn readdir<L>(
@@ -1503,6 +1534,7 @@ impl FileObject {
 
         self.ops().readdir(&mut locked, self, current_task, sink)?;
         self.update_atime();
+        self.notify(InotifyMask::ACCESS);
         Ok(())
     }
 
@@ -1539,7 +1571,9 @@ impl FileObject {
         if !self.can_write() {
             return error!(EINVAL);
         }
-        self.node().ftruncate(locked, current_task, length)
+        self.node().ftruncate(locked, current_task, length)?;
+        self.name.entry.notify_ignoring_excl_unlink(InotifyMask::MODIFY);
+        Ok(())
     }
 
     pub fn fallocate<L>(
@@ -1571,7 +1605,9 @@ impl FileObject {
             return error!(EBADF);
         }
 
-        self.node().fallocate(locked, current_task, mode, offset, length)
+        self.node().fallocate(locked, current_task, mode, offset, length)?;
+        self.notify(InotifyMask::MODIFY);
+        Ok(())
     }
 
     pub fn to_handle<L>(

@@ -51,12 +51,8 @@ impl From<Duration> for FakeInstant {
 }
 
 impl Instant for FakeInstant {
-    fn duration_since(&self, earlier: FakeInstant) -> Duration {
-        self.offset.checked_sub(earlier.offset).unwrap()
-    }
-
-    fn saturating_duration_since(&self, earlier: FakeInstant) -> Duration {
-        self.offset.saturating_sub(earlier.offset)
+    fn checked_duration_since(&self, earlier: FakeInstant) -> Option<Duration> {
+        self.offset.checked_sub(earlier.offset)
     }
 
     fn checked_add(&self, duration: Duration) -> Option<FakeInstant> {
@@ -163,6 +159,25 @@ pub struct FakeTimer<Id> {
     timer_id: usize,
     pub dispatch_id: Id,
 }
+
+impl<Id> FakeTimer<Id> {
+    /// Gets the unique ID for this timer.
+    pub fn timer_id(&self) -> FakeTimerId {
+        FakeTimerId(Some(self.timer_id))
+    }
+
+    /// Consumes this `FakeTimer` returning the dispatch id and the timer id.
+    pub fn into_dispatch_and_timer_id(self) -> (Id, FakeTimerId) {
+        let Self { timer_id, dispatch_id } = self;
+        (dispatch_id, FakeTimerId(Some(timer_id)))
+    }
+}
+
+/// The unique timer identifier for [`FakeTimer`].
+///
+/// The default implementation returns a timer ID that doesn't match any timers.
+#[derive(PartialEq, Eq, Copy, Clone, Debug, Default)]
+pub struct FakeTimerId(Option<usize>);
 
 /// A fake [`TimerContext`] which stores time as a [`FakeInstantCtx`].
 pub struct FakeTimerCtx<Id> {
@@ -362,6 +377,7 @@ impl<Id> InstantContext for FakeTimerCtx<Id> {
 impl<Id: Debug + Clone + Send + Sync> TimerBindingsTypes for FakeTimerCtx<Id> {
     type Timer = FakeTimer<Id>;
     type DispatchId = Id;
+    type UniqueTimerId = FakeTimerId;
 }
 
 impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext for FakeTimerCtx<Id> {
@@ -391,6 +407,10 @@ impl<Id: PartialEq + Debug + Clone + Send + Sync> TimerContext for FakeTimerCtx<
                 (timer.timer_id == *timer_id).then_some(*instant)
             },
         )
+    }
+
+    fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId {
+        timer.timer_id()
     }
 }
 
@@ -434,7 +454,7 @@ where
 }
 
 /// Adds methods for interacting with [`FakeTimerCtx`] and its wrappers.
-pub trait FakeTimerCtxExt<Id>: Sized {
+pub trait FakeTimerCtxExt<Id>: Sized + TimerBindingsTypes {
     /// Triggers the next timer, if any, by using the provided `handler`.
     ///
     /// `trigger_next_timer` triggers the next timer, if any, advances the
@@ -514,7 +534,11 @@ pub trait FakeTimerCtxExt<Id>: Sized {
 
 // TODO(https://fxbug.dev/42081080): hold lock on `FakeTimerCtx` across entire
 // method to avoid potential race conditions.
-impl<Id: Clone, Ctx: WithFakeTimerContext<Id>> FakeTimerCtxExt<Id> for Ctx {
+impl<
+        Id: Clone,
+        Ctx: WithFakeTimerContext<Id> + TimerBindingsTypes<UniqueTimerId = FakeTimerId>,
+    > FakeTimerCtxExt<Id> for Ctx
+{
     /// Triggers the next timer, if any, by calling `f` on it.
     ///
     /// `trigger_next_timer` triggers the next timer, if any, advances the
@@ -526,8 +550,9 @@ impl<Id: Clone, Ctx: WithFakeTimerContext<Id>> FakeTimerCtxExt<Id> for Ctx {
                 id
             })
         })
-        .map(|FakeTimer { timer_id: _, dispatch_id }| {
-            handler.handle_timer(self, dispatch_id.clone());
+        .map(|fake_timer| {
+            let (dispatch_id, timer_id) = fake_timer.into_dispatch_and_timer_id();
+            handler.handle_timer(self, dispatch_id.clone(), timer_id);
             dispatch_id
         })
     }
@@ -693,7 +718,12 @@ mod tests {
     }
 
     impl HandleableTimer<CoreCtx, FakeTimerCtx<Self>> for TimerId {
-        fn handle(self, CoreCtx(expired): &mut CoreCtx, bindings_ctx: &mut FakeTimerCtx<Self>) {
+        fn handle(
+            self,
+            CoreCtx(expired): &mut CoreCtx,
+            bindings_ctx: &mut FakeTimerCtx<Self>,
+            _: FakeTimerId,
+        ) {
             expired.push((self, bindings_ctx.now()))
         }
     }

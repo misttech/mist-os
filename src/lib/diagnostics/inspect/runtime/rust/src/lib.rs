@@ -218,6 +218,7 @@ mod tests {
             .expect("one Inspect hierarchy");
 
         assert_json_diff!(hierarchy, root: {
+            "tree-0": 0u64,
             int: 3i64,
             "lazy-node": {
                 a: "test",

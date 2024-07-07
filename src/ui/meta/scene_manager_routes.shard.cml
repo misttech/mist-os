@@ -86,6 +86,17 @@
             from: "parent",
             to: [ "#scene_manager" ],
         },
+        {
+            from: "parent",
+            to: [ "#scene_manager" ],
+            config: [
+                "fuchsia.scenic.DisplayRotation",
+                "fuchsia.ui.DisplayPixelDensity",
+                "fuchsia.ui.IdleThresholdMs",
+                "fuchsia.ui.SupportedInputDevices",
+                "fuchsia.ui.ViewingDistance",
+            ],
+        },
     ],
     expose: [
         {

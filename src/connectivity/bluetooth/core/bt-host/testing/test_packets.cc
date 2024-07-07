@@ -352,6 +352,25 @@ DynamicByteBuffer ReadRemoteSupportedFeaturesCompletePacket(
       ));
 }
 
+DynamicByteBuffer ReadScanEnable() {
+  return DynamicByteBuffer(StaticByteBuffer(
+      LowerBits(hci_spec::kReadScanEnable),
+      UpperBits(hci_spec::kReadScanEnable),
+      0x00  // No parameters
+      ));
+}
+
+DynamicByteBuffer ReadScanEnableResponse(uint8_t scan_enable) {
+  return DynamicByteBuffer(
+      StaticByteBuffer(hci_spec::kCommandCompleteEventCode,
+                       0x05,  // Size
+                       0xF0,  // Number HCI command packets
+                       LowerBits(hci_spec::kReadScanEnable),
+                       UpperBits(hci_spec::kReadScanEnable),
+                       pw::bluetooth::emboss::StatusCode::SUCCESS,
+                       scan_enable));
+}
+
 DynamicByteBuffer RejectSynchronousConnectionRequest(
     DeviceAddress address, pw::bluetooth::emboss::StatusCode status_code) {
   auto addr_bytes = address.value().bytes();
@@ -641,6 +660,19 @@ DynamicByteBuffer WritePageTimeoutPacket(uint16_t page_timeout) {
       LowerBits(page_timeout),
       UpperBits(page_timeout)  // Little-Endian Page_Timeout
       ));
+}
+
+DynamicByteBuffer WriteScanEnable(uint8_t scan_enable) {
+  return DynamicByteBuffer(
+      StaticByteBuffer(LowerBits(hci_spec::kWriteScanEnable),
+                       UpperBits(hci_spec::kWriteScanEnable),
+                       0x01,
+                       scan_enable));
+}
+
+DynamicByteBuffer WriteScanEnableResponse() {
+  return CommandCompletePacket(hci_spec::kWriteScanEnable,
+                               pw::bluetooth::emboss::StatusCode::SUCCESS);
 }
 
 DynamicByteBuffer ScoDataPacket(

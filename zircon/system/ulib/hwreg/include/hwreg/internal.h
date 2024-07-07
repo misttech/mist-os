@@ -48,13 +48,13 @@ namespace internal {
 template <typename T>
 struct IsSupportedInt : std::false_type {};
 template <>
-struct IsSupportedInt<uint8_t> : std::true_type {};
+struct IsSupportedInt<uint8_t> : std::true_type{};
 template <>
-struct IsSupportedInt<uint16_t> : std::true_type {};
+struct IsSupportedInt<uint16_t> : std::true_type{};
 template <>
-struct IsSupportedInt<uint32_t> : std::true_type {};
+struct IsSupportedInt<uint32_t> : std::true_type{};
 template <>
-struct IsSupportedInt<uint64_t> : std::true_type {};
+struct IsSupportedInt<uint64_t> : std::true_type{};
 
 template <class IntType>
 constexpr IntType ComputeMask(uint32_t num_bits) {
@@ -64,21 +64,12 @@ constexpr IntType ComputeMask(uint32_t num_bits) {
   return static_cast<IntType>((static_cast<IntType>(1) << num_bits) - 1);
 }
 
-// Unfortunately, some register layouts conditionally define the same field in
-// different locations (e.g., PAT in x86 page table entries)! This type is a
-// version of std::enable_if that helps us to support such cases. Using a naive
-// SFINAE approach that wraps getter/setter return types with
-// `std::enable_if_t<COND, ...>` across complementary values of COND would
-// result in method redeclaration. What EnableIf adds is a trivial
-// parameterization by a bit range that makes the compiler treat these as
-// different return signatures, a difference that compiles away.
-template <bool Cond, typename T, unsigned int HighBit, unsigned int LowBit>
-struct enable_if {
-  using type = std::enable_if_t<Cond, T>;
-};
-
-template <bool Cond, typename T, unsigned int HighBit, unsigned int LowBit>
-using enable_if_t = typename enable_if<Cond, T, HighBit, LowBit>::type;
+// Given a predicate, generates a unique predicate to be used in enable_if_t,
+// such that unique template signatures are generated.
+//
+// This allows generating conditional fields.
+template <bool Pred, int Id>
+inline constexpr bool kUnexpandedPred = Pred;
 
 class FieldPrinter {
  public:

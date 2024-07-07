@@ -144,9 +144,9 @@ typedef struct __TEE_PropSetHandle* TEE_PropSetHandle;  // NOLINT(bugprone-reser
 
 // 4.2.4 Property Set Pseudo-Handles
 
-#define TEE_PROPSET_TEE_IMPLEMENTATION 0xFFFFFFFD
-#define TEE_PROPSET_CURRENT_CLIENT 0xFFFFFFFE
-#define TEE_PROPSET_CURRENT_TA 0xFFFFFFFF
+#define TEE_PROPSET_TEE_IMPLEMENTATION (TEE_PropSetHandle)0xFFFFFFFD
+#define TEE_PROPSET_CURRENT_CLIENT (TEE_PropSetHandle)0xFFFFFFFE
+#define TEE_PROPSET_CURRENT_TA (TEE_PropSetHandle)0xFFFFFFFF
 
 // 4.2.5 Memory Access Rights
 

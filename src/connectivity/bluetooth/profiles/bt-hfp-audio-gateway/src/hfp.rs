@@ -22,7 +22,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp_test as hfp_test};
 
-use crate::audio::AudioControl;
+use crate::audio::{AudioControl, AudioControlEvent};
 use crate::config::AudioGatewayFeatureSupport;
 use crate::error::Error;
 use crate::inspect::{CallManagerInspect, HfpInspect};
@@ -110,6 +110,7 @@ impl Hfp {
     /// Run the Hfp object to completion. Runs until an unrecoverable error occurs or there is no
     /// more work to perform because all managed resource have been closed.
     pub async fn run(mut self) -> Result<(), Error> {
+        let mut audio_events = self.audio.lock().take_events().fuse();
         loop {
             select! {
                 // If the profile stream ever terminates or produces an irrecoverable error, the
@@ -137,6 +138,9 @@ impl Hfp {
                 }
                 event = self.internal_events_rx.select_next_some() => {
                     self.handle_internal_event(event).await;
+                }
+                audio_event = audio_events.select_next_some() => {
+                    self.handle_audio_event(audio_event).await?;
                 }
                 complete => {
                     break;
@@ -194,6 +198,41 @@ impl Hfp {
         }
     }
 
+    async fn find_or_create_peer(
+        &mut self,
+        id: PeerId,
+    ) -> Result<&mut std::pin::Pin<Box<Box<dyn Peer>>>, Error> {
+        match self.peers.inner().entry(id) {
+            Entry::Vacant(entry) => {
+                let mut peer = Box::new(PeerImpl::new(
+                    id,
+                    self.profile_svc.clone(),
+                    self.audio.clone(),
+                    self.config,
+                    self.connection_behavior,
+                    self.internal_events_tx.clone(),
+                    self.sco_connector.clone(),
+                    self.inspect_node.peers.create_child(inspect::unique_name("peer_")),
+                )?);
+                if let Some(connection_id) = self.call_manager.connection_id() {
+                    // Peer should be able to accept call_manager_connected request immediately
+                    // after the Peer was constructed.
+                    peer.call_manager_connected(connection_id).await?;
+                }
+                Ok(entry.insert(Box::pin(peer)))
+            }
+            Entry::Occupied(entry) => Ok(entry.into_mut()),
+        }
+    }
+
+    /// Handle a single `AudioControlEvent` from the audio control.
+    async fn handle_audio_event(&mut self, event: AudioControlEvent) -> Result<(), Error> {
+        let peer_id = event.id();
+        let peer = self.find_or_create_peer(peer_id).await?;
+        peer.audio_event(event).await?;
+        Ok(())
+    }
+
     /// Handle a single `ProfileEvent` from `profile`.
     async fn handle_profile_event(&mut self, event: ProfileEvent) -> Result<(), Error> {
         let id = event.peer_id();
@@ -213,28 +252,7 @@ impl Hfp {
                 return Ok(());
             }
         }
-
-        let peer = match self.peers.inner().entry(id) {
-            Entry::Vacant(entry) => {
-                let mut peer = Box::new(PeerImpl::new(
-                    id,
-                    self.profile_svc.clone(),
-                    self.audio.clone(),
-                    self.config,
-                    self.connection_behavior,
-                    self.internal_events_tx.clone(),
-                    self.sco_connector.clone(),
-                    self.inspect_node.peers.create_child(inspect::unique_name("peer_")),
-                )?);
-                if let Some(connection_id) = self.call_manager.connection_id() {
-                    // Peer should be able to accept call_manager_connected request immediately
-                    // after the Peer was constructed.
-                    peer.call_manager_connected(connection_id).await?;
-                }
-                entry.insert(Box::pin(peer))
-            }
-            Entry::Occupied(entry) => entry.into_mut(),
-        };
+        let peer = self.find_or_create_peer(id).await?;
         peer.profile_event(event).await?;
         Ok(())
     }

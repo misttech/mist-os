@@ -105,6 +105,7 @@ impl FileOps for DevZero {
 
     fn mmap(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,

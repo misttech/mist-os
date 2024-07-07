@@ -77,6 +77,11 @@ struct Opt {
     #[argh(option)]
     isolate_dir: Option<PathBuf>,
 
+    /// prefix for the toc.yaml path to the file. For example,
+    /// "/references/tools/sdk"
+    #[argh(option)]
+    toc_prefix: Option<PathBuf>,
+
     /// commands to run, otherwise defaults to internal list of commands.
     /// relative paths are on the input_path. Absolute paths are used as-is.
     #[argh(positional)]
@@ -194,10 +199,12 @@ fn run(opt: Opt) -> Result<()> {
     create_output_dir(&output_path)
         .context(format!("Unable to create output directory {:?}", output_path))?;
 
+    let mut command_summary: Vec<(String, String, PathBuf)> = vec![];
+
     // Write documentation output for each command.
     for cmd_path in cmd_paths.iter() {
         // ffx can export the help info in JSON format.
-        if cmd_path.ends_with("ffx") {
+        let summary = if cmd_path.ends_with("ffx") {
             ffx_doc::write_formatted_output_for_ffx(
                 &cmd_path,
                 output_path,
@@ -208,14 +215,21 @@ fn run(opt: Opt) -> Result<()> {
             .context(format!(
                 "Unable to write generate doc for {:?} to {:?}",
                 cmd_path, output_path
-            ))?;
+            ))?
         } else {
             write_formatted_output(&cmd_path, output_path).context(format!(
                 "Unable to write generate doc for {:?} to {:?}",
                 cmd_path, output_path
-            ))?;
-        }
+            ))?
+        };
+        command_summary.push(summary);
     }
+
+    write_toc(
+        output_path,
+        opt.toc_prefix.unwrap_or(PathBuf::from("/reference/tools/sdk")),
+        command_summary,
+    )?;
 
     info!("Generated documentation at dir: {}", &output_path.display());
 
@@ -249,6 +263,21 @@ fn run(opt: Opt) -> Result<()> {
     Ok(())
 }
 
+fn write_toc(
+    output_path: &PathBuf,
+    toc_prefix: PathBuf,
+    command_summary: Vec<(String, String, PathBuf)>,
+) -> Result<()> {
+    let toc = output_path.join("_toc.yaml");
+    let mut f = File::create(toc).expect("Unable to create _toc file");
+    writeln!(f, "toc:")?;
+    for (name, _, path) in command_summary {
+        writeln!(f, "- title: {name}")?;
+        writeln!(f, "  path: {:?}", toc_prefix.join(path.file_name().unwrap()))?;
+    }
+    Ok(())
+}
+
 #[derive(Eq, Copy, Clone, Debug, Hash, PartialEq)]
 enum Section {
     Top,
@@ -264,7 +293,7 @@ fn recurse_cmd_output<W: Write>(
     cmd_path: &PathBuf,
     output_writer: &mut W,
     cmds_sequence: &Vec<&String>,
-) -> Result<()> {
+) -> Result<String> {
     // Create vector to collect subcommands.
     let mut cmds_list: Vec<String> = Vec::new();
 
@@ -283,7 +312,7 @@ fn recurse_cmd_output<W: Write>(
     let lines: Vec<String> = match help_output_for(&cmd_path, &cmds_sequence) {
         Ok(lines) => lines,
         Err(e) => match e {
-            HelpError::Ignore => return Ok(()),
+            HelpError::Ignore => return Ok("".into()),
             HelpError::Fail(c) => bail!("Error running help: {}", c),
         },
     };
@@ -369,9 +398,14 @@ fn recurse_cmd_output<W: Write>(
         }
     }
 
+    let mut summary: String = "".into();
     if let Some(contents) = section_contents.get(&Section::Top) {
         for line in contents {
-            writeln!(output_writer, "{}", line.trim_end())?;
+            let trimmed = line.trim_end();
+            if summary.is_empty() && !trimmed.is_empty() {
+                summary = trimmed.into();
+            }
+            writeln!(output_writer, "{}", trimmed)?;
         }
         writeln!(output_writer, "\n{CODEBLOCK_END}")?;
     }
@@ -386,7 +420,8 @@ fn recurse_cmd_output<W: Write>(
             writeln!(output_writer, "{CODEBLOCK_START}")?;
         }
         for line in contents {
-            writeln!(output_writer, "{}", line.trim_end())?;
+            let l = escape_text(line);
+            writeln!(output_writer, "{}", l.trim_end())?;
         }
         if !is_markdown {
             writeln!(output_writer, "\n{CODEBLOCK_END}")?;
@@ -408,11 +443,18 @@ fn recurse_cmd_output<W: Write>(
         recurse_cmd_output(&cmd, &cmd_path, output_writer, &cmds_sequence)?;
     }
 
-    Ok(())
+    if cmd_level == 0 {
+        Ok(summary.into())
+    } else {
+        Ok("".into())
+    }
 }
 
 /// Write output of cmd at `cmd_path` to new cmd.md file at `output_path`.
-fn write_formatted_output(cmd_path: &PathBuf, output_path: &PathBuf) -> Result<()> {
+fn write_formatted_output(
+    cmd_path: &PathBuf,
+    output_path: &PathBuf,
+) -> Result<(String, String, PathBuf)> {
     // Get name of command from full path to the command executable.
     let cmd_name = cmd_path.file_name().expect("Could not get file name for command");
     let output_md_path = md_path(&cmd_name, &output_path);
@@ -431,7 +473,9 @@ fn write_formatted_output(cmd_path: &PathBuf, output_path: &PathBuf) -> Result<(
     writeln!(output_writer, "{}", HEADER)?;
 
     // Write output for cmd and all of its subcommands.
-    recurse_cmd_output(&cmd_name, &cmd_path, output_writer, &cmd_sequence)
+    let cmd_description = recurse_cmd_output(&cmd_name, &cmd_path, output_writer, &cmd_sequence)?;
+
+    Ok((cmd_name.into(), cmd_description, output_md_path.clone()))
 }
 
 /// Generate a vector of full paths to each command in the allow_list.
@@ -520,6 +564,10 @@ pub(crate) fn md_path(file_stem: &OsStr, dir: &PathBuf) -> PathBuf {
     let mut path = Path::new(dir).join(file_stem);
     path.set_extension("md");
     path
+}
+
+pub(crate) fn escape_text(raw: &str) -> String {
+    raw.replace("{", "&#123;").replace("}", "&#125;").replace("[", "\\[")
 }
 
 #[cfg(test)]

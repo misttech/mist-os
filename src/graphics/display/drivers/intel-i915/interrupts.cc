@@ -4,15 +4,23 @@
 
 #include "src/graphics/display/drivers/intel-i915/interrupts.h"
 
+#include <lib/async/cpp/task.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/sync/cpp/completion.h>
+#include <threads.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 
 #include <bitset>
 
+#include <fbl/alloc_checker.h>
+#include <fbl/auto_lock.h>
+
 #include "src/graphics/display/drivers/intel-i915/ddi.h"
-#include "src/graphics/display/drivers/intel-i915/intel-i915.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
@@ -206,92 +214,107 @@ Interrupts::Interrupts() { mtx_init(&lock_, mtx_plain); }
 Interrupts::~Interrupts() { Destroy(); }
 
 void Interrupts::Destroy() {
-  irq_.destroy();
-  if (irq_thread_) {
-    thrd_join(irq_thread_.value(), nullptr);
-    irq_thread_ = std::nullopt;
+  if (irq_handler_dispatcher_.get() != nullptr) {
+    irq_handler_dispatcher_.ShutdownAsync();
+    irq_handler_dispatcher_shutdown_completed_.Wait();
   }
-  irq_.reset();
+
+  if (irq_.is_valid()) {
+    irq_.destroy();
+    irq_.reset();
+  }
 }
 
-int Interrupts::IrqLoop() {
+void Interrupts::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
+                                  zx_status_t status, const zx_packet_interrupt_t* interrupt) {
+  if (status == ZX_ERR_CANCELED) {
+    zxlogf(INFO, "Vsync interrupt wait is cancelled.");
+    return;
+  }
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Vsync interrupt wait failed: %s", zx_status_get_string(status));
+    // A failed async interrupt wait doesn't remove the interrupt from the
+    // async loop, so we have to manually cancel it.
+    irq->Cancel();
+    return;
+  }
+
   // We implement the steps in the section "Shared Functions" > "Interrupts" >
   // "Interrupt Service Routine" section of Intel's display engine docs.
   //
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev2.0 pages 199-200
   // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 pages 142-143
   // Skylake: IHD-OS-SKL-Vol 12-05.16 pages 139-140
-  for (;;) {
-    zx_time_t timestamp;
-    if (zx_interrupt_wait(irq_.get(), &timestamp) != ZX_OK) {
-      zxlogf(INFO, "interrupt wait failed");
-      return -1;
-    }
 
-    auto graphics_primary_interrupts = registers::GraphicsPrimaryInterrupt::Get().FromValue(0);
-    if (is_tgl(device_id_)) {
-      graphics_primary_interrupts.ReadFrom(mmio_space_)
-          .set_interrupts_enabled(false)
-          .WriteTo(mmio_space_);
-    }
+  auto graphics_primary_interrupts = registers::GraphicsPrimaryInterrupt::Get().FromValue(0);
+  if (is_tgl(device_id_)) {
+    graphics_primary_interrupts.ReadFrom(mmio_space_)
+        .set_interrupts_enabled(false)
+        .WriteTo(mmio_space_);
+  }
 
-    auto display_interrupts = registers::DisplayInterruptControl::Get().ReadFrom(mmio_space_);
-    display_interrupts.set_interrupts_enabled(false);
-    display_interrupts.WriteTo(mmio_space_);
+  auto display_interrupts = registers::DisplayInterruptControl::Get().ReadFrom(mmio_space_);
+  display_interrupts.set_interrupts_enabled(false);
+  display_interrupts.WriteTo(mmio_space_);
 
-    const bool pch_display_hotplug_pending = display_interrupts.pch_engine_pending();
-    const bool display_hotplug_pending =
-        is_tgl(device_id_) && display_interrupts.display_hot_plug_pending_tiger_lake();
+  const bool pch_display_hotplug_pending = display_interrupts.pch_engine_pending();
+  const bool display_hotplug_pending =
+      is_tgl(device_id_) && display_interrupts.display_hot_plug_pending_tiger_lake();
 
-    if (pch_display_hotplug_pending || display_hotplug_pending) {
-      auto detect_result = is_tgl(device_id_) ? DetectHotplugTigerLake(mmio_space_)
-                                              : DetectHotplugSkylake(mmio_space_);
-      for (auto ddi : GetDdiIds(device_id_)) {
-        if (detect_result.detected[ddi]) {
-          zxlogf(TRACE, "Detected hot plug interrupt on ddi %d", ddi);
-          hotplug_callback_(ddi, detect_result.long_pulse[ddi]);
-        }
+  if (pch_display_hotplug_pending || display_hotplug_pending) {
+    auto detect_result = is_tgl(device_id_) ? DetectHotplugTigerLake(mmio_space_)
+                                            : DetectHotplugSkylake(mmio_space_);
+    for (auto ddi : GetDdiIds(device_id_)) {
+      if (detect_result.detected[ddi]) {
+        zxlogf(TRACE, "Detected hot plug interrupt on ddi %d", ddi);
+        hotplug_callback_(ddi, detect_result.long_pulse[ddi]);
       }
-    }
-
-    // TODO(https://fxbug.dev/42060657): Check for Pipe D interrupts here when we support
-    //                         pipe and transcoder D.
-
-    if (display_interrupts.pipe_c_pending()) {
-      HandlePipeInterrupt(PipeId::PIPE_C, timestamp);
-    }
-    if (display_interrupts.pipe_b_pending()) {
-      HandlePipeInterrupt(PipeId::PIPE_B, timestamp);
-    }
-    if (display_interrupts.pipe_a_pending()) {
-      HandlePipeInterrupt(PipeId::PIPE_A, timestamp);
-    }
-
-    {
-      // Dispatch GT interrupts to the GPU driver.
-      fbl::AutoLock lock(&lock_);
-      if (gpu_interrupt_callback_.callback) {
-        if (is_tgl(device_id_)) {
-          if (graphics_primary_interrupts.gt1_interrupt_pending() ||
-              graphics_primary_interrupts.gt0_interrupt_pending()) {
-            // Mask isn't used
-            gpu_interrupt_callback_.callback(gpu_interrupt_callback_.ctx, 0, timestamp);
-          }
-        } else {
-          if (display_interrupts.reg_value() & gpu_interrupt_mask_) {
-            gpu_interrupt_callback_.callback(gpu_interrupt_callback_.ctx,
-                                             display_interrupts.reg_value(), timestamp);
-          }
-        }
-      }
-    }
-
-    display_interrupts.set_interrupts_enabled(true).WriteTo(mmio_space_);
-
-    if (is_tgl(device_id_)) {
-      graphics_primary_interrupts.set_interrupts_enabled(true).WriteTo(mmio_space_);
     }
   }
+
+  // TODO(https://fxbug.dev/42060657): Check for Pipe D interrupts here when we support
+  //                         pipe and transcoder D.
+  zx::time timestamp(interrupt->timestamp);
+  if (display_interrupts.pipe_c_pending()) {
+    HandlePipeInterrupt(PipeId::PIPE_C, timestamp.get());
+  }
+  if (display_interrupts.pipe_b_pending()) {
+    HandlePipeInterrupt(PipeId::PIPE_B, timestamp.get());
+  }
+  if (display_interrupts.pipe_a_pending()) {
+    HandlePipeInterrupt(PipeId::PIPE_A, timestamp.get());
+  }
+
+  {
+    // Dispatch GT interrupts to the GPU driver.
+    fbl::AutoLock lock(&lock_);
+    if (gpu_interrupt_callback_.callback) {
+      if (is_tgl(device_id_)) {
+        if (graphics_primary_interrupts.gt1_interrupt_pending() ||
+            graphics_primary_interrupts.gt0_interrupt_pending()) {
+          // Mask isn't used
+          gpu_interrupt_callback_.callback(gpu_interrupt_callback_.ctx, 0, timestamp.get());
+        }
+      } else {
+        if (display_interrupts.reg_value() & gpu_interrupt_mask_) {
+          gpu_interrupt_callback_.callback(gpu_interrupt_callback_.ctx,
+                                           display_interrupts.reg_value(), timestamp.get());
+        }
+      }
+    }
+  }
+
+  display_interrupts.set_interrupts_enabled(true).WriteTo(mmio_space_);
+
+  if (is_tgl(device_id_)) {
+    graphics_primary_interrupts.set_interrupts_enabled(true).WriteTo(mmio_space_);
+  }
+
+  // For interrupts bound to ports (including those bound to async loops), the
+  // interrupt must be re-armed using zx_interrupt_ack() for each incoming
+  // interrupt request. This is best done after the interrupt has been fully
+  // processed.
+  zx::unowned_interrupt(irq->object())->ack();
 }
 
 void Interrupts::HandlePipeInterrupt(PipeId pipe_id, zx_time_t timestamp) {
@@ -335,18 +358,12 @@ zx_status_t Interrupts::SetGpuInterruptCallback(
 }
 
 zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
-                             HotplugCallback hotplug_callback, zx_device_t* dev,
-                             const ddk::Pci& pci, fdf::MmioBuffer* mmio_space, uint16_t device_id) {
+                             HotplugCallback hotplug_callback, const ddk::Pci& pci,
+                             fdf::MmioBuffer* mmio_space, uint16_t device_id) {
   ZX_DEBUG_ASSERT(pipe_vsync_callback);
   ZX_DEBUG_ASSERT(hotplug_callback);
-  ZX_DEBUG_ASSERT(dev);
   ZX_DEBUG_ASSERT(mmio_space);
-
-  // TODO(https://fxbug.dev/42167004): Looks like calling Init multiple times is allowed for unit tests but it
-  // would make the state of instances of this class more predictable to disallow this.
-  if (irq_) {
-    Destroy();
-  }
+  ZX_DEBUG_ASSERT(!irq_.is_valid());
 
   pipe_vsync_callback_ = std::move(pipe_vsync_callback);
   hotplug_callback_ = std::move(hotplug_callback);
@@ -377,26 +394,26 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
     zxlogf(ERROR, "Failed to map interrupt (%d)", status);
     return status;
   }
+  irq_handler_.set_object(irq_.get());
 
-  {
-    thrd_t thread;
-    int thrd_status = thrd_create_with_name(
-        &thread, [](void* ctx) { return static_cast<Interrupts*>(ctx)->IrqLoop(); }, this,
-        "i915-irq-thread");
-    if (thrd_status != thrd_success) {
-      status = thrd_status_to_zx_status(thrd_status);
-      zxlogf(ERROR, "Failed to create irq thread (%d)", status);
-      irq_.reset();
-      return status;
-    }
-    irq_thread_ = thread;
+  const char* kRoleName = "fuchsia.graphics.display.drivers.intel-i915.interrupt";
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "i915-irq-thread",
+          /*shutdown_handler=*/
+          [this](fdf_dispatcher_t*) { irq_handler_dispatcher_shutdown_completed_.Signal(); },
+          kRoleName);
+  if (create_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "Failed to create vsync Dispatcher: %s",
+           create_dispatcher_result.status_string());
+    return create_dispatcher_result.status_value();
   }
+  irq_handler_dispatcher_ = std::move(create_dispatcher_result).value();
 
-  const char* role_name = "fuchsia.graphics.display.drivers.intel-i915.interrupt";
-  status = device_set_profile_by_role(dev, thrd_get_zx_handle(*irq_thread_), role_name,
-                                      strlen(role_name));
+  status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to apply role: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to begin IRQ handler wait: %s", zx_status_get_string(status));
+    return status;
   }
 
   Resume();

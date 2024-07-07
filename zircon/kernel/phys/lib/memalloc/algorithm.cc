@@ -125,9 +125,9 @@ class ActiveRanges {
         return values_[1];
       case ZBI_MEM_TYPE_RESERVED:
         return values_[2];
-      case kMinExtendedTypeValue ... kMaxExtendedTypeValue - 1:
+      case kMinAllocatedTypeValue ... kMaxAllocatedTypeValue - 1:
         static_assert(kNumBaseTypes == 3);
-        return values_[kNumBaseTypes + static_cast<size_t>(type_val - kMinExtendedTypeValue)];
+        return values_[kNumBaseTypes + static_cast<size_t>(type_val - kMinAllocatedTypeValue)];
     }
     // Normalize to kReserved if unknown.
     return (*this)[Type::kReserved];
@@ -135,8 +135,8 @@ class ActiveRanges {
 
   // Gives the active range type with the highest relative precedence,
   // std::nullopt if there are no active ranges, or fit::failed if
-  // * two different extended types are active
-  // * both an extended type and one of kReserved or kPeripheral are active.
+  // * two different allocated types are active
+  // * both an allocated type and one of kReserved or kPeripheral are active.
   fit::result<fit::failed, std::optional<Type>> DominantType() {
     // First look through the base types in reverse-order of precedence (so
     // "last wins").
@@ -147,23 +147,23 @@ class ActiveRanges {
       }
     }
 
-    std::optional<Type> active_extended;
-    for (uint64_t i = kMinExtendedTypeValue; i < kMaxExtendedTypeValue; ++i) {
+    std::optional<Type> active_allocated;
+    for (uint64_t i = kMinAllocatedTypeValue; i < kMaxAllocatedTypeValue; ++i) {
       Type type = static_cast<Type>(i);
       if ((*this)[type] > 0) {
-        // If there is a non-kFreeRam base type or another extended type
+        // If there is a non-kFreeRam base type or another allocated type
         // active, that's an error.
-        if ((active_base && *active_base != Type::kFreeRam) || active_extended) {
+        if ((active_base && *active_base != Type::kFreeRam) || active_allocated) {
           return fit::failed();
         }
-        active_extended = type;
+        active_allocated = type;
       }
     }
 
-    // Give an active extended type precedence, as we now know that it can only
+    // Give an active allocated type precedence, as we now know that it can only
     // carve out subranges of active free RAM.
-    if (active_extended) {
-      return fit::ok(*active_extended);
+    if (active_allocated) {
+      return fit::ok(*active_allocated);
     }
     if (active_base) {
       return fit::ok(*active_base);
@@ -172,7 +172,7 @@ class ActiveRanges {
   }
 
  private:
-  std::array<size_t, kNumBaseTypes + kNumExtendedTypes> values_ = {};
+  std::array<size_t, kNumBaseTypes + kNumAllocatedTypes> values_ = {};
 };
 
 }  // namespace

@@ -17,11 +17,11 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/sync/completion.h>
 #include <zircon/types.h>
 
 #include <gtest/gtest.h>
-#include <wlan/drivers/testing/test_helpers.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/core.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/workqueue.h"
@@ -69,7 +69,7 @@ class RecoveryTriggerTest : public testing::Test {
 
  private:
   std::unique_ptr<brcmf_pub> fake_drvr_;
-  wlan::drivers::log::testing::UnitTestLogContext logging_{"RecoveryTriggerTest"};
+  fdf_testing::ScopedGlobalLogger logging_;
 };
 
 uint16_t RecoveryTriggerTest::recovery_trigger_count_ = 0;

@@ -367,20 +367,11 @@
                 "GetrusageTest.IgnoreZombie",
 
                 // inotify_test
-                "Inotify.InOnlyDirFlagRespected",
-                "Inotify.TruncateGeneratesModifyEvent",
-                "Inotify.SymlinkFollow",
-                "Inotify.UtimesGeneratesAttribEvent",
                 "Inotify.UnmatchedEventsAreDiscarded",
-                "Inotify.ControlEvents",
                 "Inotify.KernfsBasic",
-                "Inotify.ExcludeUnlinkInodeEvents",
                 "Inotify.ExcludeUnlinkDirectory",
                 "Inotify.ExcludeUnlink",
-                "Inotify.Fallocate",
                 "Inotify.IncludeUnlinkedFile",
-                "Inotify.ExcludeUnlinkMultipleChildren",
-                "Inotify.Utimensat",
                 "Inotify.Exec",
 
                 // ioctl_test
@@ -729,9 +720,6 @@
                 "PtraceTest.Sysemu_PokeUser",
 
                 // pty_test
-                "PtyTest.CanonInputBackspaceMultibyteCharacterWithIUTF8",
-                "PtyTest.CanonInputBackspaceMultibyteCharacterPartialWithIUTF8",
-                "PtyTest.CanonInputWordErase",
                 "JobControlTest.ControllingProcessPersistsAfterChildExists",
 
                 // rlimits_test
@@ -740,9 +728,6 @@
                 // rtsignal_test
                 "RtSignalTest.InvalidCodes",
                 "RtSignalTest.SignoMatch",
-
-                // seccomp_test
-                "SeccompTest.EmptyProgramIsRejected",
 
                 // sigaltstack_test - https://fxbug.dev/42159586
                 "SigaltstackTest.ResetByExecve",

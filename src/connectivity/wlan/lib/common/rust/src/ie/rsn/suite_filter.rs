@@ -66,14 +66,14 @@ impl<'a> SuiteFilter<'a> {
 }
 
 /// WFA, WPA1 Spec. 3.1, Chapter 2.1
-pub const WPA1_PERSONAL: SuiteFilter = SuiteFilter {
+pub const WPA1_PERSONAL: SuiteFilter<'_> = SuiteFilter {
     known_group_data_ciphers: &[cipher::TKIP, cipher::CCMP_128],
     known_akms: &[akm::PSK],
     known_pairwise_ciphers: &[cipher::TKIP, cipher::CCMP_128],
     required_group_mgmt_cipher: None,
 };
 
-pub const WPA2_PERSONAL_TKIP_ONLY: SuiteFilter = SuiteFilter {
+pub const WPA2_PERSONAL_TKIP_ONLY: SuiteFilter<'_> = SuiteFilter {
     known_group_data_ciphers: &[cipher::TKIP],
     known_akms: &[akm::PSK],
     known_pairwise_ciphers: &[cipher::TKIP],
@@ -85,7 +85,7 @@ pub const WPA2_PERSONAL_TKIP_ONLY: SuiteFilter = SuiteFilter {
 /// Ciphers that encompass different configurations used for WPA2 personal (e.g. base
 /// configuration, configuration that supports BSS fast transition, and configuration
 /// that supports management frame protection)
-pub const WPA2_PERSONAL: SuiteFilter = SuiteFilter {
+pub const WPA2_PERSONAL: SuiteFilter<'_> = SuiteFilter {
     known_group_data_ciphers: &[cipher::CCMP_128, cipher::TKIP],
     // From observation: In most WPA2 cases, only akm::PSK is included. If FT is enabled,
     // akm::FT_PSK is also included.
@@ -103,7 +103,7 @@ pub const WPA2_PERSONAL: SuiteFilter = SuiteFilter {
 };
 
 /// WFA, WPA3 Spec. 1.0, Chapter 3
-pub const WPA3_PERSONAL: SuiteFilter = SuiteFilter {
+pub const WPA3_PERSONAL: SuiteFilter<'_> = SuiteFilter {
     known_group_data_ciphers: &[cipher::CCMP_128, cipher::TKIP],
     // WPA3 spec doesn't mention Fast BSS Transition, thus akm::FT_SAE is likely not supported.
     // For some reason, An AP we use for testing provide an option to turn on FT for WPA3 network,
@@ -116,7 +116,7 @@ pub const WPA3_PERSONAL: SuiteFilter = SuiteFilter {
 /// Ciphers that encompass different configurations used for WPA2 enterprise (e.g. base
 /// configuration, configuration that supports BSS fast transition, and configuration
 /// that supports management frame protection)
-pub const WPA2_ENTERPRISE: SuiteFilter = SuiteFilter {
+pub const WPA2_ENTERPRISE: SuiteFilter<'_> = SuiteFilter {
     known_group_data_ciphers: &[cipher::CCMP_128],
     // From observation: akm::EAP is included for base WPA2 enterprise configuration. If FT
     // is enabled, akm::FT_EAP is also included.
@@ -128,7 +128,7 @@ pub const WPA2_ENTERPRISE: SuiteFilter = SuiteFilter {
 };
 
 /// WFA, WPA3 Spec. 1.0, Chapter 3
-pub const WPA3_ENTERPRISE_192_BIT: SuiteFilter = SuiteFilter {
+pub const WPA3_ENTERPRISE_192_BIT: SuiteFilter<'_> = SuiteFilter {
     known_group_data_ciphers: &[cipher::GCMP_256],
     known_akms: &[akm::EAP_SUITEB_SHA384],
     known_pairwise_ciphers: &[cipher::GCMP_256],

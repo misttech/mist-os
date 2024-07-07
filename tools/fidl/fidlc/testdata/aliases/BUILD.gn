@@ -2,22 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fidl/fidl.gni")
+import("//tools/fidl/fidlc/testdata/fidl_golden_library.gni")
 
-fidl("test.aliases") {
-  testonly = true
+fidl_golden_library("test.aliases") {
   sources = [ "example.test.fidl" ]
   experimental_flags = [ "output_index_json" ]
   public_deps = [ ":test.someotherlibrary" ]
-  enable_hlcpp = true
-  golden_fuzzer = true
-  disable_rustdoc = true
 }
 
-fidl("test.someotherlibrary") {
-  testonly = true
+fidl_golden_library("test.someotherlibrary") {
   sources = [ "someotherlibrary.test.fidl" ]
-  enable_hlcpp = true
-  golden_fuzzer = true
-  disable_rustdoc = true
 }

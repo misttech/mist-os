@@ -13,6 +13,8 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/inout.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/component/cpp/prepare_stop_completer.h>
+#include <lib/driver/component/cpp/start_completer.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -88,17 +90,6 @@ constexpr fuchsia_images2::wire::PixelFormat kPixelFormatTypes[2] = {
 constexpr fuchsia_images2::wire::PixelFormat kYuvPixelFormatTypes[2] = {
     fuchsia_images2::wire::PixelFormat::kI420,
     fuchsia_images2::wire::PixelFormat::kNv12,
-};
-
-constexpr zx_protocol_device_t kGpuCoreDeviceProtocol = {
-    .version = DEVICE_OPS_VERSION, .release = [](void* ctx) {}
-    // zx_gpu_dev_ is removed when unbind is called for zxdev() (in ::DdkUnbind),
-    // so it's not necessary to give it its own unbind method.
-};
-
-constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
-    .version = DEVICE_OPS_VERSION,
-    .release = [](void* ctx) {},
 };
 
 const display_config_t* FindBanjoConfig(display::DisplayId display_id,
@@ -392,7 +383,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   constexpr uint16_t kSequencerData = 0x3c5;
   constexpr uint8_t kClockingModeIdx = 1;
   constexpr uint8_t kClockingModeScreenOff = (1 << 5);
-  zx_status_t status = zx_ioports_request(get_ioport_resource(parent()), kSequencerIdx, 2);
+  zx_status_t status = zx_ioports_request(get_ioport_resource(parent_), kSequencerIdx, 2);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map vga ports");
     return false;
@@ -2091,7 +2082,7 @@ zx_status_t Controller::IntelGpuCoreGttInsert(uint64_t addr, zx::vmo buffer, uin
 
 // Ddk methods
 
-void Controller::DdkInit(ddk::InitTxn txn) {
+void Controller::Start(fdf::StartCompleter completer) {
   zxlogf(TRACE, "i915: initializing displays");
 
   {
@@ -2125,29 +2116,24 @@ void Controller::DdkInit(ddk::InitTxn txn) {
   interrupts_.FinishInit();
 
   zxlogf(TRACE, "i915: display initialization done");
-  txn.Reply(ZX_OK);
+  completer(zx::ok());
 }
 
-void Controller::DdkUnbind(ddk::UnbindTxn txn) {
-  device_async_remove(zx_gpu_dev_);
-  device_async_remove(display_controller_dev_);
-
+void Controller::PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer) {
   {
     fbl::AutoLock lock(&display_lock_);
     display_devices_.reset();
   }
 
-  txn.Reply();
+  completer(zx::ok());
 }
 
-void Controller::DdkRelease() { delete this; }
-
-void Controller::DdkSuspend(ddk::SuspendTxn txn) {
+void Controller::PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
-  if (txn.suspend_reason() == DEVICE_SUSPEND_REASON_MEXEC) {
-    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(parent());
+  if (suspend_reason == DEVICE_SUSPEND_REASON_MEXEC) {
+    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(parent_);
     if (fb_status.is_error()) {
-      txn.Reply(ZX_OK, txn.requested_state());
+      completer(zx::ok());
       return;
     }
 
@@ -2159,7 +2145,7 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
     zx_status_t status = pci_.ReadConfig32(bdsm_reg.kAddr, bdsm_reg.reg_value_ptr());
     if (status != ZX_OK) {
       zxlogf(TRACE, "Failed to read dsm base");
-      txn.Reply(ZX_OK, txn.requested_state());
+      completer(zx::ok());
       return;
     }
 
@@ -2198,38 +2184,7 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
       }
     }
   }
-  txn.Reply(ZX_OK, txn.requested_state());
-}
-
-void Controller::DdkResume(ddk::ResumeTxn txn) {
-  fbl::AutoLock lock(&display_lock_);
-  BringUpDisplayEngine(true);
-
-  pch_engine_->RestoreNonClockParameters();
-
-  if (!is_tgl(device_id_)) {
-    // TODO(https://fxbug.dev/42060601): Intel's documentation states that this field
-    // should only be written once, at system boot. Either delete this, or
-    // document an experiment confirming that this write works as intended.
-    //
-    // Kaby Lake: IHD-OS-KBL-Vol 2c-1.17 Part 1 page 444
-    // Skylake: IHD-OS-SKL-Vol 2c-05.16 Part 1 page 440
-    registers::DdiRegs(DdiId::DDI_A)
-        .BufferControl()
-        .ReadFrom(mmio_space())
-        .set_ddi_e_disabled_kaby_lake(ddi_e_disabled_)
-        .WriteTo(mmio_space());
-  }
-
-  for (auto& disp : display_devices_) {
-    if (!disp->Resume()) {
-      zxlogf(ERROR, "Failed to resume display");
-    }
-  }
-
-  interrupts_.Resume();
-
-  txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
+  completer(zx::ok());
 }
 
 zx_koid_t GetKoid(zx_handle_t handle) {
@@ -2242,7 +2197,7 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
-  zx::result client = DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>();
+  zx::result client = ddk::Device<void>::DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>(parent_);
   if (client.is_error()) {
     zxlogf(ERROR, "could not get SYSMEM protocol: %s", client.status_string());
     return client.status_value();
@@ -2261,7 +2216,7 @@ zx_status_t Controller::Init() {
     return set_debug_status.status();
   }
 
-  pci_ = ddk::Pci(parent(), "pci");
+  pci_ = ddk::Pci(parent_, "pci");
   if (!pci_.is_valid()) {
     zxlogf(ERROR, "Could not get Display PCI protocol");
     return ZX_ERR_INTERNAL;
@@ -2270,9 +2225,12 @@ zx_status_t Controller::Init() {
   pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
   zxlogf(TRACE, "Device id %x", device_id_);
 
-  zx_status_t status = igd_opregion_.Init(parent(), pci_);
-  if (status != ZX_OK) {
-    if (status != ZX_ERR_NOT_SUPPORTED) {
+  zx::unowned_resource driver_mmio_resource(get_mmio_resource(parent_));
+  if (!driver_mmio_resource->is_valid()) {
+    zxlogf(WARNING, "Failed to get driver MMIO resource. VBT initialization skipped.");
+  } else {
+    zx_status_t status = igd_opregion_.Init(driver_mmio_resource->borrow(), pci_);
+    if (status != ZX_OK && status != ZX_ERR_NOT_SUPPORTED) {
       zxlogf(ERROR, "VBT initializaton failed: %s", zx_status_get_string(status));
       return status;
     }
@@ -2282,7 +2240,7 @@ zx_status_t Controller::Init() {
   // map register window
   uint8_t* regs;
   uint64_t size;
-  status = IntelGpuCoreMapPciMmio(0u, &regs, &size);
+  zx_status_t status = IntelGpuCoreMapPciMmio(0u, &regs, &size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map bar 0: %d", status);
     return status;
@@ -2325,8 +2283,8 @@ zx_status_t Controller::Init() {
 
   zxlogf(TRACE, "Initializing interrupts");
   status = interrupts_.Init(fit::bind_member<&Controller::HandlePipeVsync>(this),
-                            fit::bind_member<&Controller::HandleHotplug>(this), parent(), pci_,
-                            mmio_space(), device_id_);
+                            fit::bind_member<&Controller::HandleHotplug>(this), pci_, mmio_space(),
+                            device_id_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initialize interrupts");
     return status;
@@ -2338,7 +2296,7 @@ zx_status_t Controller::Init() {
     // Prevent clients from allocating memory in this region by telling |gtt_| to exclude it from
     // the region allocator.
     uint32_t offset = 0u;
-    auto fb = GetFramebufferInfo(parent());
+    auto fb = GetFramebufferInfo(parent_);
     if (fb.is_error()) {
       zxlogf(INFO, "Failed to obtain framebuffer size (%s)", fb.status_string());
       // It is possible for zx_framebuffer_get_info to fail in a headless system as the bootloader
@@ -2379,54 +2337,28 @@ zx_status_t Controller::Init() {
     dpll_manager_ = std::make_unique<DpllManagerSkylake>(mmio_space());
   }
 
-  status = DdkAdd(ddk::DeviceAddArgs("intel_i915")
-                      .set_inspect_vmo(inspector_.DuplicateVmo())
-                      .set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add controller device");
-    return status;
-  }
-
-  {
-    device_add_args_t display_device_add_args = {
-        .version = DEVICE_ADD_ARGS_VERSION,
-        .name = "intel-display-controller",
-        .ctx = this,
-        .ops = &kDisplayControllerDeviceProtocol,
-        .proto_id = ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-        .proto_ops = &display_controller_impl_protocol_ops_,
-    };
-    status = device_add(zxdev(), &display_device_add_args, &display_controller_dev_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to publish display controller device (%d)", status);
-      return status;
-    }
-  }
-
-  {
-    device_add_args_t gpu_device_add_args = {
-        .version = DEVICE_ADD_ARGS_VERSION,
-        .name = "intel-gpu-core",
-        .ctx = this,
-        .ops = &kGpuCoreDeviceProtocol,
-        .proto_id = ZX_PROTOCOL_INTEL_GPU_CORE,
-        .proto_ops = &intel_gpu_core_protocol_ops_,
-    };
-    status = device_add(zxdev(), &gpu_device_add_args, &zx_gpu_dev_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to publish gpu core device (%d)", status);
-      return status;
-    }
-  }
-
   root_node_ = inspector_.GetRoot().CreateChild("intel-i915");
-
   zxlogf(TRACE, "bind done");
-
   return ZX_OK;
 }
 
-Controller::Controller(zx_device_t* parent) : DeviceType(parent) {
+zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
+  switch (proto_id) {
+    case ZX_PROTOCOL_INTEL_GPU_CORE:
+      return zx::ok(ddk::AnyProtocol{
+          .ops = &intel_gpu_core_protocol_ops_,
+          .ctx = this,
+      });
+    case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
+      return zx::ok(ddk::AnyProtocol{
+          .ops = &display_controller_impl_protocol_ops_,
+          .ctx = this,
+      });
+  }
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
+Controller::Controller(zx_device_t* parent) : parent_(parent) {
   mtx_init(&display_lock_, mtx_plain);
   mtx_init(&gtt_lock_, mtx_plain);
   mtx_init(&bar_lock_, mtx_plain);
@@ -2444,31 +2376,20 @@ Controller::~Controller() {
 }
 
 // static
-zx_status_t Controller::Create(zx_device_t* parent) {
+zx::result<std::unique_ptr<Controller>> Controller::Create(zx_device_t* parent) {
   fbl::AllocChecker alloc_checker;
-  auto dev = fbl::make_unique_checked<Controller>(&alloc_checker, parent);
+  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, parent);
   if (!alloc_checker.check()) {
-    return ZX_ERR_NO_MEMORY;
+    zxlogf(ERROR, "Failed to allocate memory for Controller");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx_status_t status = dev->Init();
-  if (status == ZX_OK) {
-    // devmgr now owns the memory for |dev|.
-    dev.release();
+  zx_status_t status = controller->Init();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to initialize Controller: %s", zx_status_get_string(status));
+    return zx::error(status);
   }
-
-  return status;
+  return zx::ok(std::move(controller));
 }
 
-namespace {
-
-constexpr zx_driver_ops_t kDriverOps = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = [](void* ctx, zx_device_t* parent) { return Controller::Create(parent); },
-};
-
-}  // namespace
-
 }  // namespace i915
-
-ZIRCON_DRIVER(intel_i915, i915::kDriverOps, "zircon", "0.1");

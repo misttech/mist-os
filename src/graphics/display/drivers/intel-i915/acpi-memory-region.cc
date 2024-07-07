@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/acpi-memory-region.h"
 
-#include <lib/ddk/driver.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/resource.h>
@@ -25,8 +24,8 @@
 namespace i915 {
 
 // static
-zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_device_t* parent, zx_paddr_t region_base,
-                                                      size_t region_size) {
+zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx::unowned_resource mmio_resource,
+                                                      zx_paddr_t region_base, size_t region_size) {
   auto [first_page_physical_address, vmo_size] = RoundToPageBoundaries(region_base, region_size);
 
   // The static_cast below is lossless because of this.
@@ -42,7 +41,7 @@ zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_device_t* parent, zx_pa
   // that returns a VMO representing the ACPI custom Operation Region that
   // contains a given physical address.
   zx::vmo region_vmo;
-  zx_status_t status = zx::vmo::create_physical(*zx::unowned_resource(get_mmio_resource(parent)),
+  zx_status_t status = zx::vmo::create_physical(*zx::unowned_resource(mmio_resource),
                                                 first_page_physical_address, vmo_size, &region_vmo);
   if (status != ZX_OK) {
     return zx::error_result(status);

@@ -4,6 +4,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <lib/fit/defer.h>
 #include <poll.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -1899,3 +1900,37 @@ INSTANTIATE_TEST_SUITE_P(
                 .perms = 0,
                 .expected_errno = EACCES,
             })));
+
+TEST_F(FuseServerTest, InvalidateMountDir) {
+  std::shared_ptr<FuseServer> parent_server(new FuseServer());
+  std::shared_ptr<Directory> mount_dir = parent_server->fs().AddDirAtRoot("mount_dir");
+  ASSERT_TRUE(mount_dir);
+  ASSERT_TRUE(Mount(parent_server));
+
+  std::shared_ptr<FuseServer> child_server(new FuseServer());
+  ASSERT_TRUE(child_server->fs().AddFileAtRoot("node"));
+
+  const std::string child_mount_dir = GetMountDir() + "/mount_dir";
+  ASSERT_TRUE(child_server->Mount(child_mount_dir));
+  std::thread child_mount_thread([&] {
+    while (child_server->ServeOnce()) {
+    }
+  });
+  auto cleanup_child_mount = fit::defer([&]() {
+    umount(child_mount_dir.c_str());
+    child_mount_thread.join();
+  });
+  const std::string node_path = child_mount_dir + "/node";
+  ASSERT_NO_FATAL_FAILURE(TestOpenWithFlags(node_path, O_RDONLY));
+
+  // The following open operation will trigger a revalidation on the child
+  // mount directory which will fail because we update the generation. This
+  // revalidation failure should trigger the implicit unmounting of the child
+  // FUSE server.
+  mount_dir->IncrementGeneration();
+  ASSERT_EQ(open(node_path.c_str(), O_RDONLY), -1);
+  EXPECT_EQ(errno, ENOENT);
+
+  ASSERT_EQ(umount(child_mount_dir.c_str()), -1);
+  EXPECT_EQ(errno, EINVAL);
+}

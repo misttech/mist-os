@@ -32,9 +32,9 @@ class RngDevice : public Device, public ddk::Device<RngDevice> {
 
  protected:
  private:
-  // TODO(https://fxbug.dev/42098992): The kernel should trigger entropy requests, instead of relying on this
-  // userspace thread to push entropy whenever it wants to. As a temporary hack, this thread
-  // pushes entropy to the kernel every 300 seconds instead.
+  // TODO(https://fxbug.dev/42098992): The kernel should trigger entropy requests, instead of
+  // relying on this userspace thread to push entropy whenever it wants to. As a temporary hack,
+  // this thread pushes entropy to the kernel every 300 seconds instead.
 
   // the entry point for the entropy seeding thread
   static int SeedThreadEntry(void* arg);
@@ -48,7 +48,7 @@ class RngDevice : public Device, public ddk::Device<RngDevice> {
   // the virtio ring
   static constexpr uint16_t kRingIndex = 0;
   static constexpr uint16_t kRingSize = 1;
-  Ring vring_ = {this};
+  Ring vring_{this};
 
   // the buffer used to receive entropy
   static constexpr size_t kBufferSize = ZX_CPRNG_ADD_ENTROPY_MAX_LEN;

@@ -143,3 +143,37 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     .expect("fidl error")
     .expect("failed to add a new rule");
 }
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn invalid_interface_id_selector<
+    I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support route rules in netstack2.
+    let realm = sandbox
+        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let rule_table =
+        realm.connect_to_protocol::<I::RuleTableMarker>().expect("connect to rule table");
+    let priority = fnet_routes_ext::rules::RuleSetPriority::from(0);
+    let rule_set =
+        fnet_routes_ext::rules::new_rule_set::<I>(&rule_table, priority).expect("fidl error");
+
+    assert_matches!(
+        fnet_routes_ext::rules::add_rule::<I>(
+            &rule_set,
+            RuleIndex::new(0),
+            fnet_routes_ext::rules::RuleSelector {
+                // Arbitrary non-existent interface ID.
+                bound_device: Some(1001),
+                ..Default::default()
+            },
+            fnet_routes_ext::rules::RuleAction::Unreachable
+        )
+        .await,
+        Ok(Err(fnet_routes_admin::RuleSetError::Unauthenticated))
+    )
+}

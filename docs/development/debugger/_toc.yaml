@@ -8,16 +8,16 @@
 toc:
 - title: "zxdb: The Fuchsia debugger"
   path: /docs/development/debugger/README.md
-- title: "Commands and interaction model"
+- title: "Get started with zxdb"
   path: /docs/development/debugger/commands.md
+- title: "Using breakpoints"
+  path: /docs/development/debugger/breakpoints.md
 - title: "Debug tests using zxdb"
   path: /docs/development/debugger/tests.md
 - title: "Controlling thread execution"
   path: /docs/development/debugger/execution.md
-- title: "Using breakpoints"
-  path: /docs/development/debugger/breakpoints.md
-- title: "Evaluating and printing expressions"
-  path: /docs/development/debugger/printing.md
+- title: "Evaluate expressions"
+  path: /docs/development/debugger/expressions.md
 - title: "Inspecting memory"
   path: /docs/development/debugger/memory.md
 - title: "Working with assembly language"

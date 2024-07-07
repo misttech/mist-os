@@ -17,6 +17,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect/windowed_uint_property.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/time.h>
@@ -26,7 +27,6 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <wlan/drivers/testing/test_helpers.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test/device_inspect_test_utils.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
@@ -90,7 +90,7 @@ class WindowedUintPropertyTest : public gtest::TestLoopFixture {
   inspect::Inspector inspector_;
   WindowedUintProperty count_;
   const std::string name_ = "uint_property_counter";
-  wlan::drivers::log::testing::UnitTestLogContext logging_{"WindowedUintPropertyTest"};
+  fdf_testing::ScopedGlobalLogger logging_;
 };
 
 TEST_F(WindowedUintPropertyTest, InitErrors) {

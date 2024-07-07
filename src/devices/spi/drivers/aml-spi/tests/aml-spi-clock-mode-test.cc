@@ -31,7 +31,8 @@ class AmlSpiNormalClockModeFixtureConfig final {
 };
 
 class AmlSpiNormalClockModeTest
-    : public fdf_testing::DriverTestFixture<AmlSpiNormalClockModeFixtureConfig> {};
+    : public fdf_testing::DriverTestFixture<AmlSpiNormalClockModeFixtureConfig>,
+      public ::testing::Test {};
 
 TEST_F(AmlSpiNormalClockModeTest, Test) {
   auto conreg = ConReg::Get().FromValue(driver()->conreg());
@@ -78,7 +79,8 @@ class AmlSpiEnhancedClockModeFixtureConfig final {
 };
 
 class AmlSpiEnhancedClockModeTest
-    : public fdf_testing::DriverTestFixture<AmlSpiEnhancedClockModeFixtureConfig> {};
+    : public fdf_testing::DriverTestFixture<AmlSpiEnhancedClockModeFixtureConfig>,
+      public ::testing::Test {};
 
 TEST_F(AmlSpiEnhancedClockModeTest, Test) {
   auto conreg = ConReg::Get().FromValue(driver()->conreg());
@@ -131,7 +133,8 @@ class AmlSpiNormalClockModeInvalidDividerFixtureConfig final {
 };
 
 class AmlSpiNormalClockModeInvalidDividerTest
-    : public fdf_testing::DriverTestFixture<AmlSpiNormalClockModeInvalidDividerFixtureConfig> {};
+    : public fdf_testing::DriverTestFixture<AmlSpiNormalClockModeInvalidDividerFixtureConfig>,
+      public ::testing::Test {};
 
 TEST_F(AmlSpiNormalClockModeInvalidDividerTest, Test) { EXPECT_TRUE(StartDriver().is_error()); }
 
@@ -161,7 +164,8 @@ class AmlSpiEnhancedClockModeInvalidDividerFixtureConfig final {
 };
 
 class AmlSpiEnhancedClockModeInvalidDividerTest
-    : public fdf_testing::DriverTestFixture<AmlSpiEnhancedClockModeInvalidDividerFixtureConfig> {};
+    : public fdf_testing::DriverTestFixture<AmlSpiEnhancedClockModeInvalidDividerFixtureConfig>,
+      public ::testing::Test {};
 
 TEST_F(AmlSpiEnhancedClockModeInvalidDividerTest, Test) { EXPECT_TRUE(StartDriver().is_error()); }
 

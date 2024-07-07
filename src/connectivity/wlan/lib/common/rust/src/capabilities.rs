@@ -200,7 +200,6 @@ pub fn intersect_with_ap_as_client(
 }
 
 /// Performs capability negotiation with a remote client assuming the Fuchsia device is an AP.
-#[allow(unused)]
 pub fn intersect_with_remote_client_as_ap(
     ap: &ApCapabilities,
     remote_client: &ClientCapabilities,

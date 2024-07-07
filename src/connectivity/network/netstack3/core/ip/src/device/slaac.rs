@@ -36,7 +36,8 @@ use crate::internal::device::{AddressRemovedReason, Ipv6DeviceAddr};
 /// Minimum Valid Lifetime value to actually update an address's valid lifetime.
 ///
 /// 2 hours.
-const MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE: Duration = Duration::from_secs(7200);
+const MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE: NonZeroDuration =
+    const_unwrap_option(NonZeroDuration::new(Duration::from_secs(7200)));
 
 /// Required prefix length for SLAAC.
 ///
@@ -534,9 +535,9 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     // what will be calculated here. That's fine because it's a lower bound on
     // the prefix's value, which means the prefix's value is still being
     // respected.
-    let preferred_for = match preferred_until
-        .map(|preferred_until| preferred_until.duration_since(creation_time) + desync_factor)
-    {
+    let preferred_for = match preferred_until.map(|preferred_until| {
+        preferred_until.saturating_duration_since(creation_time) + desync_factor
+    }) {
         Some(preferred_for) => preferred_for,
         // If the address is already deprecated, a new address should already
         // have been generated, so ignore this one.
@@ -548,7 +549,7 @@ fn on_address_removed_inner<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
     // (e.g. if the NDP configuration was changed since this address was
     // generated). That's okay, because `add_slaac_addr_sub` will apply the
     // current maximum valid lifetime when called below.
-    let valid_for = NonZeroDuration::new(valid_until.duration_since(creation_time))
+    let valid_for = NonZeroDuration::new(valid_until.saturating_duration_since(creation_time))
         .unwrap_or(temp_valid_lifetime);
 
     add_slaac_addr_sub::<_, CC>(
@@ -648,7 +649,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                             temporary_address_config
                                 .temp_preferred_lifetime
                                 .get()
-                                .checked_sub(now.duration_since(*creation_time))
+                                .checked_sub(now.saturating_duration_since(*creation_time))
                                 .and_then(|p| p.checked_sub(*desync_factor))
                                 .and_then(NonZeroDuration::new)
                                 .map(|d| preferred_lifetime.min_finite_duration(d))
@@ -660,7 +661,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                         //   for a time longer than (TEMP_VALID_LIFETIME) or
                         //   (TEMP_PREFERRED_LIFETIME - DESYNC_FACTOR),
                         //   respectively.
-                        let since_creation = now.duration_since(*creation_time);
+                        let since_creation = now.saturating_duration_since(*creation_time);
                         let configured_max_lifetime =
                             temporary_address_config.temp_valid_lifetime.get();
                         let max_valid_lifetime = if since_creation > configured_max_lifetime {
@@ -737,8 +738,10 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
     // `Some` iff the remaining lifetime is a positive non-zero lifetime.
     let remaining_lifetime = match entry_valid_until {
         Lifetime::Infinite => Some(Lifetime::Infinite),
-        Lifetime::Finite(entry_valid_until) => (entry_valid_until > now)
-            .then(|| Lifetime::Finite(entry_valid_until.duration_since(now))),
+        Lifetime::Finite(entry_valid_until) => entry_valid_until
+            .checked_duration_since(now)
+            .and_then(NonZeroDuration::new)
+            .map(|d| Lifetime::Finite(d)),
     };
 
     // As per RFC 4862 section 5.5.3.e, if the advertised prefix is equal to the
@@ -808,8 +811,8 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
             match valid_for {
                 Some(NonZeroNdpLifetime::Infinite) => Some(NonZeroNdpLifetime::Infinite),
                 Some(NonZeroNdpLifetime::Finite(v))
-                    if v.get() > MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE
-                        || remaining_lifetime.map_or(true, |r| r < Lifetime::Finite(v.get())) =>
+                    if v > MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE
+                        || remaining_lifetime.map_or(true, |r| r < Lifetime::Finite(v)) =>
                 {
                     Some(NonZeroNdpLifetime::Finite(v))
                 }
@@ -835,9 +838,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
                     } else {
                         // Otherwise, reset the valid lifetime of the corresponding
                         // address to 2 hours.
-                        Some(NonZeroNdpLifetime::Finite(
-                            NonZeroDuration::new(MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE).unwrap(),
-                        ))
+                        Some(NonZeroNdpLifetime::Finite(MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE))
                     }
                 }
             }
@@ -888,7 +889,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext>(
 impl<BC: SlaacBindingsContext, CC: SlaacContext<BC>> HandleableTimer<CC, BC>
     for SlaacTimerId<CC::WeakDeviceId>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self { device_id } = self;
         let Some(device_id) = device_id.upgrade() else {
             return;
@@ -1239,13 +1240,15 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext, CC: SlaacContext<BC
                     addr_subnet.addr()
                 )
             });
-        let preferred_for = deprecate_at.duration_since(creation_time) + desync_factor;
+        let preferred_for = deprecate_at.saturating_duration_since(creation_time) + desync_factor;
 
         // It's possible this `valid_for` value is larger than `temp_valid_lifetime`
         // (e.g. if the NDP configuration was changed since this address was
         // generated). That's okay, because `add_slaac_addr_sub` will apply the
         // current maximum valid lifetime when called below.
-        let valid_for = NonZeroDuration::new(valid_until.duration_since(creation_time))
+        let valid_for = valid_until
+            .checked_duration_since(creation_time)
+            .and_then(NonZeroDuration::new)
             .unwrap_or(temp_valid_lifetime);
 
         Action::Regen { valid_for, preferred_for }
@@ -2104,7 +2107,7 @@ mod tests {
     const THREE_HOURS_AS_SECS: u32 = ONE_HOUR_AS_SECS * 3;
     const INFINITE_LIFETIME: u32 = u32::MAX;
     const MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE_AS_SECS: u32 =
-        MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE.as_secs() as u32;
+        MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE.get().as_secs() as u32;
     #[test_case(RefreshStableAddressTimersTest {
         orig_pl_secs: 1,
         orig_vl_secs: 1,

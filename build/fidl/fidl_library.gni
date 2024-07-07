@@ -12,7 +12,7 @@ import("//build/sdk/sdk_atom.gni")
 import("//build/testing/fidl_api_compatibility_test.gni")
 import("//build/testing/golden_files.gni")
 
-if (override_target_api_level == "PLATFORM") {
+if (current_build_target_api_level == "PLATFORM") {
   # FIDL directly supports targeting multiple API levels. "PLATFORM" is a
   # meta-level that refers to the set of all supported API levels.
   _levels = []
@@ -21,7 +21,7 @@ if (override_target_api_level == "PLATFORM") {
   }
   fidl_target_api_levels = string_join(",", _levels)
 } else {
-  fidl_target_api_levels = "$override_target_api_level"
+  fidl_target_api_levels = "$current_build_target_api_level"
 }
 
 # Declares a bindings agnostic FIDL library. See //build/fidl/fidl.gni for the
@@ -126,18 +126,21 @@ template("fidl_library") {
                            "library_name",
                            "fidl_ir_json",
                          ])
+
+  # Make sure  the same variables are forwarded to both fidl_ir() instances.
+  invoker_variables_to_forward_to_fidl_ir = [
+    "applicable_licenses",
+    "available",
+    "experimental_flags",
+    "non_fidl_deps",
+    "public_deps",
+    "sources",
+    "testonly",
+    "versioned",
+  ]
+
   fidl_ir(compilation_target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "applicable_licenses",
-                             "available",
-                             "experimental_flags",
-                             "non_fidl_deps",
-                             "public_deps",
-                             "sources",
-                             "testonly",
-                             "versioned",
-                           ])
+    forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
     visibility = [ ":*" ]
     fidl_target_name = main_target_name
     fidl_library_name = library_name
@@ -302,9 +305,15 @@ template("fidl_library") {
           _max_frozen_api_level = level
         }
       }
-      assert(platform_version.deprecated_highest_numbered_api_level ==
-                 _max_frozen_api_level,
-             "The previous API level must be frozen before adding a new one.")
+      if (platform_version.deprecated_highest_numbered_api_level !=
+          _max_frozen_api_level) {
+        # Although this should not happen, the platform-version-roller, like
+        # all fint recipes, runs a `gn check` after the build, which causes
+        # this condition to be hit now that the level has been added to
+        # version_history.json.
+        print(
+            "WARNING: The previous API level must be frozen before adding a new one. If this is not a post-build GN check, something is wrong.")
+      }
 
       next_level = 1 + platform_version.deprecated_highest_numbered_api_level
       api_levels += [ "$next_level" ]
@@ -321,15 +330,7 @@ template("fidl_library") {
     foreach(level, api_levels) {
       fidl_ir_target_name = "${main_target_name}_compile_$level"
       fidl_ir(fidl_ir_target_name) {
-        forward_variables_from(invoker,
-                               [
-                                 "applicable_licenses",
-                                 "experimental_flags",
-                                 "non_fidl_deps",
-                                 "public_deps",
-                                 "sources",
-                                 "testonly",
-                               ])
+        forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
         fidl_target_name = main_target_name
         fidl_library_name = library_name
 

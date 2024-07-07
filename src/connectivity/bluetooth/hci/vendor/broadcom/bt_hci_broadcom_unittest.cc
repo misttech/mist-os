@@ -13,8 +13,10 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/sync/cpp/completion.h>
+
+#include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -249,7 +251,8 @@ class FixtureConfig final {
   using EnvironmentType = TestEnvironment;
 };
 
-class BtHciBroadcomTest : public fdf_testing::DriverTestFixture<FixtureConfig> {
+class BtHciBroadcomTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+                          public ::testing::Test {
  public:
   BtHciBroadcomTest() = default;
 

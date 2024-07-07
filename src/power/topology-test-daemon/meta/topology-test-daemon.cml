@@ -4,6 +4,7 @@
 {
     include: [
         "inspect/client.shard.cml",
+        "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {

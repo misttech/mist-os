@@ -12,32 +12,12 @@ use test_case::test_case;
 //
 // As such, the `Request` type is superfluous but provides a meaningful example for the reader.
 enum Request {
-    Ax {
-        payload: RequestAx,
-        responder: RequestAxResponder,
-    },
-    Bx {
-        payload: RequestBx,
-        responder: RequestBxResponder,
-    },
-    Cx {
-        payload: RequestCx,
-        responder: RequestCxResponder,
-    },
-    Dx {
-        payload: RequestDx,
-        responder: RequestDxResponder,
-    },
-    Ex {
-        #[allow(dead_code)]
-        payload: RequestEx,
-        responder: RequestExResponder,
-    },
-    Fx {
-        #[allow(dead_code)]
-        payload: RequestFx,
-        responder: RequestFxResponder,
-    },
+    Ax { payload: RequestAx, responder: RequestAxResponder },
+    Bx { payload: RequestBx, responder: RequestBxResponder },
+    Cx { payload: RequestCx, responder: RequestCxResponder },
+    Dx { payload: RequestDx, responder: RequestDxResponder },
+    Ex { responder: RequestExResponder },
+    Fx { responder: RequestFxResponder },
 }
 
 #[derive(Debug)]
@@ -95,23 +75,11 @@ impl RequestDxResponder {
 }
 
 #[derive(Debug)]
-struct RequestEx {
-    #[allow(dead_code)]
-    x: Option<()>,
-}
-
-#[derive(Debug)]
 struct RequestExResponder {}
 impl RequestExResponder {
     fn send(self) -> Result<(), fidl::Error> {
         Err(fidl::Error::InvalidHeader)
     }
-}
-
-#[derive(Debug)]
-struct RequestFx {
-    #[allow(dead_code)]
-    x: Option<()>,
 }
 
 #[derive(Debug)]
@@ -199,9 +167,7 @@ fn responder_send_error_with_context_compiles() {
 
 #[test]
 fn responder_send_error_without_type_fails_to_send() {
-    if let Request::Ex { responder, .. } =
-        (Request::Ex { payload: RequestEx { x: Some(()) }, responder: RequestExResponder {} })
-    {
+    if let Request::Ex { responder } = (Request::Ex { responder: RequestExResponder {} }) {
         let e = ResponderExt::send(responder, ())
             .format_send_err()
             .expect_err("Unexpected success upon send().");
@@ -211,9 +177,7 @@ fn responder_send_error_without_type_fails_to_send() {
 
 #[test]
 fn responder_send_error_with_context_fails_to_send() {
-    if let Request::Fx { responder, .. } =
-        (Request::Fx { payload: RequestFx { x: Some(()) }, responder: RequestFxResponder {} })
-    {
+    if let Request::Fx { responder } = (Request::Fx { responder: RequestFxResponder {} }) {
         let e = ResponderExt::send(responder, Err(zx::Status::INVALID_ARGS))
             .format_send_err_with_context("foo")
             .expect_err("Unexpected success upon send().");

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{LockEqualOrBefore, Locked, Unlocked};
 
 use crate::execution::notify_debugger_of_module_list;
 use crate::mm::{
@@ -15,6 +15,7 @@ use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutpu
 use crate::vfs::FdNumber;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
+use starnix_sync::FileOpsCore;
 use starnix_syscalls::SyscallArg;
 use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::errors::{Errno, EINTR};
@@ -45,7 +46,7 @@ fn get_valid_platform_mmap_flags() -> u32 {
 
 /// sys_mmap takes a mutable reference to current_task because it may modify the IP register.
 pub fn sys_mmap(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -54,7 +55,7 @@ pub fn sys_mmap(
     fd: FdNumber,
     offset: u64,
 ) -> Result<UserAddress, Errno> {
-    let user_address = do_mmap(current_task, addr, length, prot, flags, fd, offset)?;
+    let user_address = do_mmap(locked, current_task, addr, length, prot, flags, fd, offset)?;
     if prot & PROT_EXEC != 0 {
         // Possibly loads a new module. Notify debugger for the change.
         // We only care about dynamic linker loading modules for now, which uses mmap. In the future
@@ -64,7 +65,8 @@ pub fn sys_mmap(
     Ok(user_address)
 }
 
-pub fn do_mmap(
+pub fn do_mmap<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -72,7 +74,10 @@ pub fn do_mmap(
     flags: u32,
     fd: FdNumber,
     offset: u64,
-) -> Result<UserAddress, Errno> {
+) -> Result<UserAddress, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
         track_stub!(TODO("https://fxbug.dev/322874211"), "mmap parse protection", prot);
         errno!(EINVAL)
@@ -150,7 +155,16 @@ pub fn do_mmap(
         profile_duration!("FileBackedMmap");
         // TODO(tbodt): maximize protection flags so that mprotect works
         let file = file.expect("file retrieved above for file-backed mapping");
-        file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())
+        file.mmap(
+            locked,
+            current_task,
+            addr,
+            vmo_offset,
+            length,
+            prot_flags,
+            options,
+            file.name.clone(),
+        )
     }
 }
 
@@ -565,11 +579,13 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_mmap_with_colliding_hint() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let page_size = *PAGE_SIZE;
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), page_size);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), page_size);
         match do_mmap(
+            &mut locked,
             &current_task,
             mapped_address,
             page_size as usize,
@@ -589,11 +605,13 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_mmap_with_fixed_collision() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let page_size = *PAGE_SIZE;
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), page_size);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), page_size);
         match do_mmap(
+            &mut locked,
             &current_task,
             mapped_address,
             page_size as usize,
@@ -613,11 +631,13 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_mmap_with_fixed_noreplace_collision() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let page_size = *PAGE_SIZE;
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), page_size);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), page_size);
         match do_mmap(
+            &mut locked,
             &current_task,
             mapped_address,
             page_size as usize,
@@ -641,7 +661,8 @@ mod tests {
     async fn test_munmap() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert_eq!(
             sys_munmap(&mut locked, &current_task, mapped_address, *PAGE_SIZE as usize),
             Ok(())
@@ -656,7 +677,8 @@ mod tests {
     async fn test_munmap_not_mapped() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert_eq!(
             sys_munmap(&mut locked, &current_task, mapped_address, *PAGE_SIZE as usize),
             Ok(())
@@ -672,7 +694,8 @@ mod tests {
     async fn test_munmap_0_length() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert_eq!(sys_munmap(&mut locked, &current_task, mapped_address, 0), error!(EINVAL));
     }
 
@@ -681,7 +704,8 @@ mod tests {
     async fn test_munmap_not_aligned() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert_eq!(
             sys_munmap(&mut locked, &current_task, mapped_address + 1u64, *PAGE_SIZE as usize),
             error!(EINVAL)
@@ -696,7 +720,8 @@ mod tests {
     async fn test_munmap_unmap_partial() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert_eq!(
             sys_munmap(&mut locked, &current_task, mapped_address, (*PAGE_SIZE as usize) / 2),
             Ok(())
@@ -715,7 +740,8 @@ mod tests {
     async fn test_munmap_multiple_pages() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
         assert_eq!(
             sys_munmap(&mut locked, &current_task, mapped_address, (*PAGE_SIZE as usize) + 1),
             Ok(())
@@ -734,7 +760,8 @@ mod tests {
     async fn test_munmap_one_of_many_pages() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
         assert_eq!(
             sys_munmap(&mut locked, &current_task, mapped_address, (*PAGE_SIZE as usize) - 1),
             Ok(())
@@ -750,7 +777,8 @@ mod tests {
     async fn test_munmap_middle_page() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let mapped_address =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         assert_eq!(
             sys_munmap(
                 &mut locked,
@@ -773,7 +801,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let mapped_addresses: Vec<_> = std::iter::repeat_with(|| {
-            map_memory(&current_task, UserAddress::default(), *PAGE_SIZE)
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE)
         })
         .take(3)
         .collect();
@@ -794,7 +822,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Map 3 pages and test that ranges covering these pages return no error.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 3, 0), Ok(()));
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 2, 0), Ok(()));
         assert_eq!(
@@ -825,7 +853,10 @@ mod tests {
 
         // Map the middle page back and test that ranges covering the three pages
         // (spanning multiple ranges) return no error.
-        assert_eq!(map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE), addr + *PAGE_SIZE);
+        assert_eq!(
+            map_memory(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE),
+            addr + *PAGE_SIZE
+        );
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 3, 0), Ok(()));
         assert_eq!(sys_msync(&mut locked, &current_task, addr, *PAGE_SIZE as usize * 2, 0), Ok(()));
         assert_eq!(
@@ -840,7 +871,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Map 2 pages.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
         fill_page(&current_task, addr, 'a');
         fill_page(&current_task, addr + *PAGE_SIZE, 'b');
 
@@ -868,7 +899,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Map 3 pages.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
         fill_page(&current_task, addr + *PAGE_SIZE, 'b');
         fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
@@ -899,12 +930,15 @@ mod tests {
 
         // Map 3 pages, unmap the middle, then map the middle again. This will leave us with
         // 3 contiguous mappings.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         assert_eq!(
             sys_munmap(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE as usize),
             Ok(())
         );
-        assert_eq!(map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE), addr + *PAGE_SIZE);
+        assert_eq!(
+            map_memory(&mut locked, &current_task, addr + *PAGE_SIZE, *PAGE_SIZE),
+            addr + *PAGE_SIZE
+        );
 
         fill_page(&current_task, addr, 'a');
         fill_page(&current_task, addr + *PAGE_SIZE, 'b');
@@ -935,7 +969,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Map 3 pages, unmap the middle, leaving a hole.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
         fill_page(&current_task, addr + *PAGE_SIZE, 'b');
         fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
@@ -973,7 +1007,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Map 3 pages.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
         fill_page(&current_task, addr + *PAGE_SIZE, 'b');
         fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
@@ -1013,12 +1047,13 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         // Map 2 pages which will act as the destination.
-        let dst_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
+        let dst_addr =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
         fill_page(&current_task, dst_addr, 'y');
         fill_page(&current_task, dst_addr + *PAGE_SIZE, 'z');
 
         // Map 3 pages.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
         fill_page(&current_task, addr + *PAGE_SIZE, 'b');
         fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
@@ -1075,7 +1110,7 @@ mod tests {
             .unwrap();
 
         // Map 3 pages.
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 3);
         fill_page(&current_task, addr, 'a');
         fill_page(&current_task, addr + *PAGE_SIZE, 'b');
         fill_page(&current_task, addr + *PAGE_SIZE * 2, 'c');
@@ -1107,11 +1142,12 @@ mod tests {
     async fn test_map_32_bit() {
         use starnix_uapi::PROT_WRITE;
 
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let page_size = *PAGE_SIZE;
 
         for _i in 0..256 {
             match do_mmap(
+                &mut locked,
                 &current_task,
                 UserAddress::from(0),
                 page_size as usize,

@@ -10,7 +10,6 @@ import("//build/rust/rustc_test.gni")
 cpu_manager_deps = [
   ":cpu-manager-config-lib",
   "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_rust",
-  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_rust",
   "//src/lib/async-utils",

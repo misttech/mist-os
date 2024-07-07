@@ -12,7 +12,7 @@ use core::marker::PhantomData;
 use core::num::NonZeroU16;
 
 use derivative::Derivative;
-use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6};
 use net_types::{
     AddrAndZone, MulticastAddress, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
@@ -41,6 +41,96 @@ impl DualStackIpExt for Ipv4 {
 
 impl DualStackIpExt for Ipv6 {
     type OtherVersion = Ipv4;
+}
+
+/// A tuple of values for `T` for both `I` and `I::OtherVersion`.
+pub struct DualStackTuple<I: DualStackIpExt, T: GenericOverIp<I> + GenericOverIp<I::OtherVersion>> {
+    this_stack: <T as GenericOverIp<I>>::Type,
+    other_stack: <T as GenericOverIp<I::OtherVersion>>::Type,
+    _marker: IpVersionMarker<I>,
+}
+
+impl<I: DualStackIpExt, T: GenericOverIp<I> + GenericOverIp<I::OtherVersion>> DualStackTuple<I, T> {
+    /// Creates a new tuple with `this_stack` and `other_stack` values.
+    pub fn new(this_stack: T, other_stack: <T as GenericOverIp<I::OtherVersion>>::Type) -> Self
+    where
+        T: GenericOverIp<I, Type = T>,
+    {
+        Self { this_stack, other_stack, _marker: IpVersionMarker::new() }
+    }
+
+    /// Retrieves `(this_stack, other_stack)` from the tuple.
+    pub fn into_inner(
+        self,
+    ) -> (<T as GenericOverIp<I>>::Type, <T as GenericOverIp<I::OtherVersion>>::Type) {
+        let Self { this_stack, other_stack, _marker } = self;
+        (this_stack, other_stack)
+    }
+
+    /// Retrieves `this_stack` from the tuple.
+    pub fn into_this_stack(self) -> <T as GenericOverIp<I>>::Type {
+        self.this_stack
+    }
+
+    /// Borrows `this_stack` from the tuple.
+    pub fn this_stack(&self) -> &<T as GenericOverIp<I>>::Type {
+        &self.this_stack
+    }
+
+    /// Retrieves `other_stack` from the tuple.
+    pub fn into_other_stack(self) -> <T as GenericOverIp<I::OtherVersion>>::Type {
+        self.other_stack
+    }
+
+    /// Borrows `other_stack` from the tuple.
+    pub fn other_stack(&self) -> &<T as GenericOverIp<I::OtherVersion>>::Type {
+        &self.other_stack
+    }
+
+    /// Flips the types, making `this_stack` `other_stack` and vice-versa.
+    pub fn flip(self) -> DualStackTuple<I::OtherVersion, T> {
+        let Self { this_stack, other_stack, _marker } = self;
+        DualStackTuple {
+            this_stack: other_stack,
+            other_stack: this_stack,
+            _marker: IpVersionMarker::new(),
+        }
+    }
+
+    /// Casts to IP version `X`.
+    ///
+    /// Given `DualStackTuple` contains complete information for both IP
+    /// versions, it can be easily cast into an arbitrary `X` IP version.
+    ///
+    /// This can be used to tie together type parameters when dealing with dual
+    /// stack sockets. For example, a `DualStackTuple` defined for `SockI` can
+    /// be cast to any `WireI`.
+    pub fn cast<X>(self) -> DualStackTuple<X, T>
+    where
+        X: DualStackIpExt,
+        T: GenericOverIp<X>
+            + GenericOverIp<X::OtherVersion>
+            + GenericOverIp<Ipv4>
+            + GenericOverIp<Ipv6>,
+    {
+        I::map_ip_in(
+            self,
+            |v4| X::map_ip_out(v4, |t| t, |t| t.flip()),
+            |v6| X::map_ip_out(v6, |t| t.flip(), |t| t),
+        )
+    }
+}
+
+impl<
+        I: DualStackIpExt,
+        NewIp: DualStackIpExt,
+        T: GenericOverIp<NewIp>
+            + GenericOverIp<NewIp::OtherVersion>
+            + GenericOverIp<I>
+            + GenericOverIp<I::OtherVersion>,
+    > GenericOverIp<NewIp> for DualStackTuple<I, T>
+{
+    type Type = DualStackTuple<NewIp, T>;
 }
 
 /// Extension trait for `Ip` providing socket-specific functionality.

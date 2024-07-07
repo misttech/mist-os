@@ -57,6 +57,7 @@
             protocol: [
                 "fuchsia.component.Introspector",
                 "fuchsia.component.Realm",
+                "fuchsia.sys2.RealmQuery",
             ],
             from: "framework",
         },

@@ -27,7 +27,7 @@ namespace fs {
 // This implementation is the normal one used on Fuchsia. It will not work in host builds.
 //
 // This class is thread-safe, but it is unsafe to shutdown the dispatch loop before shutting down
-// the ManagedVfs object.
+// the ManagedVfs object, and a multi-threaded dispatcher is *not* supported.
 class ManagedVfs : public FuchsiaVfs {
  public:
   explicit ManagedVfs(async_dispatcher_t* dispatcher);
@@ -48,7 +48,6 @@ class ManagedVfs : public FuchsiaVfs {
 
   void CloseAllConnectionsForVnode(const Vnode& node,
                                    CloseAllConnectionsForVnodeCallback callback) final;
-  bool IsTerminating() const final;
 
  private:
   // Posts the task for FinishShutdown if it is safe to do so.
@@ -72,9 +71,8 @@ class ManagedVfs : public FuchsiaVfs {
   std::mutex lock_;
 
   // All live connections. There can be more than one connection per node.
-  fbl::DoublyLinkedList<std::unique_ptr<internal::Connection>> connections_ __TA_GUARDED(lock_);
+  fbl::DoublyLinkedList<internal::Connection*> connections_ __TA_GUARDED(lock_);
 
-  std::atomic_bool is_shutting_down_ = false;
   async::TaskMethod<ManagedVfs, &ManagedVfs::FinishShutdown> shutdown_task_ __TA_GUARDED(lock_){
       this};
   ShutdownCallback shutdown_handler_ __TA_GUARDED(lock_);

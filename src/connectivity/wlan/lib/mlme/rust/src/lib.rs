@@ -21,7 +21,6 @@ pub mod device;
 pub mod disconnect;
 pub mod error;
 mod minstrel;
-#[allow(unused)] // TODO(https://fxbug.dev/42159791): Remove annotation once used.
 mod probe_sequence;
 
 use anyhow::{bail, format_err, Error};

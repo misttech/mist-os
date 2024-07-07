@@ -9,6 +9,7 @@ use crate::events::router::{ConsumerConfig, EventRouter, ProducerConfig};
 use crate::events::sources::EventSource;
 use crate::events::types::*;
 use crate::identity::ComponentIdentity;
+use crate::inspect::container::InspectHandle;
 use crate::inspect::repository::InspectRepository;
 use crate::inspect::servers::*;
 use crate::logs::repository::LogsRepository;
@@ -157,7 +158,7 @@ impl Archivist {
                     ExtendedMoniker::parse_str("core/network/netstack").unwrap(),
                     "fuchsia-pkg://fuchsia.com/netstack#meta/netstack2.cm",
                 )),
-                dir,
+                InspectHandle::directory(dir),
             );
         }
 

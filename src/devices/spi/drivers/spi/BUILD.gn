@@ -80,7 +80,7 @@ test("spi-test-bin") {
   deps = [
     ":common",
     "//sdk/lib/driver/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:gtest_fixture",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",

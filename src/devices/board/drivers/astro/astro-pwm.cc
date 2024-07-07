@@ -70,17 +70,12 @@ const device_bind_prop_t kPwmProperties[] = {
                       bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
 };
 
-const ddk::BindRule kGpioWifiRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
-                            bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
-                            static_cast<uint32_t>(GPIO_SOC_WIFI_LPO_32k768)),
+const ddk::BindRule kGpioInitRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
-const device_bind_prop_t kGpioWifiProperties[] = {
-    ddk::MakeProperty(bind_fuchsia_hardware_gpio::SERVICE,
-                      bind_fuchsia_hardware_gpio::SERVICE_ZIRCONTRANSPORT),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_WIFI_LPO),
+const device_bind_prop_t kGpioInitProperties[] = {
+    ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 const ddk::BindRule kGpioBtRules[] = {
@@ -96,6 +91,8 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Astro::PwmInit() {
+  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_WIFI_LPO_32k768, S905D2_PWM_E_FN));
+
   /* PWM_AO_B used by bootloader to control PP800_EE rail. The init flag is set
   to false to prevent access to that channel as the configuration set by the
   bootloader must be preserved for proper SoC operation. */
@@ -143,7 +140,7 @@ zx_status_t Astro::PwmInit() {
 
   zx_status_t status =
       DdkAddCompositeNodeSpec("pwm_init", ddk::CompositeNodeSpec(kPwmRules, kPwmProperties)
-                                              .AddParentSpec(kGpioWifiRules, kGpioWifiProperties)
+                                              .AddParentSpec(kGpioInitRules, kGpioInitProperties)
                                               .AddParentSpec(kGpioBtRules, kGpioBtProperties));
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));

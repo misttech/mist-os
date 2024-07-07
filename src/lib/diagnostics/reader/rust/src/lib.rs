@@ -442,7 +442,7 @@ impl ArchiveReader {
                 || (self.retry_config.on_fully_filtered()
                     && result
                         .iter()
-                        .any(|entry| !entry.has_payload() && entry.was_fully_filtered()))
+                        .all(|entry| !entry.has_payload() && entry.was_fully_filtered()))
             {
                 fasync::Timer::new(fasync::Time::after(RETRY_DELAY_MS.millis())).await;
             } else {
@@ -534,6 +534,7 @@ where
                     }
                     _ => OneOrMany::Many(vec![]),
                 };
+
                 match output {
                     OneOrMany::One(data) => yield Ok(data),
                     OneOrMany::Many(datas) => {
@@ -646,10 +647,13 @@ mod tests {
         fuchsia_zircon as zx,
     };
 
-    const TEST_COMPONENT_URL: &str =
-        "fuchsia-pkg://fuchsia.com/diagnostics-reader-tests#meta/inspect_test_component.cm";
+    const TEST_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";
 
-    async fn start_component() -> Result<RealmInstance, anyhow::Error> {
+    struct ComponentOptions {
+        publish_n_trees: u64,
+    }
+
+    async fn start_component(opts: ComponentOptions) -> Result<RealmInstance, anyhow::Error> {
         let builder = RealmBuilder::new().await?;
         let test_component = builder
             .add_child("test_component", TEST_COMPONENT_URL, ChildOptions::new().eager())
@@ -662,13 +666,18 @@ mod tests {
                     .to(&test_component),
             )
             .await?;
+        builder.init_mutable_config_to_empty(&test_component).await.unwrap();
+        builder
+            .set_config_value(&test_component, "publish_n_trees", opts.publish_n_trees.into())
+            .await
+            .unwrap();
         let instance = builder.build().await?;
         Ok(instance)
     }
 
     #[fuchsia::test]
     async fn inspect_data_for_component() -> Result<(), anyhow::Error> {
-        let instance = start_component().await?;
+        let instance = start_component(ComponentOptions { publish_n_trees: 1 }).await?;
 
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
         let component_selector = selectors::sanitize_moniker_for_selectors(&moniker);
@@ -679,6 +688,7 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_data_tree!(results[0].payload.as_ref().unwrap(), root: {
+            "tree-0": 0u64,
             int: 3u64,
             "lazy-node": {
                 a: "test",
@@ -718,7 +728,6 @@ mod tests {
 
         assert_eq!(response.len(), 1);
 
-        assert_eq!(response[0].metadata.component_url, Some(TEST_COMPONENT_URL.to_string()));
         assert_eq!(response[0].moniker, moniker);
 
         assert_data_tree!(response[0].payload.as_ref().unwrap(), root: {
@@ -733,7 +742,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn select_all_for_moniker() {
-        let instance = start_component().await.expect("started component");
+        let instance = start_component(ComponentOptions { publish_n_trees: 1 })
+            .await
+            .expect("component started");
 
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
         let results = ArchiveReader::new()
@@ -744,6 +755,7 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_data_tree!(results[0].payload.as_ref().unwrap(), root: {
+            "tree-0": 0u64,
             int: 3u64,
             "lazy-node": {
                 a: "test",
@@ -756,7 +768,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn timeout() -> Result<(), anyhow::Error> {
-        let instance = start_component().await?;
+        let instance = start_component(ComponentOptions { publish_n_trees: 1 }).await?;
 
         let mut reader = ArchiveReader::new();
         reader
@@ -891,6 +903,41 @@ mod tests {
         assert_eq!(log["payload"]["root"]["message"]["value"], "hello from test");
         let log = stream.next().await.unwrap();
         assert_eq!(log["payload"]["root"]["message"]["value"], "error from test");
+    }
+
+    #[fuchsia::test]
+    async fn read_many_trees_with_filtering() {
+        let instance = start_component(ComponentOptions { publish_n_trees: 2 })
+            .await
+            .expect("component started");
+
+        let selector =
+            format!("realm_builder\\:{}/test_component:root:tree-0", instance.root.child_name());
+
+        let results = ArchiveReader::new()
+            .add_selector(selector)
+            // two schemas, but one is empty
+            .with_minimum_schema_count(2)
+            .snapshot::<Inspect>()
+            .await
+            .expect("snapshotted");
+
+        let should_be_empty = results
+            .clone()
+            .into_iter()
+            .find(|v| v.metadata.name.as_ref().unwrap().as_name() == Some("tree-1"))
+            .unwrap();
+
+        assert!(should_be_empty.payload.is_none());
+
+        let should_have_data = results
+            .into_iter()
+            .find(|v| v.metadata.name.as_ref().unwrap().as_name() == Some("tree-0"))
+            .unwrap();
+
+        assert_data_tree!(should_have_data.payload.unwrap(), root: {
+            "tree-0": 0u64,
+        });
     }
 
     fn spawn_fake_archive(data_to_send: serde_json::Value) -> fdiagnostics::ArchiveAccessorProxy {

@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use fidl_fuchsia_hardware_audio::CodecMarker;
 use fuchsia_audio_device::codec;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId};
+use futures::stream::BoxStream;
 use futures::StreamExt;
 use tracing::{info, warn};
 use {fidl_fuchsia_audio_device as audio_device, fuchsia_async as fasync};
@@ -28,8 +29,24 @@ impl AudioControl for CodecAudioControl {
         Err(AudioError::UnsupportedParameters { source: anyhow!("Not implemented") })
     }
 
-    fn stop(&mut self) -> Result<(), AudioError> {
+    fn stop(&mut self, _id: PeerId) -> Result<(), AudioError> {
         Err(AudioError::NotStarted)
+    }
+
+    fn connect(&mut self, _id: PeerId, _supported_codecs: &[CodecId]) {
+        todo!()
+    }
+
+    fn disconnect(&mut self, _id: PeerId) {
+        todo!()
+    }
+
+    fn take_events(&self) -> BoxStream<'static, super::AudioControlEvent> {
+        todo!()
+    }
+
+    fn failed_request(&self, _request: super::AudioControlEvent, _error: AudioError) {
+        // Ignore.
     }
 }
 

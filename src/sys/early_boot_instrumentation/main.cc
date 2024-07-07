@@ -30,10 +30,12 @@
 #include "src/sys/early_boot_instrumentation/coverage_source.h"
 
 int main(int argc, char** argv) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   static const std::string static_dir_name(early_boot_instrumentation::kStaticDir);
   static const std::string dynamic_dir_name(early_boot_instrumentation::kDynamicDir);
   const fxl::CommandLine command_line = fxl::CommandLineFromArgcArgv(argc, argv);
-  fxl::SetLogSettingsFromCommandLine(command_line, {"early-boot-instrumentation"});
+  fxl::SetLogSettingsFromCommandLine(command_line, {"early-boot-instrumentation"},
+                                     loop.dispatcher());
 
   early_boot_instrumentation::SinkDirMap sink_map;
   [&sink_map]() {
@@ -86,7 +88,6 @@ int main(int argc, char** argv) {
 
   std::unique_ptr context = sys::ComponentContext::Create();
   context->outgoing()->root_dir()->AddEntry("debugdata", std::move(debug_data));
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   if (zx_status_t status = context->outgoing()->ServeFromStartupInfo(loop.dispatcher());
       status != ZX_OK) {
     FX_PLOGS(FATAL, status) << "Could not serve outgoing directory";

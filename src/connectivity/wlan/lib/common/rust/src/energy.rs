@@ -170,7 +170,7 @@ mod tests {
 
             let approx = fp_exp2((x * 256.0) as u64) as f64 / 256.0;
             let actual = 2.0_f64.powf(x);
-            let error = ((approx - actual).abs() / actual);
+            let error = (approx - actual).abs() / actual;
             if error > 0.02 {
                 panic!("exceeded maximum expected error of 2% for: {} (error: {})", x, error);
             }
@@ -184,7 +184,7 @@ mod tests {
 
             // Test dbm -> femtoWatt
             let actual_fw = 10_f64.powf((dbm as f64) / 10.0) * 1e+12;
-            let error = ((approx_fw.0 as f64 - actual_fw).abs() / actual_fw);
+            let error = (approx_fw.0 as f64 - actual_fw).abs() / actual_fw;
             if error > 0.03 {
                 panic!("exceeded maximum expected error of 3% for: {} (error: {})", dbm, error);
             }

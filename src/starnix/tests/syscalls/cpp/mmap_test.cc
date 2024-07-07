@@ -382,9 +382,6 @@ TEST_P(MMapProcStatmTest, RssAfterMapOverride) {
 INSTANTIATE_TEST_SUITE_P(Private, MMapProcStatmTest, testing::Values(MAP_PRIVATE));
 INSTANTIATE_TEST_SUITE_P(Shared, MMapProcStatmTest, testing::Values(MAP_SHARED));
 
-// This variable is accessed from within a signal handler and thus must be declared volatile.
-volatile void* expected_fault_address;
-
 // The initial layout for each test is:
 //
 // ---- 0x00000000
@@ -434,12 +431,12 @@ class MapGrowsdownTest : public testing::Test {
 
   // Tests that a read at |offset| within the playground generates a fault.
   bool TestThatReadSegfaults(intptr_t offset) {
-    return TestThatAccessSegfaults(offset, AccessType::Read);
+    return TestThatAccessSegfaults(OffsetToAddress(offset), test_helper::AccessType::Read);
   }
 
   // Tests that a write at |offset| within the playground generates a fault.
   bool TestThatWriteSegfaults(intptr_t offset) {
-    return TestThatAccessSegfaults(offset, AccessType::Write);
+    return TestThatAccessSegfaults(OffsetToAddress(offset), test_helper::AccessType::Write);
   }
 
   std::byte* OffsetToAddress(intptr_t offset) { return lowest_addr_ + offset; }
@@ -473,33 +470,6 @@ class MapGrowsdownTest : public testing::Test {
   std::byte* highest_addr() const { return highest_addr_; }
 
  private:
-  enum AccessType { Read, Write };
-
-  bool TestThatAccessSegfaults(intptr_t offset, AccessType type) {
-    std::byte* test_address = OffsetToAddress(offset);
-    test_helper::ForkHelper helper;
-    helper.RunInForkedProcess([test_address, type] {
-      struct sigaction segv_act;
-      segv_act.sa_sigaction = [](int signo, siginfo_t* info, void* ucontext) {
-        if (signo == SIGSEGV && info->si_addr == expected_fault_address) {
-          _exit(EXIT_SUCCESS);
-        }
-        _exit(EXIT_FAILURE);
-      };
-      segv_act.sa_flags = SA_SIGINFO;
-      SAFE_SYSCALL(sigaction(SIGSEGV, &segv_act, nullptr));
-      expected_fault_address = test_address;
-      if (type == AccessType::Read) {
-        *static_cast<volatile std::byte*>(test_address);
-      } else {
-        *static_cast<volatile std::byte*>(test_address) = std::byte{};
-      }
-      ADD_FAILURE() << "Expected to fault on access of " << test_address;
-      exit(EXIT_FAILURE);
-    });
-    return helper.WaitForChildren();
-  }
-
   size_t page_size_;
   size_t initial_grows_down_size_;
   intptr_t initial_grows_down_low_offset_;
@@ -823,7 +793,7 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
   });
 }
 
-TEST(Mprotect, GrowTempFilePermisisons) {
+TEST(Mprotect, GrowTempFilePermissions) {
   const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
   char* tmp = getenv("TEST_TMPDIR");
   std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
@@ -837,23 +807,21 @@ TEST(Mprotect, GrowTempFilePermisisons) {
   ASSERT_EQ(0, chmod(path.c_str(), S_IRUSR | S_IRGRP | S_IROTH));
 
   std::string before;
-  ASSERT_TRUE(files::ReadFileToString(path.c_str(), &before));
+  ASSERT_TRUE(files::ReadFileToString(path, &before));
 
   {
     uint8_t buf[] = {'b'};
     fbl::unique_fd fd = fbl::unique_fd(open(path.c_str(), O_RDONLY));
     ASSERT_EQ(-1, write(fd.get(), buf, sizeof(buf)));
 
-    void* ptr = mmap(NULL, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
+    void* ptr = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
     EXPECT_NE(ptr, MAP_FAILED);
 
     EXPECT_NE(mprotect(ptr, page_size, PROT_READ | PROT_WRITE), 0);
-    test_helper::ForkHelper helper;
-    helper.RunInForkedProcess([ptr] { *reinterpret_cast<volatile char*>(ptr) = 'b'; });
-    EXPECT_FALSE(helper.WaitForChildren());
+    EXPECT_TRUE(test_helper::TestThatAccessSegfaults(ptr, test_helper::AccessType::Write));
   }
   std::string after;
-  ASSERT_TRUE(files::ReadFileToString(path.c_str(), &after));
+  ASSERT_TRUE(files::ReadFileToString(path, &after));
   EXPECT_EQ(before, after);
   ASSERT_EQ(0, unlink(path.c_str()));
 }
@@ -1044,8 +1012,8 @@ TEST(Mremap, RemapPartOfMapping) {
   ASSERT_EQ(remapped, remap_destination);
 
   EXPECT_EQ('a', reinterpret_cast<volatile char*>(mapping)[0]);
-  EXPECT_EXIT([&]() { reinterpret_cast<volatile char*>(mapping)[page_size]; }(),
-              testing::KilledBySignal(SIGSEGV), "");
+  EXPECT_TRUE(test_helper::TestThatAccessSegfaults(static_cast<std::byte*>(mapping) + page_size,
+                                                   test_helper::AccessType::Read));
   EXPECT_EQ('c', reinterpret_cast<volatile char*>(mapping)[2 * page_size]);
 
   EXPECT_EQ('x', reinterpret_cast<volatile char*>(target)[0]);

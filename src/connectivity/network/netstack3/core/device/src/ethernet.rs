@@ -385,10 +385,10 @@ where
         + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::WeakDeviceId>>
         + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::WeakDeviceId>>,
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId) {
         match self {
-            EthernetTimerId::Arp(id) => core_ctx.handle_timer(bindings_ctx, id),
-            EthernetTimerId::Nudv6(id) => core_ctx.handle_timer(bindings_ctx, id),
+            EthernetTimerId::Arp(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
+            EthernetTimerId::Nudv6(id) => core_ctx.handle_timer(bindings_ctx, id, timer),
         }
     }
 }

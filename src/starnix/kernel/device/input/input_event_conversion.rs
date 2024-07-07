@@ -4,18 +4,21 @@
 
 use crate::uinput;
 use fidl_fuchsia_input::Key;
-use fidl_fuchsia_ui_pointer::{EventPhase as FidlEventPhase, TouchEvent, TouchPointerSample};
+use fidl_fuchsia_ui_pointer::{
+    EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent, TouchPointerSample,
+};
 use once_cell::sync::Lazy;
 use starnix_logging::log_warn;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::time::{time_from_timeval, timeval_from_time};
 use starnix_uapi::{error, uapi};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use {fidl_fuchsia_input_report as fir, fidl_fuchsia_ui_input3 as fuiinput, fuchsia_zircon as zx};
 
 type SlotId = usize;
 type TrackingId = u32;
-type PointerId = u32;
+type TimeNanos = i64;
+
 /// TRACKING_ID changed to -1 means the contact is lifted.
 const LIFTED_TRACKING_ID: i32 = -1;
 
@@ -378,11 +381,60 @@ fn validate_contact_input_report(c: &fir::ContactInputReport) -> bool {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+enum TouchEventConversionError {
+    #[error("Event does not include enough information")]
+    NotEnoughInformation,
+    #[error("no more available slot id")]
+    NoMoreAvailableSlotId,
+    #[error("receive pointer add already added")]
+    PointerAdded,
+    #[error("receive pointer change/remove before added")]
+    PointerNotFound,
+    #[error("Input pipeline does not send out Cancel")]
+    PointerCancel,
+}
+
+#[derive(Debug, Clone)]
+struct TouchEvent {
+    time_nanos: TimeNanos,
+    pointer_id: TrackingId,
+    phase: FidlEventPhase,
+    x: i32,
+    y: i32,
+}
+
+impl TryFrom<FidlTouchEvent> for TouchEvent {
+    type Error = TouchEventConversionError;
+    fn try_from(e: FidlTouchEvent) -> Result<TouchEvent, Self::Error> {
+        match e {
+            FidlTouchEvent {
+                timestamp: Some(time_nanos),
+                pointer_sample:
+                    Some(TouchPointerSample {
+                        position_in_viewport: Some([x, y]),
+                        phase: Some(phase),
+                        interaction: Some(id),
+                        ..
+                    }),
+                ..
+            } => Ok(TouchEvent {
+                time_nanos,
+                pointer_id: id.pointer_id,
+                phase,
+                x: x as i32,
+                y: y as i32,
+            }),
+            _ => Err(TouchEventConversionError::NotEnoughInformation),
+        }
+    }
+}
+
 /// FuchsiaTouchEventToLinuxTouchEventConverter handles fuchsia.ui.pointer.TouchEvents
 /// and converts them to Linux uapi::input_event in Multi Touch Protocol B.
 #[derive(Debug, Default, PartialEq)]
 pub struct FuchsiaTouchEventToLinuxTouchEventConverter {
-    pointer_id_to_slot_id: HashMap<PointerId, SlotId>,
+    pointer_id_to_slot_id: HashMap<TrackingId, SlotId>,
 }
 
 const MAX_TOUCH_CONTACT: usize = 10;
@@ -403,176 +455,241 @@ impl FuchsiaTouchEventToLinuxTouchEventConverter {
         used_slot_ids.iter().position(|used| !used)
     }
 
-    /// Converts fidl touch events to Linux Multi Touch Protocol B events, returns
-    /// converted events, count of converted fidl events and count of ignored fidl
-    /// events.
-    pub fn handle(&mut self, events: Vec<TouchEvent>) -> (Vec<uapi::input_event>, u64, u64) {
-        let mut count_converted_fidl_events: u64 = 0;
+    /// Converts fidl touch events to Linux Multi Touch Protocol B events.
+    ///
+    /// One vector of fidl touch events may convert to multiple Linux Multi Touch Protocol B
+    /// sequences because:
+    /// - Same pointer happens multiple times in the vector of fidl touch events.
+    /// - Linux Multi Touch Protocol B does not allow slot with same id appear multiple times
+    ///   one sequence.
+    ///
+    /// # Returns
+    ///
+    /// - converted events
+    /// - count of converted fidl events
+    /// - count of ignored fidl events
+    /// - count of unexpected fidl events
+    pub fn handle(
+        &mut self,
+        events: Vec<FidlTouchEvent>,
+    ) -> (VecDeque<uapi::input_event>, u64, u64, u64) {
         let mut count_ignored_fidl_events: u64 = 0;
-        let mut existing_slot: Vec<uapi::input_event> = vec![];
-        let mut new_slots: Vec<uapi::input_event> = vec![];
-        let mut latest_timestamp_nanos: i64 = 0;
 
-        // TODO(https://fxbug.dev/314151713): use event.device_info to route event to different device file.
+        // TODO(https://fxbug.dev/348726475): Group events by timestamp here because events from
+        // fuchsia.ui.pointer.touch.Watch may not sorted by timestamp.
 
-        for event in events.iter() {
-            match event {
-                TouchEvent {
-                    timestamp: Some(time_nanos),
-                    pointer_sample:
-                        Some(TouchPointerSample {
-                            position_in_viewport: Some([x, y]),
-                            phase: Some(phase),
-                            interaction: Some(id),
-                            ..
-                        }),
-                    ..
-                } => {
-                    if latest_timestamp_nanos < *time_nanos {
-                        latest_timestamp_nanos = *time_nanos;
-                    }
-
-                    let time = timeval_from_time(zx::Time::from_nanos(*time_nanos));
-                    let pointer_id = id.pointer_id;
-                    let slot_id = self.pointer_id_to_slot_id.get(&pointer_id).copied();
-
-                    match phase {
-                        FidlEventPhase::Add => match slot_id {
-                            None => {
-                                let new_slot_id = match self.available_slot_id() {
-                                    Some(index) => index,
-                                    None => {
-                                        log_warn!("no more available slot id");
-                                        self.reset_state();
-                                        count_ignored_fidl_events += 1;
-                                        continue;
-                                    }
-                                };
-
-                                count_converted_fidl_events += 1;
-                                self.pointer_id_to_slot_id.insert(pointer_id, new_slot_id);
-
-                                new_slots.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_SLOT as u16,
-                                    value: new_slot_id as i32,
-                                });
-
-                                new_slots.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_TRACKING_ID as u16,
-                                    value: pointer_id as i32,
-                                });
-
-                                new_slots.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_POSITION_X as u16,
-                                    value: *x as i32,
-                                });
-
-                                new_slots.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_POSITION_Y as u16,
-                                    value: *y as i32,
-                                });
-                            }
-                            Some(_) => {
-                                log_warn!("receive pointer add already added");
-                                self.reset_state();
-                                count_ignored_fidl_events += 1;
-                                continue;
-                            }
-                        },
-                        FidlEventPhase::Change => match slot_id {
-                            None => {
-                                log_warn!("receive never seen pointer change");
-                                self.reset_state();
-                                count_ignored_fidl_events += 1;
-                                continue;
-                            }
-                            Some(slot_id) => {
-                                count_converted_fidl_events += 1;
-                                existing_slot.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_SLOT as u16,
-                                    value: slot_id as i32,
-                                });
-
-                                existing_slot.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_POSITION_X as u16,
-                                    value: *x as i32,
-                                });
-
-                                existing_slot.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_POSITION_Y as u16,
-                                    value: *y as i32,
-                                });
-                            }
-                        },
-                        FidlEventPhase::Remove => match slot_id {
-                            None => {
-                                log_warn!("receive never seen pointer remove");
-                                self.reset_state();
-                                count_ignored_fidl_events += 1;
-                                continue;
-                            }
-                            Some(slot_id) => {
-                                count_converted_fidl_events += 1;
-                                self.pointer_id_to_slot_id.remove(&pointer_id);
-
-                                existing_slot.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_SLOT as u16,
-                                    value: slot_id as i32,
-                                });
-
-                                existing_slot.push(uapi::input_event {
-                                    time: time,
-                                    type_: uapi::EV_ABS as u16,
-                                    code: uapi::ABS_MT_TRACKING_ID as u16,
-                                    value: LIFTED_TRACKING_ID,
-                                });
-                            }
-                        },
-                        FidlEventPhase::Cancel => {
-                            log_warn!("Input pipeline does not send out Cancel.");
-                            self.reset_state();
-                            count_ignored_fidl_events += 1;
-                            continue;
-                        }
-                    }
+        let mut sequences: BTreeMap<TimeNanos, Vec<TouchEvent>> = BTreeMap::new();
+        for event in events.into_iter() {
+            match TouchEvent::try_from(event) {
+                Ok(e) => {
+                    sequences.entry(e.time_nanos).or_default().push(e);
                 }
-
-                _ => {
-                    // These event can be ignored.
+                Err(_) => {
                     count_ignored_fidl_events += 1;
-                    continue;
                 }
             }
         }
 
-        existing_slot.append(&mut new_slots);
+        if sequences.is_empty() {
+            return (VecDeque::new(), 0, count_ignored_fidl_events, 0);
+        }
 
-        if existing_slot.len() > 0 {
-            existing_slot.push(uapi::input_event {
-                time: timeval_from_time(zx::Time::from_nanos(latest_timestamp_nanos)),
+        let mut count_converted_fidl_events: u64 = 0;
+        let mut count_unexpected_fidl_events: u64 = 0;
+        let mut result: VecDeque<uapi::input_event> = VecDeque::new();
+
+        for (time_nanos, seq) in sequences.iter() {
+            let count_events = seq.len() as u64;
+            match self.translate_sequence(*time_nanos, seq) {
+                Ok(mut res) => {
+                    result.append(&mut res);
+                    count_converted_fidl_events += count_events;
+                }
+                Err(e) => {
+                    count_unexpected_fidl_events += count_events;
+                    self.reset_state();
+                    log_warn!("{}", e);
+                }
+            }
+        }
+
+        (
+            result,
+            count_converted_fidl_events,
+            count_ignored_fidl_events,
+            count_unexpected_fidl_events,
+        )
+    }
+
+    /// Translates a vec of fidl FidlTouchEvent to Linux Multi Touch Protocol B sequence. Caller
+    /// ensures the given vec does not include duplicated pointer, and all event includes same
+    /// timestamp.
+    ///
+    /// Return err for unexpected events which should be filtered in earlier component:
+    /// input-pipeline and scenic. If 1 event is unexpected, translate_sequence() drops all events
+    /// from the same scan from driver.
+    fn translate_sequence(
+        &mut self,
+        time_nanos: TimeNanos,
+        events: &Vec<TouchEvent>,
+    ) -> Result<VecDeque<uapi::input_event>, TouchEventConversionError> {
+        let mut existing_slot: VecDeque<uapi::input_event> = VecDeque::new();
+        let mut new_slots: VecDeque<uapi::input_event> = VecDeque::new();
+
+        let time = timeval_from_time(zx::Time::from_nanos(time_nanos));
+
+        let no_contact_before_process_events = self.pointer_id_to_slot_id.is_empty();
+        let mut need_btn_touch_down = false;
+        let mut need_btn_touch_up = false;
+
+        // TODO(https://fxbug.dev/314151713): use event.device_info to route event to different
+        // device file.
+
+        for (index, event) in events.iter().enumerate() {
+            let pointer_id = event.pointer_id;
+            let slot_id = self.pointer_id_to_slot_id.get(&pointer_id).copied();
+
+            match event.phase {
+                FidlEventPhase::Add => match slot_id {
+                    None => {
+                        let new_slot_id = match self.available_slot_id() {
+                            Some(index) => index,
+                            None => {
+                                return Err(TouchEventConversionError::NoMoreAvailableSlotId);
+                            }
+                        };
+
+                        if no_contact_before_process_events {
+                            need_btn_touch_down = true;
+                        }
+
+                        self.pointer_id_to_slot_id.insert(pointer_id, new_slot_id);
+
+                        new_slots.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_SLOT as u16,
+                            value: new_slot_id as i32,
+                        });
+
+                        new_slots.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_TRACKING_ID as u16,
+                            value: pointer_id as i32,
+                        });
+
+                        new_slots.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_POSITION_X as u16,
+                            value: event.x,
+                        });
+
+                        new_slots.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_POSITION_Y as u16,
+                            value: event.y,
+                        });
+                    }
+                    Some(_) => {
+                        return Err(TouchEventConversionError::PointerAdded);
+                    }
+                },
+                FidlEventPhase::Change => match slot_id {
+                    None => {
+                        return Err(TouchEventConversionError::PointerNotFound);
+                    }
+                    Some(slot_id) => {
+                        existing_slot.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_SLOT as u16,
+                            value: slot_id as i32,
+                        });
+
+                        existing_slot.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_POSITION_X as u16,
+                            value: event.x,
+                        });
+
+                        existing_slot.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_POSITION_Y as u16,
+                            value: event.y,
+                        });
+                    }
+                },
+                FidlEventPhase::Remove => match slot_id {
+                    None => {
+                        return Err(TouchEventConversionError::PointerNotFound);
+                    }
+                    Some(slot_id) => {
+                        self.pointer_id_to_slot_id.remove(&pointer_id);
+
+                        // Ensure BTN_TOUCH up event is only sent when the last pointer is lifted.
+                        // Here check if the event is the last event from the vec prevents a false
+                        // BTN_TOUCH up event if any error reset_state of this converter.
+                        if index == events.len() - 1 && self.pointer_id_to_slot_id.is_empty() {
+                            need_btn_touch_up = true;
+                        }
+
+                        existing_slot.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_SLOT as u16,
+                            value: slot_id as i32,
+                        });
+
+                        existing_slot.push_back(uapi::input_event {
+                            time,
+                            type_: uapi::EV_ABS as u16,
+                            code: uapi::ABS_MT_TRACKING_ID as u16,
+                            value: LIFTED_TRACKING_ID,
+                        });
+                    }
+                },
+                FidlEventPhase::Cancel => {
+                    return Err(TouchEventConversionError::PointerCancel);
+                }
+            }
+        }
+
+        let mut result: VecDeque<uapi::input_event> = VecDeque::new();
+
+        if need_btn_touch_down {
+            result.push_back(uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::BTN_TOUCH as u16,
+                value: 1,
+            });
+        } else if need_btn_touch_up {
+            result.push_back(uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::BTN_TOUCH as u16,
+                value: 0,
+            });
+        }
+
+        result.append(&mut existing_slot);
+        result.append(&mut new_slots);
+
+        if result.len() > 0 {
+            result.push_back(uapi::input_event {
+                time,
                 type_: uapi::EV_SYN as u16,
                 code: uapi::SYN_REPORT as u16,
                 value: 0,
             });
         }
 
-        (existing_slot, count_converted_fidl_events, count_ignored_fidl_events)
+        Ok(result)
     }
 
     fn reset_state(&mut self) {
@@ -1735,14 +1852,15 @@ mod touchscreen_fuchsia_linux_tests {
     use pretty_assertions::assert_eq;
     use test_case::test_case;
 
-    fn make_touch_event_with_coords_phase_id(
+    fn make_touch_event_with_coords_phase_id_time(
         x: f32,
         y: f32,
         phase: FidlEventPhase,
         pointer_id: u32,
-    ) -> TouchEvent {
-        TouchEvent {
-            timestamp: Some(0),
+        time_nanos: i64,
+    ) -> FidlTouchEvent {
+        FidlTouchEvent {
+            timestamp: Some(time_nanos),
             pointer_sample: Some(TouchPointerSample {
                 position_in_viewport: Some([x, y]),
                 phase: Some(phase),
@@ -1757,16 +1875,49 @@ mod touchscreen_fuchsia_linux_tests {
         }
     }
 
-    fn make_uapi_input_event(ty: u32, code: u32, value: i32) -> uapi::input_event {
+    fn make_touch_event_with_coords_phase_id(
+        x: f32,
+        y: f32,
+        phase: FidlEventPhase,
+        pointer_id: u32,
+    ) -> FidlTouchEvent {
+        make_touch_event_with_coords_phase_id_time(x, y, phase, pointer_id, 0)
+    }
+
+    fn make_uapi_input_event_with_time(
+        ty: u32,
+        code: u32,
+        value: i32,
+        time_nanos: i64,
+    ) -> uapi::input_event {
         uapi::input_event {
-            time: timeval_from_time(zx::Time::from_nanos(0)),
+            time: timeval_from_time(zx::Time::from_nanos(time_nanos)),
             type_: ty as u16,
             code: code as u16,
             value,
         }
     }
 
-    #[test_case(TouchEvent::default(); "not enough fields")]
+    fn make_uapi_input_event(ty: u32, code: u32, value: i32) -> uapi::input_event {
+        make_uapi_input_event_with_time(ty, code, value, 0)
+    }
+
+    #[test_case(FidlTouchEvent::default(); "not enough fields")]
+    fn ignored_events(e: FidlTouchEvent) {
+        let mut converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
+        let _ = converter.handle(vec![make_touch_event_with_coords_phase_id(
+            10.0,
+            20.0,
+            FidlEventPhase::Add,
+            1,
+        )]);
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![e]);
+        assert_eq!(out, vec![]);
+        assert_eq!(count_converted, 0);
+        assert_eq!(count_ignored, 1);
+        assert_eq!(count_unexpected, 0);
+    }
+
     #[test_case(make_touch_event_with_coords_phase_id(
         1.0,
         2.0,
@@ -1791,7 +1942,7 @@ mod touchscreen_fuchsia_linux_tests {
         FidlEventPhase::Cancel,
         1,
     ); "touch cancel")]
-    fn ignored_events(e: TouchEvent) {
+    fn unexpected_events(e: FidlTouchEvent) {
         let mut converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
         let _ = converter.handle(vec![make_touch_event_with_coords_phase_id(
             10.0,
@@ -1799,16 +1950,17 @@ mod touchscreen_fuchsia_linux_tests {
             FidlEventPhase::Add,
             1,
         )]);
-        let (out, count_converted, count_ignored) = converter.handle(vec![e]);
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![e]);
         assert_eq!(out, vec![]);
         assert_eq!(count_converted, 0);
-        assert_eq!(count_ignored, 1);
+        assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 1);
     }
 
     #[test]
     fn touch_add() {
         let mut converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
-        let (out, count_converted, count_ignored) =
+        let (out, count_converted, count_ignored, count_unexpected) =
             converter.handle(vec![make_touch_event_with_coords_phase_id(
                 10.0,
                 20.0,
@@ -1819,6 +1971,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10),
@@ -1828,6 +1981,7 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 1);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         let mut want_converter =
             FuchsiaTouchEventToLinuxTouchEventConverter { pointer_id_to_slot_id: HashMap::new() };
@@ -1846,7 +2000,7 @@ mod touchscreen_fuchsia_linux_tests {
             FidlEventPhase::Add,
             1,
         )]);
-        let (out, count_converted, count_ignored) =
+        let (out, count_converted, count_ignored, count_unexpected) =
             converter.handle(vec![make_touch_event_with_coords_phase_id(
                 11.0,
                 21.0,
@@ -1865,6 +2019,7 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 1);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         let mut want_converter =
             FuchsiaTouchEventToLinuxTouchEventConverter { pointer_id_to_slot_id: HashMap::new() };
@@ -1883,7 +2038,7 @@ mod touchscreen_fuchsia_linux_tests {
             FidlEventPhase::Add,
             1,
         )]);
-        let (out, count_converted, count_ignored) =
+        let (out, count_converted, count_ignored, count_unexpected) =
             converter.handle(vec![make_touch_event_with_coords_phase_id(
                 0.0,
                 0.0,
@@ -1892,10 +2047,12 @@ mod touchscreen_fuchsia_linux_tests {
             )]);
         assert_eq!(count_converted, 1);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1),
                 make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
@@ -1921,7 +2078,7 @@ mod touchscreen_fuchsia_linux_tests {
         )]);
 
         // The second pointer down, and the first pointer move.
-        let (out, count_converted, count_ignored) = converter.handle(vec![
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
             make_touch_event_with_coords_phase_id(11.0, 21.0, FidlEventPhase::Change, 1),
             make_touch_event_with_coords_phase_id(100.0, 200.0, FidlEventPhase::Add, 2),
         ]);
@@ -1941,6 +2098,7 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 2);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         let mut want_converter =
             FuchsiaTouchEventToLinuxTouchEventConverter { pointer_id_to_slot_id: HashMap::new() };
@@ -1951,7 +2109,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(converter, want_converter);
 
         // Both pointer move.
-        let (out, count_converted, count_ignored) = converter.handle(vec![
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
             make_touch_event_with_coords_phase_id(12.0, 22.0, FidlEventPhase::Change, 1),
             make_touch_event_with_coords_phase_id(101.0, 201.0, FidlEventPhase::Change, 2),
         ]);
@@ -1970,10 +2128,11 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 2);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
         assert_eq!(converter, want_converter);
 
         // The second pointer up, and the first pointer move.
-        let (out, count_converted, count_ignored) = converter.handle(vec![
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
             make_touch_event_with_coords_phase_id(12.0, 22.0, FidlEventPhase::Change, 1),
             make_touch_event_with_coords_phase_id(0.0, 0.0, FidlEventPhase::Remove, 2),
         ]);
@@ -1991,13 +2150,14 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 2);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         want_converter.pointer_id_to_slot_id.remove(&2);
 
         assert_eq!(converter, want_converter);
 
         // The third pointer down, and the first pointer move.
-        let (out, count_converted, count_ignored) = converter.handle(vec![
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
             make_touch_event_with_coords_phase_id(12.0, 22.0, FidlEventPhase::Change, 1),
             make_touch_event_with_coords_phase_id(50.0, 60.0, FidlEventPhase::Add, 3),
         ]);
@@ -2018,13 +2178,14 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 2);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         want_converter.pointer_id_to_slot_id.insert(3, 1);
 
         assert_eq!(converter, want_converter);
 
         // The third pointer up, and the first pointer move.
-        let (out, count_converted, count_ignored) = converter.handle(vec![
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
             make_touch_event_with_coords_phase_id(12.0, 22.0, FidlEventPhase::Change, 1),
             make_touch_event_with_coords_phase_id(0.0, 0.0, FidlEventPhase::Remove, 3),
         ]);
@@ -2042,13 +2203,14 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 2);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         want_converter.pointer_id_to_slot_id.remove(&3);
 
         assert_eq!(converter, want_converter);
 
         // The first pointer up.
-        let (out, count_converted, count_ignored) =
+        let (out, count_converted, count_ignored, count_unexpected) =
             converter.handle(vec![make_touch_event_with_coords_phase_id(
                 0.0,
                 0.0,
@@ -2059,6 +2221,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1),
                 make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
@@ -2066,6 +2229,7 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 1);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         want_converter.pointer_id_to_slot_id = HashMap::new();
 
@@ -2077,7 +2241,7 @@ mod touchscreen_fuchsia_linux_tests {
         let mut converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
 
         // 2 pointer down.
-        let (out, count_converted, count_ignored) = converter.handle(vec![
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
             make_touch_event_with_coords_phase_id(10.0, 20.0, FidlEventPhase::Add, 1),
             make_touch_event_with_coords_phase_id(100.0, 200.0, FidlEventPhase::Add, 2),
         ]);
@@ -2085,6 +2249,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(
             out,
             vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1),
                 make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10),
@@ -2098,6 +2263,7 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 2);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
 
         let mut want_converter =
             FuchsiaTouchEventToLinuxTouchEventConverter { pointer_id_to_slot_id: HashMap::new() };
@@ -2108,7 +2274,7 @@ mod touchscreen_fuchsia_linux_tests {
         assert_eq!(converter, want_converter);
 
         // 1st pointer move, no event for 2nd pointer.
-        let (out, count_converted, count_ignored) =
+        let (out, count_converted, count_ignored, count_unexpected) =
             converter.handle(vec![make_touch_event_with_coords_phase_id(
                 12.0,
                 22.0,
@@ -2127,6 +2293,81 @@ mod touchscreen_fuchsia_linux_tests {
         );
         assert_eq!(count_converted, 1);
         assert_eq!(count_ignored, 0);
+        assert_eq!(count_unexpected, 0);
+        assert_eq!(converter, want_converter);
+    }
+
+    #[test]
+    fn handle_return_multi_protocl_b_seq() {
+        let mut converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
+
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
+            // ignore
+            FidlTouchEvent::default(),
+            make_touch_event_with_coords_phase_id_time(10.0, 20.0, FidlEventPhase::Add, 1, 1),
+            make_touch_event_with_coords_phase_id_time(11.0, 21.0, FidlEventPhase::Change, 1, 1000),
+        ]);
+
+        assert_eq!(
+            out,
+            vec![
+                make_uapi_input_event_with_time(uapi::EV_KEY, uapi::BTN_TOUCH, 1, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20, 1),
+                make_uapi_input_event_with_time(uapi::EV_SYN, uapi::SYN_REPORT, 0, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 1000),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 11, 1000),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 21, 1000),
+                make_uapi_input_event_with_time(uapi::EV_SYN, uapi::SYN_REPORT, 0, 1000),
+            ]
+        );
+        assert_eq!(count_converted, 2);
+        assert_eq!(count_ignored, 1);
+        assert_eq!(count_unexpected, 0);
+
+        let mut want_converter =
+            FuchsiaTouchEventToLinuxTouchEventConverter { pointer_id_to_slot_id: HashMap::new() };
+
+        want_converter.pointer_id_to_slot_id.insert(1, 0);
+        assert_eq!(converter, want_converter);
+    }
+
+    #[test]
+    fn handle_unsorted_events() {
+        let mut converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
+
+        let (out, count_converted, count_ignored, count_unexpected) = converter.handle(vec![
+            // ignore
+            FidlTouchEvent::default(),
+            make_touch_event_with_coords_phase_id_time(11.0, 21.0, FidlEventPhase::Change, 1, 1000),
+            make_touch_event_with_coords_phase_id_time(10.0, 20.0, FidlEventPhase::Add, 1, 1),
+        ]);
+
+        assert_eq!(
+            out,
+            vec![
+                make_uapi_input_event_with_time(uapi::EV_KEY, uapi::BTN_TOUCH, 1, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20, 1),
+                make_uapi_input_event_with_time(uapi::EV_SYN, uapi::SYN_REPORT, 0, 1),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 1000),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 11, 1000),
+                make_uapi_input_event_with_time(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 21, 1000),
+                make_uapi_input_event_with_time(uapi::EV_SYN, uapi::SYN_REPORT, 0, 1000),
+            ]
+        );
+        assert_eq!(count_converted, 2);
+        assert_eq!(count_ignored, 1);
+        assert_eq!(count_unexpected, 0);
+
+        let mut want_converter =
+            FuchsiaTouchEventToLinuxTouchEventConverter { pointer_id_to_slot_id: HashMap::new() };
+
+        want_converter.pointer_id_to_slot_id.insert(1, 0);
         assert_eq!(converter, want_converter);
     }
 }

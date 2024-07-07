@@ -20,7 +20,7 @@ impl Dict {
     pub fn serve(&self, stream: fsandbox::DictionaryRequestStream) {
         let mut clone = self.clone();
         let mut this = self.lock();
-        this.tasks.spawn(async move {
+        this.tasks().spawn(async move {
             let _ = clone.do_serve(stream).await;
         });
     }
@@ -80,13 +80,13 @@ impl Dict {
                     let items = self.enumerate();
                     let stream = server_end.into_stream().unwrap();
                     let mut this = self.lock();
-                    this.tasks.spawn(serve_enumerate_iterator(items, stream));
+                    this.tasks().spawn(serve_enumerate_iterator(items, stream));
                 }
                 fsandbox::DictionaryRequest::Keys { iterator: server_end, .. } => {
                     let keys = self.keys().collect();
                     let stream = server_end.into_stream().unwrap();
                     let mut this = self.lock();
-                    this.tasks.spawn(serve_keys_iterator(keys, stream));
+                    this.tasks().spawn(serve_keys_iterator(keys, stream));
                 }
                 fsandbox::DictionaryRequest::Drain { iterator: server_end, .. } => {
                     // Take out entries, replacing with an empty BTreeMap.
@@ -95,7 +95,7 @@ impl Dict {
                         let items = self.drain();
                         let stream = server_end.into_stream().unwrap();
                         let mut this = self.lock();
-                        this.tasks.spawn(serve_drain_iterator(items, stream));
+                        this.tasks().spawn(serve_drain_iterator(items, stream));
                     }
                 }
                 fsandbox::DictionaryRequest::_UnknownMethod { ordinal, .. } => {

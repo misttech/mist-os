@@ -226,6 +226,7 @@ rustc_library("starnix_core") {
     "testing.rs",
     "time/mod.rs",
     "time/utc.rs",
+    "timer/mod.rs",
     "vdso/mod.rs",
     "vdso/vdso_loader.rs",
     "vfs/aio.rs",
@@ -609,6 +610,7 @@ rustc_library("starnix_sync") {
   deps = [
     "//src/lib/fuchsia-sync",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/kernel/sync/lock_ordering_macro",
     "//third_party/rust_crates:lock_api",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:static_assertions",

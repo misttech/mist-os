@@ -23,11 +23,23 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+
+  python_host_test("inspect_ffx_test") {
+    enable_mypy = true
+    main_source = "inspect_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
 }
 
 group("tests") {
   testonly = true
   public_deps = [
+    ":inspect_ffx_test($host_toolchain)",
     ":screenshot_ffx_test($host_toolchain)",
     ":session_ffx_test($host_toolchain)",
   ]

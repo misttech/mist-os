@@ -112,7 +112,7 @@ command:
 
 ### Registers in expressions
 
-Registers can be used in [expressions](printing.md) like variables. The canonical name of a register
+Registers can be used in [expressions](expressions.md) like variables. The canonical name of a register
 is `$reg(register name)`.
 
 ```none {:.devsite-disable-click-to-copy}

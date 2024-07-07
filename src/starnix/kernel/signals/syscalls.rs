@@ -881,7 +881,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigaltstack() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let user_ss = UserRef::<sigaltstack>::new(addr);
         let nullptr = UserRef::<sigaltstack>::default();
@@ -924,7 +924,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigaltstack_invalid_size() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let user_ss = UserRef::<sigaltstack>::new(addr);
         let nullptr = UserRef::<sigaltstack>::default();
@@ -938,8 +938,12 @@ mod tests {
         // Try to install a sigaltstack with an invalid size.
         let sigaltstack_addr_size =
             round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
-        let sigaltstack_addr =
-            map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
+        let sigaltstack_addr = map_memory(
+            &mut locked,
+            &current_task,
+            UserAddress::default(),
+            sigaltstack_addr_size as u64,
+        );
         ss.ss_sp = sigaltstack_addr.into();
         ss.ss_flags = 0;
         ss.ss_size = MINSIGSTKSZ as u64 - 1;
@@ -951,7 +955,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigaltstack_active_stack() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let user_ss = UserRef::<sigaltstack>::new(addr);
         let nullptr = UserRef::<sigaltstack>::default();
@@ -965,8 +969,12 @@ mod tests {
         // Try to install a sigaltstack.
         let sigaltstack_addr_size =
             round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
-        let sigaltstack_addr =
-            map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
+        let sigaltstack_addr = map_memory(
+            &mut locked,
+            &current_task,
+            UserAddress::default(),
+            sigaltstack_addr_size as u64,
+        );
         ss.ss_sp = sigaltstack_addr.into();
         ss.ss_flags = 0;
         ss.ss_size = sigaltstack_addr_size as u64;
@@ -995,7 +1003,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigaltstack_active_stack_saturates() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let user_ss = UserRef::<sigaltstack>::new(addr);
         let nullptr = UserRef::<sigaltstack>::default();
@@ -1009,8 +1017,12 @@ mod tests {
         // Try to install a sigaltstack that takes the whole memory.
         let sigaltstack_addr_size =
             round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
-        let sigaltstack_addr =
-            map_memory(&current_task, UserAddress::default(), sigaltstack_addr_size as u64);
+        let sigaltstack_addr = map_memory(
+            &mut locked,
+            &current_task,
+            UserAddress::default(),
+            sigaltstack_addr_size as u64,
+        );
         ss.ss_sp = sigaltstack_addr.into();
         ss.ss_flags = 0;
         ss.ss_size = u64::MAX;
@@ -1071,7 +1083,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigprocmask_invalid_how() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
 
         let set = UserRef::<SigSet>::new(addr);
         let old_set = UserRef::<SigSet>::default();
@@ -1095,7 +1107,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigprocmask_null_set() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let original_mask = SigSet::from(SIGTRAP);
         {
             current_task.write().set_signal_mask(original_mask);
@@ -1157,7 +1169,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigprocmask_setmask() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
@@ -1195,7 +1207,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigprocmask_block() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
@@ -1233,7 +1245,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigprocmask_unblock() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
@@ -1271,7 +1283,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigprocmask_unblock_not_set() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
@@ -1309,7 +1321,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigprocmask_kill_stop() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
@@ -1387,7 +1399,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigaction_old_value_set() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction>()])
             .expect("failed to clear struct");
@@ -1419,7 +1431,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_sigaction_new_value_set() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction>()])
             .expect("failed to clear struct");
@@ -1549,7 +1561,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_blocked_signal_pending() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
@@ -1581,7 +1593,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_blocked_real_time_signal_pending() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
@@ -1634,7 +1646,7 @@ mod tests {
             assert!(!init_task_temp.read().is_blocked());
         });
 
-        let addr = map_memory(&init_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &init_task, UserAddress::default(), *PAGE_SIZE);
         let user_ref = UserRef::<SigSet>::new(addr);
 
         let sigset = !SigSet::from(SIGHUP);
@@ -1849,8 +1861,12 @@ mod tests {
         std::mem::drop(child);
 
         // Retrieve the exit status.
-        let address =
-            map_memory(&current_task, UserAddress::default(), std::mem::size_of::<i32>() as u64);
+        let address = map_memory(
+            &mut locked,
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<i32>() as u64,
+        );
         let address_ref = UserRef::<i32>::new(address);
         sys_wait4(&mut locked, &current_task, -1, address_ref, 0, UserRef::default())
             .expect("wait4");
@@ -1868,8 +1884,12 @@ mod tests {
         std::mem::drop(child);
 
         // Retrieve the exit status.
-        let address =
-            map_memory(&current_task, UserAddress::default(), std::mem::size_of::<i32>() as u64);
+        let address = map_memory(
+            &mut locked,
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<i32>() as u64,
+        );
         let address_ref = UserRef::<i32>::new(address);
         sys_wait4(&mut locked, &current_task, -1, address_ref, 0, UserRef::default())
             .expect("wait4");
@@ -1928,7 +1948,7 @@ mod tests {
         child2.thread_group.exit(ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
-        let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let address = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         assert_eq!(
             sys_waitid(
                 &mut locked,
@@ -1974,7 +1994,7 @@ mod tests {
         data[UID_DATA_OFFSET..UID_DATA_OFFSET + 4].copy_from_slice(&current_uid.to_ne_bytes());
         data[VALUE_DATA_OFFSET..VALUE_DATA_OFFSET + 8].copy_from_slice(&TEST_VALUE.to_ne_bytes());
 
-        let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(addr, &data).unwrap();
         let second_current = create_task(&mut locked, &kernel, "second task");
         let second_pid = second_current.get_pid();

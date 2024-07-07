@@ -207,5 +207,5 @@ async fn main() -> Result<(), Error> {
     logger_init();
     let command: net_cli::Command = argh::from_env();
     let connector = Connector::new()?;
-    net_cli::do_root(ffx_writer::Writer::new(None), command, &connector).await
+    net_cli::do_root(ffx_writer::MachineWriter::new(None), command, &connector).await
 }

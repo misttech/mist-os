@@ -129,6 +129,21 @@ executable("process_launch_failure_unittest_exe") {
   ]
 }
 
+executable("wake_lease_integration_test_exe") {
+  testonly = true
+
+  sources = [ "wake_lease_integration_test.cc" ]
+
+  deps = [
+    "//sdk/lib/component/incoming/cpp",
+    "//src/developer/forensics/exceptions:constants",
+    "//src/developer/forensics/exceptions/handler:lib",
+    "//src/developer/forensics/testing:gtest_with_syslog_main",
+    "//src/lib/testing/loop_fixture",
+    "//third_party/googletest:gtest",
+  ]
+}
+
 executable("wake_lease_unittest_exe") {
   testonly = true
 
@@ -195,7 +210,6 @@ fuchsia_component("exception_broker_config_test") {
   ]
 }
 
-# TODO(https://fxbug.dev/333110044): Test with suspend enabled/disabled.
 fuchsia_test_component("exception_broker_integration_test") {
   manifest = "meta/exception_broker_integration_test.cml"
 
@@ -207,6 +221,12 @@ fuchsia_test_component("exception_broker_integration_test") {
 
   # Depends on config_data which is a system capability.
   test_type = "system"
+}
+
+fuchsia_test_component("wake_lease_integration_test") {
+  manifest = "meta/wake_lease_integration_test.cml"
+
+  deps = [ ":wake_lease_integration_test_exe" ]
 }
 
 fuchsia_component_manifest("config_suspend_disabled") {
@@ -277,6 +297,16 @@ fuchsia_test_package("exception-broker-integration-test") {
   ]
 }
 
+fuchsia_test_package("wake-lease-integration-test") {
+  test_components = [ ":wake_lease_integration_test" ]
+
+  deps = [
+    # Other components that we are injecting in the integration tests.
+    "//src/power/broker:component",
+    "//src/power/system-activity-governor:component",
+  ]
+}
+
 ###############################################################################
 # GROUPS
 ###############################################################################
@@ -286,6 +316,7 @@ group("tests") {
   public_deps = [
     ":exception-broker-integration-test",
     ":exception-broker-tests",
+    ":wake-lease-integration-test",
   ]
 
   visibility += [ "//src/developer/forensics:tests" ]

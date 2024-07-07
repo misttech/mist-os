@@ -21,6 +21,7 @@
 #include <linux/netlink.h>
 #include <linux/taskstats.h>
 
+#include "gtest/gtest.h"
 #include "syscall_matchers.h"
 
 #define SAFE_SYSCALL(X)                                                             \
@@ -36,7 +37,7 @@
 #define SAFE_SYSCALL_SKIP_ON_EPERM(X)                                                 \
   ({                                                                                  \
     auto retval = (X);                                                                \
-    if (retval < 0 && errno == EPERM) {                                               \
+    if (retval < 0) {                                                                 \
       if (errno == EPERM) {                                                           \
         GTEST_SKIP() << "Permission denied for " << #X << ", skipping tests.";        \
       } else {                                                                        \
@@ -366,6 +367,11 @@ void DropAllCapabilities();
 
 // Checks if a capability is in the effective set.
 bool HasCapability(int cap);
+
+enum AccessType { Read, Write };
+
+// Checks whether the provided access segfaults.
+testing::AssertionResult TestThatAccessSegfaults(void *test_address, AccessType type);
 
 }  // namespace test_helper
 

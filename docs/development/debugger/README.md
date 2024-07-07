@@ -121,11 +121,11 @@ core/cobalt
 
 Once you have successfully connected to the `zxdb` debugger, you may want to:
 
-* [Review commands and the interaction model][zxdb-commands]
+* [Get started with zxdb][zxdb-commands]
+* [Use breakpoints][zxdb-breakpoints]
 * [Debug tests using zxdb][zxdb-tests]
 * [Control thread execution][zxdb-execution] (pausing, stepping, and resuming)
-* [Use breakpoints][zxdb-breakpoints]
-* [Evaluate and print expressions][zxdb-printing]
+* [Evaluate expressions][zxdb-expressions]
 * [Inspect memory][zxdb-memory]
 * [Work with assembly language][zxdb-assembly]
 * [Look at handles][zxdb-kernel-objects]
@@ -139,7 +139,7 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 [zxdb-advanced]: /docs/development/debugger/advanced.md
 [zxdb-execution]: /docs/development/debugger/execution.md
 [zxdb-breakpoints]: /docs/development/debugger/breakpoints.md
-[zxdb-printing]: /docs/development/debugger/printing.md
+[zxdb-expressions]: /docs/development/debugger/expressions.md
 [zxdb-memory]: /docs/development/debugger/memory.md
 [zxdb-assembly]: /docs/development/debugger/assembly.md
 [zxdb-kernel-objects]: /docs/development/debugger/kernel_objects.md

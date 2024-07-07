@@ -43,8 +43,8 @@ Connection::Connection(FuchsiaVfs* vfs, fbl::RefPtr<Vnode> vnode, fuchsia_io::Ri
 Connection::~Connection() {
   // Release the token associated with this connection's vnode since the connection will be
   // releasing the vnode's reference once this function returns.
-  if (token_) {
-    vfs_->TokenDiscard(std::move(token_));
+  if (auto vfs = vfs_.Upgrade(); vfs && token_) {
+    vfs->TokenDiscard(std::move(token_));
   }
 }
 
@@ -70,6 +70,11 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
     if (zx::result validated = vnode()->ValidateOptions(*clone_options); validated.is_error()) {
       return validated.error_value();
     }
+
+    auto vfs = vfs_.Upgrade();
+    if (!vfs)
+      return ZX_ERR_CANCELED;
+
     fbl::RefPtr vn = vnode();
     // We only need to open the Vnode for non-node reference connection.
     if (protocol != VnodeProtocol::kNode) {
@@ -78,7 +83,7 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
       }
     }
     // On failure, |Vfs::Serve()| will close the channel with an epitaph.
-    vfs_->Serve(vn, server_end.TakeChannel(), *clone_options);
+    vfs->Serve(vn, server_end.TakeChannel(), *clone_options);
     return ZX_OK;
   }();
 
@@ -107,7 +112,10 @@ zx::result<> Connection::NodeUpdateAttributes(const VnodeAttributesUpdate& updat
 }
 
 zx::result<fio::wire::FilesystemInfo> Connection::NodeQueryFilesystem() const {
-  zx::result<FilesystemInfo> info = vfs_->GetFilesystemInfo();
+  auto vfs = vfs_.Upgrade();
+  if (!vfs)
+    return zx::error(ZX_ERR_CANCELED);
+  zx::result<FilesystemInfo> info = vfs->GetFilesystemInfo();
   if (info.is_error()) {
     return info.take_error();
   }

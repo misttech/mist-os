@@ -273,7 +273,7 @@ impl CompatibilityProblems {
 
     #[cfg(test)]
     pub fn is_compatible(&self) -> bool {
-        self.0.is_empty()
+        self.has_problems(vec![])
     }
 
     #[cfg(test)]

@@ -32,10 +32,12 @@ pub(crate) struct DictInner {
     #[allow(dead_code)]
     pub(crate) not_found: Arc<dyn Fn(&str) -> () + 'static + Send + Sync>,
 
-    /// Tasks that serve the Dictionary protocol.
+    /// Tasks that serve the Dictionary protocol. This is an `Option` because dictionaries are not
+    /// necessarily used in async contexts but a TaskGroup will fail construction if there is no
+    /// async executor.
     #[cfg(target_os = "fuchsia")]
     #[derivative(Debug = "ignore")]
-    pub(crate) tasks: fasync::TaskGroup,
+    task_group: Option<fasync::TaskGroup>,
 }
 
 impl Default for Dict {
@@ -45,7 +47,7 @@ impl Default for Dict {
                 entries: BTreeMap::new(),
                 not_found: Arc::new(|_key: &str| {}),
                 #[cfg(target_os = "fuchsia")]
-                tasks: fasync::TaskGroup::new(),
+                task_group: None,
             })),
         }
     }
@@ -65,7 +67,7 @@ impl Dict {
                 entries: BTreeMap::new(),
                 not_found: Arc::new(not_found),
                 #[cfg(target_os = "fuchsia")]
-                tasks: fasync::TaskGroup::new(),
+                task_group: None,
             })),
         }
     }
@@ -164,5 +166,12 @@ impl Dict {
             let _ = std::mem::replace(&mut copy.entries, copied_entries);
         }
         Ok(copy)
+    }
+}
+
+impl DictInner {
+    #[cfg(target_os = "fuchsia")]
+    pub(crate) fn tasks(&mut self) -> &mut fasync::TaskGroup {
+        self.task_group.get_or_insert_with(|| fasync::TaskGroup::new())
     }
 }

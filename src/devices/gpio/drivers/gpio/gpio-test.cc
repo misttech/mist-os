@@ -8,12 +8,13 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 
 #include <optional>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <ddk/metadata/gpio.h>
+#include <gtest/gtest.h>
 #include <sdk/lib/driver/testing/cpp/driver_runtime.h>
 #include <src/lib/testing/predicates/status.h>
 
@@ -154,7 +155,7 @@ class FixtureConfig final {
   using EnvironmentType = GpioTestEnvironment;
 };
 
-class GpioTest : public fdf_testing::DriverTestFixture<FixtureConfig> {
+class GpioTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
  protected:
   MockGpioImpl::PinState pin_state(uint32_t index) {
     return RunInEnvironmentTypeContext<MockGpioImpl::PinState>(

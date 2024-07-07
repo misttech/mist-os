@@ -24,7 +24,6 @@
         {
             name: "perfetto-bridge",
             url: "perfetto-bridge#meta/perfetto-bridge.cm",
-            startup: "eager",
         },
     ],
     collections: [

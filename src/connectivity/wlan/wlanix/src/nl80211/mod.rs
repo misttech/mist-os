@@ -10,7 +10,6 @@ use netlink_packet_utils::{DecodeError, Parseable};
 use std::convert::TryInto;
 
 mod attr;
-#[allow(unused)]
 mod cmd;
 #[allow(unused)]
 mod constants;

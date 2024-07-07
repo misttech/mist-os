@@ -258,6 +258,8 @@
             protocol: "fuchsia.ui.brightness.Control",
             from: "#brightness_manager",
             to: "#sshd-host",
+            availability: "optional",
+            source_availability: "unknown",
         },
         {
             protocol: [

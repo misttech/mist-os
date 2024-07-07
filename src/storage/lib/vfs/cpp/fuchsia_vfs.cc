@@ -85,9 +85,46 @@ fuchsia_io::wire::FilesystemInfo FilesystemInfo::ToFidl() const {
   return out;
 }
 
-FuchsiaVfs::FuchsiaVfs(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+FuchsiaVfs::SharedPtr& FuchsiaVfs::SharedPtr::operator=(const FuchsiaVfs::SharedPtr& other) {
+  if (this == &other)
+    return *this;
+  Reset();
+  vfs_ = other.vfs_;
+  if (vfs_)
+    vfs_->ref_->strong_count.fetch_add(1);
+  return *this;
+}
 
-FuchsiaVfs::~FuchsiaVfs() = default;
+void FuchsiaVfs::SharedPtr::Reset() {
+  if (vfs_) {
+    if (vfs_->ref_->strong_count.fetch_sub(1) == 1) {
+      sync_completion_signal(&vfs_->done_);
+      // And now drop the implicit weak reference.
+      WeakPtr weak(vfs_->ref_);
+    }
+    vfs_ = nullptr;
+  }
+}
+
+FuchsiaVfs::SharedPtr FuchsiaVfs::WeakPtr::Upgrade() const {
+  int current = ref_->strong_count.load();
+  while (current > 0) {
+    if (ref_->strong_count.compare_exchange_weak(current, current + 1)) {
+      return SharedPtr(ref_->vfs);
+    }
+  }
+  return SharedPtr(nullptr);
+}
+
+FuchsiaVfs::FuchsiaVfs(async_dispatcher_t* dispatcher)
+    // We start with one strong count and one weak count.  The strong count is returned in
+    // `WillDestroy` and the weak count is returned when the last strong count is returned.
+    : dispatcher_(dispatcher), ref_(new Ref{.strong_count = 1, .weak_count = 1, .vfs = this}) {}
+
+FuchsiaVfs::~FuchsiaVfs() {
+  if (!is_terminating_)
+    WillDestroy();
+}
 
 void FuchsiaVfs::SetDispatcher(async_dispatcher_t* dispatcher) {
   ZX_ASSERT_MSG(!dispatcher_,
@@ -426,6 +463,7 @@ zx::result<> FuchsiaVfs::Serve2Impl(Vfs::Open2Result open_result, fuchsia_io::Ri
   fs::VnodeProtocol protocol = open_result.protocol();
   // Downscope the rights granted to the connection to only include those for this protocol.
   rights = internal::DownscopeRights(rights, protocol);
+
   // Create the connection that will handle requests for this Vnode.
   std::unique_ptr<internal::Connection> connection;
   switch (protocol) {

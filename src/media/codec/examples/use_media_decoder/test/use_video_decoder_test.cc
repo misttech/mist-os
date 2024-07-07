@@ -70,13 +70,12 @@ int use_video_decoder_test(std::string input_file_path, int expected_frame_count
     test_params = &default_test_params;
   }
   test_params->Validate();
-
+  async::Loop fidl_loop(&kAsyncLoopConfigAttachToCurrentThread);
   {
     std::lock_guard<std::mutex> lock(tags_lock);
     fuchsia_logging::SetTags({"use_video_decoder_test"});
   }
 
-  async::Loop fidl_loop(&kAsyncLoopConfigAttachToCurrentThread);
   thrd_t fidl_thread;
   ZX_ASSERT(ZX_OK == fidl_loop.StartThread("FIDL_thread", &fidl_thread));
   std::unique_ptr<sys::ComponentContext> component_context =

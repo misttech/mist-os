@@ -5,13 +5,13 @@
 #include <fidl/test.wlan.fidlbridge/cpp/driver/fidl.h>
 #include <fidl/test.wlan.fidlbridge/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/env.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <gtest/gtest.h>
 #include <wlan/drivers/fidl_bridge.h>
-#include <wlan/drivers/testing/test_helpers.h>
 
 namespace {
 using wlan::drivers::fidl_bridge::ForwardResult;
@@ -91,7 +91,7 @@ class ForwardResultTest : public ::testing::Test {
 
  private:
   ScopedFakeDriver fake_driver_;
-  wlan::drivers::log::testing::UnitTestLogContext log_context{"fidl-bridge-test-logger"};
+  fdf_testing::ScopedGlobalLogger log_context;
 
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;

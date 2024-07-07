@@ -35,6 +35,7 @@ class Logger final {
 
   static Logger* GlobalInstance();
   static void SetGlobalInstance(Logger*);
+  static bool HasGlobalInstance();
 
   Logger(std::string_view name, FuchsiaLogSeverity min_severity, zx::socket socket,
          fidl::WireClient<fuchsia_logger::LogSink> log_sink)

@@ -9,7 +9,6 @@
 #include <lib/ddk/driver.h>
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/compat/cpp/logging.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>

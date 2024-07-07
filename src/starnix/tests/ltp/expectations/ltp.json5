@@ -83,10 +83,6 @@
                 "getitimer01",
                 "getpriority01",
                 "getpriority02",
-                "io_cancel01",
-                "io_cancel02",
-                "io_setup01",
-                "io_setup02",
 
                 // Skipped with tmpfs.
                 "ioctl_loop05",

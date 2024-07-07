@@ -6,20 +6,19 @@
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.hardware.pwm.Service": "fuchsia.hardware.pwm.Service.ZirconTransport",
+                    "fuchsia.hardware.pwm.Service": "fuchsia.hardware.pwm.Service.ZirconTransport"
                 }
             }
         ]
     },
     {
-        "node": "gpio-wifi",
+        "node": "gpio-init",
         "tests": [
             {
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.hardware.gpio.Service": "fuchsia.hardware.gpio.Service.ZirconTransport",
-                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.WIFI_LPO"
+                    "fuchsia.BIND_INIT_STEP": "fuchsia.gpio.BIND_INIT_STEP.GPIO"
                 }
             }
         ]

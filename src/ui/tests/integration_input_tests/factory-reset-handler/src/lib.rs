@@ -13,8 +13,11 @@ use crate::mocks::sound_player_mock::{
 };
 use crate::packaged_component::PackagedComponent;
 use crate::traits::realm_builder_ext::RealmBuilderExt as _;
+use crate::traits::test_realm_component::TestRealmComponent;
 use fidl_fuchsia_ui_pointerinjector as pointerinjector;
-use fuchsia_component_test::{DirectoryContents, RealmBuilder, RealmBuilderParams, RealmInstance};
+use fuchsia_component_test::{
+    Capability, DirectoryContents, RealmBuilder, RealmBuilderParams, RealmInstance,
+};
 use futures::StreamExt;
 use input_synthesis::{modern_backend, synthesizer};
 
@@ -38,11 +41,14 @@ async fn assemble_realm(
     let a11y_test_realm =
         PackagedComponent::new_from_modern_url("a11y-test-realm", "#meta/fake-a11y-manager.cm");
     let scene_manager = PackagedComponent::new_from_modern_url("input-owner", SCENE_MANAGER_URL);
+    let scene_manager_config =
+        PackagedComponent::new_from_modern_url("scene-manager-config", SCENE_MANAGER_CONFIG_URL);
 
     // Add packaged components and mocks to the test realm.
     b.add(&scenic_test_realm).await;
     b.add(&a11y_test_realm).await;
     b.add(&scene_manager).await;
+    b.add(&scene_manager_config).await;
     b.add(&sound_player_mock).await;
     b.add(&pointer_injector_mock).await;
     b.add(&factory_reset_mock).await;
@@ -117,6 +123,18 @@ async fn assemble_realm(
         &scene_manager,
     )
     .await;
+    b.add_route(
+        fuchsia_component_test::Route::new()
+            .capability(Capability::configuration("fuchsia.ui.DisplayPixelDensity"))
+            .capability(Capability::configuration("fuchsia.scenic.DisplayRotation"))
+            .capability(Capability::configuration("fuchsia.ui.IdleThresholdMs"))
+            .capability(Capability::configuration("fuchsia.ui.SupportedInputDevices"))
+            .capability(Capability::configuration("fuchsia.ui.ViewingDistance"))
+            .from(scene_manager_config.ref_())
+            .to(scene_manager.ref_()),
+    )
+    .await
+    .unwrap();
 
     // Allow tests to inject input reports into the input pipeline.
     b.route_to_parent::<fidl_fuchsia_input_injection::InputDeviceRegistryMarker>(&scene_manager)
@@ -163,6 +181,7 @@ const SOUND_PLAYER_NAME: &'static str = "mock_sound_player";
 const POINTER_INJECTOR_NAME: &'static str = "mock_pointer_injector";
 const FACTORY_RESET_NAME: &'static str = "mock_factory_reset";
 const SCENE_MANAGER_URL: &'static str = "#meta/scene_manager.cm";
+const SCENE_MANAGER_CONFIG_URL: &'static str = "#meta/scene_manager_config.cm";
 
 #[fuchsia::test]
 async fn sound_is_played_during_factory_reset() {

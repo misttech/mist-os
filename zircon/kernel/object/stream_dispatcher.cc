@@ -118,7 +118,7 @@ zx_status_t StreamDispatcher::ReadVector(user_out_iovec_t user_data, size_t* out
     length = size_limit - offset;
   }
 
-  status = vmo_->ReadVector(user_data, length, offset, out_actual);
+  status = vmo_->ReadVector(user_data, offset, length, out_actual);
   seek_ += *out_actual;
 
   // Reacquire the lock to commit the operation.
@@ -161,7 +161,7 @@ zx_status_t StreamDispatcher::ReadVectorAt(user_out_iovec_t user_data, zx_off_t 
     length = size_limit - offset;
   }
 
-  status = vmo_->ReadVector(user_data, length, offset, out_actual);
+  status = vmo_->ReadVector(user_data, offset, length, out_actual);
 
   // Reacquire the lock to commit the operation.
   Guard<Mutex> content_size_guard{op.parent()->lock()};
@@ -203,14 +203,14 @@ zx_status_t StreamDispatcher::WriteVector(user_in_iovec_t user_data, size_t* out
 
   if (prev_content_size) {
     status =
-        vmo_->WriteVector(user_data, length, seek_, out_actual,
+        vmo_->WriteVector(user_data, seek_, length, out_actual,
                           [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
                             if (write_offset + len > *prev_content_size) {
                               op.UpdateContentSizeFromProgress(write_offset + len);
                             }
                           });
   } else {
-    status = vmo_->WriteVector(user_data, length, seek_, out_actual);
+    status = vmo_->WriteVector(user_data, seek_, length, out_actual);
   }
 
   // Reacquire the lock to potentially shrink and commit the operation.
@@ -263,14 +263,14 @@ zx_status_t StreamDispatcher::WriteVectorAt(user_in_iovec_t user_data, zx_off_t 
 
   if (prev_content_size) {
     status =
-        vmo_->WriteVector(user_data, length, offset, out_actual,
+        vmo_->WriteVector(user_data, offset, length, out_actual,
                           [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
                             if (write_offset + len > *prev_content_size) {
                               op.UpdateContentSizeFromProgress(write_offset + len);
                             }
                           });
   } else {
-    status = vmo_->WriteVector(user_data, length, offset, out_actual);
+    status = vmo_->WriteVector(user_data, offset, length, out_actual);
   }
 
   // Reacquire the lock to potentially shrink and commit the operation.
@@ -354,7 +354,7 @@ zx_status_t StreamDispatcher::AppendVector(user_in_iovec_t user_data, size_t* ou
     length = ktl::min(vmo_size, new_content_size) - offset;
   }
 
-  status = vmo_->WriteVector(user_data, length, offset, out_actual,
+  status = vmo_->WriteVector(user_data, offset, length, out_actual,
                              [&op](const uint64_t write_offset, const size_t len) {
                                op.UpdateContentSizeFromProgress(write_offset + len);
                              });

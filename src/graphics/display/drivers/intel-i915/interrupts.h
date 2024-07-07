@@ -6,9 +6,12 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTERRUPTS_H_
 
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/interrupt.h>
 #include <threads.h>
 #include <zircon/types.h>
@@ -40,11 +43,13 @@ class Interrupts {
   Interrupts(Interrupts&&) = delete;
   Interrupts& operator=(Interrupts&&) = delete;
 
-  // The lifetimes of |dev|, |pci|, and |mmio_space| must outlast the initialized Interrupts
+  // Must be called exactly once.
+  // Must be called from a driver-runtime managed dispatcher.
+  //
+  // `mmio_space` must be non-null and outlive the initialized `Interrupts`
   // instance.
   zx_status_t Init(PipeVsyncCallback pipe_vsync_callback, HotplugCallback hotplug_callback,
-                   zx_device_t* dev, const ddk::Pci& pci, fdf::MmioBuffer* mmio_space,
-                   uint16_t device_id);
+                   const ddk::Pci& pci, fdf::MmioBuffer* mmio_space, uint16_t device_id);
   void FinishInit();
   void Resume();
   void Destroy();
@@ -72,9 +77,13 @@ class Interrupts {
                                       uint32_t gpu_interrupt_mask);
 
  private:
-  int IrqLoop();
   void EnableHotplugInterrupts();
   void HandlePipeInterrupt(PipeId pipe_id, zx_time_t timestamp);
+
+  void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                        const zx_packet_interrupt_t* interrupt);
+
+  zx::result<> CancelInterruptHandler();
 
   PipeVsyncCallback pipe_vsync_callback_;
   HotplugCallback hotplug_callback_;
@@ -82,10 +91,17 @@ class Interrupts {
 
   mtx_t lock_;
 
-  // Initialized by |Init|.
+  // Initialized by `Init()`.
   zx::interrupt irq_;
   fuchsia_hardware_pci::InterruptMode irq_mode_;
-  std::optional<thrd_t> irq_thread_;  // Valid while irq_ is valid.
+
+  // The `irq_handler_dispatcher_` and `irq_handler_` are constant between
+  // `Init()` and instance destruction. Only accessed on the threads used for
+  // class initialization and destruction.
+  fdf::SynchronizedDispatcher irq_handler_dispatcher_;
+  libsync::Completion irq_handler_dispatcher_shutdown_completed_;
+  async::IrqMethod<Interrupts, &Interrupts::InterruptHandler> irq_handler_{this};
+
   uint16_t device_id_;
 
   intel_gpu_core_interrupt_t gpu_interrupt_callback_ __TA_GUARDED(lock_) = {};

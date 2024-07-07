@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
     fuchsia_inspect::component::health().set_starting_up();
 
-    let ttd = TopologyTestDaemon::new(inspector.root().clone_weak()).await?;
+    let ttd = TopologyTestDaemon::new().await?;
     fuchsia_inspect::component::health().set_ok();
 
     // This future should never complete.

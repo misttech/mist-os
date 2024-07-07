@@ -133,7 +133,6 @@ impl TryFrom<fidl_sme::ScanResult> for ScanResult {
     type Error = anyhow::Error;
 
     fn try_from(scan_result: fidl_sme::ScanResult) -> Result<ScanResult, Self::Error> {
-        #[allow(unused_variables)]
         let fidl_sme::ScanResult { compatibility, timestamp_nanos, bss_description } = scan_result;
         Ok(ScanResult {
             compatibility: compatibility

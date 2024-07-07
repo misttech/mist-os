@@ -11,6 +11,7 @@ use core::num::NonZeroU8;
 use core::ops::{Deref as _, DerefMut as _};
 use core::sync::atomic::AtomicU16;
 
+use ip::device::RsTimerId;
 use lock_order::lock::{LockLevelFor, UnlockedAccess, UnlockedAccessMarkerFor};
 use lock_order::relation::LockBefore;
 use log::debug;
@@ -538,6 +539,16 @@ where
     }
 }
 
+impl<'a, Config, L, BC: BindingsContext, T> CoreTimerContext<T, BC>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+where
+    CoreCtx<'a, BC, L>: CoreTimerContext<T, BC>,
+{
+    fn convert_timer(dispatch_id: T) -> BC::DispatchId {
+        <CoreCtx<'a, BC, L> as CoreTimerContext<T, BC>>::convert_timer(dispatch_id)
+    }
+}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<'a, I: gmp::IpExt + IpDeviceIpExt, BC: BindingsContext>
     device::WithIpDeviceConfigurationMutInner<I, BC>
@@ -886,6 +897,14 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             IcmpUnusedCode,
             message,
         )
+    }
+}
+
+impl<L, BT: BindingsTypes> CoreTimerContext<RsTimerId<WeakDeviceId<BT>>, BT>
+    for CoreCtx<'_, BT, L>
+{
+    fn convert_timer(dispatch_id: RsTimerId<WeakDeviceId<BT>>) -> BT::DispatchId {
+        IpDeviceTimerId::<Ipv6, _, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
     }
 }
 
@@ -1401,13 +1420,13 @@ impl<BC: BindingsContext, L> IpAddressIdSpecContext for CoreCtx<'_, BC, L> {
     type AddressIdSpec = IpAddrCtxSpec<BC>;
 }
 
-impl<'a, Config, L, BC: BindingsContext>
-    CoreTimerContext<DadTimerId<WeakDeviceId<BC>, WeakRc<Ipv6AddressEntry<BC>>>, BC>
-    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+impl<L, BT: BindingsTypes>
+    CoreTimerContext<DadTimerId<WeakDeviceId<BT>, WeakRc<Ipv6AddressEntry<BT>>>, BT>
+    for CoreCtx<'_, BT, L>
 {
     fn convert_timer(
-        dispatch_id: DadTimerId<WeakDeviceId<BC>, WeakRc<Ipv6AddressEntry<BC>>>,
-    ) -> BC::DispatchId {
+        dispatch_id: DadTimerId<WeakDeviceId<BT>, WeakRc<Ipv6AddressEntry<BT>>>,
+    ) -> BT::DispatchId {
         IpDeviceTimerId::<Ipv6, _, _>::from(Ipv6DeviceTimerId::from(dispatch_id)).into()
     }
 }

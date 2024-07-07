@@ -753,8 +753,8 @@ mod tests {
     }
 
     struct StartTestHarness {
-        #[allow(dead_code)]
         pub mlme_init_receiver: Pin<Box<oneshot::Receiver<()>>>,
+        // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
         #[allow(dead_code)]
         pub driver_event_sink: DriverEventSink,
     }
@@ -1021,9 +1021,7 @@ mod tests {
 
     struct ServeTestHarness {
         pub mlme_init_sender: oneshot::Sender<()>,
-        #[allow(dead_code)]
         pub driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
-        #[allow(dead_code)]
         pub softmac_ifc_bridge_proxy: fidl_softmac::WlanSoftmacIfcBridgeProxy,
         pub complete_mlme_sender: oneshot::Sender<Result<(), anyhow::Error>>,
         pub complete_sme_sender: oneshot::Sender<Result<(), anyhow::Error>>,

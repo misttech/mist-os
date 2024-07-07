@@ -15,8 +15,9 @@ ffx_plugin("ffx_hang") {
 
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//third_party/rust_crates:anyhow",
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
   ]
 
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [ "//src/lib/fuchsia" ]
 }

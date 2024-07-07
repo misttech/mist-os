@@ -150,7 +150,7 @@ typedef struct vfs_internal_node {
 
   NodeVariant node;
   std::mutex mutex;
-  // `intree_vfs::SynchronousVfs` will synchronously close all active connections on destruction.
+
   // If we need to support `intree_vfs::ManagedVfs`, this will need to be revisited to ensure node
   // lifetimes during asynchronous teardown.
   std::unique_ptr<intree_vfs::SynchronousVfs> vfs __TA_GUARDED(mutex);

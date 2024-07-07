@@ -185,8 +185,9 @@
 
 	power_button: gpio-buttons {
 		compatible = "fuchsia,gpio-buttons";
-		gpios = <&gpio 92 0>;
+		gpios = <&gpio A311D_GPIOAO(7) 0>;
 		gpio-names = "POWER";
+		pinctrl-0 = <&gpio_buttons_pins>;
 	};
 
 	wifi {
@@ -210,6 +211,12 @@
 	bt_uart_pins: bt-uart-pins {
 		pins = <A311D_GPIOX(12) A311D_GPIOX(13) A311D_GPIOX(14) A311D_GPIOX(15)>;
 		function = <0 1>;
+	};
+
+	gpio_buttons_pins: gpio-buttons-pins {
+		pins = <A311D_GPIOAO(7)>;
+		bias-disable;
+		function = <0 0>;
 	};
 
 };

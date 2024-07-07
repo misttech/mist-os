@@ -137,6 +137,10 @@ impl Config {
     fn serve_test_protocols(&self) -> bool {
         self.source_config.serve_test_protocols
     }
+
+    fn has_rtc(&self) -> bool {
+        self.source_config.has_real_time_clock
+    }
 }
 
 /// A definition which time sources to install, along with the URL and child names for each.
@@ -229,9 +233,12 @@ async fn main() -> Result<()> {
         CobaltDiagnostics::new(cobalt_experiment, &primary_track, &monitor_track),
     ));
 
-    info!("connecting to real time clock");
-    let optional_rtc = match RtcImpl::only_device() {
-        Ok(rtc) => Some(rtc),
+    info!("connecting to RTC");
+    let optional_rtc = match RtcImpl::only_device(config.has_rtc()).await {
+        Ok(rtc) => {
+            debug!("RTC found.");
+            Some(rtc)
+        }
         Err(err) => {
             match err {
                 RtcCreationError::NoDevices => info!("no RTC devices found."),

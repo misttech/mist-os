@@ -64,7 +64,7 @@
                     "Exempt the SDK workflow validation test workspace directory"
                 ],
                 "paths": [
-                    "build/bazel_sdk/e2e/test_workspace/third_party/fuchsia-infra-bazel-rules"
+                    "build/bazel_sdk/e2e/utils/generate_test_workspace/workspace/third_party"
                 ]
             },
             {

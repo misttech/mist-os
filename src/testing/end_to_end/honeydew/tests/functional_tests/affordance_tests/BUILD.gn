@@ -7,6 +7,7 @@ group("tests") {
   testonly = true
   public_deps = [
     "test_bluetooth:tests",
+    "test_inspect:tests",
     "test_rtc:tests",
     "test_session:tests",
     "test_system_power_state_controller:tests",

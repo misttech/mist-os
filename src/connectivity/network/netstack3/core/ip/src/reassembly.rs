@@ -201,7 +201,7 @@ impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> Fragment
 impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> HandleableTimer<CC, BC>
     for FragmentTimerId<I>
 {
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC) {
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
         let Self(IpVersionMarker { .. }) = self;
         core_ctx.with_state_mut(|cache| {
             let Some((key, ())) = cache.timers.pop(bindings_ctx) else {

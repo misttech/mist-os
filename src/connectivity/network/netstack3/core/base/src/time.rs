@@ -25,26 +25,26 @@ pub trait Instant:
 {
     /// Returns the amount of time elapsed from another instant to this one.
     ///
-    /// # Panics
-    ///
-    /// This function will panic if `earlier` is later than `self`.
-    fn duration_since(&self, earlier: Self) -> core::time::Duration;
+    /// Returns `None` if `earlier` is not before `self`.
+    fn checked_duration_since(&self, earlier: Self) -> Option<Duration>;
 
     /// Returns the amount of time elapsed from another instant to this one,
     /// saturating at zero.
-    fn saturating_duration_since(&self, earlier: Self) -> core::time::Duration;
+    fn saturating_duration_since(&self, earlier: Self) -> Duration {
+        self.checked_duration_since(earlier).unwrap_or_default()
+    }
 
     /// Returns `Some(t)` where `t` is the time `self + duration` if `t` can be
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.
-    fn checked_add(&self, duration: core::time::Duration) -> Option<Self>;
+    fn checked_add(&self, duration: Duration) -> Option<Self>;
 
     /// Unwraps the result from `checked_add`.
     ///
     /// # Panics
     ///
     /// This function will panic if the addition makes the clock wrap around.
-    fn add(&self, duration: core::time::Duration) -> Self {
+    fn add(&self, duration: Duration) -> Self {
         self.checked_add(duration).unwrap_or_else(|| {
             panic!("clock wraps around when adding {:?} to {:?}", duration, *self);
         })
@@ -53,7 +53,7 @@ pub trait Instant:
     /// Returns `Some(t)` where `t` is the time `self - duration` if `t` can be
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.
-    fn checked_sub(&self, duration: core::time::Duration) -> Option<Self>;
+    fn checked_sub(&self, duration: Duration) -> Option<Self>;
 }
 
 /// Trait defining the `Instant` type provided by bindings' [`InstantContext`]
@@ -86,6 +86,11 @@ pub trait TimerBindingsTypes {
     type Timer: Debug + Send + Sync;
     /// The type used to dispatch fired timers from bindings to core.
     type DispatchId: Clone;
+    /// A value that uniquely identifiers a `Timer`. It is given along with the
+    /// `DispatchId` whenever a timer is fired.
+    ///
+    /// See [`TimerContext::unique_timer_id`] for details.
+    type UniqueTimerId: PartialEq + Eq;
 }
 
 /// A context providing time scheduling to core.
@@ -133,6 +138,12 @@ pub trait TimerContext: InstantContext + TimerBindingsTypes {
 
     /// Get the instant a timer will fire, if one is scheduled.
     fn scheduled_instant(&self, timer: &mut Self::Timer) -> Option<Self::Instant>;
+
+    /// Retrieves the timer id for `timer`.
+    ///
+    /// This can be used with [`TimerHandler::handle_timer`] to match a
+    /// [`Self::Timer`] instance with a firing event.
+    fn unique_timer_id(&self, timer: &Self::Timer) -> Self::UniqueTimerId;
 }
 
 /// A handler for timer firing events.
@@ -143,17 +154,24 @@ pub trait TimerContext: InstantContext + TimerBindingsTypes {
 /// implement [`HandleableTimer`]. `TimerHandler` is meant to be used as bounds
 /// on core context types. whereas `HandleableTimer` allows split-crate
 /// implementations sidestepping coherence issues.
-pub trait TimerHandler<BC, Id> {
+pub trait TimerHandler<BC: TimerBindingsTypes, Id> {
     /// Handle a timer firing.
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id);
+    ///
+    /// `dispatch` is the firing timer's dispatch identifier, i.e., a
+    /// [`HandleableTimer`].
+    ///
+    /// `timer` is the unique timer identifier for the
+    /// [`TimerBindingsTypes::Timer`] that scheduled this operation.
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, dispatch: Id, timer: BC::UniqueTimerId);
 }
 
 impl<Id, CC, BC> TimerHandler<BC, Id> for CC
 where
+    BC: TimerBindingsTypes,
     Id: HandleableTimer<CC, BC>,
 {
-    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: Id) {
-        id.handle(self, bindings_ctx)
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, dispatch: Id, timer: BC::UniqueTimerId) {
+        dispatch.handle(self, bindings_ctx, timer)
     }
 }
 
@@ -162,9 +180,12 @@ where
 ///
 /// This trait exists to sidestep coherence issues when dealing with timer
 /// layers, see [`TimerHandler`] for more.
-pub trait HandleableTimer<CC, BC> {
+pub trait HandleableTimer<CC, BC: TimerBindingsTypes> {
     /// Handles this timer firing.
-    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC);
+    ///
+    /// `timer` is the unique timer identifier for the
+    /// [`TimerBindingsTypes::Timer`] that scheduled this operation.
+    fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, timer: BC::UniqueTimerId);
 }
 
 /// A core context providing timer type conversion.

@@ -2,17 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use errors::ffx_error;
-use ffx_core::ffx_plugin;
+pub use ffx_package_build_args::PackageBuildCommand;
+use fho::{user_error, FfxMain, FfxTool, Result, SimpleWriter};
 use package_tool::cmd_package_build;
 
-pub use ffx_package_build_args::PackageBuildCommand;
+#[derive(FfxTool)]
+pub struct PackageBuildTool {
+    #[command]
+    pub cmd: PackageBuildCommand,
+}
 
-#[ffx_plugin()]
-pub async fn cmd_package(cmd: PackageBuildCommand) -> Result<()> {
-    cmd_package_build(cmd)
-        .await
-        .map_err(|err| ffx_error!("Error: failed to build package: {err:?}"))?;
-    Ok(())
+fho::embedded_plugin!(PackageBuildTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for PackageBuildTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut _writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
+        cmd_package_build(self.cmd)
+            .await
+            .map_err(|err| user_error!("Error: failed to build package: {err:?}"))?;
+        Ok(())
+    }
 }

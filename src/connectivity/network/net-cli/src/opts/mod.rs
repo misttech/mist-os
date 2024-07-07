@@ -48,7 +48,7 @@ pub struct Command {
     pub cmd: CommandEnum,
 }
 
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum CommandEnum {
     FilterDeprecated(FilterDeprecated),

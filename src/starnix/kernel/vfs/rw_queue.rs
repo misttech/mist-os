@@ -349,7 +349,7 @@ mod test {
     use super::*;
     use crate::task::Kernel;
     use crate::testing::*;
-    use starnix_sync::{impl_lock_after, lock_level, Unlocked};
+    use starnix_sync::{lock_ordering, Unlocked};
     use std::future::Future;
     use std::pin::Pin;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -384,8 +384,9 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_write_and_read() {
-        lock_level!(TestLevel);
-        impl_lock_after!(Unlocked => TestLevel);
+        lock_ordering! {
+            Unlocked => TestLevel
+        }
 
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
@@ -405,8 +406,9 @@ mod test {
     async fn test_read_in_parallel() {
         let (kernel, _current_task) = create_kernel_and_task();
 
-        lock_level!(TestLevel);
-        impl_lock_after!(Unlocked => TestLevel);
+        lock_ordering! {
+            Unlocked => TestLevel
+        }
         struct Info {
             barrier: Barrier,
             queue: RwQueue<TestLevel>,
@@ -437,8 +439,9 @@ mod test {
         thread2.await.expect("failed to join thread");
     }
 
-    lock_level!(A);
-    impl_lock_after!(Unlocked => A);
+    lock_ordering! {
+        Unlocked => A
+    }
     struct State {
         queue: RwQueue<A>,
         gate: Barrier,

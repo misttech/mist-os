@@ -12,6 +12,18 @@
         ]
     },
     {
+        "node": "gpio-init",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_INIT_STEP": "fuchsia.gpio.BIND_INIT_STEP.GPIO"
+                }
+            }
+        ]
+    },
+    {
         "node": "mic-privacy",
         "tests": [
             {

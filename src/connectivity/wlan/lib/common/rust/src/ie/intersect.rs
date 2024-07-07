@@ -268,8 +268,8 @@ pub enum IntersectRatesError {
 /// Returns Error if intersection fails.
 /// Note: The client MUST support ALL the basic rates specified by the AP or the intersection fails.
 pub fn intersect_rates(
-    ap_rates: ApRates,
-    client_rates: ClientRates,
+    ap_rates: ApRates<'_>,
+    client_rates: ClientRates<'_>,
 ) -> Result<Vec<SupportedRate>, IntersectRatesError> {
     // Omit BSS membership selectors, which should not be interpreted as BSS rates.
     let mut rates: Vec<_> =

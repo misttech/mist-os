@@ -2,25 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
 use ffx_repository_default_args::{RepositoryDefaultCommand, SubCommand};
+use fho::{bug, FfxMain, FfxTool, Result, SimpleWriter, ToolIO};
 
 pub(crate) const CONFIG_KEY_DEFAULT: &str = "repository.default";
 
-#[ffx_plugin("ffx_repository")]
-pub async fn exec_repository_default(cmd: RepositoryDefaultCommand) -> Result<()> {
-    exec_repository_default_impl(cmd, &mut std::io::stdout()).await
+#[derive(FfxTool)]
+pub struct RepoDefaultTool {
+    #[command]
+    pub cmd: RepositoryDefaultCommand,
 }
 
-pub async fn exec_repository_default_impl<W: std::io::Write>(
+fho::embedded_plugin!(RepoDefaultTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for RepoDefaultTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
+        exec_repository_default_impl(self.cmd, &mut writer).await
+    }
+}
+
+pub async fn exec_repository_default_impl<W: std::io::Write + ToolIO>(
     cmd: RepositoryDefaultCommand,
     writer: &mut W,
 ) -> Result<()> {
     match &cmd.subcommand {
         SubCommand::Get(_) => {
             let res: String = ffx_config::get(CONFIG_KEY_DEFAULT).await.unwrap_or("".to_owned());
-            writeln!(writer, "{}", res)?;
+            writeln!(writer, "{}", res).map_err(|e| bug!(e))?;
         }
         SubCommand::Set(set) => {
             ffx_config::query(CONFIG_KEY_DEFAULT)
@@ -35,7 +45,7 @@ pub async fn exec_repository_default_impl<W: std::io::Write>(
                 .build(unset.build_dir.as_deref().map(|dir| dir.into()))
                 .remove()
                 .await
-                .map_err(|e| eprintln!("warning: {}", e));
+                .map_err(|e| writeln!(writer.stderr(), "warning: {}", e));
         }
     };
     Ok(())

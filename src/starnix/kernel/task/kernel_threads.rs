@@ -110,18 +110,6 @@ impl Drop for KernelThreads {
     }
 }
 
-thread_local! {
-    static LOCAL_TASK: RefCell<Option<CurrentTask>> = const { RefCell::new(None) };
-}
-
-/// Execute the given closure with the currently registered `CurrentTask` for the thread.
-pub fn with_current_task<F, R>(f: F) -> R
-where
-    F: FnOnce(&CurrentTask) -> R,
-{
-    LOCAL_TASK.with(|current_task| f(current_task.borrow().as_ref().unwrap()))
-}
-
 /// Create a new system task, register it on the thread and run the given closure with it.
 pub fn with_new_current_task<F, R>(
     locked: &mut Locked<'_, Unlocked>,
@@ -141,14 +129,9 @@ where
             CString::new("[kthreadd]").unwrap(),
         )?
     };
-    Ok(LOCAL_TASK.with(|task_option| {
-        *task_option.borrow_mut() = Some(current_task);
-        let result = f(locked, task_option.borrow().as_ref().unwrap());
-        if let Some(current_task) = task_option.borrow_mut().take() {
-            current_task.release(locked);
-        }
-        result
-    }))
+    let result = f(locked, &current_task);
+    current_task.release(locked);
+    Ok(result)
 }
 
 struct SystemTask {

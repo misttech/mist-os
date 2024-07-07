@@ -3,19 +3,17 @@
 // found in the LICENSE file.
 
 use crate::signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo};
-use crate::task::timers::{ClockId, TimerId};
+use crate::task::timers::TimerId;
 use crate::task::{Kernel, ThreadGroup};
 use crate::time::utc;
+use crate::timer::Timeline;
 use futures::stream::AbortHandle;
 use starnix_logging::{log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
-use starnix_uapi::errors::{error, Errno};
+use starnix_uapi::errors::Errno;
 use starnix_uapi::ownership::TempRef;
 use starnix_uapi::time::{duration_from_timespec, time_from_timespec, timespec_from_duration};
-use starnix_uapi::{
-    itimerspec, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_PROCESS_CPUTIME_ID,
-    CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, SI_TIMER,
-};
+use starnix_uapi::{itimerspec, SI_TIMER};
 use std::sync::{Arc, Weak};
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
@@ -32,68 +30,6 @@ impl From<TimerRemaining> for itimerspec {
         Self {
             it_interval: timespec_from_duration(value.interval),
             it_value: timespec_from_duration(value.remainder),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum Timeline {
-    RealTime,
-    Monotonic,
-    BootTime,
-}
-
-impl TryFrom<ClockId> for Timeline {
-    type Error = Errno;
-    fn try_from(id: ClockId) -> Result<Self, Errno> {
-        match id as u32 {
-            CLOCK_REALTIME => Ok(Self::RealTime),
-            CLOCK_MONOTONIC => Ok(Self::Monotonic),
-            CLOCK_BOOTTIME => Ok(Self::BootTime),
-            CLOCK_REALTIME_ALARM => {
-                track_stub!(TODO("https://fxbug.dev/349190823"), "timers w/ CLOCK_REALTIME_ALARM");
-                error!(ENOTSUP)
-            }
-            CLOCK_BOOTTIME_ALARM => {
-                track_stub!(TODO("https://fxbug.dev/349191846"), "timers w/ CLOCK_BOOTTIME_ALARM");
-                error!(ENOTSUP)
-            }
-            CLOCK_TAI => {
-                track_stub!(TODO("https://fxbug.dev/349191834"), "timers w/ TAI");
-                error!(ENOTSUP)
-            }
-            CLOCK_PROCESS_CPUTIME_ID => {
-                track_stub!(
-                    TODO("https://fxbug.dev/349188105"),
-                    "timers w/ calling process cpu time"
-                );
-                error!(ENOTSUP)
-            }
-            CLOCK_THREAD_CPUTIME_ID => {
-                track_stub!(
-                    TODO("https://fxbug.dev/349188105"),
-                    "timers w/ calling thread cpu time"
-                );
-                error!(ENOTSUP)
-            }
-            _ => {
-                track_stub!(
-                    TODO("https://fxbug.dev/349188105"),
-                    "timers w/ dynamic process clocks"
-                );
-                error!(ENOTSUP)
-            }
-        }
-    }
-}
-
-impl Timeline {
-    /// Returns the current time on this timeline.
-    fn now(&self) -> zx::Time {
-        match self {
-            // TODO(https://fxbug.dev/328306129) handle boot and monotonic time separately
-            Self::BootTime | Self::Monotonic => zx::Time::get_monotonic(),
-            Self::RealTime => utc::utc_now(),
         }
     }
 }
@@ -146,15 +82,10 @@ impl IntervalTimerMutableState {
 impl IntervalTimer {
     pub fn new(
         timer_id: TimerId,
-        clock_id: ClockId,
+        timeline: Timeline,
         signal_event: SignalEvent,
     ) -> Result<IntervalTimerHandle, Errno> {
-        Ok(Arc::new(Self {
-            timer_id,
-            timeline: clock_id.try_into()?,
-            signal_event,
-            state: Default::default(),
-        }))
+        Ok(Arc::new(Self { timer_id, timeline, signal_event, state: Default::default() }))
     }
 
     fn signal_info(self: &IntervalTimerHandle) -> Option<SignalInfo> {

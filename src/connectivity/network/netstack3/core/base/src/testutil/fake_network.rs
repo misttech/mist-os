@@ -12,7 +12,9 @@ use core::time::Duration;
 
 use packet::Buf;
 
-use crate::testutil::{FakeInstant, InstantAndData, WithFakeFrameContext, WithFakeTimerContext};
+use crate::testutil::{
+    FakeInstant, FakeTimerId, InstantAndData, WithFakeFrameContext, WithFakeTimerContext,
+};
 use crate::InstantContext as _;
 
 /// A fake network, composed of many `FakeCoreCtx`s.
@@ -59,7 +61,11 @@ pub trait FakeNetworkSpec: Sized {
     /// Handles a single received frame by `ctx`.
     fn handle_frame(ctx: &mut Self::Context, recv: Self::RecvMeta, data: Buf<Vec<u8>>);
     /// Handles a single timer id in `ctx`.
-    fn handle_timer(ctx: &mut Self::Context, timer: Self::TimerId);
+    ///
+    /// `dispatch` is the timer's dispatch identifier, i.e., an implementer of
+    /// `HandleableTimer`. `timer` is the unique timer identifier for the fake
+    /// timer that fired.
+    fn handle_timer(ctx: &mut Self::Context, dispatch: Self::TimerId, timer: FakeTimerId);
     /// Processes any context-internal queues, returning `true` if any work
     /// was done.
     ///
@@ -329,7 +335,7 @@ where
             // We have to collect the timers before dispatching them, to
             // avoid an infinite loop in case handle_timer schedules another
             // timer for the same or older FakeInstant.
-            let mut timers = Vec::<Spec::TimerId>::new();
+            let mut timers = Vec::<(Spec::TimerId, FakeTimerId)>::new();
             ctx.with_fake_timer_ctx_mut(|ctx| {
                 while let Some(InstantAndData(t, timer)) = ctx.timers.peek() {
                     // TODO(https://github.com/rust-lang/rust/issues/53667):
@@ -337,13 +343,13 @@ where
                     if *t > ctx.now() {
                         break;
                     }
-                    timers.push(timer.dispatch_id.clone());
+                    timers.push((timer.dispatch_id.clone(), timer.timer_id()));
                     assert_ne!(ctx.timers.pop(), None);
                 }
             });
 
-            for t in timers {
-                Spec::handle_timer(ctx, t);
+            for (dispatch_id, timer_id) in timers {
+                Spec::handle_timer(ctx, dispatch_id, timer_id);
                 ret.timers_fired += 1;
             }
         }
@@ -507,8 +513,8 @@ mod tests {
             }
         }
 
-        fn handle_timer(ctx: &mut Self, timer: u32) {
-            *ctx.fired_timers.entry(timer).or_insert(0) += 1;
+        fn handle_timer(ctx: &mut Self, dispatch: u32, _: FakeTimerId) {
+            *ctx.fired_timers.entry(dispatch).or_insert(0) += 1;
         }
 
         fn process_queues(_ctx: &mut Self) -> bool {

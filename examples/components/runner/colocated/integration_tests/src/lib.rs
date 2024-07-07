@@ -162,6 +162,7 @@ async fn test_attribute_memory() {
     assert_eq!(&elf_runner.children[0].children[0].name, "collection:colocated-component");
     let resource = &elf_runner.children[0].children[0].resources;
     for vmo_koid in colocated_component_vmos {
-        assert!(resource.contains(&zx::Koid::from_raw(vmo_koid)));
+        assert!(resource
+            .contains(&attribution_testing::Resource::KernelObject(zx::Koid::from_raw(vmo_koid))));
     }
 }

@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
@@ -133,6 +134,7 @@ class HotPlugDetectionTest : public ::testing::Test {
   }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
   fdf_testing::DriverRuntime runtime_;
 
   async::Loop fake_gpio_loop_{&kAsyncLoopConfigNeverAttachToThread};

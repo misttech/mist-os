@@ -61,8 +61,8 @@ std::string_view ToString(Type type) {
       return "ZBI_TYPE_NVRAM"sv;
     case Type::kReservedLow:
       return "reserved low memory"sv;
-    case Type::kMaxExtended:
-      return "kMaxExtended"sv;
+    case Type::kMaxAllocated:
+      return "kMaxAllocated"sv;
   }
   return "unknown"sv;
 }

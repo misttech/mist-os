@@ -248,8 +248,6 @@ impl<A: Appendable> Writer<A> {
         Ok(())
     }
 
-    // We will not use this fn until our authenticator supports MFP.
-    #[allow(unused)]
     pub fn write_igtk(&mut self, igtk_kde: &Igtk) -> Result<(), BufferTooSmall> {
         if !self.buf.can_append(HDR_LEN + igtk_kde.len()) {
             return Err(BufferTooSmall);

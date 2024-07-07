@@ -61,7 +61,7 @@ class Allocation {
     auto result = data_;
     data_ = {};
     alignment_ = 0;
-    type_ = memalloc::Type::kMaxExtended;
+    type_ = memalloc::Type::kMaxAllocated;
     return result;
   }
 
@@ -96,7 +96,7 @@ class Allocation {
  private:
   ktl::span<ktl::byte> data_;
   size_t alignment_ = 0;
-  memalloc::Type type_ = memalloc::Type::kMaxExtended;
+  memalloc::Type type_ = memalloc::Type::kMaxAllocated;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ALLOCATION_H_

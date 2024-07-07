@@ -867,10 +867,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_data_input_buffer() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let page_size = *PAGE_SIZE;
-        let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), 64 * page_size);
 
         let data: Vec<u8> = (0..1024).map(|i| (i % 256) as u8).collect();
         let mm = current_task.deref();
@@ -944,10 +944,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_data_output_buffer() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let page_size = *PAGE_SIZE;
-        let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
+        let addr = map_memory(&mut locked, &current_task, UserAddress::default(), 64 * page_size);
 
         let output_iovec = smallvec![
             UserBuffer { address: addr, length: 25 },

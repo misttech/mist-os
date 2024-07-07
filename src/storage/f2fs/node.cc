@@ -584,8 +584,7 @@ zx::result<LockedPage> NodeManager::GetNextNodePage(LockedPage &node_page, size_
 }
 
 pgoff_t NodeManager::FsyncNodePages(nid_t ino) {
-  WritebackOperation op;
-  op.bSync = true;
+  WritebackOperation op = {.bSync = true, .bReleasePages = fs_->HasNotEnoughMemory()};
   op.if_page = [ino](fbl::RefPtr<Page> page) {
     auto node_page = fbl::RefPtr<NodePage>::Downcast(std::move(page));
     if (node_page->IsDirty() && node_page->InoOfNode() == ino && node_page->IsDnode() &&

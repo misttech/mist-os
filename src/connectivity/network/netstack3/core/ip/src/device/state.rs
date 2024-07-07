@@ -676,10 +676,7 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
                 _,
                 NestedIntoCoreTimerCtx<CC, _>,
             >(bindings_ctx, device_id.clone())),
-            router_solicitations: Mutex::new(RsState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
-                bindings_ctx,
-                device_id.clone(),
-            )),
+            router_solicitations: Default::default(),
             ip_state: IpDeviceState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
                 bindings_ctx,
                 device_id.clone(),

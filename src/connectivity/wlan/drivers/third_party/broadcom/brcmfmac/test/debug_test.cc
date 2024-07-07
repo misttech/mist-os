@@ -16,13 +16,14 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
+
 #include <gtest/gtest.h>
-#include <wlan/drivers/testing/test_helpers.h>
 
 namespace {
 
 class DebugTest : public ::testing::Test {
-  wlan::drivers::log::testing::UnitTestLogContext logging_{"DebugTest"};
+  fdf_testing::ScopedGlobalLogger logging_;
 };
 
 // Sanity test for log lines.

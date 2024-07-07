@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.wlan.sme/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
-#include <lib/driver/testing/cpp/fixtures/gtest_fixture.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/fidl/cpp/client.h>
 
 #include <chrono>
@@ -40,8 +40,8 @@ class BadStartWlanSoftmacServer : public UnimplementedWlanSoftmacServer {
 };
 
 class BadStartSoftmacDriverTest : public fdf_testing::DriverTestFixture<
-                                      FixtureConfig<CustomEnvironment<BadStartWlanSoftmacServer>>> {
-};
+                                      FixtureConfig<CustomEnvironment<BadStartWlanSoftmacServer>>>,
+                                  public ::testing::Test {};
 
 // Verify that a WlanSoftmac.Start failure during Start causes Start to fail.
 TEST_F(BadStartSoftmacDriverTest, StartFails) {
@@ -60,8 +60,8 @@ class BadQueryWlanSoftmacServer : public BasicWlanSoftmacServer {
 };
 
 class BadQuerySoftmacDriverTest : public fdf_testing::DriverTestFixture<
-                                      FixtureConfig<CustomEnvironment<BadQueryWlanSoftmacServer>>> {
-};
+                                      FixtureConfig<CustomEnvironment<BadQueryWlanSoftmacServer>>>,
+                                  public ::testing::Test {};
 
 // Verify that a WlanSoftmac.Query failure during Start causes Start to fail.
 TEST_F(BadQuerySoftmacDriverTest, StartFails) {
@@ -96,7 +96,8 @@ class BadBootstrapWlanSoftmacServer : public BasicWlanSoftmacServer {
 
 class BadBootstrapSoftmacDriverTest
     : public fdf_testing::DriverTestFixture<
-          FixtureConfig<CustomEnvironment<BadBootstrapWlanSoftmacServer>>> {};
+          FixtureConfig<CustomEnvironment<BadBootstrapWlanSoftmacServer>>>,
+      public ::testing::Test {};
 
 // Verify that a failure to bootstrap to GenericSme during Start causes Start to fail.
 TEST_F(BadBootstrapSoftmacDriverTest, StartFails) {
@@ -115,7 +116,8 @@ class FragileSoftmacDriverEnvironment : public CustomEnvironment<BasicWlanSoftma
 };
 
 class FragileSoftmacDriverTest
-    : public fdf_testing::DriverTestFixture<FixtureConfig<FragileSoftmacDriverEnvironment>> {};
+    : public fdf_testing::DriverTestFixture<FixtureConfig<FragileSoftmacDriverEnvironment>>,
+      public ::testing::Test {};
 
 // Verify dropping the WlanSoftmacIfc client end causes wlansoftmac to exit.
 TEST_F(FragileSoftmacDriverTest, WlanSoftmacIfcClientDropped) {

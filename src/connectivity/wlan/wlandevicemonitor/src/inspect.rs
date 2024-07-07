@@ -14,9 +14,7 @@ const DEVICE_EVENTS_LIMIT: usize = 20;
 
 pub struct WlanMonitorTree {
     /// Root of the tree
-    // TODO(https://fxbug.dev/332405442): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub inspector: Inspector,
+    pub _inspector: Inspector,
     /// "device_events" subtree
     pub device_events: Mutex<BoundedListNode>,
 }
@@ -25,7 +23,7 @@ impl WlanMonitorTree {
     pub fn new(inspector: Inspector) -> Self {
         let device_events = inspector.root().create_child("device_events");
         Self {
-            inspector,
+            _inspector: inspector,
             device_events: Mutex::new(BoundedListNode::new(device_events, DEVICE_EVENTS_LIMIT)),
         }
     }

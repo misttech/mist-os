@@ -5,7 +5,7 @@
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/config/fuchsia/target_api_level.gni")
 
-if (override_target_api_level == "PLATFORM") {
+if (current_build_target_api_level == "PLATFORM") {
   # All API levels are less than or equal to "PLATFORM".
   rust_lesser_or_equal_fuchsia_api_levels =
       platform_version.all_numbered_api_levels + [
@@ -22,7 +22,7 @@ if (override_target_api_level == "PLATFORM") {
     "PLATFORM",
   ]
   foreach(level, platform_version.all_numbered_api_levels) {
-    if (level <= override_target_api_level) {
+    if (level <= current_build_target_api_level) {
       rust_lesser_or_equal_fuchsia_api_levels += [ level ]
     } else {
       rust_greater_fuchsia_api_levels += [ level ]

@@ -136,6 +136,7 @@ mod tests {
     use super::*;
 
     use diagnostics_assertions::assert_data_tree;
+    use fuchsia_bluetooth::types::PeerId;
     use fuchsia_inspect_derive::WithInspect;
     use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
@@ -181,7 +182,7 @@ mod tests {
         let (sco_proxy, _sco_stream) =
             fidl::endpoints::create_proxy_and_stream::<bredr::ScoConnectionMarker>()
                 .expect("ScoConnection proxy and stream");
-        let connection = ScoConnection::build(params, sco_proxy);
+        let connection = ScoConnection::build(PeerId(1), params, sco_proxy);
         let vigil = Vigil::new(ScoActive::new(&connection, None));
         state.iset(ScoState::Active(vigil));
         assert_data_tree!(inspect, root: {
