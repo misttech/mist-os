@@ -118,6 +118,11 @@
       "*.yaml.golden": "yaml",
     },
 
+    // Matches the default Fuchsia code style.
+    "editor.rulers": [
+        100
+    ],
+
     ////////
     // Dart
     //
@@ -210,6 +215,16 @@
       "--config",
       "${workspaceFolder}/pyproject.toml"
     ],
+
+    ////////
+    // Markdown
+    //
+    "[markdown]": {
+        // Matches our static checks in infra.
+        "editor.rulers": [
+            80
+        ]
+    },
 
     ////////
     // VSCode file exclusions
