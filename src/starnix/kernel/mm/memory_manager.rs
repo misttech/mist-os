@@ -44,6 +44,7 @@ use std::sync::Arc;
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};
+use zx::VmarInfo;
 
 const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
     zx::VmarFlags::from_bits_retain(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits());
@@ -2563,7 +2564,7 @@ pub struct MemoryManager {
     ///
     /// Instead of mapping memory directly in this VMAR, we map the memory in
     /// `state.user_vmar`.
-    pub root_vmar: zx::Vmar,
+    root_vmar: zx::Vmar,
 
     /// The base address of the root_vmar.
     pub base_addr: UserAddress,
@@ -3509,6 +3510,14 @@ impl MemoryManager {
             self.state.read().write_memory(addr, value.as_bytes())?;
             Ok(())
         }
+    }
+
+    pub fn get_restricted_vmar_info(&self) -> Option<VmarInfo> {
+        use zx::HandleBased;
+        if self.root_vmar.is_invalid_handle() {
+            return None;
+        }
+        Some(VmarInfo { base: USER_ASPACE_BASE, len: USER_RESTRICTED_ASPACE_SIZE })
     }
 }
 

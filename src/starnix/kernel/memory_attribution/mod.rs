@@ -149,7 +149,7 @@ fn get_thread_group_identifier(thread_group: &ThreadGroup) -> String {
     // Names not encoded in UTF-8 will stripped of invalid UTF-8 characters.
     let name = name.to_string_lossy();
     let id = thread_group.leader;
-    let name = format!("PID {id}: {name}");
+    let name = format!("{id}: {name}");
     name
 }
 
@@ -177,11 +177,16 @@ fn new_principal(pid: i32, name: String) -> fattribution::AttributionUpdate {
 /// Builds an `UpdatedPrincipal` event. If the task has an invalid root VMAR, returns `None`.
 fn updated_principal(leader: &Task) -> Option<fattribution::AttributionUpdate> {
     let mm = leader.mm();
-    let Some(vmar_koid) = mm.root_vmar.get_koid().ok() else { return None };
+    let Some(process_koid) = leader.thread_group.process.get_koid().ok() else { return None };
+    let Some(vmar_info) = mm.get_restricted_vmar_info() else { return None };
     let update = fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
         identifier: Some(leader.get_pid() as u64),
         resources: Some(fattribution::Resources::Data(fattribution::Data {
-            resources: vec![fattribution::Resource::KernelObject(vmar_koid.raw_koid())],
+            resources: vec![fattribution::Resource::ProcessMapped(fattribution::ProcessMapped {
+                process: process_koid.raw_koid(),
+                base: vmar_info.base as u64,
+                len: vmar_info.len as u64,
+            })],
         })),
         ..Default::default()
     });

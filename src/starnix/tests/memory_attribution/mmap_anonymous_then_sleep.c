@@ -13,11 +13,11 @@
 // such that the test can validate memory attribution reporting.
 // When it receives a SIGINT signal, it exits.
 int main(void) {
-  fprintf(stdout, "mmap_anonymous_then_sleep started\n");
-  fflush(stdout);
+  const size_t num_pages_to_allocate = 4200;
+  const size_t page_size = sysconf(_SC_PAGESIZE);
 
   void* addr = NULL;
-  const size_t size = 1000;
+  const size_t size = num_pages_to_allocate * page_size;
   const int prot = PROT_READ | PROT_WRITE;
   const int flags = MAP_SHARED | MAP_ANONYMOUS;
   const int fd = -1;
@@ -28,9 +28,13 @@ int main(void) {
     exit(EXIT_FAILURE);
   }
 
+  // Populate those pages.
   for (size_t i = 0; i < size; i++) {
-    ((char*)addr)[i] = 'a';
+    ((volatile char*)addr)[i] = (char)(1);
   }
+
+  fprintf(stdout, "mmap_anonymous_then_sleep did mmap\n");
+  fflush(stdout);
 
   while (1) {
     if (sleep(10) != 0 && errno == EINTR) {
