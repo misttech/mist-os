@@ -27,6 +27,25 @@ fuchsia_package_with_single_component("mmap_anonymous_then_sleep_package") {
   testonly = true
 }
 
+starnix_linux_executable("thread_group_leader_killed") {
+  output_name = "thread_group_leader_killed"
+  sources = [ "thread_group_leader_killed.c" ]
+  cflags = [
+    "-std=c11",
+    "-pthread",
+  ]
+  ldflags = [ "-lpthread" ]
+
+  disable_syslog_backend = true
+}
+
+fuchsia_package_with_single_component("thread_group_leader_killed_package") {
+  component_name = "thread_group_leader_killed"
+  manifest = "meta/thread_group_leader_killed.cml"
+  deps = [ ":thread_group_leader_killed" ]
+  testonly = true
+}
+
 # Integration test component
 
 rustc_test("bin") {
@@ -72,6 +91,7 @@ fuchsia_test_package("starnix_memory_attribution_test") {
   deps = [ ":realm" ]
   subpackages = [
     ":mmap_anonymous_then_sleep_package",
+    ":thread_group_leader_killed_package",
     "//src/starnix/runner:starnix_package",
     "//src/starnix/containers/debian:debian_package",
   ]

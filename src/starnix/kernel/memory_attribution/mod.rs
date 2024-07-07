@@ -15,7 +15,8 @@ use starnix_sync::Mutex;
 use starnix_uapi::pid_t;
 use {fidl_fuchsia_memory_attribution as fattribution, fuchsia_zircon as zx};
 
-use crate::task::{Kernel, Task, ThreadGroup};
+use crate::mm::MemoryManager;
+use crate::task::{Kernel, ThreadGroup};
 
 /// If the PID table updates multiple times within this interval, we only rescan
 /// it once, to reduce overhead.
@@ -48,11 +49,9 @@ impl MemoryAttributionManager {
             let pids = kernel.pids.read();
             let mut processes: HashSet<pid_t> = HashSet::new();
             for thread_group in pids.get_thread_groups() {
-                if let Some(leader) = pids.get_task(thread_group.leader).upgrade() {
-                    let name = get_thread_group_identifier(&thread_group);
-                    events.append(&mut attribution_info_for_thread_group(name, &leader));
-                    processes.insert(thread_group.leader);
-                }
+                let name = get_thread_group_identifier(&thread_group);
+                events.append(&mut attribution_info_for_thread_group(name, &thread_group));
+                processes.insert(thread_group.leader);
             }
             drop(pids);
 
@@ -113,13 +112,10 @@ impl MemoryAttributionManager {
             for thread_group in &thread_groups {
                 let pid = thread_group.leader;
                 if !processes.contains(&pid) {
-                    if let Some(leader) = kernel.pids.read().get_task(thread_group.leader).upgrade()
-                    {
-                        let name = get_thread_group_identifier(&thread_group);
-                        let mut update = attribution_info_for_thread_group(name, &leader);
-                        processes.insert(pid);
-                        updates.append(&mut update);
-                    }
+                    let name = get_thread_group_identifier(&thread_group);
+                    let mut update = attribution_info_for_thread_group(name, &thread_group);
+                    processes.insert(pid);
+                    updates.append(&mut update);
                 }
             }
 
@@ -155,10 +151,10 @@ fn get_thread_group_identifier(thread_group: &ThreadGroup) -> String {
 
 fn attribution_info_for_thread_group(
     name: String,
-    leader: &Task,
+    thread_group: &Arc<ThreadGroup>,
 ) -> Vec<fattribution::AttributionUpdate> {
-    let new = new_principal(leader.get_pid(), name.clone());
-    let updated = updated_principal(leader);
+    let new = new_principal(thread_group.leader, name.clone());
+    let updated = updated_principal(thread_group);
     iter::once(new).chain(updated.into_iter()).collect()
 }
 
@@ -175,12 +171,12 @@ fn new_principal(pid: i32, name: String) -> fattribution::AttributionUpdate {
 }
 
 /// Builds an `UpdatedPrincipal` event. If the task has an invalid root VMAR, returns `None`.
-fn updated_principal(leader: &Task) -> Option<fattribution::AttributionUpdate> {
-    let mm = leader.mm();
-    let Some(process_koid) = leader.thread_group.process.get_koid().ok() else { return None };
+fn updated_principal(thread_group: &Arc<ThreadGroup>) -> Option<fattribution::AttributionUpdate> {
+    let Some(process_koid) = thread_group.process.get_koid().ok() else { return None };
+    let Some(mm) = get_mm(thread_group) else { return None };
     let Some(vmar_info) = mm.get_restricted_vmar_info() else { return None };
     let update = fattribution::AttributionUpdate::Update(fattribution::UpdatedPrincipal {
-        identifier: Some(leader.get_pid() as u64),
+        identifier: Some(thread_group.leader as u64),
         resources: Some(fattribution::Resources::Data(fattribution::Data {
             resources: vec![fattribution::Resource::ProcessMapped(fattribution::ProcessMapped {
                 process: process_koid.raw_koid(),
@@ -191,4 +187,11 @@ fn updated_principal(leader: &Task) -> Option<fattribution::AttributionUpdate> {
         ..Default::default()
     });
     Some(update)
+}
+
+/// Get the memory manager shared by tasks in the thread group.
+///
+/// If all tasks in the thread group has been killed, returns `None`.
+fn get_mm(thread_group: &Arc<ThreadGroup>) -> Option<Arc<MemoryManager>> {
+    thread_group.read().tasks().find_map(|task| Some(task.mm().clone()))
 }
