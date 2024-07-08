@@ -37,12 +37,19 @@
   ],
 
   ////////
-  // Recommended Extensions for VSCode and Fuchsia
+  // Recommended Extensions for VSCode and Fuchsia | mist-os
   //
   "extensions": {
     "recommendations": [
+      // Fuchsia's own VSCode extension. Provides ZXDB support, a log view, and
+      // default target selection.
+      "fuchsia-authors.vscode-fuchsia",
+
       // Fuchsia's own FIDL LSP extension
       "fuchsia-authors.language-fidl",
+
+      // Official Go support
+      "golang.go",
 
       // The official LSP for Rust, rust-analyzer.
       "rust-lang.rust-analyzer",
@@ -65,6 +72,9 @@
       // Adds JSON5 syntax highlighting (including *.cml files).
       "mrmlnc.vscode-json5",
 
+      // Linkifies Fuchsia URLs (components, bugs, etc.)
+      "RichKadel.fuchsiaware",
+
       // Adds coverage gutters for `fx coverage`.
       "ryanluker.vscode-coverage-gutters",
     ],
@@ -79,6 +89,9 @@
 
       // Redundant and conflicts with gnls, which is preferred.
       "persidskiy.vscode-gnformat",
+
+      // Superseded by vscode-fuchsia, which provides zxdb support.
+      "fuchsia-authors.zxdb",
     ]
   },
 
@@ -105,6 +118,11 @@
       "*.yaml.golden": "yaml",
     },
 
+    // Matches the default Fuchsia code style.
+    "editor.rulers": [
+      100
+    ],
+
     ////////
     // Rust
     //
@@ -119,6 +137,8 @@
     // Use clippy.
     "rust-analyzer.check.overrideCommand": [
       "${workspaceFolder}/scripts/fx",
+      "--dir",
+      "${workspaceFolder}/out/default/",
       "clippy",
       "--raw",
       "-f",
@@ -134,11 +154,39 @@
     ////////
     // C/C++
 
+    "clangd.arguments": [
+        "--clang-tidy",
+        "--background-index"
+    ],
+    "clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/linux-x64/bin/clangd",
+
     // Formats C/C++ include guards to match Fuchsia style.
     "C/C++ Include Guard.Comment Style": "Line",
     "C/C++ Include Guard.Macro Type": "Filepath",
     "C/C++ Include Guard.Suffix": "_",
     "C/C++ Include Guard.Spaces After Endif": 2,
+
+    ////////
+    // Go
+
+    "go.goroot": "${workspaceFolder}/prebuilt/third_party/go/linux-x64",
+
+    "gopls": {
+      // Restrict directories that gopls will search in, otherwise it can fail
+      // with "Exhausted" after one million files.
+      "build.directoryFilters": [
+        "-.cache",
+        "-.cipd",
+        "-.git",
+        "-.jiri_root",
+        "-out",
+        "-prebuilt",
+      ],
+      // Used over specifying a build tag so that cgo is also aware.
+      "build.env": {
+        "GOOS": "fuchsia",
+      },
+    },
 
     ////////
     // Bazel
@@ -157,6 +205,16 @@
       "--config",
       "${workspaceFolder}/pyproject.toml"
     ],
+
+    ////////
+    // Markdown
+    //
+    "[markdown]": {
+      // Matches our static checks in infra.
+      "editor.rulers": [
+          80
+      ]
+    },
 
     ////////
     // VSCode file exclusions
