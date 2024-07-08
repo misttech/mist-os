@@ -10,14 +10,16 @@ use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::user_buffer::UserBuffers;
 use starnix_uapi::{errno, error, io_event};
 use std::sync::mpsc::Sender;
 use zerocopy::IntoBytes;
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::{CurrentTask, Task};
-use crate::vfs::{FileHandle, VecInputBuffer, VecOutputBuffer, WeakFileHandle};
+use crate::vfs::{
+    FileHandle, InputBuffer, OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer,
+    VecInputBuffer, VecOutputBuffer, WeakFileHandle,
+};
 
 /// Kernel state-machine-based implementation of asynchronous I/O.
 /// See https://man7.org/linux/man-pages/man7/aio.7.html#NOTES
@@ -42,13 +44,15 @@ pub struct AioContext {
 
 pub enum IoOperationType {
     Read,
+    ReadV,
     Write,
+    WriteV,
 }
 
 pub struct IoOperation {
     pub op_type: IoOperationType,
     pub file: WeakFileHandle,
-    pub buffer: UserBuffer,
+    pub buffers: UserBuffers,
     pub offset: usize,
     pub id: u64,
     pub iocb_addr: UserAddress,
@@ -86,7 +90,7 @@ impl AioContext {
             return error!(EAGAIN);
         }
         match op.op_type {
-            IoOperationType::Read => {
+            IoOperationType::Read | IoOperationType::ReadV => {
                 if self.read_sender.is_none() {
                     self.spawn_read_thread(current_task);
                 }
@@ -96,7 +100,7 @@ impl AioContext {
                     .send(op)
                     .map_err(|_| errno!(EINVAL))
             }
-            IoOperationType::Write => {
+            IoOperationType::Write | IoOperationType::WriteV => {
                 if self.write_sender.is_none() {
                     self.spawn_write_thread(current_task);
                 }
@@ -121,7 +125,7 @@ fn spawn_background_thread<F>(
             &CurrentTask,
             WeakRef<Task>,
             FileHandle,
-            UserBuffer,
+            UserBuffers,
             usize,
         ) -> Result<usize, Errno>
         + Send
@@ -148,7 +152,7 @@ fn spawn_background_thread<F>(
                 current_task,
                 weak_task.clone(),
                 file,
-                op.buffer,
+                op.buffers,
                 op.offset,
             ) {
                 Ok(ret) => ret as i64,
@@ -180,10 +184,16 @@ fn do_read_operation(
     current_task: &CurrentTask,
     weak_task: WeakRef<Task>,
     file: FileHandle,
-    buffer: UserBuffer,
+    buffers: UserBuffers,
     offset: usize,
 ) -> Result<usize, Errno> {
-    let mut output_buffer = VecOutputBuffer::new(buffer.length);
+    let mut output_buffer = {
+        let Some(task) = weak_task.upgrade() else {
+            return error!(EINVAL);
+        };
+        let sink = UserBuffersOutputBuffer::vmo_new(&task, buffers.clone())?;
+        VecOutputBuffer::new(sink.available())
+    };
 
     if offset != 0 {
         file.read_at(locked, current_task, offset, &mut output_buffer)?;
@@ -194,7 +204,8 @@ fn do_read_operation(
     let Some(task) = weak_task.upgrade() else {
         return error!(EINVAL);
     };
-    task.write_memory(buffer.address, &output_buffer.data())
+    let mut sink = UserBuffersOutputBuffer::vmo_new(&task, buffers)?;
+    sink.write(&output_buffer.data())
 }
 
 fn do_write_operation(
@@ -202,15 +213,15 @@ fn do_write_operation(
     current_task: &CurrentTask,
     weak_task: WeakRef<Task>,
     file: FileHandle,
-    buffer: UserBuffer,
+    buffers: UserBuffers,
     offset: usize,
 ) -> Result<usize, Errno> {
     let mut input_buffer = {
         let Some(task) = weak_task.upgrade() else {
             return error!(EINVAL);
         };
-        let input_vec = task.read_memory_to_vec(buffer.address, buffer.length)?;
-        VecInputBuffer::new(&input_vec)
+        let mut source = UserBuffersInputBuffer::vmo_new(&task, buffers)?;
+        VecInputBuffer::new(&source.read_all()?)
     };
 
     if offset != 0 {

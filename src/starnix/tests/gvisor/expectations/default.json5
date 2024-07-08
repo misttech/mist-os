@@ -154,20 +154,12 @@
                 "AffinityTest.Sanity",
 
                 // aio_test
-                "AIOTest.BasicWrite",
                 "AIOTest.MremapExpansion",
                 "AIOTest.BadWrite",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/3",
-                "AIOTest.ExitWithPendingIo",
                 "AIOTest.Mprotect",
                 "AIOTest.Mremap",
                 "AIOTest.Timeout",
                 "AIOTest.CloneVm",
-                "BadIOVecs/AIOVectorizedParamTest.BadIOVecs/0",
-                "BadIOVecs/AIOVectorizedParamTest.BadIOVecs/1",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/1",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/0",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/2",
 
                 // cgroup_test
                 "CPUAcctCgroup.CPUAcctStat",
@@ -973,6 +965,9 @@
 
                 // TODO(https://fxbug.dev/329684663): Re-enable once falke is resolved.
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
+
+                // Crashes due to assuming the aio context is a pointer.
+                "AIOTest.BasicWrite",
 
                 // This hangs on debug builds.
                 //

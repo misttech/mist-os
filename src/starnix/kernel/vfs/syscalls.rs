@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fs::fuchsia::TimerFile;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor, PAGE_SIZE};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter,
 };
@@ -23,6 +23,7 @@ use crate::vfs::{
     XattrOp,
 };
 use fuchsia_zircon as zx;
+use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked,
@@ -2860,10 +2861,47 @@ fn submit_iocb(
     let opcode = control_block.aio_lio_opcode as u32;
     let offset = control_block.aio_offset as usize;
     let flags = control_block.aio_flags;
-    let buffer = UserBuffer {
-        address: control_block.aio_buf.into(),
-        length: control_block.aio_nbytes as usize,
+
+    let op_type = match opcode {
+        starnix_uapi::IOCB_CMD_PREAD => IoOperationType::Read,
+        starnix_uapi::IOCB_CMD_PREADV => IoOperationType::ReadV,
+        starnix_uapi::IOCB_CMD_PWRITE => IoOperationType::Write,
+        starnix_uapi::IOCB_CMD_PWRITEV => IoOperationType::WriteV,
+        _ => {
+            track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
+            return error!(ENOSYS);
+        }
     };
+    match op_type {
+        IoOperationType::Read | IoOperationType::ReadV => {
+            if !file.can_read() {
+                return error!(EBADF);
+            }
+        }
+        IoOperationType::Write | IoOperationType::WriteV => {
+            if !file.can_write() {
+                return error!(EBADF);
+            }
+        }
+    }
+    let mut buffers = match op_type {
+        IoOperationType::Read | IoOperationType::Write => smallvec![UserBuffer {
+            address: control_block.aio_buf.into(),
+            length: control_block.aio_nbytes as usize,
+        }],
+        IoOperationType::ReadV | IoOperationType::WriteV => {
+            let count = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
+            current_task.read_iovec(control_block.aio_buf.into(), count)?
+        }
+    };
+
+    // Validate the user buffers and offset synchronously.
+    let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
+        current_task.maximum_valid_address(),
+        &mut buffers,
+    )?;
+    checked_add_offset_and_length(offset, buffer_length)?;
+
     let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
         let eventfd = current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
         if eventfd.downcast_file::<EventFdFileObject>().is_none() {
@@ -2874,32 +2912,13 @@ fn submit_iocb(
         None
     };
 
-    let op_type = match opcode {
-        starnix_uapi::IOCB_CMD_PREAD => {
-            if !file.can_read() {
-                return error!(EBADF);
-            }
-            IoOperationType::Read
-        }
-        starnix_uapi::IOCB_CMD_PWRITE => {
-            if !file.can_write() {
-                return error!(EBADF);
-            }
-            IoOperationType::Write
-        }
-        _ => {
-            track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
-            return error!(ENOSYS);
-        }
-    };
-
     let mut ctx = ctx.lock();
     ctx.queue_op(
         current_task,
         IoOperation {
             op_type,
             file: Arc::downgrade(&file),
-            buffer,
+            buffers,
             offset,
             id,
             iocb_addr,
