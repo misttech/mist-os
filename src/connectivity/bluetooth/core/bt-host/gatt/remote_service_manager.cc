@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/remote_service_manager.h"
 
+#include <pw_bytes/endian.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/error.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/remote_service.h"
@@ -537,10 +539,12 @@ void RemoteServiceManager::OnServiceChangedNotification(
   }
 
   ServiceChangedCharacteristicValue value;
-  value.range_start_handle =
-      le16toh(buffer.ReadMember<
-              &ServiceChangedCharacteristicValue::range_start_handle>());
-  value.range_end_handle = le16toh(
+  value.range_start_handle = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little,
+      buffer.ReadMember<
+          &ServiceChangedCharacteristicValue::range_start_handle>());
+  value.range_end_handle = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little,
       buffer
           .ReadMember<&ServiceChangedCharacteristicValue::range_end_handle>());
   if (value.range_start_handle > value.range_end_handle) {

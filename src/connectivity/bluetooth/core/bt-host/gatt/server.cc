@@ -6,6 +6,8 @@
 
 #include <lib/fit/function.h>
 
+#include <pw_bytes/endian.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/database.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/permissions.h"
@@ -121,7 +123,8 @@ class AttBasedServer final : public Server {
     att::PacketWriter writer(
         indicate_cb ? att::kIndication : att::kNotification, buffer.get());
     auto rsp_params = writer.mutable_payload<att::AttributeData>();
-    rsp_params->handle = htole16(config.handle);
+    rsp_params->handle =
+        pw::bytes::ConvertOrderTo(cpp20::endian::little, config.handle);
     writer.mutable_payload_data().Write(value, sizeof(att::AttributeData));
 
     if (!indicate_cb) {
@@ -160,7 +163,8 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::ExchangeMTURequestParams>();
-    uint16_t client_mtu = le16toh(params.client_rx_mtu);
+    uint16_t client_mtu = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                                      params.client_rx_mtu);
     uint16_t server_mtu = att_->preferred_mtu();
 
     auto buffer =
@@ -169,7 +173,8 @@ class AttBasedServer final : public Server {
 
     att::PacketWriter writer(att::kExchangeMTUResponse, buffer.get());
     auto rsp_params = writer.mutable_payload<att::ExchangeMTUResponseParams>();
-    rsp_params->server_rx_mtu = htole16(server_mtu);
+    rsp_params->server_rx_mtu =
+        pw::bytes::ConvertOrderTo(cpp20::endian::little, server_mtu);
 
     att_->Reply(tid, std::move(buffer));
 
@@ -192,8 +197,10 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::FindInformationRequestParams>();
-    att::Handle start = le16toh(params.start_handle);
-    att::Handle end = le16toh(params.end_handle);
+    att::Handle start =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.start_handle);
+    att::Handle end =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.end_handle);
 
     constexpr size_t kRspStructSize =
         sizeof(att::FindInformationResponseParams);
@@ -254,7 +261,7 @@ class AttBasedServer final : public Server {
         writer.mutable_payload_data().mutable_view(kRspStructSize);
     for (const auto& attr : results) {
       *reinterpret_cast<att::Handle*>(out_entries.mutable_data()) =
-          htole16(attr->handle());
+          pw::bytes::ConvertOrderTo(cpp20::endian::little, attr->handle());
       auto uuid_view = out_entries.mutable_view(sizeof(att::Handle));
       attr->type().ToBytes(&uuid_view, /*allow_32bit=*/false);
 
@@ -276,8 +283,10 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::FindByTypeValueRequestParams>();
-    att::Handle start = le16toh(params.start_handle);
-    att::Handle end = le16toh(params.end_handle);
+    att::Handle start =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.start_handle);
+    att::Handle end =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.end_handle);
     UUID type(params.type);
     constexpr size_t kParamsSize = sizeof(att::FindByTypeValueRequestParams);
 
@@ -331,11 +340,14 @@ class AttBasedServer final : public Server {
     for (const auto& attr : results) {
       auto* entry = reinterpret_cast<att::HandlesInformationList*>(
           next_entry.mutable_data());
-      entry->handle = htole16(attr->handle());
+      entry->handle =
+          pw::bytes::ConvertOrderTo(cpp20::endian::little, attr->handle());
       if (attr->group().active()) {
-        entry->group_end_handle = htole16(attr->group().end_handle());
+        entry->group_end_handle = pw::bytes::ConvertOrderTo(
+            cpp20::endian::little, attr->group().end_handle());
       } else {
-        entry->group_end_handle = htole16(attr->handle());
+        entry->group_end_handle =
+            pw::bytes::ConvertOrderTo(cpp20::endian::little, attr->handle());
       }
       next_entry = next_entry.mutable_view(kRspStructSize);
     }
@@ -354,14 +366,19 @@ class AttBasedServer final : public Server {
     // The group type is represented as either a 16-bit or 128-bit UUID.
     if (packet.payload_size() == sizeof(att::ReadByTypeRequestParams16)) {
       const auto& params = packet.payload<att::ReadByTypeRequestParams16>();
-      start = le16toh(params.start_handle);
-      end = le16toh(params.end_handle);
-      group_type = UUID(le16toh(params.type));
+      start = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                          params.start_handle);
+      end =
+          pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.end_handle);
+      group_type = UUID(static_cast<uint16_t>(
+          pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.type)));
     } else if (packet.payload_size() ==
                sizeof(att::ReadByTypeRequestParams128)) {
       const auto& params = packet.payload<att::ReadByTypeRequestParams128>();
-      start = le16toh(params.start_handle);
-      end = le16toh(params.end_handle);
+      start = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                          params.start_handle);
+      end =
+          pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.end_handle);
       group_type = UUID(params.type);
     } else {
       att_->ReplyWithError(
@@ -418,8 +435,10 @@ class AttBasedServer final : public Server {
     for (const auto& attr : results) {
       auto* entry = reinterpret_cast<att::AttributeGroupDataEntry*>(
           next_entry.mutable_data());
-      entry->start_handle = htole16(attr->group().start_handle());
-      entry->group_end_handle = htole16(attr->group().end_handle());
+      entry->start_handle = pw::bytes::ConvertOrderTo(
+          cpp20::endian::little, attr->group().start_handle());
+      entry->group_end_handle = pw::bytes::ConvertOrderTo(
+          cpp20::endian::little, attr->group().end_handle());
       next_entry.Write(attr->group().decl_value().view(0, value_size),
                        sizeof(att::AttributeGroupDataEntry));
 
@@ -440,14 +459,19 @@ class AttBasedServer final : public Server {
     // The attribute type is represented as either a 16-bit or 128-bit UUID.
     if (packet.payload_size() == sizeof(att::ReadByTypeRequestParams16)) {
       const auto& params = packet.payload<att::ReadByTypeRequestParams16>();
-      start = le16toh(params.start_handle);
-      end = le16toh(params.end_handle);
-      type = UUID(le16toh(params.type));
+      start = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                          params.start_handle);
+      end =
+          pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.end_handle);
+      type = UUID(static_cast<uint16_t>(
+          pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.type)));
     } else if (packet.payload_size() ==
                sizeof(att::ReadByTypeRequestParams128)) {
       const auto& params = packet.payload<att::ReadByTypeRequestParams128>();
-      start = le16toh(params.start_handle);
-      end = le16toh(params.end_handle);
+      start = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                          params.start_handle);
+      end =
+          pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.end_handle);
       type = UUID(params.type);
     } else {
       att_->ReplyWithError(
@@ -508,7 +532,8 @@ class AttBasedServer final : public Server {
 
         auto params = writer.mutable_payload<att::ReadByTypeResponseParams>();
         params->length = static_cast<uint8_t>(entry_size);
-        params->attribute_data_list->handle = htole16(handle);
+        params->attribute_data_list->handle =
+            pw::bytes::ConvertOrderTo(cpp20::endian::little, handle);
         writer.mutable_payload_data().Write(
             value.data(), value_size, sizeof(params->length) + sizeof(handle));
 
@@ -541,7 +566,8 @@ class AttBasedServer final : public Server {
     for (const auto& attr : results) {
       auto* entry =
           reinterpret_cast<att::AttributeData*>(next_entry.mutable_data());
-      entry->handle = htole16(attr->handle());
+      entry->handle =
+          pw::bytes::ConvertOrderTo(cpp20::endian::little, attr->handle());
       next_entry.Write(attr->value()->view(0, value_size),
                        sizeof(entry->handle));
 
@@ -562,8 +588,10 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::ReadBlobRequestParams>();
-    att::Handle handle = le16toh(params.handle);
-    uint16_t offset = le16toh(params.offset);
+    att::Handle handle =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.handle);
+    uint16_t offset =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.offset);
 
     const auto* attr = db()->FindAttribute(handle);
     if (!attr) {
@@ -631,7 +659,8 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::WriteRequestParams>();
-    att::Handle handle = le16toh(params.handle);
+    att::Handle handle =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.handle);
 
     const auto* attr = db()->FindAttribute(handle);
     if (!attr) {
@@ -691,7 +720,8 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::WriteRequestParams>();
-    att::Handle handle = le16toh(params.handle);
+    att::Handle handle =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.handle);
     const auto* attr = db()->FindAttribute(handle);
 
     // Attributes can be invalid if the handle is invalid
@@ -730,7 +760,8 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::WriteRequestParams>();
-    att::Handle handle = le16toh(params.handle);
+    att::Handle handle =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.handle);
 
     const auto* attr = db()->FindAttribute(handle);
     if (!attr) {
@@ -789,8 +820,10 @@ class AttBasedServer final : public Server {
     }
 
     const auto& params = packet.payload<att::PrepareWriteRequestParams>();
-    att::Handle handle = le16toh(params.handle);
-    uint16_t offset = le16toh(params.offset);
+    att::Handle handle =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.handle);
+    uint16_t offset =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.offset);
     auto value_view = packet.payload_data().view(sizeof(params.handle) +
                                                  sizeof(params.offset));
 
