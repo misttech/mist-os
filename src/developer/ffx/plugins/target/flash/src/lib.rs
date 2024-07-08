@@ -250,6 +250,7 @@ async fn flash_plugin_impl<W: Write>(
                         r"
 Warning: the target does not have a node name and is in UDP fastboot mode.
 Rediscovering the target after bootloader reboot will be impossible.
+Please try --no-bootloader-reboot to avoid a reboot.
 Using address {} as node name",
                         socket_addr.to_string()
                     )
@@ -278,6 +279,7 @@ Using address {} as node name",
                         r"
 Warning: the target does not have a node name and is in TCP fastboot mode.
 Rediscovering the target after bootloader reboot will be impossible.
+Please try --no-bootloader-reboot to avoid a reboot.
 Using address {} as node name",
                         socket_addr.to_string()
                     )
