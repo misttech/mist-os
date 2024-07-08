@@ -245,6 +245,7 @@
     "files.watcherExclude": {
       "**/.DS_Store": true,
       "**/.cipd": true,
+      "**/.git": true,
       ".jiri_root/goma_cache/**": true,
       ".jiri_root/update_history*/**": true,
       "out/**": true,
