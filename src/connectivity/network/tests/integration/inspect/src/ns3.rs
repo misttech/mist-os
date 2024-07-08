@@ -10,6 +10,7 @@ mod common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
+use std::mem::MaybeUninit;
 use std::num::{NonZeroU16, NonZeroU64};
 use std::time::Duration;
 
@@ -666,10 +667,25 @@ async fn inspect_counters(name: &str) {
         .datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
         .await
         .expect("datagram socket creation failed");
+    let receiver = realm
+        .datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("datagram socket creation failed");
+
     let addr = net_declare::std_socket_addr!("127.0.0.1:8080");
-    let buf = [0; 8];
+    receiver.bind(&addr.into()).expect("binding receiver");
+
+    const MSG_SIZE: usize = 8;
+    let buf = [0; MSG_SIZE];
     let bytes_sent = sender.send_to(&buf, &addr.into()).expect("socket send to failed");
     assert_eq!(bytes_sent, buf.len());
+
+    // We don't care about the bytes, we just want to make sure we receive it so
+    // we know the message has made through the stack and the counters are as we
+    // expect.
+    let mut recv_buf = [MaybeUninit::<u8>::uninit(); MSG_SIZE];
+    let bytes_received = receiver.recv(&mut recv_buf[..]).expect("receiving bytes");
+    assert_eq!(bytes_received, MSG_SIZE);
 
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
