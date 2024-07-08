@@ -1,0 +1,47 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+
+group("container_resources") {
+  deps = [
+    ":slash_dev_pts_target",
+    ":slash_dev_shm_target",
+    ":slash_dev_target",
+    ":slash_proc_target",
+    ":slash_sys_target",
+    ":slash_tmp_target",
+    "//src/starnix/containers:data_tmp_target",
+  ]
+}
+
+resource("slash_proc_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "proc/.placeholder" ]
+}
+
+resource("slash_sys_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "sys/.placeholder" ]
+}
+
+resource("slash_tmp_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "tmp/.placeholder" ]
+}
+
+resource("slash_dev_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "dev/.placeholder" ]
+}
+
+resource("slash_dev_pts_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "dev/pts/.placeholder" ]
+}
+
+resource("slash_dev_shm_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "dev/shm/.placeholder" ]
+}

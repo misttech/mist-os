@@ -733,6 +733,7 @@ zbi("starnix_kernel_zbi") {
     ":starnix_kernel_manifest",
     "//build/info/bootfs:minimum_utc_stamp",
     "//src/starnix/containers:default_init",
+    "//src/starnix/containers/mistos:container_resources",
     "//src/starnix/examples/hello_starnix:bin",
   ]
 
