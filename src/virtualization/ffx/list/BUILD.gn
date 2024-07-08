@@ -7,6 +7,7 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 ffx_plugin("ffx_guest_list") {
   version = "0.1.0"
   edition = "2021"
+  sdk_category = "internal"
 
   args_sources = [ "src/args.rs" ]
   args_deps = [ "//src/virtualization/lib/cli/args:guest_cli_args" ]
@@ -14,7 +15,8 @@ ffx_plugin("ffx_guest_list") {
   sources = [ "src/lib.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/virtualization/lib/cli:guest_cli",
+    "//third_party/rust_crates:async-trait",
   ]
 }

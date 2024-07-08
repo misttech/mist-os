@@ -2,35 +2,44 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
 use ffx_guest_attach_args::AttachArgs;
-use ffx_writer::Writer;
+use fho::{bug, return_user_error, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use std::io::Write as _;
 
-#[ffx_plugin("guest_enabled")]
-pub async fn guest_attach(
-    #[ffx(machine = guest_cli::attach::AttachResult)] _writer: Writer,
-    args: AttachArgs,
-    _remote_control: RemoteControlProxy,
-) -> Result<()> {
-    // TODO(https://fxbug.dev/42068091): Remove when overnet supports duplicated socket handles.
-    println!("The ffx guest plugin doesn't support attaching to a running guest.");
-    println!("Use the guest tool instead: `fx shell guest attach {}`", args.guest_type);
-    println!("See https://fxbug.dev/42068091 for updates.");
-    return Ok(());
+#[derive(FfxTool)]
+pub struct GuestAttachTool {
+    #[command]
+    pub cmd: AttachArgs,
+    remote_control: RemoteControlProxy,
+}
 
-    // TODO(https://fxbug.dev/42068091): Enable when overnet supports duplicated socket handles.
-    #[allow(unreachable_code)]
-    {
-        let services = guest_cli::platform::HostPlatformServices::new(_remote_control);
+fho::embedded_plugin!(GuestAttachTool);
 
-        let output = guest_cli::attach::handle_attach(&services, &args).await?;
-        if _writer.is_machine() {
-            _writer.machine(&output)?;
-        } else {
-            _writer.write(format!("{}\n", output))?;
+#[async_trait::async_trait(?Send)]
+impl FfxMain for GuestAttachTool {
+    type Writer = MachineWriter<guest_cli::attach::AttachResult>;
+    async fn main(self, mut _writer: Self::Writer) -> fho::Result<()> {
+        // TODO(https://fxbug.dev/42068091): Remove when overnet supports duplicated socket handles.
+        return_user_error!(
+            "The ffx guest plugin doesn't support attaching to a running guest. \
+    Use the guest tool instead: `fx shell guest attach {}`. \
+    See https://fxbug.dev/42068091 for updates.",
+            self.cmd.guest_type
+        );
+
+        // TODO(https://fxbug.dev/42068091): Enable when overnet supports duplicated socket handles.
+        #[allow(unreachable_code)]
+        {
+            let services = guest_cli::platform::HostPlatformServices::new(self.remote_control);
+
+            let output = guest_cli::attach::handle_attach(&services, &self.cmd).await?;
+            if _writer.is_machine() {
+                _writer.machine(&output)?;
+            } else {
+                writeln!(_writer, "{output}").map_err(|e| bug!(e))?;
+            }
+            Ok(())
         }
-        Ok(())
     }
 }

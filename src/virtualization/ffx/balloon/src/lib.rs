@@ -2,24 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
 use ffx_guest_balloon_args::BalloonArgs;
-use ffx_writer::Writer;
+use fho::{bug, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use std::io::Write as _;
 
-#[ffx_plugin("guest_enabled")]
-pub async fn guest_balloon(
-    #[ffx(machine = guest_cli::balloon::BalloonResult)] writer: Writer,
-    args: BalloonArgs,
+#[derive(FfxTool)]
+pub struct GuestBalloonTool {
+    #[command]
+    pub cmd: BalloonArgs,
     remote_control: RemoteControlProxy,
-) -> Result<()> {
-    let services = guest_cli::platform::HostPlatformServices::new(remote_control);
-    let output = guest_cli::balloon::handle_balloon(&services, &args).await;
-    if writer.is_machine() {
-        writer.machine(&output)?;
-    } else {
-        writer.write(format!("{}\n", output))?;
+}
+
+fho::embedded_plugin!(GuestBalloonTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for GuestBalloonTool {
+    type Writer = MachineWriter<guest_cli::balloon::BalloonResult>;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let services = guest_cli::platform::HostPlatformServices::new(self.remote_control);
+        let output = guest_cli::balloon::handle_balloon(&services, &self.cmd).await;
+        if writer.is_machine() {
+            writer.machine(&output)?;
+        } else {
+            writeln!(writer, "{output}").map_err(|e| bug!(e))?;
+        }
+        Ok(())
     }
-    Ok(())
 }
