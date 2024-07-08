@@ -32,6 +32,7 @@
 //! protocol does not remove the interface).
 
 use std::collections::hash_map;
+use std::fmt::Debug;
 use std::num::NonZeroU16;
 use std::ops::DerefMut as _;
 use std::pin::pin;
@@ -1392,9 +1393,13 @@ async fn run_address_state_provider(
                 panic!("`AddressInfo` unexpectedly missing for {:?}", address)
             }
         };
+    // After having removed ASP from the external state, the bindings ID may not
+    // be valid anymore if this is racing with device removal. Shadow the
+    // variable name to prevent misuse.
+    let id = ();
+    let () = id;
 
     let StateInCore { address: remove_address, subnet_route } = state_to_remove_from_core;
-    let device_id = bindings_ctx.devices.get_core_id(id).expect("interface not found");
 
     // The presence of this `route_set` indicates that we added a subnet route
     // previously due to the `add_subnet_route` AddressParameters option.
@@ -1406,7 +1411,7 @@ async fn run_address_state_provider(
 
     if remove_address {
         let result =
-            ctx.api().device_ip_any().del_ip_addr(&device_id, address).expect("address must exist");
+            ctx.api().device_ip_any().del_ip_addr(&core_id, address).expect("address must exist");
         let _: AddrSubnetEither = result
             .map_deferred(|d| {
                 d.map_left(|l| l.into_future("device addr", &address).map(Into::into))
@@ -1417,7 +1422,7 @@ async fn run_address_state_provider(
     }
 
     if let Some(removal_reason) = removal_reason {
-        send_address_removal_event(address.get(), id, control_handle, removal_reason.into());
+        send_address_removal_event(address.get(), &core_id, control_handle, removal_reason.into());
     }
 }
 
@@ -1710,13 +1715,13 @@ fn dispatch_address_state_provider_request(
 
 fn send_address_removal_event(
     addr: IpAddr,
-    id: BindingId,
+    id: impl Debug,
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
     reason: fnet_interfaces_admin::AddressRemovalReason,
 ) {
     control_handle.send_on_address_removed(reason).unwrap_or_else(|e| {
         error!(
-            "failed to send address removal reason for addr {:?} on interface {}: {:?}",
+            "failed to send address removal reason for addr {:?} on interface {:?}: {:?}",
             addr, id, e
         );
     })

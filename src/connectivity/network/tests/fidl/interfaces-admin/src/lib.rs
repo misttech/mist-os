@@ -719,6 +719,72 @@ async fn add_address_removal<N: Netstack>(
     }
 }
 
+// Races address and interface removal and verifies that the end state is as
+// expected. Guards against regression for ASP race in Netstack3.
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn race_address_and_interface_removal<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("new sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+    let iface_id = interface.id();
+
+    let address_state_provider = interfaces::add_address_wait_assigned(
+        interface.control(),
+        fidl_subnet!("192.0.2.1/24"),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+    )
+    .await
+    .expect("add address failed unexpectedly");
+
+    let interfaces_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interfaces_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("create event stream")
+    .map(|r| r.expect("watcher error"))
+    .fuse();
+    let mut watcher = pin!(watcher);
+
+    let _existing = fidl_fuchsia_net_interfaces_ext::existing(
+        watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+    )
+    .await
+    .expect("existing");
+
+    // Drop both the interface and state provider, poll on the watcher until we
+    // see the interface removed.
+    core::mem::drop((interface, address_state_provider));
+    loop {
+        let event = watcher.next().await.expect("watcher closed");
+        match event {
+            e @ fnet_interfaces::Event::Existing(_)
+            | e @ fnet_interfaces::Event::Idle(_)
+            | e @ fnet_interfaces::Event::Added(_) => panic!("unexpected event {e:?}"),
+            fnet_interfaces::Event::Removed(id) => {
+                assert_eq!(id, iface_id);
+                break;
+            }
+            fnet_interfaces::Event::Changed(fnet_interfaces::Properties { id, .. }) => {
+                // We may see interface changed events depending on how the race
+                // plays out, the only thing we can assert on is that it relates
+                // to the interface we're racing.
+                assert_eq!(id, Some(iface_id));
+            }
+        }
+    }
+}
+
 // Add an address while the interface is offline, bring the interface online and ensure that the
 // assignment state is set correctly.
 #[netstack_test]
