@@ -25,7 +25,6 @@
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/vim3.h"
-#include "src/storage/lib/paver/violet.h"
 #include "src/storage/lib/paver/x64.h"
 #elif defined(astro)
 #include "src/storage/lib/paver/astro.h"
@@ -37,8 +36,6 @@
 #include "src/storage/lib/paver/sherlock.h"
 #elif defined(vim3)
 #include "src/storage/lib/paver/vim3.h"
-#elif defined(violet)
-#include "src/storage/lib/paver/violet.h"
 #elif defined(x64)
 #include "src/storage/lib/paver/x64.h"
 #elif defined(android)
@@ -94,8 +91,6 @@ int main(int argc, char** argv) {
   abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::AndroidAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
@@ -116,9 +111,6 @@ int main(int argc, char** argv) {
 #elif defined(vim3)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
-#elif defined(violet)
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
 #elif defined(x64)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());

@@ -153,16 +153,6 @@ source_set("vim3") {
   ]
 }
 
-source_set("violet") {
-  sources = [ "violet.cc" ]
-  public_deps = [
-    ":gpt",
-    ":paver-core",
-    "//src/lib/uuid",
-    "//src/storage/gpt",
-  ]
-}
-
 source_set("x64") {
   sources = [
     "system_shutdown_state.cc",
@@ -201,7 +191,6 @@ source_set("paver") {
     ":paver-core",
     ":sherlock",
     ":vim3",
-    ":violet",
     ":x64",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
   ]

@@ -50,7 +50,6 @@
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/utils.h"
 #include "src/storage/lib/paver/vim3.h"
-#include "src/storage/lib/paver/violet.h"
 #include "src/storage/lib/paver/x64.h"
 
 namespace {
@@ -288,7 +287,6 @@ PaverServiceTest::PaverServiceTest()
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::VioletPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
@@ -296,7 +294,6 @@ PaverServiceTest::PaverServiceTest()
   abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
-  abr::ClientFactory::Register(std::make_unique<paver::VioletAbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
 
   fidl::BindServer(loop_.dispatcher(), std::move(server), paver_.get());
