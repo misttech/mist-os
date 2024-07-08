@@ -14,6 +14,11 @@ if (is_host) {
     ]
     transport = "fuchsia-controller"
     environments = [ vim3_env ]
+
+    # This test changes the time on device to future and resets it back to present.
+    # Failing to reset the time can cause subsequent tests to fail. So prevent it
+    # from affecting other tests by isolating it to its own shard.
+    isolated = true
   }
 }
 
