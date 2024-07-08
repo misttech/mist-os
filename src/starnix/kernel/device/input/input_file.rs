@@ -14,8 +14,9 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    error, uapi, ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, FF_CNT,
-    INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, SW_CNT,
+    error, uapi, ABS_CNT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_SLOT, ABS_MT_TRACKING_ID,
+    BTN_MISC, BTN_TOUCH, FF_CNT, INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT,
+    MSC_CNT, REL_CNT, SW_CNT,
 };
 
 use fuchsia_inspect::NumericProperty;
@@ -28,6 +29,14 @@ pub struct InspectStatus {
     _inspect_node: fuchsia_inspect::Node,
 
     /// The number of FIDL events received from Fuchsia input system.
+    ///
+    /// We expect:
+    /// fidl_events_received_count = fidl_events_ignored_count +
+    ///                              fidl_events_unexpected_count +
+    ///                              fidl_events_converted_count
+    /// otherwise starnix ignored events unexpectedly.
+    ///
+    /// fidl_events_unexpected_count should be 0, if not it hints issues from upstream of ui stack.
     pub fidl_events_received_count: fuchsia_inspect::UintProperty,
 
     /// The number of FIDL events ignored to this module’s representation of TouchEvent.
@@ -103,6 +112,8 @@ pub struct InputFile {
     supported_haptics: BitSet<{ min_bytes(FF_CNT) }>, // 'F'orce 'F'eedback
     supported_misc_features: BitSet<{ min_bytes(MSC_CNT) }>,
     properties: BitSet<{ min_bytes(INPUT_PROP_CNT) }>,
+    mt_slot_axis_info: uapi::input_absinfo,
+    mt_tracking_id_axis_info: uapi::input_absinfo,
     x_axis_info: uapi::input_absinfo,
     y_axis_info: uapi::input_absinfo,
     pub inner: Mutex<InputFileMutableState>,
@@ -134,15 +145,16 @@ fn keyboard_properties() -> BitSet<{ min_bytes(INPUT_PROP_CNT) }> {
 fn touch_key_attributes() -> BitSet<{ min_bytes(KEY_CNT) }> {
     let mut attrs = BitSet::new();
     attrs.set(BTN_TOUCH);
-    attrs.set(BTN_TOOL_FINGER);
     attrs
 }
 
 /// Returns appropriate `ABS`-olute position related flags for a touchscreen device.
 fn touch_position_attributes() -> BitSet<{ min_bytes(ABS_CNT) }> {
     let mut attrs = BitSet::new();
-    attrs.set(ABS_X);
-    attrs.set(ABS_Y);
+    attrs.set(ABS_MT_SLOT);
+    attrs.set(ABS_MT_TRACKING_ID);
+    attrs.set(ABS_MT_POSITION_X);
+    attrs.set(ABS_MT_POSITION_Y);
     attrs
 }
 
@@ -201,6 +213,16 @@ impl InputFile {
             supported_haptics: BitSet::new(),           // None supported
             supported_misc_features: BitSet::new(),     // None supported
             properties: touch_properties(),
+            mt_slot_axis_info: uapi::input_absinfo {
+                minimum: 0,
+                maximum: 10,
+                ..uapi::input_absinfo::default()
+            },
+            mt_tracking_id_axis_info: uapi::input_absinfo {
+                minimum: 0,
+                maximum: i32::MAX,
+                ..uapi::input_absinfo::default()
+            },
             x_axis_info: uapi::input_absinfo {
                 minimum: 0,
                 maximum: i32::from(width),
@@ -242,6 +264,8 @@ impl InputFile {
             supported_haptics: BitSet::new(),           // None supported
             supported_misc_features: BitSet::new(),     // None supported
             properties: keyboard_properties(),
+            mt_slot_axis_info: uapi::input_absinfo::default(),
+            mt_tracking_id_axis_info: uapi::input_absinfo::default(),
             x_axis_info: uapi::input_absinfo::default(),
             y_axis_info: uapi::input_absinfo::default(),
             inner: Mutex::new(InputFileMutableState {
@@ -315,11 +339,20 @@ impl FileOps for InputFile {
                 current_task.write_object(UserRef::new(user_addr), &self.properties.bytes)?;
                 Ok(SUCCESS)
             }
-            uapi::EVIOCGABS_X => {
+            uapi::EVIOCGABS_MT_SLOT => {
+                current_task.write_object(UserRef::new(user_addr), &self.mt_slot_axis_info)?;
+                Ok(SUCCESS)
+            }
+            uapi::EVIOCGABS_MT_TRACKING_ID => {
+                current_task
+                    .write_object(UserRef::new(user_addr), &self.mt_tracking_id_axis_info)?;
+                Ok(SUCCESS)
+            }
+            uapi::EVIOCGABS_MT_POSITION_X => {
                 current_task.write_object(UserRef::new(user_addr), &self.x_axis_info)?;
                 Ok(SUCCESS)
             }
-            uapi::EVIOCGABS_Y => {
+            uapi::EVIOCGABS_MT_POSITION_Y => {
                 current_task.write_object(UserRef::new(user_addr), &self.y_axis_info)?;
                 Ok(SUCCESS)
             }

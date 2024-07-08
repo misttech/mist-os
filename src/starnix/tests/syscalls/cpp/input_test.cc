@@ -11,6 +11,7 @@
 #include <string>
 
 #include <gtest/gtest.h>
+#include <linux/input-event-codes.h>
 #include <linux/input.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
@@ -75,25 +76,32 @@ TEST(InputTest, DevicePropertiesMatchTouchProperties) {
     ASSERT_EQ(0, ioctl(fd.get(), EVIOCGID, &buf)) << "get identifier failed: " << strerror(errno);
   }
 
-  // Getting the supported keys must succeed, with `BTN_TOUCH` and `BTN_TOOL_FINGER` supported.
+  // Getting the supported keys must succeed, with `BTN_TOUCH` supported.
   {
     constexpr auto kBufSize = min_bytes(KEY_MAX);
     std::array<uint8_t, kBufSize> buf{};
     ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_KEY, kBufSize), &buf))
         << "get supported keys failed: " << strerror(errno);
     ASSERT_TRUE(get_bit(buf, BTN_TOUCH)) << " BTN_TOUCH not supported (but should be)";
-    ASSERT_TRUE(get_bit(buf, BTN_TOOL_FINGER)) << " BTN_TOOL_FINGER not supported (but should be)";
+    ASSERT_FALSE(get_bit(buf, BTN_TOOL_FINGER)) << " BTN_TOOL_FINGER should not be supported";
   }
 
   // Getting the supported absolute position attributes must succeed, with `ABS_X` and
-  // `ABS_Y` supported.
+  // `ABS_Y` not supported, and ABS_MT_ supported.
   {
     constexpr auto kBufSize = min_bytes(ABS_MAX);
     std::array<uint8_t, kBufSize> buf{};
     ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_ABS, kBufSize), &buf))
         << "get supported absolute position failed: " << strerror(errno);
-    ASSERT_TRUE(get_bit(buf, ABS_X)) << " ABS_X not supported (but should be)";
-    ASSERT_TRUE(get_bit(buf, ABS_Y)) << " ABS_Y not supported (but should be)";
+    ASSERT_FALSE(get_bit(buf, ABS_X)) << " ABS_X should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_Y)) << " ABS_Y should not be supported";
+    ASSERT_TRUE(get_bit(buf, ABS_MT_SLOT)) << " ABS_MT_SLOT should not be supported";
+    ASSERT_TRUE(get_bit(buf, ABS_MT_TRACKING_ID))
+        << " ABS_MT_TRACKING_ID not supported (but should be)";
+    ASSERT_TRUE(get_bit(buf, ABS_MT_POSITION_X))
+        << " ABS_MT_POSITION_X not supported (but should be)";
+    ASSERT_TRUE(get_bit(buf, ABS_MT_POSITION_Y))
+        << " ABS_MT_POSITION_Y not supported (but should be)";
   }
 
   // Getting the supported relative motive attributes must succeed, but the actual values
@@ -147,21 +155,37 @@ TEST(InputTest, DevicePropertiesMatchTouchProperties) {
         << " INPUT_PROP_DIRECT not supported (but should be)";
   }
 
-  // Getting the x-axis range must succeed. The exact axis parameters are device dependent,
-  // but some basic validation is possible.
   {
     input_absinfo buf{};
-    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_X), &buf))
-        << "get x-axis info failed: " << strerror(errno);
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_SLOT), &buf))
+        << "get slot info failed: " << strerror(errno);
     ASSERT_EQ(0.0, buf.minimum);
-    ASSERT_GT(buf.maximum, 0.0);
+    ASSERT_EQ(buf.maximum, 10.0);
+  }
+
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_TRACKING_ID), &buf))
+        << "get tracking id info failed: " << strerror(errno);
+    ASSERT_EQ(0.0, buf.minimum);
+    ASSERT_EQ(buf.maximum, 0x7FFFFFFF);
   }
 
   // Getting the x-axis range must succeed. The exact axis parameters are device dependent,
   // but some basic validation is possible.
   {
     input_absinfo buf{};
-    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_Y), &buf))
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_POSITION_X), &buf))
+        << "get x-axis info failed: " << strerror(errno);
+    ASSERT_EQ(0.0, buf.minimum);
+    ASSERT_GT(buf.maximum, 0.0);
+  }
+
+  // Getting the y-axis range must succeed. The exact axis parameters are device dependent,
+  // but some basic validation is possible.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_POSITION_Y), &buf))
         << "get y-axis info failed: " << strerror(errno);
     ASSERT_EQ(0.0, buf.minimum);
     ASSERT_GT(buf.maximum, 0.0);
@@ -199,14 +223,18 @@ TEST(InputTest, DevicePropertiesMatchKeyboardProperties) {
   }
 
   // Getting the supported absolute position attributes must succeed, but Keyboard should
-  // not support position attributes `ABS_X` and `ABS_Y`.
+  // not support touch attributes.
   {
     constexpr auto kBufSize = min_bytes(ABS_MAX);
     std::array<uint8_t, kBufSize> buf{};
     ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_ABS, kBufSize), &buf))
         << "get supported absolute position failed: " << strerror(errno);
-    ASSERT_FALSE(get_bit(buf, ABS_X)) << " ABS_X not supported (but should be)";
-    ASSERT_FALSE(get_bit(buf, ABS_Y)) << " ABS_Y not supported (but should be)";
+    ASSERT_FALSE(get_bit(buf, ABS_X)) << " ABS_X should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_Y)) << " ABS_Y should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_SLOT)) << " ABS_MT_SLOT should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_TRACKING_ID)) << " ABS_MT_TRACKING_ID should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_POSITION_X)) << " ABS_MT_POSITION_X should not be supported";
+    ASSERT_FALSE(get_bit(buf, ABS_MT_POSITION_Y)) << " ABS_MT_POSITION_Y should not be supported";
   }
 
   // Getting the supported relative motive attributes must succeed, but the actual values
@@ -260,17 +288,31 @@ TEST(InputTest, DevicePropertiesMatchKeyboardProperties) {
         << " INPUT_PROP_DIRECT not supported (but should be)";
   }
 
+  // Getting the ABS_MT_SLOT range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_SLOT), &buf))
+        << "get slot info failed: " << strerror(errno);
+  }
+
+  // Getting the ABS_MT_TRACKING_ID range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_TRACKING_ID), &buf))
+        << "get tracking id info failed: " << strerror(errno);
+  }
+
   // Getting the x-axis range must succeed, but the actual values don't matter.
   {
     input_absinfo buf{};
-    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_X), &buf))
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_POSITION_X), &buf))
         << "get x-axis info failed: " << strerror(errno);
   }
 
   // Getting the y-axis range must succeed, but the actual values don't matter.
   {
     input_absinfo buf{};
-    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_Y), &buf))
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_MT_POSITION_Y), &buf))
         << "get y-axis info failed: " << strerror(errno);
   }
 }
