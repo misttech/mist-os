@@ -22,6 +22,7 @@ namespace syslog_runtime {
 
 struct LogBuffer;
 
+namespace internal {
 // A null-safe wrapper around cpp17::optional<cpp17::string_view>
 //
 // This class is used to represent a string that may be nullptr. It is used
@@ -30,7 +31,6 @@ struct LogBuffer;
 //
 // This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
 // NOLINT is used as implicit conversions are intentional here.
-// This is deprecated. Please use applicable Builder classes instead.
 class NullSafeStringView final {
  public:
   //  Constructs a NullSafeStringView from a cpp17::string_view.
@@ -69,6 +69,7 @@ class NullSafeStringView final {
  private:
   cpp17::optional<cpp17::string_view> string_view_;
 };
+}  // namespace internal
 
 template <typename Key, typename Value>
 struct KeyValue final {

@@ -191,8 +191,9 @@ fuchsia_logging::LogSeverity GetMinLogSeverity() {
   return syslog_runtime::g_log_settings.min_log_level;
 }
 
-void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
-                 unsigned int line, NullSafeStringView msg, NullSafeStringView condition) {
+void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                 internal::NullSafeStringView file, unsigned int line,
+                 internal::NullSafeStringView msg, internal::NullSafeStringView condition) {
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
 }
 
@@ -246,9 +247,9 @@ void WriteLog(fuchsia_logging::LogSeverity severity, const char* file, unsigned 
 
 LogBuffer LogBufferBuilder::Build() {
   LogBuffer buffer;
-  BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
-              NullSafeStringView::CreateFromOptional(msg_),
-              NullSafeStringView::CreateFromOptional(condition_));
+  BeginRecord(&buffer, severity_, internal::NullSafeStringView::CreateFromOptional(file_name_),
+              line_, internal::NullSafeStringView::CreateFromOptional(msg_),
+              internal::NullSafeStringView::CreateFromOptional(condition_));
   return buffer;
 }
 }  // namespace syslog_runtime

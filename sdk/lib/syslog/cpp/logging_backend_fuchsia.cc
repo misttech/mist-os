@@ -181,14 +181,16 @@ void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severit
   }
 }
 
-void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
-                 unsigned int line, NullSafeStringView msg, NullSafeStringView condition) {
+void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                 internal::NullSafeStringView file, unsigned int line,
+                 internal::NullSafeStringView msg, internal::NullSafeStringView condition) {
   BeginRecordInternal(buffer, severity, file, line, msg, condition, ZX_HANDLE_INVALID);
 }
 
 void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                           NullSafeStringView file_name, unsigned int line, NullSafeStringView msg,
-                           NullSafeStringView condition, zx_handle_t socket) {
+                           internal::NullSafeStringView file_name, unsigned int line,
+                           internal::NullSafeStringView msg, internal::NullSafeStringView condition,
+                           zx_handle_t socket) {
   BeginRecordInternal(buffer, severity, file_name, line, msg, condition, socket);
 }
 
@@ -354,13 +356,14 @@ internal::LogState::LogState(const fuchsia_logging::LogSettings& settings,
 LogBuffer LogBufferBuilder::Build() {
   LogBuffer buffer;
   if (socket_) {
-    BeginRecordWithSocket(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_),
-                          line_, NullSafeStringView::CreateFromOptional(msg_),
-                          NullSafeStringView::CreateFromOptional(condition_), socket_);
+    BeginRecordWithSocket(&buffer, severity_,
+                          internal::NullSafeStringView::CreateFromOptional(file_name_), line_,
+                          internal::NullSafeStringView::CreateFromOptional(msg_),
+                          internal::NullSafeStringView::CreateFromOptional(condition_), socket_);
   } else {
-    BeginRecord(&buffer, severity_, NullSafeStringView::CreateFromOptional(file_name_), line_,
-                NullSafeStringView::CreateFromOptional(msg_),
-                NullSafeStringView::CreateFromOptional(condition_));
+    BeginRecord(&buffer, severity_, internal::NullSafeStringView::CreateFromOptional(file_name_),
+                line_, internal::NullSafeStringView::CreateFromOptional(msg_),
+                internal::NullSafeStringView::CreateFromOptional(condition_));
   }
   return buffer;
 }
