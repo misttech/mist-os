@@ -21,7 +21,6 @@ pub mod loop_device;
 pub mod mem;
 pub mod perfetto_consumer;
 pub mod remote_block_device;
-pub mod sync_fence_registry;
 pub mod sync_file;
 pub mod terminal;
 pub mod touch_power_policy_device;
