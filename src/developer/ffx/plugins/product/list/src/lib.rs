@@ -7,12 +7,9 @@
 
 use ::gcs::client::{Client, ProgressResponse};
 use anyhow::{Context, Result};
-use errors::ffx_bail;
 use ffx_config::sdk::SdkVersion;
-use ffx_core::ffx_plugin;
 use ffx_product_list_args::ListCommand;
-use ffx_writer::Writer;
-use fidl_fuchsia_developer_ffx_ext::RepositoryConfig;
+use fho::{bug, return_user_error, FfxMain, FfxTool, MachineWriter, ToolIO as _};
 use gcs::gs_url::split_gs_url;
 use lazy_static::lazy_static;
 use maplit::hashmap;
@@ -52,31 +49,42 @@ pub struct ProductBundle {
 type ProductManifest = Vec<ProductBundle>;
 
 /// `ffx product list` sub-command.
-#[ffx_plugin()]
-pub async fn pb_list(
-    cmd: ListCommand,
-    #[ffx(machine = Vec<RepositoryConfig>)] mut writer: Writer,
-) -> Result<()> {
-    let mut input = stdin();
-    // Emit machine progress info to stderr so users can redirect it to /dev/null.
-    let mut output = if writer.is_machine() {
-        Box::new(stderr()) as Box<dyn Write + Send + Sync>
-    } else {
-        Box::new(stdout())
-    };
-    let mut err_out = stderr();
-    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+#[derive(FfxTool)]
+pub struct ProductListTool {
+    #[command]
+    pub cmd: ListCommand,
+}
 
-    let pbs = pb_list_impl(&cmd.auth, cmd.base_url, cmd.version, cmd.branch, &ui).await?;
-    if writer.is_machine() {
-        writer.machine(&pbs)?;
-    } else {
-        let pb_names = pbs.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
-        let pb_string = pb_names.join("\n");
-        writeln!(writer, "{}", pb_string)?;
+fho::embedded_plugin!(ProductListTool);
+
+/// This plugin will get the info of repository inside product bundle.
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ProductListTool {
+    type Writer = MachineWriter<Vec<ProductBundle>>;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let mut input = stdin();
+        // Emit machine progress info to stderr so users can redirect it to /dev/null.
+        let mut output = if writer.is_machine() {
+            Box::new(stderr()) as Box<dyn Write + Send + Sync>
+        } else {
+            Box::new(stdout())
+        };
+        let mut err_out = stderr();
+        let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+        let pbs =
+            pb_list_impl(&self.cmd.auth, self.cmd.base_url, self.cmd.version, self.cmd.branch, &ui)
+                .await?;
+        if writer.is_machine() {
+            writer.machine(&pbs)?;
+        } else {
+            let pb_names = pbs.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
+            let pb_string = pb_names.join("\n");
+            writeln!(writer, "{}", pb_string).map_err(|e| bug!(e))?;
+        }
+
+        Ok(())
     }
-
-    Ok(())
 }
 
 pub async fn resolve_branch_to_base_urls<I>(
@@ -85,7 +93,7 @@ pub async fn resolve_branch_to_base_urls<I>(
     auth: &AuthFlowChoice,
     ui: &I,
     client: &Client,
-) -> Result<Vec<String>>
+) -> fho::Result<Vec<String>>
 where
     I: structured_ui::Interface,
 {
@@ -106,12 +114,12 @@ where
                 match sdk.get_version() {
                     SdkVersion::Version(version) => version.to_string(),
                     SdkVersion::InTree => {
-                        ffx_bail!(
+                        return_user_error!(
                             "Using in-tree sdk. Please specify the version through '--version'"
                         )
                     }
                     SdkVersion::Unknown => {
-                        ffx_bail!(
+                        return_user_error!(
                             "Unable to determine SDK version. Please specify the version through '--version'")
                     }
                 }
@@ -124,7 +132,7 @@ where
 
     // Error out if both version and branch are provided.
     if version.is_some() {
-        ffx_bail!("Cannot provide version and branch at the same time");
+        return_user_error!("Cannot provide version and branch at the same time");
     }
 
     let branch = branch.unwrap();
@@ -207,14 +215,16 @@ async fn pb_gather_from_url<I>(
     auth_flow: &AuthFlowChoice,
     ui: &I,
     client: &Client,
-) -> Result<Vec<ProductBundle>>
+) -> fho::Result<Vec<ProductBundle>>
 where
     I: structured_ui::Interface,
 {
     tracing::debug!("transfer_manifest_url Url::parse");
     let mut manifest_url = match url::Url::parse(&base_url) {
         Ok(p) => p,
-        _ => ffx_bail!("The lookup location must be a URL, failed to parse {:?}", base_url),
+        _ => {
+            return_user_error!("The lookup location must be a URL, failed to parse {:?}", base_url)
+        }
     };
     gcs::gs_url::extend_url_path(&mut manifest_url, PB_MANIFEST_NAME)
         .with_context(|| format!("joining URL {:?} with file name", manifest_url))?;
@@ -233,19 +243,19 @@ where
         client,
     )
     .await
-    .with_context(|| format!("string from gcs: {:?}", manifest_url))?;
+    .map_err(|e| bug!("string from gcs: {:?}: {e}", manifest_url))?;
 
     Ok(serde_json::from_str::<ProductManifest>(&pm)
-        .with_context(|| format!("Parsing json {:?}", pm))?)
+        .map_err(|e| bug!("Parsing json {:?}: {e}", pm))?)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_writer::Format;
+    use fho::{Format, TestBuffers};
     use temp_test_env::TempTestEnv;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_pb_list_impl() {
         let test_env = TempTestEnv::new().expect("test_env");
         let mut f =
@@ -280,7 +290,7 @@ mod test {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_pb_list_impl_machine_code() {
         let test_env = TempTestEnv::new().expect("test_env");
         let mut f =
@@ -295,20 +305,20 @@ mod test {
         )
         .expect("write_all");
 
-        let writer = Writer::new_test(Some(Format::Json));
-        let () = pb_list(
-            ListCommand {
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::new_test(Some(Format::Json), &buffers);
+        let tool = ProductListTool {
+            cmd: ListCommand {
                 auth: AuthFlowChoice::Default,
                 base_url: Some(format!("file:{}", test_env.home.display())),
                 version: Some("fake_version".into()),
                 branch: None,
             },
-            writer.clone(),
-        )
-        .await
-        .expect("testing list");
+        };
 
-        let pbs: Vec<ProductBundle> = serde_json::from_str(&writer.test_output().unwrap()).unwrap();
+        tool.main(writer).await.expect("testing list");
+
+        let pbs: Vec<ProductBundle> = serde_json::from_str(&buffers.into_stdout_str()).unwrap();
         assert_eq!(
             vec![ProductBundle {
                 name: String::from("fake_name"),

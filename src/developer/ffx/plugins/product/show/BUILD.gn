@@ -13,8 +13,10 @@ ffx_plugin("ffx_product_show") {
   sources = [ "src/lib.rs" ]
   deps = [
     "//build/sdk/meta:rust",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/structured_ui",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
   ]

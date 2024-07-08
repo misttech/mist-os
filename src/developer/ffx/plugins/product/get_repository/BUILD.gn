@@ -15,10 +15,10 @@ ffx_plugin("ffx_product_get_repository") {
   args_deps = [ "//third_party/rust_crates:camino" ]
   deps = [
     "//build/sdk/meta:rust",
-    "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/utf8_path",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:serde",
   ]

@@ -4,32 +4,39 @@
 
 //! FFX plugin for the info of repository inside product bundle.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use camino::Utf8PathBuf;
-use ffx_core::ffx_plugin;
 use ffx_product_get_repository_args::GetRepositoryCommand;
-use ffx_writer::Writer;
-use fidl_fuchsia_developer_ffx_ext::RepositoryConfig;
+use fho::{bug, user_error, FfxMain, FfxTool, MachineWriter, ToolIO as _};
 use sdk_metadata::ProductBundle;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use utf8_path::path_relative_from;
 
+/// `ffx product show` sub-command.
+#[derive(FfxTool)]
+pub struct ProductGetRepoTool {
+    #[command]
+    pub cmd: GetRepositoryCommand,
+}
+
+fho::embedded_plugin!(ProductGetRepoTool);
+
 /// This plugin will get the info of repository inside product bundle.
-#[ffx_plugin()]
-pub async fn pb_get_repository(
-    cmd: GetRepositoryCommand,
-    #[ffx(machine = Vec<RepositoryConfig>)] mut writer: Writer,
-) -> Result<()> {
-    let product_bundle = ProductBundle::try_load_from(&cmd.product_bundle)
-        .context("Failed to load product bundle")?;
-    let info = extract_repository_info(product_bundle, cmd)?;
-    if writer.is_machine() {
-        writer.machine(&info)?;
-    } else {
-        writeln!(writer, "{:#?}", info)?;
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ProductGetRepoTool {
+    type Writer = MachineWriter<Vec<RepositoryInfo>>;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let product_bundle = ProductBundle::try_load_from(&self.cmd.product_bundle)
+            .map_err(|e| user_error!("Failed to load product bundle: {e}"))?;
+        let info = extract_repository_info(product_bundle, self.cmd).map_err(|e| bug!(e))?;
+        if writer.is_machine() {
+            writer.machine(&info)?;
+        } else {
+            writeln!(writer, "{:#?}", info).map_err(|e| bug!(e))?;
+        }
+        Ok(())
     }
-    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
