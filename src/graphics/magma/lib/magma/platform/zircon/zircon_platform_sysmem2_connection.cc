@@ -251,36 +251,26 @@ class ZirconPlatformSysmem2BufferConstraints : public PlatformBufferConstraints 
     }
 
     bool is_yuv = false;
-    switch (format_constraints->image_format) {
-      case MAGMA_FORMAT_R8G8B8A8:
-        constraints.pixel_format() = PixelFormat::kR8G8B8A8;
-        break;
-      case MAGMA_FORMAT_BGRA32:
-        constraints.pixel_format() = PixelFormat::kB8G8R8A8;
-        break;
-      case MAGMA_FORMAT_NV12:
-        constraints.pixel_format() = PixelFormat::kNv12;
-        is_yuv = true;
-        break;
-      case MAGMA_FORMAT_I420:
-        constraints.pixel_format() = PixelFormat::kI420;
-        is_yuv = true;
-        break;
-      case MAGMA_FORMAT_R8:
-        constraints.pixel_format() = PixelFormat::kR8;
-        break;
-      case MAGMA_FORMAT_L8:
-        constraints.pixel_format() = PixelFormat::kL8;
-        break;
-      case MAGMA_FORMAT_R8G8:
-        constraints.pixel_format() = PixelFormat::kR8G8;
-        break;
-      case MAGMA_FORMAT_RGB565:
-        constraints.pixel_format() = PixelFormat::kR5G6B5;
-        break;
-      default:
-        return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Invalid format: %d",
-                        format_constraints->image_format);
+    static const magma_format_t yuv_formats[] = {
+        MAGMA_FORMAT_NV12, MAGMA_FORMAT_I420, MAGMA_FORMAT_M420,
+        MAGMA_FORMAT_YV12, MAGMA_FORMAT_YUY2, MAGMA_FORMAT_MJPEG,
+    };
+    static const magma_format_t rgb_formats[] = {
+        MAGMA_FORMAT_R8G8B8A8, MAGMA_FORMAT_BGRA32, MAGMA_FORMAT_RGB565,  MAGMA_FORMAT_BGR24,
+        MAGMA_FORMAT_RGB565,   MAGMA_FORMAT_RGB332, MAGMA_FORMAT_RGB2220, MAGMA_FORMAT_L8,
+        MAGMA_FORMAT_R8,       MAGMA_FORMAT_R8G8};
+    if (std::find(std::begin(yuv_formats), std::end(yuv_formats),
+                  format_constraints->image_format) != std::end(yuv_formats)) {
+      constraints.pixel_format() =
+          static_cast<fuchsia_images2::PixelFormat>(format_constraints->image_format);
+      is_yuv = true;
+    } else if (std::find(std::begin(rgb_formats), std::end(rgb_formats),
+                         format_constraints->image_format) != std::end(rgb_formats)) {
+      constraints.pixel_format() =
+          static_cast<fuchsia_images2::PixelFormat>(format_constraints->image_format);
+    } else {
+      return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Invalid format: %d",
+                      format_constraints->image_format);
     }
     auto& color_spaces = constraints.color_spaces().emplace();
     if (is_yuv) {
