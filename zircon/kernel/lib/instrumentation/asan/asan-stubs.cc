@@ -25,8 +25,7 @@
 // compiler-rt/lib/asan/*).
 
 constexpr size_t kAsanMaxGlobalsRegions = 450;
-static asan_global* g_globals_regions[kAsanMaxGlobalsRegions];
-static size_t g_globals_regions_sizes[kAsanMaxGlobalsRegions];
+static ktl::array<ktl::span<const asan_global>, kAsanMaxGlobalsRegions> g_globals_regions;
 static size_t g_total_globals;
 
 extern "C" {
@@ -208,13 +207,10 @@ PANIC_STUB(void __asan_alloca_poison(uintptr_t addr, uintptr_t size))
 PANIC_STUB(void __asan_allocas_unpoison(uintptr_t top, uintptr_t bottom))
 
 void __asan_register_globals(asan_global* globals, size_t size) {
-  if (g_total_globals == kAsanMaxGlobalsRegions) {
-    // This will fail in asan_register_globals_late.
-    return;
+  size_t i = g_total_globals++;
+  if (i < g_globals_regions.size()) {
+    g_globals_regions[i] = {globals, size};
   }
-  g_globals_regions[g_total_globals] = globals;
-  g_globals_regions_sizes[g_total_globals] = size;
-  g_total_globals++;
 }
 
 void __asan_unregister_globals(asan_global* globals, size_t size) {
@@ -222,13 +218,12 @@ void __asan_unregister_globals(asan_global* globals, size_t size) {
 }
 
 void asan_register_globals_late() {
-  DEBUG_ASSERT(g_total_globals < kAsanMaxGlobalsRegions);
-  for (size_t i = 0; i < g_total_globals; i++) {
-    asan_global* region = g_globals_regions[i];
-    for (size_t j = 0; j < g_globals_regions_sizes[i]; j++) {
-      asan_global* g = &region[j];
-      asan_poison_shadow((reinterpret_cast<uintptr_t>(g->begin) + g->size),
-                         g->size_with_redzone - g->size, kAsanGlobalRedzoneMagic);
+  ZX_ASSERT_MSG(g_total_globals <= g_globals_regions.size(), "%zu > %zu", g_total_globals,
+                kAsanMaxGlobalsRegions);
+  for (ktl::span region : ktl::span(g_globals_regions).subspan(0, g_total_globals)) {
+    for (const asan_global& global : region) {
+      asan_poison_shadow((reinterpret_cast<uintptr_t>(global.begin) + global.size),
+                         global.size_with_redzone - global.size, kAsanGlobalRedzoneMagic);
     }
   }
 }
