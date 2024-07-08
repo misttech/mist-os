@@ -13,9 +13,10 @@ use crate::vfs::socket::{SocketAddress, SocketMessageFlags};
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
-    c_int, cmsghdr, errno, error, in6_addr, in6_addr__bindgen_ty_1, in6_pktinfo, timespec, timeval,
-    ucred, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_TOS, IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS,
-    SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP, SO_TIMESTAMPNS,
+    c_int, cmsghdr, errno, error, in6_addr, in6_addr__bindgen_ty_1, in6_pktinfo, sockaddr_in,
+    timespec, timeval, ucred, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_RECVORIGDSTADDR, IP_TOS,
+    IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS, SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP,
+    SO_TIMESTAMPNS,
 };
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
@@ -124,6 +125,12 @@ impl AncillaryData {
             (SOL_IP, IP_TTL) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTtl(
                 read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
             ))),
+            (SOL_IP, IP_RECVORIGDSTADDR) => {
+                Ok(AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(
+                    <[u8; size_of::<sockaddr_in>()]>::read_from_prefix(&message.data[..])
+                        .ok_or(errno!(EINVAL))?,
+                )))
+            }
             (SOL_IPV6, IPV6_TCLASS) => Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(
                 read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
             ))),
@@ -165,6 +172,9 @@ impl AncillaryData {
             }
             AncillaryData::Ip(syncio::ControlMessage::IpTtl(value)) => {
                 Ok(ControlMsg::new(SOL_IP, IP_TTL, (value as c_int).as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(value)) => {
+                Ok(ControlMsg::new(SOL_IP, IP_RECVORIGDSTADDR, value.as_bytes().to_vec()))
             }
             AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(value)) => {
                 Ok(ControlMsg::new(SOL_IPV6, IPV6_TCLASS, (value as c_int).as_bytes().to_vec()))

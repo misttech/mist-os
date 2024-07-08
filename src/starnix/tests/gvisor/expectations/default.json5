@@ -1059,9 +1059,6 @@
                 "AllUnixDomainSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
 
-                // socket_ipv4_udp_unbound_loopback_test - crashes.
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
-
                 // socket_udp_test - hanging tests.
                 "AllInetTests/UdpSocketTest.ReadShutdown/*",
                 "AllInetTests/UdpSocketTest.ReadShutdownDifferentThread/*",

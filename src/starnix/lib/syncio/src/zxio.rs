@@ -1282,12 +1282,12 @@ extern "C" {
 pub type in_port_t = u16;
 pub type in_addr_t = u32;
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, AsBytes, FromBytes, FromZeros, NoCell)]
 pub struct in_addr {
     pub s_addr: in_addr_t,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, AsBytes, FromBytes, FromZeros, NoCell)]
 pub struct sockaddr_in {
     pub sin_family: sa_family_t,
     pub sin_port: in_port_t,
