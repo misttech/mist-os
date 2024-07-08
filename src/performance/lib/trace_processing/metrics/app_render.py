@@ -6,38 +6,15 @@
 
 import logging
 import statistics
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Iterable, Iterator, Sequence
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 
 _LOGGER: logging.Logger = logging.getLogger("AppRenderLatencyMetricsProcessor")
-_AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
 _EVENT_CATEGORY: str = "gfx"
 _PRESENT_EVENT_NAME: str = "Flatland::PerAppPresent[{}]"
 _DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
-
-
-def metrics_processor(
-    model: trace_model.Model, extra_args: dict[str, Any]
-) -> Sequence[trace_metrics.TestCaseResult]:
-    """Computes latency from Scenic present to vsync.
-
-    Args:
-        model: The trace model to process.
-        extra_args: Additional arguments to the processor.
-
-    Returns:
-        A list of computed metrics.
-    """
-
-    debug_name = extra_args["debug_name"]
-    debug_name_str: str = str(debug_name)
-
-    return AppRenderLatencyMetricsProcessor(
-        debug_name=debug_name_str,
-        aggregates_only=extra_args.get(_AGGREGATE_METRICS_ONLY, False),
-    ).process_metrics(model)
 
 
 class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):

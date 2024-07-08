@@ -5,33 +5,13 @@
 """CPU trace metrics."""
 
 import logging
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Iterable, Iterator, Sequence
 
 import statistics
 from trace_processing import trace_metrics, trace_model, trace_utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CPU_USAGE_EVENT_NAME: str = "cpu_usage"
-_AGGREGATE_METRICS_ONLY: str = "aggregateMetricsOnly"
-
-
-# DEPRECATED: Use CpuMetricsProcessor instead.
-# TODO(b/320778225): Remove once downstream callers are migrated.
-def metrics_processor(
-    model: trace_model.Model, extra_args: dict[str, Any]
-) -> Sequence[trace_metrics.TestCaseResult]:
-    """Computes the CPU utilization for the given trace.
-
-    Args:
-        model: The trace model to process.
-        extra_args: Additional arguments to the processor.
-
-    Returns:
-        A list of computed metrics.
-    """
-    return CpuMetricsProcessor(
-        aggregates_only=extra_args.get(_AGGREGATE_METRICS_ONLY, False) is True
-    ).process_metrics(model)
 
 
 class CpuMetricsProcessor(trace_metrics.MetricsProcessor):

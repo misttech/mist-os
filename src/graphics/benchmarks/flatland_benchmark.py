@@ -85,17 +85,16 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
             json_trace_file
         )
 
-        app_render_latency_results = app_render.metrics_processor(
-            model,
-            {
-                "aggregateMetricsOnly": True,
-                "debug_name": "flatland-view-provider-example",
-            },
+        app_render_latency_results = (
+            app_render.AppRenderLatencyMetricsProcessor(
+                debug_name="flatland-view-provider-example",
+                aggregates_only=True,
+            ).process_metrics(model)
         )
 
-        cpu_results = cpu.metrics_processor(
-            model, {"aggregateMetricsOnly": False}
-        )
+        cpu_results = cpu.CpuMetricsProcessor(
+            aggregates_only=False
+        ).process_metrics(model)
 
         fuchsiaperf_json_path = Path(
             os.path.join(self.log_path, f"{TEST_NAME}.fuchsiaperf.json")
