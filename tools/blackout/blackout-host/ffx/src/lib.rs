@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
 use ffx_storage_blackout_step_args::{
     BlackoutCommand, BlackoutSubcommand, SetupCommand, TestCommand, VerifyCommand,
 };
+use fho::{bug, user_error, FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_io::OpenFlags;
 use fuchsia_zircon_status::Status;
@@ -41,39 +41,57 @@ async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
     Ok(proxy)
 }
 
-#[ffx_plugin("storage_dev")]
-async fn step(
-    cmd: BlackoutCommand,
+#[derive(FfxTool)]
+pub struct BlackoutTool {
+    #[command]
+    pub cmd: BlackoutCommand,
     remote_control: fremotecontrol::RemoteControlProxy,
-) -> Result<()> {
-    let proxy = remotecontrol_connect::<fblackout::ControllerMarker>(
-        &remote_control,
-        "/core/ffx-laboratory:blackout-target",
-    )
-    .await?;
+}
 
-    let BlackoutCommand { step } = cmd;
-    match step {
-        BlackoutSubcommand::Setup(SetupCommand { device_label, device_path, seed }) => proxy
-            .setup(&device_label, device_path.as_deref(), seed)
-            .await?
-            .map_err(|e| anyhow::anyhow!("setup failed: {}", Status::from_raw(e).to_string()))?,
-        BlackoutSubcommand::Test(TestCommand { device_label, device_path, seed, duration }) => {
-            proxy.test(&device_label, device_path.as_deref(), seed, duration).await?.map_err(
-                |e| anyhow::anyhow!("test step failed: {}", Status::from_raw(e).to_string()),
-            )?
-        }
-        BlackoutSubcommand::Verify(VerifyCommand { device_label, device_path, seed }) => {
-            proxy.verify(&device_label, device_path.as_deref(), seed).await?.map_err(|e| {
-                let status = Status::from_raw(e);
-                if status == Status::BAD_STATE {
-                    anyhow::anyhow!("verification failure")
-                } else {
-                    anyhow::anyhow!("retry-able verify step error: {}", status.to_string())
-                }
-            })?
-        }
-    };
+fho::embedded_plugin!(BlackoutTool);
 
-    Ok(())
+#[async_trait::async_trait(?Send)]
+impl FfxMain for BlackoutTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let proxy = remotecontrol_connect::<fblackout::ControllerMarker>(
+            &self.remote_control,
+            "/core/ffx-laboratory:blackout-target",
+        )
+        .await?;
+
+        let BlackoutCommand { step } = self.cmd;
+        match step {
+            BlackoutSubcommand::Setup(SetupCommand { device_label, device_path, seed }) => proxy
+                .setup(&device_label, device_path.as_deref(), seed)
+                .await
+                .map_err(|e| bug!(e))?
+                .map_err(|e| {
+                    anyhow::anyhow!("setup failed: {}", Status::from_raw(e).to_string())
+                })?,
+            BlackoutSubcommand::Test(TestCommand { device_label, device_path, seed, duration }) => {
+                proxy
+                    .test(&device_label, device_path.as_deref(), seed, duration)
+                    .await
+                    .map_err(|e| bug!(e))?
+                    .map_err(|e| {
+                        anyhow::anyhow!("test step failed: {}", Status::from_raw(e).to_string())
+                    })?
+            }
+            BlackoutSubcommand::Verify(VerifyCommand { device_label, device_path, seed }) => proxy
+                .verify(&device_label, device_path.as_deref(), seed)
+                .await
+                .map_err(|e| bug!(e))?
+                .map_err(|e| {
+                    let status = Status::from_raw(e);
+                    if status == Status::BAD_STATE {
+                        user_error!("verification failure")
+                    } else {
+                        user_error!("retry-able verify step error: {}", status.to_string())
+                    }
+                })?,
+        };
+
+        Ok(())
+    }
 }

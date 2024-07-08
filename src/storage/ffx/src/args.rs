@@ -7,5 +7,5 @@
 #[argh(subcommand, name = "storage", description = "Manage Fuchsia Filesystems")]
 pub struct StorageCommand {
     #[argh(subcommand)]
-    pub subcommand: ffx_storage_sub_command::SubCommand,
+    pub subcommand: ffx_storage_blackout_sub_command::SubCommand,
 }

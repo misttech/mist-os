@@ -4,11 +4,26 @@
 
 use anyhow::Result;
 use blackout_host::TestEnv;
-use ffx_core::ffx_plugin;
 use ffx_storage_blackout_blobfs_checkerboard_args::BlobfsCheckerboardCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter};
 use std::time::Duration;
 
-#[ffx_plugin("storage_dev")]
+#[derive(FfxTool)]
+pub struct BlobfsCheckerboardTool {
+    #[command]
+    pub cmd: BlobfsCheckerboardCommand,
+}
+
+fho::embedded_plugin!(BlobfsCheckerboardTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for BlobfsCheckerboardTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        blobfs_checkerboard(self.cmd).await.map_err(Into::into)
+    }
+}
+
 pub async fn blobfs_checkerboard(cmd: BlobfsCheckerboardCommand) -> Result<()> {
     let opts = blackout_host::CommonOpts {
         device_label: cmd.device_label,

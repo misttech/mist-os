@@ -4,5 +4,5 @@
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    ffx_storage_suite::fho_suite_main().await
+    ffx_storage_blackout_suite::fho_suite_main().await
 }
