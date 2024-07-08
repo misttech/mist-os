@@ -66,35 +66,27 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
     return;
   }
 
-  static const char* kDevicePaths[] = {
-      "sys/platform/pt/PCI0/bus/00:02.0/00_02_0/intel_i915/intel-gpu-core",
-      "sys/platform/pt/PCI0/bus/00:02.0/00_02_0/intel_i915/intel-display-controller/display-coordinator",
-      "sys/platform/pt/PCI0/bus/00:14.0/00_14_0/xhci/usb-bus",
-      "sys/platform/pt/PCI0/bus/00:17.0/00_17_0/ahci",
-      // TODO(https://fxbug.dev/42164781): Temporarily removed.
-      // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-000",
-      // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-controller",
-      "sys/platform/pt/PCI0/bus/00:1f.6/00_1f_6/e1000",
+  static const char* kNodeMonikers[] = {
+      "dev.sys.platform.pt.PCI0.bus.00_02.0.00_02_0.intel_i915.intel-gpu-core",
+      "dev.sys.platform.pt.PCI0.bus.00_02.0.00_02_0.intel_i915.intel-display-controller.display-coordinator",
+      "dev.sys.platform.pt.PCI0.bus.00_14.0.00_14_0.xhci.usb-bus",
+      "dev.sys.platform.pt.PCI0.bus.00_17.0.00_17_0.ahci",
+      // TODO(https://fxbug.dev.42164781): Temporarily removed.
+      // "dev.sys.platform.pt.PCI0.bus.00_1f.3.00_1f_3.intel-hda-000",
+      // "dev.sys.platform.pt.PCI0.bus.00_1f.3.00_1f_3.intel-hda-controller",
+      "dev.sys.platform.pt.PCI0.bus.00_1f.6.00_1f_6.e1000",
+#ifdef include_packaged_drivers
+      "dev.sys.platform.pt.PCI0.bus.01_00.0.01_00_0.iwlwifi-wlanphyimpl",
+#endif
   };
-
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+  VerifyNodes(kNodeMonikers);
 
   // TODO(https://fxbug.dev/42075152): Fix the metadata problems in i2c.cm and re-enable this.
   // static const char* kDfv1DevicePaths[] = {
-  //     "sys/platform/pt/PCI0/bus/00:15.0/00:15.0/i2c-bus-9d60",
-  //     "sys/platform/pt/PCI0/bus/00:15.1/00:15.1/i2c-bus-9d61",
+  //     "dev.sys.platform.pt.PCI0.bus.00_15.0.00_15_0.i2c-bus-9d60",
+  //     "dev.sys.platform.pt.PCI0.bus.00_15.1.00_15_1.i2c-bus-9d61",
   // };
   // ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
-
-  // TODO(b/42178510): Remove older path once we migrate iwlwifi to composite node specs.
-#ifdef include_packaged_drivers
-  static const char* kIwlwifiDevicePaths[] = {
-      "sys/platform/pt/PCI0/bus/01:00.0/01_00_0/iwlwifi-wlanphyimpl",
-      "sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlanphyimpl",
-  };
-  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
-      cpp20::span(kIwlwifiDevicePaths, std::size(kIwlwifiDevicePaths))));
-#endif
 }
 
 }  // namespace

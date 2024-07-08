@@ -66,23 +66,16 @@ TEST_F(DeviceEnumerationTest, Nuc11TNBv5Test) {
     return;
   }
 
-  static const char* kDevicePaths[] = {
-      "sys/platform/pt/PC00/bus/00:02.0/00_02_0/intel_i915/intel-gpu-core",
-      "sys/platform/pt/PC00/bus/00:02.0/00_02_0/intel_i915/intel-display-controller/display-coordinator",
-      "sys/platform/pt/PC00/bus/00:14.0/00_14_0/xhci/usb-bus",
-      "sys/platform/pt/PC00/bus/00:17.0/00_17_0/ahci",
-  };
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
-
-// TODO(b/42178510): Remove older path once we migrate iwlwifi to composite node specs.
+  static const char* kNodeMonikers[] = {
+      "dev.sys.platform.pt.PC00.bus.00_02.0.00_02_0.intel_i915.intel-gpu-core",
+      "dev.sys.platform.pt.PC00.bus.00_02.0.00_02_0.intel_i915.intel-display-controller.display-coordinator",
+      "dev.sys.platform.pt.PC00.bus.00_14.0.00_14_0.xhci.usb-bus",
+      "dev.sys.platform.pt.PC00.bus.00_17.0.00_17_0.ahci",
 #ifdef include_packaged_drivers
-  static const char* kIwlwifiDevicePaths[] = {
-      "sys/platform/pt/PC00/bus/00:14.3/00:14.3/iwlwifi-wlanphyimpl",
-      "sys/platform/pt/PC00/bus/00:14.3/00_14_3/iwlwifi-wlanphyimpl",
-  };
-  ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
-      cpp20::span(kIwlwifiDevicePaths, std::size(kIwlwifiDevicePaths))));
+      "dev.sys.platform.pt.PC00.bus.00_14.3.00_14_3.iwlwifi-wlanphyimpl",
 #endif
+  };
+  VerifyNodes(kNodeMonikers);
 }
 
 }  // namespace
