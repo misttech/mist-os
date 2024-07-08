@@ -158,7 +158,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
         power_metrics = AggregatePowerMetrics()
         suspend_power_metrics = AggregatePowerMetrics()
         for me in metrics_events:
-            # These args are set in append_power_data()
+            # These args are set in _append_power_data()
             # found in //src/tests/end_to_end/power/power_test_utils.py
             if "Voltage" in me.args and "Current" in me.args:
                 sample = PowerMetricSample(
