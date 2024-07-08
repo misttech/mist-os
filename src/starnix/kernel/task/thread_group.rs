@@ -1380,6 +1380,30 @@ impl ThreadGroup {
     }
 }
 
+// ThreadGroup can't easily go into an OwnedRef, so instead of using Releasable we have a
+// Drop impl that avoids recursive locking.
+impl Drop for ThreadGroup {
+    fn drop(&mut self) {
+        // We don't want to drop parent while we hold the PidTable lock.
+        let parent = {
+            let mut pids = self.kernel.pids.write();
+            let mut state = self.mutable_state.write();
+
+            for zombie in state.zombie_children.drain(..) {
+                zombie.release(&mut pids);
+            }
+
+            state.zombie_ptracees.release(&mut pids);
+
+            state.parent.take()
+        };
+
+        // Now that the PidTable lock has been released the parent can be dropped since it will
+        // acquire that same lock again.
+        std::mem::drop(parent);
+    }
+}
+
 pub enum WaitableChildResult {
     ReadyNow(WaitResult),
     ShouldWait,
