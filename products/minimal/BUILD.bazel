@@ -53,7 +53,7 @@ fuchsia_product(
 )
 
 fuchsia_virtual_device(
-    name = "minimal_emu",
+    name = "minimal_emu_x64",
     arch = ARCH.X64,
     device_name = "minimal_emu",
     window_height_px = 1200,
@@ -76,7 +76,7 @@ fuchsia_product_bundle(
     update_epoch = "1",
     update_version_file = "//build/info:version",
     virtual_devices = [
-        ":minimal_emu",
+        ":minimal_emu_x64",
     ],
 )
 
@@ -178,6 +178,14 @@ fuchsia_product_bundle(
     update_version_file = "//build/info:version",
 )
 
+fuchsia_virtual_device(
+    name = "minimal_emu_riscv64",
+    arch = ARCH.RISCV64,
+    device_name = "minimal_emu",
+    window_height_px = 1200,
+    window_width_px = 720,
+)
+
 fuchsia_product(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
@@ -201,4 +209,7 @@ fuchsia_product_bundle(
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
     update_version_file = "//build/info:version",
+    virtual_devices = [
+        ":minimal_emu_riscv64",
+    ],
 )

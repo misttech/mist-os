@@ -7,8 +7,9 @@
 load(":providers.bzl", "FuchsiaVirtualDeviceInfo")
 
 ARCH = struct(
-    X64 = "x64",
     ARM64 = "arm64",
+    RISCV64 = "riscv64",
+    X64 = "x64",
 )
 
 def _fuchsia_virtual_device_impl(ctx):
@@ -76,7 +77,7 @@ fuchsia_virtual_device = rule(
         ),
         "arch": attr.string(
             doc = "The architecture of the cpu.",
-            values = [ARCH.X64, ARCH.ARM64],
+            values = [ARCH.X64, ARCH.ARM64, ARCH.RISCV64],
             mandatory = True,
         ),
         "window_width_px": attr.int(
