@@ -13,5 +13,8 @@ ffx_plugin("ffx_selftest_experiment") {
 
   sources = [ "src/lib.rs" ]
 
-  deps = [ "//third_party/rust_crates:anyhow" ]
+  deps = [
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:async-trait",
+  ]
 }

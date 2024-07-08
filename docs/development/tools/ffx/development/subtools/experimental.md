@@ -6,6 +6,18 @@ plugin macros you would do this as an argument to the `ffx_plugin`
 proc macro. In the new one you do it with a check attribute on the derive macro
 for your tool definition.
 
+```rust
+use fho::{AvailabilityFlag, FfxTool,};
+
+
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("selftest.experiment"))]
+pub struct ExperimentTool {
+    #[command]
+    pub cmd: ExperimentCommand,
+}
+```
+
 ## When are tools experimental?
 
 Any new tool should start off as experimental. This allows people to use it where
