@@ -4,10 +4,10 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
 
-#include <endian.h>
-
 #include <string>
 #include <type_traits>
+
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
@@ -364,7 +364,9 @@ AdvertisingData::ParseResult AdvertisingData::FromBytes(
           return fit::error(ParseError::kManufacturerSpecificDataTooSmall);
         }
 
-        uint16_t id = le16toh(*reinterpret_cast<const uint16_t*>(field.data()));
+        uint16_t id = static_cast<uint16_t>(pw::bytes::ConvertOrderFrom(
+            cpp20::endian::little,
+            *reinterpret_cast<const uint16_t*>(field.data())));
         const BufferView manuf_data(field.data() + kManufacturerIdSize,
                                     field.size() - kManufacturerIdSize);
 
@@ -400,7 +402,8 @@ AdvertisingData::ParseResult AdvertisingData::FromBytes(
           return fit::error(ParseError::kAppearanceMalformed);
         }
 
-        out_ad.SetAppearance(le16toh(field.To<uint16_t>()));
+        out_ad.SetAppearance(pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                                         field.To<uint16_t>()));
         break;
       }
       case DataType::kURI: {
