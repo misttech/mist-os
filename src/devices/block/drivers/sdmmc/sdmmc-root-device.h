@@ -39,6 +39,7 @@ class SdmmcRootDevice : public fdf::DriverBase {
     return fdf::DriverBase::driver_dispatcher();
   }
   const std::optional<std::string>& driver_node_name() const { return node_name(); }
+  inspect::ComponentInspector& driver_inspector() { return inspector(); }
   const sdmmc_config::Config& config() const { return config_; }
 
   // Visible for testing.

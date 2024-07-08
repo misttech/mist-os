@@ -2062,12 +2062,9 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
 
   ASSERT_OK(StartDriverForMmc());
 
-  const zx::vmo inspect_vmo = block_device_->inspector().DuplicateVmo();
-  ASSERT_TRUE(inspect_vmo.is_valid());
-
   // IO error count should be zero after initialization.
   inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -2138,7 +2135,7 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_OK(op1->private_storage()->status);
 
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -2168,7 +2165,7 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
   EXPECT_TRUE(op2->private_storage()->completed);
   EXPECT_NOT_OK(op2->private_storage()->status);
 
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -2196,11 +2193,8 @@ TEST_P(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
 
   ASSERT_OK(StartDriverForMmc());
 
-  const zx::vmo inspect_vmo = block_device_->inspector().DuplicateVmo();
-  ASSERT_TRUE(inspect_vmo.is_valid());
-
   inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -2241,11 +2235,8 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   // Initial power level is kPowerLevelOff.
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
-  const zx::vmo inspect_vmo = block_device_->inspector().DuplicateVmo();
-  ASSERT_TRUE(inspect_vmo.is_valid());
-
   inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -2283,7 +2274,7 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
     sleep_complete.Wait();
   });
 
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -2304,7 +2295,7 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   });
   runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
 
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -2325,7 +2316,7 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   });
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
-  inspector.ReadInspect(inspect_vmo);
+  inspector.ReadInspect(block_device_->inspect());
 
   root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);

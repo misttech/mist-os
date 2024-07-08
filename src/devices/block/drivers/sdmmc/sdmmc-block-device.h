@@ -131,7 +131,7 @@ class SdmmcBlockDevice {
 
   // Visible for testing.
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
-  const inspect::Inspector& inspector() const { return inspector_; }
+  const inspect::Inspector& inspect() const;
   const std::vector<std::unique_ptr<PartitionDevice>>& child_partition_devices() const {
     return child_partition_devices_;
   }
@@ -266,7 +266,6 @@ class SdmmcBlockDevice {
   uint32_t max_packed_writes_effective_ = 0;  // Use command packing up to this many writes.
   ReadWriteMetadata readwrite_metadata_{this};
 
-  inspect::Inspector inspector_;
   inspect::Node root_;
   struct InspectProperties {
     inspect::UintProperty io_errors_;                    // Only updated from the worker thread.
@@ -287,8 +286,6 @@ class SdmmcBlockDevice {
     inspect::ExponentialUintHistogram
         wake_on_request_latency_us_;  // Updated whenever wake-on-request occurs.
   } properties_;
-
-  std::optional<inspect::ComponentInspector> exposed_inspector_;
 
   std::string_view block_name_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> block_node_;

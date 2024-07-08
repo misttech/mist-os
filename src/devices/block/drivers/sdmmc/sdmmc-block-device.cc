@@ -228,7 +228,7 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
     return ZX_ERR_TIMED_OUT;
   }
 
-  root_ = inspector_.GetRoot().CreateChild("sdmmc_core");
+  root_ = parent_->driver_inspector().root().CreateChild("sdmmc_core");
   properties_.io_errors_ = root_.CreateUint("io_errors", 0);
   properties_.io_retries_ = root_.CreateUint("io_retries", 0);
   properties_.wake_on_request_count_ = root_.CreateUint("wake_on_request_count", 0);
@@ -259,16 +259,6 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
     FDF_LOGL(ERROR, logger(), "Failed to start worker thread: %s", zx_status_get_string(st));
     return st;
   }
-
-  auto inspect_sink = parent_->driver_incoming()->Connect<fuchsia_inspect::InspectSink>();
-  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to inspect sink: %s",
-             inspect_sink.status_string());
-    return inspect_sink.status_value();
-  }
-  exposed_inspector_.emplace(inspect::ComponentInspector(
-      parent_->driver_async_dispatcher(),
-      {.inspector = inspector_, .client_end = std::move(inspect_sink.value())}));
 
   if (!is_sd_ && parent_->config().enable_suspend()) {
     zx::result result = ConfigurePowerManagement();
@@ -1349,6 +1339,10 @@ zx_status_t SdmmcBlockDevice::WaitForTran() {
 void SdmmcBlockDevice::SetBlockInfo(uint32_t block_size, uint64_t block_count) {
   block_info_.block_size = block_size;
   block_info_.block_count = block_count;
+}
+
+const inspect::Inspector& SdmmcBlockDevice::inspect() const {
+  return parent_->driver_inspector().inspector();
 }
 
 fdf::Logger& SdmmcBlockDevice::logger() { return parent_->logger(); }
