@@ -70,18 +70,6 @@ class NullSafeStringView final {
   cpp17::optional<cpp17::string_view> string_view_;
 };
 
-template <typename... Args>
-constexpr size_t ArgsSize(Args... args) {
-  return sizeof...(args);
-}
-
-template <typename... Args>
-struct Tuplet final {
-  std::tuple<Args...> tuple;
-  size_t size;
-  constexpr Tuplet(std::tuple<Args...> tuple, size_t size) : tuple(tuple), size(size) {}
-};
-
 template <typename Key, typename Value>
 struct KeyValue final {
   Key key;
