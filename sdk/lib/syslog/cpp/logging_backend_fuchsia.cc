@@ -35,6 +35,7 @@ namespace syslog_runtime {
 using log_word_t = uint64_t;
 
 class GlobalStateLock;
+namespace internal {
 class LogState {
  public:
   static void Set(const fuchsia_logging::LogSettings& settings, const GlobalStateLock& lock);
@@ -72,6 +73,7 @@ class LogState {
   // Handle to a fuchsia.logger.LogSink instance.
   cpp17::optional<fidl::ClientEnd<fuchsia_logger::LogSink>> provided_log_sink_;
 };
+}  // namespace internal
 
 // Global state lock. In order to mutate the LogState through SetStateLocked
 // and GetStateLocked you must hold this capability.
@@ -81,22 +83,22 @@ class LogState {
 class GlobalStateLock {
  public:
   GlobalStateLock(bool autoinit = true) {
-    FuchsiaLogAcquireState();
-    if (autoinit && !FuchsiaLogGetStateLocked()) {
-      LogState::Set(fuchsia_logging::LogSettings(), *this);
+    internal::FuchsiaLogAcquireState();
+    if (autoinit && !internal::FuchsiaLogGetStateLocked()) {
+      internal::LogState::Set(fuchsia_logging::LogSettings(), *this);
     }
   }
 
   // Retrieves the global state
-  syslog_runtime::LogState* operator->() const { return FuchsiaLogGetStateLocked(); }
+  internal::LogState* operator->() const { return internal::FuchsiaLogGetStateLocked(); }
 
   // Sets the global state
-  void Set(syslog_runtime::LogState* state) const { FuchsiaLogSetStateLocked(state); }
+  void Set(internal::LogState* state) const { FuchsiaLogSetStateLocked(state); }
 
   // Retrieves the global state
-  syslog_runtime::LogState* operator*() const { return FuchsiaLogGetStateLocked(); }
+  internal::LogState* operator*() const { return internal::FuchsiaLogGetStateLocked(); }
 
-  ~GlobalStateLock() { FuchsiaLogReleaseState(); }
+  ~GlobalStateLock() { internal::FuchsiaLogReleaseState(); }
 };
 namespace {
 
@@ -135,7 +137,7 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 }
 
 zx_koid_t pid = GetKoid(zx_process_self());
-thread_local zx_koid_t tid = FuchsiaLogGetCurrentThreadKoid();
+thread_local zx_koid_t tid = internal::FuchsiaLogGetCurrentThreadKoid();
 const char kTagFieldName[] = "tag";
 
 void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
@@ -192,13 +194,13 @@ void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity sever
 
 void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
   GlobalStateLock lock(false);
-  LogState::Set(settings, lock);
+  internal::LogState::Set(settings, lock);
 }
 
 void SetLogSettings(const fuchsia_logging::LogSettings& settings,
                     const std::initializer_list<std::string>& tags) {
   GlobalStateLock lock(false);
-  LogState::Set(settings, tags, lock);
+  internal::LogState::Set(settings, tags, lock);
 }
 
 fuchsia_logging::LogSeverity GetMinLogSeverity() {
@@ -207,7 +209,7 @@ fuchsia_logging::LogSeverity GetMinLogSeverity() {
 }
 }  // namespace
 
-void LogState::PollInterest() {
+void internal::LogState::PollInterest() {
   log_sink_->WaitForInterestChange().Then(
       [=](fidl::WireUnownedResult<fuchsia_logger::LogSink::WaitForInterestChange>&
               interest_result) {
@@ -222,7 +224,7 @@ void LogState::PollInterest() {
       });
 }
 
-void LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
+void internal::LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
   if (!interest.has_min_severity()) {
     min_severity_ = default_severity_;
   } else {
@@ -230,7 +232,7 @@ void LogState::HandleInterest(fuchsia_diagnostics::wire::Interest interest) {
   }
 }
 
-void LogState::Connect() {
+void internal::LogState::Connect() {
   auto default_dispatcher = async_get_default_dispatcher();
   bool missing_dispatcher = false;
   if (interest_listener_config_ != fuchsia_logging::Disabled) {
@@ -312,12 +314,14 @@ bool LogBuffer::Flush() {
   return ret;
 }
 
-void LogState::Set(const fuchsia_logging::LogSettings& settings, const GlobalStateLock& lock) {
+void internal::LogState::Set(const fuchsia_logging::LogSettings& settings,
+                             const GlobalStateLock& lock) {
   Set(settings, {}, lock);
 }
 
-void LogState::Set(const fuchsia_logging::LogSettings& settings,
-                   const std::initializer_list<std::string>& tags, const GlobalStateLock& lock) {
+void internal::LogState::Set(const fuchsia_logging::LogSettings& settings,
+                             const std::initializer_list<std::string>& tags,
+                             const GlobalStateLock& lock) {
   auto old = *lock;
   lock.Set(new LogState(settings, tags));
   if (old) {
@@ -325,8 +329,8 @@ void LogState::Set(const fuchsia_logging::LogSettings& settings,
   }
 }
 
-LogState::LogState(const fuchsia_logging::LogSettings& settings,
-                   const std::initializer_list<std::string>& tags)
+internal::LogState::LogState(const fuchsia_logging::LogSettings& settings,
+                             const std::initializer_list<std::string>& tags)
     : unused_loop_(&kAsyncLoopConfigNeverAttachToThread),
       min_severity_(settings.min_log_level),
       default_severity_(settings.min_log_level) {

@@ -9,9 +9,8 @@
 
 #include <cstdint>
 
-namespace syslog_runtime {
+namespace syslog_runtime::internal {
 class LogState;
-}  // namespace syslog_runtime
 
 // These functions are an internal contract between the Fuchsia logging
 // backend and the logging state shared library. API users should
@@ -24,13 +23,13 @@ extern "C" {
 void FuchsiaLogAcquireState();
 
 // Updates the log state, requires that the state lock is held.
-void FuchsiaLogSetStateLocked(syslog_runtime::LogState* new_state);
+void FuchsiaLogSetStateLocked(LogState* new_state);
 
 // Releases the state lock.
 void FuchsiaLogReleaseState();
 
 // Returns the current log state.
-syslog_runtime::LogState* FuchsiaLogGetStateLocked();
+LogState* FuchsiaLogGetStateLocked();
 
 // Returns the number of dropped logs and resets its count.
 uint32_t FuchsiaLogGetAndResetDropped();
@@ -42,5 +41,6 @@ void FuchsiaLogAddDropped(uint32_t count);
 zx_koid_t FuchsiaLogGetCurrentThreadKoid();
 
 }  // extern "C"
+}  // namespace syslog_runtime::internal
 
 #endif  // LIB_SYSLOG_CPP_LOGGING_BACKEND_FUCHSIA_GLOBALS_H_
