@@ -94,7 +94,10 @@ if (is_host && has_board) {
     if (target_cpu == "arm64") {
       sources += [ "scripts/hello_starnix_hardware_breakpoint.script" ]
     } else {
-      sources += [ "scripts" ]
+      sources += [
+        # TODO(jruthe): List test scripts invididually here once they are deflaked.
+        "scripts",
+      ]
     }
   }
 

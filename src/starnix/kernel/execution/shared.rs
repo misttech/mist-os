@@ -12,10 +12,9 @@ use starnix_sync::{Locked, Unlocked};
 use std::sync::Arc;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess};
 
-use crate::arch::execution::{new_syscall, restore_cfi_directives};
+use crate::arch::execution::new_syscall;
 use crate::execution::get_core_dump_info;
 use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
-use crate::generate_cfi_directives;
 use crate::mm::MemoryManager;
 use crate::signals::{dequeue_signal, prepare_to_restart_syscall};
 use crate::syscalls::table::dispatch_syscall;
@@ -121,7 +120,6 @@ pub fn execute_syscall(
 pub fn process_completed_restricted_exit(
     current_task: &mut CurrentTask,
     error_context: &Option<ErrorContext>,
-    state: &zx::sys::zx_restricted_state_t,
 ) -> Result<Option<ExitStatus>, Errno> {
     let result;
     loop {
@@ -187,11 +185,7 @@ pub fn process_completed_restricted_exit(
                 .core_dumps
                 .record_core_dump(get_core_dump_info(&current_task.task));
 
-            // (Re)-generate CFI directives so that stack unwinders will
-            // trace into the Linux state.
-            generate_cfi_directives!(state);
             debug::backtrace_request_current_thread();
-            restore_cfi_directives!();
         }
     }
     return Ok(result);

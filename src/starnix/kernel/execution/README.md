@@ -96,3 +96,32 @@ restricted_enter |          |           |
 The shared portion of the address space is shared between all Linux thread groups in the same
 container. This allows Starnix to access information about any thread group in the container when handling
 a system call or exception.
+
+## Execution flow (x86_64)
+
+The execution flow structure used on x86_64 is as follows:
+
+- Starnix sets up the initial restricted mode state
+- Starnix calls an assembly routine restricted_enter_loop providing a callback and context
+  - restricted_enter_loop stores all callee-saved registers and the callback + context on the normal
+  mode stack
+  - restricted_enter_loop calls zx_restricted_enter to switch to restricted mode
+    - If this fails, restricted_enter_loop unwinds and returns the error from Zircon
+    - Zircon switches the thread's architectural state to the restricted mode copy and
+      transitions memory protections to restricted mode.
+      - Linux logic runs in restricted mode until exit (exception, syscall, or kick)
+    - Zircon switches the thread's architectural state to the normal mode copy and transitions memory
+      protections to normal mode
+  - Zircon jumps to restricted_return_loop with the stored context in a register
+  - restricted_return_loop stores the address of the restricted mode register state in a register
+    and emits CFI directives telling unwinders that the logical stack continues into restricted mode
+  - restricted_return_loop invokes callback providing the restricted mode exit value
+    - restricted_enter_callback in Starnix interprets the restricted mode exit and decides whether
+    to update the restricted mode state and re-enter restricted mode or exit
+  - restricted_return_loop reads the bool from the callback and either jumps back to the middle of
+    restricted_enter_loop to re-enter restricted mode or to the epilogue of restricted_enter_loop to
+    return.
+- restricted_enter_loop returns once the task is ready to unwind
+
+Other architectures (aarch64 / riscv64) use a loop in Rust instead of assembly.
+TODO(https://fxbug.dev/297897817): Migrate these architectures to match the above structure.
