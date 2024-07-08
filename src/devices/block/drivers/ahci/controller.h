@@ -58,7 +58,7 @@ class Controller : public fdf::DriverBase {
 
   void SignalWorker() { worker_event_completion_.Signal(); }
 
-  inspect::Inspector& inspector() { return inspector_; }
+  inspect::Inspector& inspect() { return inspector().inspector(); }
   inspect::Node& inspect_node() { return inspect_node_; }
 
   Bus* bus() { return bus_.get(); }
@@ -82,10 +82,7 @@ class Controller : public fdf::DriverBase {
 
   bool ShouldExit() __TA_EXCLUDES(lock_);
 
-  inspect::Inspector inspector_;
   inspect::Node inspect_node_;
-
-  std::optional<inspect::ComponentInspector> exposed_inspector_;
 
   std::mutex lock_;
   bool shutdown_ __TA_GUARDED(lock_) = false;
