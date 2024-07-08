@@ -321,12 +321,12 @@ void WavPlayer::DisplayConfigurationSettings() {
                        return usage == usage_string_and_usage.second;
                      });
     CLI_CHECK(it != kRenderUsageOptions.cend(), "no RenderUsage found");
-    auto usage_str = it->first;
+    std::string usage_str = it->first;
     if (!options_.usage.has_value()) {
-      usage_str = (std::string("default (") + usage_str + ")").c_str();
+      usage_str = std::string("default (") + usage_str + ")";
     }
     printf("\nAudioRenderer configured for %d-channel %s at %u Hz with the %s usage", num_channels_,
-           SampleFormatToString(sample_format_), frame_rate_, usage_str);
+           SampleFormatToString(sample_format_), frame_rate_, usage_str.c_str());
 
     if (options_.stream_gain_db.has_value()) {
       printf(",\nsetting stream gain to %.3f dB", options_.stream_gain_db.value());
@@ -339,11 +339,11 @@ void WavPlayer::DisplayConfigurationSettings() {
     if (options_.usage_gain_db.has_value() || options_.usage_volume.has_value()) {
       printf(",\nafter setting ");
       if (options_.usage_gain_db.has_value()) {
-        printf("%s gain to %.3f dB%s", usage_str, options_.usage_gain_db.value(),
+        printf("%s gain to %.3f dB%s", usage_str.c_str(), options_.usage_gain_db.value(),
                (options_.usage_volume.has_value() ? " and " : ""));
       }
       if (options_.usage_volume.has_value()) {
-        printf("%s volume to %.1f", usage_str, options_.usage_volume.value());
+        printf("%s volume to %.1f", usage_str.c_str(), options_.usage_volume.value());
       }
     }
   }
