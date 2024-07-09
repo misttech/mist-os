@@ -4,7 +4,7 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/sco_data_packet.h"
 
-#include <endian.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
@@ -29,19 +29,24 @@ std::unique_ptr<ScoDataPacket> ScoDataPacket::New(
 
 hci_spec::ConnectionHandle ScoDataPacket::connection_handle() const {
   // Return the lower 12-bits of the first two octets.
-  return le16toh(view().header().handle_and_flags) & 0x0FFF;
+  return pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                     view().header().handle_and_flags) &
+         0x0FFF;
 }
 hci_spec::SynchronousDataPacketStatusFlag ScoDataPacket::packet_status_flag()
     const {
   // Return bits 4-5 in the higher octet of |handle_and_flags|, i.e.
   // 0b00xx000000000000.
+  uint16_t host_val = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little, view().header().handle_and_flags);
   return static_cast<hci_spec::SynchronousDataPacketStatusFlag>(
-      (le16toh(view().header().handle_and_flags) >> 12) & 0x0003);
+      (host_val >> 12) & 0x0003);
 }
 
 void ScoDataPacket::InitializeFromBuffer() {
   mutable_view()->Resize(
-      /*payload_size=*/le16toh(view().header().data_total_length));
+      /*payload_size=*/pw::bytes::ConvertOrderFrom(
+          cpp20::endian::little, view().header().data_total_length));
 }
 
 void ScoDataPacket::WriteHeader(hci_spec::ConnectionHandle connection_handle) {
@@ -50,7 +55,7 @@ void ScoDataPacket::WriteHeader(hci_spec::ConnectionHandle connection_handle) {
   // This sets the Packet Status Flag (upper bits of handle_and_flags) to 0,
   // which is required for Host->Controller SCO packets.
   mutable_view()->mutable_header()->handle_and_flags =
-      htole16(connection_handle);
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, connection_handle);
   mutable_view()->mutable_header()->data_total_length =
       static_cast<uint8_t>(view().payload_size());
 }
