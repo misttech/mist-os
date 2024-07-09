@@ -5,16 +5,15 @@
 mod data;
 mod toc;
 
-use data::{AllData, DataType, DataTypeInner};
-use toc::TableOfContents;
-
 use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
-use handlebars::Handlebars;
+use data::{AllData, DataType, DataTypeInner};
+use handlebars::{Handlebars, Helper, JsonRender, Output, RenderContext, RenderError};
 use schemars::gen::SchemaSettings;
 use schemars::JsonSchema;
 use std::fs::File;
 use std::io::Write;
+use toc::TableOfContents;
 
 /// Documentation generator for serde classes.
 /// Basic usage:
@@ -47,6 +46,9 @@ impl<'a> DocWriter<'a> {
         s.handlebars
             .register_template_string("struct", include_str!("struct.hbs"))
             .expect("Registering struct template");
+
+        s.handlebars.register_helper("md_escaped", Box::new(md_escaped));
+
         s
     }
 
@@ -125,5 +127,78 @@ impl<'a> DocWriter<'a> {
             .write_all(content.as_bytes())
             .with_context(|| format!("Writing {}", &output_path))?;
         Ok(())
+    }
+}
+
+/// Escape special characters that confuse the markdown parser.
+pub fn md_escaped(
+    h: &Helper<'_, '_>,
+    _: &Handlebars<'_>,
+    _: &handlebars::Context,
+    _: &mut RenderContext<'_, '_>,
+    out: &mut dyn Output,
+) -> Result<(), RenderError> {
+    // get parameter from helper or throw an error
+    let param =
+        h.param(0).ok_or_else(|| RenderError::new("Param 0 is required for md_escaped helper"))?;
+    let output: String = if let Some(s) = param.value().as_str() {
+        md_escaped_impl(s)
+    } else {
+        md_escaped_impl(&param.value().render())
+    };
+    out.write(&output)?;
+    Ok(())
+}
+
+fn md_escaped_impl(input: &str) -> String {
+    let mut output = Vec::<String>::new();
+    // look line by line
+    let mut in_code = false;
+    for l in input.lines() {
+        if l.contains("```") {
+            if in_code {
+                let escaped = l
+                    .replace("{", "&#123;")
+                    .replace("}", "&#125;")
+                    .replace("[", "\\[")
+                    .replace("```", "</code>");
+                output.push(escaped);
+                in_code = false;
+            } else {
+                let escaped = l
+                    .replace("{", "&#123;")
+                    .replace("}", "&#125;")
+                    .replace("[", "\\[")
+                    .replace("```", "<code>");
+                output.push(escaped);
+                in_code = true;
+            }
+        } else {
+            let escaped = l.replace("{", "&#123;").replace("}", "&#125;").replace("[", "\\[");
+            output.push(escaped);
+        }
+    }
+    output.join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_md_escaped() {
+        let testdata = [
+            ("", ""),
+            ("No special chars", "No special chars"),
+            ("{special} chars", "&#123;special&#125; chars"),
+            ("sum = x[i] + y[i]", "sum = x\\[i] + y\\[i]"),
+            ("`codeword`", "`codeword`"),
+            ("```c++\ncode\nblock\n```", "<code>c++\ncode\nblock\n</code>"),
+        ];
+
+        for (input, want) in testdata {
+            let got = md_escaped_impl(input);
+            assert_eq!(got, want);
+        }
     }
 }

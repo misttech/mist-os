@@ -1,6 +1,6 @@
 # {{rust_type}}
 
-{{description}}
+{{md_escaped description}}
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -8,16 +8,16 @@
         <tr id="{{field_name}}">
             <td><code>{{~ field_name ~}}</code></td>
             {{#if (eq kind "primitive")}}
-            <td><code>{{~ data_type ~}}</code></td>
+            <td><code>{{~ md_escaped data_type ~}}</code></td>
             {{else}}
             <td><code><a class='link' href="../{{~ data_type ~}}">{{~ data_type ~}}</code></td>
             {{/if}}
             <td>
-                {{~ description ~}}
+                {{~ md_escaped description ~}}
             </td>
             <td>
                 {{~ #if default includeZero=true ~}}
-                    {{~ default ~}}
+                    {{~ md_escaped default ~}}
                 {{~ /if ~}}
             </td>
         </tr>
