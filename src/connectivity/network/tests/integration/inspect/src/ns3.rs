@@ -361,6 +361,70 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
                 RemoteAddress: want_remote,
                 TransportProtocol: want_proto,
                 NetworkProtocol: I::NAME,
+                MulticastGroupMemberships: {},
+            },
+        }
+    })
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn inspect_multicast_group_memberships<I: TestIpExt>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    let loopback_id =
+        u32::try_from(get_loopback_id(&realm).await).expect("loopback ID should fit in u32");
+
+    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
+    let socket = realm
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("create datagram socket");
+
+    // Join a multicast group on the loopback interface.
+    let multicast_addr = match I::VERSION {
+        IpVersion::V4 => {
+            let mcast_addr = net_declare::std_ip_v4!("224.0.0.1");
+            let loopback_index = socket2::InterfaceIndexOrAddress::Index(loopback_id);
+            socket
+                .join_multicast_v4_n(&mcast_addr, &loopback_index)
+                .expect("failed to join multicast_group");
+            std::net::IpAddr::V4(mcast_addr)
+        }
+        IpVersion::V6 => {
+            let mcast_addr = net_declare::std_ip_v6!("ff00::1");
+            socket
+                .join_multicast_v6(&mcast_addr, loopback_id)
+                .expect("failed to join multicast_group");
+            std::net::IpAddr::V6(mcast_addr)
+        }
+    };
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    // NB: The sockets are keyed by an opaque debug identifier.
+    let sockets = data.get_child("Sockets").unwrap();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Sockets: {
+            sock_name => {
+                LocalAddress: "[NOT BOUND]",
+                RemoteAddress: "[NOT CONNECTED]",
+                TransportProtocol: "UDP",
+                NetworkProtocol: I::NAME,
+                MulticastGroupMemberships: {
+                    "0": {
+                        MulticastGroup: format!("{multicast_addr}"),
+                        Device: u64::from(loopback_id),
+                    },
+                },
             },
         }
     })
@@ -417,16 +481,13 @@ async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
     })
 }
 
-#[netstack_test]
-async fn inspect_routes(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
-
+/// Helper function that returns the ID of the loopback interface.
+async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
-    let loopback_id = fidl_fuchsia_net_interfaces_ext::wait_interface(
+
+    fidl_fuchsia_net_interfaces_ext::wait_interface(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             &interfaces_state,
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
@@ -451,8 +512,15 @@ async fn inspect_routes(name: &str) {
         },
     )
     .await
-    .expect("getting loopback id");
+    .expect("getting loopback id")
+}
 
+#[netstack_test]
+async fn inspect_routes(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+    let loopback_id = get_loopback_id(&realm).await;
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
             .await

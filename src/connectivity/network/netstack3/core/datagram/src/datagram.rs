@@ -18,7 +18,7 @@ use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use derivative::Derivative;
 use either::Either;
 use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6};
-use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr};
+use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_base::socket::{
     self, BoundSocketMap, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
     DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, EitherStack, InsertError,
@@ -200,6 +200,21 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> SocketState<I, D,
             };
             node.record_local_socket_addr::<N, _, _, _>(local);
             node.record_remote_socket_addr::<N, _, _, _>(remote);
+
+            let IpOptions {
+                multicast_memberships: MulticastMemberships(multicast_memberships),
+                socket_options: _,
+                other_stack: _,
+                transparent: _,
+            } = self.as_ref();
+            node.record_child("MulticastGroupMemberships", |node| {
+                for (index, (multicast_addr, device)) in multicast_memberships.iter().enumerate() {
+                    node.record_debug_child(index, |node| {
+                        node.record_ip_addr("MulticastGroup", multicast_addr.get());
+                        N::record_device(node, "Device", device);
+                    })
+                }
+            });
         });
     }
 
