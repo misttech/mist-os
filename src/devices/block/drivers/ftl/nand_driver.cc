@@ -124,8 +124,8 @@ const char* NandDriverImpl::Attach(const ftl::Volume* ftl_volume) {
   ftl::VolumeOptions options = {
       .num_blocks = info_.num_blocks,
       // This should be 2%, but that is of the whole device, not just this partition.
-      // TODO(https://fxbug.dev/42115225): This value should be provided by the stack. For now, use 2% for
-      // small disks (likely tests).
+      // TODO(https://fxbug.dev/42115225): This value should be provided by the stack. For now, use
+      // 2% for small disks (likely tests).
       .max_bad_blocks = info_.num_blocks > 1000 ? 41 : info_.num_blocks / 50,
       .block_size = info_.page_size * info_.pages_per_block,
       .page_size = info_.page_size,
@@ -208,11 +208,16 @@ int NandDriverImpl::NandRead(uint32_t start_page, uint32_t page_count, void* pag
   }
 
   if (page_buffer) {
-    memcpy(page_buffer, operation.buffer(), data_size);
+    if (zx_status_t status = operation.GetVmo()->read(page_buffer, 0, data_size); status != ZX_OK) {
+      return ftl::kNdmFatalError;
+    }
   }
 
   if (oob_buffer) {
-    memcpy(oob_buffer, operation.buffer() + data_size, oob_size);
+    if (zx_status_t status = operation.GetVmo()->read(oob_buffer, data_size, oob_size);
+        status != ZX_OK) {
+      return ftl::kNdmFatalError;
+    }
   }
 
   // This threshold is somewhat arbitrary, and should be adjusted if we deal
@@ -251,7 +256,10 @@ int NandDriverImpl::NandWrite(uint32_t start_page, uint32_t page_count, const vo
       zxlogf(ERROR, "FTL: SetDataVmo Failed: %d", status);
       return ftl::kNdmFatalError;
     }
-    memcpy(operation.buffer(), page_buffer, data_size);
+    if (zx_status_t status = operation.GetVmo()->write(page_buffer, 0, data_size);
+        status != ZX_OK) {
+      return ftl::kNdmFatalError;
+    }
   }
 
   if (oob_buffer) {
@@ -261,7 +269,10 @@ int NandDriverImpl::NandWrite(uint32_t start_page, uint32_t page_count, const vo
       zxlogf(ERROR, "FTL: SetOobVmo Failed: %d", status);
       return ftl::kNdmFatalError;
     }
-    memcpy(operation.buffer() + data_size, oob_buffer, oob_size);
+    if (zx_status_t status = operation.GetVmo()->write(oob_buffer, data_size, oob_size);
+        status != ZX_OK) {
+      return ftl::kNdmFatalError;
+    }
   }
 
   zxlogf(TRACE, "FTL: Write page, start %d, len %d", start_page, page_count);

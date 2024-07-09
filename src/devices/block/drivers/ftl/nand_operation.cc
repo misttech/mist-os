@@ -19,12 +19,12 @@ zx_status_t NandOperation::SetDataVmo(size_t num_bytes) {
   if (!operation) {
     return ZX_ERR_NO_MEMORY;
   }
-  zx_status_t status = GetVmo(num_bytes);
-  if (status != ZX_OK) {
+
+  if (zx_status_t status = CreateVmoForCommand(num_bytes, operation->rw.command); status != ZX_OK) {
     return status;
   }
 
-  operation->rw.data_vmo = mapper_.vmo().get();
+  operation->rw.data_vmo = vmo_.get();
   return ZX_OK;
 }
 
@@ -33,12 +33,11 @@ zx_status_t NandOperation::SetOobVmo(size_t num_bytes) {
   if (!operation) {
     return ZX_ERR_NO_MEMORY;
   }
-  zx_status_t status = GetVmo(num_bytes);
-  if (status != ZX_OK) {
+  if (zx_status_t status = CreateVmoForCommand(num_bytes, operation->rw.command); status != ZX_OK) {
     return status;
   }
 
-  operation->rw.oob_vmo = mapper_.vmo().get();
+  operation->rw.oob_vmo = vmo_.get();
   return ZX_OK;
 }
 
@@ -77,12 +76,24 @@ void NandOperation::OnCompletion(void* cookie, zx_status_t status, nand_operatio
   sync_completion_signal(&operation->event_);
 }
 
-zx_status_t NandOperation::GetVmo(size_t num_bytes) {
-  if (mapper_.start()) {
+zx_status_t NandOperation::CreateVmoForCommand(size_t num_bytes, nand_op_t command) {
+  if (vmo_.is_valid()) {
     return ZX_OK;
   }
-
-  return mapper_.CreateAndMap(num_bytes, "");
+  if (zx_status_t status = zx::vmo::create(num_bytes, 0, &vmo_); status != ZX_OK) {
+    return status;
+  }
+  if (command == NAND_OP_READ) {
+    // Pre-commit pages only for read operations. The rawnand driver maps this VMO and memcpy's data
+    // into it a page at a time. Pre-committing the pages allows the rawnand driver to map with
+    // VM_MAP_RANGE which avoids page faulting on every page during the memcpy.
+    if (zx_status_t status = vmo_.op_range(ZX_VMO_OP_COMMIT, 0, num_bytes, nullptr, 0);
+        status != ZX_OK) {
+      vmo_.reset();
+      return status;
+    }
+  }
+  return ZX_OK;
 }
 
 std::vector<zx::result<>> NandOperation::ExecuteBatch(

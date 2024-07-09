@@ -26,8 +26,10 @@ TEST(NandOperationTest, SetDataVmo) {
 
   EXPECT_NE(0, op->rw.data_vmo);
   EXPECT_NE(ZX_HANDLE_INVALID, op->rw.data_vmo);
-  EXPECT_EQ(55, operation.buffer_size());
-  EXPECT_NE(nullptr, operation.buffer());
+  EXPECT_EQ(operation.GetVmo()->get(), op->rw.data_vmo);
+  uint64_t content_size;
+  ASSERT_OK(operation.GetVmo()->get_prop_content_size(&content_size));
+  EXPECT_EQ(55, content_size);
 }
 
 TEST(NandOperationTest, SetOobVmo) {
@@ -40,8 +42,10 @@ TEST(NandOperationTest, SetOobVmo) {
 
   EXPECT_NE(0, op->rw.oob_vmo);
   EXPECT_NE(ZX_HANDLE_INVALID, op->rw.oob_vmo);
-  EXPECT_EQ(66, operation.buffer_size());
-  EXPECT_NE(nullptr, operation.buffer());
+  EXPECT_EQ(operation.GetVmo()->get(), op->rw.oob_vmo);
+  uint64_t content_size;
+  ASSERT_OK(operation.GetVmo()->get_prop_content_size(&content_size));
+  EXPECT_EQ(66, content_size);
 }
 
 class NandTester : public ddk::NandProtocol<NandTester> {
