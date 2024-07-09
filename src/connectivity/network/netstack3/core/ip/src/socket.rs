@@ -117,6 +117,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: &O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
+        transparent: bool,
     ) -> Result<(), SendOneShotIpPacketError<E>>
     where
         S: TransportPacketSerializer<I>,
@@ -125,14 +126,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         O: SendOptions<I>,
     {
         let tmp = self
-            .new_ip_socket(
-                bindings_ctx,
-                device,
-                local_ip,
-                remote_ip,
-                proto,
-                false, /* transparent */
-            )
+            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, transparent)
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
@@ -151,6 +145,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: &O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
+        transparent: bool,
     ) -> Result<(), IpSockCreateAndSendError>
     where
         S: TransportPacketSerializer<I>,
@@ -167,6 +162,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             options,
             |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
             mtu,
+            transparent,
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => err,

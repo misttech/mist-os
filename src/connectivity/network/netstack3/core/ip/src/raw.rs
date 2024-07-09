@@ -205,6 +205,7 @@ where
                     &send_options,
                     build_packet_fn,
                     None,
+                    false, /* transparent */
                 )
                 .map_err(|e| match e {
                     SendOneShotIpPacketError::CreateAndSendError { err } => {

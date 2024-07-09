@@ -5185,6 +5185,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 &DefaultSendOptions,
                 |_addr| tcp_serialize_segment(segment, conn_addr),
                 None,
+                false, /* transparent */
             )
         }
     };

@@ -3353,6 +3353,7 @@ struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakDeviceI
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: &'a Option<D>,
     socket_options: &'a DatagramSocketOptions<I, D>,
+    transparent: bool,
 }
 
 fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC, B: BufferMut>(
@@ -3365,6 +3366,7 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
         remote_id,
         device,
         socket_options,
+        transparent,
     }: SendOneshotParameters<'_, I, S, CC::WeakDeviceId>,
     body: B,
 ) -> Result<(), SendToError<S::SerializeError>> {
@@ -3396,6 +3398,7 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
                 )
             },
             None,
+            transparent,
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => SendToError::CreateAndSend(err),
@@ -4238,6 +4241,7 @@ where
                                         remote_id: remote_identifier,
                                         device,
                                         socket_options: &ip_options.socket_options,
+                                        transparent: ip_options.transparent,
                                     },
                                     core_ctx,
                                 )),
@@ -4266,6 +4270,7 @@ where
                                         remote_id: remote_identifier,
                                         device,
                                         socket_options: &ip_options.socket_options,
+                                        transparent: ip_options.transparent,
                                     },
                                     core_ctx,
                                 )),
@@ -4299,6 +4304,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: &ip_options.socket_options,
+                                    transparent: ip_options.transparent,
                                 },
                                 core_ctx,
                             )),
@@ -4316,6 +4322,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: &ip_options.socket_options,
+                                    transparent: ip_options.transparent,
                                 },
                                 core_ctx,
                             )),
@@ -4336,6 +4343,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: ds.to_other_socket_options(ip_options),
+                                    transparent: ip_options.transparent,
                                 },
                                 ds,
                             )),
@@ -4353,6 +4361,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: ds.to_other_socket_options(ip_options),
+                                    transparent: ip_options.transparent,
                                 },
                                 ds,
                             )),
@@ -4396,6 +4405,7 @@ where
                                             remote_id: remote_identifier,
                                             device,
                                             socket_options: &ip_options.socket_options,
+                                            transparent: ip_options.transparent,
                                         },
                                         core_ctx,
                                     )),
@@ -4427,6 +4437,7 @@ where
                                             remote_id: remote_identifier,
                                             device,
                                             socket_options: ds.to_other_socket_options(ip_options),
+                                            transparent: ip_options.transparent,
                                         },
                                         ds,
                                     )),
@@ -5997,6 +6008,14 @@ mod test {
             Default::default(),
         )
         .expect("connect should succeed");
+
+        api.send_to(
+            &socket,
+            Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
+            REMOTE_PORT,
+            Buf::new(Vec::new(), ..),
+        )
+        .expect("send_to should succeed");
     }
 
     #[derive(Eq, PartialEq)]

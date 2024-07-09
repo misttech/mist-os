@@ -1804,6 +1804,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
             &DefaultSendOptions,
             |src_ip| get_body_from_src_ip(src_ip.into()),
             None,
+            false, /* transparent */
         )
         .unwrap_or_else(|err| {
             debug!("failed to send ICMP reply: {}", err);
@@ -2623,7 +2624,8 @@ fn send_icmpv4_error_message<
                     message,
                 ))
             },
-            None
+            None,
+            false, /* transparent */
         )
     );
 }
@@ -2683,6 +2685,7 @@ fn send_icmpv6_error_message<
                     .encapsulate(icmp_builder)
             },
             Some(Ipv6::MINIMUM_LINK_MTU.get()),
+            false, /* transparent */
         )
     );
 }
