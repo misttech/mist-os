@@ -3308,8 +3308,16 @@ mod tests {
             local_ip: Option<SocketIpAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
+            transparent: bool,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.ip_socket_ctx.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            self.ip_socket_ctx.new_ip_socket(
+                bindings_ctx,
+                device,
+                local_ip,
+                remote_ip,
+                proto,
+                transparent,
+            )
         }
 
         fn send_ip_packet<S, O>(

@@ -53,6 +53,7 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         _local_ip: Option<SocketIpAddr<I::Addr>>,
         _remote_ip: SocketIpAddr<I::Addr>,
         _proto: I::Proto,
+        _transparent: bool,
     ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
         self.uninstantiable_unreachable()
     }

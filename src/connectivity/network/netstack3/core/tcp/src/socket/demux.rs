@@ -892,6 +892,7 @@ where
         Some(local_ip),
         remote_ip,
         IpProto::Tcp.into(),
+        false, /* transparent */
     ) {
         Ok(ip_sock) => ip_sock,
         err @ Err(IpSockCreationError::Route(_)) => {

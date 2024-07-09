@@ -2158,6 +2158,7 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
     device: &Option<CC::WeakDeviceId>,
     core_ctx: &mut CC,
     identifier: LI,
+    transparent: bool,
 ) -> Result<
     (Option<SocketIpAddr<I::Addr>>, Option<EitherDeviceId<CC::DeviceId, CC::WeakDeviceId>>, LI),
     LocalAddressError,
@@ -2171,8 +2172,8 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
 
             // Binding to multicast addresses is allowed regardless.
             // Other addresses can only be bound to if they are assigned
-            // to the device.
-            if !addr.addr().is_multicast() {
+            // to the device, or if the socket is transparent.
+            if !addr.addr().is_multicast() && !transparent {
                 BaseTransportIpContext::<I, _>::with_devices_with_assigned_addr(
                     core_ctx,
                     addr.into(),
@@ -2310,6 +2311,7 @@ fn listen_inner<
         local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
         id: <S::SocketMapSpec<I, CC::WeakDeviceId> as SocketMapStateSpec>::ListenerId,
         sharing: S::SharingState,
+        transparent: bool,
     ) -> Result<
         ListenerAddr<
             ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
@@ -2328,7 +2330,7 @@ fn listen_inner<
         }
         .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
         let (addr, device, identifier) =
-            try_pick_bound_address::<I, _, _, _>(addr, device, core_ctx, identifier)?;
+            try_pick_bound_address::<I, _, _, _>(addr, device, core_ctx, identifier, transparent)?;
         let weak_device = device.map(|d| d.as_weak().into_owned());
 
         BoundStateHandler::<_, S, _>::try_insert_listener(
@@ -2363,6 +2365,7 @@ fn listen_inner<
                         local_id,
                         id,
                         sharing.clone(),
+                        ip_options.transparent(),
                     )
                 })
                 .map(|ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }| {
@@ -2390,6 +2393,7 @@ fn listen_inner<
                         local_id,
                         id,
                         sharing.clone(),
+                        ip_options.transparent(),
                     )
                 })
                 .map(|ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }| {
@@ -2424,8 +2428,13 @@ fn listen_inner<
                         ),
                     }
                     .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
-                    let (_addr, device, identifier) =
-                        try_pick_bound_address::<I, _, _, _>(None, device, core_ctx, identifier)?;
+                    let (_addr, device, identifier) = try_pick_bound_address::<I, _, _, _>(
+                        None,
+                        device,
+                        core_ctx,
+                        identifier,
+                        ip_options.transparent(),
+                    )?;
                     let weak_device = device.map(|d| d.as_weak().into_owned());
 
                     BoundStateHandler::<_, S, _>::try_insert_listener(
@@ -2579,6 +2588,7 @@ fn connect_inner<
         local_ip.map(SocketIpAddr::into),
         remote_ip,
         S::ip_proto::<WireI>(),
+        ip_options.transparent(),
     )?;
 
     let local_port = match local_port {
@@ -3471,7 +3481,7 @@ fn set_bound_device_single_stack<
         }
         SetBoundDeviceParameters::Connected(ConnState {
             socket,
-            ip_options: _,
+            ip_options,
             addr,
             shutdown: _,
             clear_device_on_disconnect,
@@ -3486,6 +3496,7 @@ fn set_bound_device_single_stack<
                     Some(local_ip.clone()),
                     remote_ip.clone(),
                     socket.proto(),
+                    ip_options.transparent(),
                 )
                 .map_err(|_: IpSockCreationError| {
                     SocketError::Remote(RemoteAddressError::NoRoute)
@@ -5939,6 +5950,38 @@ mod test {
         api.set_ip_transparent(&unbound, false);
 
         assert!(!api.get_ip_transparent(&unbound));
+    }
+
+    #[ip_test(I)]
+    fn transparent_bind_connect_non_local_src_addr<I: DatagramIpExt<FakeDeviceId>>() {
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(
+            FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
+                device: FakeDeviceId,
+                local_ips: vec![],
+                remote_ips: vec![I::TEST_ADDRS.remote_ip],
+            }]),
+        ));
+        let mut api = ctx.datagram_api::<I>();
+        let socket = api.create(());
+        api.set_ip_transparent(&socket, true);
+
+        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
+        const REMOTE_PORT: u16 = 1234;
+
+        // Binding to `local_ip` should succeed even though it is not assigned
+        // to an interface because the socket is transparent.
+        api.listen(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(LOCAL_PORT))
+            .expect("listen should succeed");
+
+        // Connecting to a valid remote should also succeed even though the
+        // local address of the IP socket is not actually local.
+        api.connect(
+            &socket,
+            Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
+            REMOTE_PORT,
+            Default::default(),
+        )
+        .expect("connect should succeed");
     }
 
     #[derive(Eq, PartialEq)]

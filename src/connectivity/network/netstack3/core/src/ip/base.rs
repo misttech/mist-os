@@ -105,7 +105,7 @@ where
     ) -> Result<Self::DeviceId, ResolveRouteError> {
         let remote_ip = SocketIpAddr::new_from_multicast(addr);
         let ResolvedRoute { src_addr: _, device, local_delivery_device, next_hop: _ } =
-            ip::resolve_route_to_destination(self, None, None, Some(remote_ip))?;
+            ip::resolve_route_to_destination(self, None, None, Some(remote_ip), false)?;
         // NB: Because the original address is multicast, it cannot be assigned
         // to a local interface. Thus local delivery should never be requested.
         debug_assert!(local_delivery_device.is_none(), "{:?}", local_delivery_device);

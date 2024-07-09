@@ -57,6 +57,7 @@ struct NewSocketTestCase {
     local_ip_type: AddressType,
     remote_ip_type: AddressType,
     device_type: DeviceType,
+    transparent: bool,
     expected_result: Result<(), IpSockCreationError>,
 }
 
@@ -136,68 +137,93 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
         local_ip_type: AddressType::Unroutable,
         remote_ip_type: AddressType::Remote,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
     }; "unroutable local to remote")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::LocallyOwned,
         remote_ip_type: AddressType::Unroutable,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Err(ResolveRouteError::Unreachable.into()),
     }; "local to unroutable remote")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::LocallyOwned,
         remote_ip_type: AddressType::Remote,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Ok(()),
     }; "local to remote")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Unspecified { can_select: true },
         remote_ip_type: AddressType::Remote,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Ok(()),
     }; "unspecified to remote")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Unspecified { can_select: true },
         remote_ip_type: AddressType::Remote,
         device_type: DeviceType::LocalDevice,
+        transparent: false,
         expected_result: Ok(()),
     }; "unspecified to remote through local device")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Unspecified { can_select: true },
         remote_ip_type: AddressType::Remote,
         device_type: DeviceType::OtherDevice,
+        transparent: false,
         expected_result: Err(ResolveRouteError::Unreachable.into()),
     }; "unspecified to remote through other device")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Unspecified { can_select: false },
         remote_ip_type: AddressType::Remote,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
     }; "new unspcified to remote can't select")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Remote,
         remote_ip_type: AddressType::Remote,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
     }; "new remote to remote")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::LocallyOwned,
         remote_ip_type: AddressType::LocallyOwned,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Ok(()),
     }; "new local to local")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Unspecified { can_select: true },
         remote_ip_type: AddressType::LocallyOwned,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Ok(()),
     }; "new unspecified to local")]
 #[test_case(NewSocketTestCase {
         local_ip_type: AddressType::Remote,
         remote_ip_type: AddressType::LocallyOwned,
         device_type: DeviceType::Unspecified,
+        transparent: false,
         expected_result: Err(ResolveRouteError::NoSrcAddr.into()),
     }; "new remote to local")]
+#[test_case(NewSocketTestCase {
+        local_ip_type: AddressType::Remote,
+        remote_ip_type: AddressType::LocallyOwned,
+        device_type: DeviceType::Unspecified,
+        transparent: true,
+        expected_result: Ok(()),
+    }; "new transparent remote to local")]
+#[test_case(NewSocketTestCase {
+        local_ip_type: AddressType::Remote,
+        remote_ip_type: AddressType::Remote,
+        device_type: DeviceType::Unspecified,
+        transparent: true,
+        expected_result: Ok(()),
+    }; "new transparent remote to remote")]
 fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     let cfg = I::TEST_ADDRS;
     let proto = I::ICMP_IP_PROTO;
@@ -206,8 +232,13 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
     let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(cfg).build();
     let loopback_device_id = ctx.test_api().add_loopback();
 
-    let NewSocketTestCase { local_ip_type, remote_ip_type, expected_result, device_type } =
-        test_case;
+    let NewSocketTestCase {
+        local_ip_type,
+        remote_ip_type,
+        transparent,
+        device_type,
+        expected_result,
+    } = test_case;
 
     let local_device: Option<DeviceId<_>> = match device_type {
         DeviceType::Unspecified => None,
@@ -249,6 +280,7 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
         local_ip: SocketIpAddr::try_from(expected_from_ip).unwrap(),
         device: weak_local_device.clone(),
         proto,
+        transparent,
     };
 
     let res = IpSocketHandler::<I, _>::new_ip_socket(
@@ -258,6 +290,7 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
         from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
         SocketIpAddr::try_from(to_ip).unwrap(),
         proto,
+        transparent,
     );
     assert_eq!(res.map(|s| s.definition().clone()), get_expected_result(template));
 }
@@ -326,6 +359,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         from_ip.map(|a| SocketIpAddr::try_from(a).unwrap()),
         SocketIpAddr::try_from(to_ip).unwrap(),
         I::ICMP_IP_PROTO,
+        false, /* transparent */
     )
     .unwrap();
 
@@ -382,6 +416,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         None,
         SocketIpAddr::try_from(remote_ip).unwrap(),
         proto,
+        false, /* transparent */
     )
     .unwrap();
 
@@ -554,6 +589,7 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
             None,
             destination_ip,
             I::ICMP_IP_PROTO,
+            false, /* transparent */
         )
         .unwrap();
 
@@ -634,6 +670,7 @@ fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
         None,
         SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
         I::ICMP_IP_PROTO,
+        false, /* transparent */
     )
     .unwrap();
 
@@ -653,5 +690,5 @@ fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
         .unwrap())
     };
     let (mut core_ctx, bindings_ctx) = ctx.contexts();
-    assert_eq!(DeviceIpSocketHandler::get_mms(&mut core_ctx, bindings_ctx, &ip_sock), expected,);
+    assert_eq!(DeviceIpSocketHandler::get_mms(&mut core_ctx, bindings_ctx, &ip_sock), expected);
 }

@@ -889,8 +889,12 @@ fn get_local_addr<
     local_ip: Option<IpDeviceAddr<I::Addr>>,
     device: &CC::DeviceId,
     remote_addr: Option<RoutableIpAddr<I::Addr>>,
+    allow_non_local_src: bool,
 ) -> Result<IpDeviceAddr<I::Addr>, ResolveRouteError> {
     if let Some(local_ip) = local_ip {
+        if allow_non_local_src {
+            return Ok(local_ip);
+        }
         is_local_assigned_address(core_ctx, device, local_ip.into())
             .then_some(local_ip)
             .ok_or(ResolveRouteError::NoSrcAddr)
@@ -929,6 +933,7 @@ pub fn resolve_route_to_destination<
     device: Option<&CC::DeviceId>,
     src_ip: Option<IpDeviceAddr<I::Addr>>,
     dst_ip: Option<RoutableIpAddr<I::Addr>>,
+    allow_non_local_src: bool,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
         WeakLoopback { dst_ip: A, device: D },
@@ -983,8 +988,10 @@ pub fn resolve_route_to_destination<
             LocalDelivery::WeakLoopback { dst_ip, device } => {
                 let src_ip = match src_ip {
                     Some(src_ip) => {
-                        let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
-                            .ok_or(ResolveRouteError::NoSrcAddr)?;
+                        if !allow_non_local_src {
+                            let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
+                                .ok_or(ResolveRouteError::NoSrcAddr)?;
+                        }
                         src_ip
                     }
                     None => dst_ip,
@@ -992,7 +999,7 @@ pub fn resolve_route_to_destination<
                 (src_ip, device)
             }
             LocalDelivery::StrongForDevice(device) => {
-                (get_local_addr(core_ctx, src_ip, &device, dst_ip)?, device)
+                (get_local_addr(core_ctx, src_ip, &device, dst_ip, allow_non_local_src)?, device)
             }
         };
         return Ok(ResolvedRoute {
@@ -1009,7 +1016,9 @@ pub fn resolve_route_to_destination<
                 core_ctx,
                 device,
                 dst_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
-                |core_ctx, d| Some(get_local_addr(core_ctx, src_ip, d, dst_ip)),
+                |core_ctx, d| {
+                    Some(get_local_addr(core_ctx, src_ip, d, dst_ip, allow_non_local_src))
+                },
             );
 
             let first_error = match matching_with_addr.next() {
@@ -1064,8 +1073,9 @@ impl<
         device: Option<&CC::DeviceId>,
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         addr: RoutableIpAddr<I::Addr>,
+        transparent: bool,
     ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
-        resolve_route_to_destination(self, device, local_ip, Some(addr))
+        resolve_route_to_destination(self, device, local_ip, Some(addr), transparent)
     }
 
     fn send_ip_packet<S>(

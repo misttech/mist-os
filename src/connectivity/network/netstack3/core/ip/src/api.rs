@@ -71,7 +71,7 @@ where
         ResolvedRoute<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         ResolveRouteError,
     > {
-        base::resolve_route_to_destination(self.core_ctx(), None, None, destination)
+        base::resolve_route_to_destination(self.core_ctx(), None, None, destination, false)
     }
 
     /// Selects the device to use for gateway routes when the device was

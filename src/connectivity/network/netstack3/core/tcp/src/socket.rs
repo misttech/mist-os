@@ -3251,6 +3251,7 @@ where
                 Some(*local_ip),
                 *remote_ip,
                 IpProto::Tcp.into(),
+                false, /* transparent */
             )
             .map_err(|_: IpSockCreationError| SetDeviceError::Unroutable)?;
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
@@ -4920,6 +4921,7 @@ where
             local_ip,
             remote_ip,
             IpProto::Tcp.into(),
+            false, /* transparent */
         )
         .map_err(|err| match err {
             IpSockCreationError::Route(_) => ConnectError::NoRoute,
@@ -5633,6 +5635,7 @@ mod tests {
             local_ip: Option<SocketIpAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
+            transparent: bool,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
             IpSocketHandler::<I, BC>::new_ip_socket(
                 &mut self.ip_socket_ctx,
@@ -5641,6 +5644,7 @@ mod tests {
                 local_ip,
                 remote_ip,
                 proto,
+                transparent,
             )
         }
 
