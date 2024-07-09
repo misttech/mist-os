@@ -61,8 +61,7 @@ if (is_host) {
     _product_bundle = "$_pb_outdir/product_bundle"
 
     # Package repository inputs from the main build, so that `fx set ... --with //foo` will work.
-    _amber_files_label =
-        "//build/images/updates:prepare_publish($default_toolchain)"
+    _amber_files_label = "//build/images/updates:publish($default_toolchain)"
     _amber_files_path = "$root_build_dir/amber-files"
 
     host_test_data("isolated_emulator_data") {
