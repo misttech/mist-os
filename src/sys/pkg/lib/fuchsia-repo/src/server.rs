@@ -292,6 +292,15 @@ async fn handle_connection(
     conn: ConnectionStream,
 ) {
     let service_server_stopped = server_stopped.clone();
+    let peer_addr = if let ConnectionStream::Tcp(tcp_stream) = &conn {
+        if let Ok(addr) = tcp_stream.peer_addr() {
+            addr.to_string()
+        } else {
+            String::from("unknown")
+        }
+    } else {
+        String::from("socket")
+    };
     let conn = hyper::server::conn::Http::new().with_executor(executor.clone()).serve_connection(
         conn,
         service_fn(|req| {
@@ -301,6 +310,7 @@ async fn handle_connection(
             let method = req.method().to_string();
             let path = req.uri().path().to_string();
 
+            let peer_addr_clone = peer_addr.clone();
             handle_request(
                 executor.clone(),
                 service_server_stopped.clone(),
@@ -310,8 +320,9 @@ async fn handle_connection(
             )
             .inspect(move |resp| {
                 info!(
-                    "{} [ffx] {} {} => {}",
+                    "{} [ffx] {} {} {} => {}",
                     Utc::now().format("%T.%6f"),
+                    peer_addr_clone,
                     method,
                     path,
                     resp.status()
