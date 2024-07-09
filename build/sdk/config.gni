@@ -64,7 +64,7 @@ declare_args() {
   # overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
   #
   # To override the set of API levels, see
-  #`override_build_time_supported_api_levels`.
+  #`override_idk_buildable_api_levels`.
   override_idk_target_cpus = false
 }
 

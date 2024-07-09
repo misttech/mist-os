@@ -36,7 +36,7 @@ GN arguments:
 
 ```
 bazel_fuchsia_sdk_all_cpus = true
-override_build_time_supported_api_levels = false
+override_idk_buildable_api_levels = false
 ```
 
 Running this command will create the core SDK and run the generators which

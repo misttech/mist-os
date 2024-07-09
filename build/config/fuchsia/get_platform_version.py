@@ -81,19 +81,15 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         and special_api_levels[level]["status"] == "in-development"
     ]
 
-    build_time_supported_api_levels = (
-        supported_api_levels + in_development_api_levels
-    )
-    runtime_supported_api_levels = (
-        sunset_api_levels + build_time_supported_api_levels
-    )
+    idk_buildable_api_levels = supported_api_levels + in_development_api_levels
+    runtime_supported_api_levels = sunset_api_levels + idk_buildable_api_levels
 
     # Temporarily do not support the numbered in-development API level, which
     # will soon be replaced with NEXT, in the IDK since so IDK consumers do not
     # start using it.
     # TODO(https://fxbug.dev/326277078): Remove this when transitioning to NEXT.
     for level in in_development_api_levels:
-        build_time_supported_api_levels.remove(level)
+        idk_buildable_api_levels.remove(level)
 
     # The special API levels cannot currently be targeted in the IDK and thus
     # must be added here.
@@ -105,7 +101,7 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         # frozen once "NEXT" is implemented.
         "all_numbered_api_levels": all_numbered_api_levels,
         # API levels that the IDK supports targeting.
-        "build_time_supported_api_levels": build_time_supported_api_levels,
+        "idk_buildable_api_levels": idk_buildable_api_levels,
         # API levels that the platform build supports at runtime.
         "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
