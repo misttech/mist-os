@@ -20,7 +20,7 @@ if (is_host) {
       source_root = "src/main.rs"
       sources = [ source_root ]
       deps = [
-        "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+        "//src/developer/ffx/lib/e2e_emu",
         "//src/developer/ffx/tools/target-package:ffx_target_package_test_data",
         "//src/lib/fuchsia",
         "//third_party/rust_crates:tracing",

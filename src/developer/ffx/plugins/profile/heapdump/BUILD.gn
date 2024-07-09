@@ -24,7 +24,7 @@ if (is_host) {
     sources = [ source_root ]
 
     deps = [
-      "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+      "//src/developer/ffx/lib/e2e_emu",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",
       "//src/performance/memory/pprof",

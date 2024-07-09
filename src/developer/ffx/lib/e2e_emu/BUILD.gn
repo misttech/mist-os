@@ -10,13 +10,14 @@ if (is_host) {
   group("host_tests") {
     testonly = true
     if (has_board) {
-      deps = [ ":ffx_e2e_emu_test" ]
+      deps = [ ":e2e_emu_test" ]
     }
   }
 
   if (has_board) {
-    rustc_library("ffx_e2e_emu") {
+    rustc_library("e2e_emu") {
       testonly = true
+      name = "ffx_e2e_emu"
       edition = "2021"
       with_unit_tests = true
       sources = [ "src/lib.rs" ]

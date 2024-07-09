@@ -52,7 +52,7 @@ if (is_host) {
       source_root = "tests/e2e.rs"
       sources = [ source_root ]
       deps = [
-        "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+        "//src/developer/ffx/lib/e2e_emu",
         "//src/lib/fuchsia",
         "//third_party/rust_crates:anyhow",
         "//third_party/rust_crates:pretty_assertions",
