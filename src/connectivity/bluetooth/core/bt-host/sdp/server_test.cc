@@ -5,6 +5,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/server.h"
 
 #include <gtest/gtest.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel_test.h"
@@ -332,7 +333,8 @@ TEST_F(ServerTest, RegisterProtocolOnlyService) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<Header> packet(cb_packet.get());
     EXPECT_EQ(kServiceSearchResponse, packet.header().pdu_id);
-    uint16_t len = be16toh(packet.header().param_length);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     packet.Resize(len);
     ServiceSearchResponse resp;
     fit::result<Error<>> result = resp.Parse(packet.payload_data());
@@ -380,7 +382,8 @@ TEST_F(ServerTest, RegisterProtocolOnlyService) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(kServiceSearchAttributeResponse, packet.header().pdu_id);
-    uint16_t len = be16toh(packet.header().param_length);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     packet.Resize(len);
     ServiceSearchAttributeResponse rsp;
     fit::result<Error<>> result = rsp.Parse(packet.payload_data());
@@ -424,7 +427,8 @@ TEST_F(ServerTest, RegisterProtocolOnlyService) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x01, packet.header().pdu_id);
-    uint16_t len = be16toh(packet.header().param_length);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     ASSERT_GE(sizeof(Header) + len, cb_packet->size());
     packet.Resize(len);
     ErrorResponse rsp;
@@ -950,8 +954,9 @@ TEST_F(ServerTest, ServiceSearchRequest) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<Header> packet(cb_packet.get());
     EXPECT_EQ(kServiceSearchResponse, packet.header().pdu_id);
-    tid = be16toh(packet.header().tid);
-    uint16_t len = be16toh(packet.header().param_length);
+    tid = pw::bytes::ConvertOrderFrom(cpp20::endian::big, packet.header().tid);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     bt_log(TRACE, "unittest", "resize packet to %d", len);
     packet.Resize(len);
     ServiceSearchResponse resp;
@@ -1065,8 +1070,9 @@ TEST_F(ServerTest, ServiceSearchRequestOneOfMany) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<Header> packet(cb_packet.get());
     EXPECT_EQ(kServiceSearchResponse, packet.header().pdu_id);
-    tid = be16toh(packet.header().tid);
-    uint16_t len = be16toh(packet.header().param_length);
+    tid = pw::bytes::ConvertOrderFrom(cpp20::endian::big, packet.header().tid);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     bt_log(TRACE, "unittests", "resizing packet to %d", len);
     packet.Resize(len);
     ServiceSearchResponse resp;
@@ -1138,7 +1144,8 @@ TEST_F(ServerTest, ServiceSearchContinuationState) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x03, packet.header().pdu_id);
-    uint16_t len = be16toh(packet.header().param_length);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     EXPECT_LE(len,
               0x2F);  // 10 records (4 * 10) + 2 (total count) + 2 (current
                       // count) + 3 (cont state)
@@ -1266,7 +1273,8 @@ TEST_F(ServerTest, ServiceAttributeRequest) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x05, packet.header().pdu_id);
-    uint16_t len = be16toh(packet.header().param_length);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     EXPECT_LE(len, 0x11);  // 10 + 2 (byte count) + 5 (cont state)
     packet.Resize(len);
     fit::result<Error<>> result = rsp.Parse(packet.payload_data());
@@ -1457,7 +1465,8 @@ TEST_F(ServerTest, SearchAttributeRequest) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x07, packet.header().pdu_id);
-    uint16_t len = be16toh(packet.header().param_length);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     EXPECT_LE(len, 0x11);  // 2 (byte count) + 10 (max len) + 5 (cont state)
     packet.Resize(len);
     fit::result<Error<>> result = rsp.Parse(packet.payload_data());
@@ -1677,7 +1686,8 @@ TEST_F(ServerTest, BrowseGroup) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x07, packet.header().pdu_id);
-    uint16_t len = be16toh(packet.header().param_length);
+    uint16_t len = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               packet.header().param_length);
     packet.Resize(len);
     auto status = rsp.Parse(packet.payload_data());
     EXPECT_EQ(fit::ok(), status);
