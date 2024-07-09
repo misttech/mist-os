@@ -54,8 +54,8 @@ use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
 use netstack3_ip::{
-    HopLimits, IpTransportContext, MulticastMembershipHandler, TransparentLocalDelivery,
-    TransportIpContext, TransportReceiveError,
+    HopLimits, IpTransportContext, MulticastMembershipHandler, ReceiveIpPacketMeta,
+    TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::ip::{IpProto, IpProtoExt};
@@ -862,11 +862,13 @@ fn lookup<'s, I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
     (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<NonZeroU16>),
     (dst_ip, dst_port): (SocketIpAddr<I::Addr>, NonZeroU16),
     device: D,
+    broadcast: Option<I::BroadcastMarker>,
 ) -> impl Iterator<Item = LookupResult<'s, I, D, BT>> + 's {
     let matching_entries = bound.iter_receivers(
         (src_ip, src_port.map(UdpRemotePort::from)),
         (dst_ip, dst_port),
         device,
+        broadcast,
     );
     match matching_entries {
         None => Either::Left(None),
@@ -1330,7 +1332,7 @@ fn receive_ip_packet<
     src_ip: I::RecvSrcAddr,
     dst_ip: SpecifiedAddr<I::Addr>,
     mut buffer: B,
-    transport_override: Option<TransparentLocalDelivery<I>>,
+    ReceiveIpPacketMeta { broadcast, transport_override }: ReceiveIpPacketMeta<I>,
 ) -> Result<(), (B, TransportReceiveError)> {
     trace_duration!(bindings_ctx, c"udp::receive_ip_packet");
     core_ctx.increment(|counters| &counters.rx);
@@ -1380,7 +1382,7 @@ fn receive_ip_packet<
     let src_port = packet.src_port();
     // Unfortunately, type inference isn't smart enough for us to just do
     // packet.parse_metadata().
-    let meta = ParsablePacket::<_, UdpParseArgs<I::Addr>>::parse_metadata(&packet);
+    let parse_meta = ParsablePacket::<_, UdpParseArgs<I::Addr>>::parse_metadata(&packet);
 
     /// The maximum number of socket IDs that are expected to receive a given
     /// packet. While it's possible for this number to be exceeded, it's
@@ -1399,12 +1401,18 @@ fn receive_ip_packet<
         DatagramBoundStateContext::<_, _, Udp<_>>::with_bound_sockets(
             core_ctx,
             |_core_ctx, bound_sockets| {
-                lookup(bound_sockets, (src_ip, src_port), (dst_ip, dst_port), device_weak)
-                    .map(|result| match result {
-                        LookupResult::Conn(id, _) | LookupResult::Listener(id, _) => id.clone(),
-                    })
-                    // Collect into an array on the stack.
-                    .collect::<Recipients<_>>()
+                lookup(
+                    bound_sockets,
+                    (src_ip, src_port),
+                    (dst_ip, dst_port),
+                    device_weak,
+                    broadcast,
+                )
+                .map(|result| match result {
+                    LookupResult::Conn(id, _) | LookupResult::Listener(id, _) => id.clone(),
+                })
+                // Collect into an array on the stack.
+                .collect::<Recipients<_>>()
             },
         )
     });
@@ -1424,7 +1432,7 @@ fn receive_ip_packet<
     });
 
     if !was_delivered && StateContext::<I, _>::should_send_port_unreachable(core_ctx) {
-        buffer.undo_parse(meta);
+        buffer.undo_parse(parse_meta);
         core_ctx.increment(|counters| &counters.rx_unknown_dest_port);
         Err((buffer, TransportReceiveError::PortUnreachable))
     } else {
@@ -1624,7 +1632,7 @@ impl<
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
-        transport_override: Option<TransparentLocalDelivery<I>>,
+        meta: ReceiveIpPacketMeta<I>,
     ) -> Result<(), (B, TransportReceiveError)> {
         receive_ip_packet::<I, _, _, _>(
             core_ctx,
@@ -1633,7 +1641,7 @@ impl<
             src_ip,
             dst_ip,
             buffer,
-            transport_override,
+            meta,
         )
     }
 }
@@ -2611,7 +2619,9 @@ mod tests {
     use netstack3_ip::device::IpDeviceStateIpExt;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
     use netstack3_ip::testutil::DualStackSendIpPacketMeta;
-    use netstack3_ip::{IpPacketDestination, ResolveRouteError, SendIpPacketMeta};
+    use netstack3_ip::{
+        IpPacketDestination, ReceiveIpPacketMeta, ResolveRouteError, SendIpPacketMeta,
+    };
     use packet::Buf;
     use test_case::test_case;
 
@@ -3046,7 +3056,7 @@ mod tests {
             src_ip: I::RecvSrcAddr,
             dst_ip: SpecifiedAddr<I::Addr>,
             buffer: B,
-            transport_override: Option<TransparentLocalDelivery<I>>,
+            meta: ReceiveIpPacketMeta<I>,
         ) -> Result<(), (B, TransportReceiveError)> {
             // NB: The compiler can't deduce that `I::OtherVersion`` implements
             // `TestIpExt`, so use `map_ip` to transform the associated types
@@ -3060,13 +3070,13 @@ mod tests {
                     IpInvariant((core_ctx, bindings_ctx, device, buffer)),
                     SrcWrapper(src_ip),
                     dst_ip,
-                    transport_override,
+                    meta,
                 ),
                 |(
                     IpInvariant((core_ctx, bindings_ctx, device, buffer)),
                     SrcWrapper(src_ip),
                     dst_ip,
-                    transport_override,
+                    meta,
                 )| {
                     IpInvariant(receive_ip_packet::<I, _, _, _>(
                         core_ctx,
@@ -3075,7 +3085,7 @@ mod tests {
                         src_ip,
                         dst_ip,
                         buffer,
-                        transport_override,
+                        meta,
                     ))
                 }
             );
@@ -3191,7 +3201,7 @@ mod tests {
             <A::Version as TestIpExt>::into_recv_src_addr(src_ip),
             SpecifiedAddr::new(dst_ip).unwrap(),
             buffer,
-            None,
+            ReceiveIpPacketMeta::default(),
         )
         .expect("Receive IP packet succeeds");
     }

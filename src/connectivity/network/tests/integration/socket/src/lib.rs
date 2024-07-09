@@ -23,7 +23,7 @@ use futures::future::{self, LocalBoxFuture};
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{
-    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet,
+    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_addr_subnet, net_ip_v4,
     net_subnet_v4, net_subnet_v6, std_ip, std_ip_v4, std_socket_addr,
 };
 use net_types::ethernet::Mac;
@@ -60,6 +60,7 @@ use packet_formats::igmp::messages::IgmpPacket;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Header as _, Ipv4Packet, Ipv4PacketBuilder};
 use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
+use packet_formats::udp::UdpPacketBuilder;
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
 use test_case::test_case;
@@ -4455,4 +4456,75 @@ async fn redirect_original_destination_dual_stack(name: &str, test_case: TestCas
     };
     verify_original_dst(&client);
     verify_original_dst(&server);
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn broadcast_recv<N: Netstack>(name: &str) {
+    const SUBNET: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    const PORT: u16 = 3513;
+
+    const SRC_IP: net_types::ip::Ipv4Addr = net_ip_v4!("192.0.2.2");
+    const SRC_PORT: u16 = 2141;
+    const DST_IP: net_types::ip::Ipv4Addr = net_ip_v4!("192.0.2.255");
+
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+    let net = sandbox.create_network(format!("net0")).await.expect("failed to create network");
+    let iface = client.join_network(&net, format!("if0")).await.expect("failed to join network");
+    iface.add_address_and_subnet_route(SUBNET.clone()).await.expect("failed to set ip");
+    let fake_ep = net.create_fake_endpoint().expect("failed to create endpoint");
+
+    let sockets = future::join_all(std::iter::repeat(()).take(2).map(|()| async {
+        let socket = client
+            .datagram_socket(Ipv4::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+            .await
+            .expect("Failed to create UDP socket");
+
+        socket.set_reuse_port(true).expect("failed to set SO_REUSEPORT");
+
+        socket
+            .bind(
+                &std::net::SocketAddr::from((Ipv4::UNSPECIFIED_ADDRESS.to_ip_addr(), PORT)).into(),
+            )
+            .expect("failed to bind socket");
+
+        fasync::net::UdpSocket::from_socket(socket.into()).unwrap()
+    }))
+    .await;
+
+    let mut test_packet = [1, 2, 3, 4, 5];
+    let broadcast_packet = packet::Buf::new(&mut test_packet, ..)
+        .encapsulate(UdpPacketBuilder::new(
+            SRC_IP,
+            DST_IP,
+            core::num::NonZero::new(SRC_PORT),
+            core::num::NonZero::new(PORT).unwrap(),
+        ))
+        .encapsulate(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /*ttl=*/ 30, IpProto::Udp.into()))
+        .encapsulate(EthernetFrameBuilder::new(
+            /*src_mac=*/ netstack_testing_common::constants::eth::MAC_ADDR,
+            /*dst_mac=*/ net_types::ethernet::Mac::BROADCAST,
+            EtherType::Ipv4,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        ))
+        .serialize_vec_outer()
+        .expect("failed to serialize UDP packet")
+        .unwrap_b();
+    fake_ep.write(broadcast_packet.as_ref()).await.expect("failed to write UDP packet");
+
+    // Check that the packet was delivered to all sockets.
+    for socket in sockets.iter() {
+        let mut buf = [0u8; 1024];
+        let (size, _addr) = socket
+            .recv_from(&mut buf)
+            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+                panic!("Broadcast packet wasn't delivered to a listening socket")
+            })
+            .await
+            .expect("recv_from failed");
+        assert_eq!(size, test_packet.len());
+    }
 }

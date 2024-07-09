@@ -24,6 +24,7 @@ use crate::device::{
     DeviceIdentifier, EitherDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
 use crate::error::{ExistsError, NotFoundError, ZonedAddressError};
+use crate::ip::BroadcastIpExt;
 use crate::socket::address::{
     AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
 };
@@ -1163,6 +1164,7 @@ pub enum FoundSockets<A, It> {
 
 /// A borrowed entry in a [`BoundSocketMap`].
 #[allow(missing_docs)]
+#[derive(Debug)]
 pub enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
     Listen(&'a S::ListenerAddrState, ListenerAddr<ListenerIpAddr<I::Addr, A::LocalIdentifier>, D>),
     Conn(
@@ -1173,7 +1175,7 @@ pub enum AddrEntry<'a, I: Ip, D, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
 
 impl<I, D, A, S> BoundSocketMap<I, D, A, S>
 where
-    I: Ip<Addr: MulticastAddress>,
+    I: BroadcastIpExt<Addr: MulticastAddress>,
     D: DeviceIdentifier,
     A: SocketMapAddrSpec,
     S: SocketMapStateSpec
@@ -1201,6 +1203,7 @@ where
         (src_ip, src_port): (Option<SocketIpAddr<I::Addr>>, Option<A::RemoteIdentifier>),
         (dst_ip, dst_port): (SocketIpAddr<I::Addr>, A::LocalIdentifier),
         device: D,
+        broadcast: Option<I::BroadcastMarker>,
     ) -> Option<
         FoundSockets<
             AddrEntry<'_, I, D, A, S>,
@@ -1224,7 +1227,7 @@ where
             AddrVec::Conn(c) => self.conns().get_by_addr(&c).map(|state| AddrEntry::Conn(state, c)),
         });
 
-        if dst_ip.addr().is_multicast() {
+        if broadcast.is_some() || dst_ip.addr().is_multicast() {
             Some(FoundSockets::Multicast(matching_entries))
         } else {
             let single_entry: Option<_> = matching_entries.next();

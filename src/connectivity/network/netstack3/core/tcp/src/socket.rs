@@ -5244,7 +5244,9 @@ mod tests {
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
     use netstack3_ip::socket::{IpSockSendError, Mms, MmsError, SendOptions};
     use netstack3_ip::testutil::DualStackSendIpPacketMeta;
-    use netstack3_ip::{BaseTransportIpContext, HopLimits, IpTransportContext};
+    use netstack3_ip::{
+        BaseTransportIpContext, HopLimits, IpTransportContext, ReceiveIpPacketMeta,
+    };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
     use packet_formats::tcp::{TcpParseArgs, TcpSegment};
@@ -5379,7 +5381,7 @@ mod tests {
                         Ipv4::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        None,
+                        ReceiveIpPacketMeta::default(),
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -5391,7 +5393,7 @@ mod tests {
                         Ipv6::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        None,
+                        ReceiveIpPacketMeta::default(),
                     )
                     .expect("failed to deliver bytes");
                 }

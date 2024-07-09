@@ -54,8 +54,9 @@ use netstack3_ip::device::{
 use netstack3_ip::socket::IpSocketContext;
 use netstack3_ip::{
     self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
-    FragmentTimerId, IpDeviceStateContext, IpLayerTimerId, Ipv4PresentAddressStatus, NextHop,
-    RawMetric, ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    FragmentTimerId, IpDeviceStateContext, IpLayerTimerId, Ipv4PresentAddressStatus,
+    Ipv6PresentAddressStatus, NextHop, RawMetric, ReceivePacketAction, ResolveRouteError,
+    ResolvedRoute, RoutableIpAddr,
 };
 
 // Some helper functions
@@ -1407,7 +1408,7 @@ fn test_receive_ip_packet_action() {
             &v4_dev,
             v4_config.local_ip
         ),
-        ReceivePacketAction::Deliver
+        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Unicast }
     );
     assert_eq!(
         ip::receive_ipv6_packet_action(
@@ -1416,7 +1417,7 @@ fn test_receive_ip_packet_action() {
             &v6_dev,
             v6_config.local_ip
         ),
-        ReceivePacketAction::Deliver
+        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::UnicastAssigned }
     );
 
     // Receive packet addressed to the IPv4 subnet broadcast address.
@@ -1427,7 +1428,7 @@ fn test_receive_ip_packet_action() {
             &v4_dev,
             SpecifiedAddr::new(v4_subnet.broadcast()).unwrap()
         ),
-        ReceivePacketAction::Deliver
+        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::SubnetBroadcast }
     );
 
     // Receive packet addressed to the IPv4 limited broadcast address.
@@ -1438,7 +1439,7 @@ fn test_receive_ip_packet_action() {
             &v4_dev,
             Ipv4::LIMITED_BROADCAST_ADDRESS
         ),
-        ReceivePacketAction::Deliver
+        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::LimitedBroadcast }
     );
 
     // Receive packet addressed to a multicast address we're subscribed to.
@@ -1455,7 +1456,7 @@ fn test_receive_ip_packet_action() {
             &v4_dev,
             Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.into_specified()
         ),
-        ReceivePacketAction::Deliver
+        ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Multicast }
     );
 
     // Receive packet addressed to the all-nodes multicast address.
@@ -1466,7 +1467,7 @@ fn test_receive_ip_packet_action() {
             &v6_dev,
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified()
         ),
-        ReceivePacketAction::Deliver
+        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::Multicast }
     );
 
     // Receive packet addressed to a multicast address we're subscribed to.
@@ -1477,7 +1478,7 @@ fn test_receive_ip_packet_action() {
             &v6_dev,
             v6_config.local_ip.to_solicited_node_address().into_specified(),
         ),
-        ReceivePacketAction::Deliver
+        ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::Multicast }
     );
 
     // Receive packet addressed to a tentative address.

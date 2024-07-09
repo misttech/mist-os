@@ -23,7 +23,7 @@ use netstack3_base::{
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    BaseTransportIpContext, IpTransportContext, TransparentLocalDelivery, TransportIpContext,
+    BaseTransportIpContext, IpTransportContext, ReceiveIpPacketMeta, TransportIpContext,
     TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
@@ -116,13 +116,19 @@ where
         remote_ip: I::RecvSrcAddr,
         local_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
-        transport_override: Option<TransparentLocalDelivery<I>>,
+        ReceiveIpPacketMeta { broadcast, transport_override }: ReceiveIpPacketMeta<I>,
     ) -> Result<(), (B, TransportReceiveError)> {
         if let Some(delivery) = transport_override {
             warn!(
                 "TODO(https://fxbug.dev/337009139): transparent proxy not supported for TCP \
                 sockets; will not override dispatch to perform local delivery to {delivery:?}"
             );
+        }
+
+        if broadcast.is_some() {
+            core_ctx.increment(|counters: &TcpCounters<I>| &counters.invalid_ip_addrs_received);
+            debug!("tcp: dropping broadcast TCP packet");
+            return Ok(());
         }
 
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {

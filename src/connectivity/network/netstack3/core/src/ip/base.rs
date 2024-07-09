@@ -30,7 +30,7 @@ use netstack3_ip::{
     self as ip, ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext,
     IpLayerContext, IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner,
     IpTransportContext, IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache,
-    PmtuContext, ResolveRouteError, ResolvedRoute, TransparentLocalDelivery, TransportReceiveError,
+    PmtuContext, ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, TransportReceiveError,
 };
 use netstack3_tcp::TcpIpTransportContext;
 use netstack3_udp::UdpIpTransportContext;
@@ -252,7 +252,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         proto: Ipv4Proto,
         body: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
+        meta: ReceiveIpPacketMeta<Ipv4>,
     ) -> Result<(), TransportReceiveError> {
         match proto {
             Ipv4Proto::Icmp => {
@@ -263,7 +263,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -279,7 +279,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -291,7 +291,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -313,7 +313,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         proto: Ipv6Proto,
         body: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
+        meta: ReceiveIpPacketMeta<Ipv6>,
     ) -> Result<(), TransportReceiveError> {
         match proto {
             Ipv6Proto::Icmpv6 => {
@@ -324,7 +324,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -340,7 +340,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -352,7 +352,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }

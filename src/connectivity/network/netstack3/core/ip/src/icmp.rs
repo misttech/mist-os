@@ -47,8 +47,8 @@ use zerocopy::ByteSlice;
 
 use crate::internal::base::{
     self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpPacketDestination,
-    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta,
-    TransparentLocalDelivery, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, ReceiveIpPacketMeta,
+    SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
@@ -830,8 +830,9 @@ impl<
         src_ip: Ipv4Addr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         mut buffer: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
+        meta: ReceiveIpPacketMeta<Ipv4>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        let ReceiveIpPacketMeta { broadcast: _, transport_override } = &meta;
         if let Some(delivery) = transport_override {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
@@ -882,8 +883,8 @@ impl<
             Icmpv4Packet::EchoReply(echo_reply) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.echo_reply);
                 trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received an EchoReply message");
-                let meta = echo_reply.parse_metadata();
-                buffer.undo_parse(meta);
+                let parse_metadata = echo_reply.parse_metadata();
+                buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
                             as IpTransportContext<Ipv4, BC, CC>>::receive_ip_packet(
                         core_ctx,
@@ -892,7 +893,7 @@ impl<
                         src_ip,
                         dst_ip,
                         buffer,
-                        None,
+                        meta,
                 );
             }
             Icmpv4Packet::TimestampRequest(timestamp_request) => {
@@ -1629,8 +1630,9 @@ impl<
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         mut buffer: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
+        meta: ReceiveIpPacketMeta<Ipv6>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        let ReceiveIpPacketMeta { broadcast: _, transport_override } = &meta;
         if let Some(delivery) = transport_override {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
@@ -1690,8 +1692,8 @@ impl<
             Icmpv6Packet::EchoReply(echo_reply) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv6>| &counters.echo_reply);
                 trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message");
-                let meta = echo_reply.parse_metadata();
-                buffer.undo_parse(meta);
+                let parse_metadata = echo_reply.parse_metadata();
+                buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
                             as IpTransportContext<Ipv6, BC, CC>>::receive_ip_packet(
                         core_ctx,
@@ -1700,7 +1702,7 @@ impl<
                         src_ip,
                         dst_ip,
                         buffer,
-                        None,
+                        meta
                 );
             }
             Icmpv6Packet::Ndp(packet) => {
@@ -3006,7 +3008,7 @@ mod tests {
             _src_ip: I::RecvSrcAddr,
             _dst_ip: SpecifiedAddr<I::Addr>,
             _buffer: B,
-            _transport_override: Option<TransparentLocalDelivery<I>>,
+            _meta: ReceiveIpPacketMeta<I>,
         ) -> Result<(), (B, TransportReceiveError)> {
             unimplemented!()
         }
@@ -3542,7 +3544,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
-                None,
+                ReceiveIpPacketMeta::default(),
             )
             .unwrap();
             f(&ctx);
@@ -3786,7 +3788,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
-                None,
+                ReceiveIpPacketMeta::default(),
             )
             .unwrap();
             f(&ctx);

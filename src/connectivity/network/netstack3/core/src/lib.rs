@@ -152,6 +152,7 @@ pub mod neighbor {
 /// Types and utilities for dealing with routes.
 pub mod routes {
     // Re-exported types.
+    pub use netstack3_base::WrapBroadcastMarker;
     pub use netstack3_ip::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither,
         Generation, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
