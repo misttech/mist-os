@@ -201,9 +201,8 @@ class Flatland : public fuchsia::ui::composition::Flatland,
 
  private:
   Flatland(
-      std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
-      fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request,
-      scheduling::SessionId session_id, std::function<void()> destroy_instance_function,
+      std::shared_ptr<utils::DispatcherHolder> dispatcher_holder, scheduling::SessionId session_id,
+      std::function<void()> destroy_instance_function,
       std::shared_ptr<FlatlandPresenter> flatland_presenter,
       std::shared_ptr<LinkSystem> link_system,
       std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
@@ -217,6 +216,9 @@ class Flatland : public fuchsia::ui::composition::Flatland,
           register_touch_source,
       fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
           register_mouse_source);
+
+  // `Flatland::New()` dispatches a task to invoke this.
+  void Bind(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request);
 
   void ReportBadOperationError();
   void ReportLinkProtocolError(const std::string& error_log);
@@ -255,10 +257,6 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   async_dispatcher_t* dispatcher() const { return dispatcher_holder_->dispatcher(); }
   std::shared_ptr<utils::DispatcherHolder> dispatcher_holder_;
 
-  // The FIDL binding for this Flatland instance, which references |this| as the implementation and
-  // run on |dispatcher_|.
-  fidl::Binding<fuchsia::ui::composition::Flatland> binding_;
-
   // Users are not allowed to use zero as a TransformId or ContentId.
   static constexpr uint64_t kInvalidId = 0;
 
@@ -274,10 +272,6 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   // Keep track of whether |destroy_instance_function_| has been invoked, in order to guarantee that
   // it is called at most once.
   bool destroy_instance_function_was_invoked_ = false;
-
-  // Waits for the invalidation of the bound channel, then triggers the destruction of this client.
-  // Uses WaitOnce since calling the handler will result in the destruction of this object.
-  async::WaitOnce peer_closed_waiter_;
 
   // A Present2Helper to facilitate sendng the appropriate OnFramePresented() callback to FIDL
   // clients when frames are presented to the display.
@@ -436,6 +430,33 @@ class Flatland : public fuchsia::ui::composition::Flatland,
       register_touch_source_;
   fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
       register_mouse_source_;
+
+  class BindingData {
+   public:
+    BindingData(Flatland* flatland, async_dispatcher_t* dispatcher,
+                fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request);
+
+    // Send `OnFramePresented` FIDL event to client.
+    void SendOnFramePresented(fuchsia::scenic::scheduling::FramePresentedInfo info);
+
+    // Send `OnNextFrameBegin` FIDL event to client.
+    void SendOnNextFrameBegin(uint32_t additional_present_credits,
+                              FuturePresentationInfos presentation_infos);
+
+    void CloseConnection(fuchsia::ui::composition::FlatlandError error);
+
+   private:
+    // The FIDL binding for this Flatland instance, which references |this| as the implementation
+    // and run on |dispatcher_|.
+    fidl::Binding<fuchsia::ui::composition::Flatland> binding_;
+
+    // Waits for the invalidation of the bound channel, then triggers the destruction of this
+    // client. Uses WaitOnce since calling the handler will result in the destruction of this
+    // object.
+    async::WaitOnce peer_closed_waiter_;
+  };
+
+  std::unique_ptr<BindingData> binding_data_;
 };
 
 }  // namespace flatland

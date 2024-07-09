@@ -308,6 +308,9 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
         flatland_presenter_, link_system_, uber_struct_system_->AllocateQueueForSession(session_id),
         importers, [](auto...) {}, [](auto...) {}, [](auto...) {}, [](auto...) {});
 
+    // Wait for server channel to be bound; see `Flatland::Bind()`.
+    RunLoopUntilIdle();
+
     // Register OnNextFrameBegin() callback to capture errors.
     RegisterPresentError(flatlands_.back(), session_id);
     return flatland;
@@ -5388,6 +5391,9 @@ TEST_F(FlatlandTest, NoDoubleDestroyRequest) {
       },
       flatland_presenter_, link_system_, uber_struct_system_->AllocateQueueForSession(session_id),
       no_importers, [](auto...) {}, [](auto...) {}, [](auto...) {}, [](auto...) {});
+
+  // Wait for server channel to be bound; see `Flatland::Bind()`.
+  RunLoopUntilIdle();
 
   fuchsia::ui::composition::PresentArgs present_args;
   present_args.set_requested_presentation_time(0);
