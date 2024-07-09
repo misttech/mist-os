@@ -12,6 +12,7 @@ use crate::fuchsia::volume::FxVolume;
 use anyhow::{Context as _, Error};
 use delivery_blob::compression::{decode_archive, ChunkInfo, ChunkedDecompressor};
 use delivery_blob::Type1Blob;
+use fidl::endpoints::{ControlHandle as _, RequestStream as _};
 use fidl_fuchsia_fxfs::{BlobWriterRequest, BlobWriterRequestStream};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
@@ -487,45 +488,35 @@ impl DeliveryBlobWriter {
 
     /// Handle fuchsia.fxfs/BlobWriter requests for this delivery blob.
     pub(crate) async fn handle_requests(
-        self,
+        mut self,
         mut request_stream: BlobWriterRequestStream,
     ) -> Result<(), Error> {
-        // Current state of the writer. If any unrecoverable errors are encountered, the writer is
-        // dropped and instead the error state is latched.
-        let mut writer = Ok(self);
         while let Some(request) = request_stream.try_next().await? {
             match request {
                 BlobWriterRequest::GetVmo { size, responder } => {
-                    let result = match writer.as_mut() {
-                        Ok(writer) => writer.get_vmo(size).await.map_err(|e| {
-                            tracing::error!("BlobWriter.GetVmo error: {:?}", e);
-                            map_to_status(e).into_raw()
-                        }),
-                        Err(e) => Err(*e),
-                    };
-                    responder.send(result).unwrap_or_else(|e| {
-                        tracing::error!("Error sending BlobWriter.GetVmo response: {:?}", e);
+                    let result = self.get_vmo(size).await.map_err(|error| {
+                        tracing::error!(?error, "BlobWriter.GetVmo failed.");
+                        map_to_status(error).into_raw()
+                    });
+                    responder.send(result).unwrap_or_else(|error| {
+                        tracing::error!(?error, "Failed to send BlobWriter.GetVmo response.");
                     });
                 }
                 BlobWriterRequest::BytesReady { bytes_written, responder } => {
-                    let result = match writer.as_mut() {
-                        Ok(writer) => writer.bytes_ready(bytes_written).await.map_err(|e| {
-                            tracing::error!("BlobWriter.BytesReady error: {:?}", e);
-                            map_to_status(e).into_raw()
-                        }),
-                        Err(e) => Err(*e),
-                    };
-                    if let Err(e) = result {
-                        // Latch the write error.
-                        //
-                        // *NOTE*: This drops the writer, immediately queuing a tombstone for this
-                        // blob. This will also happen automatically if the client drops their end
-                        // of the channel before the blob is fully written.
-                        writer = Err(e);
-                    }
-                    responder.send(result).unwrap_or_else(|e| {
-                        tracing::error!("Error sending BlobWriter.BytesReady response: {:?}", e);
+                    let result = self.bytes_ready(bytes_written).await.map_err(|error| {
+                        tracing::error!(?error, "BlobWriter.BytesReady failed.");
+                        map_to_status(error)
                     });
+                    responder.send(result.map_err(Status::into_raw)).unwrap_or_else(|error| {
+                        tracing::error!(?error, "Failed to send BlobWriter.BytesReady response.");
+                    });
+                    // If any error occurs when handling a BytesReady request, the writer will
+                    // remain in an unrecoverable state. The client must use the BlobCreator
+                    // protocol to open a new writer and try writing the blob again.
+                    if let Err(status) = result {
+                        request_stream.control_handle().shutdown_with_epitaph(status);
+                        break;
+                    }
                 }
             }
         }
