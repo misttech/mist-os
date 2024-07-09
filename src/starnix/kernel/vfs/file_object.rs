@@ -194,6 +194,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// This method is typically called by [`Self::mmap`].
     fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -208,7 +209,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// a VMO gets mapped.
     fn mmap(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -226,14 +227,19 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         let mut memory = if options.contains(MappingOptions::SHARED) {
             profile_duration!("GetSharedVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetSharedVmo");
-            self.get_memory(file, current_task, Some(min_memory_size), prot_flags)?
+            self.get_memory(locked, file, current_task, Some(min_memory_size), prot_flags)?
         } else {
             profile_duration!("GetPrivateVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetPrivateVmo");
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
             let base_prot_flags = (prot_flags | ProtectionFlags::READ) - ProtectionFlags::WRITE;
-            let memory =
-                self.get_memory(file, current_task, Some(min_memory_size), base_prot_flags)?;
+            let memory = self.get_memory(
+                locked,
+                file,
+                current_task,
+                Some(min_memory_size),
+                base_prot_flags,
+            )?;
             let mut clone_flags = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
             if !prot_flags.contains(ProtectionFlags::WRITE) {
                 clone_flags |= zx::VmoChildOptions::NO_WRITE;
@@ -444,12 +450,13 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn get_memory(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
     ) -> Result<Arc<MemoryObject>, Errno> {
-        self.deref().get_memory(file, current_task, length, prot)
+        self.deref().get_memory(locked, file, current_task, length, prot)
     }
 
     fn mmap(
@@ -900,6 +907,7 @@ impl FileOps for OPathOps {
     }
     fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -958,13 +966,6 @@ impl FileOps for ProxyFileOps {
             offset: off_t,
             target: SeekTarget,
         ) -> Result<off_t, Errno>;
-        fn get_memory(
-            &self,
-            _file: &FileObject,
-            _current_task: &CurrentTask,
-            _length: Option<usize>,
-            _prot: ProtectionFlags,
-        ) -> Result<Arc<MemoryObject>, Errno>;
         fn wait_async(
             &self,
             _file: &FileObject,
@@ -1034,6 +1035,16 @@ impl FileOps for ProxyFileOps {
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         self.0.ops().readdir(locked, &self.0, current_task, sink)
+    }
+    fn get_memory(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        self.0.ops.get_memory(locked, &self.0, current_task, length, prot)
     }
     fn mmap(
         &self,
@@ -1464,12 +1475,16 @@ impl FileObject {
         self.ops().data_sync(self, current_task)
     }
 
-    pub fn get_memory(
+    pub fn get_memory<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<MemoryObject>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if prot.contains(ProtectionFlags::READ) && !self.can_read() {
             return error!(EACCES);
         }
@@ -1477,7 +1492,13 @@ impl FileObject {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().get_memory(self, current_task, length, prot)
+        self.ops().get_memory(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            length,
+            prot,
+        )
     }
 
     pub fn mmap<L>(

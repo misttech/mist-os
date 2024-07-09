@@ -585,7 +585,13 @@ impl file::File for StarnixNodeConnection {
         if flags.contains(fio::VmoFlags::EXECUTE) {
             prot_flags |= ProtectionFlags::EXEC;
         }
-        let memory = self.file.get_memory(&*self.task().await?, None, prot_flags)?;
+        let current_task = &*self.task().await?;
+        let memory = self.file.get_memory(
+            self.kernel().unwrap().kthreads.unlocked_for_async().deref_mut(),
+            current_task,
+            None,
+            prot_flags,
+        )?;
         let vmo = memory.as_vmo().ok_or_else(|| errno!(ENOTSUP))?;
         if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
             let size = vmo.get_size()?;

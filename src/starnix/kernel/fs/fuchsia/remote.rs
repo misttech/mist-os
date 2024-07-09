@@ -1464,6 +1464,7 @@ impl FileOps for RemoteFileObject {
 
     fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -1511,7 +1512,13 @@ impl FileOps for RemoteFileObject {
             || (request as u8 == SYNC_IOC_MERGE)
         {
             let mut sync_points: Vec<SyncPoint> = vec![];
-            let memory = self.get_memory(file, current_task, Some(8), ProtectionFlags::READ)?;
+            let memory = self.get_memory(
+                &mut locked.cast_locked::<FileOpsCore>(),
+                file,
+                current_task,
+                Some(8),
+                ProtectionFlags::READ,
+            )?;
             let vmo = memory
                 .as_vmo()
                 .ok_or_else(|| errno!(ENOTSUP))?

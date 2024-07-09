@@ -252,6 +252,7 @@ impl FileOps for BinderConnection {
 
     fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,

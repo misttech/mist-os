@@ -927,6 +927,7 @@ impl FileOps for OverlayFile {
 
     fn get_memory(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
@@ -935,7 +936,7 @@ impl FileOps for OverlayFile {
         // Not that the VMO returned here will not updated if the file is promoted to upper FS
         // later. This is consistent with OveralyFS behavior on Linux, see
         // https://docs.kernel.org/filesystems/overlayfs.html#non-standard-behavior .
-        self.state.read().file().get_memory(current_task, length, prot)
+        self.state.read().file().get_memory(locked, current_task, length, prot)
     }
 }
 pub struct OverlayFs {

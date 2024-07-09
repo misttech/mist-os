@@ -312,7 +312,7 @@ where
         return error!(ELOOP);
     }
     let memory =
-        file.get_memory(current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;
+        file.get_memory(locked, current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;
     let header = match memory.read_to_array::<u8, HASH_BANG_SIZE>(0) {
         Ok(header) => Ok(header),
         Err(zx::Status::OUT_OF_RANGE) => {
@@ -453,6 +453,7 @@ where
         let interp_file =
             current_task.open_file(locked, interp.to_bytes().into(), OpenFlags::RDONLY)?;
         let interp_memory = interp_file.get_memory(
+            locked,
             current_task,
             None,
             ProtectionFlags::READ | ProtectionFlags::EXEC,

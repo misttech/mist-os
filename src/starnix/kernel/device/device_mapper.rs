@@ -378,6 +378,7 @@ impl FileOps for DmDeviceFile {
 
     fn get_memory(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
@@ -399,7 +400,7 @@ impl FileOps for DmDeviceFile {
             }
             match &active_table.targets[0].target_type {
                 TargetType::Verity(args) => {
-                    args.block_device.get_memory(current_task, length, prot)
+                    args.block_device.get_memory(locked, current_task, length, prot)
                 }
             }
         } else {

@@ -140,7 +140,7 @@ use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryFileObject};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -281,10 +281,14 @@ impl MagmaFile {
     /// of the correct type for that file.
     ///
     /// Returns an error if the file does not contain a buffer.
-    fn get_memory_and_magma_buffer(
+    fn get_memory_and_magma_buffer<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         fd: FdNumber,
-    ) -> Result<(MemoryObject, BufferInfo), Errno> {
+    ) -> Result<(MemoryObject, BufferInfo), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let file = current_task.files.get(fd)?;
         if let Some(file) = file.downcast_file::<ImageFile>() {
             let buffer = BufferInfo::Image(file.info.clone());
@@ -312,7 +316,12 @@ impl MagmaFile {
             // Map any failure to EINVAL; any failure here is most likely to be an FD that isn't
             // a gralloc buffer.
             let memory = file
-                .get_memory(current_task, None, ProtectionFlags::READ | ProtectionFlags::WRITE)
+                .get_memory(
+                    locked,
+                    current_task,
+                    None,
+                    ProtectionFlags::READ | ProtectionFlags::WRITE,
+                )
                 .map_err(|_| errno!(EINVAL))?;
             Ok((
                 memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
@@ -446,7 +455,7 @@ impl FileOps for MagmaFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _request: u32,
@@ -617,7 +626,7 @@ impl FileOps for MagmaFile {
 
                 let buffer_fd = FdNumber::from_raw(control.buffer_handle as i32);
                 let (memory, buffer) =
-                    MagmaFile::get_memory_and_magma_buffer(current_task, buffer_fd)?;
+                    MagmaFile::get_memory_and_magma_buffer(locked, current_task, buffer_fd)?;
                 let vmo = memory.into_vmo().ok_or_else(|| errno!(EINVAL))?;
 
                 let mut buffer_out = magma_buffer_t::default();

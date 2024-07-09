@@ -80,7 +80,7 @@ impl ExtFilesystem {
 
         // Note that we *require* get_memory to work here for performance reasons.  Fallback to
         // FIDL-based read/write API is not an option.
-        let memory = source_device.get_memory(current_task, None, prot_flags)?;
+        let memory = source_device.get_memory(locked, current_task, None, prot_flags)?;
         let vmo = Arc::new(
             memory
                 .as_vmo()

@@ -179,6 +179,11 @@ pub async fn serve_container_controller(
                                 for fd in fds {
                                     if let Ok(file) = leader.files.get(fd) {
                                         if let Ok(memory) = file.get_memory(
+                                            system_task
+                                                .kernel()
+                                                .kthreads
+                                                .unlocked_for_async()
+                                                .deref_mut(),
                                             system_task,
                                             None,
                                             starnix_core::mm::ProtectionFlags::READ,

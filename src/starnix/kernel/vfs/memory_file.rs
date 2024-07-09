@@ -361,8 +361,9 @@ macro_rules! fileops_impl_memory {
 
         fn get_memory(
             &$self,
-            file: &FileObject,
-            current_task: &CurrentTask,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            file: &$crate::vfs::FileObject,
+            current_task: &$crate::task::CurrentTask,
             _length: Option<usize>,
             prot: $crate::mm::ProtectionFlags,
         ) -> Result<Arc<$crate::mm::memory::MemoryObject>, starnix_uapi::errors::Errno> {

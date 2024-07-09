@@ -124,7 +124,7 @@ impl FileOps for SyncFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -163,8 +163,13 @@ impl FileOps for SyncFile {
                         }
                     }
                 } else if let Some(file2) = file2.downcast_file::<RemoteFileObject>() {
-                    let memory =
-                        file2.get_memory(file, current_task, None, ProtectionFlags::READ)?;
+                    let memory = file2.get_memory(
+                        &mut locked.cast_locked::<FileOpsCore>(),
+                        file,
+                        current_task,
+                        None,
+                        ProtectionFlags::READ,
+                    )?;
                     let koid = memory.get_koid();
                     let vmo = memory
                         .as_vmo()

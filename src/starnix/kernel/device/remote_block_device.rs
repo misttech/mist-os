@@ -168,6 +168,7 @@ impl FileOps for RemoteBlockDeviceFile {
 
     fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         requested_length: Option<usize>,

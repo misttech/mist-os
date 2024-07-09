@@ -7,7 +7,7 @@ use magma::magma_image_info_t;
 use starnix_core::fileops_impl_memory;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{Anon, FileHandle, FileObject, FileOps, FsNodeInfo};
+use starnix_core::vfs::{Anon, FileHandle, FileOps, FsNodeInfo};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Arc;

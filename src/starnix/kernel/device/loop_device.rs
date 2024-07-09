@@ -340,6 +340,7 @@ impl FileOps for LoopDeviceFile {
 
     fn get_memory(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         requested_length: Option<usize>,
@@ -356,6 +357,7 @@ impl FileOps for LoopDeviceFile {
         };
 
         let backing_memory = backing_file.get_memory(
+            locked,
             current_task,
             requested_length.map(|l| l + configured_offset as usize),
             prot,
@@ -874,7 +876,8 @@ mod tests {
         let loop_file =
             bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
-        let memory = loop_file.get_memory(&current_task, None, ProtectionFlags::READ).unwrap();
+        let memory =
+            loop_file.get_memory(&mut locked, &current_task, None, ProtectionFlags::READ).unwrap();
         let size = memory.get_content_size();
         let memory_contents = memory.read_to_vec(0, size).unwrap();
         assert_eq!(memory_contents, expected_contents);
@@ -917,7 +920,8 @@ mod tests {
         );
         loop_file.ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
 
-        let memory = loop_file.get_memory(&current_task, None, ProtectionFlags::READ).unwrap();
+        let memory =
+            loop_file.get_memory(&mut locked, &current_task, None, ProtectionFlags::READ).unwrap();
         let size = memory.get_content_size();
         let memory_contents = memory.read_to_vec(0, size).unwrap();
         assert_eq!(memory_contents, expected_contents);
