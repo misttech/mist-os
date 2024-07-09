@@ -1,0 +1,34 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/fidl/fidl.gni")
+
+executable("bin") {
+  output_name = "system_monitor"
+  sources = [
+    "main.cc",
+    "system_monitor.cc",
+    "system_monitor.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/sys/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/lib/diagnostics/accessor2logger:accessor2logger",
+    "//src/lib/fsl",
+  ]
+}
+
+fuchsia_component("system_monitor_component") {
+  component_name = "system_monitor"
+  manifest = "meta/system_monitor.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("system_monitor_package") {
+  deps = [ ":system_monitor_component" ]
+}
