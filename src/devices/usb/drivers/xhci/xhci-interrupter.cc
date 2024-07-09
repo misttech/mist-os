@@ -73,9 +73,9 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
 }
 
 zx_status_t Interrupter::IrqThread() {
-  // TODO(https://fxbug.dev/42105800): See https://fxbug.dev/42105800.  Get rid of this.  For now we
-  // need thread priorities so that realtime transactions use the completer which ends up getting
-  // realtime latency guarantees.
+  // TODO(https://fxbug.dev/42105800): See https://fxbug.dev/42105800.  Get rid of this.  For now we need thread
+  // priorities so that realtime transactions use the completer which ends
+  // up getting realtime latency guarantees.
   async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
   config.irq_support = true;
   async_loop_.emplace(&config);
@@ -99,12 +99,9 @@ zx_status_t Interrupter::IrqThread() {
   irq.set_handler([&](async_dispatcher_t* dispatcher, async::Irq* irq, zx_status_t status,
                       const zx_packet_interrupt_t* interrupt) {
     if (!irq_.is_valid()) {
-      zxlogf(ERROR, "IRQ is not valid. Quitting IRQ loop");
       async_loop_->Quit();
     }
-    irq_.ack();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Quitting IRQ loop %d", status);
       async_loop_->Quit();
       return;
     }
@@ -116,6 +113,7 @@ zx_status_t Interrupter::IrqThread() {
     }
 
     total_irqs_.Add(1);
+    irq_.ack();
   });
   irq.Begin(async_loop_->dispatcher());
   if (!interrupter_) {
