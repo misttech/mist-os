@@ -32,6 +32,7 @@ source_set("sources") {
   public_deps = [
     ":stack",
     "fidl",
+    "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_cpp",
     "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",

@@ -812,6 +812,7 @@ sdk_molecule("platform_fidls") {
   visibility += [ ":platform" ]
   category = "internal"
   deps = [
+    "//sdk/fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.buttons:fuchsia.buttons_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_sdk($fidl_toolchain)",

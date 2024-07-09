@@ -65,6 +65,7 @@ cc_library(
         "@fuchsia_sdk//pkg/sys_cpp",
         "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
+        "@internal_sdk//fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_cpp",
         "@internal_sdk//fidl/fuchsia.bluetooth.host:fuchsia.bluetooth.host_hlcpp",
         "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_hlcpp",
         "@internal_sdk//pkg/device-watcher",
