@@ -64,7 +64,7 @@ using WithAllDrivers = Template<
     // A default-constructed variant gets the null driver.
     null::Driver,
     // These drivers are potentially used on all machines.
-    ns8250::Mmio32Driver, ns8250::Mmio8Driver, ns8250::Dw8250Driver,
+    ns8250::Mmio32Driver, ns8250::Mmio8Driver, ns8250::Dw8250Driver, ns8250::PxaDriver,
 #if defined(__aarch64__) || UART_ALL_DRIVERS
     amlogic::Driver, geni::Driver, pl011::Driver, imx::Driver,
 #endif

@@ -70,6 +70,9 @@ type KernelDriver = enum : uint32 {
 
     /// 'RTIM'
     RiscvGenericTimer = 0x4D495452;
+
+    /// 'PXAU'
+    PxaUart = 0x50584155;
 };
 
 /// Kernel driver struct that can be used for simple drivers.
