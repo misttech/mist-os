@@ -65,11 +65,4 @@ hermetic_code_blob("subprocess.blob") {
   # This target is built without `//` in the default include dirs but
   # backtrace-request is included using an absolute path.
   include_dirs = [ "//" ]
-
-  # TODO(https://fxbug.dev/42079915): LLD lets --no-pie trump the code generation
-  # switches, but this needs to be compiled as PIC though linked differently.
-  if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
-      toolchain_variant.tags) {
-    ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
-  }
 }

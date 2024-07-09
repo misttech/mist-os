@@ -61,4 +61,6 @@ config("lto-workarounds") {
     ldflags += [ "-Wl,${mllvm_mattr}=$attr" ]
     rustflags += [ "${rust_linkarg}${mllvm_mattr}=${attr}" ]
   }
+
+  visibility = [ "//build/config/lto:lto-workarounds" ]
 }
