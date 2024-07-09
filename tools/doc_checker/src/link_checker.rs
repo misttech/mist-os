@@ -137,7 +137,13 @@ impl LinkChecker {
             link_to_check = format!("https://{}{}", PUBLISHED_DOCS_HOST, link);
         } else if link.starts_with('/') {
             // paths are used as-is.
-            link_to_check = link.to_string();
+            link_to_check =
+            // if allowing fuchsia-src, replace it with docs_folder.
+            if self.allow_fuchsia_src_links {
+                link.replace("/fuchsia-src/", &format!("/{}/", self.docs_folder.display()))
+            } else {
+                link.to_string()
+            };
         } else if link.starts_with('#') {
             // Anchors are appended to the current file.
             link_to_check = format!("{}{}", self.root_dir.join(relative_filename).display(), link);
@@ -384,7 +390,6 @@ pub(crate) fn do_in_tree_check(
     in_tree_path: &Path,
 ) -> Option<DocCheckError> {
     let filepath = root_dir.join(in_tree_path.strip_prefix("/").unwrap_or(in_tree_path));
-
     if !path_helper::exists(&filepath) {
         // Look for missing the file extension.
         if filepath.extension().is_none() {
@@ -923,6 +928,8 @@ mod tests {
             local_links_only: true,
             json: false,
             allow_fuchsia_src_links: false,
+            reference_docs_root: None,
+            skip_link_check: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -982,6 +989,8 @@ mod tests {
             local_links_only: true,
             json: false,
             allow_fuchsia_src_links: false,
+            reference_docs_root: None,
+            skip_link_check: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -1133,6 +1142,8 @@ mod tests {
             local_links_only: true,
             json: false,
             allow_fuchsia_src_links: false,
+            reference_docs_root: None,
+            skip_link_check: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -1229,6 +1240,8 @@ mod tests {
             local_links_only: true,
             json: false,
             allow_fuchsia_src_links: true,
+            reference_docs_root: None,
+            skip_link_check: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
