@@ -1338,7 +1338,7 @@ impl ThreadGroup {
             if self.leader != current_task.get_pid()
                 && (signal_info.code >= 0 || signal_info.code == SI_TKILL)
             {
-                return error!(EINVAL);
+                return error!(EPERM);
             }
 
             self.write().send_signal(signal_info);
