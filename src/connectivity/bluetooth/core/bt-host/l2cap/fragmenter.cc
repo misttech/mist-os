@@ -4,10 +4,10 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fragmenter.h"
 
-#include <endian.h>
-
 #include <limits>
 #include <optional>
+
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fcs.h"
@@ -86,8 +86,10 @@ OutboundFrame::BasicHeaderBuffer OutboundFrame::MakeBasicHeader() const {
                     std::numeric_limits<decltype(BasicHeader::length)>::max(),
                 "PDU payload is too large to be encoded");
   BasicHeader header = {};
-  header.length = htole16(pdu_content_length);
-  header.channel_id = htole16(channel_id_);
+  header.length = pw::bytes::ConvertOrderTo(
+      cpp20::endian::little, static_cast<uint16_t>(pdu_content_length));
+  header.channel_id =
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, channel_id_);
   BasicHeaderBuffer buffer;
   buffer.WriteObj(header);
   return buffer;
@@ -100,7 +102,8 @@ OutboundFrame::FrameCheckSequenceBuffer OutboundFrame::MakeFcs() const {
   const FrameCheckSequence whole_fcs =
       l2cap::ComputeFcs(data_.view(), header_fcs);
   FrameCheckSequenceBuffer buffer;
-  buffer.WriteObj(htole16(whole_fcs.fcs));
+  buffer.WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, whole_fcs.fcs));
   return buffer;
 }
 

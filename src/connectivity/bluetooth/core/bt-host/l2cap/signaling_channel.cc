@@ -6,6 +6,8 @@
 
 #include <lib/fit/function.h>
 
+#include <pw_bytes/endian.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/slab_allocator.h"
@@ -130,8 +132,8 @@ void SignalingChannel::ResponderImpl::RejectNotUnderstood() {
 void SignalingChannel::ResponderImpl::RejectInvalidChannelId(
     ChannelId local_cid, ChannelId remote_cid) {
   uint16_t ids[2];
-  ids[0] = htole16(local_cid);
-  ids[1] = htole16(remote_cid);
+  ids[0] = pw::bytes::ConvertOrderTo(cpp20::endian::little, local_cid);
+  ids[1] = pw::bytes::ConvertOrderTo(cpp20::endian::little, remote_cid);
   sig()->SendCommandReject(
       id_, RejectReason::kInvalidCID, BufferView(ids, sizeof(ids)));
 }
@@ -248,7 +250,9 @@ bool SignalingChannel::Send(ByteBufferPtr packet) {
   [[maybe_unused]] SignalingPacket reply(
       packet.get(), packet->size() - sizeof(CommandHeader));
   BT_DEBUG_ASSERT(reply.header().code);
-  BT_DEBUG_ASSERT(reply.payload_size() == le16toh(reply.header().length));
+  BT_DEBUG_ASSERT(reply.payload_size() ==
+                  pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                              reply.header().length));
   BT_DEBUG_ASSERT(chan_);
 
   return chan_->Send(std::move(packet));
@@ -265,7 +269,8 @@ ByteBufferPtr SignalingChannel::BuildPacket(CommandCode code,
   MutableSignalingPacket packet(buffer.get(), data.size());
   packet.mutable_header()->code = code;
   packet.mutable_header()->id = identifier;
-  packet.mutable_header()->length = htole16(static_cast<uint16_t>(data.size()));
+  packet.mutable_header()->length = pw::bytes::ConvertOrderTo(
+      cpp20::endian::little, static_cast<uint16_t>(data.size()));
   packet.mutable_payload_data().Write(data);
 
   return buffer;
@@ -281,7 +286,8 @@ bool SignalingChannel::SendCommandReject(uint8_t identifier,
   StaticByteBuffer<kMaxPayloadLength> rej_buf;
 
   MutablePacketView<CommandRejectPayload> reject(&rej_buf, data.size());
-  reject.mutable_header()->reason = htole16(static_cast<uint16_t>(reason));
+  reject.mutable_header()->reason = pw::bytes::ConvertOrderTo(
+      cpp20::endian::little, static_cast<uint16_t>(reason));
   reject.mutable_payload_data().Write(data);
 
   return SendPacket(kCommandRejectCode, identifier, reject.data());
@@ -316,7 +322,7 @@ void SignalingChannel::OnRxBFrame(ByteBufferPtr sdu) {
 void SignalingChannel::CheckAndDispatchPacket(const SignalingPacket& packet) {
   if (packet.size() > mtu()) {
     // Respond with our signaling MTU.
-    uint16_t rsp_mtu = htole16(mtu());
+    uint16_t rsp_mtu = pw::bytes::ConvertOrderTo(cpp20::endian::little, mtu());
     BufferView rej_data(&rsp_mtu, sizeof(rsp_mtu));
     SendCommandReject(
         packet.header().id, RejectReason::kSignalingMTUExceeded, rej_data);

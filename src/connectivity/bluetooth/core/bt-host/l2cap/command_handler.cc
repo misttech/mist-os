@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/command_handler.h"
 
+#include <pw_bytes/endian.h>
+
 namespace bt::l2cap::internal {
 
 bool CommandHandler::Response::ParseReject(const ByteBuffer& rej_payload_buf) {
@@ -15,8 +17,9 @@ bool CommandHandler::Response::ParseReject(const ByteBuffer& rej_payload_buf) {
            sizeof(CommandRejectPayload));
     return false;
   }
-  reject_reason_ = static_cast<RejectReason>(
-      le16toh(rej_payload_buf.ReadMember<&CommandRejectPayload::reason>()));
+  reject_reason_ = static_cast<RejectReason>(pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little,
+      rej_payload_buf.ReadMember<&CommandRejectPayload::reason>()));
 
   if (reject_reason() == RejectReason::kInvalidCID) {
     if (rej_payload_buf.size() - sizeof(CommandRejectPayload) <
@@ -32,8 +35,10 @@ bool CommandHandler::Response::ParseReject(const ByteBuffer& rej_payload_buf) {
     const auto& invalid_cid_payload =
         rej_payload_buf.view(sizeof(CommandRejectPayload))
             .To<InvalidCIDPayload>();
-    remote_cid_ = le16toh(invalid_cid_payload.src_cid);
-    local_cid_ = le16toh(invalid_cid_payload.dst_cid);
+    remote_cid_ = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                              invalid_cid_payload.src_cid);
+    local_cid_ = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                             invalid_cid_payload.dst_cid);
   }
 
   return true;
@@ -42,8 +47,10 @@ bool CommandHandler::Response::ParseReject(const ByteBuffer& rej_payload_buf) {
 bool CommandHandler::DisconnectionResponse::Decode(
     const ByteBuffer& payload_buf) {
   const auto disconn_rsp_payload = payload_buf.To<PayloadT>();
-  local_cid_ = le16toh(disconn_rsp_payload.src_cid);
-  remote_cid_ = le16toh(disconn_rsp_payload.dst_cid);
+  local_cid_ = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                           disconn_rsp_payload.src_cid);
+  remote_cid_ = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                            disconn_rsp_payload.dst_cid);
   return true;
 }
 
@@ -69,8 +76,9 @@ bool CommandHandler::SendDisconnectionRequest(
   auto on_discon_rsp =
       BuildResponseHandler<DisconnectionResponse>(std::move(cb));
 
-  DisconnectionRequestPayload payload = {htole16(remote_cid),
-                                         htole16(local_cid)};
+  DisconnectionRequestPayload payload = {
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, remote_cid),
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, local_cid)};
   return sig()->SendRequest(kDisconnectionRequest,
                             BufferView(&payload, sizeof(payload)),
                             std::move(on_discon_rsp));
@@ -91,8 +99,10 @@ void CommandHandler::ServeDisconnectionRequest(
     }
 
     const auto& discon_req = request_payload.To<DisconnectionRequestPayload>();
-    const ChannelId local_cid = le16toh(discon_req.dst_cid);
-    const ChannelId remote_cid = le16toh(discon_req.src_cid);
+    const ChannelId local_cid =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, discon_req.dst_cid);
+    const ChannelId remote_cid =
+        pw::bytes::ConvertOrderFrom(cpp20::endian::little, discon_req.src_cid);
     DisconnectionResponder responder(sig_responder, local_cid, remote_cid);
     cb(local_cid, remote_cid, &responder);
   };
