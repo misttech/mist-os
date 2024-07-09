@@ -2,26 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod controller;
-
-use crate::search::controller::components::ComponentSearchController;
-use crate::search::controller::package_list::PackageListController;
-use crate::search::controller::packages::PackageSearchController;
-use scrutiny::prelude::*;
-use std::sync::Arc;
-
-plugin!(
-    SearchPlugin,
-    PluginHooks::new(
-        collectors! {},
-        controllers! {
-            "/search/components" => ComponentSearchController::default(),
-            "/search/packages" => PackageSearchController::default(),
-            "/search/package/list" => PackageListController::default(),
-        }
-    ),
-    vec![PluginDescriptor::new("CorePlugin")]
-);
+pub mod controller;
 
 #[cfg(test)]
 mod tests {

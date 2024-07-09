@@ -5,38 +5,25 @@
 use crate::scrutiny::Scrutiny;
 use anyhow::Result;
 use scrutiny_config::{Config, ConfigBuilder, ModelConfig};
-use scrutiny_plugins::additional_boot_args::AdditionalBootConfigPlugin;
-use scrutiny_plugins::core::CorePlugin;
-use scrutiny_plugins::engine::EnginePlugin;
-use scrutiny_plugins::search::SearchPlugin;
-use scrutiny_plugins::static_pkgs::StaticPkgsPlugin;
-use scrutiny_plugins::toolkit::ToolkitPlugin;
-use scrutiny_plugins::verify::VerifyPlugin;
-use scrutiny_plugins::zbi::ZbiPlugin;
+use scrutiny_plugins::unified_plugin::UnifiedPlugin;
 use std::sync::Arc;
 
 /// Launches scrutiny from a configuration file. This is intended to be used by binaries that
 /// want to launch custom configurations of the Scrutiny framework with select features enabled.
 pub fn launch_from_config(config: Config) -> Result<String> {
+    // The model may be empty for extract commands.
     let model_is_empty = config.runtime.model.is_empty();
 
     let mut scrutiny = Scrutiny::new(config)?;
-    scrutiny.plugin(EnginePlugin::new(
-        scrutiny.scheduler(),
-        scrutiny.dispatcher(),
-        Arc::downgrade(&scrutiny.plugin_manager()),
-    ))?;
-    scrutiny.plugin(ToolkitPlugin::new())?;
 
-    // These plugins only apply when the model contains valid paths, because the blobs and update
-    // package must be present.
-    if !model_is_empty {
-        scrutiny.plugin(ZbiPlugin::new())?;
-        scrutiny.plugin(AdditionalBootConfigPlugin::new())?;
-        scrutiny.plugin(StaticPkgsPlugin::new())?;
-        scrutiny.plugin(CorePlugin::new())?;
-        scrutiny.plugin(VerifyPlugin::new())?;
-        scrutiny.plugin(SearchPlugin::new())?;
+    if model_is_empty {
+        scrutiny.plugin(UnifiedPlugin::without_model())?;
+    } else {
+        scrutiny.plugin(UnifiedPlugin::with_model(
+            scrutiny.scheduler(),
+            scrutiny.dispatcher(),
+            Arc::downgrade(&scrutiny.plugin_manager()),
+        ))?;
     }
     scrutiny.run()
 }

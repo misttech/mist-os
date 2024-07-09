@@ -2,74 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod controller;
-
-use crate::engine::controller::collector::{CollectorListController, CollectorSchedulerController};
-use crate::engine::controller::controller::ControllerListController;
-use crate::engine::controller::health::HealthController;
-use crate::engine::controller::model::{ModelConfigController, ModelStatsController};
-use crate::engine::controller::plugin::PluginListController;
-use scrutiny::engine::dispatcher::ControllerDispatcher;
-use scrutiny::engine::manager::PluginManager;
-use scrutiny::engine::scheduler::CollectorScheduler;
-use scrutiny::prelude::*;
-use std::sync::{Arc, Mutex, RwLock, Weak};
-
-/// The `EnginePlugin` allows introspection into the Scrutiny engine
-/// through a plugin. This allows users to inspect the abstracted state of
-/// the system such as seeing what collectors, controllers and plugins are
-/// active. It also allows the user to reschedule collector tasks, disable and
-/// enable plugins etc.
-pub struct EnginePlugin {
-    desc: PluginDescriptor,
-    hooks: PluginHooks,
-    deps: Vec<PluginDescriptor>,
-}
-
-impl EnginePlugin {
-    pub fn new(
-        scheduler: Arc<Mutex<CollectorScheduler>>,
-        dispatcher: Arc<RwLock<ControllerDispatcher>>,
-        manager: Weak<Mutex<PluginManager>>,
-    ) -> Self {
-        Self {
-            desc: PluginDescriptor::new("EnginePlugin".to_string()),
-            hooks: PluginHooks::new(
-                collectors! {},
-                controllers! {
-                    "/engine/health/status" => HealthController::default(),
-                    "/engine/plugin/list" => PluginListController::new(manager),
-                    "/engine/model/config" => ModelConfigController::default(),
-                    "/engine/model/stats" => ModelStatsController::default(),
-                    "/engine/collector/list" => CollectorListController::new(scheduler.clone()),
-                    "/engine/controller/list" => ControllerListController::new(dispatcher),
-                    "/engine/collector/schedule" => CollectorSchedulerController::new(scheduler.clone()),
-                },
-            ),
-            deps: vec![],
-        }
-    }
-}
-
-impl Plugin for EnginePlugin {
-    fn descriptor(&self) -> &PluginDescriptor {
-        &self.desc
-    }
-    fn dependencies(&self) -> &Vec<PluginDescriptor> {
-        &self.deps
-    }
-    fn hooks(&mut self) -> &PluginHooks {
-        &self.hooks
-    }
-}
+pub mod controller;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use scrutiny::engine::dispatcher::ControllerDispatcher;
+    use scrutiny::engine::manager::PluginManager;
+    use scrutiny::engine::scheduler::CollectorScheduler;
+    use scrutiny::prelude::*;
+    use std::sync::{Arc, Mutex, RwLock};
+
     use crate::core::collection::{Component, ComponentSource, Components};
-    use crate::engine::controller::collector::CollectorListEntry;
-    use crate::engine::controller::model::ModelStats;
-    use crate::engine::controller::plugin::PluginListEntry;
+    use crate::engine::controller::collector::{
+        CollectorListController, CollectorListEntry, CollectorSchedulerController,
+    };
+    use crate::engine::controller::controller::ControllerListController;
+    use crate::engine::controller::model::{
+        ModelConfigController, ModelStats, ModelStatsController,
+    };
+    use crate::engine::controller::plugin::{PluginListController, PluginListEntry};
     use anyhow::Result;
     use scrutiny::plugin;
     use scrutiny_testing::fake::*;

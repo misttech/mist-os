@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::core::DataCollection;
 use cm_types::Url;
 use core::slice::Iter;
 use fuchsia_merkle::Hash;
 use fuchsia_url::{PackageName, PackageVariant};
+use scrutiny::prelude::DataCollection;
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::{HashMap, HashSet};

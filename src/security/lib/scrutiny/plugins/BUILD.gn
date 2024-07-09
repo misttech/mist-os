@@ -236,6 +236,8 @@ if (is_host) {
       "src/toolkit/controller/zbi_bootfs.rs",
       "src/toolkit/controller/zbi_cmdline.rs",
       "src/toolkit/mod.rs",
+      "src/unified_plugin/collector.rs",
+      "src/unified_plugin/mod.rs",
       "src/verify/collection.rs",
       "src/verify/collector/component_model.rs",
       "src/verify/collector/mod.rs",

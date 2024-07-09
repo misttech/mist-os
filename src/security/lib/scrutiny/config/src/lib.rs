@@ -274,18 +274,7 @@ pub struct PluginConfig {
 
 impl PluginConfig {
     pub fn default() -> PluginConfig {
-        PluginConfig {
-            plugins: vec![
-                "ZbiPlugin".to_string(),
-                "AdditionalBootConfigPlugin".to_string(),
-                "StaticPkgsPlugin".to_string(),
-                "CorePlugin".to_string(),
-                "SearchPlugin".to_string(),
-                "EnginePlugin".to_string(),
-                "ToolkitPlugin".to_string(),
-                "VerifyPlugin".to_string(),
-            ],
-        }
+        PluginConfig { plugins: vec!["UnifiedPlugin".to_string()] }
     }
     // TODO(benwright) - Make this a smaller set once API usages are cleaned up.
     pub fn minimal() -> PluginConfig {

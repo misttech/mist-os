@@ -2,44 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod controller;
-
-use crate::toolkit::controller::blobfs::BlobFsExtractController;
-use crate::toolkit::controller::far::FarMetaExtractController;
-use crate::toolkit::controller::fvm::FvmExtractController;
-use crate::toolkit::controller::zbi::ZbiExtractController;
-use crate::toolkit::controller::zbi_bootfs::{
-    ZbiExtractBootfsPackageIndex, ZbiListBootfsController,
-};
-use crate::toolkit::controller::zbi_cmdline::ZbiExtractCmdlineController;
-use scrutiny::prelude::*;
-use std::sync::Arc;
-
-plugin!(
-    ToolkitPlugin,
-    PluginHooks::new(
-        collectors! {},
-        controllers! {
-            "/tool/blobfs/extract" => BlobFsExtractController::default(),
-            "/tool/far/extract/meta" => FarMetaExtractController::default(),
-            "/tool/fvm/extract" => FvmExtractController::default(),
-            "/tool/zbi/extract" => ZbiExtractController::default(),
-            "/tool/zbi/extract/cmdline" => ZbiExtractCmdlineController::default(),
-            "/tool/zbi/list/bootfs" => ZbiListBootfsController::default(),
-            "/tool/zbi/extract/bootfs/packages" => ZbiExtractBootfsPackageIndex::default(),
-        }
-    ),
-    // The toolkit plugin takes no dependencies on the model. It is just a set
-    // of utility controllers for auditing.
-    vec![]
-);
+pub mod controller;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::toolkit::controller::fvm::FvmExtractRequest;
-    use crate::toolkit::controller::zbi::ZbiExtractRequest;
-    use crate::toolkit::controller::zbi_cmdline::ZbiExtractCmdlineRequest;
+    use crate::toolkit::controller::fvm::{FvmExtractController, FvmExtractRequest};
+    use crate::toolkit::controller::zbi::{ZbiExtractController, ZbiExtractRequest};
+    use crate::toolkit::controller::zbi_cmdline::{
+        ZbiExtractCmdlineController, ZbiExtractCmdlineRequest,
+    };
+    use scrutiny::prelude::*;
     use scrutiny_testing::fake::*;
     use tempfile::tempdir;
 
