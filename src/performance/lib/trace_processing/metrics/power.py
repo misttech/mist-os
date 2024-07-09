@@ -84,7 +84,7 @@ class AggregatePowerMetrics:
         )
 
     @property
-    def is_uninitialized(self) -> bool:
+    def is_empty(self) -> bool:
         """Returns true if no samples have been processed yet."""
         return self.max_power is None or self.min_power is None
 
@@ -156,6 +156,7 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
         _LOGGER.info(f"Identified suspend windows: {suspend_windows}")
 
         power_metrics = AggregatePowerMetrics()
+        running_power_metrics = AggregatePowerMetrics()
         suspend_power_metrics = AggregatePowerMetrics()
         for me in metrics_events:
             # These args are set in _append_power_data()
@@ -172,21 +173,29 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
                 power_metrics.process_sample(sample)
                 if any(me.start in window for window in suspend_windows):
                     suspend_power_metrics.process_sample(sample)
+                else:
+                    running_power_metrics.process_sample(sample)
 
-        if power_metrics.is_uninitialized:
+        if power_metrics.is_empty:
             _LOGGER.warning(
                 "No power metric records after load_generator sync signal. "
                 "There may have been an error processing power or trace data."
             )
             return []
 
-        suspend_results = (
-            []
-            if suspend_power_metrics.is_uninitialized
-            else suspend_power_metrics.to_fuchsiaperf_results(tag="_suspend")
-        )
+        results = power_metrics.to_fuchsiaperf_results()
 
-        return power_metrics.to_fuchsiaperf_results() + suspend_results
+        # If the system was suspended, also report suspended and non-suspended
+        # (running) power metrics.
+        if not suspend_power_metrics.is_empty:
+            results.extend(
+                suspend_power_metrics.to_fuchsiaperf_results(tag="_suspend")
+            )
+            results.extend(
+                running_power_metrics.to_fuchsiaperf_results(tag="_running")
+            )
+
+        return results
 
 
 def _find_test_start(model: trace_model.Model) -> trace_time.TimePoint | None:
