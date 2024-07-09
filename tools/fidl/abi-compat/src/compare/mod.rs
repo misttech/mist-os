@@ -388,21 +388,6 @@ pub fn compatible(external: &Platform, platform: &Platform) -> Result<Compatibil
         }
     }
 
-    for p in platform_discoverable.difference(&external_discoverable) {
-        let d = platform
-            .discoverable
-            .get(p)
-            .and_then(|p| p.discoverable.as_ref())
-            .expect("Expected discoverable attribute");
-        if d.server.external {
-            problems.platform(
-                &Path::new(&platform.api_level),
-                &platform.discoverable[p].path,
-                format!("Discoverable protocol missing from: external"),
-            );
-        }
-    }
-
     for p in external_discoverable.intersection(&platform_discoverable) {
         problems
             .append(Protocol::compatible(&external.discoverable[p], &platform.discoverable[p])?);

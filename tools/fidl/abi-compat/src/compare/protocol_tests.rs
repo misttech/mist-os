@@ -318,3 +318,20 @@ mod event {
         }
     }
 }
+
+mod protocol {
+    use super::*;
+
+    #[test]
+    fn add_protocol() {
+        assert!(compare_fidl_library(
+            Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+            r#"
+            @discoverable
+            @available(added=2)
+            protocol Example {};
+            "#
+        )
+        .is_compatible());
+    }
+}
