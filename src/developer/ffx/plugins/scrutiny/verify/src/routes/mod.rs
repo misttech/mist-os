@@ -64,14 +64,7 @@ pub async fn verify(
         .param("capability_types", query.capability_types.join(" "))
         .param("response_level", &query.response_level)
         .build();
-    let plugins = vec![
-        "ZbiPlugin",
-        "AdditionalBootConfigPlugin",
-        "StaticPkgsPlugin",
-        "CorePlugin",
-        "VerifyPlugin",
-    ];
-    let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+    let mut config = ConfigBuilder::with_model(model).command(command).build();
     config.runtime.model.component_tree_config_path = query.component_tree_config_path;
     config.runtime.model.tmp_dir_path = query.tmp_dir_path;
     config.runtime.logging.silent_mode = true;

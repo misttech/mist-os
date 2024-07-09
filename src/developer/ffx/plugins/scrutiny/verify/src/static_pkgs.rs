@@ -28,17 +28,12 @@ struct Query {
 
 fn verify_static_pkgs(query: &Query, golden_files: &Vec<PathBuf>) -> Result<HashSet<PathBuf>> {
     let command = CommandBuilder::new("static.pkgs").build();
-    let plugins = vec![
-        "ZbiPlugin".to_string(),
-        "AdditionalBootConfigPlugin".to_string(),
-        "StaticPkgsPlugin".to_string(),
-    ];
     let model = if query.recovery {
         ModelConfig::from_product_bundle_recovery(query.product_bundle.clone())
     } else {
         ModelConfig::from_product_bundle(query.product_bundle.clone())
     }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+    let mut config = ConfigBuilder::with_model(model).command(command).build();
     config.runtime.logging.silent_mode = true;
 
     let scrutiny_output =

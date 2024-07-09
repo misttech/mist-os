@@ -77,19 +77,12 @@ impl QueryComponentResolvers for ScrutinyQueryComponentResolvers {
             .param("moniker", request.moniker.to_string())
             .param("protocol", &request.protocol)
             .build();
-        let plugins = vec![
-            "ZbiPlugin",
-            "AdditionalBootConfigPlugin",
-            "StaticPkgsPlugin",
-            "CorePlugin",
-            "VerifyPlugin",
-        ];
         let model = if self.recovery {
             ModelConfig::from_product_bundle_recovery(self.product_bundle.clone())
         } else {
             ModelConfig::from_product_bundle(self.product_bundle.clone())
         }?;
-        let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+        let mut config = ConfigBuilder::with_model(model).command(command).build();
         config.runtime.model.tmp_dir_path = self.tmp_dir_path.clone();
         config.runtime.logging.silent_mode = true;
 

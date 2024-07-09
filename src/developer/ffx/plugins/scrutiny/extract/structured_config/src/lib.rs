@@ -36,14 +36,7 @@ impl FfxMain for ScrutinyStructuredConfigTool {
             ModelConfig::from_product_bundle(product_bundle)
         }?;
         let command = CommandBuilder::new("verify.structured_config.extract").build();
-        let plugins = vec![
-            "ZbiPlugin".to_string(),
-            "CorePlugin".to_string(),
-            "AdditionalBootConfigPlugin".to_string(),
-            "StaticPkgsPlugin".to_string(),
-            "VerifyPlugin".to_string(),
-        ];
-        let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+        let mut config = ConfigBuilder::with_model(model).command(command).build();
         config.runtime.logging.silent_mode = true;
         let scrutiny_output =
             launcher::launch_from_config(config).map_err(|e| bug!("running scrutiny: {e}"))?;
