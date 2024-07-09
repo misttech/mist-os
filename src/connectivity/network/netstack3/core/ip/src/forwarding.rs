@@ -10,13 +10,12 @@ use core::fmt::Debug;
 use log::debug;
 use net_types::ip::{GenericOverIp, Ip, IpAddress as _, Ipv4, Ipv4Addr, Subnet};
 use net_types::{SpecifiedAddr, Witness as _};
-use netstack3_base::{AnyDevice, DeviceIdContext, ExistsError};
+use netstack3_base::{AnyDevice, BroadcastIpExt, DeviceIdContext, ExistsError};
 use thiserror::Error;
 
 use crate::internal::base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt};
 use crate::internal::types::{
-    AddableEntry, Destination, Entry, EntryAndGeneration, IpTypesIpExt, NextHop, OrderedEntry,
-    RawMetric,
+    AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.
@@ -102,7 +101,7 @@ impl<I: Ip, D> Default for ForwardingTable<I, D> {
     }
 }
 
-impl<I: IpTypesIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
+impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     /// Adds `entry` to the forwarding table if it does not already exist.
     ///
     /// On success, a reference to the inserted entry is returned.
@@ -190,7 +189,7 @@ impl<I: IpTypesIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        enum BroadcastCase<I: IpTypesIpExt> {
+        enum BroadcastCase<I: BroadcastIpExt> {
             AllOnes(I::BroadcastMarker),
             Subnet(I::BroadcastMarker),
             NotBroadcast,
@@ -392,7 +391,7 @@ pub(crate) mod testutil {
         ip: SpecifiedAddr<A>,
         device: D,
     ) where
-        A::Version: IpTypesIpExt,
+        A::Version: BroadcastIpExt,
     {
         let subnet = Subnet::new(*ip, A::BYTES * 8).unwrap();
         let entry =
@@ -401,7 +400,7 @@ pub(crate) mod testutil {
     }
 
     // Provide tests with access to the private `ForwardingTable.add_entry` fn.
-    pub(crate) fn add_entry<I: IpTypesIpExt, D: Clone + Debug + PartialEq + Ord>(
+    pub(crate) fn add_entry<I: BroadcastIpExt, D: Clone + Debug + PartialEq + Ord>(
         table: &mut ForwardingTable<I, D>,
         entry: Entry<I::Addr, D>,
     ) -> Result<&Entry<I::Addr, D>, ExistsError> {
@@ -457,7 +456,7 @@ mod tests {
 
     type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;
 
-    impl<I: IpTypesIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
+    impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         /// Print the table.
         fn print_table(&self) {
             trace!("Installed Routing table:");
@@ -473,7 +472,7 @@ mod tests {
         }
     }
 
-    trait TestIpExt: netstack3_base::testutil::TestIpExt + IpTypesIpExt {
+    trait TestIpExt: netstack3_base::testutil::TestIpExt + BroadcastIpExt {
         fn subnet(v: u8, neg_prefix: u8) -> Subnet<Self::Addr>;
 
         fn next_hop_addr_sub(
@@ -1100,7 +1099,7 @@ mod tests {
                 super::testutil::add_entry(&mut table, less_specific_entry).expect("was added");
         }
 
-        fn lookup_with_devices<I: IpTypesIpExt>(
+        fn lookup_with_devices<I: BroadcastIpExt>(
             table: &ForwardingTable<I, MultipleDevicesId>,
             next_hop: SpecifiedAddr<I::Addr>,
             core_ctx: &mut FakeCtx,
@@ -1288,7 +1287,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_add_entry_keeps_table_sorted<I: IpTypesIpExt>() {
+    fn test_add_entry_keeps_table_sorted<I: BroadcastIpExt>() {
         const DEVICE_A: MultipleDevicesId = MultipleDevicesId::A;
         const DEVICE_B: MultipleDevicesId = MultipleDevicesId::B;
         let (more_specific_sub, less_specific_sub) = I::map_ip(

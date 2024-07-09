@@ -17,15 +17,16 @@ use net_types::{BroadcastAddress, MulticastAddr, UnicastAddr, Witness};
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    trace_duration, CoreTimerContext, Device, DeviceIdContext, FrameDestination, HandleableTimer,
-    LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext, RecvIpFrameMeta,
-    ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
-    TimerContext, TimerHandler, TracingContext, WeakDeviceIdentifier,
+    trace_duration, BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, FrameDestination,
+    HandleableTimer, LinkDevice, NestedIntoCoreTimerCtx, ReceivableFrameMeta, RecvFrameContext,
+    RecvIpFrameMeta, ResourceCounterContext, RngContext, SendFrameError, SendFrameErrorReason,
+    SendableFrameMeta, TimerContext, TimerHandler, TracingContext, WeakDeviceIdentifier,
+    WrapBroadcastMarker,
 };
 use netstack3_ip::nud::{
     LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
 };
-use netstack3_ip::{IpPacketDestination, IpTypesIpExt, WrapBroadcastMarker};
+use netstack3_ip::IpPacketDestination;
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
 use packet_formats::ethernet::{
@@ -412,7 +413,7 @@ where
         + NudHandler<I, EthernetLinkDevice, BC>
         + TransmitQueueHandler<EthernetLinkDevice, BC, Meta = ()>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    I: EthernetIpExt + IpTypesIpExt,
+    I: EthernetIpExt + BroadcastIpExt,
     S: Serializer,
     S::Buffer: BufferMut,
 {

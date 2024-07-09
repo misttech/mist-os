@@ -217,7 +217,7 @@ pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,
-    IpTypesIpExt, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
+    Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
 };
 
 /// IP layer test utilities.

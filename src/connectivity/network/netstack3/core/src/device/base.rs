@@ -20,8 +20,8 @@ use net_types::ip::{
 use net_types::{map_ip_twice, MulticastAddr, SpecifiedAddr, Witness as _};
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, CounterContext, DeviceIdContext, ExistsError, NotFoundError, ReceivableFrameMeta,
-    RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
+    AnyDevice, BroadcastIpExt, CounterContext, DeviceIdContext, ExistsError, NotFoundError,
+    ReceivableFrameMeta, RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
     ResourceCounterContext, SendFrameError,
 };
 use netstack3_device::ethernet::{
@@ -49,9 +49,7 @@ use netstack3_ip::device::{
 use netstack3_ip::nud::{
     ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
 };
-use netstack3_ip::{
-    self as ip, IpForwardingDeviceContext, IpPacketDestination, IpTypesIpExt, RawMetric,
-};
+use netstack3_ip::{self as ip, IpForwardingDeviceContext, IpPacketDestination, RawMetric};
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
@@ -182,8 +180,11 @@ where
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<I>>>
-    IpDeviceSendContext<I, BC> for CoreCtx<'_, BC, L>
+impl<
+        I: BroadcastIpExt,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::FilterState<I>>,
+    > IpDeviceSendContext<I, BC> for CoreCtx<'_, BC, L>
 {
     fn send_ip_frame<S>(
         &mut self,
@@ -203,7 +204,7 @@ impl<I: IpTypesIpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::F
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
-        I: IpTypesIpExt,
+        I: BroadcastIpExt,
         Config,
         BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::FilterState<I>>,
@@ -916,7 +917,7 @@ where
     BC: BindingsContext,
     S: Serializer,
     S::Buffer: BufferMut,
-    I: EthernetIpExt + IpTypesIpExt,
+    I: EthernetIpExt + BroadcastIpExt,
     L: LockBefore<crate::lock_ordering::IpState<I>>
         + LockBefore<crate::lock_ordering::LoopbackTxQueue>
         + LockBefore<crate::lock_ordering::PureIpDeviceTxQueue>,

@@ -21,10 +21,11 @@ use net_types::{MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr
 use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier as _,
-    ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer, Inspectable, Inspector,
-    InstantContext, NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
-    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+    AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
+    DeviceIdentifier as _, ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer,
+    Inspectable, Inspector, InstantContext, NestedIntoCoreTimerCtx, NotFoundError, RngContext,
+    SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
+    TracingContext, WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -62,9 +63,7 @@ use crate::internal::reassembly::{
     IpPacketFragmentCache,
 };
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
-use crate::internal::types::{
-    self, Destination, IpTypesIpExt, NextHop, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
-};
+use crate::internal::types::{self, Destination, NextHop, ResolvedRoute, RoutableIpAddr};
 
 #[cfg(test)]
 mod tests;
@@ -177,7 +176,7 @@ impl From<SendFrameErrorReason> for IpSendFrameErrorReason {
 }
 
 /// An [`Ip`] extension trait adding functionality specific to the IP layer.
-pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + IpTypesIpExt + IpProtoExt {
+pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + BroadcastIpExt + IpProtoExt {
     /// The type used to specify an IP packet's source address in a call to
     /// [`IpTransportContext::receive_ip_packet`].
     ///
@@ -2721,7 +2720,7 @@ pub fn receive_ipv6_packet<
 #[derive(Debug, PartialEq)]
 pub enum ReceivePacketAction<A: IpAddress, DeviceId>
 where
-    A::Version: IpTypesIpExt,
+    A::Version: BroadcastIpExt,
 {
     /// Deliver the packet locally.
     Deliver,
@@ -2962,7 +2961,7 @@ fn lookup_route_table<
 /// Packed destination passed to [`IpDeviceSendContext::send_ip_frame`].
 #[derive(Debug, Derivative)]
 #[derivative(Eq(bound = "D: Eq"), PartialEq(bound = "D: PartialEq"))]
-pub enum IpPacketDestination<I: IpTypesIpExt, D> {
+pub enum IpPacketDestination<I: BroadcastIpExt, D> {
     /// Broadcast packet.
     Broadcast(I::BroadcastMarker),
 
@@ -2978,7 +2977,7 @@ pub enum IpPacketDestination<I: IpTypesIpExt, D> {
     Loopback(D),
 }
 
-impl<I: IpTypesIpExt, D> IpPacketDestination<I, D> {
+impl<I: BroadcastIpExt, D> IpPacketDestination<I, D> {
     /// Creates `IpPacketDestination` for IP address.
     pub fn from_addr(addr: SpecifiedAddr<I::Addr>) -> Self {
         match MulticastAddr::new(addr.into_addr()) {
@@ -2999,7 +2998,7 @@ impl<I: IpTypesIpExt, D> IpPacketDestination<I, D> {
 
 /// The metadata associated with an outgoing IP packet.
 #[derive(Debug)]
-pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt + IpTypesIpExt, D, Src> {
+pub struct SendIpPacketMeta<I: IpExt, D, Src> {
     /// The outgoing device.
     pub device: D,
 
@@ -3026,8 +3025,7 @@ pub struct SendIpPacketMeta<I: packet_formats::ip::IpExt + IpTypesIpExt, D, Src>
     pub mtu: Option<u32>,
 }
 
-impl<I: packet_formats::ip::IpExt + IpTypesIpExt, D>
-    From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
+impl<I: IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
     for SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>>
 {
     fn from(
@@ -3206,21 +3204,19 @@ pub(crate) mod testutil {
         V6(SendIpPacketMeta<Ipv6, D, SpecifiedAddr<Ipv6Addr>>),
     }
 
-    impl<I: packet_formats::ip::IpExt + IpTypesIpExt, D>
-        From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>> for DualStackSendIpPacketMeta<D>
+    impl<I: IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
+        for DualStackSendIpPacketMeta<D>
     {
         fn from(value: SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>) -> Self {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<I: packet_formats::ip::IpExt + IpTypesIpExt, D>(
-                SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>,
-            );
+            struct Wrap<I: IpExt, D>(SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>);
             use DualStackSendIpPacketMeta::*;
             I::map_ip_in(Wrap(value), |Wrap(value)| V4(value), |Wrap(value)| V6(value))
         }
     }
 
-    impl<I: packet_formats::ip::IpExt + IpTypesIpExt, S, DeviceId, BC>
+    impl<I: IpExt, S, DeviceId, BC>
         SendableFrameMeta<FakeCoreCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>, BC>
         for SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>
     {
@@ -3250,12 +3246,12 @@ pub(crate) mod testutil {
     impl<D> DualStackSendIpPacketMeta<D> {
         /// Returns the internal [`SendIpPacketMeta`] if this is carrying the
         /// version matching `I`.
-        pub fn try_as<I: packet_formats::ip::IpExt + IpTypesIpExt>(
+        pub fn try_as<I: IpExt>(
             &self,
         ) -> Result<&SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, WrongIpVersion> {
             #[derive(GenericOverIp)]
             #[generic_over_ip(I, Ip)]
-            struct Wrap<'a, I: packet_formats::ip::IpExt + IpTypesIpExt, D>(
+            struct Wrap<'a, I: IpExt, D>(
                 Option<&'a SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>,
             );
             use DualStackSendIpPacketMeta::*;

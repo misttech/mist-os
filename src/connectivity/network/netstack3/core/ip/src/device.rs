@@ -40,7 +40,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 use zerocopy::ByteSlice;
 
-use crate::internal::base::IpPacketDestination;
+use crate::internal::base::{IpExt, IpPacketDestination};
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
@@ -61,7 +61,6 @@ use crate::internal::device::state::{
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
 use crate::internal::gmp::{GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult};
-use crate::internal::types::IpTypesIpExt;
 
 use self::state::Ipv6NetworkLearnedParameters;
 
@@ -1135,7 +1134,7 @@ impl<
 }
 
 /// The execution context for an IP device with a buffer.
-pub trait IpDeviceSendContext<I: IpTypesIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpDeviceSendContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Sends an IP packet through the device.
     fn send_ip_frame<S>(
         &mut self,

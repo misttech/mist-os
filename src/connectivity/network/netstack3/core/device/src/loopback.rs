@@ -15,12 +15,12 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4, Ipv6, Mtu};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
+    AnyDevice, BroadcastIpExt, CoreTimerContext, Device, DeviceIdAnyCompatContext, DeviceIdContext,
     FrameDestination, RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendFrameError,
     SendFrameErrorReason, SendableFrameMeta, StrongDeviceIdentifier, TimerContext,
     WeakDeviceIdentifier,
 };
-use netstack3_ip::{IpPacketDestination, IpTypesIpExt};
+use netstack3_ip::IpPacketDestination;
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
@@ -341,7 +341,7 @@ where
         > + ResourceCounterContext<<CC as DeviceIdContext<LoopbackDevice>>::DeviceId, DeviceCounters>
         + DeviceIdContext<AnyDevice>,
     BC: DeviceLayerTypes,
-    I: EthernetIpExt + IpTypesIpExt,
+    I: EthernetIpExt + BroadcastIpExt,
     S: Serializer,
     S::Buffer: BufferMut,
 {

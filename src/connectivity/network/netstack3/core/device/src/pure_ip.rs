@@ -13,11 +13,11 @@ use log::warn;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Mtu};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
-    CoreTimerContext, Device, DeviceIdContext, ReceivableFrameMeta, RecvFrameContext,
-    RecvIpFrameMeta, ResourceCounterContext, SendFrameError, SendFrameErrorReason,
-    SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
+    BroadcastIpExt, CoreTimerContext, Device, DeviceIdContext, ReceivableFrameMeta,
+    RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendFrameError,
+    SendFrameErrorReason, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
 };
-use netstack3_ip::{IpPacketDestination, IpTypesIpExt};
+use netstack3_ip::IpPacketDestination;
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::internal::base::{
@@ -242,7 +242,7 @@ where
     BC: DeviceLayerTypes,
     CC: TransmitQueueHandler<PureIpDevice, BC, Meta = PureIpDeviceTxQueueFrameMetadata>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>,
-    I: Ip + IpTypesIpExt,
+    I: Ip + BroadcastIpExt,
     S: Serializer,
     S::Buffer: BufferMut,
 {

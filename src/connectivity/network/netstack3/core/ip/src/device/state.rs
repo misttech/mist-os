@@ -21,8 +21,8 @@ use net_types::ip::{
 use net_types::SpecifiedAddr;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    CoreTimerContext, ExistsError, Inspectable, InspectableValue, Inspector, Instant,
-    InstantBindingsTypes, NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers,
+    BroadcastIpExt, CoreTimerContext, ExistsError, Inspectable, InspectableValue, Inspector,
+    Instant, InstantBindingsTypes, NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers,
     TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::utils::NonZeroDuration;
@@ -38,7 +38,7 @@ use crate::internal::device::{
 use crate::internal::gmp::igmp::{IgmpGroupState, IgmpState, IgmpTimerId};
 use crate::internal::gmp::mld::{MldGroupState, MldTimerId};
 use crate::internal::gmp::{GmpDelayedReportTimerId, GmpState, MulticastGroupSet};
-use crate::internal::types::{IpTypesIpExt, RawMetric};
+use crate::internal::types::RawMetric;
 
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
@@ -51,7 +51,7 @@ pub const RETRANS_TIMER_DEFAULT: NonZeroDuration =
 const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 
 /// An `Ip` extension trait adding IP device state properties.
-pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
+pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// The information stored about an IP address assigned to an interface.
     type AssignedAddress<BT: IpDeviceStateBindingsTypes>: AssignedAddress<Self::Addr> + Debug;
     /// The per-group state kept by the Group Messaging Protocol (GMP) used to announce

@@ -22,6 +22,7 @@ mod error;
 mod event;
 mod frame;
 mod inspect;
+mod ip;
 mod port_alloc;
 mod resource_references;
 mod rng;
@@ -49,6 +50,7 @@ pub use frame::{
     SendFrameError, SendFrameErrorReason, SendableFrameMeta,
 };
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
+pub use ip::{BroadcastIpExt, WrapBroadcastMarker};
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, ReferenceNotifiersExt,

@@ -25,6 +25,7 @@ rustc_library_with_features("netstack3-base") {
     "src/event.rs",
     "src/frame.rs",
     "src/inspect.rs",
+    "src/ip.rs",
     "src/lib.rs",
     "src/port_alloc.rs",
     "src/resource_references.rs",
