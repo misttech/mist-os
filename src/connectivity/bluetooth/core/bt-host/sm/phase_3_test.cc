@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <gtest/gtest.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
@@ -105,8 +106,8 @@ class Phase3Test : public l2cap::testing::FakeChannelTest {
     StaticByteBuffer<PacketSize<CentralIdentificationParams>()> buffer;
     PacketWriter writer(kCentralIdentification, &buffer);
     auto* params = writer.mutable_payload<CentralIdentificationParams>();
-    params->ediv = htole16(ediv);
-    params->rand = htole64(random);
+    params->ediv = pw::bytes::ConvertOrderTo(cpp20::endian::little, ediv);
+    params->rand = pw::bytes::ConvertOrderTo(cpp20::endian::little, random);
     return buffer;
   }
 

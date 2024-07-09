@@ -4,13 +4,12 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/util.h"
 
-#include <endian.h>
-
 #include <algorithm>
 #include <optional>
 
 #include <openssl/aes.h>
 #include <openssl/cmac.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
@@ -328,12 +327,16 @@ uint32_t Ah(const UInt128& k, uint32_t r) {
   // r' = padding || r.
   UInt128 r_prime;
   r_prime.fill(0);
-  *reinterpret_cast<uint32_t*>(r_prime.data()) = htole32(r & k24BitMax);
+  *reinterpret_cast<uint32_t*>(r_prime.data()) =
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, r & k24BitMax);
 
   UInt128 hash128;
   Encrypt(k, r_prime, &hash128);
 
-  return le32toh(*reinterpret_cast<uint32_t*>(hash128.data())) & k24BitMax;
+  return pw::bytes::ConvertOrderFrom(
+             cpp20::endian::little,
+             *reinterpret_cast<uint32_t*>(hash128.data())) &
+         k24BitMax;
 }
 
 bool IrkCanResolveRpa(const UInt128& irk, const DeviceAddress& rpa) {
@@ -346,7 +349,9 @@ bool IrkCanResolveRpa(const UInt128& irk, const DeviceAddress& rpa) {
   BufferView rpa_bytes = rpa.value().bytes();
 
   // Lower 24-bits (in host order).
-  uint32_t rpa_hash = le32toh(rpa_bytes.To<uint32_t>()) & k24BitMax;
+  uint32_t rpa_hash = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                                  rpa_bytes.To<uint32_t>()) &
+                      k24BitMax;
 
   // Upper 24-bits (we avoid a cast to uint32_t to prevent an invalid access
   // since the buffer would be too short).
@@ -377,7 +382,9 @@ DeviceAddress GenerateRpa(const UInt128& irk) {
   prand_bytes[2] &= ~0b10000000;
 
   // 24-bit hash value in little-endian order.
-  uint32_t hash_le = htole32(Ah(irk, le32toh(prand_le)));
+  uint32_t hash_le = pw::bytes::ConvertOrderTo(
+      cpp20::endian::little,
+      Ah(irk, pw::bytes::ConvertOrderFrom(cpp20::endian::little, prand_le)));
   BufferView hash_bytes(&hash_le, k24BitSize);
 
   // The |rpa_hash| and |prand| values generated below take up the least
