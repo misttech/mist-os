@@ -3,6 +3,12 @@
 // found in the LICENSE file.
 library fuchsia.bluetooth.map;
 
+using zx;
+
+// Based on max MAS instance ID value (255). See MAP v1.4.2 section
+// 3.1.8 for details.
+const MAX_NUM_MAS_INSTANCE_LENGTH uint16 = 256;
+
 // Based on MAP v1.4.2 section 3.1.6.
 const MAX_SUBJECT_LENGTH uint16 = 256;
 const MAX_SENDER_ADDR_LENGTH uint16 = 256;
@@ -63,7 +69,7 @@ type Audience = table {
 /// Used to represent the type of a particular Message.
 /// Also used to present the message types that are supported
 /// by a Message Access Server.
-type MessageType = strict bits : uint8 {
+type MessageType = flexible bits : uint8 {
     EMAIL = 0x01;
     SMS_GSM = 0x02;
     SMS_CDMA = 0x04;
@@ -71,11 +77,55 @@ type MessageType = strict bits : uint8 {
     IM = 0x10;
 };
 
+/// Notification type based on types defined in MAP v1.4.2 section 3.1.7.
+/// Note that MEMORY_FULL and MEMORY_AVAILABLE types are not represented as
+/// part of implementation decision.
+// TODO(b/348004441): Add in types for event report 1.2.
+type NotificationType = flexible enum {
+    NEW_MESSAGE = 1;
+    DELIVERY_SUCCESS = 2;
+    SENDING_SUCCESS = 3;
+    DELIVERY_FAILURE = 4;
+    SENDING_FAILURE = 5;
+    MESSAGE_DELETED = 6;
+    MESSAGE_SHIFT = 7;
+    // Available if both host and remote devices support MAP event report version 1.1.
+    READ_STATUS_CHANGED = 8;
+};
+
+/// Notification data from incoming event report from a remote MSE device.
+/// See MAP v1.4.2 section 3.1.7 for details about MAP event report objects.
+/// Note that not all fields are represented.
+type Notification = table {
+    1: type NotificationType;
+    2: mas_instance_id uint8;
+    3: message_handle uint64;
+    4: folder string:MAX_FOLDER_LENGTH;
+    5: message_type MessageType;
+    // Fields `timestamp`, `subject`, `sender`, and `priority` are only
+    // present for NEW_MESSAGE notification type.
+    //
+    // Unix timestamp that represents the sending time if it was included
+    // in the message, otherwise represents the reception time of the MSE.
+    6: timestamp zx.Time;
+    7: subject string:MAX_SUBJECT_LENGTH;
+    8: sender Audience;
+    9: priority bool;
+};
+
+/// Represents a Message Access Service Instance as described in
+/// MAP v1.4.2 section 3.1.8.
+type MasInstance = table {
+    1: id uint8;
+    2: supported_message_types MessageType;
+    3: supports_notification bool;
+};
+
 /// Specific error that is returned for Message Access/Message Notification
 /// related requests.
 type Error = strict enum {
-    /// A general error occurred that cannot be classified as one of the more specific statuses.
-    GENERIC = 1;
+    /// An unknown error occurred that cannot be classified as one of the more specific statuses.
+    UNKNOWN = 1;
 
     /// Peer was disconnected.
     PEER_DISCONNECTED = 2;
@@ -95,4 +145,7 @@ type Error = strict enum {
 
     /// Request could not be performed due to some condition at the peer.
     UNAVAILABLE = 7;
+
+    /// The functionality is not supported by the peer.
+    NOT_SUPPORTED = 8;
 };
