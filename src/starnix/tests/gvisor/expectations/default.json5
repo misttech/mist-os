@@ -757,9 +757,6 @@
                 "BindToDeviceTest/BindToDeviceTest.GetsockoptDevice/*",
                 "BindToDeviceTest/BindToDeviceTest.SetsockoptValidThenInvalid/*",
 
-                // socket_capability_test
-                "SocketTest.UnixConnectNeedsWritePerm",
-
                 // socket_filesystem_test
                 "FilesystemUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "FilesystemUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
