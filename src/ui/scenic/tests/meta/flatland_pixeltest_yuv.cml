@@ -4,7 +4,7 @@
 {
     include: [ "//src/ui/scenic/tests/meta/scenic_integration_test_base.shard.cml" ],
     program: {
-        binary: "bin/flatland_pixeltest_bin",
+        binary: "bin/flatland-pixeltest-bin",
 
         // Only run the flip and orientation tests, so that this test component can
         // run within the test timeout.

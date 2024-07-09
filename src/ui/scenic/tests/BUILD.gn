@@ -8,21 +8,18 @@ import("//src/lib/vulkan/vulkan.gni")
 group("tests") {
   testonly = true
   public_deps = [
-    ":display_integration_tests",
-    ":flatland_cpu_renderer_integration_test",
-    ":flatland_integration_tests",
-    ":flatland_null_renderer_integration_test",
-    ":flatland_pixeltest_yuv",
-    ":flatland_protected_memory_integration_test",
-    ":observer_integration_tests",
+    ":display-integration-tests",
+    ":flatland-cpu-renderer-integration-test",
+    ":flatland-integration-tests",
+    ":flatland-null-renderer-integration-test",
+    ":flatland-pixeltest-yuv",
+    ":flatland-protected-memory-integration-test",
+    ":observer-integration-tests",
   ]
 }
 
-config("vulkan_no_nodiscard") {
-  defines = [ "VULKAN_HPP_NO_NODISCARD_WARNINGS" ]
-}
-
-source_set("common_deps") {
+# TODO(https://fxbug.dev/42175597): use common-deps-zxtest for CTF tests.
+source_set("common-deps-gtest") {
   testonly = true
   sources = [
     "utils/blocking_present.cc",
@@ -33,7 +30,7 @@ source_set("common_deps") {
     "utils/utils.h",
   ]
   public_deps = [
-    ":scenic_realm_builder",
+    ":scenic-realm-builder",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
@@ -45,7 +42,7 @@ source_set("common_deps") {
   deps = [ "//src/lib/fostr/fidl/fuchsia.ui.input:fuchsia.ui.input" ]
 }
 
-source_set("common_deps_cts") {
+source_set("common-deps-zxtest") {
   testonly = true
   sources = [
     "utils/blocking_present.cc",
@@ -56,16 +53,26 @@ source_set("common_deps_cts") {
     "utils/utils.h",
   ]
   public_deps = [
-    ":scenic_realm_builder",
+    ":scenic-realm-builder",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/ui/testing/util:screenshot_helper",
     "//zircon/system/ulib/zxtest",
   ]
+  deps = [ "//src/lib/fostr/fidl/fuchsia.ui.input:fuchsia.ui.input" ]
 }
 
-source_set("scenic_realm_builder") {
+# TODO(https://fxbug.dev/42175597): use common-deps-zxtest for CTF tests.
+source_set("common-deps-zxtest-with-realm-builder") {
+  testonly = true
+  public_deps = [
+    ":common-deps-zxtest",
+    ":scenic-realm-builder",
+  ]
+}
+
+source_set("scenic-realm-builder") {
   testonly = true
   sources = [
     "utils/scenic_realm_builder.cc",
@@ -86,14 +93,14 @@ source_set("scenic_realm_builder") {
   ]
 }
 
-source_set("screen_capture_utils") {
+source_set("screen-capture-utils") {
   testonly = true
   sources = [
     "utils/screen_capture_utils.cc",
     "utils/screen_capture_utils.h",
   ]
   public_deps = [
-    ":common_deps",
+    ":common-deps-gtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/flatland/engine",
@@ -101,11 +108,11 @@ source_set("screen_capture_utils") {
   ]
 }
 
-executable("flatland_allocation_test_bin") {
+executable("flatland-allocation-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/flatland_allocation_test.cc" ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils:utils",
@@ -113,21 +120,21 @@ executable("flatland_allocation_test_bin") {
   ]
 }
 
-fuchsia_test_component("flatland_allocation_test") {
-  component_name = "flatland_allocation_test"
+fuchsia_test_component("flatland-allocation-test") {
+  component_name = "flatland-allocation-test"
   manifest = "meta/flatland_allocation_test.cml"
-  deps = [ ":flatland_allocation_test_bin" ]
+  deps = [ ":flatland-allocation-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("flatland_touch_integration_test_bin") {
+executable("flatland-touch-integration-test-bin") {
   testonly = true
   sources = [
     "flatland_integration_tests/flatland_touch_integration_test.cc",
     "flatland_integration_tests/flatland_touch_local_hit_integration_test.cc",
   ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_hlcpp",
@@ -135,64 +142,64 @@ executable("flatland_touch_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("flatland_touch_integration_test") {
-  component_name = "flatland_touch_integration_test"
+fuchsia_test_component("flatland-touch-integration-test") {
+  component_name = "flatland-touch-integration-test"
   manifest = "meta/flatland_touch_integration_test.cml"
-  deps = [ ":flatland_touch_integration_test_bin" ]
+  deps = [ ":flatland-touch-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("flatland_focus_integration_test_bin") {
+executable("flatland-focus-integration-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/flatland_focus_integration_test.cc" ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
   ]
 }
 
-fuchsia_test_component("flatland_focus_integration_test") {
-  component_name = "flatland_focus_integration_test"
+fuchsia_test_component("flatland-focus-integration-test") {
+  component_name = "flatland-focus-integration-test"
   manifest = "meta/flatland_focus_integration_test.cml"
-  deps = [ ":flatland_focus_integration_test_bin" ]
+  deps = [ ":flatland-focus-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("flatland_view_ref_installed_integration_test_bin") {
+executable("flatland-view-ref-installed-integration-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/flatland_view_ref_installed_integration_test.cc" ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
   ]
 }
 
-fuchsia_test_component("flatland_view_ref_installed_integration_test") {
-  component_name = "flatland_view_ref_installed_integration_test"
+fuchsia_test_component("flatland-view-ref-installed-integration-test") {
+  component_name = "flatland-view-ref-installed-integration-test"
   manifest = "meta/flatland_view_ref_installed_integration_test.cml"
-  deps = [ ":flatland_view_ref_installed_integration_test_bin" ]
+  deps = [ ":flatland-view-ref-installed-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("flatland_view_integration_test_bin") {
+executable("flatland-view-integration-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/flatland_view_integration_test.cc" ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
   ]
 }
 
-fuchsia_test_component("flatland_view_integration_test") {
-  component_name = "flatland_view_integration_test"
+fuchsia_test_component("flatland-view-integration-test") {
+  component_name = "flatland-view-integration-test"
   manifest = "meta/flatland_view_integration_test.cml"
-  deps = [ ":flatland_view_integration_test_bin" ]
+  deps = [ ":flatland-view-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("cpu_renderer_integration_test_bin") {
+executable("cpu-renderer-integration-test-bin") {
   testonly = true
 
   # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
@@ -201,7 +208,7 @@ executable("cpu_renderer_integration_test_bin") {
     sources = [ "flatland_integration_tests/cpu_renderer_integration_test.cc" ]
   }
   deps = [
-    ":common_deps",
+    ":common-deps-gtest",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
@@ -210,18 +217,18 @@ executable("cpu_renderer_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("cpu_renderer_integration_test") {
-  component_name = "cpu_renderer_integration_test"
+fuchsia_test_component("cpu-renderer-integration-test") {
+  component_name = "cpu-renderer-integration-test"
   manifest = "meta/cpu_renderer_integration_test.cml"
-  deps = [ ":cpu_renderer_integration_test_bin" ]
+  deps = [ ":cpu-renderer-integration-test-bin" ]
   test_type = "system"
 }
 
-executable("null_renderer_integration_test_bin") {
+executable("null-renderer-integration-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/null_renderer_integration_test.cc" ]
   deps = [
-    ":common_deps",
+    ":common-deps-gtest",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
@@ -229,19 +236,19 @@ executable("null_renderer_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("null_renderer_integration_test") {
-  component_name = "null_renderer_integration_test"
+fuchsia_test_component("null-renderer-integration-test") {
+  component_name = "null-renderer-integration-test"
   manifest = "meta/null_renderer_integration_test.cml"
-  deps = [ ":null_renderer_integration_test_bin" ]
+  deps = [ ":null-renderer-integration-test-bin" ]
   test_type = "system"
 }
 
-executable("observer_registry_integration_test_bin") {
+executable("observer-registry-integration-test-bin") {
   testonly = true
   sources =
       [ "observer_integration_tests/observer_registry_integration_test.cc" ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.geometry:fuchsia.ui.observation.geometry_hlcpp",
@@ -249,20 +256,20 @@ executable("observer_registry_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("observer_registry_integration_test") {
-  component_name = "observer_registry_integration_test"
+fuchsia_test_component("observer-registry-integration-test") {
+  component_name = "observer-registry-integration-test"
   manifest = "meta/observer_registry_integration_test.cml"
-  deps = [ ":observer_registry_integration_test_bin" ]
+  deps = [ ":observer-registry-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("scoped_observer_registry_integration_test_bin") {
+executable("scoped-observer-registry-integration-test-bin") {
   testonly = true
   sources = [
     "observer_integration_tests/scoped_observer_registry_integration_test.cc",
   ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.geometry:fuchsia.ui.observation.geometry_hlcpp",
@@ -270,19 +277,19 @@ executable("scoped_observer_registry_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("scoped_observer_registry_integration_test") {
-  component_name = "scoped_observer_registry_integration_test"
+fuchsia_test_component("scoped-observer-registry-integration-test") {
+  component_name = "scoped-observer-registry-integration-test"
   manifest = "meta/scoped_observer_registry_integration_test.cml"
-  deps = [ ":scoped_observer_registry_integration_test_bin" ]
+  deps = [ ":scoped-observer-registry-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("protected_memory_integration_test_bin") {
+executable("protected-memory-integration-test-bin") {
   testonly = true
   sources =
       [ "flatland_integration_tests/protected_memory_integration_test.cc" ]
   deps = [
-    ":common_deps",
+    ":common-deps-gtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/utils:utils",
@@ -290,19 +297,19 @@ executable("protected_memory_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("protected_memory_integration_test") {
-  component_name = "protected_memory_integration_test"
+fuchsia_test_component("protected-memory-integration-test") {
+  component_name = "protected-memory-integration-test"
   manifest = "meta/protected_memory_integration_test.cml"
-  deps = [ ":protected_memory_integration_test_bin" ]
+  deps = [ ":protected-memory-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("screen_capture_integration_test_bin") {
+executable("screen-capture-integration-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/screen_capture_integration_test.cc" ]
   deps = [
-    ":common_deps",
-    ":screen_capture_utils",
+    ":common-deps-gtest",
+    ":screen-capture-utils",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/screen_capture:screen_capture",
@@ -311,19 +318,19 @@ executable("screen_capture_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("screen_capture_integration_test") {
-  component_name = "screen_capture_integration_test"
+fuchsia_test_component("screen-capture-integration-test") {
+  component_name = "screen-capture-integration-test"
   manifest = "meta/screen_capture_integration_test.cml"
-  deps = [ ":screen_capture_integration_test_bin" ]
+  deps = [ ":screen-capture-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("screen_capture2_integration_test_bin") {
+executable("screen-capture2-integration-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/screen_capture2_integration_test.cc" ]
   deps = [
-    ":common_deps",
-    ":screen_capture_utils",
+    ":common-deps-gtest",
+    ":screen-capture-utils",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
@@ -336,38 +343,38 @@ executable("screen_capture2_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("screen_capture2_integration_test") {
-  component_name = "screen_capture2_integration_test"
+fuchsia_test_component("screen-capture2-integration-test") {
+  component_name = "screen-capture2-integration-test"
   manifest = "meta/screen_capture2_integration_test.cml"
-  deps = [ ":screen_capture2_integration_test_bin" ]
+  deps = [ ":screen-capture2-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("display_ownership_integration_test_bin") {
+executable("display-ownership-integration-test-bin") {
   testonly = true
   sources = [ "display_ownership_integration_test.cc" ]
   deps = [
-    ":common_deps_cts",
-    ":scenic_realm_builder",
+    ":common-deps-zxtest-with-realm-builder",
+    ":scenic-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
     "//src/ui/scenic/lib/utils:utils",
     "//zircon/system/ulib/fbl",
   ]
 }
 
-fuchsia_test_component("display_ownership_integration_test") {
-  component_name = "display_ownership_integration_test"
+fuchsia_test_component("display-ownership-integration-test") {
+  component_name = "display-ownership-integration-test"
   manifest = "meta/display_ownership_integration_test.cml"
-  deps = [ ":display_ownership_integration_test_bin" ]
+  deps = [ ":display-ownership-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("singleton_display_integration_test_bin") {
+executable("singleton-display-integration-test-bin") {
   testonly = true
   sources = [ "singleton_display_integration_test.cc" ]
   deps = [
-    ":common_deps_cts",
-    ":scenic_realm_builder",
+    ":common-deps-zxtest-with-realm-builder",
+    ":scenic-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//src/ui/scenic/lib/utils:utils",
@@ -375,18 +382,18 @@ executable("singleton_display_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("singleton_display_integration_test") {
-  component_name = "singleton_display_integration_test"
+fuchsia_test_component("singleton-display-integration-test") {
+  component_name = "singleton-display-integration-test"
   manifest = "meta/singleton_display_integration_test.cml"
-  deps = [ ":singleton_display_integration_test_bin" ]
+  deps = [ ":singleton-display-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("flatland_mouse_integration_test_bin") {
+executable("flatland-mouse-integration-test-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/flatland_mouse_integration_test.cc" ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
@@ -395,18 +402,18 @@ executable("flatland_mouse_integration_test_bin") {
   ]
 }
 
-fuchsia_test_component("flatland_mouse_integration_test") {
-  component_name = "flatland_mouse_integration_test"
+fuchsia_test_component("flatland-mouse-integration-test") {
+  component_name = "flatland-mouse-integration-test"
   manifest = "meta/flatland_mouse_integration_test.cml"
-  deps = [ ":flatland_mouse_integration_test_bin" ]
+  deps = [ ":flatland-mouse-integration-test-bin" ]
   test_type = "vulkan"
 }
 
-executable("flatland_pixeltest_bin") {
+executable("flatland-pixeltest-bin") {
   testonly = true
   sources = [ "flatland_integration_tests/flatland_pixeltest.cc" ]
   deps = [
-    ":common_deps_cts",
+    ":common-deps-zxtest-with-realm-builder",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
@@ -419,32 +426,32 @@ executable("flatland_pixeltest_bin") {
   ]
 }
 
-fuchsia_test_component("flatland_pixeltest_flip_and_orientation") {
-  component_name = "flatland_pixeltest_flip_and_orientation"
+fuchsia_test_component("flatland-pixeltest-flip-and-orientation") {
+  component_name = "flatland-pixeltest-flip-and-orientation"
   manifest = "meta/flatland_pixeltest_flip_and_orientation.cml"
-  deps = [ ":flatland_pixeltest_bin" ]
+  deps = [ ":flatland-pixeltest-bin" ]
   test_type = "vulkan"
 }
 
-fuchsia_test_component("flatland_pixeltest_general") {
-  component_name = "flatland_pixeltest_general"
+fuchsia_test_component("flatland-pixeltest-general") {
+  component_name = "flatland-pixeltest-general"
   manifest = "meta/flatland_pixeltest_general.cml"
-  deps = [ ":flatland_pixeltest_bin" ]
+  deps = [ ":flatland-pixeltest-bin" ]
   test_type = "vulkan"
 }
 
-fuchsia_test_package("flatland_integration_tests") {
+fuchsia_test_package("flatland-integration-tests") {
   test_components = [
-    ":flatland_allocation_test",
-    ":flatland_focus_integration_test",
-    ":flatland_mouse_integration_test",
-    ":flatland_pixeltest_flip_and_orientation",
-    ":flatland_pixeltest_general",
-    ":flatland_touch_integration_test",
-    ":flatland_view_ref_installed_integration_test",
-    ":flatland_view_integration_test",
-    ":screen_capture_integration_test",
-    ":screen_capture2_integration_test",
+    ":flatland-allocation-test",
+    ":flatland-focus-integration-test",
+    ":flatland-mouse-integration-test",
+    ":flatland-pixeltest-flip-and-orientation",
+    ":flatland-pixeltest-general",
+    ":flatland-touch-integration-test",
+    ":flatland-view-ref-installed-integration-test",
+    ":flatland-view-integration-test",
+    ":screen-capture-integration-test",
+    ":screen-capture2-integration-test",
   ]
   test_specs = {
     environments = vulkan_envs
@@ -454,15 +461,15 @@ fuchsia_test_package("flatland_integration_tests") {
   }
 }
 
-fuchsia_test_component("pixeltest_yuv") {
-  component_name = "flatland_pixeltest_yuv"
+fuchsia_test_component("pixeltest-yuv") {
+  component_name = "flatland-pixeltest-yuv"
   manifest = "meta/flatland_pixeltest_yuv.cml"
-  deps = [ ":flatland_pixeltest_bin" ]
+  deps = [ ":flatland-pixeltest-bin" ]
   test_type = "vulkan"
 }
 
-fuchsia_test_package("flatland_pixeltest_yuv") {
-  test_components = [ ":pixeltest_yuv" ]
+fuchsia_test_package("flatland-pixeltest-yuv") {
+  test_components = [ ":pixeltest-yuv" ]
   test_specs = {
     # TODO(https://fxbug.dev/42137913): Skip this test for AEMU as YUV Sysmem images are not supported yet.
     environments = magma_libvulkan_hardware_envs
@@ -472,8 +479,8 @@ fuchsia_test_package("flatland_pixeltest_yuv") {
   }
 }
 
-fuchsia_test_package("flatland_cpu_renderer_integration_test") {
-  test_components = [ ":cpu_renderer_integration_test" ]
+fuchsia_test_package("flatland-cpu-renderer-integration-test") {
+  test_components = [ ":cpu-renderer-integration-test" ]
 
   test_specs = {
     log_settings = {
@@ -482,8 +489,8 @@ fuchsia_test_package("flatland_cpu_renderer_integration_test") {
   }
 }
 
-fuchsia_test_package("flatland_null_renderer_integration_test") {
-  test_components = [ ":null_renderer_integration_test" ]
+fuchsia_test_package("flatland-null-renderer-integration-test") {
+  test_components = [ ":null-renderer-integration-test" ]
 
   test_specs = {
     log_settings = {
@@ -492,8 +499,8 @@ fuchsia_test_package("flatland_null_renderer_integration_test") {
   }
 }
 
-fuchsia_test_package("flatland_protected_memory_integration_test") {
-  test_components = [ ":protected_memory_integration_test" ]
+fuchsia_test_package("flatland-protected-memory-integration-test") {
+  test_components = [ ":protected-memory-integration-test" ]
 
   test_specs = {
     environments = [
@@ -507,10 +514,10 @@ fuchsia_test_package("flatland_protected_memory_integration_test") {
   }
 }
 
-fuchsia_test_package("observer_integration_tests") {
+fuchsia_test_package("observer-integration-tests") {
   test_components = [
-    ":observer_registry_integration_test",
-    ":scoped_observer_registry_integration_test",
+    ":observer-registry-integration-test",
+    ":scoped-observer-registry-integration-test",
   ]
   test_specs = {
     environments = vulkan_envs
@@ -520,10 +527,10 @@ fuchsia_test_package("observer_integration_tests") {
   }
 }
 
-fuchsia_test_package("display_integration_tests") {
+fuchsia_test_package("display-integration-tests") {
   test_components = [
-    ":singleton_display_integration_test",
-    ":display_ownership_integration_test",
+    ":singleton-display-integration-test",
+    ":display-ownership-integration-test",
   ]
   test_specs = {
     environments = vulkan_envs

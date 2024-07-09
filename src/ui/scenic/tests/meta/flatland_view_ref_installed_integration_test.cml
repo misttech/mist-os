@@ -4,6 +4,6 @@
 {
     include: [ "//src/ui/scenic/tests/meta/scenic_integration_test_base.shard.cml" ],
     program: {
-        binary: "bin/flatland_view_ref_installed_integration_test_bin",
+        binary: "bin/flatland-view-ref-installed-integration-test-bin",
     },
 }
