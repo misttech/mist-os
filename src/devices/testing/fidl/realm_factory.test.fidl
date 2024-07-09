@@ -29,10 +29,9 @@ type RealmOptions = resource table {
     /// This is optional.
     4: dev_class server_end:fuchsia.io.Directory;
 
-    /// This is the client end to a directory that provides all of the |dtr_offers|, or the
-    /// deprecated |offers|, specified in the |driver_test_realm_start_args| to drivers under test.
-    /// This is required if and only if |dtr_offers| or |offers| is provided in
-    /// |driver_test_realm_start_args|.
+    /// This is the client end to a directory that provides all of the |offers| specified in the
+    /// |driver_test_realm_start_args| to drivers under test.
+    /// This is required if and only if |offers| is provided in |driver_test_realm_start_args|.
     5: offers_client client_end:fuchsia.io.Directory;
 };
 
