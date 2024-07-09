@@ -8,14 +8,14 @@ namespace {
 
 TEST_F(DeviceEnumerationTest, QemuRiscv64Test) {
   // clang-format off
-  static const char* kDevicePaths[] = {
-      "sys/platform/goldfish-rtc",        // goldfish-rtc
-      "sys/platform/pt/PCI0/bus/00:00.0", // host bridge
-      "sys/platform/pt/qemu-riscv64",     // board driver
+  static const char* kNodeMonikers[] = {
+      "dev.sys.platform.goldfish-rtc",        // goldfish-rtc
+      "dev.sys.platform.pt.PCI0.bus.00_00.0", // host bridge
+      "dev.sys.platform.pt.qemu-riscv64",     // board driver
   };
   // clang-format on
 
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+  VerifyNodes(kNodeMonikers);
 }
 
 }  // namespace
