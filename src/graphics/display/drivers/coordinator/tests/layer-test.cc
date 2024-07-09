@@ -37,7 +37,7 @@ class LayerTest : public TestBase {
 
   fbl::RefPtr<Image> CreateReadyImage() {
     zx::result<DriverImageId> import_result = display()->ImportVmoImageForTesting(zx::vmo(0), 0);
-    EXPECT_OK(import_result.status_value());
+    EXPECT_OK(import_result);
     EXPECT_NE(import_result.value(), kInvalidDriverImageId);
 
     static constexpr ImageMetadata image_metadata({

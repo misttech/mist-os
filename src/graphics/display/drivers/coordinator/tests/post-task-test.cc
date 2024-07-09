@@ -231,7 +231,7 @@ TEST_P(PostTaskTest, RunsCallback) {
     callback_called.store(true, std::memory_order_relaxed);
     AsyncWorkDone();
   });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
 
   WaitForAsyncWorkToBeDone();
   EXPECT_TRUE(callback_called.load(std::memory_order_relaxed));
@@ -246,14 +246,14 @@ TEST_P(PostTaskTest, DoesNotRunCallbackSynchronously) {
   Barrier loop_barrier;
   zx::result<> post_stall_result =
       PostTask<kCaptureSize>(dispatcher_, [&]() { loop_barrier.WaitUntilSignaled(); });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   std::atomic<bool> callback_called = false;
   zx::result<> post_task_result = PostTask<kCaptureSize>(dispatcher_, [&]() {
     callback_called.store(true, std::memory_order_relaxed);
     AsyncWorkDone();
   });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
   EXPECT_FALSE(callback_called.load(std::memory_order_relaxed));
 
   loop_barrier.Signal();
@@ -267,7 +267,7 @@ TEST_P(PostTaskTest, CaptureDestructionOnCallbackRun) {
   Barrier loop_barrier;
   zx::result<> post_stall_result =
       PostTask<kCaptureSize>(dispatcher_, [&]() { loop_barrier.WaitUntilSignaled(); });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   std::atomic<bool> captures_destroyed_during_callback_call = false;
   zx::result<> post_task_result = PostTask<kCaptureSize>(
@@ -275,7 +275,7 @@ TEST_P(PostTaskTest, CaptureDestructionOnCallbackRun) {
         captures_destroyed_during_callback_call.store(CapturesDestroyed(),
                                                       std::memory_order_relaxed);
       });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
   EXPECT_FALSE(CapturesDestroyed());
 
   // AsyncWorkDone() must be called in a separate task, because the test covers
@@ -286,7 +286,7 @@ TEST_P(PostTaskTest, CaptureDestructionOnCallbackRun) {
     captures_destroyed_during_done_call.store(CapturesDestroyed(), std::memory_order_relaxed);
     AsyncWorkDone();
   });
-  ASSERT_OK(post_done_result.status_value());
+  ASSERT_OK(post_done_result);
   EXPECT_FALSE(CapturesDestroyed());
 
   loop_barrier.Signal();
@@ -331,12 +331,12 @@ TEST_P(PostTaskTest, ShutdownAfterPostBeforeCall) {
     AsyncWorkDone();
     WaitForLoopShutdown();
   });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   std::atomic<bool> callback_called = false;
   zx::result<> post_task_result = PostTask<kCaptureSize>(
       dispatcher_, [&]() { callback_called.store(true, std::memory_order_relaxed); });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
   EXPECT_FALSE(callback_called.load(std::memory_order_relaxed));
 
   WaitForAsyncWorkToBeDone();
@@ -352,11 +352,11 @@ TEST_P(PostTaskTest, CaptureDestructionOnShutdownAfterPostBeforeCall) {
     AsyncWorkDone();
     WaitForLoopShutdown();
   });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   zx::result<> post_task_result = PostTask<kCaptureSize>(
       dispatcher_, [&, _ = CallFromDestructor([&] { RecordCaptureDestruction(); })]() {});
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
   EXPECT_FALSE(CapturesDestroyed());
 
   WaitForAsyncWorkToBeDone();
@@ -384,7 +384,7 @@ TEST_P(PostTaskStateTest, RunsCallback) {
     callback_called.store(true, std::memory_order_relaxed);
     AsyncWorkDone();
   });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
 
   WaitForAsyncWorkToBeDone();
   EXPECT_TRUE(callback_called.load(std::memory_order_relaxed));
@@ -401,14 +401,14 @@ TEST_P(PostTaskStateTest, DoesNotRunCallbackSynchronously) {
   Barrier loop_barrier;
   zx::result<> post_stall_result = PostTask(std::move(post_stall_state), dispatcher_,
                                             [&]() { loop_barrier.WaitUntilSignaled(); });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   std::atomic<bool> callback_called = false;
   zx::result<> post_task_result = PostTask(std::move(post_task_state), dispatcher_, [&]() {
     callback_called.store(true, std::memory_order_relaxed);
     AsyncWorkDone();
   });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
   EXPECT_FALSE(callback_called.load(std::memory_order_relaxed));
 
   loop_barrier.Signal();
@@ -425,7 +425,7 @@ TEST_P(PostTaskStateTest, CaptureDestructionOnCallbackRun) {
   Barrier loop_barrier;
   zx::result<> post_stall_result =
       PostTask<kCaptureSize>(dispatcher_, [&]() { loop_barrier.WaitUntilSignaled(); });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   std::atomic<bool> captures_destroyed_during_callback_call = false;
   zx::result<> post_task_result =
@@ -434,7 +434,7 @@ TEST_P(PostTaskStateTest, CaptureDestructionOnCallbackRun) {
                  captures_destroyed_during_callback_call.store(CapturesDestroyed(),
                                                                std::memory_order_relaxed);
                });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
   EXPECT_FALSE(CapturesDestroyed());
 
   // AsyncWorkDone() must be called in a separate task, because the test covers
@@ -445,7 +445,7 @@ TEST_P(PostTaskStateTest, CaptureDestructionOnCallbackRun) {
     captures_destroyed_during_done_call.store(CapturesDestroyed(), std::memory_order_relaxed);
     AsyncWorkDone();
   });
-  ASSERT_OK(post_done_result.status_value());
+  ASSERT_OK(post_done_result);
   EXPECT_FALSE(CapturesDestroyed());
 
   loop_barrier.Signal();
@@ -495,13 +495,13 @@ TEST_P(PostTaskStateTest, ShutdownAfterPostBeforeCall) {
     AsyncWorkDone();
     WaitForLoopShutdown();
   });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   std::atomic<bool> callback_called = false;
   zx::result<> post_task_result = PostTask(std::move(post_task_state), dispatcher_, [&]() {
     callback_called.store(true, std::memory_order_relaxed);
   });
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
 
   WaitForAsyncWorkToBeDone();
   loop_.Shutdown();
@@ -518,12 +518,12 @@ TEST_P(PostTaskStateTest, CaptureDestructionOnShutdownAfterPostBeforeCall) {
     AsyncWorkDone();
     WaitForLoopShutdown();
   });
-  ASSERT_OK(post_stall_result.status_value());
+  ASSERT_OK(post_stall_result);
 
   zx::result<> post_task_result =
       PostTask(std::move(post_task_state), dispatcher_,
                [&, _ = CallFromDestructor([&] { RecordCaptureDestruction(); })]() {});
-  ASSERT_OK(post_task_result.status_value());
+  ASSERT_OK(post_task_result);
   EXPECT_FALSE(CapturesDestroyed());
 
   WaitForAsyncWorkToBeDone();

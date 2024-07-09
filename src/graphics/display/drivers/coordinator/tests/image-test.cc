@@ -118,7 +118,7 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
           image->StartRetire();
           image->OnRetire();
         });
-    ASSERT_OK(post_task_result.status_value());
+    ASSERT_OK(post_task_result);
 
     async::WaitOnce signal_event_wait(signal_event.get(), ZX_EVENT_SIGNALED, /*options=*/0);
     bool signal_event_signaled = false;

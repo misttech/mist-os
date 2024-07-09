@@ -98,7 +98,7 @@ class HotPlugDetectionTest : public ::testing::Test {
     // The fake GPIO FIDL server can only be bound on the test thread's default
     // dispatcher, so Init() must be called on another thread.
     zx::result<> init_result = runtime_.PerformBlockingWork([&] { return hpd->Init(); });
-    EXPECT_OK(init_result.status_value());
+    EXPECT_OK(init_result);
 
     return hpd;
   }

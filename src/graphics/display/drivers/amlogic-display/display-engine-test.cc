@@ -361,13 +361,13 @@ class FakeSysmemTest : public testing::Test {
     std::vector<fuchsia_component_runner::ComponentNamespaceEntry> entries;
     entries.push_back({{.path = "/", .directory = std::move(directory_client)}});
     zx::result<fdf::Namespace> namespace_result = fdf::Namespace::Create(entries);
-    ASSERT_OK(namespace_result.status_value());
+    ASSERT_OK(namespace_result);
 
     incoming_ = std::make_shared<fdf::Namespace>(std::move(namespace_result).value());
 
     zx::result<> test_environment_init_result = test_environment_.SyncCall(
         &fdf_testing::TestEnvironment::Initialize, std::move(directory_server));
-    ASSERT_OK(test_environment_init_result.status_value());
+    ASSERT_OK(test_environment_init_result);
   }
 
   void SetUp() override {
@@ -384,7 +384,7 @@ class FakeSysmemTest : public testing::Test {
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result = Vout::CreateDsiVoutForTesting(
         /*panel_type=*/PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO, /*width=*/kWidth,
         /*height=*/kHeight);
-    ASSERT_OK(create_dsi_vout_result.status_value());
+    ASSERT_OK(create_dsi_vout_result);
     display_engine_->SetVoutForTesting(std::move(create_dsi_vout_result).value());
 
     PixelGridSize2D layer_image_size = {
@@ -398,7 +398,7 @@ class FakeSysmemTest : public testing::Test {
     zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_result =
         VideoInputUnit::CreateForTesting(vpu_mmio_.GetMmioBuffer(), /*rdma=*/nullptr,
                                          layer_image_size, display_contents_size);
-    ASSERT_OK(video_input_unit_result.status_value());
+    ASSERT_OK(video_input_unit_result);
     display_engine_->SetVideoInputUnitForTesting(std::move(video_input_unit_result).value());
 
     allocator_ = std::make_unique<MockAllocator>(loop_.dispatcher());
@@ -461,10 +461,10 @@ bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) 
 TEST_F(FakeSysmemTest, ImportBufferCollection) {
   zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> token1_endpoints =
       fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  ASSERT_OK(token1_endpoints.status_value());
+  ASSERT_OK(token1_endpoints);
   zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> token2_endpoints =
       fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
-  ASSERT_OK(token2_endpoints.status_value());
+  ASSERT_OK(token2_endpoints);
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);

@@ -82,13 +82,13 @@ class AmlCanvasDriverTest : public ::testing::Test {
   void StartDriver() {
     zx::result start_result = runtime_.RunToCompletion(driver_.SyncCall(
         &fdf_testing::DriverUnderTest<AmlCanvasDriver>::Start, (std::move(start_args_))));
-    ASSERT_OK(start_result.status_value());
+    ASSERT_OK(start_result);
   }
 
   void StopDriver() {
     zx::result stop_result = runtime_.RunToCompletion(
         driver_.SyncCall(&fdf_testing::DriverUnderTest<AmlCanvasDriver>::PrepareStop));
-    ASSERT_OK(stop_result.status_value());
+    ASSERT_OK(stop_result);
   }
 
   fdf_testing::DriverRuntime& runtime() { return runtime_; }
@@ -133,7 +133,7 @@ TEST_F(AmlCanvasDriverTest, ServesAmlogicCanvasDeviceProtocol) {
   zx::result canvas_client_end =
       component::ConnectAtMember<fuchsia_hardware_amlogiccanvas::Service::Device>(
           CreateDriverSvcClient());
-  ASSERT_OK(canvas_client_end.status_value());
+  ASSERT_OK(canvas_client_end);
 
   StopDriver();
 }

@@ -215,7 +215,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 
     zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
         VirtioPciDevice::Create(std::move(bti), std::move(backend));
-    ASSERT_OK(virtio_device_result.status_value());
+    ASSERT_OK(virtio_device_result);
 
     std::unique_ptr<VirtioGpuDevice> gpu_device =
         std::make_unique<VirtioGpuDevice>(std::move(virtio_device_result).value());
@@ -283,7 +283,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
     zx::result<DisplayEngine::BufferInfo> buffer_info_result =
         device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0,
                                                 kDefaultImageMetadata);
-    ASSERT_OK(buffer_info_result.status_value());
+    ASSERT_OK(buffer_info_result);
 
     const auto& buffer_info = buffer_info_result.value();
     EXPECT_EQ(4u, buffer_info.bytes_per_pixel);

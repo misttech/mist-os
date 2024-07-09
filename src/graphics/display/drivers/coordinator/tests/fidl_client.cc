@@ -308,10 +308,10 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmem(
 
 std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPresentLayerInfo() {
   zx::result<LayerId> layer_result = CreateLayer();
-  EXPECT_OK(layer_result.status_value());
+  EXPECT_OK(layer_result);
 
   zx::result<ImageId> image_result = ImportImageWithSysmem(displays_[0].image_metadata_);
-  EXPECT_OK(image_result.status_value());
+  EXPECT_OK(image_result);
 
   return {
       {.layer_id = layer_result.value(),

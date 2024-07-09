@@ -66,7 +66,7 @@ TEST_F(FakePdevTest, MapMmioSuccess) {
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev = ConnectToFakePdev();
   PerformBlockingWork([&] {
     zx::result<fdf::MmioBuffer> mmio_result = MapMmio(MmioResourceIndex::kDmc, pdev);
-    ASSERT_OK(mmio_result.status_value());
+    ASSERT_OK(mmio_result);
   });
 }
 
@@ -93,7 +93,7 @@ TEST_F(FakePdevTest, GetBtiSuccess) {
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev = ConnectToFakePdev();
   PerformBlockingWork([&] {
     zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kCanvas, pdev);
-    ASSERT_OK(bti_result.status_value());
+    ASSERT_OK(bti_result);
   });
 }
 
