@@ -84,6 +84,9 @@ type FuchsiaTarget interface {
 	// IPv6 returns the IPv6 of the target.
 	IPv6() (*net.IPAddr, error)
 
+	// IPAddr returns the IP address of the target, favoring IPv4 over IPv6.
+	IPAddr() (net.IPAddr, error)
+
 	// Nodename returns the name of the target node.
 	Nodename() string
 
@@ -269,6 +272,27 @@ func (t *genericFuchsiaTarget) IPv6() (*net.IPAddr, error) {
 	return t.ipv6, nil
 }
 
+// IPAddr returns the IP address of the target, favoring IPv4 over IPv6.
+func (t *genericFuchsiaTarget) IPAddr() (net.IPAddr, error) {
+	var addr net.IPAddr
+	ipv6, err := t.IPv6()
+	if err != nil {
+		return addr, err
+	}
+	if ipv6 != nil {
+		addr = *ipv6
+	}
+	ipv4, err := t.IPv4()
+	if err != nil {
+		return addr, err
+	}
+	if ipv4 != nil {
+		addr.IP = ipv4
+		addr.Zone = ""
+	}
+	return addr, nil
+}
+
 // CaptureSerialLog starts copying serial logs from the serial server
 // to the given filename. This is a blocking function; it will not return
 // until either the serial server disconnects or the target is stopped.
@@ -427,7 +451,7 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 	syslogCtx, cancel := context.WithCancel(t.targetCtx)
 	defer cancel()
 	errs := syslogger.Stream(syslogCtx, syslogWriter)
-	maxAttempts := 20
+	maxAttempts := 5
 	startTime := time.Now()
 	attempt := 0
 	for range errs {
