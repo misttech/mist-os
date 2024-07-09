@@ -161,6 +161,7 @@ DRY_RUN=
 VERBOSE=
 CHANGED_LINES=
 PARALLEL=
+FILES_SPECIFIED=
 
 fx-config-read
 
@@ -180,6 +181,7 @@ while [ $# -gt 0 ]; do
       GET_FILES=get_git_files
       ;;
     --files=*)
+      FILES_SPECIFIED="1"
       GET_FILES=:
       OLDIFS=$IFS && IFS=$'\n' \
       && FILES=( \
@@ -305,6 +307,11 @@ shac_files=()
 for file in "${FILES[@]}"; do
   # Git reports deleted files, which we don't want to try to format
   if [[ ! -f "${file}" ]]; then
+    # If files were specified on the command line rather than retrieved via Git,
+    # report missing files as errors.
+    if [[ -n "${FILES_SPECIFIED}" ]]; then
+      fx-error "no such file: ${file}"
+    fi
     continue
   fi
   shac_files+=("$file")
