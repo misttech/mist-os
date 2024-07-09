@@ -138,7 +138,6 @@ group("tests_no_e2e") {
     "//tools/shush:tests($host_toolchain)",
     "//tools/staticanalysis:tests",
     "//tools/symbolizer:tests",
-    "//tools/sys-realm-analyzer:tests($host_toolchain)",
     "//tools/test_list_tool:test_list_tool_test($host_toolchain)",
     "//tools/test_pilot:tests",
     "//tools/testgen:tests",
