@@ -339,6 +339,7 @@ class AmlSdmmc : public fdf::DriverBase,
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
+  zx::event hardware_power_assertive_token_;
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl>
       wake_on_request_element_control_client_;
