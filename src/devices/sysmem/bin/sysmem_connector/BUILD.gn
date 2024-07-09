@@ -13,6 +13,7 @@ executable("sysmem_connector_executable") {
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",

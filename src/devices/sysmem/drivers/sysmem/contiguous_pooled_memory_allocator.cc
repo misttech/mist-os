@@ -688,6 +688,7 @@ void ContiguousPooledMemoryAllocator::IncrementGuardRegionFailureInspectData() {
   failed_guard_region_checks_++;
   failed_guard_region_checks_property_.Set(failed_guard_region_checks_);
   last_failed_guard_region_check_timestamp_ns_property_.Set(zx::clock::get_monotonic().get());
+  parent_device_->snapshot_annotation_register().IncrementNumDmaCorruptions();
 }
 
 void ContiguousPooledMemoryAllocator::CheckGuardRegionData(const RegionData& region) {

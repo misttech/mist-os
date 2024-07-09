@@ -183,12 +183,13 @@
             to: "#bootstrap",
         },
 
-        // Non-zircon services for archivist, pwrbtn-monitor, and console.
+        // Non-zircon services for archivist, pwrbtn-monitor, sysmem and console.
         {
             protocol: [
                 "fuchsia.component.PersistenceBinder",
                 "fuchsia.component.SamplerBinder",
                 "fuchsia.exception.Handler",
+                "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.metrics.MetricEventLoggerFactory",

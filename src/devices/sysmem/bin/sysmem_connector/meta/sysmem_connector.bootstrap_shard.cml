@@ -19,7 +19,10 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.metrics.MetricEventLoggerFactory",
+            protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+            ],
             from: "parent",
             to: "#sysmem",
         },

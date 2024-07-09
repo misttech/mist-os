@@ -300,6 +300,7 @@ void Device::DdkUnbindInternal() {
     ZX_ASSERT(loop_checker_.has_value());
     std::lock_guard checker(*loop_checker_);
     outgoing_.reset();
+    snapshot_annotation_register_.UnsetServiceDirectory();
     waiting_for_unbind_ = true;
     CheckForUnbind();
   });
@@ -346,6 +347,10 @@ void Device::CheckForUnbind() {
 
   // This will cause the loop to exit and will allow DdkUnbind to continue.
   loop_.Quit();
+}
+
+SnapshotAnnotationRegister& Device::snapshot_annotation_register() {
+  return snapshot_annotation_register_;
 }
 
 SysmemMetrics& Device::metrics() { return metrics_; }
@@ -789,7 +794,8 @@ void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
   postTask([this, aux_service_directory = std::make_shared<sys::ServiceDirectory>(
                       request->service_directory.TakeChannel())] {
     // Should the need arise in future, it'd be fine to stash a shared_ptr<aux_service_directory>
-    // here if we need it for anything else.  For now we only need it for metrics.
+    // here if we need it for anything else.
+    snapshot_annotation_register_.SetServiceDirectory(aux_service_directory, dispatcher());
     metrics_.metrics_buffer().SetServiceDirectory(aux_service_directory);
     metrics_.LogUnusedPageCheck(sysmem_metrics::UnusedPageCheckMetricDimensionEvent_Connectivity);
   });
