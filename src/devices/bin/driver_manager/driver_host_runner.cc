@@ -184,19 +184,25 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
   return ZX_OK;
 }
 
-zx::result<> DriverHostRunner::StartDriverHost() {
+zx::result<> DriverHostRunner::StartDriverHost(StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   std::string name = "driver-host-new-" + std::to_string(next_driver_host_id_++);
 
   StartDriverHostComponent(
       name, kUrl,
-      [this,
-       name](zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
+      [this, name, callback = std::move(callback)](
+          zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
         if (component.is_error()) {
           LOGF(ERROR, "Failed to start driver host: %s", component.status_string());
+          callback(component.take_error());
           return;
         }
-        LoadDriverHost(component->info, name);
+        auto result = LoadDriverHost(component->info, name);
+        if (!result.is_ok()) {
+          callback(result.take_error());
+        } else {
+          callback(zx::ok());
+        }
       });
   return zx::ok();
 }
@@ -209,7 +215,7 @@ std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::Driver
   return result_hosts;
 }
 
-void DriverHostRunner::LoadDriverHost(
+zx::result<> DriverHostRunner::LoadDriverHost(
     const fuchsia_component_runner::ComponentStartInfo& start_info, std::string_view name) {
   auto url = *start_info.resolved_url();
   fidl::Arena arena;
@@ -219,14 +225,14 @@ void DriverHostRunner::LoadDriverHost(
   if (binary.is_error()) {
     LOGF(ERROR, "Failed to start driver host, missing 'binary' argument: %s",
          binary.status_string());
-    return;
+    return binary.take_error();
   }
 
   auto driver_file = OpenPkgFile(*start_info.ns(), *binary);
   if (driver_file.is_error()) {
     LOGF(ERROR, "Failed to open driver host '%s' file: %s", url.c_str(),
          driver_file.status_string());
-    return;
+    return driver_file.take_error();
   }
 
   fidl::SyncClient file(std::move(*driver_file));
@@ -234,11 +240,11 @@ void DriverHostRunner::LoadDriverHost(
                                        fio::VmoFlags::kPrivateClone);
 
   if (result.is_error()) {
-    LOGF(ERROR, "Failed to get driver host vmo: %s",
-         zx_status_get_string(result.error_value().is_domain_error()
-                                  ? result.error_value().domain_error()
-                                  : ZX_ERR_BAD_HANDLE));
-    return;
+    zx_status_t status = result.error_value().is_domain_error()
+                             ? result.error_value().domain_error()
+                             : ZX_ERR_BAD_HANDLE;
+    LOGF(ERROR, "Failed to get driver host vmo: %s", zx_status_get_string(status));
+    return zx::error(status);
   }
 
   zx::vmo exec_vmo = std::move(result->vmo());
@@ -246,14 +252,14 @@ void DriverHostRunner::LoadDriverHost(
   auto vdso_result = GetVdsoVmo();
   if (vdso_result.is_error()) {
     LOGF(ERROR, "Failed to get vdso vmo, %s", vdso_result.status_string());
-    return;
+    return vdso_result.take_error();
   }
   zx::vmo vdso_vmo = std::move(*vdso_result);
 
   zx::result<DriverHost*> driver_host = CreateDriverHost(name);
   if (driver_host.is_error()) {
     LOGF(ERROR, "Failed to create driver host env: %s", driver_host.status_string());
-    return;
+    return driver_host.take_error();
   }
 
   zx::process process;
@@ -263,19 +269,20 @@ void DriverHostRunner::LoadDriverHost(
   zx_status_t status = (*driver_host)->GetDuplicateHandles(&process, &thread, &root_vmar);
   if (status != ZX_OK) {
     LOGF(ERROR, "GetDuplicateHandles failed: %s", zx_status_get_string(status));
-    return;
+    return zx::error(status);
   }
 
   status = loader_->Start(std::move(process), std::move(thread), std::move(root_vmar),
                           std::move(exec_vmo), std::move(vdso_vmo));
   if (status != ZX_OK) {
     LOGF(ERROR, "Loader failed to start driver host: %lu", zx_status_get_string(status));
-    return;
+    return zx::error(status);
   }
+  return zx::ok();
 }
 
 void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::string_view url,
-                                                StartCallback callback) {
+                                                StartComponentCallback callback) {
   zx::event token;
   zx_status_t status = zx::event::create(0, &token);
   if (status != ZX_OK) {

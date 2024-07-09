@@ -184,13 +184,21 @@ TEST_F(DriverHostRunnerTest, Start) {
   ASSERT_NE(nullptr, loader);
   driver_manager::DriverHostRunner driver_host_runner(dispatcher(), ConnectToRealm(),
                                                       std::move(loader));
-  auto res = driver_host_runner.StartDriverHost();
+
+  bool got_cb = false;
+  auto res = driver_host_runner.StartDriverHost([&](zx::result<> result) {
+    // TODO(https://fxbug.dev/330775896): this is expected to be an error until
+    // the loader library CL is submitted.
+    ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, result.status_value());
+    got_cb = true;
+  });
   ASSERT_EQ(ZX_OK, res.status_value());
 
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(created_component);
 
   ASSERT_NO_FATAL_FAILURE(CallComponentStart(driver_host_runner));
+  ASSERT_TRUE(got_cb);
 }
 
 }  // namespace
