@@ -35,15 +35,26 @@ pub async fn init_ga4_metrics_service(
     ga4_key: String,
     invoker: Option<String>,
 ) -> Result<Arc<Mutex<GA4MetricsService>>> {
+    let metrics_dir: PathBuf;
+    let mut disabled_by_init_failure = false;
+
+    match analytics_folder() {
+        Ok(metrics_dir_retrieved) => metrics_dir = metrics_dir_retrieved,
+        Err(e) => {
+            tracing::error!("Could not get analytics folder. Disabling analytics. Error: {:?}", e);
+            disabled_by_init_failure = true;
+            metrics_dir = PathBuf::from("");
+        }
+    }
     let metrics_state = MetricsState::from_config(
-        &PathBuf::from(&analytics_folder()),
+        &metrics_dir,
         app_name,
         build_version.unwrap_or(UNKNOWN_VERSION.into()),
         sdk_version,
         "deprecated".to_string(),
         ga4_product_code,
         ga4_key,
-        is_analytics_disabled_by_env(),
+        disabled_by_init_failure || is_analytics_disabled_by_env(),
         invoker,
     );
     let data = Mutex::new(GA4MetricsService::new(metrics_state));
