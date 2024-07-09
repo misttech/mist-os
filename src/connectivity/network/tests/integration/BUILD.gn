@@ -9,7 +9,10 @@ import(
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
-tests = [ "sys" ]
+tests = [
+  "sys",
+  "device",
+]
 
 tests_with_err_logs = [
   {
