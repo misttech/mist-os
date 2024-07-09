@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
 
@@ -171,13 +171,7 @@ fn insert_allows(filename: &str, lints: &[Lint], bug_link: &str) -> Result<()> {
 fn calculate_insertions(src: &str, lints: &[Lint]) -> Result<BTreeMap<usize, HashSet<String>>> {
     let mut finder =
         Finder { lints: lints.iter().cloned().map(|l| (l, Span::default())).collect() };
-    // TODO(https://fxbug.dev/331979452) Skip over any files that contain c-string literals or
-    // syn will crash. Those have to be done manually.
-    if !src.contains("c\"") {
-        finder.visit_file(&syn::parse_file(src)?);
-    } else {
-        return Err(anyhow!("File contains c-string literal. Manually apply lints: {lints:?}"));
-    }
+    finder.visit_file(&syn::parse_file(src)?);
 
     // Group lints by the line where they occur
     let mut inserts: BTreeMap<usize, HashSet<String>> = BTreeMap::new();
