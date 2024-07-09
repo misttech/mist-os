@@ -618,6 +618,7 @@ async fn power_manager_not_present_reboot_oom(
 // variant is introduced the `send_command` function in shutdown-shim must be
 // updated to support it.
 async fn test_variant_coverage() -> Result<(), Error> {
+    #[allow(dead_code)] // TODO(https://fxbug.dev/351850765)
     struct Mock {}
 
     impl std::convert::From<fdevicemanager::SystemPowerState> for Mock {

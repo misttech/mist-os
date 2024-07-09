@@ -701,6 +701,7 @@ impl<'a, A: IpAddress, LI, RI> From<&'a ConnIpAddr<A, LI, RI>> for SocketAddrTyp
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/351850359)
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct SocketAddrTypeTag<S> {
     pub(crate) has_device: bool,

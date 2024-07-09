@@ -6,6 +6,7 @@ use assembly_util::{impl_path_type_marker, PathTypeMarker, TypedPathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/351850417)
 /// PackageIdentity is an opaque type that allows for the string that's used as
 /// a package's identity to be evolved over time, compared with other instances,
 /// and used as a key in maps / sets.
