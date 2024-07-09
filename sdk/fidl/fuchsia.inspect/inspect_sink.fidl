@@ -10,6 +10,9 @@ type EscrowToken = resource struct {
     token zx.Handle:<EVENTPAIR, zx.Rights.WAIT | zx.Rights.INSPECT>;
 };
 
+@available(added=HEAD)
+alias EscrowedVmo = zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ | zx.Rights.SET_PROPERTY>;
+
 @available(added=16)
 const MAX_NAME_LENGTH uint64 = 4096;
 
@@ -58,7 +61,7 @@ open protocol InspectSink {
     flexible Escrow(resource table {
         /// The VMO containing Inspect data that the server will store.
         /// Required
-        1: vmo zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ>;
+        1: vmo EscrowedVmo;
 
         /// The token identifying this VMO and also serving as a controller to
         /// stop storing this VMO in the server.
@@ -116,6 +119,6 @@ open protocol InspectSink {
         /// Optional
         2: tree client_end:Tree;
     }) -> (resource table {
-        1: vmo zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ>;
+        1: vmo EscrowedVmo;
     });
 };

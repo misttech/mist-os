@@ -60,6 +60,13 @@ impl Inspector {
         })
     }
 
+    /// Returns a duplicate of the underlying VMO for this Inspector with the given rights.
+    ///
+    /// The duplicated VMO will be read-only, and is suitable to send to clients over FIDL.
+    pub fn duplicate_vmo_with_rights(&self, rights: zx::Rights) -> Option<zx::Vmo> {
+        self.storage.as_ref().and_then(|vmo| vmo.duplicate_handle(rights).ok())
+    }
+
     /// This produces a copy-on-write VMO with a generation count marked as
     /// VMO_FROZEN. The resulting VMO is read-only.
     ///

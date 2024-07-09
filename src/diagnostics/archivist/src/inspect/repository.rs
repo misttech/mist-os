@@ -16,11 +16,16 @@ use fuchsia_sync::{RwLock, RwLockWriteGuard};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
+use once_cell::sync::Lazy;
 use selectors::SelectorExt;
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
+
+static INSPECT_ESCROW_NAME: Lazy<CString> =
+    Lazy::new(|| CString::new("InspectEscrowedVmo").unwrap());
 
 pub struct InspectRepository {
     inner: RwLock<InspectRepositoryInner>,
@@ -102,6 +107,9 @@ impl InspectRepository {
         tree: Option<zx::Koid>,
     ) {
         debug!(identity = %component, "Escrow inspect handle.");
+        if let Err(err) = vmo.set_name(&INSPECT_ESCROW_NAME) {
+            debug!(%err, "Failed to set escrow vmo name");
+        }
         let handle = InspectHandle::escrow(vmo, token, name);
         let guard = self.inner.write();
         self.add_inspect_artifacts(guard, Arc::clone(&component), handle, tree);
@@ -329,6 +337,8 @@ mod tests {
     use selectors::FastError;
 
     const TEST_URL: &str = "fuchsia-pkg://test";
+    static ESCROW_TEST_RIGHTS: Lazy<zx::Rights> =
+        Lazy::new(|| zx::Rights::BASIC | zx::Rights::READ | zx::Rights::MAP | zx::Rights::PROPERTY);
 
     #[fuchsia::test]
     fn inspect_repo_disallows_duplicated_handles() {
@@ -455,7 +465,7 @@ mod tests {
         let (ep0, ep1) = zx::EventPair::create();
         repo.escrow_handle(
             Arc::clone(&identity),
-            inspector.duplicate_vmo().unwrap(),
+            inspector.duplicate_vmo_with_rights(*ESCROW_TEST_RIGHTS).unwrap(),
             finspect::EscrowToken { token: ep1 },
             Some("escrow"),
             None,
@@ -495,7 +505,7 @@ mod tests {
         let (_ep0, ep1) = zx::EventPair::create();
         repo.escrow_handle(
             Arc::clone(&identity),
-            inspector.duplicate_vmo().unwrap(),
+            inspector.duplicate_vmo_with_rights(*ESCROW_TEST_RIGHTS).unwrap(),
             finspect::EscrowToken { token: ep1 },
             Some("escrow"),
             Some(koid),
@@ -521,7 +531,7 @@ mod tests {
         let (ep0, ep1) = zx::EventPair::create();
         repo.escrow_handle(
             Arc::clone(&identity),
-            inspector.duplicate_vmo().unwrap(),
+            inspector.duplicate_vmo_with_rights(*ESCROW_TEST_RIGHTS).unwrap(),
             finspect::EscrowToken { token: ep1 },
             Some("escrow"),
             None,
@@ -536,7 +546,9 @@ mod tests {
         let vmo =
             repo.fetch_escrow(Arc::clone(&identity), finspect::EscrowToken { token: ep0 }, None);
         assert!(vmo.is_some());
-        let inspector_loaded = Inspector::new(InspectorConfig::default().vmo(vmo.unwrap()));
+        let vmo = vmo.unwrap();
+        assert_eq!(vmo.get_name().unwrap(), *INSPECT_ESCROW_NAME);
+        let inspector_loaded = Inspector::new(InspectorConfig::default().vmo(vmo));
         assert_data_tree!(inspector_loaded, root: {
             foo: 3i64,
         });
@@ -559,7 +571,7 @@ mod tests {
         let (ep0, ep1) = zx::EventPair::create();
         repo.escrow_handle(
             Arc::clone(&identity),
-            inspector.duplicate_vmo().unwrap(),
+            inspector.duplicate_vmo_with_rights(*ESCROW_TEST_RIGHTS).unwrap(),
             finspect::EscrowToken { token: ep1 },
             Some("escrow"),
             None,
