@@ -196,3 +196,125 @@ mod method {
         }
     }
 }
+
+mod event {
+    use super::*;
+
+    /// Helper to generate protocols with changing events.
+    fn protocol(discoverable: &str, change: &str, openness: &str, flexibility: &str) -> String {
+        let discoverable = if discoverable == "" {
+            "@discoverable".to_string()
+        } else {
+            format!("@discoverable({discoverable})")
+        };
+
+        "
+        DISCOVERABLE
+        OPENNESS protocol Foo {
+            strict Bar() -> ();
+            @available(CHANGE)
+            FLEXIBILITY -> Baz();
+        };"
+        .replace("DISCOVERABLE", &discoverable)
+        .replace("OPENNESS", openness)
+        .replace("CHANGE", change)
+        .replace("FLEXIBILITY", flexibility)
+    }
+
+    #[test]
+    fn server_external_add_remove_event() {
+        // With server=external it's safe to add and remove protocols because the
+        // platform will support the superset of all stable and unstable levels'
+        // protocols.
+        for change in vec!["added=2", "added=HEAD", "removed=2", "removed=HEAD"] {
+            for (openness, flexibility) in
+                vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
+            {
+                assert!(compare_fidl_library(
+                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    protocol("server=\"external\"", change, openness, flexibility)
+                )
+                .is_compatible());
+            }
+        }
+    }
+
+    #[test]
+    fn server_platform_add_event() {
+        let changes = vec!["added=2", "added=HEAD"];
+        let discoverable = "server=\"platform\"";
+        // For strict events this should fail.
+        for change in &changes {
+            for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
+                assert!(compare_fidl_library(
+                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    protocol(discoverable, change, openness, flexibility)
+                )
+                .has_problems(vec![
+                    ProblemPattern::protocol("1", "PLATFORM").message(Contains("missing event"))
+                ]));
+            }
+        }
+        // For flexible events this should succeed.
+        for change in changes {
+            for (openness, flexibility) in vec![("open", "flexible")] {
+                assert!(compare_fidl_library(
+                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    protocol(discoverable, change, openness, flexibility)
+                )
+                .is_compatible());
+            }
+        }
+    }
+
+    #[test]
+    fn remove_event() {
+        // It's safe to remove events because the platform will support the
+        // superset of all stable and unstable levels' events.
+
+        let discoverables = ["", "server=\"platform\"", "server=\"external\""];
+
+        for discoverable in discoverables {
+            for change in vec!["removed=2", "removed=HEAD"] {
+                for (openness, flexibility) in
+                    vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
+                {
+                    assert!(compare_fidl_library(
+                        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                        protocol(discoverable, change, openness, flexibility)
+                    )
+                    .is_compatible());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn client_anywhere_add_event() {
+        let changes = vec!["added=2", "added=HEAD"];
+        let discoverable = "name=\"fuchsia.example.Foo\"";
+
+        // For strict clients this should fail.
+        for change in &changes {
+            for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
+                assert!(compare_fidl_library(
+                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    protocol(discoverable, change, openness, flexibility)
+                )
+                .has_problems(vec![
+                    ProblemPattern::protocol("1", "PLATFORM").message(Contains("missing event"))
+                ]));
+            }
+        }
+        // For flexible clients this should succeed.
+        for change in changes {
+            for (openness, flexibility) in vec![("open", "flexible")] {
+                assert!(compare_fidl_library(
+                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    protocol(discoverable, change, openness, flexibility)
+                )
+                .is_compatible());
+            }
+        }
+    }
+}
