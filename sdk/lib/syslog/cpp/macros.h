@@ -13,10 +13,8 @@
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #endif
 #include <atomic>
-#include <functional>
 #include <limits>
 #include <sstream>
-#include <vector>
 
 namespace syslog_runtime {
 
