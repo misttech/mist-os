@@ -527,5 +527,240 @@ TEST(FileTest2, FailedNidReuse) {
   FileTester::Unmount(std::move(fs), &bc);
 }
 
+TEST_F(FileTest, BasicXattrSetGet) {
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
+  File *test_file_ptr = static_cast<File *>(test_file_vn.get());
+
+  std::string name = "testname";
+  std::array<uint8_t, 5> value = {'x', 'a', 't', 't', 'r'};
+
+  // Initially xattr block is not allocated
+  ASSERT_EQ(test_file_ptr->XattrNid(), 0U);
+
+  // Create xattr
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kNone),
+            ZX_OK);
+
+  // Xattr block allocated
+  ASSERT_NE(test_file_ptr->XattrNid(), 0U);
+
+  // Get and verify
+  std::array<uint8_t, kMaxXattrValueLength> buf;
+  buf.fill(0);
+  zx::result<size_t> result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(*result, value.size());
+  ASSERT_EQ(std::memcmp(buf.data(), value.data(), value.size()), 0);
+
+  // Modify xattr
+  value = {'h', 'e', 'l', 'l', 'o'};
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kNone),
+            ZX_OK);
+
+  // Get and verify
+  buf.fill(0);
+  result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(*result, value.size());
+  ASSERT_EQ(std::memcmp(buf.data(), value.data(), value.size()), 0);
+
+  // Remount and verify again
+  ASSERT_EQ(test_file_vn->Close(), ZX_OK);
+  test_file_vn = nullptr;
+  ASSERT_EQ(root_dir_->Close(), ZX_OK);
+  root_dir_ = nullptr;
+
+  FileTester::Unmount(std::move(fs_), &bc_);
+
+  fbl::RefPtr<VnodeF2fs> root;
+  FileTester::MountWithOptions(loop_.dispatcher(), mount_options_, &bc_, &fs_);
+  FileTester::CreateRoot(fs_.get(), &root);
+  root_dir_ = fbl::RefPtr<Dir>::Downcast(std::move(root));
+
+  fbl::RefPtr<fs::Vnode> test_vn;
+  FileTester::Lookup(root_dir_.get(), "test", &test_vn);
+  test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_vn));
+  test_file_ptr = static_cast<File *>(test_file_vn.get());
+
+  buf.fill(0);
+  result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(*result, value.size());
+  ASSERT_EQ(std::memcmp(buf.data(), value.data(), value.size()), 0);
+
+  // Remove xattr, then get xattr is failed
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name,
+                                                cpp20::span<const uint8_t>(), XattrOption::kNone),
+            ZX_OK);
+  result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
+  ASSERT_TRUE(result.is_error());
+  ASSERT_EQ(result.error_value(), ZX_ERR_NOT_FOUND);
+
+  // Check xattr block deallocated
+  ASSERT_EQ(test_file_ptr->XattrNid(), 0U);
+
+  ASSERT_EQ(test_file_vn->Close(), ZX_OK);
+  test_file_vn = nullptr;
+}
+
+TEST_F(FileTest, XattrFill) {
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
+  File *test_file_ptr = static_cast<File *>(test_file_vn.get());
+
+  // Set xattr until no remaining space
+  std::vector<std::pair<std::string, std::vector<uint8_t>>> xattrs;
+  std::string current_name;
+  std::vector<uint8_t> current_value;
+  for (uint32_t i = 0;; ++i) {
+    // name string: "a", "ab", "abc", ..., "abcdefgh", "b", "bc", "bcd", ...
+    if (i % kMaxNameLen == 0) {
+      current_name.clear();
+    }
+    current_name.push_back(static_cast<std::string::value_type>(
+        'a' + (i / kMaxNameLen + i % kMaxNameLen) % ('z' - 'a' + 1)));
+
+    // value string: "a", "ab", "abc", ..., "abc...xyz", "abc...xyza", "abc...xyzab", ...
+    current_value.push_back(static_cast<std::string::value_type>('a' + i % ('z' - 'a' + 1)));
+
+    auto ret = test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, current_name, current_value,
+                                                   XattrOption::kNone);
+
+    if (ret != ZX_OK) {
+      ASSERT_EQ(ret, ZX_ERR_NO_SPACE);
+      break;
+    }
+
+    xattrs.emplace_back(current_name, current_value);
+  }
+
+  // Get and verify
+  std::array<uint8_t, kMaxXattrValueLength> buf;
+  for (auto &i : xattrs) {
+    buf.fill(0);
+    zx::result<size_t> result =
+        test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, i.first, buf);
+    ASSERT_TRUE(result.is_ok());
+    ASSERT_EQ(*result, i.second.size());
+    ASSERT_EQ(std::memcmp(buf.data(), i.second.data(), i.second.size()), 0);
+  }
+
+  // Remove half of xattrs
+  for (uint32_t i = 0; i < xattrs.size(); i += 2) {
+    ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, xattrs[i].first,
+                                                  cpp20::span<const uint8_t>(), XattrOption::kNone),
+              ZX_OK);
+  }
+
+  // Get and verify
+  for (uint32_t i = 0; i < xattrs.size(); ++i) {
+    buf.fill(0);
+    zx::result<size_t> result =
+        test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, xattrs[i].first, buf);
+
+    // Removed
+    if (i % 2 == 0) {  // removed
+      ASSERT_TRUE(result.is_error());
+      ASSERT_EQ(result.error_value(), ZX_ERR_NOT_FOUND);
+    } else {  // exist
+      ASSERT_TRUE(result.is_ok());
+      ASSERT_EQ(*result, xattrs[i].second.size());
+      ASSERT_EQ(std::memcmp(buf.data(), xattrs[i].second.data(), xattrs[i].second.size()), 0);
+    }
+  }
+
+  ASSERT_EQ(test_file_vn->Close(), ZX_OK);
+  test_file_vn = nullptr;
+}
+
+TEST_F(FileTest, XattrException) {
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
+  File *test_file_ptr = static_cast<File *>(test_file_vn.get());
+
+  // Error for empty name
+  std::string name;
+  std::array<uint8_t, 5> value = {'x', 'a', 't', 't', 'r'};
+
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kNone),
+            ZX_ERR_INVALID_ARGS);
+
+  std::array<uint8_t, kMaxXattrValueLength> buf;
+  buf.fill(0);
+  zx::result<size_t> result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
+  ASSERT_TRUE(result.is_error());
+  ASSERT_EQ(result.error_value(), ZX_ERR_INVALID_ARGS);
+
+  // Error for name length exceed limit
+  name.clear();
+  for (uint32_t i = 0; i < kMaxNameLen; ++i) {
+    name.push_back('a');
+  }
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kNone),
+            ZX_OK);
+
+  name.push_back('a');
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kNone),
+            ZX_ERR_OUT_OF_RANGE);
+
+  buf.fill(0);
+  result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
+  ASSERT_TRUE(result.is_error());
+  ASSERT_EQ(result.error_value(), ZX_ERR_OUT_OF_RANGE);
+
+  // Error for value length exceed limit
+  name = "12345678";
+  std::array<uint8_t, kMaxXattrValueLength + 1> value_large;
+  value_large.fill(0);
+  ASSERT_EQ(
+      test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value_large, XattrOption::kNone),
+      ZX_ERR_OUT_OF_RANGE);
+
+  ASSERT_EQ(test_file_vn->Close(), ZX_OK);
+  test_file_vn = nullptr;
+}
+
+TEST_F(FileTest, XattrFlagException) {
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  fbl::RefPtr<VnodeF2fs> test_file_vn = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_file));
+  File *test_file_ptr = static_cast<File *>(test_file_vn.get());
+
+  std::string name = "test";
+  std::array<uint8_t, 5> value = {'x', 'a', 't', 't', 'r'};
+
+  // Create xattr
+  ASSERT_EQ(
+      test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kCreate),
+      ZX_OK);
+
+  std::array<uint8_t, kMaxXattrValueLength> buf;
+  // Get and verify
+  buf.fill(0);
+  zx::result<size_t> result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(*result, value.size());
+  ASSERT_EQ(std::memcmp(buf.data(), value.data(), value.size()), 0);
+
+  // Error for create xattr that is already exist
+  value[0] = '0';
+  ASSERT_EQ(
+      test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kCreate),
+      ZX_ERR_ALREADY_EXISTS);
+
+  // Error for replace xattr that is not exist
+  name = "test2";
+  ASSERT_EQ(
+      test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kReplace),
+      ZX_ERR_NOT_FOUND);
+
+  ASSERT_EQ(test_file_vn->Close(), ZX_OK);
+  test_file_vn = nullptr;
+}
+
 }  // namespace
 }  // namespace f2fs

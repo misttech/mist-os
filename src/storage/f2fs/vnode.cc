@@ -1295,4 +1295,112 @@ bool VnodeF2fs::IsColdFile() {
   return IsAdviseSet(FAdvise::kCold);
 }
 
+zx_status_t VnodeF2fs::SetExtendedAttribute(XattrIndex index, std::string_view name,
+                                            cpp20::span<const uint8_t> value, XattrOption option) {
+  if (name.empty()) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (name.length() > kMaxNameLen || value.size() > kMaxXattrValueLength) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
+  LockedPage xattr_page;
+  if (xattr_nid_ > 0) {
+    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(xattr_nid_, &xattr_page);
+        err != ZX_OK) {
+      return err;
+    }
+  }
+
+  XattrOperator xattr_operator(xattr_page);
+
+  zx::result<uint32_t> offset_or = xattr_operator.FindSlotOffset(index, name);
+
+  if (option == XattrOption::kCreate) {
+    if (offset_or.is_ok()) {
+      return ZX_ERR_ALREADY_EXISTS;
+    }
+  }
+
+  if (option == XattrOption::kReplace) {
+    if (offset_or.is_error()) {
+      return ZX_ERR_NOT_FOUND;
+    }
+  }
+
+  if (offset_or.is_ok()) {
+    xattr_operator.Remove(*offset_or);
+  }
+
+  if (!value.empty()) {
+    if (zx_status_t err = xattr_operator.Add(index, name, value); err != ZX_OK) {
+      return err;
+    }
+  }
+
+  bool need_inode_update = false;
+  if (xattr_nid_ == 0) {
+    zx::result<nid_t> nid_or = fs()->GetNodeManager().AllocNid();
+    if (nid_or.is_error()) {
+      return ZX_ERR_NO_SPACE;
+    }
+    xattr_nid_ = *nid_or;
+
+    zx::result<LockedPage> page_or =
+        fs()->GetNodeManager().NewNodePage(ino_, xattr_nid_, IsDir(), 0);
+    if (page_or.is_error()) {
+      fs()->GetNodeManager().AddFreeNid(xattr_nid_);
+      xattr_nid_ = 0;
+      return page_or.error_value();
+    }
+    xattr_page = std::move(*page_or);
+
+    IncBlocks(1);
+    need_inode_update = true;
+  } else if (xattr_operator.GetEndOffset(kXattrHeaderSlots) == kXattrHeaderSlots) {
+    TruncateNode(xattr_page);
+    xattr_nid_ = 0;
+    xattr_page.reset();
+    need_inode_update = true;
+  }
+
+  xattr_operator.WriteTo(xattr_page);
+
+  if (need_inode_update) {
+    LockedPage inode_page;
+    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(ino_, &inode_page); err != ZX_OK) {
+      return err;
+    }
+
+    UpdateInodePage(inode_page);
+  }
+
+  return ZX_OK;
+}
+
+zx::result<size_t> VnodeF2fs::GetExtendedAttribute(XattrIndex index, std::string_view name,
+                                                   cpp20::span<uint8_t> out) {
+  if (name.empty()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  if (name.length() > kMaxNameLen) {
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  }
+
+  if (xattr_nid_ == 0) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  LockedPage xattr_page;
+  if (zx_status_t err = fs()->GetNodeManager().GetNodePage(xattr_nid_, &xattr_page); err != ZX_OK) {
+    return zx::error(err);
+  }
+
+  XattrOperator xattr_operator(xattr_page);
+
+  return xattr_operator.Lookup(index, name, out);
+}
+
 }  // namespace f2fs

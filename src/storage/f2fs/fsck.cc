@@ -378,9 +378,14 @@ zx::result<TraverseResult> FsckWorker::TraverseInodeBlock(const Node &node_block
   ZX_ASSERT(LeToCpu(node_block.footer.nid) == node_info.nid);
   ZX_ASSERT(LeToCpu(node_block.footer.ino) == node_info.ino);
 
-#if 0  // porting needed
-  fsck_chk_xattr_blk(sbi, nid, LeToCpu(node_block->i.i_xattr_nid), block_count);
-#endif
+  zx::result<bool> xattr_block_or = CheckXattrBlock(nid, node_block.i.i_xattr_nid);
+  if (xattr_block_or.is_error()) {
+    return xattr_block_or.take_error();
+  }
+
+  if (*xattr_block_or) {
+    ++block_count;
+  }
 
   do {
     if (ftype == FileType::kFtChrdev || ftype == FileType::kFtBlkdev ||
@@ -668,38 +673,38 @@ zx_status_t FsckWorker::CheckOrphanNodes() {
   return ZX_OK;
 }
 
-#if 0  // porting needed
-int FsckWorker::FsckChkXattrBlk(uint32_t ino, uint32_t x_nid, uint32_t *block_count) {
-  FsckInfo *fsck = &fsck_;
-  NodeInfo ni;
+zx::result<bool> FsckWorker::CheckXattrBlock(uint32_t ino, uint32_t x_nid) {
+  if (x_nid == 0x0) {
+    return zx::ok(false);
+  }
 
-  if (x_nid == 0x0)
-    return 0;
-
-  if (TestValidBitmap(x_nid, fsck->nat_area_bitmap) != 0x0) {
-    ClearValidBitmap(x_nid, fsck->nat_area_bitmap);
+  if (fsck_.nat_area_bitmap.GetOne(ToMsbFirst(x_nid)) != 0x0) {
+    fsck_.nat_area_bitmap.ClearOne(ToMsbFirst(x_nid));
   } else {
     ZX_ASSERT_MSG(false, "xattr_nid duplicated [0x%x]\n", x_nid);
   }
 
-  *block_count = *block_count + 1;
-  ++fsck->chk.valid_block_count;
-  ++fsck->chk.valid_node_count;
+  ++fsck_.result.valid_block_count;
+  ++fsck_.result.valid_node_count;
 
-  ZX_ASSERT(GetNodeInfo(x_nid, &ni) >= 0);
+  zx::result<NodeInfo> result = GetNodeInfo(x_nid);
+  if (result.is_error()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  NodeInfo node_info = *result;
 
-  if (TestValidBitmap(BlkoffFromMain(superblock_info, ni.blk_addr), fsck->main_area_bitmap) != 0) {
+  if (fsck_.main_area_bitmap.GetOne(
+          ToMsbFirst(BlkoffFromMain(*segment_manager_, node_info.blk_addr))) != 0) {
     ZX_ASSERT_MSG(false,
                   "Duplicated node block for x_attr. "
                   "x_nid[0x%x] block addr[0x%x]\n",
-                  x_nid, ni.blk_addr);
+                  x_nid, node_info.blk_addr);
   }
-  SetValidBitmap(BlkoffFromMain(superblock_info, ni.blk_addr), fsck->main_area_bitmap);
-  // DBG (2)
-  printf("ino[0x%x] x_nid[0x%x]\n", ino, x_nid);
-  return 0;
+  fsck_.main_area_bitmap.SetOne(ToMsbFirst(BlkoffFromMain(*segment_manager_, node_info.blk_addr)));
+
+  FX_LOGS(INFO) << "ino[0x" << std::hex << ino << "] x_nid[0x" << x_nid << "]";
+  return zx::ok(true);
 }
-#endif
 
 zx_status_t FsckWorker::Init() {
   fsck_ = FsckInfo{};
@@ -851,7 +856,8 @@ zx_status_t FsckWorker::Verify() {
   if (is_free) {
     FX_LOGS(INFO) << str << "[OK]";
   } else {
-    FX_LOGS(INFO) << str << "[FAILED] : " << "corrupted cursegs(" << segnums << ")";
+    FX_LOGS(INFO) << str << "[FAILED] : "
+                  << "corrupted cursegs(" << segnums << ")";
     status = ZX_ERR_INTERNAL;
   }
 

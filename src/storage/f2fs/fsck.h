@@ -258,8 +258,9 @@ class FsckWorker {
     ni.version = raw_nat.version;
   }
 
+  zx::result<bool> CheckXattrBlock(uint32_t ino, uint32_t x_nid);
+
 #if 0  // porting needed
-  int FsckChkXattrBlk(uint32_t ino, uint32_t x_nid, uint32_t *block_count);
   void sit_dump(SuperblockInfo *sbi, int start_sit, int end_sit);
   void ssa_dump(SuperblockInfo *sbi, int start_ssa, int end_ssa);
   int dump_node(SuperblockInfo *sbi, nid_t nid);

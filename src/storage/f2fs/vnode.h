@@ -9,6 +9,7 @@
 #include "src/storage/f2fs/file_cache.h"
 #include "src/storage/f2fs/timestamp.h"
 #include "src/storage/f2fs/vmo_manager.h"
+#include "src/storage/f2fs/xattr.h"
 
 namespace f2fs {
 constexpr uint32_t kNullIno = std::numeric_limits<uint32_t>::max();
@@ -346,6 +347,13 @@ class VnodeF2fs : public fs::PagedVnode,
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
   zx_status_t InitFileCacheUnsafe(uint64_t nbytes = 0) __TA_REQUIRES(mutex_);
   void CleanupPages();
+
+  zx_status_t SetExtendedAttribute(XattrIndex index, std::string_view name,
+                                   cpp20::span<const uint8_t> value, XattrOption option);
+  zx::result<size_t> GetExtendedAttribute(XattrIndex index, std::string_view name,
+                                          cpp20::span<uint8_t> out);
+
+  nid_t XattrNid() const { return xattr_nid_; }
 
   // for testing
   void ResetFileCache() { file_cache_->Reset(); }
