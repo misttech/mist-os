@@ -84,7 +84,7 @@ fn symlink_old_to_new(analytics_folder: &PathBuf, old_analytics_folder: &PathBuf
 }
 
 #[cfg(not(target_os = "linux"))]
-fn symlink_old_to_new(analytics_folder: &PathBuf, old_analytics_folder: PathBuf) {}
+fn symlink_old_to_new(_analytics_folder: &PathBuf, _old_analytics_folder: &PathBuf) {}
 
 fn old_analytics_folder() -> PathBuf {
     let mut metrics_path = get_home_dir();
