@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_system_page_size;
+use crate::mm::memory::MemoryObject;
 use crate::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryManager, ProtectionFlags,
     PAGE_SIZE, VMEX_RESOURCE,
 };
 use crate::security;
 use crate::task::CurrentTask;
-use crate::vdso::vdso_loader::ZX_TIME_VALUES_VMO;
+use crate::vdso::vdso_loader::ZX_TIME_VALUES_MEMORY;
 use crate::vfs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef};
 use fuchsia_zircon::{
     HandleBased, {self as zx},
@@ -18,6 +18,7 @@ use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::user_address::UserAddress;
@@ -180,9 +181,9 @@ impl elf_load::Mapper for Mapper<'_> {
         length: usize,
         vmar_flags: zx::VmarFlags,
     ) -> Result<usize, zx::Status> {
-        let vmo = Arc::new(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?);
+        let memory = Arc::new(MemoryObject::from(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?));
         self.mm
-            .map_vmo(
+            .map_memory(
                 DesiredAddress::Fixed(self.mm.base_addr.checked_add(vmar_offset).ok_or_else(
                     || {
                         log_error!(
@@ -193,7 +194,7 @@ impl elf_load::Mapper for Mapper<'_> {
                         zx::Status::INVALID_ARGS
                     },
                 )?),
-                vmo,
+                memory,
                 vmo_offset,
                 length,
                 ProtectionFlags::from_vmar_flags(vmar_flags),
@@ -212,11 +213,12 @@ impl elf_load::Mapper for Mapper<'_> {
 
 fn load_elf(
     elf: FileHandle,
-    elf_vmo: Arc<zx::Vmo>,
+    elf_memory: Arc<MemoryObject>,
     mm: &MemoryManager,
     file_write_guard: FileWriteGuardRef,
 ) -> Result<LoadedElf, Errno> {
-    let headers = elf_parse::Elf64Headers::from_vmo(&elf_vmo).map_err(elf_parse_error_to_errno)?;
+    let vmo = elf_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
+    let headers = elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?;
     let elf_info = elf_load::loaded_elf_info(&headers);
     let file_base = match headers.file_header().elf_type() {
         Ok(elf_parse::ElfType::SharedObject) => {
@@ -227,7 +229,7 @@ fn load_elf(
     };
     let vaddr_bias = file_base.wrapping_sub(elf_info.low);
     let mapper = Mapper { file: &elf, mm, file_write_guard };
-    elf_load::map_elf_segments(&elf_vmo, &headers, &mapper, mm.base_addr.ptr(), vaddr_bias)
+    elf_load::map_elf_segments(vmo, &headers, &mapper, mm.base_addr.ptr(), vaddr_bias)
         .map_err(elf_load_error_to_errno)?;
     Ok(LoadedElf { headers, file_base, vaddr_bias })
 }
@@ -242,7 +244,7 @@ pub struct ResolvedElf {
     /// A file handle to the resolved ELF executable.
     pub file: FileHandle,
     /// A VMO to the resolved ELF executable.
-    pub vmo: Arc<zx::Vmo>,
+    pub memory: Arc<MemoryObject>,
     /// An ELF interpreter, if specified in the ELF executable header.
     pub interp: Option<ResolvedInterpElf>,
     /// Arguments to be passed to the new process.
@@ -260,7 +262,7 @@ pub struct ResolvedInterpElf {
     /// A file handle to the resolved ELF interpreter.
     file: FileHandle,
     /// A VMO to the resolved ELF interpreter.
-    vmo: Arc<zx::Vmo>,
+    memory: Arc<MemoryObject>,
     /// Exec/write lock.
     file_write_guard: FileWriteGuardRef,
 }
@@ -309,8 +311,9 @@ where
     if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
     }
-    let vmo = file.get_vmo(current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;
-    let header = match vmo.read_to_array::<u8, HASH_BANG_SIZE>(0) {
+    let memory =
+        file.get_memory(current_task, None, ProtectionFlags::READ | ProtectionFlags::EXEC)?;
+    let header = match memory.read_to_array::<u8, HASH_BANG_SIZE>(0) {
         Ok(header) => Ok(header),
         Err(zx::Status::OUT_OF_RANGE) => {
             // The file is empty, or it would have at least one page allocated to it.
@@ -322,7 +325,7 @@ where
         resolve_script(
             locked,
             current_task,
-            vmo,
+            memory,
             path,
             argv,
             environ,
@@ -330,7 +333,7 @@ where
             security_state,
         )
     } else {
-        resolve_elf(locked, current_task, file, vmo, argv, environ, security_state)
+        resolve_elf(locked, current_task, file, memory, argv, environ, security_state)
     }
 }
 
@@ -338,7 +341,7 @@ where
 fn resolve_script<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
-    vmo: Arc<zx::Vmo>,
+    memory: Arc<MemoryObject>,
     path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
@@ -354,7 +357,7 @@ where
     // less, we should never read past the end of the VMO.
     // Since Linux 5.1, the max length of the interpreter following the #! is 255.
     const HEADER_BUFFER_CAP: usize = 255 + HASH_BANG.len();
-    let buffer = match vmo.read_to_array::<u8, HEADER_BUFFER_CAP>(0) {
+    let buffer = match memory.read_to_array::<u8, HEADER_BUFFER_CAP>(0) {
         Ok(b) => b,
         Err(_) => return error!(EINVAL),
     };
@@ -425,7 +428,7 @@ fn resolve_elf<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: FileHandle,
-    vmo: Arc<zx::Vmo>,
+    memory: Arc<MemoryObject>,
     argv: Vec<CString>,
     environ: Vec<CString>,
     security_state: Option<security::ResolvedElfState>,
@@ -435,33 +438,38 @@ where
     L: LockBefore<DeviceOpen>,
     L: LockBefore<BeforeFsNodeAppend>,
 {
-    let elf_headers = elf_parse::Elf64Headers::from_vmo(&vmo).map_err(elf_parse_error_to_errno)?;
+    let vmo = memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
+    let elf_headers = elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?;
     let interp = if let Some(interp_hdr) = elf_headers
         .program_header_with_type(elf_parse::SegmentType::Interp)
         .map_err(|_| errno!(EINVAL))?
     {
         // The ELF header specified an ELF interpreter.
         // Read the path and load this ELF as well.
-        let interp = vmo
+        let interp = memory
             .read_to_vec(interp_hdr.offset as u64, interp_hdr.filesz)
             .map_err(|status| from_status_like_fdio!(status))?;
         let interp = CStr::from_bytes_until_nul(&interp).map_err(|_| errno!(EINVAL))?;
         let interp_file =
             current_task.open_file(locked, interp.to_bytes().into(), OpenFlags::RDONLY)?;
-        let interp_vmo = interp_file.get_vmo(
+        let interp_memory = interp_file.get_memory(
             current_task,
             None,
             ProtectionFlags::READ | ProtectionFlags::EXEC,
         )?;
         let file_write_guard =
             interp_file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
-        Some(ResolvedInterpElf { file: interp_file, vmo: interp_vmo, file_write_guard })
+        Some(ResolvedInterpElf {
+            file: interp_file,
+            memory: interp_memory.clone(),
+            file_write_guard,
+        })
     } else {
         None
     };
     let file_write_guard =
         file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
-    Ok(ResolvedElf { file, vmo, interp, argv, environ, security_state, file_write_guard })
+    Ok(ResolvedElf { file, memory, interp, argv, environ, security_state, file_write_guard })
 }
 
 /// Loads a resolved ELF into memory, along with an interpreter if one is defined, and initializes
@@ -473,13 +481,15 @@ pub fn load_executable(
 ) -> Result<ThreadStartInfo, Errno> {
     let main_elf = load_elf(
         resolved_elf.file,
-        resolved_elf.vmo,
+        resolved_elf.memory,
         current_task.mm(),
         resolved_elf.file_write_guard,
     )?;
     let interp_elf = resolved_elf
         .interp
-        .map(|interp| load_elf(interp.file, interp.vmo, current_task.mm(), interp.file_write_guard))
+        .map(|interp| {
+            load_elf(interp.file, interp.memory, current_task.mm(), interp.file_write_guard)
+        })
         .transpose()?;
 
     let entry_elf = interp_elf.as_ref().unwrap_or(&main_elf);
@@ -487,21 +497,21 @@ pub fn load_executable(
         entry_elf.headers.file_header().entry.wrapping_add(entry_elf.vaddr_bias),
     );
 
-    let vdso_vmo = &current_task.kernel().vdso.vmo;
-    let vvar_vmo = current_task.kernel().vdso.vvar_readonly.clone();
+    let vdso_memory = &current_task.kernel().vdso.memory;
+    let vvar_memory = current_task.kernel().vdso.vvar_readonly.clone();
 
-    let vdso_size = vdso_vmo.get_size().map_err(|_| errno!(EINVAL))?;
+    let vdso_size = vdso_memory.get_size();
     const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
 
-    let vvar_size = vvar_vmo.get_size().map_err(|_| errno!(EINVAL))?;
+    let vvar_size = vvar_memory.get_size();
     const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
 
     // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
     // userspace sees this as one big vvar block in memory.
-    let time_values_size = ZX_TIME_VALUES_VMO.get_size().map_err(|_| errno!(EINVAL))?;
-    let time_values_map_result = current_task.mm().map_vmo(
+    let time_values_size = ZX_TIME_VALUES_MEMORY.get_size();
+    let time_values_map_result = current_task.mm().map_memory(
         DesiredAddress::Any,
-        ZX_TIME_VALUES_VMO.clone(),
+        ZX_TIME_VALUES_MEMORY.clone(),
         0,
         (time_values_size as usize) + (vvar_size as usize) + (vdso_size as usize),
         VVAR_PROT_FLAGS,
@@ -511,18 +521,20 @@ pub fn load_executable(
     )?;
 
     // Create a private clone of the starnix kernel vDSO.
-    let vdso_clone = vdso_vmo
+    let vdso_clone = vdso_memory
         .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vdso_size)
         .map_err(|status| from_status_like_fdio!(status))?;
 
-    let vdso_executable = vdso_clone
-        .replace_as_executable(&VMEX_RESOURCE)
-        .map_err(|status| from_status_like_fdio!(status))?;
+    let vdso_executable = Arc::new(
+        vdso_clone
+            .replace_as_executable(&VMEX_RESOURCE)
+            .map_err(|status| from_status_like_fdio!(status))?,
+    );
 
     // Overwrite the second part of the vvar mapping with starnix's vvar.
-    let vvar_map_result = current_task.mm().map_vmo(
+    let vvar_map_result = current_task.mm().map_memory(
         DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
-        vvar_vmo,
+        vvar_memory,
         0,
         vvar_size as usize,
         VVAR_PROT_FLAGS,
@@ -532,9 +544,9 @@ pub fn load_executable(
     )?;
 
     // Overwrite the third part of the vvar mapping to contain the vDSO clone.
-    let vdso_base = current_task.mm().map_vmo(
+    let vdso_base = current_task.mm().map_memory(
         DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
-        Arc::new(vdso_executable),
+        vdso_executable,
         0,
         vdso_size as usize,
         VDSO_PROT_FLAGS,

@@ -6,8 +6,8 @@ use crate::device::kobject::DeviceMetadata;
 use crate::device::{simple_device_ops, DeviceMode};
 use crate::fs::sysfs::DeviceDirectory;
 use crate::mm::{
-    create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt,
-    ProtectionFlags,
+    create_anonymous_mapping_memory, DesiredAddress, MappingName, MappingOptions,
+    MemoryAccessorExt, ProtectionFlags,
 };
 use crate::task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
@@ -109,7 +109,7 @@ impl FileOps for DevZero {
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         mut options: MappingOptions,
@@ -124,14 +124,14 @@ impl FileOps for DevZero {
         // Similar to anonymous mappings, if this process were to request a shared mapping
         // of /dev/zero and then fork, the child and the parent process would share the
         // VMO created here.
-        let vmo = create_anonymous_mapping_vmo(length as u64)?;
+        let memory = create_anonymous_mapping_memory(length as u64)?;
 
         options |= MappingOptions::ANONYMOUS;
 
-        current_task.mm().map_vmo(
+        current_task.mm().map_memory(
             addr,
-            vmo.clone(),
-            vmo_offset,
+            memory,
+            memory_offset,
             length,
             prot_flags,
             options,

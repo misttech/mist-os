@@ -133,10 +133,11 @@ use magma::{
 use starnix_core::device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use starnix_core::fileops_impl_nonseekable;
 use starnix_core::fs::fuchsia::RemoteFileObject;
+use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
-use starnix_core::vfs::{Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject};
+use starnix_core::vfs::{Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryFileObject};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
@@ -280,21 +281,21 @@ impl MagmaFile {
     /// of the correct type for that file.
     ///
     /// Returns an error if the file does not contain a buffer.
-    fn get_vmo_and_magma_buffer(
+    fn get_memory_and_magma_buffer(
         current_task: &CurrentTask,
         fd: FdNumber,
-    ) -> Result<(zx::Vmo, BufferInfo), Errno> {
+    ) -> Result<(MemoryObject, BufferInfo), Errno> {
         let file = current_task.files.get(fd)?;
         if let Some(file) = file.downcast_file::<ImageFile>() {
             let buffer = BufferInfo::Image(file.info.clone());
             Ok((
-                file.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
+                file.memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
                 buffer,
             ))
-        } else if let Some(file) = file.downcast_file::<VmoFileObject>() {
+        } else if let Some(file) = file.downcast_file::<MemoryFileObject>() {
             let buffer = BufferInfo::Default;
             Ok((
-                file.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
+                file.memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
                 buffer,
             ))
         } else if file.downcast_file::<RemoteFileObject>().is_some() {
@@ -304,16 +305,19 @@ impl MagmaFile {
             // used instead of ImageFile. Or if not needed, maybe we can remove ImageFile without
             // any replacement.
             //
-            // TODO: Consider if we can have binder related code in starnix use VmoFileObject for
+            // TODO: Consider if we can have binder related code in starnix use MemoryFileObject for
             // any FD wrapping a VMO, or if that's not workable, we may want to have magma related
             // code use RemoteFileObject.
             let buffer = BufferInfo::Default;
             // Map any failure to EINVAL; any failure here is most likely to be an FD that isn't
             // a gralloc buffer.
-            let vmo = file
-                .get_vmo(current_task, None, ProtectionFlags::READ | ProtectionFlags::WRITE)
+            let memory = file
+                .get_memory(current_task, None, ProtectionFlags::READ | ProtectionFlags::WRITE)
                 .map_err(|_| errno!(EINVAL))?;
-            Ok((vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?, buffer))
+            Ok((
+                memory.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?,
+                buffer,
+            ))
         } else {
             error!(EINVAL)
         }
@@ -612,7 +616,9 @@ impl FileOps for MagmaFile {
                 let connection = self.get_connection(control.connection)?;
 
                 let buffer_fd = FdNumber::from_raw(control.buffer_handle as i32);
-                let (vmo, buffer) = MagmaFile::get_vmo_and_magma_buffer(current_task, buffer_fd)?;
+                let (memory, buffer) =
+                    MagmaFile::get_memory_and_magma_buffer(current_task, buffer_fd)?;
+                let vmo = memory.into_vmo().ok_or_else(|| errno!(EINVAL))?;
 
                 let mut buffer_out = magma_buffer_t::default();
                 let mut size_out = 0u64;

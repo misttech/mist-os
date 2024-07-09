@@ -191,7 +191,7 @@ fn do_read_operation(
         let Some(task) = weak_task.upgrade() else {
             return error!(EINVAL);
         };
-        let sink = UserBuffersOutputBuffer::vmo_new(&task, buffers.clone())?;
+        let sink = UserBuffersOutputBuffer::syscall_new(&task, buffers.clone())?;
         VecOutputBuffer::new(sink.available())
     };
 
@@ -204,7 +204,7 @@ fn do_read_operation(
     let Some(task) = weak_task.upgrade() else {
         return error!(EINVAL);
     };
-    let mut sink = UserBuffersOutputBuffer::vmo_new(&task, buffers)?;
+    let mut sink = UserBuffersOutputBuffer::syscall_new(&task, buffers)?;
     sink.write(&output_buffer.data())
 }
 
@@ -220,7 +220,7 @@ fn do_write_operation(
         let Some(task) = weak_task.upgrade() else {
             return error!(EINVAL);
         };
-        let mut source = UserBuffersInputBuffer::vmo_new(&task, buffers)?;
+        let mut source = UserBuffersInputBuffer::syscall_new(&task, buffers)?;
         VecInputBuffer::new(&source.read_all()?)
     };
 

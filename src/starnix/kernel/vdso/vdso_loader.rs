@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::arch::vdso::VDSO_SIGRETURN_NAME;
+use crate::mm::memory::MemoryObject;
 use crate::mm::PAGE_SIZE;
 use crate::time::utc::update_utc_clock;
-use fidl::AsHandleRef;
 use fuchsia_zircon::{
-    ClockTransformation, HandleBased, {self as zx},
+    ClockTransformation, {self as zx},
 };
 use once_cell::sync::Lazy;
 use process_builder::elf_parse;
@@ -18,8 +18,8 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
-pub static ZX_TIME_VALUES_VMO: Lazy<Arc<zx::Vmo>> =
-    Lazy::new(|| load_time_values_vmo().expect("Could not find time values VMO"));
+pub static ZX_TIME_VALUES_MEMORY: Lazy<Arc<MemoryObject>> =
+    Lazy::new(|| load_time_values_memory().expect("Could not find time values VMO"));
 
 #[derive(Default)]
 pub struct MemoryMappedVvar {
@@ -27,10 +27,10 @@ pub struct MemoryMappedVvar {
 }
 
 impl MemoryMappedVvar {
-    /// Maps the vvar vmo to a region of the Starnix kernel root VMAR and stores the address of
+    /// Maps the vvar memory to a region of the Starnix kernel root VMAR and stores the address of
     /// the mapping in this object.
     /// Initialises the mapped region with data by writing an initial set of vvar data
-    pub fn new(vmo: &zx::Vmo) -> Result<MemoryMappedVvar, zx::Status> {
+    pub fn new(memory: &MemoryObject) -> Result<MemoryMappedVvar, zx::Status> {
         let vvar_data_size = size_of::<uapi::vvar_data>();
         // Check that the vvar_data struct isn't larger than the size of the memory mapped vvar
         debug_assert!(vvar_data_size <= *VVAR_SIZE);
@@ -38,7 +38,8 @@ impl MemoryMappedVvar {
             | zx::VmarFlags::ALLOW_FAULTS
             | zx::VmarFlags::REQUIRE_NON_RESIZABLE
             | zx::VmarFlags::PERM_WRITE;
-        let map_addr = fuchsia_runtime::vmar_root_self().map(0, &vmo, 0, *VVAR_SIZE, flags)?;
+        let map_addr =
+            memory.map_in_vmar(&fuchsia_runtime::vmar_root_self(), 0, 0, *VVAR_SIZE, flags)?;
         let memory_mapped_vvar = MemoryMappedVvar { map_addr };
         let vvar_data = memory_mapped_vvar.get_pointer_to_memory_mapped_vvar();
         vvar_data.seq_num.store(0, Ordering::Release);
@@ -100,49 +101,46 @@ impl Drop for MemoryMappedVvar {
 }
 
 pub struct Vdso {
-    pub vmo: Arc<zx::Vmo>,
+    pub memory: Arc<MemoryObject>,
     pub sigreturn_offset: u64,
     pub vvar_writeable: Arc<MemoryMappedVvar>,
-    pub vvar_readonly: Arc<zx::Vmo>,
+    pub vvar_readonly: Arc<MemoryObject>,
 }
 
 impl Vdso {
     pub fn new() -> Self {
-        let vmo = load_vdso_from_file().expect("Couldn't read vDSO from disk");
+        let memory = load_vdso_from_file().expect("Couldn't read vDSO from disk");
         let sigreturn_offset = match VDSO_SIGRETURN_NAME {
-            Some(name) => get_sigreturn_offset(&vmo, name)
+            Some(name) => get_sigreturn_offset(&memory, name)
                 .expect("Couldn't find sigreturn trampoline code in vDSO"),
             None => 0,
         };
 
         let (vvar_writeable, vvar_readonly) = create_vvar_and_handles();
-        Self { vmo, sigreturn_offset, vvar_writeable, vvar_readonly }
+        Self { memory, sigreturn_offset, vvar_writeable, vvar_readonly }
     }
 }
 
-fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<zx::Vmo>) {
-    // Creating a vvar vmo which has a handle which is writeable.
-    let vvar_vmo_writeable =
-        Arc::new(zx::Vmo::create(*VVAR_SIZE as u64).expect("Couldn't create vvar vvmo"));
-    // Map the writeable vvar_vmo to a region of Starnix kernel VMAR and write initial vvar_data
+fn create_vvar_and_handles() -> (Arc<MemoryMappedVvar>, Arc<MemoryObject>) {
+    // Creating a vvar memory which has a handle which is writeable.
+    let vvar_memory_writeable = Arc::new(MemoryObject::from(
+        zx::Vmo::create(*VVAR_SIZE as u64).expect("Couldn't create vvar memory"),
+    ));
+    // Map the writeable vvar_memory to a region of Starnix kernel VMAR and write initial vvar_data
     let vvar_memory_mapped =
-        Arc::new(MemoryMappedVvar::new(&vvar_vmo_writeable).expect("couldn't map vvar vmo"));
+        Arc::new(MemoryMappedVvar::new(&vvar_memory_writeable).expect("couldn't map vvar memory"));
     // Write initial mono to utc transform to the vvar.
     update_utc_clock(&vvar_memory_mapped);
-    let vvar_writeable_rights = vvar_vmo_writeable
-        .basic_info()
-        .expect("Couldn't get rights of writeable vvar handle")
-        .rights;
-    // Create a duplicate handle to this vvar vmo which doesn't have write permission
+    let vvar_writeable_rights = vvar_memory_writeable.basic_info().rights;
+    // Create a duplicate handle to this vvar memory which doesn't have write permission
     // This handle is used to map vvar into linux userspace
     let vvar_readable_rights = vvar_writeable_rights.difference(zx::Rights::WRITE);
-    let vvar_vmo_readonly = Arc::new(
-        vvar_vmo_writeable
-            .as_ref()
+    let vvar_memory_readonly = Arc::new(
+        vvar_memory_writeable
             .duplicate_handle(vvar_readable_rights)
             .expect("couldn't duplicate vvar handle"),
     );
-    (vvar_memory_mapped, vvar_vmo_readonly)
+    (vvar_memory_mapped, vvar_memory_readonly)
 }
 
 fn sync_open_in_namespace(
@@ -158,7 +156,7 @@ fn sync_open_in_namespace(
 }
 
 /// Reads the vDSO file and returns the backing VMO.
-fn load_vdso_from_file() -> Result<Arc<zx::Vmo>, Errno> {
+fn load_vdso_from_file() -> Result<Arc<MemoryObject>, Errno> {
     const VDSO_FILENAME: &str = "libvdso.so";
     const VDSO_LOCATION: &str = "/pkg/data";
 
@@ -171,10 +169,10 @@ fn load_vdso_from_file() -> Result<Arc<zx::Vmo>, Errno> {
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 
-    Ok(Arc::new(vdso_vmo))
+    Ok(Arc::new(MemoryObject::from(vdso_vmo)))
 }
 
-fn load_time_values_vmo() -> Result<Arc<zx::Vmo>, Errno> {
+fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
     const FILENAME: &str = "time_values";
     const DIR: &str = "/boot/kernel";
 
@@ -206,10 +204,11 @@ fn load_time_values_vmo() -> Result<Arc<zx::Vmo>, Errno> {
             vmo_size, expected_size
         );
     }
-    Ok(Arc::new(vmo))
+    Ok(Arc::new(MemoryObject::from(vmo)))
 }
 
-fn get_sigreturn_offset(vdso_vmo: &zx::Vmo, sigreturn_name: &str) -> Result<u64, Errno> {
+fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Result<u64, Errno> {
+    let vdso_vmo = vdso_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
     let symtab =
         dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Symtab).ok_or(errno!(EINVAL))?;

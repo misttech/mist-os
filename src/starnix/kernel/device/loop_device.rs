@@ -5,6 +5,7 @@
 use crate::device::kobject::{Device, DeviceMetadata};
 use crate::device::DeviceMode;
 use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
@@ -14,7 +15,7 @@ use crate::vfs::{
     PeekBufferSegmentsCallback,
 };
 use bitflags::bitflags;
-use fuchsia_zircon::{Vmo, VmoChildOptions};
+use fuchsia_zircon::VmoChildOptions;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -337,13 +338,13 @@ impl FileOps for LoopDeviceFile {
         }
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
         requested_length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         let backing_file = self.device.backing_file().ok_or_else(|| errno!(EBADF))?;
 
         let state = self.device.state.lock();
@@ -354,28 +355,28 @@ impl FileOps for LoopDeviceFile {
             n => Some(n),
         };
 
-        let backing_vmo = backing_file.get_vmo(
+        let backing_memory = backing_file.get_memory(
             current_task,
             requested_length.map(|l| l + configured_offset as usize),
             prot,
         )?;
-        let backing_vmo_size = backing_vmo.get_size().map_err(|e| errno!(EBADF, e))?;
+        let backing_memory_size = backing_memory.get_size();
 
-        let slice_len = backing_vmo_size
+        let slice_len = backing_memory_size
             .min(configured_size_limit.unwrap_or(u64::MAX))
             .min(requested_length.unwrap_or(usize::MAX) as u64);
 
-        let vmo_slice = backing_vmo
+        let memory_slice = backing_memory
             .create_child(VmoChildOptions::SLICE, configured_offset, slice_len)
             .map_err(|e| errno!(EINVAL, e))?;
 
-        let backing_content_size = backing_vmo.get_content_size().map_err(|e| errno!(EIO, e))?;
+        let backing_content_size = backing_memory.get_content_size();
         if backing_content_size < slice_len {
             let new_content_size = backing_content_size.saturating_sub(configured_offset);
-            vmo_slice.set_content_size(&new_content_size).map_err(|e| errno!(EIO, e))?;
+            memory_slice.set_content_size(new_content_size);
         }
 
-        Ok(Arc::new(vmo_slice))
+        Ok(Arc::new(memory_slice))
     }
 
     fn ioctl(
@@ -856,7 +857,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn basic_get_vmo() {
+    async fn basic_get_memory() {
         let test_data_path = "/pkg/data/testfile.txt";
         let expected_contents = std::fs::read(test_data_path).unwrap();
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
@@ -873,14 +874,14 @@ mod tests {
         let loop_file =
             bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
 
-        let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
-        let size = vmo.get_content_size().unwrap();
-        let vmo_contents = vmo.read_to_vec(0, size).unwrap();
-        assert_eq!(vmo_contents, expected_contents);
+        let memory = loop_file.get_memory(&current_task, None, ProtectionFlags::READ).unwrap();
+        let size = memory.get_content_size();
+        let memory_contents = memory.read_to_vec(0, size).unwrap();
+        assert_eq!(memory_contents, expected_contents);
     }
 
     #[::fuchsia::test]
-    async fn get_vmo_offset_and_size_limit_work() {
+    async fn get_memory_offset_and_size_limit_work() {
         // VMO slice children require a page-aligned offset, so we need a file that's big enough to
         // have multiple pages to support creating a child with a meaningful offset, our own
         // binary should do the trick.
@@ -916,9 +917,9 @@ mod tests {
         );
         loop_file.ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
 
-        let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
-        let size = vmo.get_content_size().unwrap();
-        let vmo_contents = vmo.read_to_vec(0, size).unwrap();
-        assert_eq!(vmo_contents, expected_contents);
+        let memory = loop_file.get_memory(&current_task, None, ProtectionFlags::READ).unwrap();
+        let size = memory.get_content_size();
+        let memory_contents = memory.read_to_vec(0, size).unwrap();
+        assert_eq!(memory_contents, expected_contents);
     }
 }

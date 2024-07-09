@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_increment;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
@@ -18,6 +17,7 @@ use starnix_uapi::auth::CAP_SYS_ADMIN;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;

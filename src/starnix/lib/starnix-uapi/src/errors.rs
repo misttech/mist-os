@@ -379,10 +379,10 @@ macro_rules! errno_from_zxio_code {
 // TODO: Replace clients with more context-specific mappings.
 #[macro_export]
 macro_rules! from_status_like_fdio {
-    ($status:ident) => {{
+    ($status:expr) => {{
         $crate::from_status_like_fdio!($status, "")
     }};
-    ($status:ident, $context:expr) => {{
+    ($status:expr, $context:expr) => {{
         use fuchsia_zircon as zx;
         match $status {
             zx::Status::NOT_FOUND => $crate::errno!(ENOENT, $context),

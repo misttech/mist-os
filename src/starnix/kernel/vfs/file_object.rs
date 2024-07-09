@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_system_page_size;
+use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use crate::task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
@@ -29,6 +29,7 @@ use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
 use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::Releasable;
 use starnix_uapi::seal_flags::SealFlags;
@@ -191,17 +192,17 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// The `length` is a hint for the desired size of the VMO. The returned VMO may be larger or
     /// smaller than the requested length.
     /// This method is typically called by [`Self::mmap`].
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         _prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         error!(ENODEV)
     }
 
-    /// Responds to an mmap call. The default implementation calls [`Self::get_vmo`] to get a VMO
+    /// Responds to an mmap call. The default implementation calls [`Self::get_memory`] to get a VMO
     /// and then maps it with [`crate::mm::MemoryManager::map`].
     /// Only implement this trait method if your file needs to control mapping, or record where
     /// a VMO gets mapped.
@@ -211,7 +212,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -219,27 +220,27 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     ) -> Result<UserAddress, Errno> {
         profile_duration!("FileOpsDefaultMmap");
         trace_duration!(CATEGORY_STARNIX_MM, c"FileOpsDefaultMmap");
-        let min_vmo_size = (vmo_offset as usize)
+        let min_memory_size = (memory_offset as usize)
             .checked_add(round_up_to_system_page_size(length)?)
             .ok_or(errno!(EINVAL))?;
-        let mut vmo = if options.contains(MappingOptions::SHARED) {
+        let mut memory = if options.contains(MappingOptions::SHARED) {
             profile_duration!("GetSharedVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetSharedVmo");
-            self.get_vmo(file, current_task, Some(min_vmo_size), prot_flags)?
+            self.get_memory(file, current_task, Some(min_memory_size), prot_flags)?
         } else {
             profile_duration!("GetPrivateVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetPrivateVmo");
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
             let base_prot_flags = (prot_flags | ProtectionFlags::READ) - ProtectionFlags::WRITE;
-            let vmo = self.get_vmo(file, current_task, Some(min_vmo_size), base_prot_flags)?;
+            let memory =
+                self.get_memory(file, current_task, Some(min_memory_size), base_prot_flags)?;
             let mut clone_flags = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
             if !prot_flags.contains(ProtectionFlags::WRITE) {
                 clone_flags |= zx::VmoChildOptions::NO_WRITE;
             }
             trace_duration!(CATEGORY_STARNIX_MM, c"CreatePrivateChildVmo");
             Arc::new(
-                vmo.create_child(clone_flags, 0, vmo.get_size().map_err(impossible_error)?)
-                    .map_err(impossible_error)?,
+                memory.create_child(clone_flags, 0, memory.get_size()).map_err(impossible_error)?,
             )
         };
 
@@ -263,7 +264,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
                 if prot_flags.contains(ProtectionFlags::EXEC) {
                     new_rights |= zx::Rights::EXECUTE;
                 }
-                vmo = Arc::new(vmo.duplicate_handle(new_rights).map_err(impossible_error)?);
+                memory = Arc::new(memory.duplicate_handle(new_rights).map_err(impossible_error)?);
 
                 FileWriteGuardRef(None)
             } else {
@@ -273,10 +274,10 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             FileWriteGuardRef(None)
         };
 
-        current_task.mm().map_vmo(
+        current_task.mm().map_memory(
             addr,
-            vmo,
-            vmo_offset,
+            memory,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -441,14 +442,14 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
         self.deref().data_sync(file, current_task)
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
-        self.deref().get_vmo(file, current_task, length, prot)
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        self.deref().get_memory(file, current_task, length, prot)
     }
 
     fn mmap(
@@ -457,7 +458,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -468,7 +469,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
             file,
             current_task,
             addr,
-            vmo_offset,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -897,13 +898,13 @@ impl FileOps for OPathOps {
     ) -> Result<off_t, Errno> {
         error!(EBADF)
     }
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         _prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         error!(EBADF)
     }
     fn readdir(
@@ -957,13 +958,13 @@ impl FileOps for ProxyFileOps {
             offset: off_t,
             target: SeekTarget,
         ) -> Result<off_t, Errno>;
-        fn get_vmo(
+        fn get_memory(
             &self,
             _file: &FileObject,
             _current_task: &CurrentTask,
             _length: Option<usize>,
             _prot: ProtectionFlags,
-        ) -> Result<Arc<zx::Vmo>, Errno>;
+        ) -> Result<Arc<MemoryObject>, Errno>;
         fn wait_async(
             &self,
             _file: &FileObject,
@@ -1040,7 +1041,7 @@ impl FileOps for ProxyFileOps {
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -1051,7 +1052,7 @@ impl FileOps for ProxyFileOps {
             &self.0,
             current_task,
             addr,
-            vmo_offset,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -1463,12 +1464,12 @@ impl FileObject {
         self.ops().data_sync(self, current_task)
     }
 
-    pub fn get_vmo(
+    pub fn get_memory(
         &self,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         if prot.contains(ProtectionFlags::READ) && !self.can_read() {
             return error!(EACCES);
         }
@@ -1476,7 +1477,7 @@ impl FileObject {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().get_vmo(self, current_task, length, prot)
+        self.ops().get_memory(self, current_task, length, prot)
     }
 
     pub fn mmap<L>(
@@ -1484,7 +1485,7 @@ impl FileObject {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -1510,7 +1511,7 @@ impl FileObject {
             self,
             current_task,
             addr,
-            vmo_offset,
+            memory_offset,
             length,
             prot_flags,
             options,

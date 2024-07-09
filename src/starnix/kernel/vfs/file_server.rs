@@ -585,7 +585,8 @@ impl file::File for StarnixNodeConnection {
         if flags.contains(fio::VmoFlags::EXECUTE) {
             prot_flags |= ProtectionFlags::EXEC;
         }
-        let vmo = self.file.get_vmo(&*self.task().await?, None, prot_flags)?;
+        let memory = self.file.get_memory(&*self.task().await?, None, prot_flags)?;
+        let vmo = memory.as_vmo().ok_or_else(|| errno!(ENOTSUP))?;
         if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
             let size = vmo.get_size()?;
             vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, size)

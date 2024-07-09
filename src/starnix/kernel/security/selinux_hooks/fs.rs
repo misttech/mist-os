@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mm::memory::MemoryObject;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
@@ -9,14 +10,15 @@ use crate::vfs::{
     fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek, BytesFile, BytesFileOps, CacheMode,
     DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
     FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    SeekTarget, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry, VmoFileNode,
+    MemoryFileNode, SeekTarget, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
 };
-
 use bstr::ByteSlice;
+use fuchsia_zircon as zx;
+use fuchsia_zircon::HandleBased;
 use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
-use starnix_logging::{log_error, log_info, track_stub};
+use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -105,7 +107,12 @@ impl SeLinuxFs {
             // When the selinux state changes in the future, the way to update this data (and
             // communicate updates with userspace) is to use the
             // ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
-            VmoFileNode::from_vmo(security_server.get_status_vmo()),
+            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(
+                security_server
+                    .get_status_vmo()
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .map_err(impossible_error)?,
+            ))),
             mode!(IFREG, 0o444),
         );
 

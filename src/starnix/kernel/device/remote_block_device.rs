@@ -5,6 +5,7 @@
 use crate::device::kobject::DeviceMetadata;
 use crate::device::DeviceMode;
 use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessorExt, ProtectionFlags};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
@@ -28,8 +29,8 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct RemoteBlockDevice {
     name: String,
-    backing_vmo: zx::Vmo,
-    backing_vmo_size: usize,
+    backing_memory: MemoryObject,
+    backing_memory_size: usize,
     block_size: u32,
 }
 
@@ -37,7 +38,7 @@ const BLOCK_SIZE: u32 = 512;
 
 impl RemoteBlockDevice {
     pub fn read(&self, offset: u64, buf: &mut [u8]) -> Result<(), Error> {
-        Ok(self.backing_vmo.read(buf, offset)?)
+        Ok(self.backing_memory.read(buf, offset)?)
     }
 
     fn new<L>(
@@ -45,7 +46,7 @@ impl RemoteBlockDevice {
         current_task: &CurrentTask,
         minor: u32,
         name: &str,
-        backing_vmo: zx::Vmo,
+        backing_memory: MemoryObject,
     ) -> Arc<Self>
     where
         L: LockBefore<FileOpsCore>,
@@ -55,11 +56,11 @@ impl RemoteBlockDevice {
         let device_name = FsString::from(format!("remoteblk-{name}"));
         let virtual_block_class =
             registry.get_or_create_class("block".into(), registry.virtual_bus());
-        let backing_vmo_size = backing_vmo.get_content_size().unwrap() as usize;
+        let backing_memory_size = backing_memory.get_content_size() as usize;
         let device = Arc::new(Self {
             name: name.to_owned(),
-            backing_vmo,
-            backing_vmo_size,
+            backing_memory,
+            backing_memory_size,
             block_size: BLOCK_SIZE,
         });
         let device_weak = Arc::<RemoteBlockDevice>::downgrade(&device);
@@ -85,10 +86,7 @@ impl RemoteBlockDevice {
 
 impl BlockDeviceInfo for RemoteBlockDevice {
     fn size(&self) -> Result<usize, Errno> {
-        self.backing_vmo
-            .get_size()
-            .map(|size| size as usize)
-            .map_err(|status| from_status_like_fdio!(status))
+        Ok(self.backing_memory.get_size() as usize)
     }
 }
 
@@ -115,7 +113,8 @@ impl FileOps for RemoteBlockDeviceFile {
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
         default_seek(current_offset, target, |offset| {
-            let eof_offset = self.device.backing_vmo_size.try_into().map_err(|_| errno!(EINVAL))?;
+            let eof_offset =
+                self.device.backing_memory_size.try_into().map_err(|_| errno!(EINVAL))?;
             offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
         })
     }
@@ -131,10 +130,10 @@ impl FileOps for RemoteBlockDeviceFile {
         data.write_each(&mut move |buf| {
             let buflen = buf.len();
             let buf = &mut buf
-                [..std::cmp::min(self.device.backing_vmo_size.saturating_sub(offset), buflen)];
+                [..std::cmp::min(self.device.backing_memory_size.saturating_sub(offset), buflen)];
             if !buf.is_empty() {
                 self.device
-                    .backing_vmo
+                    .backing_memory
                     .read_uninit(buf, offset as u64)
                     .map_err(|status| from_status_like_fdio!(status))?;
                 offset = offset.checked_add(buf.len()).ok_or(errno!(EINVAL))?;
@@ -153,9 +152,9 @@ impl FileOps for RemoteBlockDeviceFile {
     ) -> Result<usize, Errno> {
         data.read_each(&mut move |buf| {
             let to_write =
-                std::cmp::min(self.device.backing_vmo_size.saturating_sub(offset), buf.len());
+                std::cmp::min(self.device.backing_memory_size.saturating_sub(offset), buf.len());
             self.device
-                .backing_vmo
+                .backing_memory
                 .write(&buf[..to_write], offset as u64)
                 .map_err(|status| from_status_like_fdio!(status))?;
             offset = offset.checked_add(to_write).ok_or(errno!(EINVAL))?;
@@ -167,18 +166,18 @@ impl FileOps for RemoteBlockDeviceFile {
         Ok(())
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
         requested_length: Option<usize>,
         _prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         let slice_len =
-            std::cmp::min(self.device.backing_vmo_size, requested_length.unwrap_or(usize::MAX))
+            std::cmp::min(self.device.backing_memory_size, requested_length.unwrap_or(usize::MAX))
                 as u64;
         self.device
-            .backing_vmo
+            .backing_memory
             .create_child(zx::VmoChildOptions::SLICE, 0, slice_len)
             .map(Arc::new)
             .map_err(|status| from_status_like_fdio!(status))
@@ -195,13 +194,14 @@ impl FileOps for RemoteBlockDeviceFile {
         match request {
             BLKGETSIZE => {
                 let user_size = UserRef::<u64>::from(arg);
-                let size = (self.device.backing_vmo_size / self.device.block_size as usize) as u64;
+                let size =
+                    (self.device.backing_memory_size / self.device.block_size as usize) as u64;
                 current_task.write_object(user_size, &size)?;
                 Ok(SUCCESS)
             }
             BLKGETSIZE64 => {
                 let user_size = UserRef::<u64>::from(arg);
-                let size = self.device.backing_vmo_size as u64;
+                let size = self.device.backing_memory_size as u64;
                 current_task.write_object(user_size, &size)?;
                 Ok(SUCCESS)
             }
@@ -261,9 +261,9 @@ impl RemoteBlockDeviceRegistry {
             return Ok(());
         }
 
-        let backing_vmo = zx::Vmo::create(initial_size)?;
+        let backing_memory = MemoryObject::from(zx::Vmo::create(initial_size)?);
         let minor = self.next_minor.fetch_add(1, Ordering::Relaxed);
-        let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_vmo);
+        let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_memory);
         if let Some(callback) = self.device_added_fn.get() {
             callback(name, minor, &device);
         }

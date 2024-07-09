@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mm::memory::MemoryObject;
+use crate::mm::{ProtectionFlags, PAGE_SIZE};
+use crate::task::{CurrentTask, Task};
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
+use starnix_logging::log_error;
 use starnix_sync::{InterruptibleEvent, Mutex};
+use starnix_uapi::errors::Errno;
+use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::{errno, error, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK, FUTEX_WAITERS};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Weak};
-
-use crate::mm::{ProtectionFlags, PAGE_SIZE};
-use crate::task::{CurrentTask, Task};
-use starnix_logging::{impossible_error, log_error};
-use starnix_uapi::errors::Errno;
-use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::{errno, error, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK, FUTEX_WAITERS};
 
 /// A table of futexes.
 ///
@@ -304,20 +304,20 @@ impl<Key: FutexKey> FutexTable<Key> {
 }
 
 impl FutexTable<SharedFutexKey> {
-    /// Wait on the futex at the given offset in the vmo.
+    /// Wait on the futex at the given offset in the memory.
     ///
     /// See FUTEX_WAIT.
     pub fn external_wait(
         &self,
-        vmo: zx::Vmo,
+        memory: MemoryObject,
         offset: u64,
         value: u32,
         mask: u32,
     ) -> Result<oneshot::Receiver<()>, Errno> {
-        let key = SharedFutexKey::new(&vmo, offset)?;
+        let key = SharedFutexKey::new(&memory, offset)?;
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
-        Self::external_check_futex_value(&vmo, offset, value)?;
+        Self::external_check_futex_value(&memory, offset, value)?;
 
         let (sender, receiver) = oneshot::channel::<()>();
         state
@@ -326,25 +326,29 @@ impl FutexTable<SharedFutexKey> {
         Ok(receiver)
     }
 
-    /// Wake the given number of waiters on futex at the given offset in the vmo. Returns the
+    /// Wake the given number of waiters on futex at the given offset in the memory. Returns the
     /// number of waiters actually woken.
     ///
     /// See FUTEX_WAKE.
     pub fn external_wake(
         &self,
-        vmo: zx::Vmo,
+        memory: MemoryObject,
         offset: u64,
         count: usize,
         mask: u32,
     ) -> Result<usize, Errno> {
-        Ok(self.state.lock().wake(SharedFutexKey::new(&vmo, offset)?, count, mask))
+        Ok(self.state.lock().wake(SharedFutexKey::new(&memory, offset)?, count, mask))
     }
 
-    fn external_check_futex_value(vmo: &zx::Vmo, offset: u64, value: u32) -> Result<(), Errno> {
+    fn external_check_futex_value(
+        memory: &MemoryObject,
+        offset: u64,
+        value: u32,
+    ) -> Result<(), Errno> {
         let loaded_value = {
             // TODO: This read should be atomic.
             let mut buf = [0u8; 4];
-            vmo.read(&mut buf, offset).map_err(|_| errno!(EINVAL))?;
+            memory.read(&mut buf, offset).map_err(|_| errno!(EINVAL))?;
             u32::from_ne_bytes(buf)
         };
         if loaded_value != value {
@@ -355,7 +359,7 @@ impl FutexTable<SharedFutexKey> {
 }
 
 pub struct FutexOperand {
-    vmo: Arc<zx::Vmo>,
+    memory: Arc<MemoryObject>,
     offset: u64,
 }
 
@@ -386,10 +390,11 @@ impl FutexOperandMapping {
         assert!(value_offset + std::mem::size_of::<AtomicU32>() <= length);
 
         let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
-        let kernel_address = kernel_root_vmar
-            .map(
+        let kernel_address = operand
+            .memory
+            .map_in_vmar(
+                &kernel_root_vmar,
                 0,
-                &operand.vmo,
                 mapping_start,
                 length,
                 zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
@@ -452,9 +457,9 @@ impl FutexKey for PrivateFutexKey {
         if !addr.is_aligned(4) {
             return error!(EINVAL);
         }
-        let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
+        let (memory, offset) = task.mm().get_mapping_memory(addr, perms)?;
         let key = PrivateFutexKey { addr };
-        Ok((FutexOperand { vmo, offset }, key))
+        Ok((FutexOperand { memory, offset }, key))
     }
 
     fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
@@ -483,9 +488,9 @@ impl FutexKey for SharedFutexKey {
         if !addr.is_aligned(4) {
             return error!(EINVAL);
         }
-        let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
-        let key = SharedFutexKey::new(&vmo, offset)?;
-        Ok((FutexOperand { vmo, offset }, key))
+        let (memory, offset) = task.mm().get_mapping_memory(addr, perms)?;
+        let key = SharedFutexKey::new(&memory, offset)?;
+        Ok((FutexOperand { memory, offset }, key))
     }
 
     fn get_table_from_task(task: &Task) -> &FutexTable<Self> {
@@ -494,8 +499,8 @@ impl FutexKey for SharedFutexKey {
 }
 
 impl SharedFutexKey {
-    fn new(vmo: &zx::Vmo, offset: u64) -> Result<Self, Errno> {
-        let koid = vmo.info().map_err(impossible_error)?.koid;
+    fn new(memory: &MemoryObject, offset: u64) -> Result<Self, Errno> {
+        let koid = memory.get_koid();
         Ok(Self { koid, offset })
     }
 }

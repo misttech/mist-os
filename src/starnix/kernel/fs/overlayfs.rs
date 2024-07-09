@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mm::memory::MemoryObject;
 use crate::task::CurrentTask;
 use crate::vfs::rw_queue::RwQueueReadGuard;
 use crate::vfs::{
@@ -924,17 +925,17 @@ impl FileOps for OverlayFile {
         file.write_at(locked, current_task, offset, data)
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: crate::mm::ProtectionFlags,
-    ) -> Result<Arc<fuchsia_zircon::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         // Not that the VMO returned here will not updated if the file is promoted to upper FS
         // later. This is consistent with OveralyFS behavior on Linux, see
         // https://docs.kernel.org/filesystems/overlayfs.html#non-standard-behavior .
-        self.state.read().file().get_vmo(current_task, length, prot)
+        self.state.read().file().get_memory(current_task, length, prot)
     }
 }
 pub struct OverlayFs {

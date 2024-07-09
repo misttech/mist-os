@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fs::fuchsia::update_info_from_attrs;
+use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::{
@@ -148,24 +149,21 @@ struct File {
 
 enum Inner {
     NeedsVmo(fio::FileSynchronousProxy),
-    Vmo(Arc<zx::Vmo>),
+    Memory(Arc<MemoryObject>),
 }
 
 impl Inner {
-    fn get_vmo(&mut self) -> Result<Arc<zx::Vmo>, Errno> {
+    fn get_memory(&mut self) -> Result<Arc<MemoryObject>, Errno> {
         if let Inner::NeedsVmo(file) = &*self {
-            let vmo = match file
-                .get_backing_memory(fio::VmoFlags::READ, zx::Time::INFINITE)
-                .map_err(|err| errno!(EIO, format!("Error {err} on GetBackingMemory")))?
-                .map_err(zx::Status::from_raw)
-            {
-                Ok(vmo) => Arc::new(vmo),
-                Err(status) => return Err(from_status_like_fdio!(status)),
-            };
-            *self = Inner::Vmo(vmo);
+            let memory = Arc::new(MemoryObject::from(
+                file.get_backing_memory(fio::VmoFlags::READ, zx::Time::INFINITE)
+                    .map_err(|err| errno!(EIO, format!("Error {err} on GetBackingMemory")))?
+                    .map_err(|s| from_status_like_fdio!(zx::Status::from_raw(s)))?,
+            ));
+            *self = Inner::Memory(memory);
         }
-        let Inner::Vmo(vmo) = &*self else { unreachable!() };
-        Ok(vmo.clone())
+        let Inner::Memory(memory) = &*self else { unreachable!() };
+        Ok(memory.clone())
     }
 }
 
@@ -179,12 +177,9 @@ impl FsNodeOps for File {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let vmo = self.inner.lock().unwrap().get_vmo()?;
-        let size = usize::try_from(
-            vmo.get_content_size().map_err(|status| from_status_like_fdio!(status))?,
-        )
-        .unwrap();
-        Ok(Box::new(VmoFile { vmo, size }))
+        let memory = self.inner.lock().unwrap().get_memory()?;
+        let size = usize::try_from(memory.get_content_size()).unwrap();
+        Ok(Box::new(MemoryFile { memory, size }))
     }
 
     fn fetch_and_refresh_info<'a>(
@@ -193,11 +188,9 @@ impl FsNodeOps for File {
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let vmo = self.inner.lock().unwrap().get_vmo()?;
+        let memory = self.inner.lock().unwrap().get_memory()?;
         let attrs = zxio_node_attributes_t {
-            content_size: vmo
-                .get_content_size()
-                .map_err(|status| from_status_like_fdio!(status))?,
+            content_size: memory.get_content_size(),
             // TODO(https://fxbug.dev/293607051): Plumb through storage size from underlying connection.
             storage_size: 0,
             link_count: 1,
@@ -238,22 +231,22 @@ impl FsNodeOps for File {
     }
 }
 
-// NB: This is different from VmoFileObject, which is designed to wrap a VMO that is owned and
+// NB: This is different from MemoryFileObject, which is designed to wrap a VMO that is owned and
 // managed by Starnix.  This struct is a wrapper around a pager-backed VMO received from the
 // filesystem backing the remote bundle.
-// VmoFileObject does its own content size management, which is (a) incompatible with the content
+// MemoryFileObject does its own content size management, which is (a) incompatible with the content
 // size management done for us by the remote filesystem, and (b) the content size is based on file
-// attributes in the case of VmoFileObject, which we've intentionally avoided querying here for
-// performance.  Specifically, VmoFile is designed to be opened as fast as possible, and requiring
+// attributes in the case of MemoryFileObject, which we've intentionally avoided querying here for
+// performance.  Specifically, MemoryFile is designed to be opened as fast as possible, and requiring
 // that we stat the file whilst opening it is counter to that goal.
-// Note that VmoFile assumes that the underlying file is read-only and not resizable (which is the
+// Note that MemoryFile assumes that the underlying file is read-only and not resizable (which is the
 // case for remote bundles since they're stored as blobs).
-struct VmoFile {
-    vmo: Arc<zx::Vmo>,
+struct MemoryFile {
+    memory: Arc<MemoryObject>,
     size: usize,
 }
 
-impl FileOps for VmoFile {
+impl FileOps for MemoryFile {
     fileops_impl_seekable!();
 
     fn read(
@@ -268,7 +261,7 @@ impl FileOps for VmoFile {
             let buflen = buf.len();
             let buf = &mut buf[..std::cmp::min(self.size.saturating_sub(offset), buflen)];
             if !buf.is_empty() {
-                self.vmo
+                self.memory
                     .read_uninit(buf, offset as u64)
                     .map_err(|status| from_status_like_fdio!(status))?;
                 offset += buf.len();
@@ -288,23 +281,23 @@ impl FileOps for VmoFile {
         Err(errno!(EPERM))
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         Ok(if prot.contains(ProtectionFlags::EXEC) {
             Arc::new(
-                self.vmo
+                self.memory
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
                     .map_err(impossible_error)?
                     .replace_as_executable(&VMEX_RESOURCE)
                     .map_err(impossible_error)?,
             )
         } else {
-            self.vmo.clone()
+            self.memory.clone()
         })
     }
 

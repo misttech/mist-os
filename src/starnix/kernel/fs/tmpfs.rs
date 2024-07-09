@@ -8,7 +8,7 @@ use crate::vfs::directory_file::MemoryDirectoryFile;
 use crate::vfs::{
     fs_args, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, MemoryXattrStorage, SymlinkNode, VmoFileNode,
+    FsNodeOps, FsStr, MemoryFileNode, MemoryXattrStorage, SymlinkNode,
 };
 use bstr::B;
 use starnix_logging::{log_warn, track_stub};
@@ -188,7 +188,7 @@ fn create_child_node(
     owner: FsCred,
 ) -> Result<FsNodeHandle, Errno> {
     let ops: Box<dyn FsNodeOps> = match mode.fmt() {
-        FileMode::IFREG => Box::new(VmoFileNode::new()?),
+        FileMode::IFREG => Box::new(MemoryFileNode::new()?),
         FileMode::IFIFO | FileMode::IFBLK | FileMode::IFCHR | FileMode::IFSOCK => {
             Box::new(TmpfsSpecialNode::new())
         }

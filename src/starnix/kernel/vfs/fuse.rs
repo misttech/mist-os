@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_increment;
 use crate::mm::PAGE_SIZE;
 use crate::mutable_state::Guard;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
@@ -31,6 +30,7 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EINTR, EINVAL, ENOENT, ENOSYS};
 use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
 use starnix_uapi::vfs::{default_statfs, FdEvents};

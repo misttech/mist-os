@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_system_page_size;
+use crate::mm::memory::MemoryObject;
 use crate::mm::{FutexTable, PrivateFutexKey, VMEX_RESOURCE};
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
@@ -13,17 +13,16 @@ use crate::vfs::{
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
-use fuchsia_zircon::{
-    AsHandleRef, {self as zx},
-};
+use fuchsia_zircon::{self as zx};
 use once_cell::sync::Lazy;
 use range_map::RangeMap;
 use smallvec::SmallVec;
 use starnix_logging::{
-    impossible_error, log_warn, set_zx_name, trace_duration, track_stub, CATEGORY_STARNIX_MM,
+    impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::range_ext::RangeExt;
 use starnix_uapi::resource_limits::Resource;
@@ -268,7 +267,7 @@ pub enum MappingName {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct MappingBackingVmo {
+struct MappingBackingMemory {
     /// The base address of this mapping.
     ///
     /// Keep in mind that the mapping might be trimmed in the RangeMap if the
@@ -276,14 +275,14 @@ struct MappingBackingVmo {
     /// before the currently valid portion of the mapping.
     base: UserAddress,
 
-    /// The VMO that contains the memory used in this mapping.
-    vmo: Arc<zx::Vmo>,
+    /// The memory object that contains the memory used in this mapping.
+    memory: Arc<MemoryObject>,
 
-    /// The offset in the VMO that corresponds to the base address.
-    vmo_offset: u64,
+    /// The offset in the memory object that corresponds to the base address.
+    memory_offset: u64,
 }
 
-impl MappingBackingVmo {
+impl MappingBackingMemory {
     /// Reads exactly `bytes.len()` bytes of memory from `addr`.
     ///
     /// # Parameters
@@ -295,34 +294,34 @@ impl MappingBackingVmo {
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
         profile_duration!("MappingReadMemory");
-        self.vmo.read_uninit(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
+        self.memory.read_uninit(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
     }
 
     /// Writes the provided bytes to `addr`.
     ///
     /// # Parameters
     /// - `addr`: The address to write to.
-    /// - `bytes`: The bytes to write to the VMO.
+    /// - `bytes`: The bytes to write to the memory object.
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<(), Errno> {
-        self.vmo.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
+        self.memory.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.vmo
+        self.memory
             .op_range(zx::VmoOp::ZERO, self.address_to_offset(addr), length as u64)
             .map_err(|_| errno!(EFAULT))?;
         Ok(length)
     }
 
-    /// Converts a `UserAddress` to an offset in this mapping's VMO.
+    /// Converts a `UserAddress` to an offset in this mapping's memory object.
     fn address_to_offset(&self, addr: UserAddress) -> u64 {
-        (addr.ptr() - self.base.ptr()) as u64 + self.vmo_offset
+        (addr.ptr() - self.base.ptr()) as u64 + self.memory_offset
     }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum MappingBacking {
-    Vmo(MappingBackingVmo),
+    Memory(MappingBackingMemory),
 
     #[cfg(feature = "alternate_anon_allocs")]
     PrivateAnonymous,
@@ -353,24 +352,24 @@ struct Mapping {
 impl Mapping {
     fn new(
         base: UserAddress,
-        vmo: Arc<zx::Vmo>,
-        vmo_offset: u64,
+        memory: Arc<MemoryObject>,
+        memory_offset: u64,
         flags: MappingFlags,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
-        Self::with_name(base, vmo, vmo_offset, flags, MappingName::None, file_write_guard)
+        Self::with_name(base, memory, memory_offset, flags, MappingName::None, file_write_guard)
     }
 
     fn with_name(
         base: UserAddress,
-        vmo: Arc<zx::Vmo>,
-        vmo_offset: u64,
+        memory: Arc<MemoryObject>,
+        memory_offset: u64,
         flags: MappingFlags,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
         Mapping {
-            backing: MappingBacking::Vmo(MappingBackingVmo { base, vmo, vmo_offset }),
+            backing: MappingBacking::Memory(MappingBackingMemory { base, memory, memory_offset }),
             flags,
             name,
             file_write_guard,
@@ -387,13 +386,13 @@ impl Mapping {
         }
     }
 
-    /// Converts a `UserAddress` to an offset in this mapping's VMO.
+    /// Converts a `UserAddress` to an offset in this mapping's memory object.
     fn address_to_offset(&self, addr: UserAddress) -> u64 {
         match &self.backing {
-            MappingBacking::Vmo(backing) => backing.address_to_offset(addr),
+            MappingBacking::Memory(backing) => backing.address_to_offset(addr),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => {
-                // For private, anonymous allocations the virtual address is the offset in the backing VMO.
+                // For private, anonymous allocations the virtual address is the offset in the backing memory object.
                 addr.ptr() as u64
             }
         }
@@ -430,12 +429,12 @@ struct ProgramBreak {
     // The current program break.
     //
     // The addresses from [base, current.round_up(*PAGE_SIZE)) are mapped into the
-    // client address space from the underlying |vmo|.
+    // client address space from the underlying |memory|.
     current: UserAddress,
 
     #[cfg(not(feature = "alternate_anon_allocs"))]
-    /// Placeholder VMO mapped to pages reserved for program break growth.
-    placeholder_vmo: Arc<zx::Vmo>,
+    /// Placeholder memory object mapped to pages reserved for program break growth.
+    placeholder_memory: Arc<MemoryObject>,
 }
 
 /// The policy about whether the address space can be dumped.
@@ -464,10 +463,10 @@ pub struct MemoryManagerState {
 
     /// The memory mappings currently used by this address space.
     ///
-    /// The mappings record which VMO backs each address.
+    /// The mappings record which object backs each address.
     mappings: RangeMap<UserAddress, Mapping>,
 
-    /// VMO backing private, anonymous memory allocations in this address space.
+    /// Memory object backing private, anonymous memory allocations in this address space.
     #[cfg(feature = "alternate_anon_allocs")]
     private_anonymous: PrivateAnonymousMemoryManager,
 
@@ -479,24 +478,25 @@ pub struct MemoryManagerState {
 
 #[cfg(feature = "alternate_anon_allocs")]
 struct PrivateAnonymousMemoryManager {
-    /// VMO backing private, anonymous memory allocations in this address space.
-    backing: Arc<zx::Vmo>,
+    /// Memory object backing private, anonymous memory allocations in this address space.
+    backing: Arc<MemoryObject>,
 
-    /// VMO used to make address allocations for private, anonymous memory allocations in this address space.
-    allocation: zx::Vmo,
+    /// Memory object used to make address allocations for private, anonymous memory allocations in this address space.
+    allocation: MemoryObject,
 }
 
 #[cfg(feature = "alternate_anon_allocs")]
 impl PrivateAnonymousMemoryManager {
     fn new(backing_size: u64) -> Self {
-        let backing = Arc::new(
+        let backing = Arc::new(MemoryObject::from(
             zx::Vmo::create(backing_size).unwrap().replace_as_executable(&VMEX_RESOURCE).unwrap(),
-        );
-        // The allocation VMO is mapped to find available address ranges. Pages in it are never
+        ));
+        // The allocation memory object is mapped to find available address ranges. Pages in it are never
         // modified and the actual size does not matter. To allow creating mappings that might
         // fault (if permissions were to allow) this mapping has to be resizable. It will never be
         // resized.
-        let allocation = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap();
+        let allocation =
+            MemoryObject::from(zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap());
 
         Self { backing, allocation }
     }
@@ -539,15 +539,15 @@ impl PrivateAnonymousMemoryManager {
         dest: UserAddress,
     ) -> Result<(), Errno> {
         let length = source.end - source.start;
-        let dest_vmo_offset = dest.ptr() as u64;
-        let source_vmo_offset = source.start.ptr() as u64;
+        let dest_memory_offset = dest.ptr() as u64;
+        let source_memory_offset = source.start.ptr() as u64;
         self.backing
             .transfer_data(
                 fuchsia_zircon::TransferDataOptions::empty(),
-                dest_vmo_offset,
+                dest_memory_offset,
                 length.try_into().unwrap(),
                 &self.backing,
-                source_vmo_offset,
+                source_memory_offset,
             )
             .map_err(impossible_error)?;
         Ok(())
@@ -562,8 +562,10 @@ impl PrivateAnonymousMemoryManager {
                     .replace_as_executable(&VMEX_RESOURCE)
                     .map_err(impossible_error)?,
             ),
-            allocation: zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
-                .map_err(impossible_error)?,
+            allocation: MemoryObject::from(
+                zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
+                    .map_err(impossible_error)?,
+            ),
         })
     }
 }
@@ -608,8 +610,8 @@ fn map_in_vmar(
     vmar: &zx::Vmar,
     vmar_info: &zx::VmarInfo,
     addr: DesiredAddress,
-    vmo: &zx::Vmo,
-    vmo_offset: u64,
+    memory: &Arc<MemoryObject>,
+    memory_offset: u64,
     length: usize,
     flags: MappingFlags,
     populate: bool,
@@ -642,7 +644,7 @@ fn map_in_vmar(
             zx::VmoOp::PREFETCH
         };
         trace_duration!(CATEGORY_STARNIX_MM, c"MmapCommitPages");
-        let _ = vmo.op_range(op, vmo_offset, length as u64);
+        let _ = memory.op_range(op, memory_offset, length as u64);
         // "The mmap() call doesn't fail if the mapping cannot be populated."
     }
 
@@ -657,14 +659,14 @@ fn map_in_vmar(
         | vmar_maybe_map_range;
 
     profile.pivot("VmarMapSyscall");
-    let mut map_result = vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
+    let mut map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
 
     // Retry mapping if the target address was a Hint.
     profile.pivot("MapInVmarResults");
     if map_result.is_err() {
         if let DesiredAddress::Hint(_) = addr {
             let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
-            map_result = vmar.map(0, vmo, vmo_offset, length, vmar_flags);
+            map_result = memory.map_in_vmar(vmar, 0, memory_offset, length, vmar_flags);
         }
     }
 
@@ -678,8 +680,8 @@ impl MemoryManagerState {
     fn map_internal(
         &self,
         addr: DesiredAddress,
-        vmo: &zx::Vmo,
-        vmo_offset: u64,
+        memory: &Arc<MemoryObject>,
+        memory_offset: u64,
         length: usize,
         flags: MappingFlags,
         populate: bool,
@@ -688,8 +690,8 @@ impl MemoryManagerState {
             &self.user_vmar,
             &self.user_vmar_info,
             addr,
-            vmo,
-            vmo_offset,
+            memory,
+            memory_offset,
             length,
             flags,
             populate,
@@ -705,11 +707,11 @@ impl MemoryManagerState {
         Ok(())
     }
 
-    fn map_vmo(
+    fn map_memory(
         &mut self,
         addr: DesiredAddress,
-        vmo: Arc<zx::Vmo>,
-        vmo_offset: u64,
+        memory: Arc<MemoryObject>,
+        memory_offset: u64,
         length: usize,
         flags: MappingFlags,
         populate: bool,
@@ -719,7 +721,8 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
-        let mapped_addr = self.map_internal(addr, &vmo, vmo_offset, length, flags, populate)?;
+        let mapped_addr =
+            self.map_internal(addr, &memory, memory_offset, length, flags, populate)?;
 
         #[cfg(any(test, debug_assertions))]
         {
@@ -738,7 +741,7 @@ impl MemoryManagerState {
             self.update_after_unmap(addr, end - addr, released_mappings)?;
         }
 
-        let mut mapping = Mapping::new(mapped_addr, vmo, vmo_offset, flags, file_write_guard);
+        let mut mapping = Mapping::new(mapped_addr, memory, memory_offset, flags, file_write_guard);
         mapping.name = name;
         self.mappings.insert(mapped_addr..end, mapping);
 
@@ -769,14 +772,14 @@ impl MemoryManagerState {
             options,
         )?;
 
-        let backing_vmo_offset = target_addr.ptr();
+        let backing_memory_offset = target_addr.ptr();
 
         let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
 
         let mapped_addr = self.map_internal(
             DesiredAddress::FixedOverwrite(target_addr),
             &self.private_anonymous.backing,
-            backing_vmo_offset as u64,
+            backing_memory_offset as u64,
             length,
             flags,
             false,
@@ -818,11 +821,11 @@ impl MemoryManagerState {
                 released_mappings,
             );
         }
-        let vmo = create_anonymous_mapping_vmo(length as u64)?;
+        let memory = create_anonymous_mapping_memory(length as u64)?;
         let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
-        self.map_vmo(
+        self.map_memory(
             addr,
-            vmo,
+            memory,
             0,
             length,
             flags,
@@ -948,33 +951,33 @@ impl MemoryManagerState {
         let private_anonymous = original_mapping.private_anonymous();
 
         // As a special case for private, anonymous mappings, allocate more space in the
-        // VMO. FD-backed mappings have their backing memory handled by the file system.
+        // memory object. FD-backed mappings have their backing memory handled by the file system.
         match original_mapping.backing {
-            MappingBacking::Vmo(backing) => {
+            MappingBacking::Memory(backing) => {
                 if private_anonymous {
-                    let new_vmo_size = backing
-                        .vmo_offset
+                    let new_memory_size = backing
+                        .memory_offset
                         .checked_add(final_length as u64)
                         .ok_or_else(|| errno!(EINVAL))?;
                     backing
-                        .vmo
-                        .set_size(new_vmo_size)
+                        .memory
+                        .set_size(new_memory_size)
                         .map_err(MemoryManager::get_errno_for_map_err)?;
                     // Zero-out the pages that were added when growing. This is not necessary, but ensures
                     // correctness of our COW implementation. Ignore any errors.
                     let original_length = original_range.end - original_range.start;
-                    let _ = backing.vmo.op_range(
+                    let _ = backing.memory.op_range(
                         zx::VmoOp::ZERO,
-                        backing.vmo_offset + original_length as u64,
+                        backing.memory_offset + original_length as u64,
                         (final_length - original_length) as u64,
                     );
                 }
 
                 // Re-map the original range, which may include pages before the requested range.
-                Ok(Some(self.map_vmo(
+                Ok(Some(self.map_memory(
                     DesiredAddress::FixedOverwrite(original_range.start),
-                    backing.vmo,
-                    backing.vmo_offset,
+                    backing.memory,
+                    backing.memory_offset,
                     final_length,
                     original_mapping.flags,
                     false,
@@ -1060,37 +1063,37 @@ impl MemoryManagerState {
 
         let offset_into_original_range = (src_addr - original_range.start) as u64;
         let private_anonymous = src_mapping.private_anonymous();
-        let (dst_vmo_offset, vmo) = match src_mapping.backing {
-            MappingBacking::Vmo(backing) => {
+        let (dst_memory_offset, memory) = match src_mapping.backing {
+            MappingBacking::Memory(backing) => {
                 if private_anonymous {
-                    // This mapping is a private, anonymous mapping. Create a COW child VMO that covers
+                    // This mapping is a private, anonymous mapping. Create a COW child memory object that covers
                     // the pages being moved and map that into the destination.
-                    let child_vmo = backing
-                        .vmo
+                    let child_memory = backing
+                        .memory
                         .create_child(
                             zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
-                            backing.vmo_offset + offset_into_original_range,
+                            backing.memory_offset + offset_into_original_range,
                             dst_length as u64,
                         )
                         .map_err(MemoryManager::get_errno_for_map_err)?;
                     if dst_length > src_length {
                         // The mapping has grown. Zero-out the pages that were "added" when growing the
-                        // mapping. These pages might be pointing inside the parent VMO, in which case
+                        // mapping. These pages might be pointing inside the parent memory object, in which case
                         // we want to zero them out to make them look like new pages. Since this is a COW
-                        // child VMO, this will simply allocate new pages.
+                        // child memory object, this will simply allocate new pages.
                         // This is not necessary, but ensures correctness of our COW implementation.
                         // Ignore any errors.
-                        let _ = child_vmo.op_range(
+                        let _ = child_memory.op_range(
                             zx::VmoOp::ZERO,
                             src_length as u64,
                             (dst_length - src_length) as u64,
                         );
                     }
-                    (0, Arc::new(child_vmo))
+                    (0, Arc::new(MemoryObject::from(child_memory)))
                 } else {
-                    // This mapping is backed by an FD, just map the range of the VMO covering the moved
-                    // pages. If the VMO already had COW semantics, this preserves them.
-                    (backing.vmo_offset + offset_into_original_range, backing.vmo)
+                    // This mapping is backed by an FD, just map the range of the memory object covering the moved
+                    // pages. If the memory object already had COW semantics, this preserves them.
+                    (backing.memory_offset + offset_into_original_range, backing.memory)
                 }
             }
             #[cfg(feature = "alternate_anon_allocs")]
@@ -1148,10 +1151,10 @@ impl MemoryManagerState {
             }
         };
 
-        let new_address = self.map_vmo(
+        let new_address = self.map_memory(
             dst_addr_for_map,
-            vmo,
-            dst_vmo_offset,
+            memory,
+            dst_memory_offset,
             dst_length,
             src_mapping.flags,
             false,
@@ -1241,11 +1244,11 @@ impl MemoryManagerState {
     //      |-------------|           <- unmap range R
     //
     // Assuming the mappings are all MAP_ANONYMOUS:
-    // - the pages of A, B, and C that fall in range R are unmapped; the VMO backing B is dropped.
-    // - the VMO backing A is shrunk.
-    // - a COW child VMO is created from C, which is mapped in the range of C that falls outside R.
+    // - the pages of A, B, and C that fall in range R are unmapped; the memory object backing B is dropped.
+    // - the memory object backing A is shrunk.
+    // - a COW child memory object is created from C, which is mapped in the range of C that falls outside R.
     //
-    // File-backed mappings don't need to have their VMOs modified.
+    // File-backed mappings don't need to have their memory object modified.
     //
     // Unmapped mappings are placed in `released_mappings`.
     fn update_after_unmap(
@@ -1294,49 +1297,53 @@ impl MemoryManagerState {
             released_mappings.extend(self.mappings.remove(&(addr..end_addr)));
 
             if let Some((range, mut mapping)) = truncated_tail {
-                let MappingBacking::Vmo(backing) = &mut mapping.backing;
-                // Create and map a child COW VMO mapping that represents the truncated tail.
-                let vmo_info = backing.vmo.basic_info().map_err(impossible_error)?;
-                let child_vmo_offset = (range.start - backing.base) as u64 + backing.vmo_offset;
+                let MappingBacking::Memory(backing) = &mut mapping.backing;
+                // Create and map a child COW memory object mapping that represents the truncated tail.
+                let memory_info = backing.memory.basic_info();
+                let child_memory_offset =
+                    (range.start - backing.base) as u64 + backing.memory_offset;
                 let child_length = range.end - range.start;
-                let mut child_vmo = backing
-                    .vmo
+                let mut child_memory = backing
+                    .memory
                     .create_child(
                         zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
-                        child_vmo_offset,
+                        child_memory_offset,
                         child_length as u64,
                     )
                     .map_err(MemoryManager::get_errno_for_map_err)?;
-                if vmo_info.rights.contains(zx::Rights::EXECUTE) {
-                    child_vmo = child_vmo
+                if memory_info.rights.contains(zx::Rights::EXECUTE) {
+                    child_memory = child_memory
                         .replace_as_executable(&VMEX_RESOURCE)
                         .map_err(impossible_error)?;
                 }
 
                 // Update the mapping.
-                backing.vmo = Arc::new(child_vmo);
+                backing.memory = Arc::new(child_memory);
                 backing.base = range.start;
-                backing.vmo_offset = 0;
+                backing.memory_offset = 0;
 
                 self.map_internal(
                     DesiredAddress::FixedOverwrite(range.start),
-                    &backing.vmo,
+                    &backing.memory,
                     0,
                     child_length,
                     mapping.flags,
                     false,
                 )?;
 
-                // Replace the mapping with a new one that contains updated VMO handle.
+                // Replace the mapping with a new one that contains updated memory object handle.
                 self.mappings.insert(range, mapping);
             }
 
             if let Some((range, mapping)) = truncated_head {
-                let MappingBacking::Vmo(backing) = &mapping.backing;
-                // Resize the VMO of the head mapping, whose tail was cut off.
+                let MappingBacking::Memory(backing) = &mapping.backing;
+                // Resize the memory object of the head mapping, whose tail was cut off.
                 let new_mapping_size = (range.end - range.start) as u64;
-                let new_vmo_size = backing.vmo_offset + new_mapping_size;
-                backing.vmo.set_size(new_vmo_size).map_err(MemoryManager::get_errno_for_map_err)?;
+                let new_memory_size = backing.memory_offset + new_mapping_size;
+                backing
+                    .memory
+                    .set_size(new_memory_size)
+                    .map_err(MemoryManager::get_errno_for_map_err)?;
             }
 
             Ok(())
@@ -1445,10 +1452,10 @@ impl MemoryManagerState {
                     _ => mapping.flags,
                 };
                 let new_mapping = match &mapping.backing {
-                    MappingBacking::Vmo(backing) => Mapping::with_name(
+                    MappingBacking::Memory(backing) => Mapping::with_name(
                         range_to_zero.start,
-                        backing.vmo.clone(),
-                        backing.vmo_offset + start,
+                        backing.memory.clone(),
+                        backing.memory_offset + start,
                         new_flags,
                         mapping.name.clone(),
                         mapping.file_write_guard.clone(),
@@ -1489,12 +1496,12 @@ impl MemoryManagerState {
                     }
                 };
 
-                let vmo = match &mapping.backing {
-                    MappingBacking::Vmo(backing) => &backing.vmo,
+                let memory = match &mapping.backing {
+                    MappingBacking::Memory(backing) => &backing.memory,
                     #[cfg(feature = "alternate_anon_allocs")]
                     MappingBacking::PrivateAnonymous => &self.private_anonymous.backing,
                 };
-                vmo.op_range(op, start, end - start).map_err(|s| match s {
+                memory.op_range(op, start, end - start).map_err(|s| match s {
                     zx::Status::OUT_OF_RANGE => errno!(EINVAL),
                     zx::Status::NO_MEMORY => errno!(ENOMEM),
                     zx::Status::INVALID_ARGS => errno!(EINVAL),
@@ -1613,24 +1620,30 @@ impl MemoryManagerState {
             .ptr()
             .checked_sub(low_addr.ptr())
             .ok_or_else(|| anyhow!("Invalid growth range"))?;
-        // TODO(https://fxbug.dev/42179751): - Instead of making a new VMO, perhaps a growsdown mapping should be oversized to start with the end mapped.
-        // Then on extension we could map further down in the VMO for as long as we had space.
-        let vmo = Arc::new(zx::Vmo::create(length as u64).map_err(|s| match s {
-            zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
-                anyhow!("Could not allocate VMO for mapping growth")
-            }
-            _ => anyhow!("Unexpected error creating VMO: {s}"),
-        })?);
+        // TODO(https://fxbug.dev/42179751): - Instead of making a new memory object, perhaps a
+        // growsdown mapping should be oversized to start with the end mapped. Then on extension
+        // we could map further down in the memory object for as long as we had space.
+        let memory =
+            Arc::new(MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
+                zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
+                    anyhow!("Could not allocate VMO for mapping growth")
+                }
+                _ => anyhow!("Unexpected error creating VMO: {s}"),
+            })?));
         let vmar_flags =
             mapping_to_grow.flags.prot_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
-        let mapping =
-            Mapping::new(low_addr, vmo.clone(), 0, mapping_to_grow.flags, FileWriteGuardRef(None));
+        let mapping = Mapping::new(
+            low_addr,
+            memory.clone(),
+            0,
+            mapping_to_grow.flags,
+            FileWriteGuardRef(None),
+        );
         let vmar_offset = self
             .user_address_to_vmar_offset(low_addr)
             .map_err(|_| anyhow!("Address outside of user range"))?;
-        let mapped_address = self
-            .user_vmar
-            .map(vmar_offset, &vmo, 0, length, vmar_flags)
+        let mapped_address = memory
+            .map_in_vmar(&self.user_vmar, vmar_offset, 0, length, vmar_flags)
             .map_err(MemoryManager::get_errno_for_map_err)?;
         if mapped_address != low_addr.ptr() {
             return Err(anyhow!("Could not map extension of mapping to desired location."));
@@ -1690,7 +1703,7 @@ impl MemoryManagerState {
             return error!(EFAULT);
         }
         match &mapping.backing {
-            MappingBacking::Vmo(backing) => backing.read_memory(addr, bytes),
+            MappingBacking::Memory(backing) => backing.read_memory(addr, bytes),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => self.private_anonymous.read_memory(addr, bytes),
         }
@@ -1785,7 +1798,7 @@ impl MemoryManagerState {
     ///
     /// # Parameters
     /// - `addr`: The address to write to.
-    /// - `bytes`: The bytes to write to the VMO.
+    /// - `bytes`: The bytes to write to the memory object.
     fn write_mapping_memory(
         &self,
         addr: UserAddress,
@@ -1797,7 +1810,7 @@ impl MemoryManagerState {
             return error!(EFAULT);
         }
         match &mapping.backing {
-            MappingBacking::Vmo(backing) => backing.write_memory(addr, bytes),
+            MappingBacking::Memory(backing) => backing.write_memory(addr, bytes),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => self.private_anonymous.write_memory(addr, bytes),
         }
@@ -1864,7 +1877,7 @@ impl MemoryManagerState {
         }
 
         match &mapping.backing {
-            MappingBacking::Vmo(backing) => backing.zero(addr, length),
+            MappingBacking::Memory(backing) => backing.zero(addr, length),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => self.private_anonymous.zero(addr, length),
         }
@@ -2385,11 +2398,11 @@ impl MemoryManager {
                 error!(EFAULT)
             }
         } else {
-            self.vmo_read_memory(addr, bytes)
+            self.syscall_read_memory(addr, bytes)
         }
     }
 
-    pub fn vmo_read_memory<'a>(
+    pub fn syscall_read_memory<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
@@ -2414,11 +2427,11 @@ impl MemoryManager {
                 Ok(read_bytes)
             }
         } else {
-            self.vmo_read_memory_partial_until_null_byte(addr, bytes)
+            self.syscall_read_memory_partial_until_null_byte(addr, bytes)
         }
     }
 
-    pub fn vmo_read_memory_partial_until_null_byte<'a>(
+    pub fn syscall_read_memory_partial_until_null_byte<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
@@ -2443,11 +2456,11 @@ impl MemoryManager {
                 Ok(read_bytes)
             }
         } else {
-            self.vmo_read_memory_partial(addr, bytes)
+            self.syscall_read_memory_partial(addr, bytes)
         }
     }
 
-    pub fn vmo_read_memory_partial<'a>(
+    pub fn syscall_read_memory_partial<'a>(
         &self,
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
@@ -2475,11 +2488,11 @@ impl MemoryManager {
                 Ok(num_copied)
             }
         } else {
-            self.vmo_write_memory(addr, bytes)
+            self.syscall_write_memory(addr, bytes)
         }
     }
 
-    pub fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+    pub fn syscall_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         self.state.read().write_memory(addr, bytes)
     }
 
@@ -2500,11 +2513,11 @@ impl MemoryManager {
                 Ok(num_copied)
             }
         } else {
-            self.vmo_write_memory_partial(addr, bytes)
+            self.syscall_write_memory_partial(addr, bytes)
         }
     }
 
-    pub fn vmo_write_memory_partial(
+    pub fn syscall_write_memory_partial(
         &self,
         addr: UserAddress,
         bytes: &[u8],
@@ -2528,14 +2541,14 @@ impl MemoryManager {
             // The number of bytes needed to zero at least a full page (not just
             // a pages worth of bytes) starting at `addr`.
             let length_with_atleast_one_full_page = page_size + (next_page_boundary - addr.ptr());
-            // If at least one full page is being zeroed, go through the VMO since
-            // Zircon can swap the mapped pages with the zero page which should be
-            // cheaper than zeroing out a pages worth of bytes manually.
+            // If at least one full page is being zeroed, go through the memory object since Zircon
+            // can swap the mapped pages with the zero page which should be cheaper than zeroing
+            // out a pages worth of bytes manually.
             //
             // If we are not zeroing out a full page, then go through usercopy
             // if unified aspaces is enabled.
             if length >= length_with_atleast_one_full_page {
-                return self.vmo_zero(addr, length);
+                return self.syscall_zero(addr, length);
             }
         }
 
@@ -2547,11 +2560,11 @@ impl MemoryManager {
                 error!(EFAULT)
             }
         } else {
-            self.vmo_zero(addr, length)
+            self.syscall_zero(addr, length)
         }
     }
 
-    pub fn vmo_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+    pub fn syscall_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.state.read().zero(addr, length)
     }
 }
@@ -2602,9 +2615,10 @@ impl MemoryManager {
 
     fn from_vmar(root_vmar: zx::Vmar, user_vmar: zx::Vmar, user_vmar_info: zx::VmarInfo) -> Self {
         #[cfg(feature = "alternate_anon_allocs")]
-        // The private anonymous backing VMOs extend from the user address 0 up to the highest
-        // mappable address. The pages below `user_vmar_info.base` are never mapped, but including
-        // them in the VMO makes the math for mapping address to VMO offsets simpler.
+        // The private anonymous backing memory object extend from the user address 0 up to the
+        // highest mappable address. The pages below `user_vmar_info.base` are never mapped, but
+        // including them in the memory object makes the math for mapping address to memory object
+        // offsets simpler.
         let backing_size = (user_vmar_info.base + user_vmar_info.len) as u64;
 
         MemoryManager {
@@ -2645,16 +2659,18 @@ impl MemoryManager {
         // Ensure that there is address-space set aside for the program break.
         let brk = match state.brk.clone() {
             None => {
-                let vmo = zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?;
-                set_zx_name(&vmo, b"starnix-brk");
+                let memory = Arc::new(MemoryObject::from(
+                    zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?,
+                ));
+                memory.set_zx_name(b"starnix-brk");
 
-                // Map the whole program-break VMO into the Zircon address-space, to prevent
-                // other mappings using the range, unless they do so deliberately.
-                // Pages in this range are made writable, and added to `mappings`, as the
-                // caller grows the program break.
+                // Map the whole program-break memory object into the Zircon address-space, to
+                // prevent other mappings using the range, unless they do so deliberately.  Pages
+                // in this range are made writable, and added to `mappings`, as the caller grows
+                // the program break.
                 let base = state.map_internal(
                     DesiredAddress::Any,
-                    &vmo,
+                    &memory,
                     0u64,
                     PROGRAM_BREAK_LIMIT as usize,
                     MappingFlags::ANONYMOUS,
@@ -2665,7 +2681,7 @@ impl MemoryManager {
                     base,
                     current: base,
                     #[cfg(not(feature = "alternate_anon_allocs"))]
-                    placeholder_vmo: Arc::new(vmo),
+                    placeholder_memory: memory,
                 };
                 state.brk = Some(brk.clone());
                 brk
@@ -2709,12 +2725,12 @@ impl MemoryManager {
                 }
                 #[cfg(not(feature = "alternate_anon_allocs"))]
                 {
-                    let vmo_offset = (new_end - brk.base) as u64;
+                    let memory_offset = (new_end - brk.base) as u64;
                     if state
                         .map_internal(
                             DesiredAddress::FixedOverwrite(new_end),
-                            &*brk.placeholder_vmo,
-                            vmo_offset,
+                            &brk.placeholder_memory,
+                            memory_offset,
                             delta,
                             MappingFlags::ANONYMOUS,
                             /* populate= */ false,
@@ -2820,26 +2836,30 @@ impl MemoryManager {
         // we can remove the hack below (which also won't be performant). For now, as a workaround,
         // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
 
-        struct VmoInfo {
-            vmo: Arc<zx::Vmo>,
+        struct MemoryInfo {
+            memory: Arc<MemoryObject>,
             size: u64,
 
-            // Indicates whether or not the VMO needs to be replaced on the parent as well.
+            // Indicates whether or not the memory object needs to be replaced on the parent as
+            // well.
             needs_snapshot_on_parent: bool,
         }
 
-        // Clones the `vmo` and returns the `VmoInfo` with the clone.
-        fn clone_vmo(vmo: &Arc<zx::Vmo>, rights: zx::Rights) -> Result<VmoInfo, Errno> {
-            let vmo_info = vmo.info().map_err(impossible_error)?;
-            let pager_backed = vmo_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
+        // Clones the `memory` and returns the `MemoryInfo` with the clone.
+        fn clone_memory(
+            memory: &Arc<MemoryObject>,
+            rights: zx::Rights,
+        ) -> Result<MemoryInfo, Errno> {
+            let memory_info = memory.info()?;
+            let pager_backed = memory_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
             Ok(if pager_backed && !rights.contains(zx::Rights::WRITE) {
-                VmoInfo {
-                    vmo: vmo.clone(),
-                    size: vmo_info.size_bytes,
+                MemoryInfo {
+                    memory: memory.clone(),
+                    size: memory_info.size_bytes,
                     needs_snapshot_on_parent: false,
                 }
             } else {
-                let mut cloned_vmo = vmo
+                let mut cloned_memory = memory
                     .create_child(
                         if pager_backed {
                             zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
@@ -2847,28 +2867,28 @@ impl MemoryManager {
                             zx::VmoChildOptions::SNAPSHOT
                         } | zx::VmoChildOptions::RESIZABLE,
                         0,
-                        vmo_info.size_bytes,
+                        memory_info.size_bytes,
                     )
                     .map_err(MemoryManager::get_errno_for_map_err)?;
                 if rights.contains(zx::Rights::EXECUTE) {
-                    cloned_vmo = cloned_vmo
+                    cloned_memory = cloned_memory
                         .replace_as_executable(&VMEX_RESOURCE)
                         .map_err(impossible_error)?;
                 }
-                VmoInfo {
-                    vmo: Arc::new(cloned_vmo),
-                    size: vmo_info.size_bytes,
+                MemoryInfo {
+                    memory: Arc::new(cloned_memory),
+                    size: memory_info.size_bytes,
                     needs_snapshot_on_parent: pager_backed,
                 }
             })
         }
 
-        fn snapshot_vmo(
-            vmo: &Arc<zx::Vmo>,
+        fn snapshot_memory(
+            memory: &Arc<MemoryObject>,
             size: u64,
             rights: zx::Rights,
-        ) -> Result<Arc<zx::Vmo>, Errno> {
-            let mut cloned_vmo = vmo
+        ) -> Result<Arc<MemoryObject>, Errno> {
+            let mut cloned_memory = memory
                 .create_child(
                     zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE
                         | zx::VmoChildOptions::RESIZABLE,
@@ -2878,16 +2898,17 @@ impl MemoryManager {
                 .map_err(MemoryManager::get_errno_for_map_err)?;
 
             if rights.contains(zx::Rights::EXECUTE) {
-                cloned_vmo =
-                    cloned_vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
+                cloned_memory = cloned_memory
+                    .replace_as_executable(&VMEX_RESOURCE)
+                    .map_err(impossible_error)?;
             }
-            Ok(Arc::new(cloned_vmo))
+            Ok(Arc::new(cloned_memory))
         }
 
         let state: &mut MemoryManagerState = &mut self.state.write();
         let mut target_state = target.state.write();
-        let mut child_vmos = HashMap::<zx::Koid, VmoInfo>::new();
-        let mut replaced_vmos = HashMap::<zx::Koid, Arc<zx::Vmo>>::new();
+        let mut child_memorys = HashMap::<zx::Koid, MemoryInfo>::new();
+        let mut replaced_memorys = HashMap::<zx::Koid, Arc<MemoryObject>>::new();
 
         #[cfg(feature = "alternate_anon_allocs")]
         {
@@ -2900,50 +2921,54 @@ impl MemoryManager {
                 continue;
             }
             match &mut mapping.backing {
-                MappingBacking::Vmo(backing) => {
-                    let vmo_offset = backing.vmo_offset + (range.start - backing.base) as u64;
+                MappingBacking::Memory(backing) => {
+                    let memory_offset = backing.memory_offset + (range.start - backing.base) as u64;
                     let length = range.end - range.start;
 
-                    let target_vmo = if mapping.flags.contains(MappingFlags::SHARED)
+                    let target_memory = if mapping.flags.contains(MappingFlags::SHARED)
                         || mapping.name == MappingName::Vvar
                     {
                         // Note that the Vvar is a special mapping that behaves like a shared mapping but
                         // is private to each process.
-                        backing.vmo.clone()
+                        backing.memory.clone()
                     } else if mapping.flags.contains(MappingFlags::WIPEONFORK) {
-                        create_anonymous_mapping_vmo(length as u64)?
+                        create_anonymous_mapping_memory(length as u64)?
                     } else {
-                        let basic_info = backing.vmo.basic_info().map_err(impossible_error)?;
+                        let basic_info = backing.memory.basic_info();
 
-                        let VmoInfo { vmo, size: vmo_size, needs_snapshot_on_parent } = child_vmos
-                            .entry(basic_info.koid)
-                            .or_insert(clone_vmo(&backing.vmo, basic_info.rights)?);
+                        let MemoryInfo { memory, size: memory_size, needs_snapshot_on_parent } =
+                            child_memorys
+                                .entry(basic_info.koid)
+                                .or_insert(clone_memory(&backing.memory, basic_info.rights)?);
 
                         if *needs_snapshot_on_parent {
-                            let replaced_vmo = replaced_vmos.entry(basic_info.koid).or_insert(
-                                snapshot_vmo(&backing.vmo, *vmo_size, basic_info.rights)?,
-                            );
+                            let replaced_memory =
+                                replaced_memorys.entry(basic_info.koid).or_insert(snapshot_memory(
+                                    &backing.memory,
+                                    *memory_size,
+                                    basic_info.rights,
+                                )?);
                             map_in_vmar(
                                 &state.user_vmar,
                                 &state.user_vmar_info,
                                 DesiredAddress::FixedOverwrite(range.start),
-                                replaced_vmo,
-                                vmo_offset,
+                                replaced_memory,
+                                memory_offset,
                                 length,
                                 mapping.flags,
                                 false,
                             )?;
 
-                            backing.vmo = replaced_vmo.clone();
+                            backing.memory = replaced_memory.clone();
                         }
-                        vmo.clone()
+                        memory.clone()
                     };
 
                     let mut released_mappings = vec![];
-                    target_state.map_vmo(
+                    target_state.map_memory(
                         DesiredAddress::Fixed(range.start),
-                        target_vmo,
-                        vmo_offset,
+                        target_memory,
+                        memory_offset,
                         length,
                         mapping.flags,
                         false,
@@ -2963,13 +2988,13 @@ impl MemoryManager {
                             .map_err(|_| errno!(ENOMEM))?;
                     }
 
-                    let target_vmo_offset = range.start.ptr() as u64;
+                    let target_memory_offset = range.start.ptr() as u64;
                     map_in_vmar(
                         &target_state.user_vmar,
                         &target_state.user_vmar_info,
                         DesiredAddress::FixedOverwrite(range.start),
                         &target_state.private_anonymous.backing,
-                        target_vmo_offset,
+                        target_memory_offset,
                         length,
                         mapping.flags,
                         false,
@@ -3026,11 +3051,11 @@ impl MemoryManager {
         }
     }
 
-    pub fn map_vmo(
+    pub fn map_memory(
         &self,
         addr: DesiredAddress,
-        vmo: Arc<zx::Vmo>,
-        vmo_offset: u64,
+        memory: Arc<MemoryObject>,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -3042,10 +3067,10 @@ impl MemoryManager {
         // Unmapped mappings must be released after the state is unlocked.
         let mut released_mappings = vec![];
         let mut state = self.state.write();
-        let result = state.map_vmo(
+        let result = state.map_memory(
             addr,
-            vmo,
-            vmo_offset,
+            memory,
+            memory_offset,
             length,
             flags,
             options.contains(MappingOptions::POPULATE),
@@ -3231,13 +3256,13 @@ impl MemoryManager {
                 let start_split_range = range.start..addr;
                 let start_split_length = addr - range.start;
                 let start_split_mapping = match &mut mapping.backing {
-                    MappingBacking::Vmo(backing) => {
+                    MappingBacking::Memory(backing) => {
                         // Shrink the range of the named mapping to only the named area.
-                        backing.vmo_offset = start_split_length as u64;
+                        backing.memory_offset = start_split_length as u64;
                         Mapping::new(
                             range.start,
-                            backing.vmo.clone(),
-                            backing.vmo_offset,
+                            backing.memory.clone(),
+                            backing.memory_offset,
                             mapping.flags,
                             mapping.file_write_guard.clone(),
                         )
@@ -3262,13 +3287,13 @@ impl MemoryManager {
             // such as memory analysis tools.
             #[cfg(not(feature = "alternate_anon_allocs"))]
             {
-                let MappingBacking::Vmo(backing) = &mapping.backing;
+                let MappingBacking::Memory(backing) = &mapping.backing;
                 match &name {
-                    Some(vmo_name) => {
-                        set_zx_name(&*backing.vmo, vmo_name);
+                    Some(memory_name) => {
+                        backing.memory.set_zx_name(memory_name);
                     }
                     None => {
-                        set_zx_name(&*backing.vmo, b"");
+                        backing.memory.set_zx_name(b"");
                     }
                 }
             }
@@ -3278,10 +3303,10 @@ impl MemoryManager {
                 let tail_range = end..range.end;
                 let tail_offset = range.end - end;
                 let tail_mapping = match &mapping.backing {
-                    MappingBacking::Vmo(backing) => Mapping::new(
+                    MappingBacking::Memory(backing) => Mapping::new(
                         end,
-                        backing.vmo.clone(),
-                        backing.vmo_offset + tail_offset as u64,
+                        backing.memory.clone(),
+                        backing.memory_offset + tail_offset as u64,
                         mapping.flags,
                         mapping.file_write_guard.clone(),
                     ),
@@ -3341,21 +3366,21 @@ impl MemoryManager {
         }
     }
 
-    /// Returns the VMO mapped at the address and the offset into the VMO of the address. Intended
-    /// for implementing futexes.
-    pub fn get_mapping_vmo(
+    /// Returns the memory object mapped at the address and the offset into the memory object of
+    /// the address. Intended for implementing futexes.
+    pub fn get_mapping_memory(
         &self,
         addr: UserAddress,
         perms: ProtectionFlags,
-    ) -> Result<(Arc<zx::Vmo>, u64), Errno> {
+    ) -> Result<(Arc<MemoryObject>, u64), Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
         if !mapping.flags.prot_flags().contains(perms) {
             return error!(EACCES);
         }
         match &mapping.backing {
-            MappingBacking::Vmo(backing) => {
-                Ok((Arc::clone(&backing.vmo), mapping.address_to_offset(addr)))
+            MappingBacking::Memory(backing) => {
+                Ok((Arc::clone(&backing.memory), mapping.address_to_offset(addr)))
             }
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => {
@@ -3442,10 +3467,10 @@ impl MemoryManager {
             result.vm_size += size;
 
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
-                    let vmo_info = backing.vmo.info().map_err(|_| errno!(EIO))?;
-                    let committed_bytes = vmo_info.committed_bytes as usize;
-                    let populated_bytes = vmo_info.populated_bytes as usize;
+                MappingBacking::Memory(backing) => {
+                    let memory_info = backing.memory.info()?;
+                    let committed_bytes = memory_info.committed_bytes as usize;
+                    let populated_bytes = memory_info.populated_bytes as usize;
 
                     result.vm_rss += committed_bytes;
 
@@ -3456,7 +3481,7 @@ impl MemoryManager {
                         result.vm_swap += populated_bytes - committed_bytes;
                     }
 
-                    if vmo_info.share_count > 1 {
+                    if memory_info.share_count > 1 {
                         result.rss_shared += committed_bytes;
                     }
 
@@ -3553,7 +3578,7 @@ fn write_map(
         if map.can_exec() { 'x' } else { '-' },
         if map.flags.contains(MappingFlags::SHARED) { 's' } else { 'p' },
         match &map.backing {
-            MappingBacking::Vmo(backing) => backing.vmo_offset,
+            MappingBacking::Memory(backing) => backing.memory_offset,
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => 0,
         },
@@ -3691,9 +3716,9 @@ impl SequenceFileSource for ProcSmapsFile {
             writeln!(sink, "Size:\t{size_kb} kB",)?;
 
             let (committed_bytes, share_count) = match &map.backing {
-                MappingBacking::Vmo(backing) => {
-                    let vmo_info = backing.vmo.info().map_err(|_| errno!(EIO))?;
-                    (vmo_info.committed_bytes, vmo_info.share_count as u64)
+                MappingBacking::Memory(backing) => {
+                    let memory_info = backing.memory.info()?;
+                    (memory_info.committed_bytes, memory_info.share_count as u64)
                 }
                 #[cfg(feature = "alternate_anon_allocs")]
                 MappingBacking::PrivateAnonymous => {
@@ -3739,25 +3764,25 @@ impl SequenceFileSource for ProcSmapsFile {
     }
 }
 
-/// Creates a VMO that can be used in an anonymous mapping for the `mmap`
-/// syscall.
-pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
+/// Creates a memory object that can be used in an anonymous mapping for the `mmap` syscall.
+pub fn create_anonymous_mapping_memory(size: u64) -> Result<Arc<MemoryObject>, Errno> {
     let mut profile = ProfileDuration::enter("CreatAnonVmo");
-    // mremap can grow memory regions, so make sure the VMO is resizable.
-    let mut vmo =
+    // mremap can grow memory regions, so make sure the memory object is resizable.
+    let mut memory = MemoryObject::from(
         zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, size).map_err(|s| match s {
             zx::Status::NO_MEMORY => errno!(ENOMEM),
             zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
             _ => impossible_error(s),
-        })?;
+        })?,
+    );
 
     profile.pivot("SetAnonVmoName");
-    set_zx_name(&vmo, b"starnix-anon");
+    memory.set_zx_name(b"starnix-anon");
 
     profile.pivot("ReplaceAnonVmoAsExecutable");
     // TODO(https://fxbug.dev/42056890): Audit replace_as_executable usage
-    vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
-    Ok(Arc::new(vmo))
+    memory = memory.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
+    Ok(Arc::new(memory))
 }
 
 #[cfg(test)]
@@ -4305,7 +4330,7 @@ mod tests {
     }
 
     /// Maps two pages, then unmaps the first page.
-    /// The second page should be re-mapped with a new child COW VMO.
+    /// The second page should be re-mapped with a new child COW memory object.
     #[::fuchsia::test]
     async fn test_unmap_beginning() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
@@ -4320,13 +4345,13 @@ mod tests {
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
-        let original_vmo = {
+        let original_memory = {
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
+                MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base, addr);
-                    assert_eq!(backing.vmo_offset, 0);
-                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE * 2);
-                    backing.vmo.clone()
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE * 2);
+                    backing.memory.clone()
                 }
             }
         };
@@ -4340,7 +4365,7 @@ mod tests {
             // The first page should be unmapped.
             assert!(state.mappings.get(&addr).is_none());
 
-            // The second page should be a new child COW VMO.
+            // The second page should be a new child COW memory object.
             let (range, mapping) = state.mappings.get(&(addr + *PAGE_SIZE)).expect("second page");
             assert_eq!(range.start, addr + *PAGE_SIZE);
             assert_eq!(range.end, addr + *PAGE_SIZE * 2);
@@ -4348,18 +4373,18 @@ mod tests {
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
+                MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base, addr + *PAGE_SIZE);
-                    assert_eq!(backing.vmo_offset, 0);
-                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
-                    assert_ne!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
+                    assert_ne!(original_memory.get_koid(), backing.memory.get_koid());
                 }
             }
         }
     }
 
     /// Maps two pages, then unmaps the second page.
-    /// The first page's VMO should be shrunk.
+    /// The first page's memory object should be shrunk.
     #[::fuchsia::test]
     async fn test_unmap_end() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
@@ -4374,13 +4399,13 @@ mod tests {
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
-        let original_vmo = {
+        let original_memory = {
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
+                MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base, addr);
-                    assert_eq!(backing.vmo_offset, 0);
-                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE * 2);
-                    backing.vmo.clone()
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE * 2);
+                    backing.memory.clone()
                 }
             }
         };
@@ -4394,7 +4419,7 @@ mod tests {
             // The second page should be unmapped.
             assert!(state.mappings.get(&(addr + *PAGE_SIZE)).is_none());
 
-            // The first page's VMO should be the same as the original, only shrunk.
+            // The first page's memory object should be the same as the original, only shrunk.
             let (range, mapping) = state.mappings.get(&addr).expect("first page");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + *PAGE_SIZE);
@@ -4402,19 +4427,19 @@ mod tests {
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
+                MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base, addr);
-                    assert_eq!(backing.vmo_offset, 0);
-                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
-                    assert_eq!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
+                    assert_eq!(original_memory.get_koid(), backing.memory.get_koid());
                 }
             }
         }
     }
 
     /// Maps three pages, then unmaps the middle page.
-    /// The last page should be re-mapped with a new COW child VMO.
-    /// The first page's VMO should be shrunk,
+    /// The last page should be re-mapped with a new COW child memory object.
+    /// The first page's memory object should be shrunk,
     #[::fuchsia::test]
     async fn test_unmap_middle() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
@@ -4429,13 +4454,13 @@ mod tests {
         #[cfg(feature = "alternate_anon_allocs")]
         let _ = mapping;
         #[cfg(not(feature = "alternate_anon_allocs"))]
-        let original_vmo = {
+        let original_memory = {
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
+                MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base, addr);
-                    assert_eq!(backing.vmo_offset, 0);
-                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE * 3);
-                    backing.vmo.clone()
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE * 3);
+                    backing.memory.clone()
                 }
             }
         };
@@ -4455,13 +4480,13 @@ mod tests {
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
-            // The first page's VMO should be the same as the original, only shrunk.
+            // The first page's memory object should be the same as the original, only shrunk.
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
+                MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base, addr);
-                    assert_eq!(backing.vmo_offset, 0);
-                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
-                    assert_eq!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
+                    assert_eq!(original_memory.get_koid(), backing.memory.get_koid());
                 }
             }
 
@@ -4471,13 +4496,13 @@ mod tests {
             #[cfg(feature = "alternate_anon_allocs")]
             let _ = mapping;
             #[cfg(not(feature = "alternate_anon_allocs"))]
-            // The last page should be a new child COW VMO.
+            // The last page should be a new child COW memory object.
             match &mapping.backing {
-                MappingBacking::Vmo(backing) => {
+                MappingBacking::Memory(backing) => {
                     assert_eq!(backing.base, addr + *PAGE_SIZE * 2);
-                    assert_eq!(backing.vmo_offset, 0);
-                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
-                    assert_ne!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                    assert_eq!(backing.memory_offset, 0);
+                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
+                    assert_ne!(original_memory.get_koid(), backing.memory.get_koid());
                 }
             }
         }
@@ -4741,18 +4766,17 @@ mod tests {
             }
         });
 
-        let child_vmo = Arc::new(
-            vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, VMO_SIZE).unwrap(),
-        );
+        let child_vmo =
+            vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, VMO_SIZE).unwrap();
 
         // Write something to the source VMO.
         vmo.write(b"foo", 0).expect("write failed");
 
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
         let addr = mm
-            .map_vmo(
+            .map_memory(
                 DesiredAddress::Any,
-                child_vmo,
+                Arc::new(MemoryObject::from(child_vmo)),
                 0,
                 VMO_SIZE as usize,
                 prot_flags,

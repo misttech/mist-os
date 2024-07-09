@@ -5,6 +5,7 @@
 use crate::device::kobject::{Device, DeviceMetadata};
 use crate::device::DeviceMode;
 use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::VecOutputBuffer;
@@ -14,7 +15,6 @@ use crate::vfs::{
 };
 use bitflags::bitflags;
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
-use fuchsia_zircon::Vmo;
 use linux_uapi::DM_UUID_LEN;
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use starnix_logging::{log_trace, track_stub};
@@ -376,13 +376,13 @@ impl FileOps for DmDeviceFile {
         }
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         let device = &self.device;
         let state = device.state.lock();
         if state.suspended {
@@ -398,7 +398,9 @@ impl FileOps for DmDeviceFile {
                 return Err(errno!(ENOTSUP));
             }
             match &active_table.targets[0].target_type {
-                TargetType::Verity(args) => args.block_device.get_vmo(current_task, length, prot),
+                TargetType::Verity(args) => {
+                    args.block_device.get_memory(current_task, length, prot)
+                }
             }
         } else {
             Err(errno!(EINVAL))

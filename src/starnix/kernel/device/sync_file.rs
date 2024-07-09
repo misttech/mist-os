@@ -22,7 +22,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_char, error, sync_fence_info, sync_file_info, sync_merge_data, SYNC_IOC_MAGIC,
+    c_char, errno, error, sync_fence_info, sync_file_info, sync_merge_data, SYNC_IOC_MAGIC,
 };
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -163,10 +163,18 @@ impl FileOps for SyncFile {
                         }
                     }
                 } else if let Some(file2) = file2.downcast_file::<RemoteFileObject>() {
-                    let vmo = file2.get_vmo(file, current_task, None, ProtectionFlags::READ)?;
-                    let koid = vmo.get_koid().unwrap();
+                    let memory =
+                        file2.get_memory(file, current_task, None, ProtectionFlags::READ)?;
+                    let koid = memory.get_koid();
+                    let vmo = memory
+                        .as_vmo()
+                        .ok_or_else(|| errno!(EINVAL))?
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .map_err(impossible_error)?;
                     if set.insert(koid) {
-                        fence.sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });
+                        fence
+                            .sync_points
+                            .push(SyncPoint { timeline: Timeline::Hwc, handle: Arc::new(vmo) });
                     }
                 } else {
                     return error!(EINVAL);

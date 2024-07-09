@@ -421,7 +421,7 @@ impl<'a> UserBuffersOutputBuffer<'a, CurrentTask> {
 }
 
 impl<'a> UserBuffersOutputBuffer<'a, Task> {
-    pub fn vmo_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
+    pub fn syscall_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }
@@ -595,7 +595,7 @@ impl<'a> UserBuffersInputBuffer<'a, CurrentTask> {
 }
 
 impl<'a> UserBuffersInputBuffer<'a, Task> {
-    pub fn vmo_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
+    pub fn syscall_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }

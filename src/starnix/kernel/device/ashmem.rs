@@ -2,28 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-use once_cell::sync::OnceCell;
-use std::sync::Arc;
-
 use crate::device::kobject::DeviceMetadata;
 use crate::device::DeviceMode;
 use crate::fs::sysfs::DeviceDirectory;
+use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::CurrentTask;
 use crate::vfs::{
-    default_ioctl, fileops_impl_vmo, FileObject, FileOps, FileSystemCreator, FsNode, FsString,
+    default_ioctl, fileops_impl_memory, FileObject, FileOps, FileSystemCreator, FsNode, FsString,
 };
+use fuchsia_zircon as zx;
 use linux_uapi::{
     ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE, ASHMEM_PIN,
     ASHMEM_PURGE_ALL_CACHES, ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN,
 };
+use once_cell::sync::OnceCell;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{device_type, errno, error, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN};
+use std::sync::Arc;
 
 /// Initializes the ashmem device.
 pub fn ashmem_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
@@ -48,7 +48,7 @@ where
 }
 
 pub struct Ashmem {
-    vmo: OnceCell<Arc<zx::Vmo>>,
+    memory: OnceCell<Arc<MemoryObject>>,
     state: Mutex<AshmemState>,
 }
 
@@ -66,23 +66,24 @@ impl Ashmem {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(Ashmem { vmo: OnceCell::new(), state: Mutex::default() }))
+        Ok(Box::new(Ashmem { memory: OnceCell::new(), state: Mutex::default() }))
     }
 
-    fn vmo(&self) -> Result<&Arc<zx::Vmo>, Errno> {
+    fn memory(&self) -> Result<&Arc<MemoryObject>, Errno> {
         let state = self.state.lock();
-        self.vmo.get_or_try_init(|| {
+        self.memory.get_or_try_init(|| {
             if state.size == 0 {
                 return error!(EINVAL);
             }
-            let vmo = zx::Vmo::create(state.size as u64).map_err(|_| errno!(ENOMEM))?;
-            Ok(Arc::new(vmo))
+            let memory =
+                MemoryObject::from(zx::Vmo::create(state.size as u64).map_err(|_| errno!(ENOMEM))?);
+            Ok(Arc::new(memory))
         })
     }
 }
 
 impl FileOps for Ashmem {
-    fileops_impl_vmo!(self, self.vmo()?);
+    fileops_impl_memory!(self, self.memory()?);
 
     fn ioctl(
         &self,
@@ -95,7 +96,7 @@ impl FileOps for Ashmem {
         match request {
             ASHMEM_SET_SIZE => {
                 let mut state = self.state.lock();
-                if self.vmo.get().is_some() {
+                if self.memory.get().is_some() {
                     return error!(EINVAL);
                 }
                 state.size = arg.into();

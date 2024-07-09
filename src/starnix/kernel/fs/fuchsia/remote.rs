@@ -4,6 +4,7 @@
 
 use crate::device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
+use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
@@ -19,6 +20,7 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
+use fuchsia_zircon::HandleBased;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
@@ -1406,22 +1408,22 @@ pub struct RemoteFileObject {
     zxio: Arc<Zxio>,
 
     /// Cached read-only VMO handle.
-    read_only_vmo: OnceCell<Arc<zx::Vmo>>,
+    read_only_memory: OnceCell<Arc<MemoryObject>>,
 
     /// Cached read/exec VMO handle.
-    read_exec_vmo: OnceCell<Arc<zx::Vmo>>,
+    read_exec_memory: OnceCell<Arc<MemoryObject>>,
 }
 
 impl RemoteFileObject {
     fn new(zxio: impl Into<Arc<Zxio>>) -> RemoteFileObject {
         RemoteFileObject {
             zxio: zxio.into(),
-            read_only_vmo: Default::default(),
-            read_exec_vmo: Default::default(),
+            read_only_memory: Default::default(),
+            read_exec_memory: Default::default(),
         }
     }
 
-    fn fetch_remote_vmo(&self, prot: ProtectionFlags) -> Result<Arc<zx::Vmo>, Errno> {
+    fn fetch_remote_memory(&self, prot: ProtectionFlags) -> Result<Arc<MemoryObject>, Errno> {
         let without_exec = self
             .zxio
             .vmo_get(prot.to_vmar_flags() - zx::VmarFlags::PERM_EXECUTE)
@@ -1431,7 +1433,7 @@ impl RemoteFileObject {
         } else {
             without_exec
         };
-        Ok(Arc::new(all_flags))
+        Ok(Arc::new(MemoryObject::from(all_flags)))
     }
 }
 
@@ -1460,25 +1462,25 @@ impl FileOps for RemoteFileObject {
         zxio_write_at(&self.zxio, current_task, offset, data)
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         trace_duration!(CATEGORY_STARNIX_MM, c"RemoteFileGetVmo");
-        let vmo_cache = if prot == (ProtectionFlags::READ | ProtectionFlags::EXEC) {
-            Some(&self.read_exec_vmo)
+        let memory_cache = if prot == (ProtectionFlags::READ | ProtectionFlags::EXEC) {
+            Some(&self.read_exec_memory)
         } else if prot == ProtectionFlags::READ {
-            Some(&self.read_only_vmo)
+            Some(&self.read_only_memory)
         } else {
             None
         };
 
-        vmo_cache
-            .map(|c| c.get_or_try_init(|| self.fetch_remote_vmo(prot)).cloned())
-            .unwrap_or_else(|| self.fetch_remote_vmo(prot))
+        memory_cache
+            .map(|c| c.get_or_try_init(|| self.fetch_remote_memory(prot)).cloned())
+            .unwrap_or_else(|| self.fetch_remote_memory(prot))
     }
 
     fn to_handle(
@@ -1509,8 +1511,13 @@ impl FileOps for RemoteFileObject {
             || (request as u8 == SYNC_IOC_MERGE)
         {
             let mut sync_points: Vec<SyncPoint> = vec![];
-            let vmo = self.get_vmo(file, current_task, Some(8), ProtectionFlags::READ)?;
-            sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });
+            let memory = self.get_memory(file, current_task, Some(8), ProtectionFlags::READ)?;
+            let vmo = memory
+                .as_vmo()
+                .ok_or_else(|| errno!(ENOTSUP))?
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .map_err(impossible_error)?;
+            sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: Arc::new(vmo) });
             let sync_file_name: &[u8; 32] = b"hwc semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
             let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
             return sync_file.ioctl(locked, file, current_task, request, arg);

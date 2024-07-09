@@ -2,21 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mm::memory::MemoryObject;
 use crate::mm::ProtectionFlags;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
     default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
     fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode, DirectoryEntryType,
     DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
-    SymlinkTarget, VmoFileObject, XattrOp,
+    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp,
 };
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
 use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
 use fuchsia_zircon as zx;
+use fuchsia_zircon::HandleBased;
 use once_cell::sync::OnceCell;
-use starnix_logging::track_stub;
+use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -76,9 +78,16 @@ impl ExtFilesystem {
 
         let source_device = current_task.open_file(locked, options.source.as_ref(), open_flags)?;
 
-        // Note that we *require* get_vmo to work here for performance reasons.  Fallback to
+        // Note that we *require* get_memory to work here for performance reasons.  Fallback to
         // FIDL-based read/write API is not an option.
-        let vmo = source_device.get_vmo(current_task, None, prot_flags)?;
+        let memory = source_device.get_memory(current_task, None, prot_flags)?;
+        let vmo = Arc::new(
+            memory
+                .as_vmo()
+                .ok_or_else(|| errno!(EINVAL))?
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .map_err(impossible_error)?,
+        );
         let parser = ExtParser::new(Box::new(VmoReader::new(vmo.clone())));
         let pager = Arc::new(Pager::new(vmo, parser.block_size().map_err(|e| errno!(EIO, e))?)?);
         let fs = Self { parser, pager: pager.clone() };
@@ -213,12 +222,12 @@ struct ExtFile {
     // The VMO here will be a child of the main VMO that the pager holds.  We want to keep it here
     // so that whilst ExtFile remains resident, we hold a child reference to the main VMO which
     // will prevent the pager from dropping the VMO (and any data we might have paged-in).
-    vmo: OnceCell<Arc<zx::Vmo>>,
+    memory: OnceCell<Arc<MemoryObject>>,
 }
 
 impl ExtFile {
     fn new(inner: ExtNode, name: FsString) -> Self {
-        ExtFile { inner, name, vmo: OnceCell::new() }
+        ExtFile { inner, name, memory: OnceCell::new() }
     }
 }
 
@@ -236,7 +245,7 @@ impl FsNodeOps for ExtFile {
         let fs = node.fs();
         let fs_ops = fs.downcast_ops::<ExtFilesystem>().unwrap();
         let inode_num = self.inner.inode_num;
-        let vmo = self.vmo.get_or_try_init(|| {
+        let memory = self.memory.get_or_try_init(|| {
             let (file_size, extents) = fs_ops
                 .parser
                 .read_extents(self.inner.inode_num)
@@ -252,16 +261,16 @@ impl FsNodeOps for ExtFile {
                 last_block = pager_extent.logical.end;
                 pager_extents.push(pager_extent);
             }
-            Ok(Arc::new(
+            Ok(Arc::new(MemoryObject::from(
                 fs_ops
                     .pager
                     .register(self.name.as_ref(), inode_num, file_size, pager_extents.into())
                     .map_err(|e| errno!(EINVAL, e))?,
-            ))
+            )))
         })?;
 
-        // TODO(https://fxbug.dev/42080696) returned vmo shouldn't be writeable
-        Ok(Box::new(VmoFileObject::new(vmo.clone())))
+        // TODO(https://fxbug.dev/42080696) returned memory shouldn't be writeable
+        Ok(Box::new(MemoryFileObject::new(memory.clone())))
     }
 }
 

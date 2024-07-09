@@ -178,14 +178,16 @@ pub async fn serve_container_controller(
                                 let fds = leader.files.get_all_fds();
                                 for fd in fds {
                                     if let Ok(file) = leader.files.get(fd) {
-                                        if let Ok(vmo) = file.get_vmo(
+                                        if let Ok(memory) = file.get_memory(
                                             system_task,
                                             None,
                                             starnix_core::mm::ProtectionFlags::READ,
                                         ) {
-                                            let vmo_koid =
-                                                vmo.info().expect("Failed to get vmo info").koid;
-                                            if vmo_koid.raw_koid() == koid {
+                                            let memory_koid = memory
+                                                .info()
+                                                .expect("Failed to get memory info")
+                                                .koid;
+                                            if memory_koid.raw_koid() == koid {
                                                 let process_name = thread_group
                                                     .process
                                                     .get_name()
