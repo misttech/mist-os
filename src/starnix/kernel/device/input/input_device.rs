@@ -230,25 +230,48 @@ impl InputDevice {
                 if let Err(e) = registry_proxy.register_listener(listener, zx::Time::INFINITE) {
                     log_warn!("Failed to register media buttons listener: {:?}", e);
                 }
+
                 let mut power_was_pressed = false;
                 let mut function_was_pressed = false;
-                while let Some(Ok(request)) = listener_stream.next().await {
+                while let Some(request) = listener_stream.next().await {
                     match request {
-                        fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder } => {
-                            let (new_events, power_is_pressed, function_is_pressed) =
-                                parse_fidl_button_event(
-                                    &event,
-                                    power_was_pressed,
-                                    function_was_pressed,
-                                );
+                        Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder }) => {
+                            let (
+                                new_events,
+                                power_is_pressed,
+                                function_is_pressed,
+                            ) = parse_fidl_button_event(
+                                &event,
+                                power_was_pressed,
+                                function_was_pressed
+                            );
                             power_was_pressed = power_is_pressed;
                             function_was_pressed = function_is_pressed;
+
+                            let (converted_events, ignored_events, generated_events) = match new_events.len() {
+                              0 => (0u64, 1u64, 0u64),
+                              len => {
+                                  if len % 2 == 1 {
+                                      log_warn!("unexpectedly received {} events: there should always be an even number of non-empty events.", len);
+                                  }
+                                  (1u64, 0u64, len as u64)
+                              }
+                          };
 
                             let mut files = slf.open_files.lock();
                             let filtered_files: Vec<Arc<InputFile>> =
                                 files.drain(..).flat_map(|f| f.upgrade()).collect();
                             for file in filtered_files {
                                 let mut inner = file.inner.lock();
+                                match &inner.inspect_status {
+                                    Some(inspect_status) => {
+                                        inspect_status.count_received_events(1);
+                                        inspect_status.count_ignored_events(ignored_events);
+                                        inspect_status.count_converted_events(converted_events);
+                                        inspect_status.count_generated_events(generated_events);
+                                    }
+                                    None => (),
+                                }
                                 inner.events.extend(new_events.clone());
                                 inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 files.push(Arc::downgrade(&file));
@@ -256,9 +279,15 @@ impl InputDevice {
 
                             responder.send().expect("media buttons responder failed to respond");
                         }
-                        _ => {}
+                        Ok(_) => { /* Ignore deprecated OnMediaButtonsEvent */ }
+                        Err(e) => {
+                          log_warn!("Received an error while listening for events on MediaButtonsListener: {:?}", e);
+                          break;
+                        }
                     }
                 }
+
+                log_warn!("MediaButtonsListener request stream has ended");
             })
         });
     }
@@ -278,7 +307,10 @@ impl InputDevice {
                 ));
                 file
             }
-            InputDeviceType::Keyboard => Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, None)),
+            InputDeviceType::Keyboard => Arc::new(InputFile::new_keyboard(
+                KEYBOARD_INPUT_ID,
+                Some(self.input_files_node.create_child("keyboard_file")),
+            )),
         };
         self.open_files.lock().push(Arc::downgrade(&input_file));
         let file_object = starnix_core::vfs::FileObject::new(
@@ -465,11 +497,18 @@ mod test {
         current_task: &CurrentTask,
     ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
+        start_button_input_inspect(current_task, &inspector)
+    }
+
+    fn start_button_input_inspect(
+        current_task: &CurrentTask,
+        inspector: &fuchsia_inspect::Inspector,
+    ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
         let input_device = InputDevice::new_keyboard(inspector.root());
         let input_file = input_device.open_test(current_task).expect("Failed to create input file");
         let (device_registry_proxy, device_listener_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+        fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
+            .expect("Failed to create DeviceListenerRegistry proxy and stream.");
         input_device.start_button_relay(current_task.kernel(), device_registry_proxy);
         (input_device, input_file, device_listener_stream)
     }
@@ -1631,6 +1670,94 @@ mod test {
                     fidl_events_converted_count: 5u64,
                     uapi_events_generated_count: 22u64,
                     uapi_events_read_count: 22u64,
+                },
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    fn keyboard_input_file_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let _keyboard_file = InputFile::new_keyboard(
+            KEYBOARD_INPUT_ID,
+            Some(inspector.root().create_child("keyboard_input_file")),
+        );
+
+        assert_data_tree!(inspector, root: {
+          keyboard_input_file: {
+                fidl_events_received_count: 0u64,
+                fidl_events_ignored_count: 0u64,
+                fidl_events_unexpected_count: 0u64,
+                fidl_events_converted_count: 0u64,
+                uapi_events_generated_count: 0u64,
+                uapi_events_read_count: 0u64,
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn button_relay_updates_keyboard_inspect_status() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut device_listener_stream) =
+            start_button_input_inspect(&current_task, &inspector);
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        // Each of these events should count toward received and converted.
+        // They also generate 2 uapi events each.
+        let power_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(false),
+            ..Default::default()
+        };
+
+        let power_release_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(false),
+            function: Some(false),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&power_event).await;
+        let _ = buttons_listener.on_event(&power_release_event).await;
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(events.len(), 4);
+        assert_eq!(events[0].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[0].value, 1);
+        assert_eq!(events[2].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[2].value, 0);
+
+        let _events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_data_tree!(inspector, root: {
+            keyboard_device: {
+                keyboard_file: {
+                    fidl_events_received_count: 2u64,
+                    fidl_events_ignored_count: 0u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 2u64,
+                    uapi_events_generated_count: 4u64,
+                    uapi_events_read_count: 4u64,
                 },
             }
         });
