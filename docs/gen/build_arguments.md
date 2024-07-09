@@ -331,9 +331,9 @@ binaries for all API levels, or a subset of them. Possible values are:
       contains artifacts built at "PLATFORM".
 
   true: To build for all API levels listed in
-      platform_version.build_time_supported_api_levels, which defaults to
+      platform_version.idk_buildable_api_levels, which defaults to
       all Supported API levels plus the current in-development API level,
-      unless `override_build_time_supported_api_levels` is also set.
+      unless `override_idk_buildable_api_levels` is also set.
       See //build/config/fuchsia/platform_versions.gni.
 
 
@@ -5398,7 +5398,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 From //build/config/BUILDCONFIG.gn:30
 
-### override_build_time_supported_api_levels
+### override_idk_buildable_api_levels
 
 Overrides the set of API levels for which this build will provide build-time
 support in the IDK/SDK. The default (`false`) set is all `supported` and
@@ -5435,7 +5435,7 @@ Note: The in-tree Bazel SDK ignores this variable and the variable it
 overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
 
 To override the set of API levels, see
-`override_build_time_supported_api_levels`.
+`override_idk_buildable_api_levels`.
 
 **Current value (from the default):** `false`
 
