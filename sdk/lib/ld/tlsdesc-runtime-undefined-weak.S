@@ -35,7 +35,7 @@
 
   // On entry x0 contains the argument: the address of the GOT slot pair.
   // Fetch the addend.
-  ldr tlsdesc.r0, [x0, #tlsdesc.value_offset]
+  ldr tlsdesc_r0, [x0, #tlsdesc.value_offset]
 
   // On exit x0 contains the return value: offset from $tp (TPIDR_EL0).
   .cfi_undefined x0
@@ -44,7 +44,7 @@
   mrs x1, TPIDR_EL0
 
   // Subtract the thread pointer from the addend.
-  sub tlsdesc.r0, tlsdesc.r0, tlsdesc.r1
+  sub tlsdesc_r0, tlsdesc_r0, tlsdesc_r1
 
   ldr x1, [sp], #16
   .cfi_same_value x1

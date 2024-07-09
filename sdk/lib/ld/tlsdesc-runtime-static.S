@@ -21,7 +21,7 @@
 
   // On entry x0 contains the argument: the address of the GOT slot pair.
   // The first word holds our own PC, the second the static TLS offset.
-  ldr tlsdesc.r0, [x0, #tlsdesc.value_offset]
+  ldr tlsdesc_r0, [x0, #tlsdesc.value_offset]
 
   // On exit x0 contains the return value: offset from $tp (TPIDR_EL0).
   .cfi_undefined x0
