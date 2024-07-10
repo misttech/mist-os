@@ -787,6 +787,9 @@ config("default_warnings") {
     ]
 
     cflags += [
+      # This warns about compatibility with ancient binaries, not relevant.
+      "-Wno-psabi",
+
       # TODO(https://fxbug.dev/42052174): -Warray-bounds has false positives in GCC 12.
       # When https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105762 is fixed,
       # remove this.
@@ -802,6 +805,11 @@ config("default_warnings") {
       # Needs to be pursued upstream.
       "-Wno-stringop-overread",
       "-Wno-stringop-overflow",
+
+      # TODO(https://fxbug.dev/351904809): -Wmaybe-uninitialized has at least
+      # one false positive in GCC 14 that was not obvious how to work around
+      # locally.  Needs to be pursued upstream.
+      "-Wno-maybe-uninitialized",
     ]
   }
 
