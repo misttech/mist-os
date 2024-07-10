@@ -44,11 +44,7 @@ where
         }
     }
 
-    write!(w, "    component_url = ")?;
-    match &schema.metadata.component_url {
-        Some(url) => writeln!(w, "{}", url)?,
-        None => writeln!(w, "null")?,
-    }
+    writeln!(w, "    component_url = {}", schema.metadata.component_url)?;
     writeln!(w, "    timestamp = {}", schema.metadata.timestamp)?;
 
     match &schema.payload {

@@ -115,9 +115,6 @@ pub trait Metadata: DeserializeOwned + Serialize + Clone + Send {
     /// The type of error returned in this metadata.
     type Error: Clone + MetadataError;
 
-    /// Returns the component URL which generated this value.
-    fn component_url(&self) -> Option<&str>;
-
     /// Returns the timestamp at which this value was recorded.
     fn timestamp(&self) -> Timestamp;
 
@@ -158,10 +155,6 @@ impl DiagnosticsData for Inspect {
 impl Metadata for InspectMetadata {
     type Error = InspectError;
 
-    fn component_url(&self) -> Option<&str> {
-        self.component_url.as_ref().map(|s| s.as_str())
-    }
-
     fn timestamp(&self) -> Timestamp {
         Timestamp(self.timestamp)
     }
@@ -187,10 +180,6 @@ impl DiagnosticsData for Logs {
 
 impl Metadata for LogsMetadata {
     type Error = LogError;
-
-    fn component_url(&self) -> Option<&str> {
-        self.component_url.as_ref().map(|s| s.as_str())
-    }
 
     fn timestamp(&self) -> Timestamp {
         Timestamp(self.timestamp)
@@ -286,11 +275,18 @@ pub struct InspectMetadata {
     pub name: Option<InspectHandleName>,
 
     /// The url with which the component was launched.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub component_url: Option<String>,
+    pub component_url: String,
 
     /// Monotonic time in nanos.
     pub timestamp: i64,
+}
+
+impl InspectMetadata {
+    /// Returns the component URL with which the component that emitted the associated Inspect data
+    /// was launched.
+    pub fn component_url(&self) -> &str {
+        self.component_url.as_str()
+    }
 }
 
 /// The metadata contained in a `DiagnosticsData` object where the data source is
@@ -343,6 +339,13 @@ pub struct LogsMetadata {
     /// that contain this field.
     #[serde(skip)]
     size_bytes: Option<usize>,
+}
+
+impl LogsMetadata {
+    /// Returns the component URL which generated this value.
+    pub fn component_url(&self) -> Option<&str> {
+        self.component_url.as_ref().map(|s| s.as_str())
+    }
 }
 
 /// Severities a log message can have, often called the log's "level".
@@ -590,7 +593,7 @@ impl InspectDataBuilder {
                 metadata: InspectMetadata {
                     errors: None,
                     name: None,
-                    component_url: Some(component_url.into()),
+                    component_url: component_url.into(),
                     timestamp,
                 },
             },

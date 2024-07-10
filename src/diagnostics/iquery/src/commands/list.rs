@@ -92,17 +92,10 @@ impl fmt::Display for ListResult {
 fn components_from_inspect_data(inspect_data: Vec<InspectData>) -> Vec<ListResultItem> {
     let mut result = vec![];
     for value in inspect_data {
-        match value.metadata.component_url {
-            Some(ref url) => {
-                result.push(ListResultItem::MonikerWithUrl(MonikerWithUrl {
-                    moniker: value.moniker,
-                    component_url: url.clone(),
-                }));
-            }
-            None => {
-                result.push(ListResultItem::Moniker(value.moniker));
-            }
-        }
+        result.push(ListResultItem::MonikerWithUrl(MonikerWithUrl {
+            moniker: value.moniker,
+            component_url: value.metadata.component_url,
+        }));
     }
     result
 }
