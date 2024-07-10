@@ -32,7 +32,7 @@ use crate::internal::base::{
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::device::IpDeviceAddr;
 use crate::internal::types::{ResolvedRoute, RoutableIpAddr};
-use crate::HopLimits;
+use crate::{HopLimits, NextHop};
 
 /// An execution context defining a type of IP socket.
 pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
@@ -187,6 +187,9 @@ pub enum IpSockSendError {
     /// a non-loopback device.
     #[error("illegal loopback address")]
     IllegalLoopbackAddress,
+    /// Broadcast send is not allowed.
+    #[error("Broadcast send is not enabled for the socket")]
+    BroadcastNotAllowed,
 }
 
 impl From<SerializeError<Infallible>> for IpSockSendError {
@@ -479,7 +482,7 @@ where
 /// instead of an inherent impl on a type so that users of sockets that don't
 /// need certain option types, like TCP for anything multicast-related, can
 /// avoid allocating space for those options.
-pub trait SendOptions<I: Ip> {
+pub trait SendOptions<I: IpExt> {
     /// Returns the hop limit to set on a packet going to the given destination.
     ///
     /// If `Some(u)`, `u` will be used as the hop limit (IPv6) or TTL (IPv4) for
@@ -490,19 +493,26 @@ pub trait SendOptions<I: Ip> {
     /// Returns true if outgoing multicast packets should be looped back and
     /// delivered to local receivers who joined the multicast group.
     fn multicast_loop(&self) -> bool;
+
+    /// `Some` if the socket can be used to send broadcast packets.
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker>;
 }
 
 /// Empty send options that never overrides default values.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct DefaultSendOptions;
 
-impl<I: Ip> SendOptions<I> for DefaultSendOptions {
+impl<I: IpExt> SendOptions<I> for DefaultSendOptions {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         None
     }
 
     fn multicast_loop(&self) -> bool {
         false
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        None
     }
 }
 
@@ -647,6 +657,10 @@ where
         mut next_hop,
         mut local_delivery_device,
     } = resolve(core_ctx, bindings_ctx, socket_device, *local_ip, *remote_ip, *transparent)?;
+
+    if matches!(next_hop, NextHop::Broadcast(_)) && options.allow_broadcast().is_none() {
+        return Err(IpSockSendError::BroadcastNotAllowed);
+    }
 
     let previous_dst = remote_ip.addr();
     let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);

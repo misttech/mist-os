@@ -9,9 +9,7 @@ use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 
-use net_types::ip::{
-    AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-};
+use net_types::ip::{AddrSubnet, GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
@@ -82,7 +80,7 @@ impl IpSocketIpExt for Ipv6 {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct WithHopLimit(Option<NonZeroU8>);
 
-impl<I: Ip> SendOptions<I> for WithHopLimit {
+impl<I: IpExt> SendOptions<I> for WithHopLimit {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         let Self(hop_limit) = self;
         *hop_limit
@@ -90,6 +88,10 @@ impl<I: Ip> SendOptions<I> for WithHopLimit {
 
     fn multicast_loop(&self) -> bool {
         false
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        None
     }
 }
 
@@ -543,14 +545,18 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
 
     const SET_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(42));
 
-    impl<A: IpAddress> SendOptions<A::Version> for SetHopLimitFor<A> {
-        fn hop_limit(&self, destination: &SpecifiedAddr<A>) -> Option<NonZeroU8> {
+    impl<I: IpExt> SendOptions<I> for SetHopLimitFor<I::Addr> {
+        fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
             let Self(expected_destination) = self;
             (destination == expected_destination).then_some(SET_HOP_LIMIT)
         }
 
         fn multicast_loop(&self) -> bool {
             false
+        }
+
+        fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+            None
         }
     }
 

@@ -764,6 +764,10 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
         // TODO(https://fxbug.dev/344645667): Support IP_MULTICAST_LOOP.
         false
     }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        None
+    }
 }
 
 /// A marker type capturing that raw IP sockets don't have ports.

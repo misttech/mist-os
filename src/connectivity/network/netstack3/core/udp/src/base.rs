@@ -2139,6 +2139,33 @@ where
         self.datagram().set_ip_transparent(id, value)
     }
 
+    /// Gets the broadcast option.
+    pub fn get_broadcast(&mut self, id: &UdpApiSocketId<I, C>) -> bool {
+        self.datagram().with_both_stacks_ip_options(id, |this_stack, other_stack| {
+            I::map_ip_in(
+                (this_stack, WrapOtherStackIpOptions(other_stack)),
+                |(this_stack, _)| this_stack.allow_broadcast.is_some(),
+                |(_, WrapOtherStackIpOptions(other_stack))| {
+                    other_stack.socket_options.allow_broadcast.is_some()
+                },
+            )
+        })
+    }
+
+    /// Sets the broadcast option.
+    pub fn set_broadcast(&mut self, id: &UdpApiSocketId<I, C>, value: bool) {
+        self.datagram().with_both_stacks_ip_options_mut(id, |this_stack, other_stack| {
+            let value = value.then_some(());
+            I::map_ip_in(
+                (this_stack, WrapOtherStackIpOptionsMut(other_stack)),
+                |(this_stack, _)| this_stack.allow_broadcast = value,
+                |(_, WrapOtherStackIpOptionsMut(other_stack))| {
+                    other_stack.socket_options.allow_broadcast = value;
+                },
+            )
+        })
+    }
+
     /// Gets the loopback multicast option.
     pub fn get_multicast_loop(
         &mut self,

@@ -11,7 +11,7 @@ use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 pub trait BroadcastIpExt: Ip {
     /// A marker type carried by the [`NextHop::Broadcast`] variant to indicate
     /// that it is uninhabited for IPv6.
-    type BroadcastMarker: Debug + Copy + Clone + PartialEq + Eq + Send + Sync;
+    type BroadcastMarker: Debug + Copy + Clone + PartialEq + Eq + Send + Sync + 'static;
 }
 
 impl BroadcastIpExt for Ipv4 {

@@ -907,6 +907,9 @@ impl IntoErrno for RawIpSocketSendToError {
                 IpSockCreateAndSendError::Send(IpSockSendError::IllegalLoopbackAddress) => {
                     fposix::Errno::Einval
                 }
+                IpSockCreateAndSendError::Send(IpSockSendError::BroadcastNotAllowed) => {
+                    fposix::Errno::Eacces
+                }
                 IpSockCreateAndSendError::Send(IpSockSendError::Unroutable(inner)) => {
                     inner.into_errno()
                 }

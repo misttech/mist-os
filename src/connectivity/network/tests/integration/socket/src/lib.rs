@@ -4528,3 +4528,77 @@ async fn broadcast_recv<N: Netstack>(name: &str) {
         assert_eq!(size, test_packet.len());
     }
 }
+
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn broadcast_send<N: Netstack, I: TestIpExt>(name: &str) {
+    const NETWORK: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    const BROADCAST_ADDR: std::net::SocketAddr = std_socket_addr!("192.0.2.255:3513");
+
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let net = sandbox.create_network(format!("net0")).await.expect("failed to create network");
+    let iface = client.join_network(&net, format!("if0")).await.expect("failed to join network");
+    iface.add_address_and_subnet_route(NETWORK.clone()).await.expect("failed to set ip");
+    let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
+
+    let socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+
+    assert_eq!(socket.broadcast().expect("getsockopt(SO_BROADCAST) failed"), false);
+
+    let test_packet = [1, 2, 3, 4, 5];
+    let err = socket
+        .send_to(&test_packet, &BROADCAST_ADDR.into())
+        .expect_err("sendto is expected to fail to send broadcast packets by default");
+    assert_eq!(err.raw_os_error(), Some(libc::EACCES));
+
+    socket.set_broadcast(true).expect("failed to set SO_BROADCAST");
+    assert_eq!(socket.broadcast().expect("getsockopt(SO_BROADCAST) failed"), true);
+
+    assert_eq!(
+        socket
+            .send_to(&test_packet, &BROADCAST_ADDR.into())
+            .expect("failed to send broadcast packet"),
+        test_packet.len()
+    );
+
+    // Check that the packet is sent to the network.
+    std::pin::pin!(receiver.frame_stream().map(|r| r.expect("failed to read frame")).filter_map(
+        |(data, dropped)| async move {
+            assert_eq!(dropped, 0);
+            let (_payload, _src_mac, _dst_mac, _src_ip, dst_ip, proto, _ttl) =
+                match packet_formats::testutil::parse_ip_packet_in_ethernet_frame::<Ipv4>(
+                    &data[..],
+                    EthernetFrameLengthCheck::NoCheck,
+                ) {
+                    Ok(result) => result,
+                    Err(_e) => {
+                        // Packet may fail to parse if it was for a
+                        // different IP version. Just skip it.
+                        return None;
+                    }
+                };
+
+            if proto != IpProto::Udp.into() {
+                return None;
+            }
+
+            assert_eq!(dst_ip.to_ip_addr(), BROADCAST_ADDR.ip().into());
+
+            Some(())
+        }
+    ))
+    .next()
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+        panic!("timed out waiting for the multicast packet")
+    })
+    .await
+    .expect("didn't receive the packet before end of the stream");
+}

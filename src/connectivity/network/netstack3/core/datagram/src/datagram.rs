@@ -562,6 +562,9 @@ pub struct DatagramSocketOptions<I: IpExt, D: WeakDeviceIdentifier> {
     /// IP_MULTICAST_LOOP flag). Enabled by default.
     #[derivative(Default(value = "true"))]
     pub multicast_loop: bool,
+
+    /// Set to `Some` when the socket can be used to send broadcast packets.
+    pub allow_broadcast: Option<I::BroadcastMarker>,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions<I, D> {
@@ -571,6 +574,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions
 
     fn multicast_loop(&self) -> bool {
         self.multicast_loop
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        self.allow_broadcast
     }
 }
 
@@ -4847,6 +4854,38 @@ where
         })
     }
 
+    /// Calls the callback with mutable access to [`DatagramSocketOptionsI, D>`]
+    /// and [`S::OtherStackIpOptions<I, D>`].
+    pub fn with_both_stacks_ip_options_mut<R>(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+        cb: impl FnOnce(
+            &mut DatagramSocketOptions<I, DatagramApiWeakDeviceId<C>>,
+            &mut S::OtherStackIpOptions<I, DatagramApiWeakDeviceId<C>>,
+        ) -> R,
+    ) -> R {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            let options = state.get_options_mut(core_ctx);
+            cb(&mut options.socket_options, &mut options.other_stack)
+        })
+    }
+
+    /// Calls the callback with access to [`DatagramSocketOptionsI, D>`] and
+    /// [`S::OtherStackIpOptions<I, D>`].
+    pub fn with_both_stacks_ip_options<R>(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+        cb: impl FnOnce(
+            &DatagramSocketOptions<I, DatagramApiWeakDeviceId<C>>,
+            &S::OtherStackIpOptions<I, DatagramApiWeakDeviceId<C>>,
+        ) -> R,
+    ) -> R {
+        self.core_ctx().with_socket_state(id, |core_ctx, state| {
+            let (options, _device) = state.get_options_device(core_ctx);
+            cb(&options.socket_options, &options.other_stack)
+        })
+    }
+
     /// Updates the socket's sharing state to the result of `f`.
     ///
     /// `f` is given mutable access to the sharing state and is called under the
@@ -4901,7 +4940,29 @@ where
         })
     }
 
-    /// Sets the multicast interface for outgoing multicast interface.
+    /// Sets the broadcast option.
+    pub fn set_broadcast(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+        value: Option<I::BroadcastMarker>,
+    ) {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            state.get_options_mut(core_ctx).socket_options.allow_broadcast = value;
+        })
+    }
+
+    /// Returns the broadcast option.
+    pub fn get_broadcast(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+    ) -> Option<I::BroadcastMarker> {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            let (options, _device) = state.get_options_device(core_ctx);
+            options.socket_options.allow_broadcast
+        })
+    }
+
+    /// Sets the multicast interface for outgoing multicast packets.
     pub fn set_multicast_interface(
         &mut self,
         id: &DatagramApiSocketId<I, C, S>,
