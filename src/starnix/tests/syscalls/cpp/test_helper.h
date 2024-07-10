@@ -29,23 +29,22 @@
     auto retval = (X);                                                              \
     if (retval < 0) {                                                               \
       ADD_FAILURE() << #X << " failed: " << strerror(errno) << "(" << errno << ")"; \
-      _exit(-1);                                                                    \
+      retval = {};                                                                  \
     }                                                                               \
     retval;                                                                         \
   })
 
-#define SAFE_SYSCALL_SKIP_ON_EPERM(X)                                                 \
-  ({                                                                                  \
-    auto retval = (X);                                                                \
-    if (retval < 0) {                                                                 \
-      if (errno == EPERM) {                                                           \
-        GTEST_SKIP() << "Permission denied for " << #X << ", skipping tests.";        \
-      } else {                                                                        \
-        ADD_FAILURE() << #X << " failed: " << strerror(errno) << "(" << errno << ")"; \
-        _exit(-1);                                                                    \
-      }                                                                               \
-    }                                                                                 \
-    retval;                                                                           \
+#define SAFE_SYSCALL_SKIP_ON_EPERM(X)                                          \
+  ({                                                                           \
+    auto retval = (X);                                                         \
+    if (retval < 0) {                                                          \
+      if (errno == EPERM) {                                                    \
+        GTEST_SKIP() << "Permission denied for " << #X << ", skipping tests."; \
+      } else {                                                                 \
+        FAIL() << #X << " failed: " << strerror(errno) << "(" << errno << ")"; \
+      }                                                                        \
+    }                                                                          \
+    retval;                                                                    \
   })
 
 #define ASSERT_RESULT_SUCCESS_AND_RETURN(S)          \
