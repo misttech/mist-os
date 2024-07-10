@@ -13,6 +13,7 @@
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sync/completion.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zx/channel.h>
@@ -145,6 +146,7 @@ class PlatformBus : public PlatformBusType,
   fdf::OutgoingDirectory outgoing_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bindings_;
   fdf::UnownedDispatcher dispatcher_;
+  std::optional<inspect::ComponentInspector> inspector_;
 };
 
 }  // namespace platform_bus

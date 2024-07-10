@@ -235,8 +235,8 @@ zx::result<> PlatformBus::NodeAddInternal(fuchsia_hardware_platform_bus::Node& n
     return result.take_error();
   }
   std::unique_ptr<platform_bus::PlatformDevice> dev;
-  auto status =
-      PlatformDevice::Create(std::move(node), zxdev(), this, PlatformDevice::Isolated, &dev);
+  auto status = PlatformDevice::Create(std::move(node), zxdev(), this, PlatformDevice::Isolated,
+                                       inspector_.value(), &dev);
   if (status != ZX_OK) {
     return zx::error(status);
   }
@@ -366,6 +366,7 @@ void PlatformBus::RegisterSysSuspendCallback(RegisterSysSuspendCallbackRequestVi
 
 void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, fdf::Arena& arena,
                                        AddCompositeNodeSpecCompleter::Sync& completer) {
+  ZX_ASSERT_MSG(inspector_.has_value(), "Inspector not initialized");
   // Create the pdev fragments
   auto vid = request->node.has_vid() ? request->node.vid() : 0;
   auto pid = request->node.has_pid() ? request->node.pid() : 0;
@@ -416,8 +417,8 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
     return;
   }
 
-  status =
-      PlatformDevice::Create(std::move(natural), zxdev(), this, PlatformDevice::Fragment, &dev);
+  status = PlatformDevice::Create(std::move(natural), zxdev(), this, PlatformDevice::Fragment,
+                                  inspector_.value(), &dev);
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
@@ -588,6 +589,16 @@ zx::result<zbi_board_info_t> PlatformBus::GetBoardInfo() {
 }
 
 zx_status_t PlatformBus::Init() {
+  // Set up inspector
+  zx::result inspect_client = DdkConnectNsProtocol<fuchsia_inspect::InspectSink>();
+  if (inspect_client.is_error()) {
+    zxlogf(ERROR, "Failed to connect to inspect client: %s", inspect_client.status_string());
+    return inspect_client.status_value();
+  }
+  inspector_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                     inspect::PublishOptions{.tree_name = "platform-bus",
+                                             .client_end = std::move(inspect_client.value())});
+
   zx_status_t status;
   // Set up a dummy IOMMU protocol to use in the case where our board driver
   // does not set a real one.

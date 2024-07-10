@@ -36,6 +36,8 @@ fuchsia_driver("platform-bus-driver") {
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/inspect/component/cpp",
+    "//sdk/lib/sys/cpp",
     "//sdk/lib/zbi-format",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
