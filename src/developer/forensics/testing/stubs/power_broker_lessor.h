@@ -25,9 +25,7 @@ class PowerBrokerLessorBase : public FidlServer<fuchsia_power_broker::Lessor> {
 
   virtual ~PowerBrokerLessorBase() = default;
 
-  virtual bool IsActive() const = 0;
-
-  void SetLeaseStatus(fuchsia_power_broker::LeaseStatus status);
+  bool IsActive() const;
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
 
@@ -47,18 +45,32 @@ class PowerBrokerLessor : public PowerBrokerLessorBase {
  public:
   explicit PowerBrokerLessor(fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
                              async_dispatcher_t* dispatcher,
-                             fuchsia_power_broker::LeaseStatus initial_status)
+                             std::function<void(uint8_t)> level_changed)
       : PowerBrokerLessorBase(std::move(server_end), dispatcher),
         dispatcher_(dispatcher),
-        initial_status_(initial_status) {}
+        level_changed_(std::move(level_changed)) {}
 
   void Lease(LeaseRequest& request, LeaseCompleter::Sync& completer) override;
 
-  bool IsActive() const override;
+ private:
+  async_dispatcher_t* dispatcher_;
+  std::function<void(uint8_t)> level_changed_;
+};
+
+class PowerBrokerLessorDelaysRequiredLevel : public PowerBrokerLessorBase {
+ public:
+  explicit PowerBrokerLessorDelaysRequiredLevel(
+      fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end, async_dispatcher_t* dispatcher,
+      std::function<void(uint8_t)> level_changed)
+      : PowerBrokerLessorBase(std::move(server_end), dispatcher),
+        dispatcher_(dispatcher),
+        level_changed_(std::move(level_changed)) {}
+
+  void Lease(LeaseRequest& request, LeaseCompleter::Sync& completer) override;
 
  private:
   async_dispatcher_t* dispatcher_;
-  fuchsia_power_broker::LeaseStatus initial_status_;
+  std::function<void(uint8_t)> level_changed_;
 };
 
 class PowerBrokerLessorClosesConnection : public PowerBrokerLessorBase {
@@ -70,8 +82,6 @@ class PowerBrokerLessorClosesConnection : public PowerBrokerLessorBase {
   void Lease(LeaseRequest& request, LeaseCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_PEER_CLOSED);
   }
-
-  bool IsActive() const override { return false; }
 };
 
 }  // namespace forensics::stubs

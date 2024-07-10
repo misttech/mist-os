@@ -16,7 +16,6 @@ fpromise::promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error> WakeL
 
   auto lease_control = std::make_unique<PowerBrokerLeaseControl>(
       /*level=*/1, std::move(endpoints->server), dispatcher_,
-      /*initial_status=*/fuchsia_power_broker::LeaseStatus::kSatisfied,
       /*on_closure=*/[this](PowerBrokerLeaseControl* control) {
         cpp20::erase_if(lease_controls_,
                         [control](const std::unique_ptr<PowerBrokerLeaseControl>& item) {

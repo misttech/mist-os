@@ -63,7 +63,7 @@ class WakeLeaseTest : public UnitTestFixture {
 
   template <typename Impl>
   static std::optional<std::tuple<fidl::ClientEnd<fpb::Topology>, std::unique_ptr<Impl>>>
-  CreateTopology(async_dispatcher_t* dispatcher,
+  CreateTopology(async_dispatcher_t* dispatcher, const uint8_t initial_required_level,
                  typename Impl::ConstructLessorFn construct_lessor) {
     static_assert(std::is_base_of_v<TestBase<fpb::Topology>, Impl>);
 
@@ -72,7 +72,8 @@ class WakeLeaseTest : public UnitTestFixture {
       return std::nullopt;
     }
 
-    auto stub = std::make_unique<Impl>(std::move(endpoints->server), dispatcher, construct_lessor);
+    auto stub = std::make_unique<Impl>(std::move(endpoints->server), dispatcher,
+                                       initial_required_level, construct_lessor);
     return std::make_tuple(std::move(endpoints->client), std::move(stub));
   }
 
@@ -86,11 +87,12 @@ TEST_F(WakeLeaseTest, AcquiresLeaseSuccessfully) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
         return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kSatisfied);
+                                                          std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -133,11 +135,12 @@ TEST_F(WakeLeaseTest, AddsElementOnlyOnce) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
         return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kSatisfied);
+                                                          std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -195,11 +198,12 @@ TEST_F(WakeLeaseTest, WaitsForAddElementToComplete) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopologyDelaysResponse>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
         return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kSatisfied);
+                                                          std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -249,17 +253,18 @@ TEST_F(WakeLeaseTest, WaitsForAddElementToComplete) {
   EXPECT_TRUE(topology->IsLeaseActive("exceptions-element-001"));
 }
 
-TEST_F(WakeLeaseTest, WaitsUntilLeaseSatisfied) {
+TEST_F(WakeLeaseTest, WaitsUntilRequiredLevelActive) {
   auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernor>(dispatcher());
   ASSERT_TRUE(sag_client_and_stub.has_value());
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
-        return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kPending);
+      dispatcher(), /*initial_required_level=*/kPowerLevelInactive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
+        return std::make_unique<stubs::PowerBrokerLessorDelaysRequiredLevel>(
+            std::move(server_end), dispatcher, std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -294,7 +299,7 @@ TEST_F(WakeLeaseTest, WaitsUntilLeaseSatisfied) {
 
   EXPECT_FALSE(lease.has_value());
 
-  topology->SetLeaseStatus("exceptions-element-001", fuchsia_power_broker::LeaseStatus::kSatisfied);
+  topology->SetRequiredLevel("exceptions-element-001", kPowerLevelActive);
   RunLoopUntilIdle();
 
   ASSERT_TRUE(lease.has_value());
@@ -307,11 +312,12 @@ TEST_F(WakeLeaseTest, GetPowerElementsFails) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
         return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kSatisfied);
+                                                          std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -339,11 +345,12 @@ TEST_F(WakeLeaseTest, GracefulSubsequentFailuresAfterFailureToAddElement) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
         return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kSatisfied);
+                                                          std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -385,11 +392,12 @@ TEST_F(WakeLeaseTest, GetPowerElementsNoSagPowerElements) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
         return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kSatisfied);
+                                                          std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -417,11 +425,12 @@ TEST_F(WakeLeaseTest, GetPowerElementsNoTokens) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
         return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kSatisfied);
+                                                          std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;
@@ -475,9 +484,10 @@ TEST_F(WakeLeaseTest, LeaseFails) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
+      dispatcher(), /*initial_required_level=*/kPowerLevelActive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  const std::function<void(uint8_t)>& level_changed) {
         return std::make_unique<stubs::PowerBrokerLessorClosesConnection>(std::move(server_end),
                                                                           dispatcher);
       });
@@ -508,11 +518,12 @@ TEST_F(WakeLeaseTest, LeaseFailsOnTimeout) {
   auto& [sag_client, sag] = *sag_client_and_stub;
 
   auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
-      dispatcher(),
-      /*construct_lessor=*/[dispatcher = dispatcher()](
-                               fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end) {
-        return std::make_unique<stubs::PowerBrokerLessor>(std::move(server_end), dispatcher,
-                                                          fpb::LeaseStatus::kPending);
+      dispatcher(), /*initial_required_level=*/kPowerLevelInactive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
+        return std::make_unique<stubs::PowerBrokerLessorDelaysRequiredLevel>(
+            std::move(server_end), dispatcher, std::move(level_changed));
       });
   ASSERT_TRUE(topology_client_and_stub.has_value());
   auto& [topology_client, topology] = *topology_client_and_stub;

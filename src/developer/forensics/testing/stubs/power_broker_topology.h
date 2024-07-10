@@ -20,6 +20,7 @@
 #include "src/developer/forensics/testing/stubs/fidl_server.h"
 #include "src/developer/forensics/testing/stubs/power_broker_element_control.h"
 #include "src/developer/forensics/testing/stubs/power_broker_lessor.h"
+#include "src/developer/forensics/testing/stubs/power_broker_required_level.h"
 
 namespace forensics::stubs {
 
@@ -27,7 +28,8 @@ namespace forensics::stubs {
 class PowerBrokerTopologyBase : public FidlServer<fuchsia_power_broker::Topology> {
  public:
   using ConstructLessorFn = std::function<std::unique_ptr<PowerBrokerLessorBase>(
-      fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end)>;
+      fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+      std::function<void(uint8_t)> level_changed)>;
 
   virtual ~PowerBrokerTopologyBase() = default;
 
@@ -42,13 +44,14 @@ class PowerBrokerTopologyBase : public FidlServer<fuchsia_power_broker::Topology
 
   bool IsLeaseActive(const std::string& element_name) const;
 
-  void SetLeaseStatus(const std::string& element_name, fuchsia_power_broker::LeaseStatus status);
+  void SetRequiredLevel(const std::string& element_name, uint8_t level);
 
  protected:
   explicit PowerBrokerTopologyBase(fidl::ServerEnd<fuchsia_power_broker::Topology> server_end,
-                                   async_dispatcher_t* dispatcher,
+                                   async_dispatcher_t* dispatcher, uint8_t initial_required_level,
                                    ConstructLessorFn construct_lessor)
       : dispatcher_(dispatcher),
+        initial_required_level_(initial_required_level),
         construct_lessor_(std::move(construct_lessor)),
         binding_(dispatcher_, std::move(server_end), this, &PowerBrokerTopologyBase::OnFidlClosed) {
   }
@@ -57,16 +60,20 @@ class PowerBrokerTopologyBase : public FidlServer<fuchsia_power_broker::Topology
     std::vector<fuchsia_power_broker::LevelDependency> dependencies;
     std::unique_ptr<PowerBrokerElementControl> element_control_server;
     std::unique_ptr<PowerBrokerLessorBase> lessor_server;
+    std::unique_ptr<PowerBrokerRequiredLevel> required_level_server;
   };
 
   async_dispatcher_t* Dispatcher() { return dispatcher_; }
 
   std::unordered_map<std::string, PowerElement>& AddedElements() { return added_elements_; }
 
+  uint8_t InitialRequiredLevel() const { return initial_required_level_; }
+
   ConstructLessorFn& ConstructLessor() { return construct_lessor_; }
 
  private:
   async_dispatcher_t* dispatcher_;
+  uint8_t initial_required_level_;
   ConstructLessorFn construct_lessor_;
   std::unordered_map<std::string, PowerElement> added_elements_;
   fidl::ServerBinding<fuchsia_power_broker::Topology> binding_;
@@ -75,8 +82,10 @@ class PowerBrokerTopologyBase : public FidlServer<fuchsia_power_broker::Topology
 class PowerBrokerTopology : public PowerBrokerTopologyBase {
  public:
   explicit PowerBrokerTopology(fidl::ServerEnd<fuchsia_power_broker::Topology> server_end,
-                               async_dispatcher_t* dispatcher, ConstructLessorFn construct_lessor)
-      : PowerBrokerTopologyBase(std::move(server_end), dispatcher, std::move(construct_lessor)) {}
+                               async_dispatcher_t* dispatcher, uint8_t initial_required_level,
+                               ConstructLessorFn construct_lessor)
+      : PowerBrokerTopologyBase(std::move(server_end), dispatcher, initial_required_level,
+                                std::move(construct_lessor)) {}
 
   // Adds an element to the topology. |request| must have a valid element_name, lessor_channel,
   // dependencies, and valid_levels. Check-fails if elements with duplicate names are added.
@@ -89,8 +98,9 @@ class PowerBrokerTopologyDelaysResponse : public PowerBrokerTopologyBase {
  public:
   explicit PowerBrokerTopologyDelaysResponse(
       fidl::ServerEnd<fuchsia_power_broker::Topology> server_end, async_dispatcher_t* dispatcher,
-      ConstructLessorFn construct_lessor)
-      : PowerBrokerTopologyBase(std::move(server_end), dispatcher, std::move(construct_lessor)) {}
+      uint8_t initial_required_level, ConstructLessorFn construct_lessor)
+      : PowerBrokerTopologyBase(std::move(server_end), dispatcher, initial_required_level,
+                                std::move(construct_lessor)) {}
 
   // Adds an element to the topology. |request| must have a valid element_name, lessor_channel,
   // dependencies, and valid_levels. Check-fails if elements with duplicate names are added.
