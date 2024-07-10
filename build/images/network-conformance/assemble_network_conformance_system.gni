@@ -13,7 +13,9 @@ import("//src/sys/core/build/core.gni")
 # Parameters
 #
 #   additional_base_packages
-#     Additional package labels to include in the `base_packages` passed to `assembled_system`.
+#     Additional package labels to include in the product assembly
+#     configuration.  These must not be groups, but labels of fuchsia_package()
+#     targets.
 #
 template("assemble_network_conformance_system") {
   _image_name = target_name
@@ -22,10 +24,6 @@ template("assemble_network_conformance_system") {
     product_config = "${target_name}.product_assembly_config"
     product_config_fxfs = "${target_name}.product_assembly_config_fxfs"
     board_config = "${target_name}.board_config"
-  }
-
-  core_realm_definition("core") {
-    testonly = true
   }
 
   board_configuration(labels.board_config) {
@@ -45,21 +43,46 @@ template("assemble_network_conformance_system") {
     }
   }
 
-  product_assembly_configuration(labels.product_config) {
+  product_assembly_base = {
+    testonly = true
     platform = {
       build_type = "eng"
       intl = {
         config_type = "none"
       }
-      storage = {
-        filesystems = {
-          image_name = _image_name
-          volume = {
-            fvm = {
-              data = {
-              }
-              blob = {
-              }
+      graphics = {
+        enable_virtual_console = false
+      }
+    }
+    base_packages = [
+      {
+        package_target = "//src/connectivity/network/net-cli"
+      },
+      {
+        package_target = "//src/connectivity/network/testing/network-test-realm/service:network-test-realm"
+      },
+    ]
+  }
+  if (defined(invoker.additional_base_packages)) {
+    foreach(_package, invoker.additional_base_packages) {
+      product_assembly_base.base_packages += [
+        {
+          package_target = _package
+        },
+      ]
+    }
+  }
+
+  product_assembly_configuration(labels.product_config) {
+    forward_variables_from(product_assembly_base, "*")
+    platform.storage = {
+      filesystems = {
+        image_name = _image_name
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
             }
           }
         }
@@ -68,15 +91,10 @@ template("assemble_network_conformance_system") {
   }
 
   product_assembly_configuration(labels.product_config_fxfs) {
-    platform = {
-      build_type = "eng"
-      intl = {
-        config_type = "none"
-      }
-      storage = {
-        filesystems = {
-          image_name = _image_name
-        }
+    forward_variables_from(product_assembly_base, "*")
+    platform.storage = {
+      filesystems = {
+        image_name = _image_name
       }
     }
   }
@@ -95,15 +113,7 @@ template("assemble_network_conformance_system") {
 
     board_config_label = ":${labels.board_config}"
     allow_eng_platform_bundle_use = true
-    base_packages = [
-      "//src/connectivity/network/net-cli",
-      "//src/connectivity/network/testing/network-test-realm/service:network-test-realm",
-    ]
-    base_packages += invoker.additional_base_packages
 
-    core_realm_definition = ":core"
-
-    additional_boot_args = [ "virtcon.disable=true" ]
     cmdline = [ "kernel.halt-on-panic=true" ]
 
     bootfs_labels = [ "//build/input:recovery_bootfs" ]
