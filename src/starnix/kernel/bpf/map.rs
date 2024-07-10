@@ -111,6 +111,7 @@ impl Map {
                 entries[array_range_for_index(self.schema.value_size, index)]
                     .copy_from_slice(&value);
             }
+            MapStore::RingBuffer(_) => return error!(EINVAL),
         }
         Ok(())
     }
@@ -133,6 +134,7 @@ impl Map {
                 //  elements cannot be deleted.
                 return error!(EINVAL);
             }
+            MapStore::RingBuffer(_) => return error!(EINVAL),
         }
         Ok(())
     }
@@ -166,6 +168,7 @@ impl Map {
                 }
                 current_task.write_memory(user_next_key, &next_index.to_ne_bytes())?;
             }
+            MapStore::RingBuffer(_) => return error!(EINVAL),
         }
         Ok(())
     }
@@ -184,19 +187,24 @@ impl Map {
                 }
                 Some(&mut entries[array_range_for_index(schema.value_size, index)])
             }
+            MapStore::RingBuffer(_) => None,
         }
     }
 
     pub fn get_memory<L>(
         &self,
-        _locked: &mut Locked<'_, L>,
-        _length: Option<usize>,
-        _prot: ProtectionFlags,
+        locked: &mut Locked<'_, L>,
+        length: Option<usize>,
+        prot: ProtectionFlags,
     ) -> Result<Arc<MemoryObject>, Errno>
     where
         L: LockBefore<BpfMapEntries>,
     {
-        error!(ENODEV)
+        self.entries
+            .lock(locked)
+            .as_ringbuf()
+            .ok_or_else(|| errno!(ENODEV))?
+            .get_memory(length, prot)
     }
 }
 
@@ -208,6 +216,7 @@ type PinnedBuffer = Pin<Box<[u8]>>;
 enum MapStore {
     Array(PinnedBuffer),
     Hash(HashStorage),
+    RingBuffer(RingBufferStorage),
 }
 
 impl MapStore {
@@ -232,7 +241,10 @@ impl MapStore {
             }
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_RINGBUF");
-                Ok(MapStore::Hash(HashStorage::new(&schema)?))
+                if schema.key_size != 0 || schema.value_size != 0 {
+                    return error!(EINVAL);
+                }
+                Ok(MapStore::RingBuffer(RingBufferStorage {}))
             }
 
             // Unimplemented types
@@ -368,6 +380,14 @@ impl MapStore {
             }
         }
     }
+
+    fn as_ringbuf(&mut self) -> Option<&'_ mut RingBufferStorage> {
+        if let Self::RingBuffer(storage) = self {
+            Some(storage)
+        } else {
+            None
+        }
+    }
 }
 
 fn compute_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
@@ -457,6 +477,18 @@ impl HashStorage {
             }
         }
         Ok(())
+    }
+}
+
+struct RingBufferStorage {}
+
+impl RingBufferStorage {
+    pub fn get_memory(
+        &self,
+        _length: Option<usize>,
+        _prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        error!(ENODEV)
     }
 }
 
