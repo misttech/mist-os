@@ -10,6 +10,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -381,14 +382,6 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 					}
 					logger.Debugf(ctx, "added package repo to target %s", t.Nodename())
 				}
-				addr, err := t.IPAddr()
-				if err != nil {
-					return err
-				}
-				// Add the target address in order to skip MDNS discovery.
-				if err := t.GetFFX().Run(ctx, "target", "add", addr.String()); err != nil {
-					return err
-				}
 				if r.syslogDir != "" {
 					if _, err := os.Stat(r.syslogDir); errors.Is(err, os.ErrNotExist) {
 						if err := os.Mkdir(r.syslogDir, os.ModePerm); err != nil {
@@ -613,22 +606,30 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 	}
 
 	if r.expectsSSH {
+		var addr net.IPAddr
 		ipv6, err := t.IPv6()
 		if err != nil {
 			return err
+		}
+		if ipv6 != nil {
+			addr = *ipv6
 		}
 		ipv4, err := t.IPv4()
 		if err != nil {
 			return err
 		}
-		addr, err := t.IPAddr()
-		if err != nil {
-			return err
+		if ipv4 != nil {
+			addr.IP = ipv4
+			addr.Zone = ""
 		}
 
 		testrunnerEnv[constants.DeviceAddrEnvKey] = addr.String()
 		testrunnerEnv[constants.IPv4AddrEnvKey] = ipv4.String()
 		testrunnerEnv[constants.IPv6AddrEnvKey] = ipv6.String()
+		// Add the target address in order to skip MDNS discovery.
+		if err := t.GetFFX().Run(ctx, "target", "add", addr.String()); err != nil {
+			return err
+		}
 	}
 
 	// One would assume this should only be provisioned when paving, but
