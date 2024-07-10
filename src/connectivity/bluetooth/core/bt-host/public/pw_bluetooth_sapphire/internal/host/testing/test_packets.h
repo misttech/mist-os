@@ -7,6 +7,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/a2dp_offload_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
@@ -28,7 +30,9 @@ DynamicByteBuffer CommandCompletePacket(hci_spec::OpCode opcode,
                                         pw::bluetooth::emboss::StatusCode);
 
 DynamicByteBuffer CommandStatusPacket(
-    hci_spec::OpCode op_code, pw::bluetooth::emboss::StatusCode status_code);
+    hci_spec::OpCode op_code,
+    pw::bluetooth::emboss::StatusCode status_code,
+    uint8_t num_packets = 0xF0);
 
 DynamicByteBuffer ConnectionCompletePacket(
     DeviceAddress address,
@@ -68,6 +72,11 @@ DynamicByteBuffer EnhancedSetupSynchronousConnectionPacket(
     hci_spec::ConnectionHandle conn,
     bt::StaticPacket<
         pw::bluetooth::emboss::SynchronousConnectionParametersWriter> params);
+
+DynamicByteBuffer InquiryCommandPacket(
+    uint16_t inquiry_length = gap::kInquiryLengthDefault);
+DynamicByteBuffer InquiryCommandResponse(
+    pw::bluetooth::emboss::StatusCode status_code);
 
 DynamicByteBuffer LEReadRemoteFeaturesCompletePacket(
     hci_spec::ConnectionHandle conn, hci_spec::LESupportedFeatures le_features);
