@@ -23,6 +23,7 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v1/display-controller-banjo.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/display-device-driver.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
 
 namespace virtio_display {
@@ -37,8 +38,8 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
   }
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
-      DdkDeviceType::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2>(
-          parent, "sysmem");
+      DdkGpuDeviceType::DdkConnectFragmentFidlProtocol<
+          fuchsia_hardware_sysmem::Service::AllocatorV2>(parent, "sysmem");
   if (sysmem_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem client: %s", sysmem_client_result.status_string());
     return sysmem_client_result.error_value();
@@ -83,7 +84,7 @@ zx_status_t GpuDeviceDriver::Create(zx_device_t* parent) {
 GpuDeviceDriver::GpuDeviceDriver(zx_device_t* bus_device,
                                  std::unique_ptr<DisplayCoordinatorEventsBanjo> coordinator_events,
                                  std::unique_ptr<DisplayEngine> display_engine)
-    : DdkDeviceType(bus_device),
+    : DdkGpuDeviceType(bus_device),
       coordinator_events_(std::move(coordinator_events)),
       display_engine_(std::move(display_engine)),
       display_controller_banjo_(display_engine_.get(), coordinator_events_.get()) {
@@ -98,17 +99,25 @@ GpuDeviceDriver::~GpuDeviceDriver() {
 }
 
 zx::result<> GpuDeviceDriver::Init() {
-  zx_status_t status = DdkAdd(
-      ddk::DeviceAddArgs("virtio-gpu-display").set_proto_id(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL));
+  zx_status_t status =
+      DdkAdd(ddk::DeviceAddArgs("virtio-gpu-root").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add device node: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
+  zx::result<> add_display_device_result =
+      DisplayDeviceDriver::Create(zxdev(), &display_controller_banjo_);
+  if (add_display_device_result.is_error()) {
+    zxlogf(ERROR, "Failed to add display device driver: %s",
+           add_display_device_result.status_string());
+    return add_display_device_result;
+  }
+
   gpu_control_server_ = std::make_unique<GpuControlServer>(
       this, display_engine_->pci_device().GetCapabilitySetLimit());
 
-  zx::result<> result = gpu_control_server_->Init(parent());
+  zx::result<> result = gpu_control_server_->Init(zxdev());
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to init virtio gpu server: %s", result.status_string());
     return zx::error(result.status_value());
@@ -117,10 +126,6 @@ zx::result<> GpuDeviceDriver::Init() {
   zxlogf(TRACE, "GpuDeviceDriver::Init success");
 
   return zx::ok();
-}
-
-zx_status_t GpuDeviceDriver::DdkGetProtocol(uint32_t proto_id, void* out) {
-  return display_controller_banjo_.DdkGetProtocol(proto_id, out);
 }
 
 void GpuDeviceDriver::DdkInit(ddk::InitTxn txn) {

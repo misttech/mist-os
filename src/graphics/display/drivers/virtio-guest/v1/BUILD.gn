@@ -48,6 +48,8 @@ source_set("common_srcs") {
     "display-coordinator-events-banjo.cc",
     "display-coordinator-events-banjo.h",
     "display-coordinator-events-interface.h",
+    "display-device-driver.cc",
+    "display-device-driver.h",
     "display-engine-interface.h",
     "display-engine.cc",
     "display-engine.h",

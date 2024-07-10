@@ -23,10 +23,10 @@
 namespace virtio_display {
 
 class GpuDeviceDriver;
-using DdkDeviceType = ddk::Device<GpuDeviceDriver, ddk::GetProtocolable, ddk::Initializable>;
+using DdkGpuDeviceType = ddk::Device<GpuDeviceDriver, ddk::Initializable>;
 
 // Integration between this driver and the Driver Framework.
-class GpuDeviceDriver : public DdkDeviceType, public GpuControlServer::Owner {
+class GpuDeviceDriver : public DdkGpuDeviceType, public GpuControlServer::Owner {
  public:
   // Factory method used by the device manager glue code.
   static zx_status_t Create(zx_device_t* parent);
@@ -47,9 +47,6 @@ class GpuDeviceDriver : public DdkDeviceType, public GpuControlServer::Owner {
 
   // Resource initialization that is not suitable for the constructor.
   zx::result<> Init();
-
-  // ddk::GetProtocolable interface.
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
 
   // ddk::Initializable interface.
   void DdkInit(ddk::InitTxn txn);
