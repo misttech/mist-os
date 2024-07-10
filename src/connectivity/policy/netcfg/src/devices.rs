@@ -50,7 +50,7 @@ impl errors::ContextExt for AddDeviceError {
 // not being able to return a struct of references.
 #[derive(Debug, Clone)]
 pub(super) struct DeviceInfo {
-    pub(super) device_class: fhwnet::DeviceClass,
+    pub(super) port_class: fhwnet::PortClass,
     pub(super) mac: Option<fidl_fuchsia_net_ext::MacAddress>,
     pub(super) topological_path: String,
 }
@@ -176,7 +176,7 @@ impl NetworkDeviceInstance {
             .await
             .context("error getting port info")
             .map_err(errors::Error::NonFatal)?;
-        let device_class = base_info
+        let port_class = base_info
             .ok_or_else(|| errors::Error::Fatal(anyhow::anyhow!("missing base info in port info")))?
             .port_class
             .ok_or_else(|| {
@@ -204,7 +204,7 @@ impl NetworkDeviceInstance {
             })
             .map_err(errors::Error::NonFatal)?;
         Ok(DeviceInfo {
-            device_class,
+            port_class,
             mac: mac.map(Into::into),
             topological_path: topological_path.clone(),
         })

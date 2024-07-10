@@ -573,6 +573,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::interface::DeviceInfoRef;
+    use crate::DeviceClass;
 
     use super::*;
 
@@ -765,9 +766,9 @@ mod tests {
             topological_path: "",
         };
 
-        let wlan_info = make_info(fidl_fuchsia_hardware_network::DeviceClass::Wlan);
-        let wlan_ap_info = make_info(fidl_fuchsia_hardware_network::DeviceClass::WlanAp);
-        let ethernet_info = make_info(fidl_fuchsia_hardware_network::DeviceClass::Ethernet);
+        let wlan_info = make_info(DeviceClass::Wlan);
+        let wlan_ap_info = make_info(DeviceClass::WlanAp);
+        let ethernet_info = make_info(DeviceClass::Ethernet);
 
         let mut fes = FilterEnabledState::new(types_empty);
         assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), false);

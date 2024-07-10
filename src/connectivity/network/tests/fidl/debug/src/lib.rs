@@ -21,15 +21,8 @@ use {
 };
 
 async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
-    let fnet_interfaces_ext::Properties {
-        id,
-        name: _,
-        device_class: _,
-        online: _,
-        addresses: _,
-        has_default_ipv4_route: _,
-        has_default_ipv6_route: _,
-    } = realm.loopback_properties().await.expect("loopback properties").expect("loopback missing");
+    let fnet_interfaces_ext::Properties { id, .. } =
+        realm.loopback_properties().await.expect("loopback properties").expect("loopback missing");
     id.get()
 }
 

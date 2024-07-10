@@ -131,7 +131,7 @@ impl Client {
 #[fidl_table_src(netdev::PortBaseInfo)]
 pub struct PortBaseInfo {
     /// Port's class.
-    pub port_class: netdev::DeviceClass,
+    pub port_class: netdev::PortClass,
     /// Supported rx frame types on this port.
     pub rx_types: Vec<netdev::FrameType>,
     /// Supported tx frame types on this port.

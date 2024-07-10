@@ -5,9 +5,10 @@
 #![cfg(test)]
 
 use anyhow::Context as _;
+use assert_matches::assert_matches;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
-use futures::{FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
+use futures::{pin_mut, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
 use net_declare::{fidl_ip, fidl_subnet, std_ip};
 use net_types::ip::IpVersion;
@@ -20,6 +21,7 @@ use std::convert::TryInto as _;
 use std::pin::pin;
 use test_case::test_case;
 use {
+    fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
     fuchsia_zircon as zx,
@@ -56,9 +58,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                         == &fidl_fuchsia_net_interfaces_ext::Properties {
                             id: (*id).try_into().expect("should be nonzero"),
                             name: "lo".to_owned(),
-                            device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                                fidl_fuchsia_net_interfaces::Empty,
-                            ),
+                            port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Loopback,
                             online: true,
                             addresses: vec![
                                 fidl_fuchsia_net_interfaces_ext::Address {
@@ -88,7 +88,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                     let fidl_fuchsia_net_interfaces_ext::Properties {
                         id: rhs_id,
                         name: rhs_name,
-                        device_class,
+                        port_class,
                         online,
                         addresses,
                         has_default_ipv4_route: rhs_ipv4_route,
@@ -106,10 +106,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                         && id == &rhs_id.get()
                         && has_default_ipv4_route == rhs_ipv4_route
                         && has_default_ipv6_route == rhs_ipv6_route
-                        && device_class
-                            == &fidl_fuchsia_net_interfaces::DeviceClass::Device(
-                                fidl_fuchsia_hardware_network::DeviceClass::Virtual,
-                            )
+                        && port_class == &fidl_fuchsia_net_interfaces_ext::PortClass::Virtual
                 }
             }
         }
@@ -275,9 +272,7 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
                 properties: fidl_fuchsia_net_interfaces_ext::Properties {
                     id: 1.try_into().expect("should be nonzero"),
                     name: "lo".to_owned(),
-                    device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                        fidl_fuchsia_net_interfaces::Empty,
-                    ),
+                    port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Loopback,
                     online: true,
                     addresses: vec![
                         fidl_fuchsia_net_interfaces_ext::Address {
@@ -1121,9 +1116,6 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
                                 online,
                                 addresses,
                                 has_default_ipv4_route,
-                                name: _,
-                                device_class: _,
-                                has_default_ipv6_route: _,
                                 ..
                             },
                         ) => {
@@ -1265,16 +1257,7 @@ async fn addresses_while_offline<N: Netstack>(
         event_stream.by_ref(),
         &mut if_state,
         |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-             properties:
-                 fidl_fuchsia_net_interfaces_ext::Properties {
-                     online,
-                     addresses,
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fidl_fuchsia_net_interfaces_ext::Properties { online, addresses, .. },
              state: _,
          }| { (*online && contains_address(addresses, addr_with_prefix)).then_some(()) },
     )
@@ -1287,16 +1270,7 @@ async fn addresses_while_offline<N: Netstack>(
         event_stream.by_ref(),
         &mut if_state,
         |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-             properties:
-                 fidl_fuchsia_net_interfaces_ext::Properties {
-                     online,
-                     addresses,
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fidl_fuchsia_net_interfaces_ext::Properties { online, addresses, .. },
              state: _,
          }| { (!*online && !contains_address(addresses, addr_with_prefix)).then_some(()) },
     )
@@ -1309,16 +1283,7 @@ async fn addresses_while_offline<N: Netstack>(
         event_stream.by_ref(),
         &mut if_state,
         |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-             properties:
-                 fidl_fuchsia_net_interfaces_ext::Properties {
-                     online,
-                     addresses,
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fidl_fuchsia_net_interfaces_ext::Properties { online, addresses, .. },
              state: _,
          }| { (*online && contains_address(addresses, addr_with_prefix)).then_some(()) },
     )
@@ -1350,19 +1315,13 @@ async fn watcher<N: Netstack>(name: &str) {
     }
     fn assert_loopback_existing(
         fidl_fuchsia_net_interfaces::Properties {
-            device_class,
-            id: _,
-            name: _,
-            online: _,
-            has_default_ipv4_route: _,
-            has_default_ipv6_route: _,
-            addresses: _,
+            port_class,
             ..
         }: fidl_fuchsia_net_interfaces::Properties,
     ) {
         assert_eq!(
-            device_class,
-            Some(fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+            port_class,
+            Some(fidl_fuchsia_net_interfaces::PortClass::Loopback(
                 fidl_fuchsia_net_interfaces::Empty {}
             ))
         );
@@ -1428,6 +1387,9 @@ async fn watcher<N: Netstack>(name: &str) {
         device_class: Some(fidl_fuchsia_net_interfaces::DeviceClass::Device(
             fidl_fuchsia_hardware_network::DeviceClass::Virtual,
         )),
+        port_class: Some(fidl_fuchsia_net_interfaces::PortClass::Device(
+            fidl_fuchsia_hardware_network::PortClass::Virtual,
+        )),
         addresses: Some(vec![]),
         has_default_ipv4_route: Some(false),
         has_default_ipv6_route: Some(false),
@@ -1460,9 +1422,10 @@ async fn watcher<N: Netstack>(name: &str) {
                 addresses,
                 name: None,
                 device_class: None,
+                port_class: None,
                 has_default_ipv4_route: None,
                 has_default_ipv6_route: None,
-                ..
+                __source_breaking: fidl::marker::SourceBreaking,
             }) if got_id == id => (online, addresses)
         );
         let online_changed = online.map_or(online_changed, |got_online| {
@@ -1548,10 +1511,11 @@ async fn watcher<N: Netstack>(name: &str) {
                 addresses: Some(addresses),
                 name: None,
                 device_class: None,
+                port_class: None,
                 online: None,
                 has_default_ipv4_route: None,
                 has_default_ipv6_route: None,
-                ..
+                __source_breaking: fidl::marker::SourceBreaking,
             }) if event_id == id => {
                 addresses
                     .iter()
@@ -1635,9 +1599,10 @@ async fn watcher<N: Netstack>(name: &str) {
                     addresses,
                     name: None,
                     device_class: None,
+                    port_class: None,
                     has_default_ipv4_route: None,
                     has_default_ipv6_route: None,
-                    ..
+                    __source_breaking: fidl::marker::SourceBreaking,
                 }) if got_id == id => (online, addresses)
             );
             let addresses_empty = addresses.as_ref().map_or(addresses_empty, |addresses| {
@@ -1871,4 +1836,54 @@ async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
         ) => panic!("violated API expectations while waiting for address to appear: {}", e),
         Err(e) => panic!("wait for address to appear: {}", e),
     }
+}
+
+/// Verifies that the deprecated `device_class` field is populated alongside the
+/// replacement `port_class` in the interface `Properties`, for backwards
+/// compatibility.
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn populate_device_class<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let stream = realm.get_interface_event_stream().expect("get interface event stream");
+    pin_mut!(stream);
+
+    // Verify that `Existing` events populate `device_class`.
+    // NB: The loopback interface will always be pre-existing.
+    let fnet_interfaces::Properties { port_class, device_class, .. } = assert_matches!(
+            stream.next().await,
+            Some(Ok(fnet_interfaces::Event::Existing(properties))) => properties);
+    assert_matches!(port_class, Some(fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty)));
+    assert_matches!(
+        device_class,
+        Some(fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty))
+    );
+
+    assert_matches!(
+        stream.next().await,
+        Some(Ok(fnet_interfaces::Event::Idle(fnet_interfaces::Empty)))
+    );
+
+    // Verify that `Added` events populate `device_class`.
+    let dev = sandbox
+        .create_endpoint("ep")
+        .await
+        .expect("create endpoint")
+        .into_interface_in_realm(&realm)
+        .await
+        .expect("add endpoint to Netstack");
+    let () = dev.set_link_up(true).await.expect("bring device up");
+    let fnet_interfaces::Properties { port_class, device_class, .. } = assert_matches!(
+            stream.next().await,
+            Some(Ok(fnet_interfaces::Event::Added(properties))) => properties);
+    assert_eq!(
+        port_class,
+        Some(fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Virtual))
+    );
+    assert_eq!(
+        device_class,
+        Some(fnet_interfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual))
+    );
 }

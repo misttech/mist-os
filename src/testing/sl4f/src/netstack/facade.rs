@@ -42,6 +42,7 @@ enum DeviceClass {
     Ppp,
     Bridge,
     WlanAp,
+    Lowpan,
 }
 
 #[derive(Serialize)]
@@ -70,7 +71,7 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
             fidl_fuchsia_net_interfaces_ext::Properties {
                 id,
                 name,
-                device_class,
+                port_class,
                 online,
                 addresses,
                 has_default_ipv4_route: _,
@@ -78,18 +79,15 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
             },
             mac,
         ) = t;
-        let device_class = match device_class {
-            fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                fidl_fuchsia_net_interfaces::Empty {},
-            ) => DeviceClass::Loopback,
-            fidl_fuchsia_net_interfaces::DeviceClass::Device(device) => match device {
-                fidl_fuchsia_hardware_network::DeviceClass::Virtual => DeviceClass::Virtual,
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet => DeviceClass::Ethernet,
-                fidl_fuchsia_hardware_network::DeviceClass::Wlan => DeviceClass::Wlan,
-                fidl_fuchsia_hardware_network::DeviceClass::Ppp => DeviceClass::Ppp,
-                fidl_fuchsia_hardware_network::DeviceClass::Bridge => DeviceClass::Bridge,
-                fidl_fuchsia_hardware_network::DeviceClass::WlanAp => DeviceClass::WlanAp,
-            },
+        let device_class = match port_class {
+            fidl_fuchsia_net_interfaces_ext::PortClass::Loopback => DeviceClass::Loopback,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Virtual => DeviceClass::Virtual,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Ethernet => DeviceClass::Ethernet,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Wlan => DeviceClass::Wlan,
+            fidl_fuchsia_net_interfaces_ext::PortClass::WlanAp => DeviceClass::WlanAp,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Ppp => DeviceClass::Ppp,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Bridge => DeviceClass::Bridge,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Lowpan => DeviceClass::Lowpan,
         };
         let (ipv4_addresses, ipv6_addresses) =
             addresses.into_iter().partition_map::<_, _, _, std::net::Ipv4Addr, std::net::Ipv6Addr>(

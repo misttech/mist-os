@@ -227,7 +227,7 @@ type EndpointSetup = struct {
     /// Endpoint name, must be unique in network context.
     name string:MAX_NAME_LENGTH;
     /// Optional endpoint config, if not provided defaults will be used. Default
-    /// values are: mtu = 1500,  mac = randomized.
+    /// values are: mtu = 1500,  mac = randomized, port_class = Virtual.
     config box<EndpointConfig>;
     /// Start endpoint with link status up.
     link_up bool;

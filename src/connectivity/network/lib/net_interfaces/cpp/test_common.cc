@@ -19,8 +19,8 @@ fuchsia::net::interfaces::Properties NewProperties(uint64_t id, bool reachable) 
   fuchsia::net::interfaces::Properties properties;
   properties.set_id(id);
   properties.set_name(kName);
-  properties.set_device_class(fuchsia::net::interfaces::DeviceClass::WithDevice(
-      fuchsia::hardware::network::DeviceClass::ETHERNET));
+  fuchsia::hardware::network::PortClass ethernet = fuchsia::hardware::network::PortClass::ETHERNET;
+  properties.set_port_class(fuchsia::net::interfaces::PortClass::WithDevice(std::move(ethernet)));
   SetMutableProperties(properties, reachable, true, true, Addresses(kIPv4Address1, kIPv6Address1));
   return properties;
 }

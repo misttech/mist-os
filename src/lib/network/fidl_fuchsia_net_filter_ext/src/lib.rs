@@ -27,6 +27,7 @@ use thiserror::Error;
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
 };
 
 /// Conversion errors from `fnet_filter` FIDL types to the
@@ -446,7 +447,7 @@ impl TryFrom<fnet_filter::Routine> for Routine {
 #[derive(Debug, Clone, PartialEq)]
 pub enum DeviceClass {
     Loopback,
-    Device(fhardware_network::DeviceClass),
+    Device(fhardware_network::PortClass),
 }
 
 impl From<DeviceClass> for fnet_filter::DeviceClass {
@@ -467,6 +468,33 @@ impl TryFrom<fnet_filter::DeviceClass> for DeviceClass {
             fnet_filter::DeviceClass::Device(device_class) => Ok(DeviceClass::Device(device_class)),
             fnet_filter::DeviceClass::__SourceBreaking { .. } => {
                 Err(FidlConversionError::UnknownUnionVariant(type_names::DEVICE_CLASS))
+            }
+        }
+    }
+}
+
+impl From<fnet_interfaces_ext::PortClass> for DeviceClass {
+    fn from(port_class: fnet_interfaces_ext::PortClass) -> Self {
+        match port_class {
+            fnet_interfaces_ext::PortClass::Loopback => Self::Loopback,
+            fnet_interfaces_ext::PortClass::Virtual => {
+                Self::Device(fhardware_network::PortClass::Virtual)
+            }
+            fnet_interfaces_ext::PortClass::Ethernet => {
+                Self::Device(fhardware_network::PortClass::Ethernet)
+            }
+            fnet_interfaces_ext::PortClass::Wlan => {
+                Self::Device(fhardware_network::PortClass::Wlan)
+            }
+            fnet_interfaces_ext::PortClass::WlanAp => {
+                Self::Device(fhardware_network::PortClass::WlanAp)
+            }
+            fnet_interfaces_ext::PortClass::Ppp => Self::Device(fhardware_network::PortClass::Ppp),
+            fnet_interfaces_ext::PortClass::Bridge => {
+                Self::Device(fhardware_network::PortClass::Bridge)
+            }
+            fnet_interfaces_ext::PortClass::Lowpan => {
+                Self::Device(fhardware_network::PortClass::Lowpan)
             }
         }
     }

@@ -98,8 +98,8 @@ func (*noopController) SetPromiscuousMode(_ bool) error {
 	return nil
 }
 
-func (*noopController) DeviceClass() network.DeviceClass {
-	return network.DeviceClassVirtual
+func (*noopController) PortClass() network.PortClass {
+	return network.PortClassVirtual
 }
 
 func (*noopController) ConnectPort(port network.PortWithCtxInterfaceRequest) {

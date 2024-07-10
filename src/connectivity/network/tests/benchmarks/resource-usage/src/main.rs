@@ -116,10 +116,10 @@ async fn run_benchmark<W: Workload, N: Netstack>(
     };
     assert_eq!(interfaces.len(), 1);
     let fnet_interfaces_ext::PropertiesAndState {
-        properties: fnet_interfaces_ext::Properties { device_class, online, .. },
+        properties: fnet_interfaces_ext::Properties { port_class, online, .. },
         state: _,
     } = interfaces.values().into_iter().next().unwrap();
-    assert_eq!(device_class, &fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty));
+    assert_eq!(port_class, &fnet_interfaces_ext::PortClass::Loopback);
     assert!(online);
 
     let diagnostics = netstack

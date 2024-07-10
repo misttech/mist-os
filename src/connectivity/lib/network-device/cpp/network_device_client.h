@@ -76,7 +76,7 @@ struct PortInfoAndMac {
       const std::optional<fuchsia_net::wire::MacAddress>& unicast_address);
 
   netdev::wire::PortId id;
-  fuchsia_hardware_network::wire::DeviceClass port_class;
+  fuchsia_hardware_network::wire::PortClass port_class;
   std::vector<fuchsia_hardware_network::wire::FrameType> rx_types;
   std::vector<fuchsia_hardware_network::wire::FrameTypeSupport> tx_types;
   std::optional<fuchsia_net::wire::MacAddress> unicast_address;

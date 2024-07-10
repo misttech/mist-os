@@ -1630,7 +1630,7 @@ type filterNicInfoProvider struct {
 var _ filter.NicInfoProvider = (*filterNicInfoProvider)(nil)
 
 // GetNicInfo implements filter.NicInfoProvider.
-func (p *filterNicInfoProvider) GetNicInfo(nicid tcpip.NICID) (string, *network.DeviceClass) {
+func (p *filterNicInfoProvider) GetNicInfo(nicid tcpip.NICID) (string, *network.PortClass) {
 	nicInfo, ok := p.stack.NICInfo()[nicid]
 	if !ok {
 		return "", nil
@@ -1639,6 +1639,6 @@ func (p *filterNicInfoProvider) GetNicInfo(nicid tcpip.NICID) (string, *network.
 	if ifs.controller == nil {
 		return nicInfo.Name, nil
 	}
-	deviceClass := ifs.controller.DeviceClass()
-	return nicInfo.Name, &deviceClass
+	PortClass := ifs.controller.PortClass()
+	return nicInfo.Name, &PortClass
 }

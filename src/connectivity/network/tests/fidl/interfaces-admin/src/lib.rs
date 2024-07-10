@@ -328,16 +328,7 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
         event_stream,
         &mut if_state,
         |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-             properties:
-                 fidl_fuchsia_net_interfaces_ext::Properties {
-                     addresses,
-                     online: _,
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fidl_fuchsia_net_interfaces_ext::Properties { addresses, .. },
              state: (),
          }| {
             addresses.iter().find_map(
@@ -361,15 +352,7 @@ async fn add_address_errors<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
-    let fidl_fuchsia_net_interfaces_ext::Properties {
-        id: loopback_id,
-        addresses,
-        name: _,
-        device_class: _,
-        online: _,
-        has_default_ipv4_route: _,
-        has_default_ipv6_route: _,
-    } = realm
+    let fidl_fuchsia_net_interfaces_ext::Properties { id: loopback_id, addresses, .. } = realm
         .loopback_properties()
         .await
         .expect("failed to get loopback properties")
@@ -462,15 +445,7 @@ async fn add_ipv4_mapped_ipv6_address<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
-    let fidl_fuchsia_net_interfaces_ext::Properties {
-        id: loopback_id,
-        addresses: _,
-        name: _,
-        device_class: _,
-        online: _,
-        has_default_ipv4_route: _,
-        has_default_ipv6_route: _,
-    } = realm
+    let fidl_fuchsia_net_interfaces_ext::Properties { id: loopback_id, .. } = realm
         .loopback_properties()
         .await
         .expect("failed to get loopback properties")
@@ -1153,16 +1128,7 @@ async fn add_address_and_remove<N: Netstack>(
         .expect("event stream from state"),
         &mut fnet_interfaces_ext::InterfaceState::Unknown(id),
         |fnet_interfaces_ext::PropertiesAndState {
-             properties:
-                 fnet_interfaces_ext::Properties {
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     online: _,
-                     addresses,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fnet_interfaces_ext::Properties { addresses, .. },
              state: (),
          }| {
             addresses
@@ -1368,16 +1334,7 @@ async fn remove_slaac_address<N: Netstack>(name: &str) {
         &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
         |fnet_interfaces_ext::PropertiesAndState {
              state: (),
-             properties:
-                 fnet_interfaces_ext::Properties {
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     online: _,
-                     addresses,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fnet_interfaces_ext::Properties { addresses, .. },
          }| {
             addresses.iter().find_map(
                 |&fnet_interfaces_ext::Address {
@@ -1468,9 +1425,7 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
         fidl_fuchsia_net_interfaces_ext::Properties {
             id: iface_id.try_into().expect("should be nonzero"),
             name: IF_NAME.to_string(),
-            device_class: fidl_fuchsia_net_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Virtual
-            ),
+            port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Virtual,
             online: false,
             // We haven't enabled the interface, it mustn't have any addresses assigned
             // to it yet.
@@ -2987,12 +2942,7 @@ async fn get_set_forwarding_loopback<N: Netstack>(
             realm.loopback_properties().await,
             Ok(Some(fnet_interfaces_ext::Properties {
                 id,
-                name: _,
-                device_class: _,
-                online: _,
-                addresses: _,
-                has_default_ipv4_route: _,
-                has_default_ipv6_route: _,
+                ..
             })) => id.get()
         ))
         .unwrap();

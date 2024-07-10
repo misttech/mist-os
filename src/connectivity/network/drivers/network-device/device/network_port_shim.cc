@@ -37,7 +37,7 @@ void NetworkPortShim::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& complet
   }
 
   fidl::WireTableBuilder builder = netdev::wire::PortBaseInfo::Builder(arena);
-  builder.port_class(static_cast<netdev::DeviceClass>(info.port_class))
+  builder.port_class(static_cast<netdev::PortClass>(info.port_class))
       .tx_types(fidl::ObjectView<decltype(tx_types)>::FromExternal(&tx_types))
       .rx_types(fidl::ObjectView<decltype(rx_types)>::FromExternal(&rx_types));
 

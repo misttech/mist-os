@@ -196,6 +196,7 @@ fn write_tabulated_interfaces_info<
                     ser::DeviceClass::Ppp => "ppp",
                     ser::DeviceClass::Bridge => "bridge",
                     ser::DeviceClass::WlanAp => "wlan-ap",
+                    ser::DeviceClass::Lowpan => "lowpan",
                 }
             ],
         );
@@ -783,7 +784,7 @@ async fn do_if<C: NetCliDepsConnector>(
                                         finterfaces_ext::Properties {
                                             name,
                                             id: _,
-                                            device_class: _,
+                                            port_class: _,
                                             online: _,
                                             addresses: _,
                                             has_default_ipv4_route: _,
@@ -1714,10 +1715,7 @@ mod tests {
     use std::fmt::Debug;
     use std::num::NonZeroU64;
     use test_case::test_case;
-    use {
-        fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_routes as froutes,
-        fidl_fuchsia_net_routes_ext as froutes_ext,
-    };
+    use {fidl_fuchsia_net_routes as froutes, fidl_fuchsia_net_routes_ext as froutes_ext};
 
     const IF_ADDR_V4: fnet::Subnet = fidl_subnet!("192.168.0.1/32");
     const IF_ADDR_V6: fnet::Subnet = fidl_subnet!("fd00::1/64");
@@ -1891,14 +1889,14 @@ mod tests {
     fn get_fake_interface(
         id: u64,
         name: &'static str,
-        device_class: finterfaces::DeviceClass,
+        port_class: finterfaces_ext::PortClass,
         octets: Option<[u8; 6]>,
     ) -> (finterfaces_ext::Properties, Option<fnet::MacAddress>) {
         (
             finterfaces_ext::Properties {
                 id: id.try_into().unwrap(),
                 name: name.to_string(),
-                device_class,
+                port_class,
                 online: true,
                 addresses: Vec::new(),
                 has_default_ipv4_route: false,
@@ -1910,46 +1908,41 @@ mod tests {
 
     fn shortlist_interfaces_by_nicid(name_pattern: &str) -> Vec<u64> {
         let mut interfaces = [
-            get_fake_interface(
-                1,
-                "lo",
-                finterfaces::DeviceClass::Loopback(finterfaces::Empty),
-                None,
-            ),
+            get_fake_interface(1, "lo", finterfaces_ext::PortClass::Loopback, None),
             get_fake_interface(
                 10,
                 "eth001",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet),
+                finterfaces_ext::PortClass::Ethernet,
                 Some([1, 2, 3, 4, 5, 6]),
             ),
             get_fake_interface(
                 20,
                 "eth002",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet),
+                finterfaces_ext::PortClass::Ethernet,
                 Some([1, 2, 3, 4, 5, 7]),
             ),
             get_fake_interface(
                 30,
                 "eth003",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet),
+                finterfaces_ext::PortClass::Ethernet,
                 Some([1, 2, 3, 4, 5, 8]),
             ),
             get_fake_interface(
                 100,
                 "wlan001",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Wlan),
+                finterfaces_ext::PortClass::Wlan,
                 Some([2, 2, 3, 4, 5, 6]),
             ),
             get_fake_interface(
                 200,
                 "wlan002",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Wlan),
+                finterfaces_ext::PortClass::Wlan,
                 Some([2, 2, 3, 4, 5, 7]),
             ),
             get_fake_interface(
                 300,
                 "wlan003",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Wlan),
+                finterfaces_ext::PortClass::Wlan,
                 Some([2, 2, 3, 4, 5, 8]),
             ),
         ]
@@ -2427,7 +2420,7 @@ mod tests {
         let (interface1_properties, _mac) = get_fake_interface(
             interface1.nicid,
             interface1.name,
-            finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet),
+            finterfaces_ext::PortClass::Ethernet,
             None,
         );
 
@@ -2547,9 +2540,7 @@ mod tests {
         finterfaces_ext::Properties {
             id: INTERFACE_ID.try_into().unwrap(),
             name: INTERFACE_NAME.to_string(),
-            device_class: finterfaces::DeviceClass::Device(
-                fhardware_network::DeviceClass::Ethernet,
-            ),
+            port_class: finterfaces_ext::PortClass::Ethernet,
             online: true,
             addresses: addrs
                 .into_iter()
@@ -2826,28 +2817,21 @@ mac               -
             get_fake_interface(
                 1,
                 "lo",
-                finterfaces::DeviceClass::Loopback(finterfaces::Empty),
+                finterfaces_ext::PortClass::Loopback,
                 Some([0, 0, 0, 0, 0, 0]),
             ),
             get_fake_interface(
                 10,
                 "eth001",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet),
+                finterfaces_ext::PortClass::Ethernet,
                 Some([1, 2, 3, 4, 5, 6]),
             ),
-            get_fake_interface(
-                20,
-                "virt001",
-                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual),
-                None,
-            ),
+            get_fake_interface(20, "virt001", finterfaces_ext::PortClass::Virtual, None),
             (
                 finterfaces_ext::Properties {
                     id: 30.try_into().unwrap(),
                     name: "eth002".to_string(),
-                    device_class: finterfaces::DeviceClass::Device(
-                        fhardware_network::DeviceClass::Ethernet,
-                    ),
+                    port_class: finterfaces_ext::PortClass::Ethernet,
                     online: true,
                     addresses: vec![finterfaces_ext::Address {
                         addr: fidl_subnet!("192.168.0.1/24"),
@@ -2866,9 +2850,7 @@ mac               -
                 finterfaces_ext::Properties {
                     id: 40.try_into().unwrap(),
                     name: "eth003".to_string(),
-                    device_class: finterfaces::DeviceClass::Device(
-                        fhardware_network::DeviceClass::Ethernet,
-                    ),
+                    port_class: finterfaces_ext::PortClass::Ethernet,
                     online: true,
                     addresses: vec![finterfaces_ext::Address {
                         addr: fidl_subnet!("2001:db8::1/64"),
@@ -2897,7 +2879,7 @@ mac               -
                     |finterfaces_ext::Properties {
                          id,
                          name,
-                         device_class,
+                         port_class,
                          online,
                          addresses,
                          has_default_ipv4_route,
@@ -2906,7 +2888,7 @@ mac               -
                         finterfaces::Event::Existing(finterfaces::Properties {
                             id: Some(id.get()),
                             name: Some(name),
-                            device_class: Some(device_class),
+                            port_class: Some(port_class.into()),
                             online: Some(online),
                             addresses: Some(
                                 addresses
@@ -3277,7 +3259,7 @@ mac               -
                 let (interface, _mac) = get_fake_interface(
                     interface.nicid,
                     interface.name,
-                    finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet),
+                    finterfaces_ext::PortClass::Ethernet,
                     None,
                 );
                 interface.into()

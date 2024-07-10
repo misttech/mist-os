@@ -54,13 +54,14 @@ proto = { ("proto" ~ (tcp | udp | icmp))? }
   udp = { "udp" }
   icmp = { "icmp" }
 
-devclass = { ("devclass" ~ (virt | ethernet | wlan | ppp | bridge | ap))? }
+devclass = { ("devclass" ~ (virt | ethernet | wlan | ppp | bridge | ap | lowpan))? }
   virt = { "virt" }
   ethernet = { "ethernet" }
   wlan = { "wlan" }
   ppp = { "ppp" }
   bridge = { "bridge" }
   ap = { "ap" }
+  lowpan = { "lowpan" }
 
 src = { ("from" ~ invertible_subnet? ~ port_range?)? }
 dst = { ("to" ~ invertible_subnet? ~ port_range?)? }

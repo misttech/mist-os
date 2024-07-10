@@ -56,7 +56,7 @@ type Rule = struct {
     /// interface.
     device_class strict union {
         1: any Empty;
-        2: match fuchsia.hardware.network.DeviceClass;
+        2: match fuchsia.hardware.network.PortClass;
     };
 };
 

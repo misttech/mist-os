@@ -61,13 +61,14 @@ fn parse_proto(pair: Pair<'_, Rule>) -> Option<TransportProtocol> {
 fn parse_devclass(pair: Pair<'_, Rule>) -> Option<filter_ext::DeviceClass> {
     assert_eq!(pair.as_rule(), Rule::devclass);
     pair.into_inner().next().map(|pair| match pair.as_rule() {
-        Rule::virt => filter_ext::DeviceClass::Device(fhnet::DeviceClass::Virtual.into()),
-        Rule::ethernet => filter_ext::DeviceClass::Device(fhnet::DeviceClass::Ethernet.into()),
-        Rule::wlan => filter_ext::DeviceClass::Device(fhnet::DeviceClass::Wlan.into()),
-        Rule::ppp => filter_ext::DeviceClass::Device(fhnet::DeviceClass::Ppp.into()),
-        Rule::bridge => filter_ext::DeviceClass::Device(fhnet::DeviceClass::Bridge.into()),
-        Rule::ap => filter_ext::DeviceClass::Device(fhnet::DeviceClass::WlanAp.into()),
-        _ => unreachable!("devclass must be one of (virt|ethernet|wlan|ppp|bridge|ap)"),
+        Rule::virt => filter_ext::DeviceClass::Device(fhnet::PortClass::Virtual.into()),
+        Rule::ethernet => filter_ext::DeviceClass::Device(fhnet::PortClass::Ethernet.into()),
+        Rule::wlan => filter_ext::DeviceClass::Device(fhnet::PortClass::Wlan.into()),
+        Rule::ppp => filter_ext::DeviceClass::Device(fhnet::PortClass::Ppp.into()),
+        Rule::bridge => filter_ext::DeviceClass::Device(fhnet::PortClass::Bridge.into()),
+        Rule::ap => filter_ext::DeviceClass::Device(fhnet::PortClass::WlanAp.into()),
+        Rule::lowpan => filter_ext::DeviceClass::Device(fhnet::PortClass::Lowpan.into()),
+        _ => unreachable!("devclass must be one of (virt|ethernet|wlan|ppp|bridge|ap|lowpan)"),
     })
 }
 
@@ -613,7 +614,7 @@ mod test {
                 id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
                 matchers: filter_ext::Matchers {
                     in_interface: Some(filter_ext::InterfaceMatcher::DeviceClass(
-                        filter_ext::DeviceClass::Device(fhnet::DeviceClass::WlanAp.into())
+                        filter_ext::DeviceClass::Device(fhnet::PortClass::WlanAp.into())
                     )),
                     transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
                         src_port: None,
@@ -637,7 +638,7 @@ mod test {
                 id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
                 matchers: filter_ext::Matchers {
                     in_interface: Some(filter_ext::InterfaceMatcher::DeviceClass(
-                        filter_ext::DeviceClass::Device(fhnet::DeviceClass::WlanAp.into())
+                        filter_ext::DeviceClass::Device(fhnet::PortClass::WlanAp.into())
                     )),
                     transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
                         src_port: None,

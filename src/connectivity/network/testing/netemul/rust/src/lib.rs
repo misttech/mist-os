@@ -1229,11 +1229,11 @@ impl<'a> TestInterface<'a> {
         Ok(name)
     }
 
-    /// Gets the interface's device class.
-    pub async fn get_device_class(&self) -> Result<fnet_interfaces::DeviceClass> {
-        let fnet_interfaces_ext::Properties { device_class, .. } =
+    /// Gets the interface's port class.
+    pub async fn get_port_class(&self) -> Result<fnet_interfaces_ext::PortClass> {
+        let fnet_interfaces_ext::Properties { port_class, .. } =
             self.get_properties(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned).await?;
-        Ok(device_class)
+        Ok(port_class)
     }
 
     /// Gets the interface's MAC address.

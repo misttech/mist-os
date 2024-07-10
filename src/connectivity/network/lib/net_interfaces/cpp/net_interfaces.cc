@@ -18,7 +18,7 @@ namespace {
 
 bool VerifyCompleteProperties(const fuchsia::net::interfaces::Properties& properties) {
   if (!(properties.has_id() && properties.has_name() && properties.has_addresses() &&
-        properties.has_online() && properties.has_device_class() &&
+        properties.has_online() && properties.has_port_class() &&
         properties.has_has_default_ipv4_route() && properties.has_has_default_ipv6_route())) {
     return false;
   }
@@ -51,7 +51,7 @@ bool Properties::operator==(const Properties& rhs) const {
 }
 
 bool Properties::is_loopback() const {
-  return device_class().Which() == fuchsia::net::interfaces::DeviceClass::kLoopback;
+  return port_class().Which() == fuchsia::net::interfaces::PortClass::kLoopback;
 }
 
 bool Properties::Update(fuchsia::net::interfaces::Properties* properties) {

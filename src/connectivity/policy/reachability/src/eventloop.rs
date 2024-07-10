@@ -25,7 +25,7 @@ use reachability_core::route_table::RouteTable;
 use reachability_core::telemetry::{self, TelemetryEvent, TelemetrySender};
 use reachability_core::{
     watchdog, InterfaceView, Monitor, NeighborCache, NetworkCheckAction, NetworkCheckCookie,
-    NetworkCheckResult, NetworkChecker, NetworkCheckerOutcome, PortType, FIDL_TIMEOUT_ID,
+    NetworkCheckResult, NetworkChecker, NetworkCheckerOutcome, FIDL_TIMEOUT_ID,
 };
 use reachability_handler::ReachabilityHandler;
 use std::collections::{HashMap, HashSet};
@@ -476,7 +476,7 @@ impl EventLoop {
                         addresses: current_addresses,
                         id: _,
                         name: _,
-                        device_class: _,
+                        port_class: _,
                         online: _,
                         has_default_ipv4_route: _,
                         has_default_ipv6_route: _,
@@ -533,11 +533,17 @@ impl EventLoop {
 
     /// Determine whether an interface should be monitored or not.
     fn should_monitor_interface(
-        &fnet_interfaces_ext::Properties { device_class, .. }: &fnet_interfaces_ext::Properties,
+        &fnet_interfaces_ext::Properties { port_class, .. }: &fnet_interfaces_ext::Properties,
     ) -> bool {
-        return match PortType::from(device_class) {
-            PortType::Loopback => false,
-            PortType::Unknown | PortType::Ethernet | PortType::WiFi | PortType::SVI => true,
+        return match port_class {
+            fnet_interfaces_ext::PortClass::Loopback => false,
+            fnet_interfaces_ext::PortClass::Virtual
+            | fnet_interfaces_ext::PortClass::Ethernet
+            | fnet_interfaces_ext::PortClass::Wlan
+            | fnet_interfaces_ext::PortClass::WlanAp
+            | fnet_interfaces_ext::PortClass::Ppp
+            | fnet_interfaces_ext::PortClass::Bridge
+            | fnet_interfaces_ext::PortClass::Lowpan => true,
         };
     }
 
@@ -706,8 +712,8 @@ mod tests {
             id: Some(12345),
             addresses: Some(vec![addr]),
             online: Some(true),
-            device_class: Some(fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
+            port_class: Some(fnet_interfaces::PortClass::Device(
+                fidl_fuchsia_hardware_network::PortClass::Ethernet,
             )),
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
@@ -744,8 +750,8 @@ mod tests {
             id: Some(12345),
             addresses: Some(vec![addr]),
             online: Some(true),
-            device_class: Some(fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
+            port_class: Some(fnet_interfaces::PortClass::Device(
+                fidl_fuchsia_hardware_network::PortClass::Ethernet,
             )),
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),

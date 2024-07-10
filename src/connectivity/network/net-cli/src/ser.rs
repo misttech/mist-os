@@ -134,22 +134,20 @@ pub(crate) enum DeviceClass {
     Ppp,
     Bridge,
     WlanAp,
+    Lowpan,
 }
 
-impl From<fidl_fuchsia_net_interfaces::DeviceClass> for DeviceClass {
-    fn from(device_class: fidl_fuchsia_net_interfaces::DeviceClass) -> Self {
-        match device_class {
-            fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                fidl_fuchsia_net_interfaces::Empty,
-            ) => Self::Loopback,
-            fidl_fuchsia_net_interfaces::DeviceClass::Device(device_class) => match device_class {
-                fidl_fuchsia_hardware_network::DeviceClass::Virtual => Self::Virtual,
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet => Self::Ethernet,
-                fidl_fuchsia_hardware_network::DeviceClass::Wlan => Self::Wlan,
-                fidl_fuchsia_hardware_network::DeviceClass::Ppp => Self::Ppp,
-                fidl_fuchsia_hardware_network::DeviceClass::Bridge => Self::Bridge,
-                fidl_fuchsia_hardware_network::DeviceClass::WlanAp => Self::WlanAp,
-            },
+impl From<fidl_fuchsia_net_interfaces_ext::PortClass> for DeviceClass {
+    fn from(port_class: fidl_fuchsia_net_interfaces_ext::PortClass) -> Self {
+        match port_class {
+            fidl_fuchsia_net_interfaces_ext::PortClass::Loopback => Self::Loopback,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Virtual => Self::Virtual,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Ethernet => Self::Ethernet,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Wlan => Self::Wlan,
+            fidl_fuchsia_net_interfaces_ext::PortClass::WlanAp => Self::WlanAp,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Ppp => Self::Ppp,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Bridge => Self::Bridge,
+            fidl_fuchsia_net_interfaces_ext::PortClass::Lowpan => Self::Lowpan,
         }
     }
 }
@@ -177,7 +175,7 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
             fidl_fuchsia_net_interfaces_ext::Properties {
                 id,
                 name,
-                device_class,
+                port_class,
                 online,
                 addresses,
                 has_default_ipv4_route,
@@ -188,7 +186,7 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
         InterfaceView {
             nicid: id.get(),
             name,
-            device_class: device_class.into(),
+            device_class: port_class.into(),
             online,
             addresses: addresses.into_iter().into(),
             has_default_ipv4_route,

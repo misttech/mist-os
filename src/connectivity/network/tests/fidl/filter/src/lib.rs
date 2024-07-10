@@ -1801,13 +1801,13 @@ async fn invalid_matcher_for_hook(
             matchers: match interface_matcher {
                 WhichInterface::In => Matchers {
                     in_interface: Some(InterfaceMatcher::DeviceClass(DeviceClass::Device(
-                        fhardware_network::DeviceClass::Wlan,
+                        fhardware_network::PortClass::Wlan,
                     ))),
                     ..Default::default()
                 },
                 WhichInterface::Out => Matchers {
                     out_interface: Some(InterfaceMatcher::DeviceClass(DeviceClass::Device(
-                        fhardware_network::DeviceClass::Wlan,
+                        fhardware_network::PortClass::Wlan,
                     ))),
                     ..Default::default()
                 },

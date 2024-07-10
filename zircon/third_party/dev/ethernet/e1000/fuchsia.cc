@@ -1343,7 +1343,7 @@ void Device<RxDescriptor>::GetInfo(
   }};
 
   fidl::WireTableBuilder builder = netdev::wire::PortBaseInfo::Builder(arena);
-  builder.port_class(netdev::wire::DeviceClass::kEthernet).tx_types(kTxTypes).rx_types(kRxTypes);
+  builder.port_class(netdev::wire::PortClass::kEthernet).tx_types(kTxTypes).rx_types(kRxTypes);
 
   completer.buffer(arena).Reply(builder.Build());
 }

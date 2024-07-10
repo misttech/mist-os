@@ -7,14 +7,11 @@ use std::num::NonZeroU64;
 use std::ops::RangeInclusive;
 
 use fidl_fuchsia_net_filter_ext::{
-    AddressMatcher, AddressMatcherType, DeviceClass, InterfaceMatcher, Matchers, PortMatcher,
+    AddressMatcher, AddressMatcherType, InterfaceMatcher, Matchers, PortMatcher,
     TransportProtocolMatcher,
 };
 use net_types::ip::{Ip, IpVersion};
-use {
-    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
-};
+use {fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter};
 
 use crate::ip_hooks::{
     IcmpSocket, Interfaces, IrrelevantToTest, Ports, SocketType, Subnets, TcpSocket, UdpSocket,
@@ -127,12 +124,7 @@ impl Matcher for InterfaceDeviceClass {
     ) -> Matchers {
         async fn get_device_class(interface: &netemul::TestInterface<'_>) -> InterfaceMatcher {
             InterfaceMatcher::DeviceClass(
-                match interface.get_device_class().await.expect("get device class") {
-                    fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => {
-                        DeviceClass::Loopback
-                    }
-                    fnet_interfaces::DeviceClass::Device(device) => DeviceClass::Device(device),
-                },
+                interface.get_port_class().await.expect("get port class").into(),
             )
         }
 

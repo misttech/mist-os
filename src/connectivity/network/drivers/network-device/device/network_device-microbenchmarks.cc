@@ -131,7 +131,7 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
   void NetworkDeviceImplSetSnoop(bool snoop) { ZX_PANIC("unexpected call to SetSnoop(%d)", snoop); }
   void NetworkPortGetInfo(port_base_info_t* out_info) {
     *out_info = {
-        .port_class = static_cast<uint8_t>(netdev::wire::DeviceClass::kEthernet),
+        .port_class = static_cast<uint16_t>(netdev::wire::PortClass::kEthernet),
         .rx_types_list = kRxFrameTypes,
         .rx_types_count = std::size(kRxFrameTypes),
         .tx_types_list = kTxFrameTypes,

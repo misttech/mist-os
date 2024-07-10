@@ -497,17 +497,9 @@ async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
         |if_map| {
             if_map.values().find_map(
                 |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-                     properties:
-                         fidl_fuchsia_net_interfaces_ext::Properties { device_class, id, .. },
+                     properties: fidl_fuchsia_net_interfaces_ext::Properties { port_class, id, .. },
                      state: (),
-                 }| {
-                    match device_class {
-                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                            fidl_fuchsia_net_interfaces::Empty {},
-                        ) => Some(id.get()),
-                        fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
-                    }
-                },
+                 }| { port_class.is_loopback().then(|| id.get()) },
             )
         },
     )

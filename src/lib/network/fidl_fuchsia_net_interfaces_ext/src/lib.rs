@@ -20,7 +20,130 @@ use std::collections::hash_map::{self, HashMap};
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
 use thiserror::Error;
-use {fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon_types as zx};
+use {
+    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon_types as zx,
+};
+
+/// Like [`fnet_interfaces::PortClass`], with the inner `device` flattened.
+///
+/// This type also derives additional impls that are not available on
+/// `fnet_interfaces::PortClass`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(missing_docs)]
+pub enum PortClass {
+    Loopback,
+    Virtual,
+    Ethernet,
+    Wlan,
+    WlanAp,
+    Ppp,
+    Bridge,
+    Lowpan,
+}
+
+impl PortClass {
+    /// Returns `true` if this `PortClass` is `Loopback`.
+    pub fn is_loopback(&self) -> bool {
+        match self {
+            PortClass::Loopback => true,
+            PortClass::Virtual
+            | PortClass::Ethernet
+            | PortClass::Wlan
+            | PortClass::WlanAp
+            | PortClass::Ppp
+            | PortClass::Bridge
+            | PortClass::Lowpan => false,
+        }
+    }
+}
+
+/// An Error returned when converting from `fnet_interfaces::PortClass` to
+/// `PortClass`.
+#[derive(Debug, Error)]
+#[allow(missing_docs)]
+pub enum UnknownPortClassError {
+    #[error(transparent)]
+    NetInterfaces(UnknownNetInterfacesPortClassError),
+    #[error(transparent)]
+    HardwareNetwork(UnknownHardwareNetworkPortClassError),
+}
+
+/// An error returned when `fnet_interfaces::PortClass` is an unknown variant.
+#[derive(Debug, Error)]
+#[error("unknown fuchsia.net.interfaces/PortClass ordinal: {unknown_ordinal}")]
+pub struct UnknownNetInterfacesPortClassError {
+    unknown_ordinal: u64,
+}
+
+/// An error returned when `fhardware_network::PortClass` is an unknown variant.
+#[derive(Debug, Error)]
+#[error("unknown fuchsia.hardware.network/PortClass ordinal: {unknown_ordinal}")]
+pub struct UnknownHardwareNetworkPortClassError {
+    unknown_ordinal: u16,
+}
+
+impl TryFrom<fnet_interfaces::PortClass> for PortClass {
+    type Error = UnknownPortClassError;
+    fn try_from(port_class: fnet_interfaces::PortClass) -> Result<Self, Self::Error> {
+        match port_class {
+            fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty) => Ok(PortClass::Loopback),
+            fnet_interfaces::PortClass::Device(port_class) => {
+                PortClass::try_from(port_class).map_err(UnknownPortClassError::HardwareNetwork)
+            }
+            fnet_interfaces::PortClass::__SourceBreaking { unknown_ordinal } => {
+                Err(UnknownPortClassError::NetInterfaces(UnknownNetInterfacesPortClassError {
+                    unknown_ordinal,
+                }))
+            }
+        }
+    }
+}
+
+impl From<PortClass> for fnet_interfaces::PortClass {
+    fn from(port_class: PortClass) -> Self {
+        match port_class {
+            PortClass::Loopback => fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty),
+            PortClass::Virtual => {
+                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Virtual)
+            }
+            PortClass::Ethernet => {
+                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Ethernet)
+            }
+            PortClass::Wlan => {
+                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Wlan)
+            }
+            PortClass::WlanAp => {
+                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::WlanAp)
+            }
+            PortClass::Ppp => fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Ppp),
+            PortClass::Bridge => {
+                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Bridge)
+            }
+            PortClass::Lowpan => {
+                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Lowpan)
+            }
+        }
+    }
+}
+
+impl TryFrom<fhardware_network::PortClass> for PortClass {
+    type Error = UnknownHardwareNetworkPortClassError;
+    fn try_from(port_class: fhardware_network::PortClass) -> Result<Self, Self::Error> {
+        match port_class {
+            fhardware_network::PortClass::Virtual => Ok(PortClass::Virtual),
+            fhardware_network::PortClass::Ethernet => Ok(PortClass::Ethernet),
+            fhardware_network::PortClass::Wlan => Ok(PortClass::Wlan),
+            fhardware_network::PortClass::WlanAp => Ok(PortClass::WlanAp),
+            fhardware_network::PortClass::Ppp => Ok(PortClass::Ppp),
+            fhardware_network::PortClass::Bridge => Ok(PortClass::Bridge),
+            fhardware_network::PortClass::Lowpan => Ok(PortClass::Lowpan),
+            fhardware_network::PortClass::__SourceBreaking { unknown_ordinal } => {
+                Err(UnknownHardwareNetworkPortClassError { unknown_ordinal })
+            }
+        }
+    }
+}
 
 // TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// Properties of a network interface.
@@ -32,8 +155,6 @@ pub struct Properties {
     pub id: NonZeroU64,
     /// The name of the interface. Immutable.
     pub name: String,
-    /// The device class of the interface. Immutable.
-    pub device_class: fnet_interfaces::DeviceClass,
     /// The device is enabled and its physical state is online.
     pub online: bool,
     /// The addresses currently assigned to the interface.
@@ -42,6 +163,8 @@ pub struct Properties {
     pub has_default_ipv4_route: bool,
     /// Whether there is a default IPv6 route through this interface.
     pub has_default_ipv6_route: bool,
+    /// The device type of the interface. Immutable.
+    pub port_class: PortClass,
 }
 
 // TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
@@ -188,7 +311,7 @@ impl<S> Update<S> for PropertiesAndState<S> {
                 let fnet_interfaces::Properties {
                     id,
                     name: _,
-                    device_class: _,
+                    port_class: _,
                     online,
                     has_default_ipv4_route,
                     has_default_ipv6_route,
@@ -651,7 +774,7 @@ mod tests {
         fnet_interfaces::Properties {
             id: Some(id),
             name: Some("test1".to_string()),
-            device_class: Some(fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {})),
+            port_class: Some(fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty {})),
             online: Some(false),
             has_default_ipv4_route: Some(false),
             has_default_ipv6_route: Some(false),
@@ -671,7 +794,7 @@ mod tests {
         fnet_interfaces::Properties {
             id: Some(id),
             name: None,
-            device_class: None,
+            port_class: None,
             online: Some(true),
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
@@ -684,7 +807,7 @@ mod tests {
         fnet_interfaces::Properties {
             id: Some(id),
             name: Some("test1".to_string()),
-            device_class: Some(fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {})),
+            port_class: Some(fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty {})),
             online: Some(true),
             has_default_ipv4_route: Some(true),
             has_default_ipv6_route: Some(true),
@@ -778,7 +901,7 @@ mod tests {
     fn test_empty_change_error(state: &mut impl Update<()>) {
         let empty_change = fnet_interfaces::Properties { id: Some(ID), ..Default::default() };
         let net_zero_change =
-            fnet_interfaces::Properties { name: None, device_class: None, ..fidl_properties(ID) };
+            fnet_interfaces::Properties { name: None, port_class: None, ..fidl_properties(ID) };
         assert_matches::assert_matches!(
             state.update(fnet_interfaces::Event::Changed(empty_change.clone())),
             Err(UpdateError::EmptyChange(properties)) if properties == empty_change

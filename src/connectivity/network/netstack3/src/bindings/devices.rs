@@ -313,8 +313,8 @@ impl StaticNetdeviceInfo {
             fidl_fuchsia_net_filter::DeviceClass::Loopback(fidl_fuchsia_net_filter::Empty {}) => {
                 false
             }
-            fidl_fuchsia_net_filter::DeviceClass::Device(class) => {
-                *class == self.handler.device_class()
+            fidl_fuchsia_net_filter::DeviceClass::Device(port_class) => {
+                *port_class == self.handler.port_class()
             }
             fidl_fuchsia_net_filter::DeviceClass::__SourceBreaking { unknown_ordinal } => {
                 panic!("unknown device class ordinal {unknown_ordinal:?}")

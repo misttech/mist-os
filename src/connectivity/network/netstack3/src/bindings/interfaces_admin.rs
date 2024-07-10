@@ -319,7 +319,8 @@ async fn create_interface(
                 }
                 netdevice_worker::Error::ConfigurationNotSupported
                 | netdevice_worker::Error::MacNotUnicast { .. }
-                | netdevice_worker::Error::MismatchedRxFrameType { .. } => {
+                | netdevice_worker::Error::MismatchedRxFrameType { .. }
+                | netdevice_worker::Error::InvalidPortClass(_) => {
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::BadPort)
                 }
                 netdevice_worker::Error::DuplicateName(_) => {

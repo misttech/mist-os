@@ -2085,7 +2085,7 @@ TEST_F(NetworkDeviceTest, PortGetInfo) {
   const netdev::wire::PortBaseInfo& base_info = port_info.base_info();
   ASSERT_TRUE(base_info.has_port_class());
   EXPECT_EQ(base_info.port_class(),
-            static_cast<netdev::wire::DeviceClass>(port13_.port_info().port_class));
+            static_cast<netdev::wire::PortClass>(port13_.port_info().port_class));
   ASSERT_TRUE(base_info.has_rx_types());
   EXPECT_EQ(base_info.rx_types().count(), impl_info.rx_types.size());
   for (size_t i = 0; i < base_info.rx_types().count(); i++) {

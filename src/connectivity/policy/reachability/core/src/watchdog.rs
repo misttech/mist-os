@@ -455,10 +455,10 @@ mod tests {
 
     use crate::route_table::Route;
     use assert_matches::assert_matches;
+    use fidl_fuchsia_net as fnet;
     use futures::FutureExt as _;
     use net_declare::{fidl_ip, fidl_subnet};
     use std::sync::{Arc, Mutex};
-    use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces};
 
     use crate::neighbor_cache::NeighborState;
     use crate::route_table::RouteTable;
@@ -842,7 +842,7 @@ mod tests {
                 properties: fnet_interfaces_ext::Properties {
                     id: id.try_into().expect("should be nonzero"),
                     name: "foo".to_owned(),
-                    device_class: fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}),
+                    port_class: fnet_interfaces_ext::PortClass::Loopback,
                     online: true,
                     addresses: vec![],
                     has_default_ipv4_route: true,

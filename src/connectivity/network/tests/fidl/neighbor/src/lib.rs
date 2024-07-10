@@ -69,7 +69,7 @@ async fn create_realm<'a, N: Netstack>(
     let fidl_fuchsia_net_interfaces_ext::Properties {
         id: loopback_id,
         name: _,
-        device_class: _,
+        port_class: _,
         online: _,
         addresses: _,
         has_default_ipv4_route: _,

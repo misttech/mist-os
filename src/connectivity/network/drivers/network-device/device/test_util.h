@@ -139,7 +139,7 @@ constexpr zx_signals_t kEventPortActiveChanged = ZX_USER_SIGNAL_6;
 constexpr zx_signals_t kEventSessionDied = ZX_USER_SIGNAL_7;
 
 struct PortInfo {
-  netdev::wire::DeviceClass port_class;
+  netdev::wire::PortClass port_class;
   std::vector<netdev::wire::FrameType> rx_types;
   std::vector<netdev::wire::FrameTypeSupport> tx_types;
 };

@@ -526,8 +526,8 @@ mod tests {
                                                     .collect(),
                                                 ),
                                                 online: Some(true),
-                                                device_class: Some(
-                                                    fnet_interfaces::DeviceClass::Loopback(
+                                                port_class: Some(
+                                                    fnet_interfaces::PortClass::Loopback(
                                                         fnet_interfaces::Empty {},
                                                     ),
                                                 ),

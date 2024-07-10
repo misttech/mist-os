@@ -72,6 +72,7 @@ impl TunNetworkInterface {
                                 supported_flags: fhwnet::TxFlags::empty(),
                             },
                         ]),
+                        port_class: Some(fhwnet::PortClass::Lowpan),
                         ..Default::default()
                     }),
                     ..Default::default()

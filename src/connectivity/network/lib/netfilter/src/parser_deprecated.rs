@@ -49,13 +49,14 @@ fn parse_devclass(pair: Pair<'_, Rule>) -> filter::DeviceClass {
     assert_eq!(pair.as_rule(), Rule::devclass);
     match pair.into_inner().next() {
         Some(pair) => match pair.as_rule() {
-            Rule::virt => filter::DeviceClass::Match_(fhnet::DeviceClass::Virtual),
-            Rule::ethernet => filter::DeviceClass::Match_(fhnet::DeviceClass::Ethernet),
-            Rule::wlan => filter::DeviceClass::Match_(fhnet::DeviceClass::Wlan),
-            Rule::ppp => filter::DeviceClass::Match_(fhnet::DeviceClass::Ppp),
-            Rule::bridge => filter::DeviceClass::Match_(fhnet::DeviceClass::Bridge),
-            Rule::ap => filter::DeviceClass::Match_(fhnet::DeviceClass::WlanAp),
-            _ => unreachable!("devclass must be one of (virt|ethernet|wlan|ppp|bridge|ap)"),
+            Rule::virt => filter::DeviceClass::Match_(fhnet::PortClass::Virtual),
+            Rule::ethernet => filter::DeviceClass::Match_(fhnet::PortClass::Ethernet),
+            Rule::wlan => filter::DeviceClass::Match_(fhnet::PortClass::Wlan),
+            Rule::ppp => filter::DeviceClass::Match_(fhnet::PortClass::Ppp),
+            Rule::bridge => filter::DeviceClass::Match_(fhnet::PortClass::Bridge),
+            Rule::ap => filter::DeviceClass::Match_(fhnet::PortClass::WlanAp),
+            Rule::lowpan => filter::DeviceClass::Match_(fhnet::PortClass::Lowpan),
+            _ => unreachable!("devclass must be one of (virt|ethernet|wlan|ppp|bridge|ap|lowpan)"),
         },
         None => filter::DeviceClass::Any(filter::Empty {}),
     }
@@ -638,7 +639,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
-                device_class: filter::DeviceClass::Match_(fhnet::DeviceClass::WlanAp),
+                device_class: filter::DeviceClass::Match_(fhnet::PortClass::WlanAp),
             }])
         );
     }
@@ -660,7 +661,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
-                device_class: filter::DeviceClass::Match_(fhnet::DeviceClass::WlanAp),
+                device_class: filter::DeviceClass::Match_(fhnet::PortClass::WlanAp),
             }])
         );
     }

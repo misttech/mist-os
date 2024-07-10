@@ -136,7 +136,7 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
   std::unique_ptr<MacAddrDeviceInterface> mac_ __TA_GUARDED(lock_);
   BindingList bindings_ __TA_GUARDED(lock_);
 
-  netdev::wire::DeviceClass port_class_;
+  netdev::wire::PortClass port_class_;
   netdev::PortStatus status_;
   std::vector<netdev::wire::FrameType> supported_rx_;
   std::vector<netdev::wire::FrameTypeSupport> supported_tx_;

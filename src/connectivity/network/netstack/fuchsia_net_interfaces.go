@@ -23,6 +23,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
+	"fidl/fuchsia/hardware/network"
 	"fidl/fuchsia/net"
 	"fidl/fuchsia/net/interfaces"
 
@@ -38,9 +39,15 @@ func initialProperties(ifs *ifState, name string) interfaces.Properties {
 	p.SetId(uint64(ifs.nicid))
 	p.SetName(name)
 	if ifs.endpoint.Capabilities()&stack.CapabilityLoopback != 0 {
+		p.SetPortClass(interfaces.PortClassWithLoopback(interfaces.Empty{}))
+		// TODO(https://fxbug.dev/42157740): Remove this field.
 		p.SetDeviceClass(interfaces.DeviceClassWithLoopback(interfaces.Empty{}))
 	} else if ifs.controller != nil {
-		p.SetDeviceClass(interfaces.DeviceClassWithDevice(ifs.controller.DeviceClass()))
+		p.SetPortClass(interfaces.PortClassWithDevice(ifs.controller.PortClass()))
+		// TODO(https://fxbug.dev/42157740): Remove this field.
+		deviceClass := deviceClassFromPortClass(ifs.controller.PortClass())
+		p.SetDeviceClass(interfaces.DeviceClassWithDevice(deviceClass))
+
 	} else {
 		panic(fmt.Sprintf("can't extract DeviceClass from non-loopback NIC %d(%s) with nil controller", ifs.nicid, name))
 	}
@@ -51,6 +58,32 @@ func initialProperties(ifs *ifState, name string) interfaces.Properties {
 	p.SetAddresses([]interfaces.Address{})
 
 	return p
+}
+
+// TODO(https://fxbug.dev/42157740): Remove this converter.
+// deviceClassFromPortClass provides a backwards compatible conversion between
+// the deprecated `DeviceClass` and it's replacement `PortClass`.
+func deviceClassFromPortClass(portClass network.PortClass) network.DeviceClass {
+	switch portClass {
+	case network.PortClassVirtual:
+		return network.DeviceClassVirtual
+	case network.PortClassBridge:
+		return network.DeviceClassBridge
+	case network.PortClassPpp:
+		return network.DeviceClassPpp
+	case network.PortClassEthernet:
+		return network.DeviceClassEthernet
+	case network.PortClassWlan:
+		return network.DeviceClassWlan
+	case network.PortClassWlanAp:
+		return network.DeviceClassWlanAp
+	case network.PortClassLowpan:
+		// NB: There is no equivalent for lowpan in `DeviceClass`. Represent it
+		// as virtual.
+		return network.DeviceClassVirtual
+	default:
+		panic(fmt.Sprintf("can't extract DeviceClass from unknown PortClass (%d)", portClass))
+	}
 }
 
 func hasAllSecondaryProperties(addr interfaces.Address) bool {
@@ -322,14 +355,14 @@ var _ interfaceEvent = (*interfaceAdded)(nil)
 
 func (*interfaceAdded) isInterfaceEvent() {}
 
-func deviceClassToString(d interfaces.DeviceClass) string {
+func portClassToString(d interfaces.PortClass) string {
 	switch tag := d.Which(); tag {
-	case interfaces.DeviceClassLoopback:
+	case interfaces.PortClassLoopback:
 		return "loopback"
-	case interfaces.DeviceClassDevice:
+	case interfaces.PortClassDevice:
 		return d.Device.String()
 	default:
-		panic(fmt.Sprintf("fuchsia.net.interfaces/DeviceClass with unknown tag: %d", tag))
+		panic(fmt.Sprintf("fuchsia.net.interfaces/PortClass with unknown tag: %d", tag))
 	}
 }
 
@@ -345,8 +378,8 @@ func (a interfaceAdded) String() string {
 	if p.HasName() {
 		b.WriteString(fmt.Sprintf(", Name:%s", p.GetName()))
 	}
-	if p.HasDeviceClass() {
-		b.WriteString(fmt.Sprintf(", DeviceClass:%s", deviceClassToString(p.GetDeviceClass())))
+	if p.HasPortClass() {
+		b.WriteString(fmt.Sprintf(", PortClass:%s", portClassToString(p.GetPortClass())))
 	}
 	if p.HasOnline() {
 		b.WriteString(fmt.Sprintf(", Online:%t", p.GetOnline()))

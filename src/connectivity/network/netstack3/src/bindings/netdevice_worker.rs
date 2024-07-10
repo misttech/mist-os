@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
-use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext};
 
 use futures::lock::Mutex;
 use futures::{FutureExt as _, TryStreamExt as _};
@@ -90,8 +90,10 @@ pub(crate) enum Error {
     MacNotUnicast { mac: net_types::ethernet::Mac, port: netdevice_client::Port },
     #[error("interface named {0} already exists")]
     DuplicateName(String),
-    #[error("{port_type:?} port received unexpected frame type: {frame_type:?}")]
-    MismatchedRxFrameType { port_type: PortWireFormat, frame_type: fhardware_network::FrameType },
+    #[error("{port_class:?} port received unexpected frame type: {frame_type:?}")]
+    MismatchedRxFrameType { port_class: PortWireFormat, frame_type: fhardware_network::FrameType },
+    #[error("invalid port class: {0}")]
+    InvalidPortClass(fnet_interfaces_ext::UnknownHardwareNetworkPortClassError),
 }
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
@@ -173,7 +175,7 @@ impl NetdeviceWorker {
                             // indicates a bug in `netdevice_client` or the core
                             // netdevice driver.
                             return Err(Error::MismatchedRxFrameType {
-                                port_type: PortWireFormat::Ethernet,
+                                port_class: PortWireFormat::Ethernet,
                                 frame_type: f,
                             });
                         }
@@ -192,7 +194,7 @@ impl NetdeviceWorker {
                             // else here indicates a bug in `netdevice_client` or
                             // the core netdevice driver.
                             return Err(Error::MismatchedRxFrameType {
-                                port_type: PortWireFormat::Ip,
+                                port_class: PortWireFormat::Ip,
                                 frame_type: f,
                             });
                         }
@@ -350,11 +352,8 @@ impl DeviceHandler {
         let netdevice_client::client::PortStatus { flags, mtu } =
             status_stream.try_next().await?.ok_or_else(|| Error::PortClosed)?;
         let phy_up = flags.contains(fhardware_network::StatusFlags::ONLINE);
-        let netdevice_client::client::PortBaseInfo {
-            port_class: device_class,
-            rx_types: _,
-            tx_types: _,
-        } = base_info;
+        let netdevice_client::client::PortBaseInfo { port_class, rx_types: _, tx_types: _ } =
+            base_info;
 
         enum DeviceProperties {
             Ethernet {
@@ -420,10 +419,12 @@ impl DeviceHandler {
                 id: binding_id,
                 port_id: port,
                 inner: self.inner.clone(),
-                device_class: device_class.clone(),
+                port_class: port_class.clone(),
                 wire_format,
             },
         };
+        let port_class = fnet_interfaces_ext::PortClass::try_from(port_class)
+            .map_err(Error::InvalidPortClass)?;
         let dynamic_netdevice_info_builder = |mtu: Mtu| devices::DynamicNetdeviceInfo {
             phy_up,
             common_info: devices::DynamicCommonInfo {
@@ -432,10 +433,7 @@ impl DeviceHandler {
                 events: crate::bindings::create_interface_event_producer(
                     interfaces_event_sink,
                     binding_id,
-                    crate::bindings::InterfaceProperties {
-                        name: name.clone(),
-                        device_class: fnet_interfaces::DeviceClass::Device(device_class),
-                    },
+                    crate::bindings::InterfaceProperties { name: name.clone(), port_class },
                 ),
                 control_hook: control_hook,
                 addresses: HashMap::new(),
@@ -633,7 +631,7 @@ pub(crate) struct PortHandler {
     id: BindingId,
     port_id: netdevice_client::Port,
     inner: Inner,
-    device_class: fhardware_network::DeviceClass,
+    port_class: fhardware_network::PortClass,
     wire_format: PortWireFormat,
 }
 
@@ -646,8 +644,8 @@ pub(crate) enum SendError {
 }
 
 impl PortHandler {
-    pub(crate) fn device_class(&self) -> fhardware_network::DeviceClass {
-        self.device_class
+    pub(crate) fn port_class(&self) -> fhardware_network::PortClass {
+        self.port_class
     }
 
     pub(crate) async fn attach(&self) -> Result<(), netdevice_client::Error> {
@@ -701,11 +699,11 @@ impl PortHandler {
 
 impl std::fmt::Debug for PortHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { id, port_id, inner: _, device_class, wire_format } = self;
+        let Self { id, port_id, inner: _, port_class, wire_format } = self;
         f.debug_struct("PortHandler")
             .field("id", id)
             .field("port_id", port_id)
-            .field("device_class", device_class)
+            .field("port_class", port_class)
             .field("wire_format", wire_format)
             .finish()
     }

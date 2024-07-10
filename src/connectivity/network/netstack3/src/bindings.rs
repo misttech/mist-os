@@ -983,9 +983,7 @@ impl Netstack {
             binding_id,
             InterfaceProperties {
                 name: LOOPBACK_NAME.to_string(),
-                device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                    fidl_fuchsia_net_interfaces::Empty {},
-                ),
+                port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Loopback,
             },
         );
         events.notify(InterfaceUpdate::OnlineChanged(true)).expect("interfaces worker not running");

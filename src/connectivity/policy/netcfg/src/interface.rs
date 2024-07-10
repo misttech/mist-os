@@ -107,7 +107,7 @@ impl InterfaceNamingConfig {
         &mut self,
         topological_path: &str,
         mac: &fidl_fuchsia_net_ext::MacAddress,
-        device_class: fidl_fuchsia_hardware_network::DeviceClass,
+        device_class: DeviceClass,
     ) -> Result<(&str, InterfaceNamingIdentifier), NameGenerationError> {
         let interface_naming_id = generate_identifier(mac);
         let info = DeviceInfoRef { topological_path, mac, device_class };
@@ -284,7 +284,7 @@ impl MatchingRule {
             MatchingRule::DeviceClasses(class_list) => {
                 // Match the interface if the interface under comparison
                 // matches any of the types included in the list.
-                Ok(class_list.contains(&info.device_class.into()))
+                Ok(class_list.contains(&info.device_class))
             }
             MatchingRule::Any(matches_any_interface) => Ok(*matches_any_interface),
         }
@@ -531,7 +531,7 @@ pub struct ProvisioningRule {
 // `add_new_device` in `lib.rs`. This makes mac into a required field for
 // ease of use.
 pub(super) struct DeviceInfoRef<'a> {
-    pub(super) device_class: fidl_fuchsia_hardware_network::DeviceClass,
+    pub(super) device_class: DeviceClass,
     pub(super) mac: &'a fidl_fuchsia_net_ext::MacAddress,
     pub(super) topological_path: &'a str,
 }
@@ -545,12 +545,13 @@ impl<'a> DeviceInfoRef<'a> {
     pub(super) fn is_wlan_ap(&self) -> bool {
         let DeviceInfoRef { device_class, mac: _, topological_path: _ } = self;
         match device_class {
-            fidl_fuchsia_hardware_network::DeviceClass::WlanAp => true,
-            fidl_fuchsia_hardware_network::DeviceClass::Wlan
-            | fidl_fuchsia_hardware_network::DeviceClass::Virtual
-            | fidl_fuchsia_hardware_network::DeviceClass::Ethernet
-            | fidl_fuchsia_hardware_network::DeviceClass::Ppp
-            | fidl_fuchsia_hardware_network::DeviceClass::Bridge => false,
+            DeviceClass::WlanAp => true,
+            DeviceClass::Wlan
+            | DeviceClass::Virtual
+            | DeviceClass::Ethernet
+            | DeviceClass::Bridge
+            | DeviceClass::Ppp
+            | DeviceClass::Lowpan => false,
         }
     }
 }
@@ -595,16 +596,14 @@ mod tests {
     use assert_matches::assert_matches;
     use test_case::test_case;
 
-    use fidl_fuchsia_hardware_network as fhwnet;
-
     // This is a lossy conversion between `InterfaceType` and `DeviceClass`
     // that allows tests to use a `devices::DeviceInfo` struct instead of
     // handling the fields individually.
-    fn device_class_from_interface_type(ty: crate::InterfaceType) -> fhwnet::DeviceClass {
+    fn device_class_from_interface_type(ty: crate::InterfaceType) -> DeviceClass {
         match ty {
-            crate::InterfaceType::Ethernet => fhwnet::DeviceClass::Ethernet,
-            crate::InterfaceType::Wlan => fhwnet::DeviceClass::Wlan,
-            crate::InterfaceType::Ap => fhwnet::DeviceClass::WlanAp,
+            crate::InterfaceType::Ethernet => DeviceClass::Ethernet,
+            crate::InterfaceType::Wlan => DeviceClass::Wlan,
+            crate::InterfaceType::Ap => DeviceClass::WlanAp,
         }
     }
 
@@ -837,7 +836,7 @@ mod tests {
                 generate_identifier(&fidl_fuchsia_net_ext::MacAddress { octets });
 
             let info = DeviceInfoRef {
-                device_class: fhwnet::DeviceClass::Ethernet,
+                device_class: DeviceClass::Ethernet,
                 mac: &fidl_fuchsia_net_ext::MacAddress { octets },
                 topological_path: topo_usb,
             };
@@ -853,7 +852,7 @@ mod tests {
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
         assert!(config
             .generate_name(&DeviceInfoRef {
-                device_class: fhwnet::DeviceClass::Ethernet,
+                device_class: DeviceClass::Ethernet,
                 mac: &fidl_fuchsia_net_ext::MacAddress { octets },
                 topological_path: topo_usb
             })
@@ -864,7 +863,7 @@ mod tests {
     // no impact on the test.
     fn default_device_info() -> DeviceInfoRef<'static> {
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
             topological_path: "",
         }
@@ -1054,58 +1053,47 @@ mod tests {
     }
 
     #[test_case(
-        fhwnet::DeviceClass::Ethernet,
-        vec![DeviceClass::Ethernet],
         DeviceClass::Ethernet,
+        vec![DeviceClass::Ethernet],
         true;
         "eth_match"
     )]
     #[test_case(
-        fhwnet::DeviceClass::Ethernet,
-        vec![DeviceClass::Wlan, DeviceClass::WlanAp],
         DeviceClass::Ethernet,
+        vec![DeviceClass::Wlan, DeviceClass::WlanAp],
         false;
         "eth_no_match"
     )]
     #[test_case(
-        fhwnet::DeviceClass::Wlan,
-        vec![DeviceClass::Wlan],
         DeviceClass::Wlan,
+        vec![DeviceClass::Wlan],
         true;
         "wlan_match"
     )]
     #[test_case(
-        fhwnet::DeviceClass::Wlan,
-        vec![DeviceClass::Ethernet, DeviceClass::WlanAp],
         DeviceClass::Wlan,
+        vec![DeviceClass::Ethernet, DeviceClass::WlanAp],
         false;
         "wlan_no_match"
     )]
     #[test_case(
-        fhwnet::DeviceClass::WlanAp,
-        vec![DeviceClass::WlanAp],
         DeviceClass::WlanAp,
+        vec![DeviceClass::WlanAp],
         true;
         "ap_match"
     )]
     #[test_case(
-        fhwnet::DeviceClass::WlanAp,
-        vec![DeviceClass::Ethernet, DeviceClass::Wlan],
         DeviceClass::WlanAp,
+        vec![DeviceClass::Ethernet, DeviceClass::Wlan],
         false;
         "ap_no_match"
     )]
     fn test_interface_matching_by_device_class(
-        device_class: fhwnet::DeviceClass,
+        device_class: DeviceClass,
         device_classes: Vec<DeviceClass>,
-        expected_device_class: DeviceClass,
         want_match: bool,
     ) {
         let device_info = DeviceInfoRef { device_class, ..default_device_info() };
-
-        // Verify the `DeviceClass` determined from the device info.
-        let device_class: DeviceClass = device_info.device_class.into();
-        assert_eq!(device_class, expected_device_class);
 
         // Create a matching rule for the provided `DeviceClass` list.
         let matching_rule = MatchingRule::DeviceClasses(device_classes);
@@ -1118,12 +1106,12 @@ mod tests {
     // to ensure that all interfaces are accepted or all interfaces
     // are rejected.
     #[test_case(
-        fhwnet::DeviceClass::Ethernet,
+        DeviceClass::Ethernet,
         "/dev/pci-00:15.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet"
     )]
-    #[test_case(fhwnet::DeviceClass::Wlan, "/dev/pci-00:14.0/ethernet")]
+    #[test_case(DeviceClass::Wlan, "/dev/pci-00:14.0/ethernet")]
     fn test_interface_matching_by_any_matching_rule(
-        device_class: fhwnet::DeviceClass,
+        device_class: DeviceClass,
         topological_path: &'static str,
     ) {
         let device_info = DeviceInfoRef {
@@ -1144,25 +1132,25 @@ mod tests {
     }
 
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan])],
         false;
         "false_single_rule"
     )]
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan]), MatchingRule::Any(true)],
         false;
         "false_one_rule_of_multiple"
     )]
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::Any(true)],
         true;
         "true_single_rule"
     )]
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::DeviceClasses(vec![DeviceClass::Ethernet]), MatchingRule::Any(true)],
         true;
         "true_multiple_rules"
@@ -1178,7 +1166,7 @@ mod tests {
     }
 
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         "",
         vec![
             ProvisioningMatchingRule::Common(
@@ -1189,7 +1177,7 @@ mod tests {
         "false_single_rule"
     )]
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Wlan, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Wlan, ..default_device_info() },
         "wlanx5009",
         vec![
             ProvisioningMatchingRule::InterfaceName {
@@ -1201,14 +1189,14 @@ mod tests {
         "false_one_rule_of_multiple"
     )]
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         "",
         vec![ProvisioningMatchingRule::Common(MatchingRule::Any(true))],
         true;
         "true_single_rule"
     )]
     #[test_case(
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         "wlanx5009",
         vec![
             ProvisioningMatchingRule::Common(
@@ -1273,13 +1261,13 @@ mod tests {
     )]
     #[test_case(
         vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass }],
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         "eth";
         "eth_device_class"
     )]
     #[test_case(
         vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass }],
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Wlan, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Wlan, ..default_device_info() },
         "wlan";
         "wlan_device_class"
     )]
@@ -1288,7 +1276,7 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
             NameCompositionRule::Static { value: String::from("x") },
         ],
-        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
         "ethx";
         "device_class_with_static"
     )]
@@ -1299,7 +1287,7 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
         ],
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Wlan,
+            device_class: DeviceClass::Wlan,
             mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x8] },
             ..default_device_info()
         },
@@ -1313,7 +1301,7 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
         ],
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
             ..default_device_info()
         },
@@ -1327,7 +1315,7 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
         ],
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
             ..default_device_info()
         },
@@ -1341,7 +1329,7 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
         ],
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             topological_path: "/dev/sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
             ..default_device_info()
         },
@@ -1351,7 +1339,7 @@ mod tests {
     #[test_case(
         vec![NameCompositionRule::Default],
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
             mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x2] },
         },
@@ -1361,7 +1349,7 @@ mod tests {
     #[test_case(
         vec![NameCompositionRule::Default],
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             topological_path: "/dev/sys/platform/05:00:18/usb-phy-composite/aml_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function/netdevice-migration/network-device",
             mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x3] },
         },
@@ -1371,7 +1359,7 @@ mod tests {
     #[test_case(
         vec![NameCompositionRule::Default],
         DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             topological_path: "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
             ..default_device_info()
         },
@@ -1438,7 +1426,7 @@ mod tests {
             let interface_naming_id =
                 generate_identifier(&fidl_fuchsia_net_ext::MacAddress { octets });
             let info = DeviceInfoRef {
-                device_class: fhwnet::DeviceClass::Ethernet,
+                device_class: DeviceClass::Ethernet,
                 mac: &fidl_fuchsia_net_ext::MacAddress { octets },
                 topological_path: topo_usb,
             };
@@ -1457,7 +1445,7 @@ mod tests {
         // Use an Ethernet device that is determined to have a USB bus type
         // from the topological path.
         let info = DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
+            device_class: DeviceClass::Ethernet,
             mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
             topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet"
         };
@@ -1495,7 +1483,7 @@ mod tests {
                 provisioning: ProvisioningAction::Delegated,
             }],
             &DeviceInfoRef {
-                device_class: fhwnet::DeviceClass::Wlan,
+                device_class: DeviceClass::Wlan,
                 mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
                 topological_path: "",
             },
