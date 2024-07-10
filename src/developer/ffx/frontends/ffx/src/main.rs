@@ -275,6 +275,7 @@ async fn main() {
 mod test {
     use super::*;
     use ffx_command::{FlagInfo, FlagKind, PositionalInfo, SubCommandInfo};
+    use ffx_core as _;
 
     #[fuchsia::test]
     async fn test_try_runner_from_name() {
