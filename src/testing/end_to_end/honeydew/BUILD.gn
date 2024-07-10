@@ -114,6 +114,7 @@ python_library("honeydew_no_testonly") {
     ":honeydew_ffx_tool_deps",
     ":honeydew_fidl_ir_and_deps",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//src/lib/diagnostics/python/fuchsia_inspect",
     "//third_party/pypng",
   ]
 

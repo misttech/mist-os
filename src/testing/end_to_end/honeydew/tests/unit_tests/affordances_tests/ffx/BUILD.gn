@@ -30,6 +30,7 @@ if (is_host) {
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//third_party/parameterized",
+      "//src/lib/diagnostics/python/fuchsia_inspect",
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]

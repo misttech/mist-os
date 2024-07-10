@@ -5,7 +5,8 @@
 query component nodes exposed via the Inspect API."""
 
 import abc
-from typing import Any
+
+import fuchsia_inspect
 
 
 class Inspect(abc.ABC):
@@ -17,7 +18,7 @@ class Inspect(abc.ABC):
         self,
         selectors: list[str] | None = None,
         monikers: list[str] | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> fuchsia_inspect.InspectDataCollection:
         """Return the inspect data associated with the given selectors and
         monikers.
 
@@ -29,7 +30,7 @@ class Inspect(abc.ABC):
         for the whole system will be returned.
 
         Returns:
-            Inspect data
+            Inspect data collection
 
         Raises:
             InspectError: Failed to return inspect data.

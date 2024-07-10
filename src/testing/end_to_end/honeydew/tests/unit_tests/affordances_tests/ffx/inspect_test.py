@@ -8,16 +8,84 @@ import unittest
 from collections.abc import Callable
 from unittest import mock
 
+import fuchsia_inspect
 from parameterized import param, parameterized
 
 from honeydew import errors
 from honeydew.affordances.ffx import inspect as ffx_inspect
 from honeydew.transports import ffx as ffx_transport
 
-_INSPECT_SHOW_JSON_TEXT: str = '[{"data_source":"Inspect","metadata":{"component_url":"fuchsia-pkg://fuchsia.com/system-update-checker#meta/system-update-checker.cm","timestamp":64307780890800},"moniker":"core/system-update/system-update-checker","payload":{"root":{"update-manager":{"update-state":"None","version-available":"None"}}},"version":1}]\n'
+_INSPECT_DATA_JSON_TEXT = """
+[
+  {
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo",
+        "timestamp": 181016000000000,
+        "file_name": "foo.txt"
+    },
+    "moniker": "core/example",
+    "payload": {
+      "root": {
+        "value": 100
+      }
+    },
+    "version": 1
+  },
+  {
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo2",
+        "timestamp": 181016000000000
+    },
+    "moniker": "core/example",
+    "payload": {
+      "root": {
+        "value": 100
+      }
+    },
+    "version": 1
+  },
+  {
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo2",
+        "timestamp": 181016000000000,
+        "errors": [
+          {
+            "message": "Unknown failure"
+          }
+        ]
+    },
+    "moniker": "core/example",
+    "payload": null,
+    "version": 1
+  }
+]
+"""
+
+_INSPECT_DATA_BAD_VERSION = """
+{
+    "data_source": "Inspect",
+    "metadata": {
+        "component_url": "foo",
+        "timestamp": 181016000000000,
+        "file_name": "foo.txt"
+    },
+    "moniker": "core/example",
+    "payload": {
+      "root": {
+        "value": 100
+      }
+    },
+    "version": 2
+  }
+"""
+
 
 _MOCK_ARGS: dict[str, str] = {
-    "INSPECT_SHOW_JSON_TEXT": _INSPECT_SHOW_JSON_TEXT,
+    "INSPECT_DATA_JSON_TEXT": _INSPECT_DATA_JSON_TEXT,
+    "INSPECT_DATA_BAD_VERSION": _INSPECT_DATA_BAD_VERSION,
 }
 
 
@@ -115,12 +183,20 @@ class InspectFfxTests(unittest.TestCase):
         expected_cmd: list[str],
     ) -> None:
         """Test case for Inspect.get_data()"""
-        self.mock_ffx.run.return_value = _MOCK_ARGS["INSPECT_SHOW_JSON_TEXT"]
+        self.mock_ffx.run.return_value = _MOCK_ARGS["INSPECT_DATA_JSON_TEXT"]
 
-        self.inspect_obj.get_data(
-            selectors=selectors,
-            monikers=monikers,
+        inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+            self.inspect_obj.get_data(
+                selectors=selectors,
+                monikers=monikers,
+            )
         )
+
+        self.assertIsInstance(
+            inspect_data_collection, fuchsia_inspect.InspectDataCollection
+        )
+        for inspect_data in inspect_data_collection.data:
+            self.assertIsInstance(inspect_data, fuchsia_inspect.InspectData)
 
         self.mock_ffx.run.assert_called_with(
             cmd=expected_cmd,
@@ -131,24 +207,24 @@ class InspectFfxTests(unittest.TestCase):
     @parameterized.expand(
         [
             param(
-                label="when_ffx_run_fails_with_FfxCommandError",
+                label="with_FfxCommandError",
                 side_effect=errors.FfxCommandError("error"),
                 expected_error=errors.InspectError,
             ),
             param(
-                label="when_ffx_run_fails_with_DeviceNotConnectedError",
+                label="with_DeviceNotConnectedError",
                 side_effect=errors.DeviceNotConnectedError("error"),
                 expected_error=errors.InspectError,
             ),
             param(
-                label="when_ffx_run_fails_with_someother_error",
+                label="with_someother_error",
                 side_effect=errors.FfxTimeoutError("error"),
                 expected_error=errors.FfxTimeoutError,
             ),
         ],
         name_func=_custom_test_name_func,
     )
-    def test_get_data_exception(
+    def test_get_data_exception_when_ffx_run_fails(
         self,
         label: str,  # pylint: disable=unused-argument,
         side_effect: type[errors.HoneydewError],
@@ -158,4 +234,11 @@ class InspectFfxTests(unittest.TestCase):
         self.mock_ffx.run.side_effect = side_effect
 
         with self.assertRaises(expected_error):
+            self.inspect_obj.get_data()
+
+    def test_get_data_exception_when_inspect_data_parsing_fails(self) -> None:
+        """Test case for Inspect.get_data() raising InspectError failure."""
+        self.mock_ffx.run.return_value = _MOCK_ARGS["INSPECT_DATA_BAD_VERSION"]
+
+        with self.assertRaises(errors.InspectError):
             self.inspect_obj.get_data()

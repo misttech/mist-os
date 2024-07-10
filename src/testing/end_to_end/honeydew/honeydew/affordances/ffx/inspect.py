@@ -7,6 +7,8 @@ import json
 import logging
 from typing import Any
 
+import fuchsia_inspect
+
 from honeydew import errors
 from honeydew.interfaces.affordances import inspect
 from honeydew.transports import ffx as ffx_transport
@@ -30,7 +32,7 @@ class Inspect(inspect.Inspect):
         self,
         selectors: list[str] | None = None,
         monikers: list[str] | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> fuchsia_inspect.InspectDataCollection:
         """Return the inspect data associated with the given selectors and
         monikers.
 
@@ -42,7 +44,7 @@ class Inspect(inspect.Inspect):
         for the whole system will be returned.
 
         Returns:
-            Inspect data
+            Inspect data collection
 
         Raises:
             InspectError: Failed to return inspect data.
@@ -63,15 +65,24 @@ class Inspect(inspect.Inspect):
 
         try:
             _LOGGER.info("Collecting the inspect data from %s...", self._name)
-            output: str = self._ffx.run(
+            inspect_data_json_str: str = self._ffx.run(
                 cmd=cmd,
                 log_output=False,
                 timeout=None,
             )
             _LOGGER.info("Collected the inspect data from %s.", self._name)
 
-            return json.loads(output)
-        except (errors.FfxCommandError, errors.DeviceNotConnectedError) as err:
+            inspect_data_json_obj: list[dict[str, Any]] = json.loads(
+                inspect_data_json_str
+            )
+            return fuchsia_inspect.InspectDataCollection.from_list(
+                inspect_data_json_obj
+            )
+        except (
+            errors.FfxCommandError,
+            errors.DeviceNotConnectedError,
+            fuchsia_inspect.InspectDataError,
+        ) as err:
             raise errors.InspectError(
                 f"Failed to collect the inspect data from {self._name}"
             ) from err
