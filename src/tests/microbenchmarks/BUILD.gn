@@ -287,7 +287,7 @@ if (host_os == "linux" && !is_asan) {
     deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
   }
 
-  fuchsia_shell_package("starnix_microbenchmarks_perftestmode") {
+  fuchsia_package("starnix_microbenchmarks_perftestmode") {
     testonly = true
 
     subpackages = starnix_test_subpackages +
