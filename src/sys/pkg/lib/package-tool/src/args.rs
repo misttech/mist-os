@@ -46,6 +46,10 @@ pub struct PackageArchiveExtractCommand {
     #[argh(switch)]
     pub blobs_json: bool,
 
+    /// extract the package namespace into /pkg
+    #[argh(switch)]
+    pub namespace: bool,
+
     /// package archive
     #[argh(positional)]
     pub archive: PathBuf,

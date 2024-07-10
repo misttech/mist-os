@@ -42,6 +42,14 @@
       "short": null,
       "description": "produce a blobs.json file",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--namespace",
+      "short": null,
+      "description": "extract the package namespace into /pkg",
+      "hidden": false
     }
   ],
   "notes": [],

@@ -8,10 +8,13 @@ use crate::args::{
 };
 use crate::{to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, PACKAGE_MANIFEST_NAME};
 use anyhow::{anyhow, Context as _, Result};
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
+use fuchsia_archive as far;
 use fuchsia_pkg::{PackageBuilder, PackageManifest, SubpackageInfo};
-use std::collections::BTreeSet;
-use std::fs::File;
+use std::collections::{BTreeSet, HashMap};
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 pub async fn cmd_package_archive_create(cmd: PackageArchiveCreateCommand) -> Result<()> {
@@ -112,7 +115,11 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
         to_writer_json_pretty(file, package_manifest.blobs())?;
     }
 
-    Ok(())
+    if cmd.namespace {
+        populate_namespace(cmd.archive, cmd.out.into()).await
+    } else {
+        Ok(())
+    }
 }
 
 pub async fn cmd_package_archive_add(cmd: PackageArchiveAddCommand) -> Result<()> {
@@ -126,6 +133,7 @@ pub async fn cmd_package_archive_add(cmd: PackageArchiveAddCommand) -> Result<()
         out: extract_dir.clone(),
         repository: None,
         blobs_json: true,
+        namespace: false,
         archive: cmd.archive.clone().into(),
     })
     .await?;
@@ -175,6 +183,7 @@ pub async fn cmd_package_archive_remove(cmd: PackageArchiveRemoveCommand) -> Res
         out: extract_dir.clone(),
         repository: None,
         blobs_json: true,
+        namespace: false,
         archive: cmd.archive.clone().into(),
     })
     .await?;
@@ -204,6 +213,100 @@ pub async fn cmd_package_archive_remove(cmd: PackageArchiveRemoveCommand) -> Res
     let () = new_pkg_manifest.archive(extract_dir, output_archive).await?;
 
     Ok(())
+}
+
+async fn populate_namespace(far_file: PathBuf, output_dir: PathBuf) -> Result<()> {
+    let file = File::open(&far_file)
+        .with_context(|| format!("failed to open file: {}", far_file.display()))?;
+    let mut reader = far::Utf8Reader::new(file)
+        .with_context(|| format!("failed to parse FAR file: {}", far_file.display()))?;
+    let blobs_dir = output_dir.join("blobs");
+    let output_dir = output_dir.join("pkg");
+
+    let far_content_paths: Vec<_> = reader.list().into_iter().map(|e| e.path()).collect();
+    if far_content_paths.contains(&"meta.far") {
+        // Extract the meta.far from the package
+        let mut path_map = HashMap::new();
+        path_map.insert("meta.far".to_owned(), "meta.far".to_owned());
+        extract_far_to_dir(&mut reader, &output_dir, &blobs_dir, Some(path_map)).await?;
+        // Extract the meta.far itself
+        let meta_far_file =
+            File::open(&output_dir.join("meta.far")).with_context(|| "failed to open meta.far")?;
+        let mut meta_far_reader =
+            far::Utf8Reader::new(meta_far_file).with_context(|| "failed to parse meta.far")?;
+        extract_far_to_dir(&mut meta_far_reader, &output_dir, &blobs_dir, None).await?;
+        // Remove the meta.far now that it is extracted
+        fs::remove_file(&output_dir.join("meta.far"))
+            .with_context(|| "failed to remove the temporary meta.far")?;
+        // Extract the hash-to-path mapping
+        let hash_path_map =
+            extract_mapping_from_contents(&output_dir.join("meta").join("contents")).await?;
+        // Finally, extract the files respecting the mapping from the contents file
+        extract_far_to_dir(&mut reader, &output_dir, &blobs_dir, Some(hash_path_map)).await?;
+    } else {
+        tracing::info!("No meta.far included, simply extracting all files.");
+        extract_far_to_dir(&mut reader, &output_dir, &blobs_dir, None).await?;
+    }
+
+    Ok(())
+}
+
+async fn extract_far_to_dir(
+    reader: &mut far::Utf8Reader<File>,
+    output_dir: &Path,
+    blobs_dir: &Path,
+    path_map: Option<HashMap<String, String>>,
+) -> Result<()> {
+    let src_paths: Vec<Utf8PathBuf> = if let Some(ref m) = path_map {
+        m.keys().map(|e| Utf8PathBuf::from(e)).collect()
+    } else {
+        reader.list().map(|e| Utf8PathBuf::from(e.path())).collect()
+    };
+    for src_path in src_paths {
+        // dst_path is resolved from the hash map if an entry exists
+        let dst_path = if let Some(ref m) = path_map {
+            if let Some(p) = m.get(src_path.as_str()) {
+                output_dir.join(p)
+            } else {
+                unreachable!();
+            }
+        } else {
+            output_dir.join(&src_path)
+        };
+
+        let parent = dst_path.parent().expect("`path` must be non-empty");
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create directory: {}", parent.display()))?;
+
+        // We can link the blobs from the /blobs dir which was populated during archive extract
+        if let Err(_) = std::fs::hard_link(blobs_dir.join(src_path.as_str()), &dst_path) {
+            // The files that do not exist in /blobs (e.g. meta.far and its content) will return
+            // an error when trying to link. We then extract them directly from the far file.
+            let bytes = reader
+                .read_file(src_path.as_str())
+                .with_context(|| format!("failed to read {src_path} from FAR"))?;
+            fs::write(&dst_path, &bytes)
+                .with_context(|| format!("failed to write {}", dst_path.display()))?;
+        }
+    }
+    Ok(())
+}
+
+async fn extract_mapping_from_contents(path: &PathBuf) -> Result<HashMap<String, String>> {
+    let mut map = HashMap::new();
+    let contents_file = File::open(path).with_context(|| "failed to open meta/contents")?;
+    for line in BufReader::new(contents_file).lines().flatten() {
+        let m: Vec<_> = line.split("=").collect();
+        if m.len() != 2 {
+            return Err(anyhow!("meta/contents contains invalid entry: {line}"));
+        } else {
+            if m[0] == "" || m[1] == "" {
+                return Err(anyhow!("meta/contents contains invalid entry: {line}"));
+            }
+            map.insert(m[1].to_owned(), m[0].to_owned());
+        }
+    }
+    Ok(map)
 }
 
 #[cfg(test)]
@@ -398,6 +501,7 @@ mod tests {
             repository: None,
             archive: archive_path.clone().into(),
             blobs_json: true,
+            namespace: false,
         })
         .await
         .unwrap();
@@ -500,6 +604,7 @@ mod tests {
             repository: None,
             archive: archive_path.clone().into(),
             blobs_json: true,
+            namespace: false,
         })
         .await
         .unwrap();
@@ -643,6 +748,7 @@ mod tests {
             repository: None,
             archive: archive_path.clone().into(),
             blobs_json: true,
+            namespace: false,
         })
         .await
         .unwrap();
@@ -769,6 +875,7 @@ mod tests {
             out: extract_dir.clone(),
             repository: None,
             blobs_json: false,
+            namespace: false,
             archive: archive_path.clone().into_std_path_buf(),
         })
         .await
@@ -783,5 +890,79 @@ mod tests {
             Utf8Path::new("blobs").join(LIB_HASH),
         );
         assert_eq!(extract_contents, BTreeMap::from([]));
+    }
+
+    #[fuchsia::test]
+    async fn file_mapping_invalid_meta_content() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let mut file = File::create(tmpdir.path().join("contents")).unwrap();
+        let invalid_meta = "bin=\nlib=65f1e8f09fdc18cbcf";
+        file.write_all(invalid_meta.as_bytes()).unwrap();
+        drop(file);
+
+        assert_eq!(
+            extract_mapping_from_contents(&tmpdir.path().join("contents")).await.is_err(),
+            true
+        );
+    }
+
+    #[fuchsia::test]
+    async fn file_mapping_valid_meta_content() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let mut file = File::create(tmpdir.path().join("contents")).unwrap();
+        let valid_meta = format!(
+            "{}={}\n{}={}",
+            String::from_utf8(BIN_CONTENTS.to_vec()).unwrap(),
+            BIN_HASH,
+            String::from_utf8(LIB_CONTENTS.to_vec()).unwrap(),
+            LIB_HASH
+        );
+        file.write_all(valid_meta.as_bytes()).unwrap();
+        drop(file);
+
+        let m = extract_mapping_from_contents(&tmpdir.path().join("contents")).await.unwrap();
+        assert_eq!(m.len(), 2);
+    }
+
+    #[fuchsia::test]
+    async fn extract_namespace_valid_package() {
+        let srcdir = tempfile::tempdir().unwrap();
+        let pkg = create_package(Utf8Path::from_path(srcdir.path()).unwrap());
+
+        let archive_path = srcdir.path().join("archive.far");
+        cmd_package_archive_create(PackageArchiveCreateCommand {
+            out: archive_path.clone().into(),
+            root_dir: Utf8PathBuf::from_path_buf(srcdir.path().to_path_buf()).unwrap(),
+            package_manifest: pkg.manifest_path,
+            depfile: None,
+        })
+        .await
+        .unwrap();
+
+        let _ = pkg.meta_far_contents;
+
+        let dstdir = tempfile::tempdir().unwrap();
+
+        assert_eq!(
+            cmd_package_archive_extract(PackageArchiveExtractCommand {
+                out: Utf8PathBuf::from_path_buf(dstdir.path().to_path_buf()).unwrap(),
+                repository: None,
+                archive: archive_path,
+                blobs_json: false,
+                namespace: true,
+            })
+            .await
+            .is_ok(),
+            true
+        );
+
+        let meta_contents = vec![(BIN_CONTENTS, BIN_HASH), (LIB_CONTENTS, LIB_HASH)];
+        for (f, b) in meta_contents {
+            let f = String::from_utf8(f.to_vec()).unwrap();
+            let file_path = dstdir.path().join("pkg").join(f);
+            let blob_path = dstdir.path().join("blobs").join(b);
+            assert!(fs::metadata(file_path).unwrap().is_file());
+            assert!(fs::metadata(blob_path).unwrap().is_file());
+        }
     }
 }
