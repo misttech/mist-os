@@ -13,7 +13,7 @@ use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::warn;
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
 
 pub struct InspectSinkServer {
@@ -73,9 +73,10 @@ impl InspectSinkServer {
                 ),
                 finspect::InspectSinkRequest::Publish {
                     payload: finspect::InspectSinkPublishRequest { tree: None, name, .. },
-                    ..
+                    control_handle,
                 } => {
-                    debug!(name, %component, "InspectSink/Publish without a tree");
+                    warn!(name, %component, "InspectSink/Publish without a tree");
+                    control_handle.shutdown();
                 }
                 finspect::InspectSinkRequest::Escrow {
                     payload:

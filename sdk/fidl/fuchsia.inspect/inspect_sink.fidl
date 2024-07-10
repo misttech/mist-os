@@ -33,7 +33,19 @@ open protocol InspectSink {
     /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the
     /// server can use to read Inspect data, including lazy nodes.
     flexible Publish(resource table {
+        /// The Tree that the server will use to fetch Inspect data.
+        ///
+        /// The connection will be closed if this isn't provided.
+        ///
+        /// Required
         1: tree client_end:Tree;
+
+        /// A name to identify this tree from the client perspective. This name
+        /// isn't required to be unique across multiple trees. Multiple trees
+        /// published under the same name are accepted and will not overwrite
+        /// previously published trees.
+        ///
+        /// Optional
         2: name string:MAX_NAME_LENGTH;
     });
 
