@@ -6,7 +6,9 @@
 #define SRC_UI_INPUT_DRIVERS_USB_HID_USB_HID_H_
 
 #include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
+#include <fidl/fuchsia.hardware.usb/cpp/fidl.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/sync/completion.h>
 
@@ -17,6 +19,7 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
+#include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/hid.h>
 #include <usb/usb.h>
 
@@ -30,10 +33,11 @@ class UsbHidbus : public DeviceType,
                   public fidl::WireServer<fuchsia_hardware_hidbus::Hidbus> {
  public:
   explicit UsbHidbus(zx_device_t* device)
-      : DeviceType(device), outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
+      : DeviceType(device),
+        dispatcher_loop_(&kAsyncLoopConfigNeverAttachToThread),
+        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
 
   // Methods required by the ddk mixins.
-  void UsbInterruptCallback(usb_request_t* req);
   // fuchsia_hardware_hidbus methods.
   void Query(QueryCompleter::Sync& completer) override;
   void Start(StartCompleter::Sync& completer) override;
@@ -68,10 +72,16 @@ class UsbHidbus : public DeviceType,
   void FindDescriptors(usb::Interface interface, usb_hid_descriptor_t** hid_desc,
                        const usb_endpoint_descriptor_t** endptin,
                        const usb_endpoint_descriptor_t** endptout);
-  zx_status_t Bind(ddk::UsbProtocolClient usbhid);
+  zx_status_t Bind(ddk::UsbProtocolClient usbhid,
+                   fidl::ClientEnd<fuchsia_hardware_usb::Usb>& client);
 
  private:
   void Stop();
+
+  void HandleInterrupt(fuchsia_hardware_usb_endpoint::Completion completion);
+  void SetReportComplete(fuchsia_hardware_usb_endpoint::Completion completion);
+
+  async::Loop dispatcher_loop_;
 
   component::OutgoingDirectory outgoing_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_hidbus::Hidbus>> binding_;
@@ -82,18 +92,8 @@ class UsbHidbus : public DeviceType,
   // These pointers are valid as long as usb_interface_list_ is valid.
   usb_hid_descriptor_t* hid_desc_ = nullptr;
 
-  uint8_t endptin_address_ = 0;
-  uint8_t endptout_address_ = 0;
-  // This boolean is set to true for a usb device that has an interrupt out endpoint. The interrupt
-  // out endpoint is used to send reports to the device. (the SET report protocol).
-  bool has_endptout_ = false;
-  size_t endptout_max_size_ = 0;
-
   fidl::Arena<> arena_;
   fuchsia_hardware_hidbus::wire::HidInfo info_;
-  usb_request_t* req_ = nullptr;
-  usb_request_t* request_out_ = nullptr;
-  bool req_queued_ = false;
 
   ddk::UsbProtocolClient usb_ = {};
 
@@ -103,6 +103,11 @@ class UsbHidbus : public DeviceType,
 
   std::thread unbind_thread_;
   sync_completion_t set_report_complete_;
+
+  // Interrupt endpoint
+  usb_endpoint::UsbEndpoint<UsbHidbus> ep_in_{usb::EndpointType::INTERRUPT, this,
+                                              std::mem_fn(&UsbHidbus::HandleInterrupt)};
+  std::optional<usb_endpoint::UsbEndpoint<UsbHidbus>> ep_out_;
 };
 
 }  // namespace usb_hid

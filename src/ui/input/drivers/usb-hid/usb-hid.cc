@@ -29,6 +29,7 @@
 
 namespace usb_hid {
 
+namespace fendpoint = fuchsia_hardware_usb_endpoint;
 namespace fhidbus = fuchsia_hardware_hidbus;
 
 #define to_usb_hid(d) containerof(d, usb_hid_device_t, hiddev)
@@ -36,21 +37,24 @@ namespace fhidbus = fuchsia_hardware_hidbus;
 // This driver binds on any USB device that exposes HID reports. It passes the
 // reports to the HID driver by implementing the HidBus protocol.
 
-void UsbHidbus::UsbInterruptCallback(usb_request_t* req) {
+void UsbHidbus::HandleInterrupt(fendpoint::Completion completion) {
+  ZX_ASSERT(completion.request().has_value());
+  ZX_ASSERT(completion.status().has_value());
+  ZX_ASSERT(completion.transfer_size().has_value());
+
   // TODO use usb request copyfrom instead of mmap
-  void* buffer;
-  zx_status_t status = usb_request_mmap(req, &buffer);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "usb-hid: usb_request_mmap failed: %s", zx_status_get_string(status));
-    return;
-  }
-  zxlogf(TRACE, "usb-hid: callback request status %d", req->response.status);
+  usb::FidlRequest req(std::move(completion.request().value()));
+  std::vector<uint8_t> buffer(*completion.transfer_size());
+  auto actual = req.CopyFrom(0, buffer.data(), *completion.transfer_size(), ep_in_.GetMapped);
+  ZX_ASSERT(actual.size() == 1);
+  ZX_ASSERT(actual[0] == *completion.transfer_size());
+  zxlogf(TRACE, "usb-hid: callback request status %d", *completion.status());
   if (zxlog_level_enabled(TRACE)) {
-    hexdump(buffer, req->response.actual);
+    hexdump(buffer.data(), *completion.transfer_size());
   }
 
   bool requeue = true;
-  switch (req->response.status) {
+  switch (*completion.status()) {
     case ZX_ERR_IO_NOT_PRESENT:
       requeue = false;
       break;
@@ -59,8 +63,7 @@ void UsbHidbus::UsbInterruptCallback(usb_request_t* req) {
         fidl::Arena arena;
         auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
             fhidbus::wire::Report::Builder(arena)
-                .buf(fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(buffer),
-                                                             req->response.actual))
+                .buf(fidl::VectorView<uint8_t>::FromExternal(buffer.data(), buffer.size()))
                 .timestamp(zx_clock_get_monotonic())
                 .Build());
         if (!result.ok()) {
@@ -70,22 +73,22 @@ void UsbHidbus::UsbInterruptCallback(usb_request_t* req) {
       break;
     default:
       zxlogf(ERROR, "usb-hid: unknown interrupt status %d; not requeuing req",
-             req->response.status);
+             *completion.status());
       requeue = false;
       break;
   }
 
   if (requeue) {
-    usb_request_complete_callback_t complete = {
-        .callback =
-            [](void* ctx, usb_request_t* request) {
-              static_cast<UsbHidbus*>(ctx)->UsbInterruptCallback(request);
-            },
-        .ctx = this,
-    };
-    usb_.RequestQueue(req, &complete);
+    req.reset_buffers(ep_in_.GetMapped);
+    req.CacheFlushInvalidate(ep_in_.GetMapped);
+    std::vector<fuchsia_hardware_usb_request::Request> requests;
+    requests.push_back(req.take_request());
+    auto result = ep_in_->QueueRequests(std::move(requests));
+    if (result.is_error()) {
+      zxlogf(ERROR, "QueueRequests failed %s", result.error_value().FormatDescription().c_str());
+    }
   } else {
-    req_queued_ = false;
+    ep_in_.PutRequest(std::move(req));
   }
 }
 
@@ -99,16 +102,16 @@ void UsbHidbus::Start(StartCompleter::Sync& completer) {
   }
 
   started_ = true;
-  if (!req_queued_) {
-    req_queued_ = true;
-    usb_request_complete_callback_t complete = {
-        .callback =
-            [](void* ctx, usb_request_t* request) {
-              static_cast<UsbHidbus*>(ctx)->UsbInterruptCallback(request);
-            },
-        .ctx = this,
-    };
-    usb_.RequestQueue(req_, &complete);
+  auto req = ep_in_.GetRequest();
+  if (req.has_value()) {
+    req->reset_buffers(ep_in_.GetMapped);
+    req->CacheFlushInvalidate(ep_in_.GetMapped);
+    std::vector<fuchsia_hardware_usb_request::Request> requests;
+    requests.push_back(req->take_request());
+    auto result = ep_in_->QueueRequests(std::move(requests));
+    if (result.is_error()) {
+      zxlogf(ERROR, "QueueRequests failed %s", result.error_value().FormatDescription().c_str());
+    }
   }
   completer.ReplySuccess();
 }
@@ -192,28 +195,37 @@ void UsbHidbus::GetReport(fhidbus::wire::HidbusGetReportRequest* request,
   completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(report.data(), report.size()));
 }
 
+void UsbHidbus::SetReportComplete(fendpoint::Completion completion) {
+  sync_completion_signal(&set_report_complete_);
+}
+
 void UsbHidbus::SetReport(fhidbus::wire::HidbusSetReportRequest* request,
                           SetReportCompleter::Sync& completer) {
-  if (has_endptout_) {
-    sync_completion_reset(&set_report_complete_);
-    usb_request_complete_callback_t complete = {
-        .callback =
-            [](void* ctx, usb_request_t* request) {
-              sync_completion_signal(&static_cast<UsbHidbus*>(ctx)->set_report_complete_);
-            },
-        .ctx = this,
-    };
-
-    request_out_->header.length = request->data.count();
-    if (request->data.count() > endptout_max_size_) {
+  if (ep_out_.has_value()) {
+    auto req = ep_out_->GetRequest();
+    if (!req.has_value()) {
+      completer.ReplyError(ZX_ERR_SHOULD_WAIT);
+      return;
+    }
+    auto actual = req->CopyTo(0, request->data.data(), request->data.count(), ep_out_->GetMapped);
+    ZX_ASSERT(actual.size() == 1);
+    if (request->data.count() != actual[0]) {
       completer.ReplyError(ZX_ERR_BUFFER_TOO_SMALL);
       return;
     }
-    size_t result =
-        usb_request_copy_to(request_out_, request->data.data(), request->data.count(), 0);
-    ZX_ASSERT(result == request->data.count());
-    usb_.RequestQueue(request_out_, &complete);
-    auto status = sync_completion_wait(&set_report_complete_, ZX_TIME_INFINITE);
+    auto status = req->CacheFlush(ep_out_->GetMappedLocked);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Cache flush failed %d", status);
+    }
+    std::vector<fuchsia_hardware_usb_request::Request> requests;
+    requests.push_back(req->take_request());
+    auto result = (*ep_out_)->QueueRequests(std::move(requests));
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to QueueRequests %s", result.error_value().FormatDescription().c_str());
+      completer.ReplyError(result.error_value().status());
+      return;
+    }
+    status = sync_completion_wait(&set_report_complete_, ZX_TIME_INFINITE);
     if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
@@ -282,18 +294,25 @@ void UsbHidbus::SetProtocol(fhidbus::wire::HidbusSetProtocolRequest* request,
 
 void UsbHidbus::DdkUnbind(ddk::UnbindTxn txn) {
   unbind_thread_ = std::thread([this, txn = std::move(txn)]() mutable {
-    usb_.CancelAll(endptin_address_);
-    if (has_endptout_) {
-      usb_.CancelAll(endptout_address_);
+    ep_in_->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+      if (result.is_error()) {
+        zxlogf(ERROR, "Failed to cancel all for in endpoint %s",
+               result.error_value().FormatDescription().c_str());
+      }
+    });
+    if (ep_out_.has_value()) {
+      (*ep_out_)->CancelAll().Then([](fidl::Result<fendpoint::Endpoint::CancelAll>& result) {
+        if (result.is_error()) {
+          zxlogf(ERROR, "Failed to cancel all for out endpoint %s",
+                 result.error_value().FormatDescription().c_str());
+        }
+      });
     }
     txn.Reply();
   });
 }
 
 void UsbHidbus::DdkRelease() {
-  if (req_) {
-    usb_request_release(req_);
-  }
   usb_desc_iter_release(&desc_iter_);
   unbind_thread_.join();
   delete this;
@@ -317,7 +336,10 @@ void UsbHidbus::FindDescriptors(usb::Interface interface, usb_hid_descriptor_t**
   }
 }
 
-zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
+zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid,
+                            fidl::ClientEnd<fuchsia_hardware_usb::Usb>& client) {
+  dispatcher_loop_.StartThread("usb-hid-dispatcher-loop");
+
   zx_status_t status;
   usb_ = usbhid;
 
@@ -349,7 +371,11 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
     return status;
   }
   hid_desc_ = hid_desc;
-  endptin_address_ = endptin->b_endpoint_address;
+  status = ep_in_.Init(endptin->b_endpoint_address, client, dispatcher_loop_.dispatcher());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to init IN ep %d", status);
+    return status;
+  }
   // Calculation according to 9.6.6 of USB2.0 Spec for interrupt endpoints
   switch (auto speed = usb_.GetSpeed()) {
     case USB_SPEED_LOW:
@@ -376,11 +402,21 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
   }
 
   if (endptout) {
-    endptout_address_ = endptout->b_endpoint_address;
-    has_endptout_ = true;
-    endptout_max_size_ = usb_ep_max_packet(endptout);
-    status = usb_request_alloc(&request_out_, endptout_max_size_, endptout->b_endpoint_address,
-                               parent_req_size_);
+    ep_out_.emplace(usb::EndpointType::INTERRUPT, this, std::mem_fn(&UsbHidbus::SetReportComplete));
+    status = ep_out_->Init(endptout->b_endpoint_address, client, dispatcher_loop_.dispatcher());
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Failed to init IN ep %d", status);
+      return status;
+    }
+    auto actual = ep_out_->AddRequests(1, usb_ep_max_packet(endptout),
+                                       fuchsia_hardware_usb_request::Buffer::Tag::kData);
+    if (actual == 0) {
+      zxlogf(ERROR, "Could not add any requests!");
+      return ZX_ERR_INTERNAL;
+    }
+    if (actual != 1) {
+      zxlogf(WARNING, "Wanted %d request, got %zu requests", 1, actual);
+    }
   }
 
   interface_ = interface.descriptor()->b_interface_number;
@@ -394,11 +430,14 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
   }
   info_ = info_builder.Build();
 
-  status = usb_request_alloc(&req_, usb_ep_max_packet(endptin), endptin->b_endpoint_address,
-                             parent_req_size_);
-  if (status != ZX_OK) {
-    status = ZX_ERR_NO_MEMORY;
-    return status;
+  auto actual = ep_in_.AddRequests(1, usb_ep_max_packet(endptin),
+                                   fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
+  if (actual == 0) {
+    zxlogf(ERROR, "Could not add any requests!");
+    return ZX_ERR_INTERNAL;
+  }
+  if (actual != 1) {
+    zxlogf(WARNING, "Wanted %d request, got %zu requests", 1, actual);
   }
 
   auto result = outgoing_.AddService<fhidbus::Service>(fhidbus::Service::InstanceHandler({
@@ -447,12 +486,18 @@ static zx_status_t usb_hid_bind(void* ctx, zx_device_t* parent) {
 
   ddk::UsbProtocolClient usb;
   zx_status_t status = device_get_protocol(parent, ZX_PROTOCOL_USB, &usb);
-
   if (status != ZX_OK) {
     return status;
   }
 
-  status = usbHid->Bind(usb);
+  auto client =
+      ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_usb::UsbService::Device>(parent);
+  if (client.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol");
+    return client.error_value();
+  }
+
+  status = usbHid->Bind(usb, *client);
   if (status == ZX_OK) {
     // devmgr is now in charge of the memory for dev.
     [[maybe_unused]] auto ptr = usbHid.release();
