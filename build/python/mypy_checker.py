@@ -182,6 +182,9 @@ def run_mypy_checks(
                 "-S",
                 "-m",
                 "mypy",
+                # TODO(https://fxbug.dev/345717802): Disabling cache to temporarily resolve this flake.
+                # see https://github.com/python/mypy/issues/7276 for details on similar issue.
+                "--no-incremental",
                 "--config-file",
                 str(config_path),
                 app_dir,
