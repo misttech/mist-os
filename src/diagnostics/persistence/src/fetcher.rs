@@ -269,7 +269,7 @@ impl Fetcher {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::InspectHandleName;
+    use diagnostics_data::{InspectDataBuilder, InspectHandleName};
     use diagnostics_hierarchy::hierarchy;
     use serde_json::json;
 
@@ -288,14 +288,9 @@ mod tests {
 
     #[fuchsia::test]
     fn test_condense_empty() {
-        let empty_data = Data::for_inspect(
-            "a/b/c/d",
-            None,
-            123456i64,
-            "fuchsia-pkg://test",
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        );
+        let empty_data = InspectDataBuilder::new("a/b/c/d", "fuchsia-pkg://test", 123456i64)
+            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+            .build();
         let empty_data_result = condensed_map_of_data(vec![empty_data].into_iter());
         let empty_vec_result = condensed_map_of_data(vec![].into_iter());
 
@@ -307,14 +302,10 @@ mod tests {
 
     fn make_data(mut hierarchy: DiagnosticsHierarchy, moniker: &str) -> Data<Inspect> {
         hierarchy.sort();
-        Data::for_inspect(
-            moniker,
-            Some(hierarchy),
-            123456i64,
-            "fuchsia-pkg://test",
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        )
+        InspectDataBuilder::new(moniker, "fuchsia-pkg://test", 123456i64)
+            .with_hierarchy(hierarchy)
+            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+            .build()
     }
 
     #[fuchsia::test]

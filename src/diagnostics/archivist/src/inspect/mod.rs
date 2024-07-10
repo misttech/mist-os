@@ -5,7 +5,7 @@
 use crate::accessor::PerformanceConfig;
 use crate::diagnostics::BatchIteratorConnectionStats;
 use crate::inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer};
-use diagnostics_data::{self as schema, Data, Inspect, InspectHandleName};
+use diagnostics_data::{self as schema, Data, Inspect, InspectDataBuilder, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_inspect::reader::PartialNodeHierarchy;
@@ -361,14 +361,21 @@ impl ReaderServer {
             identity.to_string().as_str(),
             parent_trace_id,
         );
-        Some(Data::for_inspect(
+        let mut builder = InspectDataBuilder::new(
             moniker,
-            hierarchy_data.hierarchy,
-            hierarchy_data.timestamp.into_nanos(),
             identity.url.clone(),
-            hierarchy_data.name,
-            hierarchy_data.errors,
-        ))
+            hierarchy_data.timestamp.into_nanos(),
+        );
+        if let Some(hierarchy) = hierarchy_data.hierarchy {
+            builder = builder.with_hierarchy(hierarchy);
+        }
+        if let Some(name) = hierarchy_data.name {
+            builder = builder.with_name(name);
+        }
+        if !hierarchy_data.errors.is_empty() {
+            builder = builder.with_errors(hierarchy_data.errors);
+        }
+        Some(builder.build())
     }
 }
 

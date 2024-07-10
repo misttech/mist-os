@@ -180,43 +180,23 @@ impl Command for ListCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::{InspectHandleName, Timestamp};
+    use diagnostics_data::{InspectDataBuilder, InspectHandleName};
 
     #[fuchsia::test]
     fn components_from_inspect_data_uses_diagnostics_ready() {
         let inspect_data = vec![
-            InspectData::for_inspect(
-                "some_moniker",
-                /*inspect_hierarchy=*/ None,
-                Timestamp::from(123456789800i64),
-                "fake-url",
-                Some(InspectHandleName::filename("fake-file")),
-                vec![],
-            ),
-            InspectData::for_inspect(
-                "other_moniker",
-                /*inspect_hierarchy=*/ None,
-                Timestamp::from(123456789900i64),
-                "other-fake-url",
-                Some(InspectHandleName::filename("fake-file")),
-                vec![],
-            ),
-            InspectData::for_inspect(
-                "some_moniker",
-                /*inspect_hierarchy=*/ None,
-                Timestamp::from(123456789910i64),
-                "fake-url",
-                Some(InspectHandleName::filename("fake-file")),
-                vec![],
-            ),
-            InspectData::for_inspect(
-                "different_moniker",
-                /*inspect_hierarchy=*/ None,
-                Timestamp::from(123456790990i64),
-                "different-fake-url",
-                Some(InspectHandleName::filename("fake-file")),
-                vec![],
-            ),
+            InspectDataBuilder::new("some_moniker", "fake-url", 123456789800i64)
+                .with_name(InspectHandleName::filename("fake-file"))
+                .build(),
+            InspectDataBuilder::new("other_moniker", "other-fake-url", 123456789900i64)
+                .with_name(InspectHandleName::filename("fake-file"))
+                .build(),
+            InspectDataBuilder::new("some_moniker", "fake-url", 123456789910i64)
+                .with_name(InspectHandleName::filename("fake-file"))
+                .build(),
+            InspectDataBuilder::new("different_moniker", "different-fake-url", 123456790990i64)
+                .with_name(InspectHandleName::filename("fake-file"))
+                .build(),
         ];
 
         let components = components_from_inspect_data(inspect_data);

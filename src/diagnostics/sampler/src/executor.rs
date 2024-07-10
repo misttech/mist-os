@@ -1209,6 +1209,7 @@ fn process_schema_errors(errors: &Option<Vec<diagnostics_data::InspectError>>, m
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_data::InspectDataBuilder;
     use diagnostics_hierarchy::hierarchy;
     use futures::executor;
 
@@ -1983,38 +1984,26 @@ mod tests {
         });
         sampler.rebuild_selector_data_structures();
 
-        let file1_value4 = vec![Data::for_inspect(
-            "my/component",
-            Some(hierarchy! { root: {branch: {leaf: 4i32}}}),
-            0, /* timestamp */
-            "component-url",
-            Some(InspectHandleName::filename("file1")),
-            vec![], /* errors */
-        )];
-        let file2_value3 = vec![Data::for_inspect(
-            "my/component",
-            Some(hierarchy! { root: {branch: {leaf: 3i32}}}),
-            0, /* timestamp */
-            "component-url",
-            Some(InspectHandleName::filename("file2")),
-            vec![], /* errors */
-        )];
-        let file1_value6 = vec![Data::for_inspect(
-            "my/component",
-            Some(hierarchy! { root: {branch: {leaf: 6i32}}}),
-            0, /* timestamp */
-            "component-url",
-            Some(InspectHandleName::filename("file1")),
-            vec![], /* errors */
-        )];
-        let file2_value8 = vec![Data::for_inspect(
-            "my/component",
-            Some(hierarchy! { root: {branch: {leaf: 8i32}}}),
-            0, /* timestamp */
-            "component-url",
-            Some(InspectHandleName::filename("file2")),
-            vec![], /* errors */
-        )];
+        let file1_value4 =
+            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
+                .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
+                .with_name(InspectHandleName::filename("file1"))
+                .build()];
+        let file2_value3 =
+            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
+                .with_hierarchy(hierarchy! { root: {branch: {leaf: 3i32}}})
+                .with_name(InspectHandleName::filename("file2"))
+                .build()];
+        let file1_value6 =
+            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
+                .with_hierarchy(hierarchy! { root: {branch: {leaf: 6i32}}})
+                .with_name(InspectHandleName::filename("file1"))
+                .build()];
+        let file2_value8 =
+            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
+                .with_hierarchy(hierarchy! { root: {branch: {leaf: 8i32}}})
+                .with_name(InspectHandleName::filename("file2"))
+                .build()];
 
         fn expect_one_metric_event_value(
             events: Result<Vec<EventToLog>, Error>,
@@ -2069,14 +2058,11 @@ mod tests {
         });
         sampler.rebuild_selector_data_structures();
 
-        let value = vec![Data::for_inspect(
-            "my/component",
-            Some(hierarchy! { root: {branch: {leaf: 4i32}}}),
-            0, /* timestamp */
-            "component-url",
-            Some(InspectHandleName::filename("file1")),
-            vec![], /* errors */
-        )];
+        let value =
+            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
+                .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
+                .with_name(InspectHandleName::filename("file1"))
+                .build()];
 
         let events = sampler.process_snapshot(value).await.expect("processed snapshot");
         assert_eq!(events.len(), 1);

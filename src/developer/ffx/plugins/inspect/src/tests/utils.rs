@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_data::{Data, DiagnosticsHierarchy, InspectData, InspectHandleName, Property};
+use diagnostics_data::{
+    DiagnosticsHierarchy, InspectData, InspectDataBuilder, InspectHandleName, Property,
+};
 use fidl::endpoints::{create_proxy_and_stream, ServerEnd};
 use fidl::Channel;
 use fidl_fuchsia_developer_remotecontrol::{
@@ -92,9 +94,9 @@ pub fn setup_fake_archive_accessor(expected_data: Vec<FakeAccessorData>) -> Arch
 pub fn make_inspects_for_lifecycle() -> Vec<InspectData> {
     let fake_filename = "fake-filename";
     vec![
-        make_inspect(String::from("test/moniker1"), 1, 20, fake_filename),
-        make_inspect(String::from("test/moniker1"), 2, 30, fake_filename),
-        make_inspect(String::from("test/moniker3"), 3, 3, fake_filename),
+        make_inspect("test/moniker1", 1, 20, fake_filename),
+        make_inspect("test/moniker1", 2, 30, fake_filename),
+        make_inspect("test/moniker3", 3, 3, fake_filename),
     ]
 }
 
@@ -208,34 +210,30 @@ fn handle_remote_control_connect(
     })
 }
 
-pub fn make_inspect_with_length(moniker: String, timestamp: i64, len: usize) -> InspectData {
+pub fn make_inspect_with_length(moniker: &str, timestamp: i64, len: usize) -> InspectData {
     make_inspect(moniker, timestamp, len, "fake-filename")
 }
 
-pub fn make_inspect(moniker: String, timestamp: i64, len: usize, file_name: &str) -> InspectData {
+pub fn make_inspect(moniker: &str, timestamp: i64, len: usize, file_name: &str) -> InspectData {
     let long_string = std::iter::repeat("a").take(len).collect::<String>();
     let hierarchy = DiagnosticsHierarchy::new(
         String::from("name"),
         vec![Property::String(format!("hello_{}", timestamp), long_string)],
         vec![],
     );
-    Data::for_inspect(
-        moniker.clone(),
-        Some(hierarchy),
-        timestamp,
-        format!("fake-url://{}", moniker),
-        Some(InspectHandleName::filename(file_name)),
-        vec![],
-    )
+    InspectDataBuilder::new(moniker, format!("fake-url://{}", moniker), timestamp)
+        .with_hierarchy(hierarchy)
+        .with_name(InspectHandleName::filename(file_name))
+        .build()
 }
 
 pub fn make_inspects() -> Vec<InspectData> {
     let fake_filename = "fake-filename";
     vec![
-        make_inspect(String::from("test/moniker1"), 1, 20, fake_filename),
-        make_inspect(String::from("test/moniker2"), 2, 10, fake_filename),
-        make_inspect(String::from("test/moniker3"), 3, 30, fake_filename),
-        make_inspect(String::from("test/moniker1"), 20, 3, fake_filename),
+        make_inspect("test/moniker1", 1, 20, fake_filename),
+        make_inspect("test/moniker2", 2, 10, fake_filename),
+        make_inspect("test/moniker3", 3, 30, fake_filename),
+        make_inspect("test/moniker1", 20, 3, fake_filename),
     ]
 }
 
