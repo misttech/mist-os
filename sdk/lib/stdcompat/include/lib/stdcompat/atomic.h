@@ -27,14 +27,14 @@ using std::atomic_ref;
 
 // Polyfill for |std::atomic_ref<T>|.
 template <typename T>
-class atomic_ref : public atomic_internal::atomic_ops<atomic_ref<T>, T>,
+class atomic_ref : public atomic_internal::atomic_difference_type<T>,
+                   public atomic_internal::atomic_ops<atomic_ref<T>, T>,
                    public atomic_internal::arithmetic_ops<atomic_ref<T>, T>,
                    public atomic_internal::bitwise_ops<atomic_ref<T>, T> {
  public:
   static_assert(cpp17::is_trivially_copyable_v<T>, "");
 
   using value_type = T;
-  using difference_type = atomic_internal::difference_t<T>;
 
   static constexpr bool is_always_lock_free =
       __atomic_always_lock_free(sizeof(T), static_cast<T*>(nullptr));
