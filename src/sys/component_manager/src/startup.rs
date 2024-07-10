@@ -7,6 +7,10 @@ use cm_types::Url;
 
 // Used when component manager is started with the "--boot" flag by userboot.
 const BOOT_CONFIG: &str = "/boot/config/component_manager";
+
+#[cfg(mistos)]
+const BOOT_ROOT_COMPONENT_URL: &str = "fuchsia-boot:///#meta/root.cm";
+#[cfg(not(mistos))]
 const BOOT_ROOT_COMPONENT_URL: &str = "fuchsia-boot:///root#meta/root.cm";
 
 /// Command line arguments that control component_manager's behavior. Use [Arguments::from_args()]

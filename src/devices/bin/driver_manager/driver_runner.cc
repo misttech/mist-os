@@ -614,8 +614,13 @@ void DriverRunner::RequestRebindFromDriverIndex(std::string spec,
 zx::result<> DriverRunner::CreateDriverHostComponent(
     std::string moniker, fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
     std::shared_ptr<bool> exposed_dir_connected, bool use_next_vdso) {
+#ifdef __mist_os__
+  constexpr std::string_view kUrl = "fuchsia-boot:///#meta/driver_host.cm";
+  constexpr std::string_view kNextUrl = "fuchsia-boot:///#meta/driver_host_next.cm";
+#else
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host#meta/driver_host.cm";
   constexpr std::string_view kNextUrl = "fuchsia-boot:///driver_host#meta/driver_host_next.cm";
+#endif
   fidl::Arena arena;
   auto child_decl_builder = fdecl::wire::Child::Builder(arena)
                                 .name(moniker)

@@ -7,6 +7,7 @@ import("//build/assembly/bootfs_files_for_assembly.gni")
 executable("ping") {
   visibility = [
     ":*",
+    "//build/images/mistos:*",
     "//build/images/zedboot:*",
   ]
   sources = [ "ping.cc" ]

@@ -1,0 +1,181 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/zbi/kernel_cmdline.gni")
+import("//build/zbi/zbi.gni")
+import("//build/zbi/zbi_input.gni")
+
+if (is_mistos) {
+  assert(current_toolchain == default_toolchain,
+         "//build/images/* are only valid in the mist-os toolchain")
+
+  kernel_cmdline("virtcon_disable") {
+    args = [
+      "virtcon.hide-on-boot",
+      "virtcon.disable=true",
+    ]
+  }
+
+  kernel_cmdline("kernel_args_eng") {
+    args = [
+      "console.shell=true",
+      "kernel.enable-debugging-syscalls=true",
+      "kernel.enable-serial-syscalls=true",
+    ]
+  }
+
+  fuchsia_component("root") {
+    component_name = "root"
+    manifest = "meta/root.cml"
+  }
+
+  fuchsia_component("bootstrap") {
+    component_name = "bootstrap"
+    manifest = "meta/bootstrap.cml"
+    restricted_features = [ "allow_long_names" ]
+  }
+
+  fuchsia_component("config") {
+    component_name = "config"
+    manifest = "meta/config.cml"
+  }
+
+  fuchsia_component("core") {
+    component_name = "core"
+    manifest = "meta/core.cml"
+  }
+
+  fuchsia_component("network") {
+    component_name = "network"
+    manifest = "meta/network.cml"
+  }
+
+  fuchsia_component("netcfg-config") {
+    component_name = "netcfg-config"
+    manifest = "meta/netcfg-config.cml"
+    deps = [ ":netcfg_default" ]
+  }
+
+  resource("netcfg_default") {
+    sources =
+        [ "//src/connectivity/policy/netcfg/config/netcfg_default.mistos.json" ]
+    outputs = [ "meta/fuchsia.domain_config/netcfg-config/netcfg_default.json" ]
+  }
+
+  fuchsia_component("archivist-pipelines-config") {
+    component_name = "archivist-pipelines"
+    manifest = "meta/archivist-pipelines.cml"
+  }
+
+  zbi("mistos") {
+    deps = [ "//zircon/kernel" ]
+
+    deps += [
+      # Realm
+      ":bootstrap",
+      ":config",
+      ":core",
+      ":network",
+      ":root",
+
+      #
+      ":kernel_args_eng",
+      ":virtcon_disable",
+
+      ## Embeddable
+      "//build/info/bootfs:minimum_utc_stamp",
+      "//src/bringup:bringup-config",
+      "//src/bringup/bin/critical-services:component",
+      "//src/power/shutdown-shim:component",
+      "//src/sys/component_manager:bin",
+      "//src/sys/component_manager:component_manager_bootfs_config",
+      "//src/sys/component_manager:elf_runner",
+      "//src/sys/startup:component",
+
+      # Archivist
+      ":archivist-pipelines-config",
+      "//src/diagnostics/archivist:archivist-default-config",
+      "//src/diagnostics/archivist:component",
+
+      ## Bootstrap
+      "//src/bringup:bringup-config",
+      "//src/devices/sysmem/bin/sysmem_connector:sysmem_connector_cmp",
+      "//src/sys/core:config",
+      "//src/zircon/bin/role_manager",
+
+      # Console
+      "//src/bringup/bin/console:component",
+      "//src/bringup/bin/console-launcher:component",
+
+      # ptysvc
+      "//src/bringup/bin/ptysvc:component",
+      "//src/sys/tools/component:component-binary",
+
+      # shell
+      "//zircon/third_party/uapp/dash",
+
+      # Driver Framework
+      "//src/devices/bin/devfs:component",
+      "//src/devices/bin/devfs:component-non-critical",
+      "//src/devices/bin/driver-index:component",
+      "//src/devices/bin/driver_host:component",
+      "//src/devices/bin/driver_host:next_component",
+      "//src/devices/bin/driver_manager:component",
+      "//src/devices/bin/driver_manager:driver_manager_config_default",
+
+      ## Drivers
+      "//src/connectivity/network/drivers/network-device",
+      "//src/devices/board/drivers/x86:platform-bus-x86",
+      "//src/devices/bus/drivers/pci:bus-pci",
+      "//src/devices/bus/drivers/platform:platform-bus",
+
+      # TODO: Move this to bootstrap after fixing pci to not depend on it.
+      "//src/devices/sysmem/drivers/sysmem",
+      "//src/devices/sysmem/drivers/sysmem:config_values",
+
+      # Virtio
+      "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",
+
+      # Utils
+      "//src/connectivity/network/bin/ping",
+      "//src/connectivity/network/net-cli:bin",
+      "//src/devices/pci/bin/lspci:database",
+      "//src/devices/pci/bin/lspci:lspci",
+
+      ## Networking
+
+      # network_realm_packages
+      "//src/connectivity/network/dhcpv4/server:component",
+      ":netcfg-config",
+      "//src/connectivity/network/dhcpv4/client/bindings:component",
+      "//src/connectivity/network/dhcpv6/client:component",
+      "//src/connectivity/network/dns:component",
+      "//src/connectivity/network/netstack3:component",
+      "//src/connectivity/network/netstack3:config_for_tests",
+      "//src/connectivity/policy/http-client:component",
+      "//src/connectivity/policy/netcfg:component-basic",
+      "//src/connectivity/policy/reachability:component",
+    ]
+
+    output_dir = root_out_dir
+    output_extension = "zbi"
+    output_path = rebase_path("$output_dir/$target_name.$output_extension",
+                              root_build_dir)
+
+    metadata = {
+      # For the //:images build_api_module().
+      images = [
+        {
+          label = get_label_info(":$target_name", "label_with_toolchain")
+          name = "$target_name"
+          tags = [ "incomplete" ]
+          type = "zbi"
+          path = output_path
+          cpu = current_cpu
+        },
+      ]
+    }
+  }
+}

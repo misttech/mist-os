@@ -1,0 +1,315 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+        "trace/offer.shard.cml",
+    ],
+    children: [
+        {
+            name: "dhcpd",
+            url: "fuchsia-boot:///#meta/dhcpv4_server.cm",
+        },
+        {
+            name: "dhcpv6-client",
+            url: "fuchsia-boot:///#meta/dhcpv6-client.cm",
+        },
+        {
+            name: "dns-resolver",
+            url: "fuchsia-boot:///#meta/dns_resolver.cm",
+        },
+        {
+            name: "http-client",
+            url: "fuchsia-boot:///#meta/http-client.cm",
+        },
+        {
+            name: "reachability",
+            url: "fuchsia-boot:///#meta/reachability.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.device.NameProvider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+            from: "parent",
+            to: [ "#netstack" ],
+        },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "parent",
+            to: [ "#dns-resolver" ],
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent",
+            to: [
+                "#dhcpd",
+                "#dhcpv6-client",
+                "#dns-resolver",
+                "#http-client",
+                "#netcfg",
+                "#netstack",
+                "#reachability",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.stash.SecureStore" ],
+            from: "parent",
+            to: [
+                "#dhcpd",
+                "#netstack",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.diagnostics.persist.DataPersistence-netstack" ],
+            from: "parent",
+            to: [ "#netstack" ],
+        },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "parent",
+            to: [ "#reachability" ],
+        },
+        {
+            protocol: [ "fuchsia.net.dhcp.Server" ],
+            from: "#dhcpd",
+            to: [ "#netcfg" ],
+        },
+        {
+            protocol: [ "fuchsia.net.dhcpv6.ClientProvider" ],
+            from: "#dhcpv6-client",
+            to: [ "#netcfg" ],
+        },
+        {
+            protocol: "fuchsia.net.dhcp.ClientProvider",
+
+            // TODO(https://fxbug.dev/42076541): Once the DHCP client component is
+            // being used for all DHCPv4 functionality, make it a child of this
+            // realm, route the protocol from there instead of the netstack
+            // realm, and mark it here as "required".
+            from: "#netstack",
+            to: "#netcfg",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.net.filter.deprecated.Filter",
+
+            // NS3 will not implement fuchsia.net.filter.deprecated, mark as optional.
+            from: "#netstack",
+            to: "#netcfg",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.net.filter.Control",
+
+            // NS2 will not implement fuchsia.net.filter, mark as optional.
+            from: "#netstack",
+            to: "#netcfg",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [ "fuchsia.net.name.Lookup" ],
+            from: "#dns-resolver",
+            to: [
+                "#dhcpd",
+                "#http-client",
+                "#reachability",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.net.name.LookupAdmin" ],
+            from: "#dns-resolver",
+            to: [ "#netcfg" ],
+        },
+        {
+            protocol: [
+                "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.name.DnsServerWatcher",
+                "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.stack.Stack",
+            ],
+            from: "#netstack",
+            to: [ "#netcfg" ],
+        },
+        {
+            protocol: [ "fuchsia.net.interfaces.State" ],
+            from: "#netstack",
+            to: [
+                "#netcfg",
+                "#reachability",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.net.routes.StateV4",
+                "fuchsia.net.routes.StateV6",
+            ],
+            from: "#netstack",
+            to: [ "#reachability" ],
+        },
+        {
+            protocol: [ "fuchsia.net.routes.State" ],
+            from: "#netstack",
+            to: [ "#dns-resolver" ],
+        },
+        {
+            protocol: [ "fuchsia.posix.socket.Provider" ],
+            from: "#netstack",
+            to: [
+                "#dhcpd",
+                "#dhcpv6-client",
+                "#dns-resolver",
+                "#http-client",
+                "#reachability",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.posix.socket.packet.Provider" ],
+            from: "#netstack",
+            to: [ "#dhcpd" ],
+        },
+        {
+            protocol: [
+                "fuchsia.net.debug.Diagnostics",
+                "fuchsia.net.debug.Interfaces",
+                "fuchsia.net.neighbor.View",
+            ],
+            from: "#netstack",
+            to: [ "#reachability" ],
+        },
+        {
+            directory: "dev-class-network",
+            from: "parent",
+            to: [ "#netcfg" ],
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#netcfg",
+            subdir: "netcfg",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#netstack",
+            subdir: "netstack",
+        },
+        {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            to: [ "#http-client" ],
+        },
+        {
+            from: "parent",
+            to: "#http-client",
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
+            availability: "same_as_target",
+        },
+        {
+            storage: "cache",
+            from: "parent",
+            to: [ "#netstack" ],
+        },
+        {
+            storage: "data",
+            from: "parent",
+            to: [ "#netcfg" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
+                "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.routes.State",
+                "fuchsia.net.routes.StateV4",
+                "fuchsia.net.routes.StateV6",
+                "fuchsia.net.stack.Stack",
+                "fuchsia.posix.socket.Provider",
+
+                // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
+                // components running in the network realm, remove this.
+                "fuchsia.posix.socket.raw.Provider",
+
+                // TODO(https://fxbug.dev/42061698): make it possible to put this
+                // standalone import in its own paragraph without format-code
+                // reflowing the entire list.
+                "fuchsia.update.verify.NetstackVerifier",
+            ],
+            from: "#netstack",
+        },
+
+        // TODO(https://fxbug.dev/42062982) Don't expose the Root API once
+        // Weavestack no longer needs it.
+        {
+            protocol: [ "fuchsia.net.root.Interfaces" ],
+            from: "#netstack",
+            as: "fuchsia.net.root.Interfaces_OnlyForWeavestack",
+        },
+        {
+            protocol: [ "fuchsia.net.filter.Control" ],
+            from: "#netstack",
+            as: "fuchsia.net.filter.Control_OnlyForStarnix",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [ "fuchsia.net.root.Interfaces" ],
+            from: "#netstack",
+            as: "fuchsia.net.root.Interfaces_OnlyForStarnix",
+        },
+        {
+            protocol: [ "fuchsia.posix.socket.packet.Provider" ],
+            from: "#netstack",
+            as: "fuchsia.posix.socket.packet.Provider_OnlyForStarnix",
+        },
+
+        // TODO(https://fxbug.dev/328647117): This is not a long term solution and should be fixed
+        // soon.
+        {
+            protocol: [ "fuchsia.net.name.DnsServerWatcher" ],
+            from: "#netstack",
+            as: "fuchsia.net.name.DnsServerWatcher_OnlyForLowpan",
+        },
+        {
+            protocol: [ "fuchsia.net.name.Lookup" ],
+            from: "#dns-resolver",
+        },
+        {
+            protocol: [ "fuchsia.net.http.Loader" ],
+            from: "#http-client",
+        },
+        {
+            protocol: [ "fuchsia.net.reachability.Monitor" ],
+            from: "#reachability",
+        },
+        {
+            protocol: [
+                "fuchsia.net.dhcpv6.PrefixProvider",
+                "fuchsia.net.masquerade.Factory",
+            ],
+            from: "#netcfg",
+        },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "diagnostics",
+            from: "#netstack",
+            as: "netstack-diagnostics",
+            availability: "optional",
+        },
+    ],
+}

@@ -1,0 +1,10 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/connectivity/network/meta/common.shard.mistos.cml",
+        "//src/connectivity/network/meta/network-basic.shard.mistos.cml",
+        "//src/connectivity/network/meta/netstack3.shard.mistos.cml",
+    ],
+}

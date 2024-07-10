@@ -1,7 +1,6 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#![allow(dead_code)]
 
 use fidl::AsHandleRef as _;
 use fuchsia_bootfs::{
@@ -45,8 +44,11 @@ const BOOTFS_EXECUTABLE_PACKAGE_DIRECTORIES: &[&str] = &["bin", "lib"];
 
 // Top level directories in bootfs that are allowed to contain executable files.
 // Every file in these directories will have ZX_RIGHT_EXECUTE.
-#[cfg(mistos)]
+#[cfg(feature = "starnix_lite")]
 const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "lib", "test", "data"];
+#[cfg(not(feature = "starnix_lite"))]
+#[cfg(mistos)]
+const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "driver", "lib", "test", "blob", "data"];
 #[cfg(not(mistos))]
 const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "driver", "lib", "test", "blob"];
 

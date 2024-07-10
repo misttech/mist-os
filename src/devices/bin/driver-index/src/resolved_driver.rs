@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -84,6 +85,7 @@ impl ResolvedDriver {
             fuchsia_zircon::Status::INTERNAL
         })?;
         let package_dir = PackageDirectory::from_proxy(proxy);
+        #[cfg(not(mistos))]
         let package_hash = package_dir.merkle_root().await.map_err(|e| {
             tracing::warn!("Failed to read package directory's hash: {}", e);
             fuchsia_zircon::Status::INTERNAL
@@ -93,6 +95,9 @@ impl ResolvedDriver {
             decl,
             package_dir,
             package_type,
+            #[cfg(mistos)]
+            None,
+            #[cfg(not(mistos))]
             Some(BlobId::from(package_hash)),
         )
         .map_err(|e| {

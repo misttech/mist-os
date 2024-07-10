@@ -89,7 +89,7 @@ rustc_library("elf_runner") {
   ]
 
   if (is_mistos) {
-    configs += [ "//build/config/rust:mistos" ]
+    configs += [ "//build/config/mistos:mistos_config" ]
   }
 }
 

@@ -13,7 +13,7 @@ rustc_binary("bin") {
 
   configs += [
     "//build/config/rust:bootfs",
-    "//build/config/rust:mistos",
+    "//build/config/mistos:mistos_config",
   ]
 
   deps = [
@@ -53,6 +53,9 @@ rustc_binary("bin") {
     "src/builtin/time.rs",
     "src/main.rs",
   ]
+
+  # TODO (Herrera) find a better feature name (need by bootfs as sym link)
+  features = [ "starnix_lite" ]
 }
 
 resource("mistos_elf_runner_process_builder_config") {

@@ -1,0 +1,69 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/diagnostics/archivist/meta/common.shard.cml",
+        "//src/diagnostics/archivist/meta/config_capabilities.shard.cml",
+    ],
+    program: {
+        binary: "bin/archivist",
+        main_process_critical: "true",
+        forward_stdout_to: "none",
+        forward_stderr_to: "none",
+    },
+    children: [
+        {
+            name: "archivist-pipelines",
+            url: "fuchsia-boot:///#meta/archivist-pipelines.cm",
+        },
+    ],
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.host.LoWPANArchiveAccessor",
+                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+            ],
+        },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.component.PersistenceBinder",
+                "fuchsia.component.SamplerBinder",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.component.DetectBinder",
+                "fuchsia.component.KernelDebugBrokerBinder",
+            ],
+            availability: "optional",
+        },
+        {
+            directory: "config",
+            from: "#archivist-pipelines",
+            rights: [ "r*" ],
+            path: "/config/data",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.host.LoWPANArchiveAccessor",
+                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+            ],
+            from: "self",
+        },
+    ],
+}
