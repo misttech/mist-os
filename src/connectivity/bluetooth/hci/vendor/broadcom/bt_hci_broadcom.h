@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_BT_HCI_BROADCOM_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
@@ -21,11 +22,23 @@
 
 namespace bt_hci_broadcom {
 
+class HciEventHandler
+    : public fidl::WireSyncEventHandler<fuchsia_hardware_bluetooth::HciTransport> {
+ public:
+  HciEventHandler(fit::function<void(std::vector<uint8_t>&)> on_receive_callback);
+
+  void OnReceive(fuchsia_hardware_bluetooth::wire::ReceivedPacket*) override;
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata) override {}
+
+ private:
+  fit::function<void(std::vector<uint8_t>&)> on_receive_callback_;
+};
+
 class BtHciBroadcom final
     : public fdf::DriverBase,
       public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
       public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
-      public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
       public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
   explicit BtHciBroadcom(fdf::DriverStartArgs start_args,
@@ -48,42 +61,25 @@ class BtHciBroadcom final
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
-  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // fuchsia_hardware_bluetooth::Hci protocol interface implementations.
-  void OpenCommandChannel(OpenCommandChannelRequestView request,
-                          OpenCommandChannelCompleter::Sync& completer) override;
-  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                          OpenAclDataChannelCompleter::Sync& completer) override;
-  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                          OpenScoDataChannelCompleter::Sync& completer) override;
-  void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override;
-  void ResetSco(ResetScoCompleter::Sync& completer) override;
-  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                          OpenIsoDataChannelCompleter::Sync& completer) override;
-  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                        OpenSnoopChannelCompleter::Sync& completer) override;
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override;
-
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
   // Truly private, internal helper methods:
-  zx_status_t ConnectToHciFidlProtocol();
+  zx_status_t ConnectToHciTransportFidlProtocol();
   zx_status_t ConnectToSerialFidlProtocol();
 
   static void EncodeSetAclPriorityCommand(
       fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer);
 
+  void OnReceivePacket(std::vector<uint8_t>& packet);
   fpromise::promise<std::vector<uint8_t>, zx_status_t> SendCommand(const void* command,
                                                                    size_t length);
 
-  // Waits for a "readable" signal from the command channel and reads the next event.
+  // Waits for the next event from |hci_transport_client_|'s fidl channel.
   fpromise::promise<std::vector<uint8_t>, zx_status_t> ReadEvent();
 
   fpromise::promise<void, zx_status_t> SetBaudRate(uint32_t baud_rate);
@@ -109,7 +105,6 @@ class BtHciBroadcom final
   zx_status_t Bind();
 
   uint32_t serial_pid_;
-  zx::channel command_channel_;
   // true if underlying transport is UART
   bool is_uart_;
 
@@ -117,7 +112,11 @@ class BtHciBroadcom final
 
   std::optional<async::Executor> executor_;
 
-  fidl::WireClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
+  std::vector<uint8_t> event_receive_buffer_;
+  HciEventHandler hci_event_handler_;
+  fidl::WireSyncClient<fuchsia_hardware_bluetooth::HciTransport> hci_transport_client_;
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::HciTransport> hci_transport_client_end_;
+
   fdf::WireSyncClient<fuchsia_hardware_serialimpl::Device> serial_client_;
 
   fidl::WireClient<fuchsia_driver_framework::Node> node_;

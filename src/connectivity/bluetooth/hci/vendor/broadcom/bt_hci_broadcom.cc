@@ -28,6 +28,7 @@
 #include <zircon/threads.h>
 
 namespace bt_hci_broadcom {
+namespace fhbt = fuchsia_hardware_bluetooth;
 
 constexpr uint32_t kTargetBaudRate = 2000000;
 constexpr uint32_t kDefaultBaudRate = 115200;
@@ -43,19 +44,36 @@ const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
     {PDEV_PID_BCM4359, "BCM4359C0.hcd"},
 };
 
+HciEventHandler::HciEventHandler(fit::function<void(std::vector<uint8_t>&)> on_receive_callback)
+    : on_receive_callback_(std::move(on_receive_callback)) {}
+
+void HciEventHandler::OnReceive(fhbt::wire::ReceivedPacket* packet) {
+  if (!on_receive_callback_) {
+    FDF_LOG(ERROR, "No receive callback has been set.");
+    return;
+  }
+  // Ignore packets if they are not event packets during initialization.
+  if (packet->Which() != fhbt::wire::ReceivedPacket::Tag::kEvent) {
+    FDF_LOG(ERROR, "Received non event packet: %d", packet->Which());
+    return;
+  }
+  std::vector<uint8_t> buffer(packet->event().begin(), packet->event().end());
+  on_receive_callback_(buffer);
+}
+
 BtHciBroadcom::BtHciBroadcom(fdf::DriverStartArgs start_args,
                              fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("bt-hci-broadcom", std::move(start_args), std::move(driver_dispatcher)),
+      hci_event_handler_([this](std::vector<uint8_t>& packet) { OnReceivePacket(packet); }),
       node_(fidl::WireClient(std::move(node()), dispatcher())),
       devfs_connector_(fit::bind_member<&BtHciBroadcom::Connect>(this)) {}
 
 void BtHciBroadcom::Start(fdf::StartCompleter completer) {
-  zx_status_t status = ConnectToHciFidlProtocol();
+  zx_status_t status = ConnectToHciTransportFidlProtocol();
   if (status != ZX_OK) {
     completer(zx::error(status));
     return;
   }
-
   status = ConnectToSerialFidlProtocol();
   if (status == ZX_OK) {
     is_uart_ = true;
@@ -76,7 +94,6 @@ void BtHciBroadcom::Start(fdf::StartCompleter completer) {
   }
 
   serial_pid_ = result.value()->info.serial_pid;
-
   // Continue initialization through the fpromise executor.
   start_completer_.emplace(std::move(completer));
   executor_.emplace(dispatcher());
@@ -89,16 +106,13 @@ void BtHciBroadcom::Start(fdf::StartCompleter completer) {
   }));
 }
 
-void BtHciBroadcom::PrepareStop(fdf::PrepareStopCompleter completer) {
-  command_channel_.reset();
-  completer(zx::ok());
-}
+void BtHciBroadcom::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
 void BtHciBroadcom::EncodeCommand(EncodeCommandRequestView request,
                                   EncodeCommandCompleter::Sync& completer) {
   uint8_t data_buffer[kBcmSetAclPriorityCmdSize];
   switch (request->Which()) {
-    case fuchsia_hardware_bluetooth::wire::VendorCommand::Tag::kSetAclPriority: {
+    case fhbt::wire::VendorCommand::Tag::kSetAclPriority: {
       EncodeSetAclPriorityCommand(request->set_acl_priority(), data_buffer);
       auto encoded_cmd =
           fidl::VectorView<uint8_t>::FromExternal(data_buffer, kBcmSetAclPriorityCmdSize);
@@ -113,147 +127,57 @@ void BtHciBroadcom::EncodeCommand(EncodeCommandRequestView request,
 }
 
 void BtHciBroadcom::OpenHci(OpenHciCompleter::Sync& completer) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
-  if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
-    completer.ReplyError(endpoints.error_value());
+  zx::result<fidl::ClientEnd<fhbt::Hci>> client_end = incoming()->Connect<fhbt::HciService::Hci>();
+  if (client_end.is_error()) {
+    FDF_LOG(ERROR, "Connect to fhbt::Hci protocol failed: %s", client_end.status_string());
+    completer.ReplyError(client_end.status_value());
     return;
   }
 
-  hci_server_bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                  std::move(endpoints->server), this, fidl::kIgnoreBindingClosure);
-  completer.ReplySuccess(std::move(endpoints->client));
+  completer.ReplySuccess(std::move(*client_end));
 }
 
-void BtHciBroadcom::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
+void BtHciBroadcom::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {
+  if (!hci_transport_client_end_.is_valid()) {
+    FDF_LOG(ERROR, "HciTransport client end is not avaliable after driver initialization.");
+    completer.ReplyError(ZX_ERR_BAD_STATE);
+    return;
+  }
+  completer.ReplySuccess(std::move(hci_transport_client_end_));
+}
+
+void BtHciBroadcom::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Vendor> metadata,
+                                          fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown method in Vendor protocol, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void BtHciBroadcom::OpenCommandChannel(OpenCommandChannelRequestView request,
-                                       OpenCommandChannelCompleter::Sync& completer) {
-  hci_client_->OpenCommandChannel(std::move(request->channel))
-      .ThenExactlyOnce(
-          [completer = completer.ToAsync()](
-              fidl::WireUnownedResult<fuchsia_hardware_bluetooth::Hci::OpenCommandChannel>&
-                  result) mutable {
-            if (!result.ok()) {
-              FDF_LOG(ERROR, "OpenCommandChannel failed with FIDL error %s",
-                      result.status_string());
-              completer.ReplyError(result.status());
-              return;
-            }
-            if (result->is_error()) {
-              FDF_LOG(ERROR, "OpenCommandChannel failed with error %s",
-                      zx_status_get_string(result->error_value()));
-              completer.ReplyError(result->error_value());
-              return;
-            }
-            completer.ReplySuccess();
-          });
-}
-
-void BtHciBroadcom::OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                                       OpenAclDataChannelCompleter::Sync& completer) {
-  hci_client_->OpenAclDataChannel(std::move(request->channel))
-      .ThenExactlyOnce(
-          [completer = completer.ToAsync()](
-              fidl::WireUnownedResult<fuchsia_hardware_bluetooth::Hci::OpenAclDataChannel>&
-                  result) mutable {
-            if (!result.ok()) {
-              FDF_LOG(ERROR, "OpenAclDataChannel failed with FIDL error %s",
-                      result.status_string());
-              completer.ReplyError(result.status());
-              return;
-            }
-            if (result->is_error()) {
-              FDF_LOG(ERROR, "OpenAclDataChannel failed with error %s",
-                      zx_status_get_string(result->error_value()));
-              completer.ReplyError(result->error_value());
-              return;
-            }
-            completer.ReplySuccess();
-          });
-}
-void BtHciBroadcom::OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                                       OpenScoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void BtHciBroadcom::ConfigureSco(ConfigureScoRequestView request,
-                                 ConfigureScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void BtHciBroadcom::ResetSco(ResetScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void BtHciBroadcom::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                       OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void BtHciBroadcom::OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                                     OpenSnoopChannelCompleter::Sync& completer) {
-  hci_client_->OpenSnoopChannel(std::move(request->channel))
-      .ThenExactlyOnce(
-          [completer = completer.ToAsync()](
-              fidl::WireUnownedResult<fuchsia_hardware_bluetooth::Hci::OpenSnoopChannel>&
-                  result) mutable {
-            if (!result.ok()) {
-              FDF_LOG(ERROR, "OpenSnoopChannel failed with FIDL error %s", result.status_string());
-              completer.ReplyError(result.status());
-              return;
-            }
-            if (result->is_error()) {
-              FDF_LOG(ERROR, "OpenSnoopChannel failed with error %s",
-                      zx_status_get_string(result->error_value()));
-              completer.ReplyError(result->error_value());
-              return;
-            }
-            completer.ReplySuccess();
-          });
-}
-
-void BtHciBroadcom::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "Unknown method in Hci protocol, closing with ZX_ERR_NOT_SUPPORTED");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-// driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor>
-void BtHciBroadcom::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
+// driver_devfs::Connector<fhbt::Vendor>
+void BtHciBroadcom::Connect(fidl::ServerEnd<fhbt::Vendor> request) {
   vendor_binding_group_.AddBinding(dispatcher(), std::move(request), this,
                                    fidl::kIgnoreBindingClosure);
 
-  vendor_binding_group_.ForEachBinding(
-      [](const fidl::ServerBinding<fuchsia_hardware_bluetooth::Vendor>& binding) {
-        fidl::Arena arena;
-        auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
-        builder.acl_priority_command(true);
-        fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
+  vendor_binding_group_.ForEachBinding([](const fidl::ServerBinding<fhbt::Vendor>& binding) {
+    fidl::Arena arena;
+    auto builder = fhbt::wire::VendorFeatures::Builder(arena);
+    builder.acl_priority_command(true);
+    fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
 
-        if (status.status() != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
-        }
-      });
+    if (status.status() != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
+    }
+  });
 }
 
-zx_status_t BtHciBroadcom::ConnectToHciFidlProtocol() {
-  zx::result<fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci>> client_end =
-      incoming()->Connect<fuchsia_hardware_bluetooth::HciService::Hci>();
+zx_status_t BtHciBroadcom::ConnectToHciTransportFidlProtocol() {
+  zx::result<fidl::ClientEnd<fhbt::HciTransport>> client_end =
+      incoming()->Connect<fhbt::HciService::HciTransport>();
   if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Connect to fuchsia_hardware_bluetooth::Hci protocol failed: %s",
-            client_end.status_string());
+    FDF_LOG(ERROR, "Connect to fhbt::HciTransport protocol failed: %s", client_end.status_string());
     return client_end.status_value();
   }
 
-  hci_client_ =
-      fidl::WireClient(*std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  hci_transport_client_ = fidl::WireSyncClient(*std::move(client_end));
 
   return ZX_OK;
 }
@@ -271,8 +195,8 @@ zx_status_t BtHciBroadcom::ConnectToSerialFidlProtocol() {
   return ZX_OK;
 }
 
-void BtHciBroadcom::EncodeSetAclPriorityCommand(
-    fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams params, void* out_buffer) {
+void BtHciBroadcom::EncodeSetAclPriorityCommand(fhbt::wire::VendorSetAclPriorityParams params,
+                                                void* out_buffer) {
   if (!params.has_connection_handle() || !params.has_priority() || !params.has_direction()) {
     FDF_LOG(ERROR,
             "The command cannot be encoded because the following fields are missing: %s %s %s",
@@ -287,10 +211,9 @@ void BtHciBroadcom::EncodeSetAclPriorityCommand(
               .parameter_total_size = sizeof(BcmSetAclPriorityCmd) - sizeof(HciCommandHeader),
           },
       .connection_handle = htole16(params.connection_handle()),
-      .priority = (params.priority() == fuchsia_hardware_bluetooth::VendorAclPriority::kNormal)
-                      ? kBcmAclPriorityNormal
-                      : kBcmAclPriorityHigh,
-      .direction = (params.direction() == fuchsia_hardware_bluetooth::VendorAclDirection::kSource)
+      .priority = (params.priority() == fhbt::VendorAclPriority::kNormal) ? kBcmAclPriorityNormal
+                                                                          : kBcmAclPriorityHigh,
+      .direction = (params.direction() == fhbt::VendorAclDirection::kSource)
                        ? kBcmAclDirectionSource
                        : kBcmAclDirectionSink,
   };
@@ -298,57 +221,69 @@ void BtHciBroadcom::EncodeSetAclPriorityCommand(
   memcpy(out_buffer, &command, sizeof(command));
 }
 
+void BtHciBroadcom::OnReceivePacket(std::vector<uint8_t>& packet) {
+  event_receive_buffer_ = packet;
+  auto result = hci_transport_client_->AckReceive();
+  if (result.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to ack receive: %s", result.status_string());
+  }
+}
+
 fpromise::promise<std::vector<uint8_t>, zx_status_t> BtHciBroadcom::SendCommand(const void* command,
                                                                                 size_t length) {
   // send HCI command
-  zx_status_t status = command_channel_.write(/*flags=*/0, command, static_cast<uint32_t>(length),
-                                              /*handles=*/nullptr, /*num_handles=*/0);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "command channel write failed %s", zx_status_get_string(status));
+  fidl::Arena arena;
+  auto command_vec = std::vector<uint8_t>(static_cast<const uint8_t*>(command),
+                                          static_cast<const uint8_t*>(command) + length);
+  auto command_view = fidl::VectorView<uint8_t>::FromExternal(command_vec);
+  auto result =
+      hci_transport_client_->Send(fhbt::wire::SentPacket::WithCommand(arena, command_view));
+  if (result.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to send command: %s", result.status_string());
     return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
-        fpromise::error(status));
+        fpromise::error(result.status()));
   }
 
   return ReadEvent();
 }
 
 fpromise::promise<std::vector<uint8_t>, zx_status_t> BtHciBroadcom::ReadEvent() {
-  return executor_
-      ->MakePromiseWaitHandle(zx::unowned_handle(command_channel_.get()),
-                              ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED)
-      .then([this](fpromise::result<zx_packet_signal_t, zx_status_t>&)
-                -> fpromise::result<std::vector<uint8_t>, zx_status_t> {
-        std::vector<uint8_t> read_buf(kChanReadBufLen, 0u);
-        uint32_t actual = 0;
-        zx_status_t status = command_channel_.read(
-            /*flags=*/0, read_buf.data(), /*handles=*/nullptr, kChanReadBufLen,
-            /*num_handles=*/0, &actual, /*actual_handles=*/nullptr);
-        if (status != ZX_OK) {
-          return fpromise::error(status);
-        }
+  fidl::Status result = hci_transport_client_.HandleOneEvent(hci_event_handler_);
+  if (result.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to get event packet.");
+    return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
+        fpromise::error(result.status()));
+  }
 
-        if (actual < sizeof(HciCommandComplete)) {
-          FDF_LOG(ERROR, "command channel read too short: %d < %lu", actual,
-                  sizeof(HciCommandComplete));
-          return fpromise::error(ZX_ERR_INTERNAL);
-        }
+  // Read result will be stored in |event_receive_buffer_|.
+  std::vector<uint8_t> packet_bytes = std::move(event_receive_buffer_);
+  // Copy out the data from buffer and clear the buffer.
+  event_receive_buffer_.clear();
 
-        HciCommandComplete event;
-        std::memcpy(&event, read_buf.data(), sizeof(HciCommandComplete));
-        if (event.header.event_code != kHciEvtCommandCompleteEventCode ||
-            event.header.parameter_total_size < kMinEvtParamSize) {
-          FDF_LOG(ERROR, "did not receive command complete or params too small");
-          return fpromise::error(ZX_ERR_INTERNAL);
-        }
+  if (packet_bytes.size() < sizeof(HciCommandComplete)) {
+    FDF_LOG(ERROR, "command channel read too short: %zu < %lu", packet_bytes.size(),
+            sizeof(HciCommandComplete));
+    return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
+        fpromise::error(ZX_ERR_INTERNAL));
+  }
 
-        if (event.return_code != 0) {
-          FDF_LOG(ERROR, "got command complete error %u", event.return_code);
-          return fpromise::error(ZX_ERR_INTERNAL);
-        }
+  HciCommandComplete event;
+  std::memcpy(&event, packet_bytes.data(), sizeof(HciCommandComplete));
+  if (event.header.event_code != kHciEvtCommandCompleteEventCode ||
+      event.header.parameter_total_size < kMinEvtParamSize) {
+    FDF_LOG(ERROR, "did not receive command complete or params too small");
+    return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
+        fpromise::error(ZX_ERR_INTERNAL));
+  }
 
-        read_buf.resize(actual);
-        return fpromise::ok(std::move(read_buf));
-      });
+  if (event.return_code != 0) {
+    FDF_LOG(ERROR, "got command complete error %u", event.return_code);
+    return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
+        fpromise::error(ZX_ERR_INTERNAL));
+  }
+
+  return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
+      fpromise::ok(std::move(packet_bytes)));
 }
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::SetBaudRate(uint32_t baud_rate) {
@@ -586,23 +521,6 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vm
 }
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::Initialize() {
-  zx::channel theirs;
-  zx_status_t status = zx::channel::create(/*flags=*/0, &command_channel_, &theirs);
-  if (status != ZX_OK) {
-    return OnInitializeComplete(status);
-  }
-
-  FDF_LOG(DEBUG, "opening command channel");
-  auto result = hci_client_.sync()->OpenCommandChannel(std::move(theirs));
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "OpenCommandChannel failed FIDL error: %s", result.status_string());
-    return OnInitializeComplete(result.status());
-  }
-  if (result->is_error()) {
-    FDF_LOG(ERROR, "OpenCommandChannel failed : %s", zx_status_get_string(result->error_value()));
-    return OnInitializeComplete(result->error_value());
-  }
-
   FDF_LOG(DEBUG, "sending initial reset command");
   return SendCommand(&kResetCmd, sizeof(kResetCmd))
       .and_then([this](std::vector<uint8_t>&) -> fpromise::promise<void, zx_status_t> {
@@ -644,12 +562,9 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::Initialize() {
 }
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::OnInitializeComplete(zx_status_t status) {
-  // We're done with the command channel. Close it so that it can be opened by
-  // the host stack after the device becomes visible.
-  if (command_channel_.is_valid()) {
-    FDF_LOG(DEBUG, "closing command channel");
-    command_channel_.reset();
-  }
+  // We're done with the HciTransport client end. Unbind the |ClientEnd| from the |Wireclient| and
+  // keep it until the host calls |OpenHci| to get it.
+  hci_transport_client_end_ = hci_transport_client_.TakeClientEnd();
 
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "device initialization failed: %s", zx_status_get_string(status));
