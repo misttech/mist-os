@@ -29,22 +29,35 @@ class ExecutableCommand(ABC):
             AsyncCommand: Wrapper for the started command.
         """
 
-    @abstractmethod
     def sync(
         self,
         *args: str,
         stdout_callback: typing.Callable[[StdoutEvent], None] | None = None,
         stderr_callback: typing.Callable[[StderrEvent], None] | None = None,
     ) -> CommandOutput:
-        """Run the command with the given arguments to completion synchronously.
+        """Run this command to completion synchronously.
 
-        Args:
-            stdout_callback (typing.Callable[[StdoutEvent], None] | None, optional): If set, receives one message per line of stdout.
-            stderr_callback (typing.Callable[[StderrEvent], None] | None, optional): If set, receives one message per line of stderr.
+        Note that this method creates its own asyncio loop and will fail if
+        it is called in the context of an existing asyncio loop. For async,
+        use start() to get an AsyncCommand directly.
 
         Returns:
             CommandOutput: The result of running the command to completion.
         """
+
+        def local_callback(event: CommandEvent) -> None:
+            if stdout_callback is not None and isinstance(event, StdoutEvent):
+                stdout_callback(event)
+            elif stderr_callback is not None and isinstance(event, StderrEvent):
+                stderr_callback(event)
+
+        async def operation() -> CommandOutput:
+            running_command = await self.start(*args)
+            return await running_command.run_to_completion(
+                callback=local_callback
+            )
+
+        return asyncio.run(operation())
 
 
 class FxCmd(ExecutableCommand):
@@ -103,36 +116,6 @@ class FxCmd(ExecutableCommand):
         return await AsyncCommand.create(
             new_args[0], *new_args[1:], timeout=self._timeout
         )
-
-    def sync(
-        self,
-        *args: str,
-        stdout_callback: typing.Callable[[StdoutEvent], None] | None = None,
-        stderr_callback: typing.Callable[[StderrEvent], None] | None = None,
-    ) -> CommandOutput:
-        """Run an invocation of fx to completion synchronously
-
-        Note that this method creates its own asyncio loop and will fail if
-        it is called in the context of an existing asyncio loop. For async,
-        use start() to get an AsyncCommand directly.
-
-        Returns:
-            CommandOutput: The result of running the command to completion.
-        """
-
-        def local_callback(event: CommandEvent) -> None:
-            if stdout_callback is not None and isinstance(event, StdoutEvent):
-                stdout_callback(event)
-            elif stderr_callback is not None and isinstance(event, StderrEvent):
-                stderr_callback(event)
-
-        async def operation() -> CommandOutput:
-            running_command = await self.start(*args)
-            return await running_command.run_to_completion(
-                callback=local_callback
-            )
-
-        return asyncio.run(operation())
 
 
 EventType = typing.TypeVar("EventType")
