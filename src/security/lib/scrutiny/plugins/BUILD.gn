@@ -186,7 +186,6 @@ if (is_host) {
         "//src/sys/lib/cm_rust/testing",
         "//third_party/rust_crates:assert_matches",
         "//third_party/rust_crates:tempfile",
-        "//third_party/rust_crates:uuid",
         "//tools/lib/cml",
       ]
     }
@@ -211,13 +210,6 @@ if (is_host) {
       "src/core/util/jsons.rs",
       "src/core/util/mod.rs",
       "src/core/util/types.rs",
-      "src/engine/controller/collector.rs",
-      "src/engine/controller/controller.rs",
-      "src/engine/controller/health.rs",
-      "src/engine/controller/mod.rs",
-      "src/engine/controller/model.rs",
-      "src/engine/controller/plugin.rs",
-      "src/engine/mod.rs",
       "src/lib.rs",
       "src/search/controller/components.rs",
       "src/search/controller/mod.rs",

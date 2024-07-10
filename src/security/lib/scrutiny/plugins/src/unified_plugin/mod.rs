@@ -10,11 +10,6 @@ use crate::core::controller::blob::*;
 use crate::core::controller::component::*;
 use crate::core::controller::package::*;
 use crate::core::controller::package_extract::*;
-use crate::engine::controller::collector::*;
-use crate::engine::controller::controller::*;
-use crate::engine::controller::health::*;
-use crate::engine::controller::model::*;
-use crate::engine::controller::plugin::*;
 use crate::search::controller::components::*;
 use crate::search::controller::package_list::*;
 use crate::search::controller::packages::*;
@@ -33,11 +28,8 @@ use crate::verify::controller::route_sources::*;
 use crate::verify::controller::structured_config::*;
 use crate::zbi::controller::*;
 
-use scrutiny::engine::dispatcher::ControllerDispatcher;
-use scrutiny::engine::manager::PluginManager;
-use scrutiny::engine::scheduler::CollectorScheduler;
 use scrutiny::prelude::*;
-use std::sync::{Arc, Mutex, RwLock, Weak};
+use std::sync::Arc;
 
 pub struct UnifiedPlugin {
     desc: PluginDescriptor,
@@ -65,11 +57,7 @@ impl UnifiedPlugin {
         }
     }
 
-    pub fn with_model(
-        scheduler: Arc<Mutex<CollectorScheduler>>,
-        dispatcher: Arc<RwLock<ControllerDispatcher>>,
-        manager: Weak<Mutex<PluginManager>>,
-    ) -> Self {
+    pub fn with_model() -> Self {
         Self {
             desc: PluginDescriptor::new("UnifiedPlugin".to_string()),
             hooks: PluginHooks::new(
@@ -77,13 +65,6 @@ impl UnifiedPlugin {
                     "UnifiedCollector" => UnifiedCollector::default(),
                 },
                 controllers! {
-                    "/engine/health/status" => HealthController::default(),
-                    "/engine/plugin/list" => PluginListController::new(manager),
-                    "/engine/model/config" => ModelConfigController::default(),
-                    "/engine/model/stats" => ModelStatsController::default(),
-                    "/engine/collector/list" => CollectorListController::new(scheduler.clone()),
-                    "/engine/controller/list" => ControllerListController::new(dispatcher),
-                    "/engine/collector/schedule" => CollectorSchedulerController::new(scheduler.clone()),
                     "/devmgr/config" => ExtractAdditionalBootConfigController::default(),
                     "/component" => ComponentGraphController::default(),
                     "/components" => ComponentsGraphController::default(),

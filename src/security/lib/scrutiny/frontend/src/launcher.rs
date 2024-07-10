@@ -6,7 +6,6 @@ use crate::scrutiny::Scrutiny;
 use anyhow::Result;
 use scrutiny_config::{Config, ConfigBuilder, ModelConfig};
 use scrutiny_plugins::unified_plugin::UnifiedPlugin;
-use std::sync::Arc;
 
 /// Launches scrutiny from a configuration file. This is intended to be used by binaries that
 /// want to launch custom configurations of the Scrutiny framework with select features enabled.
@@ -19,11 +18,7 @@ pub fn launch_from_config(config: Config) -> Result<String> {
     if model_is_empty {
         scrutiny.plugin(UnifiedPlugin::without_model())?;
     } else {
-        scrutiny.plugin(UnifiedPlugin::with_model(
-            scrutiny.scheduler(),
-            scrutiny.dispatcher(),
-            Arc::downgrade(&scrutiny.plugin_manager()),
-        ))?;
+        scrutiny.plugin(UnifiedPlugin::with_model())?;
     }
     scrutiny.run()
 }
