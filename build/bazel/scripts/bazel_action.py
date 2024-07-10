@@ -6,6 +6,7 @@
 "Run a Bazel command from Ninja. See bazel_action.gni for details."
 
 import argparse
+import dataclasses
 import errno
 import filecmp
 import json
@@ -732,6 +733,43 @@ def label_requires_content_hash(label: str) -> bool:
     return not label.startswith(_BAZEL_NO_CONTENT_HASH_REPOSITORIES)
 
 
+@dataclasses.dataclass
+class PackageOutputs:
+    package_label: str
+    archive_path: Optional[str] = None
+    manifest_path: Optional[str] = None
+    copy_debug_symbols: bool = False
+
+
+class PackageOutputsAction(argparse.Action):
+    """ArgumentParser action class to convert --package-outputs arguments into PackageOutputs instances."""
+
+    def __init__(
+        self, option_strings, dest, nargs=None, default=None, **kwargs
+    ):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        if default is not None:
+            raise ValueError("default not allowed")
+        super().__init__(option_strings, dest, nargs=4, default=[], **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string):
+        assert len(values) == 4
+        if not values[0]:
+            raise ValueError("expected non-empty Bazel package label.")
+        dest_list = getattr(namespace, self.dest, [])
+        package_label = values[0]
+        archive_path = values[1] if values[1] != "NONE" else None
+        manifest_path = values[2] if values[2] != "NONE" else None
+        copy_debug_symbols = bool(values[3] == "true")
+        dest_list.append(
+            PackageOutputs(
+                package_label, archive_path, manifest_path, copy_debug_symbols
+            )
+        )
+        setattr(namespace, self.dest, dest_list)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -785,17 +823,9 @@ def main() -> int:
     )
 
     parser.add_argument(
-        "--fuchsia-package-output-archive",
-        help="Output path for Fuchsia package archive file.",
-    )
-    parser.add_argument(
-        "--fuchsia-package-output-manifest",
-        help="Output path for Fuchsia package manifest file.",
-    )
-    parser.add_argument(
-        "--fuchsia-package-copy-debug-symbols",
-        action="store_true",
-        help="Copy debug symbols from Fuchsia package target to top-level .build-id/ directory.",
+        "--package-outputs",
+        action=PackageOutputsAction,
+        help="A tuple of four values describing Fuchsia package related outputs. Fields are Bazel package target label, archive output path or 'NONE', manifest output path or 'NONE', and copy debug symbols flag as either 'true' or 'false' string",
     )
 
     parser.add_argument("--depfile", help="Ninja depfile output path.")
@@ -816,11 +846,7 @@ def main() -> int:
     if not args.bazel_targets:
         return parser.error("A least one --bazel-targets value is needed!")
 
-    _build_fuchsia_package = args.command == "build" and (
-        args.fuchsia_package_output_archive
-        or args.fuchsia_package_output_manifest
-        or args.fuchsia_package_copy_debug_symbols
-    )
+    _build_fuchsia_package = args.command == "build" and args.package_outputs
 
     if args.command == "build" and not _build_fuchsia_package:
         if not args.bazel_outputs:
@@ -1052,7 +1078,7 @@ def main() -> int:
     # CQ/CI bots usable.
     cmd += configured_args + args.bazel_targets + ["--verbose_failures"]
 
-    if args.fuchsia_package_copy_debug_symbols:
+    if any(entry.copy_debug_symbols for entry in args.package_outputs):
         # Ensure the build_id directories are produced.
         cmd += ["--output_groups=+build_id_dirs"]
 
@@ -1090,7 +1116,9 @@ def main() -> int:
     if _build_fuchsia_package:
         bazel_execroot = find_bazel_execroot(args.workspace_dir)
 
-        def run_starlark_cquery(starlark_filename: str) -> List[str]:
+        def run_starlark_cquery(
+            query_target: str, starlark_filename: str
+        ) -> List[str]:
             return get_bazel_query_output(
                 "cquery",
                 [
@@ -1098,46 +1126,47 @@ def main() -> int:
                     "--output=starlark",
                     "--starlark:file",
                     get_input_starlark_file_path(starlark_filename),
-                    f"{query_targets}",
+                    query_target,
                 ]
                 + configured_args,
             )
 
-        if (
-            args.fuchsia_package_output_archive
-            or args.fuchsia_package_output_manifest
-        ):
-            # Run a cquery to extract the FuchsiaPackageInfo provider values.
-            fuchsia_package_info = run_starlark_cquery(
-                "FuchsiaPackageInfo_archive_and_manifest.cquery"
-            )
-            assert (
-                len(fuchsia_package_info) == 2
-            ), f"Unexpected FuchsiaPackageInfo cquery result: {fuchsia_package_info}"
-            # Get all paths, which are relative to the Bazel execroot.
-            bazel_archive_path, bazel_manifest_path = fuchsia_package_info
-            bazel_debug_symbol_dirs = fuchsia_package_info[2:]
-
-            if args.fuchsia_package_output_archive:
-                copy_file_if_changed(
-                    os.path.join(bazel_execroot, bazel_archive_path),
-                    args.fuchsia_package_output_archive,
+        for entry in args.package_outputs:
+            if entry.archive_path or entry.manifest_path:
+                # Run a cquery to extract the FuchsiaPackageInfo provider values.
+                fuchsia_package_info = run_starlark_cquery(
+                    entry.package_label,
+                    "FuchsiaPackageInfo_archive_and_manifest.cquery",
                 )
+                assert (
+                    len(fuchsia_package_info) == 2
+                ), f"Unexpected FuchsiaPackageInfo cquery result: {fuchsia_package_info}"
 
-            if args.fuchsia_package_output_manifest:
-                copy_file_if_changed(
-                    os.path.join(bazel_execroot, bazel_manifest_path),
-                    args.fuchsia_package_output_manifest,
-                )
+                # Get all paths, which are relative to the Bazel execroot.
+                bazel_archive_path, bazel_manifest_path = fuchsia_package_info
+                bazel_debug_symbol_dirs = fuchsia_package_info[2:]
 
-        if args.fuchsia_package_copy_debug_symbols:
-            debug_symbol_dirs = run_starlark_cquery(
-                "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery"
-            )
-            for debug_symbol_dir in debug_symbol_dirs:
-                copy_build_id_dir(
-                    os.path.join(bazel_execroot, debug_symbol_dir)
+                if entry.archive_path:
+                    copy_file_if_changed(
+                        os.path.join(bazel_execroot, bazel_archive_path),
+                        entry.archive_path,
+                    )
+
+                if entry.manifest_path:
+                    copy_file_if_changed(
+                        os.path.join(bazel_execroot, bazel_manifest_path),
+                        entry.manifest_path,
+                    )
+
+            if entry.copy_debug_symbols:
+                debug_symbol_dirs = run_starlark_cquery(
+                    entry.package_label,
+                    "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
                 )
+                for debug_symbol_dir in debug_symbol_dirs:
+                    copy_build_id_dir(
+                        os.path.join(bazel_execroot, debug_symbol_dir)
+                    )
 
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get

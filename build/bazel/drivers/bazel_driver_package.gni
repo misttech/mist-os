@@ -64,10 +64,13 @@ template("bazel_driver_package") {
       deps += invoker.bazel_inputs
     }
 
-    fuchsia_package_outputs = {
-      archive = "$target_out_dir/$package_name.far"
-      copy_debug_symbols = true
-    }
+    package_outputs = [
+      {
+        package_label = bazel_target
+        archive = "$package_name.far"
+        copy_debug_symbols = true
+      },
+    ]
 
     metadata = {
       # Used by the check_included_drivers template.

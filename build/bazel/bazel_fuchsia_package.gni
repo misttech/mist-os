@@ -75,10 +75,13 @@ template("bazel_fuchsia_package") {
       deps += invoker.bazel_inputs
     }
 
-    fuchsia_package_outputs = {
-      archive = "$target_out_dir/$package_name.far"
-      copy_debug_symbols = true
-    }
+    package_outputs = [
+      {
+        package_label = bazel_target
+        archive = "$package_name.far"
+        copy_debug_symbols = true
+      },
+    ]
   }
 
   # From the perspective of GN/Ninja, this package is a prebuilt

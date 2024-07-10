@@ -125,17 +125,20 @@ declare_args() {
 #     Type: list of paths relative to target_out_dir.
 #     Default: empty
 #
-#   fuchsia_package_outputs: (optional)
-#      A scope describing where to place various Fuchsia package related
-#      output files. Should only be used when bazel_inputs contains a single
-#      label pointing to a Bazel fuchsia_package() or fuchsia_test_package()
-#      macro. Scope schema is:
+#   package_outputs: (optional)
+#      A list of scopes describing where to place various Fuchsia package
+#      related output files. Scope schema is:
+#
+#          package_label: (required)
+#             A bazel label to a fuchsia_package() or fuchsia_test_package()
+#             target. This target must be reachable from one of the labels
+#             listed in the top-level bazel_targets argument.
 #
 #          archive: (required)
-#             output path for the package's archive, relative to $root_build_dir.
+#             output path for the package's archive, relative to $target_out_dir.
 #
 #          manifest: (optional)
-#             output path for the package's manifest file, relative to $root_build_dir.
+#             output path for the package's manifest file, relative to $target_out_dir.
 #
 #          copy_debug_symbols: (optional)
 #             A boolean flag, set it to true to copy all debug symbols from
@@ -235,12 +238,10 @@ template("bazel_action") {
   assert(defined(invoker.bazel_targets), "bazel_targets must be defined!")
   assert(invoker.bazel_targets != [], "bazel_targets cannot be empty!")
 
-  assert(
-      defined(invoker.copy_outputs) || defined(invoker.fuchsia_package_outputs),
-      "`copy_outputs` or `fuchsia_package_outputs` must be defined")
+  assert(defined(invoker.copy_outputs) || defined(invoker.package_outputs),
+         "`copy_outputs` or `package_outputs` must be defined")
 
-  if (defined(invoker.copy_outputs) &&
-      !defined(invoker.fuchsia_package_outputs)) {
+  if (defined(invoker.copy_outputs) && !defined(invoker.package_outputs)) {
     assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty.")
   }
   _copy_outputs = []
@@ -258,14 +259,6 @@ template("bazel_action") {
   }
 
   _bazel_targets = invoker.bazel_targets
-
-  if (defined(invoker.fuchsia_package_outputs)) {
-    assert(
-        _bazel_targets == [ _bazel_targets[0] ],
-        "When fuchsia_package_outputs is set, bazel_targets must include a single target, got: ${_bazel_targets}")
-
-    _fuchsia_package_outputs = invoker.fuchsia_package_outputs
-  }
 
   foreach(entry, _copy_outputs) {
     assert("$entry" != entry,
@@ -486,28 +479,37 @@ template("bazel_action") {
              "--path-mapping",
              rebase_path(_path_mapping, root_build_dir),
            ]
-    if (defined(_fuchsia_package_outputs)) {
-      if (defined(_fuchsia_package_outputs.archive) ||
-          defined(_fuchsia_package_outputs.manifest)) {
-        inputs += [ "//build/bazel/starlark/FuchsiaPackageInfo_archive_and_manifest.cquery" ]
-      }
-      if (defined(_fuchsia_package_outputs.archive)) {
-        outputs += [ _fuchsia_package_outputs.archive ]
+
+    if (defined(invoker.package_outputs)) {
+      # These starlark script are used to perform queries to get provider values
+      # for each package.
+      inputs += [
+        "//build/bazel/starlark/FuchsiaPackageInfo_archive_and_manifest.cquery",
+        "//build/bazel/starlark/FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
+      ]
+      foreach(_entry, invoker.package_outputs) {
+        _archive_arg = "NONE"
+        if (defined(_entry.archive)) {
+          _archive = "$target_out_dir/${_entry.archive}"
+          outputs += [ _archive ]
+          _archive_arg = rebase_path(_archive, root_build_dir)
+        }
+        _manifest_arg = "NONE"
+        if (defined(_entry.manifest)) {
+          _manifest = "$target_out_dir/${_entry.manifest}"
+          outputs += [ _manifest ]
+          _manifest_arg = rebase_path(_manifest, root_build_dir)
+        }
+        _copy_debug_symbols =
+            defined(_entry.copy_debug_symbols) && _entry.copy_debug_symbols
+
         args += [
-          "--fuchsia-package-output-archive",
-          rebase_path(_fuchsia_package_outputs.archive, root_build_dir),
+          "--package-outputs",
+          get_label_info(_entry.package_label, "label_no_toolchain"),
+          _archive_arg,
+          _manifest_arg,
+          "${_copy_debug_symbols}",
         ]
-      }
-      if (defined(_fuchsia_package_outputs.manifest)) {
-        args += [
-          "--fuchsia-package-output-manifest",
-          rebase_path(_fuchsia_package_outputs.manifest, root_build_dir),
-        ]
-      }
-      if (defined(_fuchsia_package_outputs.copy_debug_symbols) &&
-          _fuchsia_package_outputs.copy_debug_symbols) {
-        args += [ "--fuchsia-package-copy-debug-symbols" ]
-        inputs += [ "//build/bazel/starlark/FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery" ]
       }
     }
 

@@ -63,7 +63,7 @@ import("//build/bazel/bazel_action.gni")
 #
 #     See technical note below for details about <bazel_path> and <ninja_path>
 #
-#     Type: list of scopes (cannot be empty, unless fuchsia_package_outputs is used)
+#     Type: list of scopes (cannot be empty, unless package_outputs is used)
 #
 #   allow_directory_in_outputs (optional):
 #     If true, directories are allowed in `copy_outputs`, which will allow
@@ -104,26 +104,26 @@ import("//build/bazel/bazel_action.gni")
 #     Type: list of paths relative to target_out_dir.
 #     Default: empty
 #
-#   fuchsia_package_outputs: (optional)
-#      A scope describing where to place various Fuchsia package related
-#      output files. Should only be used when bazel_target points to a Bazel
-#      fuchsia_package() or fuchsia_test_package() macro. Scope schema is:
+#   package_outputs: (optional)
+#     A list of scopes describing where to place various Fuchsia package related
+#     output files. Each list item describes a single package reachable from the
+#     top-level bazel_target label, with the following schema:
+#
+#          package_label: (required)
+#             A bazel label to a fuchsia_package() or fuchsia_test_package()
+#             target. This target must be reachable from one of the labels
+#             listed in the top-level bazel_targets argument.
 #
 #          archive: (required)
-#             output path for the package's archive, relative to $root_build_dir.
+#             output path for the package's archive, relative to $target_out_dir.
 #
 #          manifest: (optional)
-#             output path for the package's manifest file, relative to $root_build_dir.
+#             output path for the package's manifest file, relative to $target_out_dir.
 #
 #          copy_debug_symbols: (optional)
 #             A boolean flag, set it to true to copy all debug symbols from
 #             the package's ELF binaries to the top-level ${root_build_dir}/.build-id/
 #             directory.
-#
-#     This is much more convenient as using copy_outputs, as the corresponding source
-#     paths are extracted using Bazel cqueries by the underlying action.
-#
-#     If this argument is set, `copy_outputs` can be left undefined or empty.
 #
 #   extra_bazel_args: (optional)
 #     A list extra command line arguments to pass to Bazel.
