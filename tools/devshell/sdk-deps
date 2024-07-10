@@ -11,7 +11,7 @@
 ##  Options:
 ##     -t < target> : List all the deps of this target
 ##     -d < dep> : Determine if the dependency is in SDK
-##
+##     -o < filename> : Write output to CSV file. Default: sdk_deps_out.csv
 
 set -o errexit
 
@@ -25,6 +25,7 @@ trap 'rm -rf "$TEMPDIR"' EXIT
 dep_list_file="${TEMPDIR}/dep_list"
 partner_sdk_deps_file="${TEMPDIR}/partner_sdk_deps_list"
 non_sdk_deps_file="${TEMPDIR}/non_sdk_deps_list"
+output_csv="sdk_deps_out.csv" # Default CSV filename
 
 touch ${dep_list_file}
 touch ${partner_sdk_deps_file}
@@ -34,7 +35,7 @@ collect_deps() {
     local target=$1
     local prefix=$(echo ${target} | cut -d ":" -f1)
     local deps=($(fx-command-run gn desc "${build_dir}" "${target}" deps || continue))
-    for dep in ${deps[@]}; do
+    for dep in "${deps[@]}"; do
         # We skip some deps
         if [[ "${dep}" == *"shlib-allowlist-check"* \
            || "${dep}" == *"static-libc++-deps"* \
@@ -66,6 +67,10 @@ main() {
             shift
             sdk_deps+=( "$1" )
             ;;
+        -o)
+            shift
+            output_csv="$1"
+            ;;
         esac
         shift
     done
@@ -79,7 +84,7 @@ main() {
         local distribution_manifests=()
         # Use `gn meta` to walk the metadata and select all items with
         # `driver_package_component_files`. This is mandatory all driver.
-        for target in ${targets[@]}; do
+        for target in "${targets[@]}"; do
             distribution_manifests+=( $(fx-command-run gn meta "${build_dir}" --data=driver_package_component_files "${target}" 2>/dev/null | grep "distribution_manifest = " | cut -d "\"" -f2 | sed -e "s|.*|${build_dir}/&|") )
         done
 
@@ -103,11 +108,10 @@ main() {
     fi
 
     # Also collect the deps directly passed in
-    for dep in ${sdk_deps[@]}; do
+    for dep in "${sdk_deps[@]}"; do
         echo "${dep}" | xargs >> ${dep_list_file}
     done
 
-    local core_deps=()
     local non_sdk=()
 
     local partner_sdk_deps="${TEMPDIR}/partner_sdk_all_deps"
@@ -128,7 +132,7 @@ main() {
             dep_sdk="$(echo ${dep} | cut -d "(" -f1)_sdk"
         fi
 
-        if [[ $(grep ${dep_sdk} ${partner_sdk_deps} | wc -l) -gt 0 ]]; then
+        if [[ $(grep -c ${dep_sdk} ${partner_sdk_deps}) -gt 0 ]]; then
             echo "${dep}" >> "${partner_sdk_deps_file}"
             continue
         fi
@@ -136,18 +140,36 @@ main() {
         echo "${dep}" >> "${non_sdk_deps_file}"
     done
 
+    # Calculate non sdk total items
+    num_non_sdk_total_items=$(cat ${non_sdk_deps_file} | wc -l)
+
+    # Calculate items containing banjo
+    num_total_banjo=$(cat ${non_sdk_deps_file} | grep banjo | wc -l)
+
+    # Calculate total number of drivers
+    num_drivers="${#drivers[@]}"
+
+    # Calculate total number of parter sdk deps
+    num_partner_sdk_deps=$(cat ${partner_sdk_deps_file} | wc -l)
+
+    # Print to console
     fx-info "Result:"
     echo
     echo "    In SDK:"
     sed -i -e 's/^/      /' ${partner_sdk_deps_file}
-    echo "      Total items:" $(cat ${partner_sdk_deps_file} | wc -l)
+    echo "      Total items:" ${num_partner_sdk_deps}
     cat ${partner_sdk_deps_file}
     echo
     echo "    Not in SDK:"
     sed -i -e 's/^/      /' ${non_sdk_deps_file}
-    echo "      Total items:" $(cat ${non_sdk_deps_file} | wc -l)
-    echo "      Items containing 'banjo':" $(cat ${non_sdk_deps_file} | grep banjo | wc -l)
+    echo "      Total items:" ${num_non_sdk_total_items}
+    echo "      Items containing 'banjo':" ${num_total_banjo}
     cat ${non_sdk_deps_file}
+
+    # Write to CSV with headers
+    echo "date_time_run,number_drivers,number_partner_sdk_deps,number_non_sdk_total_items,number_total_banjo" > "${output_csv}"
+    echo "$(date +"%Y-%m-%d %H:%M:%S"),${num_drivers},${num_partner_sdk_deps},${num_non_sdk_total_items},${num_total_banjo}" >> "${output_csv}"
+    fx-info "CSV output written to: ${output_csv}"
 }
 
 main "$@"
