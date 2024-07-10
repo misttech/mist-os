@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod aggregations;
+pub mod experimental;
 
 use crate::aggregations::SumAndCount;
 use fuchsia_async as fasync;
