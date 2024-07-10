@@ -89,6 +89,10 @@ if (platform_enable_user_pci) {
       "//build/config/fuchsia:enable_zircon_asserts",
     ]
 
+    if (is_mistos) {
+      configs -= [ "//build/config/fuchsia:enable_zircon_asserts" ]
+      configs += [ "//build/config/mistos:enable_zircon_asserts" ]
+    }
     sources = [
       # The driver needs bind glue, unlike tests.
       "bind.cc",
@@ -118,6 +122,10 @@ if (platform_enable_user_pci) {
       "//build/config:all_source",
       "//build/config/fuchsia:enable_zircon_asserts",
     ]
+    if (is_mistos) {
+      configs -= [ "//build/config/fuchsia:enable_zircon_asserts" ]
+      configs += [ "//build/config/mistos:enable_zircon_asserts" ]
+    }
     sources = [
       "composite.cc",
       "kpci.cc",

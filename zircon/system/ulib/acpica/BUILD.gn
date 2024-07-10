@@ -14,7 +14,7 @@ config("acpica-config") {
   cflags_c = [ "-fno-sanitize=alignment" ]
 }
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   source_set("acpica-fuchsia") {
     deps = [
       "//src/devices/pci/lib/pci",

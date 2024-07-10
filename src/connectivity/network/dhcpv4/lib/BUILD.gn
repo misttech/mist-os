@@ -20,7 +20,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:tracing",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     deps += [
       "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
       "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
@@ -46,7 +46,7 @@ rustc_library("lib") {
     "src/server.rs",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [ "src/stash.rs" ]
   }
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

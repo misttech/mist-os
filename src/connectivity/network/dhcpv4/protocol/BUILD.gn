@@ -22,7 +22,7 @@ rustc_library("protocol") {
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     deps += [
       "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
       "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
