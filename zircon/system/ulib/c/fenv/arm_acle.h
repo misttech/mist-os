@@ -15,6 +15,10 @@
 
 #include_next <arm_acle.h>
 
+// TODO(https://fxbug.dev/351904809): GCC 14 now has these, so this whole file
+// can go away when that toolchain lands.
+#if __GNUC__ < 14
+
 // Read 32-bit system register.
 #define __arm_rsr(reg)                            \
   ({                                              \
@@ -29,5 +33,7 @@
     uint32_t _val = (val);                           \
     __asm__ volatile("msr " reg ", %0" ::"r"(_val)); \
   })
+
+#endif  // __GNUC__ < 14
 
 #endif  // ZIRCON_SYSTEM_ULIB_C_FENV_ARM_ACLE_H_
