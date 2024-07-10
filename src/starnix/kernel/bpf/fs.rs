@@ -8,6 +8,8 @@
 use crate::bpf::map::Map;
 use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
+use crate::mm::memory::MemoryObject;
+use crate::mm::ProtectionFlags;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
@@ -103,6 +105,19 @@ impl FileOps for BpfHandle {
     ) -> Result<usize, Errno> {
         track_stub!(TODO("https://fxbug.dev/322873841"), "bpf handle write");
         error!(EINVAL)
+    }
+    fn get_memory(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        match self {
+            Self::Map(map) => map.get_memory(locked, length, prot),
+            _ => error!(ENODEV),
+        }
     }
 }
 

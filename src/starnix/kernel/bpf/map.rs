@@ -4,7 +4,8 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::mm::MemoryAccessor;
+use crate::mm::memory::MemoryObject;
+use crate::mm::{MemoryAccessor, ProtectionFlags};
 use crate::task::CurrentTask;
 use dense_map::DenseMap;
 use ebpf::MapSchema;
@@ -36,6 +37,7 @@ use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::ops::{Bound, Deref, DerefMut, Range, RangeBounds};
 use std::pin::Pin;
+use std::sync::Arc;
 
 /// Counter for map identifiers.
 static MAP_IDS: AtomicU32Counter = AtomicU32Counter::new(1);
@@ -183,6 +185,18 @@ impl Map {
                 Some(&mut entries[array_range_for_index(schema.value_size, index)])
             }
         }
+    }
+
+    pub fn get_memory<L>(
+        &self,
+        _locked: &mut Locked<'_, L>,
+        _length: Option<usize>,
+        _prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        error!(ENODEV)
     }
 }
 
