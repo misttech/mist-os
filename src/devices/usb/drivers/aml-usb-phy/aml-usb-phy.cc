@@ -69,15 +69,13 @@ zx_status_t AmlUsbPhy::InitPhy2() {
 
   // amlogic_new_usb2_init()
   for (auto& phy : usbphy2_) {
-    auto u2p_ro_v2 = U2P_R0_V2::Get(phy.idx()).ReadFrom(usbctrl_mmio).set_por(1);
+    auto u2p_ro_v2 = U2P_R0_V2::Get(phy.idx()).ReadFrom(usbctrl_mmio);
     if (phy.is_otg_capable()) {
-      u2p_ro_v2.set_idpullup0(1)
-          .set_drvvbus0(1)
-          .set_host_device(phy.dr_mode() == UsbMode::Peripheral ? 0 : 1)
-          .WriteTo(usbctrl_mmio);
-    } else {
-      u2p_ro_v2.set_host_device(phy.dr_mode() == UsbMode::Peripheral).WriteTo(usbctrl_mmio);
+      u2p_ro_v2.set_idpullup0(1).set_drvvbus0(1);
     }
+    u2p_ro_v2.set_por(1)
+        .set_host_device(phy.dr_mode() != UsbMode::Peripheral)
+        .WriteTo(usbctrl_mmio);
     u2p_ro_v2.set_por(0).WriteTo(usbctrl_mmio);
   }
 
