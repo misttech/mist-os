@@ -165,7 +165,7 @@
         "--clang-tidy",
         "--background-index"
     ],
-    "clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/linux-x64/bin/clangd",
+    "clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/mac-x64/bin/clangd",
 
     // Formats C/C++ include guards to match Fuchsia style.
     "C/C++ Include Guard.Comment Style": "Line",
