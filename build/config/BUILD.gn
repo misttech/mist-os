@@ -797,9 +797,11 @@ config("default_warnings") {
       # warning on gcc to make it easier to see actual errors.
       "-Wno-deprecated-declarations",
 
-      # TODO(https://fxbug.dev/42076979): -Wstringop-overread has false positives in GCC
-      # 13.  Needs to be pursued upstream.
+      # TODO(https://fxbug.dev/351904809): -Wstringop-overread has false
+      # positives in GCC 13, and -Wstringop-overflow does in GCC 14.
+      # Needs to be pursued upstream.
       "-Wno-stringop-overread",
+      "-Wno-stringop-overflow",
     ]
   }
 
