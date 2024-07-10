@@ -12,14 +12,9 @@ use scrutiny_plugins::unified_plugin::UnifiedPlugin;
 pub fn launch_from_config(config: Config) -> Result<String> {
     // The model may be empty for extract commands.
     let model_is_empty = config.runtime.model.is_empty();
-
-    let mut scrutiny = Scrutiny::new(config)?;
-
-    if model_is_empty {
-        scrutiny.plugin(UnifiedPlugin::without_model())?;
-    } else {
-        scrutiny.plugin(UnifiedPlugin::with_model())?;
-    }
+    let plugin =
+        if model_is_empty { UnifiedPlugin::without_model() } else { UnifiedPlugin::with_model() };
+    let mut scrutiny = Scrutiny::new(config, plugin)?;
     scrutiny.run()
 }
 
