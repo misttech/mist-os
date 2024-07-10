@@ -1,55 +1,134 @@
-# Generate C bindings
+# wlan-fullmac-mlme-c
 
-## Install cbindgen
+Static FFI library that provides an entry point to the Rust wlan-fullmac-mlme
+library for the C++ wlanif driver.
 
-We are using `cbindgen 0.15.0` to auto generate our C bindings.
-Install the tool via:
+## How to update FFI bindings
+
+The [cbindgen program](https://github.com/mozilla/cbindgen) reads a
+locally generated `Cargo.toml` manifest to create the `bindings.h` header
+for the `wlan-fullmac-mlme-c` static Rust library, and its dependencies, to
+expose a public C API.
+
+There are four steps to create/update the `bindings.h` header:
+
+1. Link the Fuchsia (or nightly) Rust toolchain.
+1. Install cbindgen 0.26.0.
+1. Generate the local `Cargo.toml` manifest for `wlan-fullmac-mlme-c`.
+1. Create/update the `bindings.h` header.
+1. Format the `bindings.h` header.
+
+## Link the Fuchsia Rust (or nightly) toolchain
+
+The stable Rust toolchain cannot process Fuchsia-generated
+`Cargo.toml` manifests. You therefore must link the Fuchsia toolchain in
+your environment:
+
 ```
-cargo install --version 0.15.0 --force cbindgen
+rustup toolchain link fuchsia "$FUCHSIA_DIR/prebuilt/third_party/rust/linux-x64"
 ```
 
-## Generate Cargo.toml file
+If you cannot link this toolchain in your environment, you may
+alternately use the nightly Rust toolchain instead.
 
-Generate a Cargo.toml for `wlan-fullmac-mlme-c` by following [the instructions on fuchsia.dev](https://fuchsia.dev/fuchsia-src/development/languages/rust/cargo)
-for the build target `//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c`.
+## Install cbindgen 0.26.0
+
+We currently pin cbindgen at version 0.26.0 to avoid unexpected
+behavior with cbindgen updates. You can install it with the following:
+
+```
+cargo install --version 0.26.0 --force cbindgen
+```
+
+## Generate the local `Cargo.toml` manifest for `wlan-fullmac-mlme-c`
+
+Generate a Cargo.toml for `wlan-fullmac-mlme-c` by following [the instructions on
+fuchsia.dev](https://fuchsia.dev/fuchsia-src/development/languages/rust/cargo)
+for the build target
+`//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c`.
+
 As of this writing, this is done in the following way.
 
+1. Add `//build/rust:cargo_toml_gen` to `host_labels` using `fx args`.
+
+2. Add `//src/connectivity/wlan/lib/mlme/fullmac/c-binding:_wlan_fullmac_mlme_c_rustc_static` to `build_only_labels`
+   using `fx args`.
+
+3. Build the `cargo_toml_gen` target and generate the `Cargo.toml`
+   manifest:
+
 ```
-fx set PRODUCT.BOARD --cargo-toml-gen <other fx args>
-fx build build/rust:cargo_toml_gen
+fx args # then append "//build/rust:cargo_toml_gen" to `host_labels`
+fx args # then append "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:_wlan_fullmac_mlme_c_rustc_static"
+        # to `build_only_labels`
+
+fx build //build/rust:cargo_toml_gen
 fx gen-cargo //src/connectivity/wlan/lib/mlme/fullmac/c-binding:_wlan_fullmac_mlme_c_rustc_static
 ```
 
-## Create the C bindings
+## Create/update the `bindings.h` header
+
+The following command uses the Fuchsia toolchain and cbindgen to
+create/update the `bindings.h` header. If you could not link the
+Fuchsia toolchain, you may substitute `RUSTUP_TOOLCHAIN=nightly`.
 
 ```
-cbindgen $FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/ -o $FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h
+RUSTUP_TOOLCHAIN=fuchsia cbindgen $FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/ -o $FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h
 ```
 
-## Format the bindings
-
-At present, cbindgen changes the comment on the final line to use a `/* */` style
-comment for the header guard. This is not recognized by `fx format-code`. Change
-the final line of `bindings.h` to be the following.
+**NOTE:** The wlan-mlme library and wlanif driver each use
+bindings for their respective language. This means cbindgen
+cannot properly identify whether the types in those libraries exist
+or not. Therefore, it is is normal to see `WARN` logs like the
+following for some types:
 
 ```
-#endif  // SRC_CONNECTIVITY_WLAN_LIB_MLME_RUST_FULLMAC_C_BINDING_BINDINGS_H_
+WARN: Can't find zx_status_t. This usually means that this type was incompatible or not found.
 ```
 
-And finally, run `fx format-code` and check-in the new `bindings.h`
+## Format `bindings.h`
+
+cbindgen uses a `/* */` style comment for the header guard which is
+incompatible with `fx format-code`. Change this final comment line in
+`bindings.h` to
+
+```
+#endif  // SRC_CONNECTIVITY_WLAN_LIB_MLME_FULLMAC_C_BINDING_BINDINGS_H_
+```
+
+and then run `fx format-code`
 
 ```
 fx format-code --files=$FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h
-git add $FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h
 ```
 
 ## Troubleshooting
 
-* `cbindgen` fails when running `cargo metadata`: Remove the Cargo.toml and Cargo.lock
-files from `wlan-fullmac-mlme-c` folder and re-run `fx gen-cargo .`.
+## Troubleshooting
 
-* ERROR: Parsing crate `wlan_fullmac_mlme_c`: can't find dependency version for `xyz`:
-Rebuild Fuchsia and re-run `fx gen-cargo .`
+### cbindgen fails when running `cargo metadata`
 
-* For other issues, see the troubleshooting section of
-//src/connectivity/wlan/lib/mlme/rust/c-binding/README.md
+Remove the local `Cargo.toml` manifest and `Cargo.lock` and re-run `fx gen-cargo`.
+
+### ERROR: Parsing crate `wlan_fullmac_mlme_c`: can't find dependency version for `xyz`
+
+Rebuild Fuchsia with `fx build` and re-run `fx gen-cargo //src/connectivity/wlan/lib/mlme/fullmac/c-binding:_wlan_fullmac_mlme_c_rustc_static`.
+
+### cbindgen did not generate a binding as expected
+
+Try running `cbindgen` with `-v` argument to get a better understand
+what types and functions were found and why they may have been rejected.
+
+### Alternate method How to generate a manifest and pass it to cbindgen
+
+1. Generate the manifest with cargo:
+
+```
+cargo +nightly metadata --all-features --format-version 1 --manifest-path Cargo.toml > metadata.json
+```
+
+2. Generate the C bindings with cbindgen using the generated metadata:
+
+```
+RUSTUP_TOOLCHAIN=fuchsia cbindgen $FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/ -o $FUCHSIA_DIR/src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h --metadata metadata.json
+```
