@@ -280,14 +280,14 @@ impl LoopbackInfo {
     }
 }
 
-impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for LoopbackInfo {
-    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
-        match device_class {
-            fidl_fuchsia_net_filter::DeviceClass::Loopback(fidl_fuchsia_net_filter::Empty {}) => {
-                true
-            }
-            fidl_fuchsia_net_filter::DeviceClass::Device(_) => false,
-            fidl_fuchsia_net_filter::DeviceClass::__SourceBreaking { unknown_ordinal } => {
+impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for LoopbackInfo {
+    fn device_class_matches(&self, port_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
+        match port_class {
+            fidl_fuchsia_net_interfaces::PortClass::Loopback(
+                fidl_fuchsia_net_interfaces::Empty {},
+            ) => true,
+            fidl_fuchsia_net_interfaces::PortClass::Device(_) => false,
+            fidl_fuchsia_net_interfaces::PortClass::__SourceBreaking { unknown_ordinal } => {
                 panic!("unknown device class ordinal {unknown_ordinal:?}")
             }
         }
@@ -308,15 +308,15 @@ pub(crate) struct StaticNetdeviceInfo {
 }
 
 impl StaticNetdeviceInfo {
-    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
-        match device_class {
-            fidl_fuchsia_net_filter::DeviceClass::Loopback(fidl_fuchsia_net_filter::Empty {}) => {
-                false
-            }
-            fidl_fuchsia_net_filter::DeviceClass::Device(port_class) => {
+    fn device_class_matches(&self, port_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
+        match port_class {
+            fidl_fuchsia_net_interfaces::PortClass::Loopback(
+                fidl_fuchsia_net_interfaces::Empty {},
+            ) => false,
+            fidl_fuchsia_net_interfaces::PortClass::Device(port_class) => {
                 *port_class == self.handler.port_class()
             }
-            fidl_fuchsia_net_filter::DeviceClass::__SourceBreaking { unknown_ordinal } => {
+            fidl_fuchsia_net_interfaces::PortClass::__SourceBreaking { unknown_ordinal } => {
                 panic!("unknown device class ordinal {unknown_ordinal:?}")
             }
         }
@@ -359,8 +359,8 @@ impl EthernetInfo {
     }
 }
 
-impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for EthernetInfo {
-    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
+impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for EthernetInfo {
+    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
         self.netdevice.device_class_matches(device_class)
     }
 }
@@ -388,8 +388,8 @@ impl PureIpDeviceInfo {
     }
 }
 
-impl DeviceClassMatcher<fidl_fuchsia_net_filter::DeviceClass> for PureIpDeviceInfo {
-    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_filter::DeviceClass) -> bool {
+impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for PureIpDeviceInfo {
+    fn device_class_matches(&self, device_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
         self.netdevice.device_class_matches(device_class)
     }
 }

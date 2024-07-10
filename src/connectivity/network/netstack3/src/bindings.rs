@@ -403,7 +403,7 @@ macro_rules! trace_duration {
 pub(crate) use trace_duration;
 
 impl FilterBindingsTypes for BindingsCtx {
-    type DeviceClass = fidl_fuchsia_net_filter::DeviceClass;
+    type DeviceClass = fidl_fuchsia_net_interfaces::PortClass;
 }
 
 #[derive(Default)]

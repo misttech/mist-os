@@ -5,7 +5,10 @@
 use pest::iterators::Pair;
 use pest::Parser;
 
-use {fidl_fuchsia_hardware_network as fhnet, fidl_fuchsia_net_filter_ext as filter_ext};
+use {
+    fidl_fuchsia_net_filter_ext as filter_ext,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+};
 
 use crate::grammar::{Error, FilterRuleParser, InvalidReason, Rule};
 use crate::util;
@@ -58,16 +61,16 @@ fn parse_proto(pair: Pair<'_, Rule>) -> Option<TransportProtocol> {
     })
 }
 
-fn parse_devclass(pair: Pair<'_, Rule>) -> Option<filter_ext::DeviceClass> {
+fn parse_devclass(pair: Pair<'_, Rule>) -> Option<fnet_interfaces_ext::PortClass> {
     assert_eq!(pair.as_rule(), Rule::devclass);
     pair.into_inner().next().map(|pair| match pair.as_rule() {
-        Rule::virt => filter_ext::DeviceClass::Device(fhnet::PortClass::Virtual.into()),
-        Rule::ethernet => filter_ext::DeviceClass::Device(fhnet::PortClass::Ethernet.into()),
-        Rule::wlan => filter_ext::DeviceClass::Device(fhnet::PortClass::Wlan.into()),
-        Rule::ppp => filter_ext::DeviceClass::Device(fhnet::PortClass::Ppp.into()),
-        Rule::bridge => filter_ext::DeviceClass::Device(fhnet::PortClass::Bridge.into()),
-        Rule::ap => filter_ext::DeviceClass::Device(fhnet::PortClass::WlanAp.into()),
-        Rule::lowpan => filter_ext::DeviceClass::Device(fhnet::PortClass::Lowpan.into()),
+        Rule::virt => fnet_interfaces_ext::PortClass::Virtual,
+        Rule::ethernet => fnet_interfaces_ext::PortClass::Ethernet,
+        Rule::wlan => fnet_interfaces_ext::PortClass::Wlan,
+        Rule::ppp => fnet_interfaces_ext::PortClass::Ppp,
+        Rule::bridge => fnet_interfaces_ext::PortClass::Bridge,
+        Rule::ap => fnet_interfaces_ext::PortClass::WlanAp,
+        Rule::lowpan => fnet_interfaces_ext::PortClass::Lowpan,
         _ => unreachable!("devclass must be one of (virt|ethernet|wlan|ppp|bridge|ap|lowpan)"),
     })
 }
@@ -152,7 +155,7 @@ fn parse_rule(
     let action = parse_action(pairs.next().unwrap());
     let direction = parse_direction(pairs.next().unwrap());
     let proto = parse_proto(pairs.next().unwrap());
-    let device_class = parse_devclass(pairs.next().unwrap());
+    let port_class = parse_devclass(pairs.next().unwrap());
     let mut in_interface = None;
     let mut out_interface = None;
     let routine_id = match direction {
@@ -161,8 +164,7 @@ fn parse_rule(
             let Some(ref routine_id) = routines.local_ingress else {
                 return Err(Error::RoutineNotProvided(direction));
             };
-            in_interface =
-                device_class.map(|class| filter_ext::InterfaceMatcher::DeviceClass(class));
+            in_interface = port_class.map(|class| filter_ext::InterfaceMatcher::PortClass(class));
             routine_id
         }
         Direction::LocalEgress => {
@@ -170,8 +172,7 @@ fn parse_rule(
             let Some(ref routine_id) = routines.local_egress else {
                 return Err(Error::RoutineNotProvided(direction));
             };
-            out_interface =
-                device_class.map(|class| filter_ext::InterfaceMatcher::DeviceClass(class));
+            out_interface = port_class.map(|class| filter_ext::InterfaceMatcher::PortClass(class));
             routine_id
         }
     };
@@ -607,14 +608,14 @@ mod test {
     }
 
     #[test]
-    fn test_rule_with_device_class() {
+    fn test_rule_with_port_class() {
         assert_eq!(
             parse_str_to_rules("pass in proto tcp devclass ap;", &test_filter_routines()),
             Ok(vec![filter_ext::Rule {
                 id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
                 matchers: filter_ext::Matchers {
-                    in_interface: Some(filter_ext::InterfaceMatcher::DeviceClass(
-                        filter_ext::DeviceClass::Device(fhnet::PortClass::WlanAp.into())
+                    in_interface: Some(filter_ext::InterfaceMatcher::PortClass(
+                        fnet_interfaces_ext::PortClass::WlanAp,
                     )),
                     transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
                         src_port: None,
@@ -628,7 +629,7 @@ mod test {
     }
 
     #[test]
-    fn test_rule_with_device_class_and_dst_range() {
+    fn test_rule_with_port_class_and_dst_range() {
         assert_eq!(
             parse_str_to_rules(
                 "pass in proto tcp devclass ap to range 1:2;",
@@ -637,8 +638,8 @@ mod test {
             Ok(vec![filter_ext::Rule {
                 id: filter_ext::RuleId { routine: local_ingress_routine(), index: 0 },
                 matchers: filter_ext::Matchers {
-                    in_interface: Some(filter_ext::InterfaceMatcher::DeviceClass(
-                        filter_ext::DeviceClass::Device(fhnet::PortClass::WlanAp.into())
+                    in_interface: Some(filter_ext::InterfaceMatcher::PortClass(
+                        fnet_interfaces_ext::PortClass::WlanAp
                     )),
                     transport_protocol: Some(filter_ext::TransportProtocolMatcher::Tcp {
                         src_port: None,

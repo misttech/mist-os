@@ -122,19 +122,19 @@ impl Matcher for InterfaceDeviceClass {
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
-        async fn get_device_class(interface: &netemul::TestInterface<'_>) -> InterfaceMatcher {
-            InterfaceMatcher::DeviceClass(
+        async fn get_port_class(interface: &netemul::TestInterface<'_>) -> InterfaceMatcher {
+            InterfaceMatcher::PortClass(
                 interface.get_port_class().await.expect("get port class").into(),
             )
         }
 
         let Interfaces { ingress, egress } = interfaces;
         let in_interface = match ingress {
-            Some(ingress) => Some(get_device_class(ingress).await),
+            Some(ingress) => Some(get_port_class(ingress).await),
             None => None,
         };
         let out_interface = match egress {
-            Some(egress) => Some(get_device_class(egress).await),
+            Some(egress) => Some(get_port_class(egress).await),
             None => None,
         };
         Matchers { in_interface, out_interface, ..Default::default() }

@@ -17,11 +17,12 @@ use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_net_filter_ext::{
     self as fnet_filter_ext, Action, AddressMatcher, AddressMatcherType, AddressRange, Change,
-    ChangeCommitError, CommitError, Controller, ControllerId, DeviceClass, Domain, Event,
-    InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
-    NamespaceId, NatHook, PortMatcher, PushChangesError, Resource, ResourceId, Routine, RoutineId,
-    RoutineType, Rule, RuleId, Subnet, TransparentProxy, TransportProtocolMatcher,
+    ChangeCommitError, CommitError, Controller, ControllerId, Domain, Event, InstalledIpRoutine,
+    InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace, NamespaceId, NatHook,
+    PortMatcher, PushChangesError, Resource, ResourceId, Routine, RoutineId, RoutineType, Rule,
+    RuleId, Subnet, TransparentProxy, TransportProtocolMatcher,
 };
+use fidl_fuchsia_net_interfaces_ext::PortClass;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
@@ -31,10 +32,7 @@ use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
 use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
-use {
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_filter as fnet_filter,
-};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter};
 
 trait TestValue {
     fn test_value() -> Self;
@@ -1800,15 +1798,11 @@ async fn invalid_matcher_for_hook(
             id: rule_id.clone(),
             matchers: match interface_matcher {
                 WhichInterface::In => Matchers {
-                    in_interface: Some(InterfaceMatcher::DeviceClass(DeviceClass::Device(
-                        fhardware_network::PortClass::Wlan,
-                    ))),
+                    in_interface: Some(InterfaceMatcher::PortClass(PortClass::Wlan)),
                     ..Default::default()
                 },
                 WhichInterface::Out => Matchers {
-                    out_interface: Some(InterfaceMatcher::DeviceClass(DeviceClass::Device(
-                        fhardware_network::PortClass::Wlan,
-                    ))),
+                    out_interface: Some(InterfaceMatcher::PortClass(PortClass::Wlan)),
                     ..Default::default()
                 },
             },
