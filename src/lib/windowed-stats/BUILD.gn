@@ -23,6 +23,7 @@ rustc_library("windowed-stats") {
   sources = [
     "src/aggregations.rs",
     "src/experimental/mod.rs",
+    "src/experimental/vec1.rs",
     "src/lib.rs",
   ]
 }
