@@ -5,6 +5,7 @@
 use anyhow::{format_err, Context as _, Error};
 use async_helpers::maybe_stream::MaybeStream;
 use battery_client::{BatteryClient, BatteryInfo, BatteryLevel};
+use fasync::TimeoutExt;
 use fidl::endpoints;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_bluetooth::types::PeerId;
@@ -12,6 +13,7 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_zircon::Duration;
 use futures::{select, StreamExt};
 use std::fmt::Debug;
 use tracing::{debug, info, trace};
@@ -19,6 +21,10 @@ use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
     fidl_fuchsia_media_sessions2 as sessions2, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
+
+// Typically, AVRCP peer responds to requests within 0.2s.
+// We wait for ~2x longer to give ample time for peer to respond.
+const INITIAL_AVRCP_RESPONSE_WAIT_TIME: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, ValidFidlTable, PartialEq)]
 #[fidl_table_src(sessions2::PlayerStatus)]
@@ -191,10 +197,21 @@ impl AvrcpRelay {
 
         // Get the initial Media Attributes and status
         let mut building = staged_info.as_mut().unwrap();
-        // TODO(https://fxbug.dev/42119160): sometimes these initially fail with "Protocol Error".  Avoid exiting the
-        // relay for now.
-        let _ = update_attributes(&controller, &mut building, &mut last_player_status).await;
-        let _ = update_status(&controller, &mut last_player_status).await;
+        // TODO(https://fxbug.dev/42119160): sometimes these initially fail
+        // with "Protocol Error" or because we don't get any response from
+        // the peer.  Avoid exiting the relay for now.
+        if let Err(e) = update_attributes(&controller, &mut building, &mut last_player_status)
+            .on_timeout(INITIAL_AVRCP_RESPONSE_WAIT_TIME, || Err(Error::msg("timed out")))
+            .await
+        {
+            info!(%e, %peer_id, "Failed to update initial attributes");
+        }
+        if let Err(e) = update_status(&controller, &mut last_player_status)
+            .on_timeout(INITIAL_AVRCP_RESPONSE_WAIT_TIME, || Err(Error::msg("timed out")))
+            .await
+        {
+            info!(%e, %peer_id, "Failed to update initial play status");
+        }
         building.player_status = Some(last_player_status.clone().into());
         self.update_player_status_inspect(&last_player_status);
         self.battery_watcher_active.set(battery_client.is_some());
@@ -456,6 +473,7 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_power_battery as fpower;
+    use fuchsia_async::DurationExt;
     use fuchsia_inspect_derive::WithInspect;
     use futures::task::Poll;
     use futures::Future;
@@ -541,9 +559,9 @@ mod tests {
     }
 
     #[track_caller]
-    fn finish_relay_setup(
+    fn setup_avrcp(
         mut relay_fut: &mut Pin<&mut impl Future>,
-        mut exec: &mut fasync::TestExecutor,
+        exec: &mut fasync::TestExecutor,
         avrcp_request_stream: avrcp::PeerManagerRequestStream,
     ) -> (avrcp::ControllerRequestStream, avrcp::BrowseControllerRequestStream) {
         let mut avrcp_request_stream = pin!(avrcp_request_stream);
@@ -589,6 +607,18 @@ mod tests {
 
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
 
+        (controller_request_stream, browse_controller_request_stream)
+    }
+
+    #[track_caller]
+    fn finish_relay_setup(
+        mut relay_fut: &mut Pin<&mut impl Future>,
+        mut exec: &mut fasync::TestExecutor,
+        avrcp_request_stream: avrcp::PeerManagerRequestStream,
+    ) -> (avrcp::ControllerRequestStream, avrcp::BrowseControllerRequestStream) {
+        let (mut controller_request_stream, browse_controller_request_stream) =
+            setup_avrcp(relay_fut, exec, avrcp_request_stream);
+
         expect_media_attributes_request(&mut exec, &mut controller_request_stream);
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
 
@@ -600,6 +630,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
         expect_play_status_request(&mut exec, &mut controller_request_stream);
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
+
         // At this point, the relay is set up and should be waiting for requests from
         // player_client, and sending commands / getting notifications from avrcp.
         (controller_request_stream, browse_controller_request_stream)
@@ -607,6 +638,64 @@ mod tests {
 
     fn run_to_stalled(exec: &mut fasync::TestExecutor) {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+    }
+
+    /// Test that the relay is set up even when the peer does not respond to initial AVRCP
+    /// requests for media attributes and play status.
+    #[fuchsia::test]
+    fn test_finish_relay_setup_hanging_avrcp_requests() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(7000));
+
+        let (player_client, avrcp_requests, relay_fut) = setup_media_relay();
+
+        let mut relay_fut = pin!(relay_fut);
+
+        assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
+
+        let (mut controller_request_stream, _browse_controller_request_stream) =
+            setup_avrcp(&mut relay_fut, &mut exec, avrcp_requests);
+
+        // We should have sent an initial get media attributes request to the peer.
+        let _request = exec
+            .run_until_stalled(&mut controller_request_stream.next())
+            .expect("should be ready")
+            .expect("should be some")
+            .expect("should be ok");
+
+        // Imitate peer ignoring our request.
+        // Advance time past the max amount of time we would wait for a response back.
+        exec.set_fake_time(
+            (INITIAL_AVRCP_RESPONSE_WAIT_TIME + Duration::from_micros(10)).after_now(),
+        );
+        let _ = exec.wake_expired_timers();
+        assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
+
+        // We should have sent an initial get status request to the peer.
+        let _request = exec
+            .run_until_stalled(&mut controller_request_stream.next())
+            .expect("should be ready")
+            .expect("should be some")
+            .expect("should be ok");
+
+        // Imitate peer ignoring our request.
+        // Advance time past the max amount of time we would wait for a response back.
+        exec.set_fake_time(
+            (INITIAL_AVRCP_RESPONSE_WAIT_TIME + Duration::from_micros(10)).after_now(),
+        );
+        let _ = exec.wake_expired_timers();
+        assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
+
+        // Even when the initial AVRCP requests were not answered by the peer, we should
+        // be able to publish the media session.
+        // We should have sent an initial get play status request to the peer.
+        let player_info_fut = pin!(player_client.watch_info_change());
+        let (res, _relay_fut) = run_while(&mut exec, relay_fut, player_info_fut);
+        let player = res.expect("should have published a player");
+        assert_eq!(
+            player.player_status.expect("default status should exist").player_state,
+            Some(sessions2::PlayerState::Idle)
+        );
     }
 
     /// Test that the relay sets up the connection to AVRCP and Sessions and stops on the stop
