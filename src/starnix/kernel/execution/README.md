@@ -97,9 +97,9 @@ The shared portion of the address space is shared between all Linux thread group
 container. This allows Starnix to access information about any thread group in the container when handling
 a system call or exception.
 
-## Execution flow (x86_64)
+## Execution flow (aarch64 and x86_64)
 
-The execution flow structure used on x86_64 is as follows:
+The execution flow structure used on aarch64 and x86_64 is as follows:
 
 - Starnix sets up the initial restricted mode state
 - Starnix calls an assembly routine restricted_enter_loop providing a callback and context
@@ -123,5 +123,5 @@ The execution flow structure used on x86_64 is as follows:
     return.
 - restricted_enter_loop returns once the task is ready to unwind
 
-Other architectures (aarch64 / riscv64) use a loop in Rust instead of assembly.
-TODO(https://fxbug.dev/297897817): Migrate these architectures to match the above structure.
+On riscv64 the loop is implemented in Rust instead of assembly.
+TODO(https://fxbug.dev/297897817): Migrate all architectures to match the above structure.
