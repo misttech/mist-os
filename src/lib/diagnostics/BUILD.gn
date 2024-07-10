@@ -21,6 +21,7 @@ group("tests") {
     "//src/lib/diagnostics/hierarchy:tests",
     "//src/lib/diagnostics/inspect:tests",
     "//src/lib/diagnostics/log:tests",
+    "//src/lib/diagnostics/python:tests",
     "//src/lib/diagnostics/reader:tests",
     "//src/lib/diagnostics/selectors:tests",
     "//src/lib/diagnostics/testing:tests",
