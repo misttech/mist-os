@@ -38,10 +38,11 @@ A component that uses Vulkan must have these FIDL services routed to it:
 - `fuchsia.vulkan.loader.Loader`
 - `fuchsia.tracing.provider.Registry`
 - `fuchsia.logger.LogSink`
-- `fuchsia.media.ProfileProvider` - optional, but strongly recommended; this should only be left out
+- `fuchsia.scheduler.RoleManager` - optional, but strongly recommended; this should only be left out
 if there are security concerns about the use of deadline threads in the Vulkan ICD. If not
 specified, the Vulkan ICD will use default thread priorities for internal threads, which may cause
 suboptimal performance.  Not included in `vulkan/client.shard.cml`, so it must be `use`d manually.
+- `fuchsia.media.ProfileProvider` - deprecated; replaced by `fuchsia.scheduler.RoleManager`.
 
 Test components can receive these capabilities by being executed in a
 [non-hermetic realm](/docs/development/testing/components/test_runner_framework.md#non-hermetic_tests):
