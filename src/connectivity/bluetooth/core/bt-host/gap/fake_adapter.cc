@@ -83,6 +83,9 @@ void FakeAdapter::FakeLowEnergy::Connect(
     LowEnergyConnectionOptions connection_options) {
   connections_[peer_id] = Connection{peer_id, connection_options};
 
+  auto accept_cis_cb = [](iso::CigCisIdentifier, iso::CisEstablishedCallback) {
+    return iso::AcceptCisStatus::kSuccess;
+  };
   auto bondable_cb = [connection_options]() {
     return connection_options.bondable_mode;
   };
@@ -94,6 +97,7 @@ void FakeAdapter::FakeLowEnergy::Connect(
       peer_id,
       /*handle=*/1,
       /*release_cb=*/[](auto) {},
+      std::move(accept_cis_cb),
       std::move(bondable_cb),
       std::move(security_cb),
       std::move(role_cb));

@@ -68,8 +68,42 @@ void LowEnergyConnectionServer::AcceptCis(
   }
   auto stream_server = std::make_unique<IsoStreamServer>(std::move(*connection_stream),
                                                          [id, this]() { iso_streams_.erase(id); });
+  auto weak_stream_server = stream_server->GetWeakPtr();
   iso_streams_[id] = std::move(stream_server);
-  bt_log(INFO, "fidl", "waiting for incoming CIS connection (CIG: %u, CIS: %u)", cig_id, cis_id);
+
+  bt::iso::AcceptCisStatus result = conn_->AcceptCis(
+      id, [weak_stream_server](
+              pw::bluetooth::emboss::StatusCode status,
+              std::optional<bt::iso::IsoStream::WeakPtr> weak_stream_ptr,
+              const std::optional<bt::iso::CisEstablishedParameters>& connection_params) {
+        if (weak_stream_server.is_alive()) {
+          if (status == pw::bluetooth::emboss::StatusCode::SUCCESS) {
+            BT_ASSERT(weak_stream_ptr.has_value());
+            BT_ASSERT(connection_params.has_value());
+            weak_stream_server->OnStreamEstablished(*weak_stream_ptr, *connection_params);
+          } else {
+            weak_stream_server->OnStreamEstablishmentFailed(status);
+          }
+        }
+      });
+
+  switch (result) {
+    case bt::iso::AcceptCisStatus::kSuccess:
+      bt_log(INFO, "fidl", "waiting for incoming CIS connection (CIG: %u, CIS: %u)", cig_id,
+             cis_id);
+      return;
+    case bt::iso::AcceptCisStatus::kNotPeripheral:
+      bt_log(WARN, "fidl", "attempt to wait for incoming CIS on Central not allowed");
+      iso_streams_[id]->Close(ZX_ERR_NOT_SUPPORTED);
+      return;
+    case bt::iso::AcceptCisStatus::kAlreadyExists:
+      bt_log(WARN, "fidl", "redundant request to wait for incoming CIS (CIG: %u, CIS: %u)", cig_id,
+             cis_id);
+      iso_streams_[id]->Close(ZX_ERR_INVALID_ARGS);
+      return;
+    default:
+      BT_PANIC("Invalid AcceptCisStatus value %d", static_cast<int>(result));
+  }
 }
 
 void LowEnergyConnectionServer::GetCodecLocalDelayRange(
