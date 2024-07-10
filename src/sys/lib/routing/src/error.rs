@@ -294,6 +294,11 @@ pub enum RoutingError {
         the source component instance likely isn't defined in the component declaration"
     )]
     SourceCapabilityIsVoid,
+
+    #[error(
+        "routes that do not set the `debug` flag are unsupported in the current configuration."
+    )]
+    NonDebugRoutesUnsupported,
 }
 
 impl Explain for RoutingError {
@@ -339,6 +344,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockNotCloneable { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
+            | RoutingError::NonDebugRoutesUnsupported
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
             RoutingError::MonikerError(_) => zx::Status::INTERNAL,
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
