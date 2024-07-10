@@ -95,6 +95,34 @@
             protocol: "fuchsia.fxfs.BlobReader",
             availability: "optional",
         },
+        {
+            // TODO(https://fxbug.dev/331302451) Use this config value instead of the presence of file
+            // data/pkgfs_disable_executability_restrictions in the system_image package to determine
+            // whether executability should be enforced.
+            //
+            // If true, then all package directories will be executable. Otherwise, only base packages
+            // will be executable.
+            config: "fuchsia.pkgcache.AllPackagesExecutable",
+            key: "all_packages_executable",
+            type: "bool",
+        },
+        {
+            // If true, then pkg-cache will use the fuchsia.fxfs.BlobCreator capability from its
+            // environment to write blobs and the BlobReader to read and execute blobs.
+            // Otherwise, pkg-cache will use the /blob directory to read and write blobs.
+            config: "fuchsia.pkgcache.UseFxblob",
+            key: "use_fxblob",
+            type: "bool",
+        },
+        {
+            // If true, pkg-cache will load the system_image package and use the settings contained
+            // therein.
+            // This is true except on some configurations that do not have a system_image package, such
+            // as recovery.
+            config: "fuchsia.pkgcache.UseSystemImage",
+            key: "use_system_image",
+            type: "bool",
+        },
     ],
     expose: [
         {
@@ -123,24 +151,4 @@
             from: "self",
         },
     ],
-    config: {
-        // TODO(https://fxbug.dev/331302451) Use this config value instead of the presence of file
-        // data/pkgfs_disable_executability_restrictions in the system_image package to determine
-        // whether executability should be enforced.
-        //
-        // If true, then all package directories will be executable. Otherwise, only base packages
-        // will be executable.
-        all_packages_executable: { type: "bool" },
-
-        // If true, then pkg-cache will use the fuchsia.fxfs.BlobCreator capability from its
-        // environment to write blobs and the BlobReader to read and execute blobs.
-        // Otherwise, pkg-cache will use the /blob directory to read and write blobs.
-        use_fxblob: { type: "bool" },
-
-        // If true, pkg-cache will load the system_image package and use the settings contained
-        // therein.
-        // This is true except on some configurations that do not have a system_image package, such
-        // as recovery.
-        use_system_image: { type: "bool" },
-    },
 }

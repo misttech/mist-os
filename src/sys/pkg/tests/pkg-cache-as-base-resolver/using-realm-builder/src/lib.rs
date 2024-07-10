@@ -77,6 +77,20 @@ impl TestEnvBuilder {
             .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
             .await
             .unwrap();
+        let pkg_cache_config = builder
+            .add_child("pkg_cache_config", "#meta/pkg-cache-config.cm", ChildOptions::new())
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.pkgcache.AllPackagesExecutable"))
+                    .capability(Capability::configuration("fuchsia.pkgcache.UseSystemImage"))
+                    .from(&pkg_cache_config)
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
 
         let local_mocks = builder
             .add_local_child(
@@ -112,7 +126,13 @@ impl TestEnvBuilder {
         builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
         match BLOB_IMPLEMENTATION {
             blobfs_ramdisk::Implementation::Fxblob => {
-                builder.set_config_value(&pkg_cache, "use_fxblob", true.into()).await.unwrap();
+                builder
+                    .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                        name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
+                        value: true.into(),
+                    }))
+                    .await
+                    .unwrap();
 
                 let svc_dir = vfs::remote::remote_dir(blobfs.svc_dir().unwrap().unwrap());
                 let service_reflector = builder
@@ -167,9 +187,24 @@ impl TestEnvBuilder {
                     .unwrap();
             }
             blobfs_ramdisk::Implementation::CppBlobfs => {
-                builder.set_config_value(&pkg_cache, "use_fxblob", false.into()).await.unwrap();
+                builder
+                    .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                        name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
+                        value: false.into(),
+                    }))
+                    .await
+                    .unwrap();
             }
         }
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
+                    .from(Ref::self_())
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
 
         builder
             .add_route(

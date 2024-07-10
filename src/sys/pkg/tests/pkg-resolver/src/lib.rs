@@ -651,21 +651,44 @@ where
 
         // Unconditionally overwrite `use_fxblob` because the value in the production config is
         // outside of SWD control.
-        let () = builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
-        let () = builder
-            .set_config_value(
-                &pkg_cache,
-                "use_fxblob",
-                matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob).into(),
+        let pkg_cache_config = builder
+            .add_child("pkg_cache_config", "#meta/pkg-cache-config.cm", ChildOptions::new())
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.pkgcache.AllPackagesExecutable"))
+                    .from(&pkg_cache_config)
+                    .to(&pkg_cache),
             )
             .await
             .unwrap();
-        if system_image.is_none() {
-            let () = builder
-                .set_config_value(&pkg_cache, "use_system_image", false.into())
-                .await
-                .unwrap();
-        }
+
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
+                value: matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob).into(),
+            }))
+            .await
+            .unwrap();
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.pkgcache.UseSystemImage".parse().unwrap(),
+                value: system_image.is_some().into(),
+            }))
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
+                    .capability(Capability::configuration("fuchsia.pkgcache.UseSystemImage"))
+                    .from(Ref::self_())
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
 
         builder
             .add_route(

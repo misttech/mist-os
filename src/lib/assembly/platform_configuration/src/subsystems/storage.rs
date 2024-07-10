@@ -152,12 +152,19 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             }
         }
         // Inform pkg-cache when fxfs_blob should be used.
-        builder
-            .package("pkg-cache")
-            .component("meta/pkg-cache.cm")?
-            .field("all_packages_executable", context.build_type == &BuildType::Eng)?
-            .field("use_fxblob", fxfs_blob)?
-            .field("use_system_image", true)?;
+        builder.set_config_capability(
+            "fuchsia.pkgcache.AllPackagesExecutable",
+            Config::new(ConfigValueType::Bool, (context.build_type == &BuildType::Eng).into()),
+        )?;
+
+        builder.set_config_capability(
+            "fuchsia.pkgcache.UseFxblob",
+            Config::new(ConfigValueType::Bool, fxfs_blob.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.pkgcache.UseSystemImage",
+            Config::new(ConfigValueType::Bool, true.into()),
+        )?;
 
         let configs = [
             ("fuchsia.fshost.Blobfs", Config::new_bool(true)),

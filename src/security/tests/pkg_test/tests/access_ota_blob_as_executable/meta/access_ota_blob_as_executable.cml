@@ -69,6 +69,10 @@
             url: "#meta/pkg-cache.cm",
         },
         {
+            name: "pkg-cache-config",
+            url: "#meta/pkg-cache-config.cm",
+        },
+        {
             name: "pkg-resolver",
             url: "#meta/pkg-resolver.cm",
         },
@@ -141,6 +145,15 @@
         },
     ],
     offer: [
+        {
+            from: "#pkg-cache-config",
+            to: "#pkg-cache",
+            config: [
+                "fuchsia.pkgcache.AllPackagesExecutable",
+                "fuchsia.pkgcache.UseFxblob",
+                "fuchsia.pkgcache.UseSystemImage",
+            ],
+        },
         {
             from: "#fshost_config",
             to: "#fshost",
@@ -315,6 +328,7 @@
                 "#fshost",
                 "#paver",
                 "#pkg-cache",
+                "#pkg-cache-config",
                 "#pkg-resolver",
                 "#pkg_server",
                 "#system-updater",

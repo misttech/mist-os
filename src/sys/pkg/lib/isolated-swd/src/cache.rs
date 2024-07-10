@@ -90,6 +90,23 @@ pub(crate) mod for_tests {
                 .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
                 .await
                 .unwrap();
+            let pkg_cache_config = realm_builder
+                .add_child("pkg_cache_config", "#meta/pkg-cache-config.cm", ChildOptions::new())
+                .await
+                .unwrap();
+            realm_builder
+                .add_route(
+                    Route::new()
+                        .capability(Capability::configuration(
+                            "fuchsia.pkgcache.AllPackagesExecutable",
+                        ))
+                        .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
+                        .capability(Capability::configuration("fuchsia.pkgcache.UseSystemImage"))
+                        .from(&pkg_cache_config)
+                        .to(&pkg_cache),
+                )
+                .await
+                .unwrap();
             let system_update_committer = realm_builder
                 .add_child(
                     "system-update-committer",
