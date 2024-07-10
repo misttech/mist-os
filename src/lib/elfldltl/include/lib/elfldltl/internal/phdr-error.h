@@ -5,6 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_PHDR_ERROR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_PHDR_ERROR_H_
 
+#include <type_traits>
+
 #include "../constants.h"
 #include "const-string.h"
 
@@ -13,7 +15,10 @@ namespace elfldltl::internal {
 // This is specialized below to provide constexpr-substitutable name strings.
 template <ElfPhdrType Type>
 inline constexpr auto kPhdrTypeName = []() {
-  static_assert(Type != Type, "missing specialization");
+  // This has to be something template-dependent so it only fails when
+  // instantiated, and nontrivial enough to avoid tautological test sorts of
+  // warnings that are generated for e.g. `Type != Type`.
+  static_assert(std::is_void_v<ConstString<static_cast<size_t>(Type)>>, "missing specialization");
   return internal::ConstString("");
 }();
 

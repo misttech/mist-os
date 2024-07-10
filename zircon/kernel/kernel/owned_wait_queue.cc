@@ -537,7 +537,11 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
     DEBUG_ASSERT(added_ipv != nullptr);
     DEBUG_ASSERT(lost_ipv != nullptr);
   } else {
-    static_assert(OpType != OpType, "Unrecognized propagation operation");
+    // This has to be something template-dependent so it only fails when
+    // instantiated and not ignored by the `if constexpr` logic, and nontrivial
+    // enough to avoid tautological test sorts of warnings that are generated
+    // for e.g. `OpType != OpType`.
+    static_assert(ktl::is_void_v<PropagateOpTag<OpType>>, "Unrecognized propagation operation");
   }
 
   // When we have finally finished updating everything, make sure to update
