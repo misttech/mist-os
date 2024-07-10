@@ -147,6 +147,12 @@ pub fn parse_policy_by_reference<'a>(
     Ok(Unvalidated(parsed_policy))
 }
 
+/// Information on a Class. This struct is used for sharing Class information outside this crate.
+pub struct ClassInfo<'a> {
+    pub class_name: &'a [u8],
+    pub class_id: u32,
+}
+
 #[derive(Debug)]
 pub struct Policy<PS: ParseStrategy>(PolicyIndex<PS>);
 
@@ -168,6 +174,19 @@ impl<PS: ParseStrategy> Policy<PS> {
             .conditional_booleans()
             .iter()
             .map(|boolean| (PS::deref_slice(&boolean.data), PS::deref(&boolean.metadata).active()))
+            .collect()
+    }
+
+    /// The set of class names and their respective class identifiers.
+    pub fn classes<'a>(&'a self) -> Vec<ClassInfo<'a>> {
+        self.0
+            .parsed_policy()
+            .classes()
+            .iter()
+            .map(|class| ClassInfo {
+                class_name: class.name_bytes(),
+                class_id: class.id().0.into(),
+            })
             .collect()
     }
 

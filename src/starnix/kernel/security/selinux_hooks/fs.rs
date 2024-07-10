@@ -27,7 +27,6 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 const SELINUX_PERMS: &[&str] = &["add", "find", "read", "set"];
@@ -64,7 +63,12 @@ impl SeLinuxFs {
 
         // Read-only files & directories, exposing SELinux internal state.
         dir.entry(current_task, "checkreqprot", SeCheckReqProt::new_node(), mode!(IFREG, 0o644));
-        dir.entry(current_task, "class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
+        dir.entry(
+            current_task,
+            "class",
+            SeLinuxClassDirectory::new(security_server.clone()),
+            mode!(IFDIR, 0o555),
+        );
         dir.entry(
             current_task,
             "deny_unknown",
@@ -544,18 +548,19 @@ impl BytesFileOps for SeLinuxCommitBooleans {
 }
 
 struct SeLinuxClassDirectory {
-    entries: Mutex<BTreeMap<FsString, FsNodeHandle>>,
+    security_server: Arc<SecurityServer>,
 }
 
 impl SeLinuxClassDirectory {
-    fn new() -> Arc<Self> {
-        Arc::new(Self { entries: Mutex::new(BTreeMap::new()) })
+    fn new(security_server: Arc<SecurityServer>) -> Arc<Self> {
+        Arc::new(Self { security_server })
     }
 }
 
 impl FsNodeOps for Arc<SeLinuxClassDirectory> {
     fs_node_impl_dir_readonly!();
 
+    /// Returns the set of classes under the "class" directory.
     fn create_file_ops(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
@@ -564,13 +569,14 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(
-            self.entries
-                .lock()
+            self.security_server
+                .class_names()
+                .map_err(|_| errno!(ENOENT))?
                 .iter()
-                .map(|(name, node)| VecDirectoryEntry {
+                .map(|class_name| VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
-                    name: name.clone(),
-                    inode: Some(node.node_id),
+                    name: class_name.clone().into(),
+                    inode: None,
                 })
                 .collect(),
         ))
@@ -582,25 +588,23 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut entries = self.entries.lock();
-        let next_index = entries.len() + 1;
-        Ok(entries
-            .entry(name.to_owned())
-            .or_insert_with(|| {
-                let index = format!("{next_index}\n").into_bytes();
-                let fs = node.fs();
-                let mut dir = StaticDirectoryBuilder::new(&fs);
-                dir.entry(current_task, "index", BytesFile::new_node(index), mode!(IFREG, 0o444));
-                dir.subdir(current_task, "perms", 0o555, |perms| {
-                    for (i, perm) in SELINUX_PERMS.iter().enumerate() {
-                        let node = BytesFile::new_node(format!("{}\n", i + 1).into_bytes());
-                        perms.entry(current_task, perm, node, mode!(IFREG, 0o444));
-                    }
-                });
-                dir.set_mode(mode!(IFDIR, 0o555));
-                dir.build(current_task)
-            })
-            .clone())
+        let fs = node.fs();
+        let mut dir = StaticDirectoryBuilder::new(&fs);
+        dir.set_mode(mode!(IFDIR, 0o555));
+        let id =
+            self.security_server.class_id_by_name(&name.to_string()).map_err(|_| errno!(EINVAL))?;
+        let index_bytes = format!("{}", id).into_bytes();
+        dir.entry(current_task, "index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
+        // TODO(329440571): Get the correct permission for the class and any others listed in CommonSymbol.
+        if self.security_server.is_fake() {
+            dir.subdir(current_task, "perms", 0o555, |perms| {
+                for (i, perm) in SELINUX_PERMS.iter().enumerate() {
+                    let node = BytesFile::new_node(format!("{}", i + 1).into_bytes());
+                    perms.entry(current_task, perm, node, mode!(IFREG, 0o444));
+                }
+            });
+        }
+        Ok(dir.build(current_task).clone())
     }
 }
 
