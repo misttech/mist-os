@@ -138,7 +138,7 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
 
         if (std::find(controllers.begin(), controllers.end(), gpio_node->id()) ==
             controllers.end()) {
-          result = AddInitNodeSpec(node);
+          result = AddInitNodeSpec(node, gpio_node->id());
           if (result.is_error()) {
             return result.take_error();
           }
@@ -172,10 +172,14 @@ zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint
   return zx::ok();
 }
 
-zx::result<> GpioImplVisitor::AddInitNodeSpec(fdf_devicetree::Node& child) {
+zx::result<> GpioImplVisitor::AddInitNodeSpec(fdf_devicetree::Node& child, uint32_t controller_id) {
   auto gpio_init_node = fuchsia_driver_framework::ParentSpec{{
-      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                             bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                      bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+              fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, controller_id),
+          },
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
