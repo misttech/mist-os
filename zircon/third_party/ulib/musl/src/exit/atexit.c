@@ -68,7 +68,7 @@ int __cxa_atexit(void (*func)(void*), void* arg, void* dso) {
 
   /* If the current function list is full, add a new one */
   if (slot == COUNT) {
-    struct fl* new_fl = calloc(sizeof(struct fl), 1);
+    struct fl* new_fl = calloc(1, sizeof(struct fl));
     if (!new_fl) {
       mtx_unlock(&lock);
       return -1;
