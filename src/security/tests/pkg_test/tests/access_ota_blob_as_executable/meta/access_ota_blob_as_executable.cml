@@ -87,6 +87,10 @@
             url: "#meta/fshost.cm",
             startup: "eager",
         },
+        {
+            name: "fshost_config",
+            url: "#meta/fshost_config.cm",
+        },
     ],
     capabilities: [
         {
@@ -137,6 +141,36 @@
         },
     ],
     offer: [
+        {
+            from: "#fshost_config",
+            to: "#fshost",
+            config: [
+                "fuchsia.fshost.Blobfs",
+                "fuchsia.fshost.BlobfsInitialInodes",
+                "fuchsia.fshost.BlobfsMaxBytes",
+                "fuchsia.fshost.BlobfsUseDeprecatedPaddedFormat",
+                "fuchsia.fshost.BootPart",
+                "fuchsia.fshost.CheckFilesystems",
+                "fuchsia.fshost.Data",
+                "fuchsia.fshost.DataFilesystemFormat",
+                "fuchsia.fshost.DataMaxBytes",
+                "fuchsia.fshost.DisableBlockWatcher",
+                "fuchsia.fshost.Factory",
+                "fuchsia.fshost.FormatDataOnCorruption",
+                "fuchsia.fshost.Fvm",
+                "fuchsia.fshost.FvmSliceSize",
+                "fuchsia.fshost.FxfsBlob",
+                "fuchsia.fshost.FxfsCryptUrl",
+                "fuchsia.fshost.Gpt",
+                "fuchsia.fshost.GptAll",
+                "fuchsia.fshost.Mbr",
+                "fuchsia.fshost.Nand",
+                "fuchsia.fshost.Netboot",
+                "fuchsia.fshost.NoZxcrypt",
+                "fuchsia.fshost.RamdiskImage",
+                "fuchsia.fshost.UseDiskMigration",
+            ],
+        },
         {
             directory: "blob-exec",
             from: "#fshost",

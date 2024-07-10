@@ -39,6 +39,16 @@ impl Config {
         Config { type_, value }
     }
 
+    /// Create a new boolean configuration capability.
+    pub fn new_bool(value: bool) -> Self {
+        Config::new(ConfigValueType::Bool, value.into())
+    }
+
+    /// Create a new uint64 configuration capability.
+    pub fn new_uint64(value: u64) -> Self {
+        Config::new(ConfigValueType::Uint64, value.into())
+    }
+
     /// Create a new configuration capability whose source is "void". This is for any optional
     /// config capabilities that should be absent.
     pub fn new_void() -> Self {

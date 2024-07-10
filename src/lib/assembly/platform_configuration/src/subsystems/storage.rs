@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_component_id_index::ComponentIdIndexBuilder;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_images_config::{
     BlobfsLayout, DataFilesystemFormat, DataFvmVolumeConfig, FvmVolumeConfig, VolumeConfig,
@@ -150,7 +151,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 }
             }
         }
-
         // Inform pkg-cache when fxfs_blob should be used.
         builder
             .package("pkg-cache")
@@ -159,34 +159,50 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             .field("use_fxblob", fxfs_blob)?
             .field("use_system_image", true)?;
 
-        let mut fshost_config_builder = builder.package("fshost").component("meta/fshost.cm")?;
-        fshost_config_builder
-            .field("blobfs", true)?
-            .field("blobfs_max_bytes", blobfs_max_bytes)?
-            .field("bootpart", true)?
-            .field("check_filesystems", true)?
-            .field("data", has_data)?
-            .field("data_max_bytes", data_max_bytes)?
-            .field("disable_block_watcher", false)?
-            .field("factory", false)?
-            .field("fvm", true)?
-            .field("ramdisk_image", ramdisk_image)?
-            .field("gpt", true)?
-            .field("gpt_all", gpt_all)?
-            .field("mbr", false)?
-            .field("netboot", false)?
-            .field("no_zxcrypt", no_zxcrypt)?
-            .field("format_data_on_corruption", format_data_on_corruption)?
-            .field("blobfs_initial_inodes", blobfs_initial_inodes)?
-            .field("blobfs_use_deprecated_padded_format", blob_deprecated_padded)?
-            .field("use_disk_migration", use_disk_migration)?
-            .field("nand", nand)?
-            .field("fxfs_blob", fxfs_blob)?
-            .field("fxfs_crypt_url", "fuchsia-boot:///fxfs-crypt#meta/fxfs-crypt.cm")?
-            .field("fvm_slice_size", fvm_slice_size)?;
-
-        fshost_config_builder.field("data_filesystem_format", data_filesystem_format_str)?;
-
+        let configs = [
+            ("fuchsia.fshost.Blobfs", Config::new_bool(true)),
+            ("fuchsia.fshost.BlobfsMaxBytes", Config::new_uint64(blobfs_max_bytes)),
+            ("fuchsia.fshost.BootPart", Config::new_bool(true)),
+            ("fuchsia.fshost.CheckFilesystems", Config::new_bool(true)),
+            ("fuchsia.fshost.Data", Config::new_bool(has_data)),
+            ("fuchsia.fshost.DataMaxBytes", Config::new_uint64(data_max_bytes)),
+            ("fuchsia.fshost.DisableBlockWatcher", Config::new_bool(false)),
+            ("fuchsia.fshost.Factory", Config::new_bool(false)),
+            ("fuchsia.fshost.Fvm", Config::new_bool(true)),
+            ("fuchsia.fshost.RamdiskImage", Config::new_bool(ramdisk_image)),
+            ("fuchsia.fshost.Gpt", Config::new_bool(true)),
+            ("fuchsia.fshost.GptAll", Config::new_bool(gpt_all)),
+            ("fuchsia.fshost.Mbr", Config::new_bool(false)),
+            ("fuchsia.fshost.Netboot", Config::new_bool(false)),
+            ("fuchsia.fshost.NoZxcrypt", Config::new_bool(no_zxcrypt)),
+            ("fuchsia.fshost.FormatDataOnCorruption", Config::new_bool(format_data_on_corruption)),
+            ("fuchsia.fshost.BlobfsInitialInodes", Config::new_uint64(blobfs_initial_inodes)),
+            (
+                "fuchsia.fshost.BlobfsUseDeprecatedPaddedFormat",
+                Config::new_bool(blob_deprecated_padded),
+            ),
+            ("fuchsia.fshost.UseDiskMigration", Config::new_bool(use_disk_migration)),
+            ("fuchsia.fshost.Nand", Config::new_bool(nand)),
+            ("fuchsia.fshost.FxfsBlob", Config::new_bool(fxfs_blob)),
+            ("fuchsia.fshost.FvmSliceSize", Config::new_uint64(fvm_slice_size)),
+            (
+                "fuchsia.fshost.DataFilesystemFormat",
+                Config::new(
+                    ConfigValueType::String { max_size: 64 },
+                    data_filesystem_format_str.into(),
+                ),
+            ),
+            (
+                "fuchsia.fshost.FxfsCryptUrl",
+                Config::new(
+                    ConfigValueType::String { max_size: 64 },
+                    "fuchsia-boot:///fxfs-crypt#meta/fxfs-crypt.cm".into(),
+                ),
+            ),
+        ];
+        for config in configs {
+            builder.set_config_capability(config.0, config.1)?;
+        }
         Ok(())
     }
 }

@@ -34,9 +34,43 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   // Setup Fshost.
   if (args->disable_block_watcher) {
     realm_builder.AddChild("fshost", "#meta/test-fshost-no-watcher.cm");
+    realm_builder.AddChild("fshost_config", "#meta/test-fshost-no-watcher_config.cm");
   } else {
     realm_builder.AddChild("fshost", "#meta/test-fshost.cm");
+    realm_builder.AddChild("fshost_config", "#meta/test-fshost_config.cm");
   }
+  realm_builder.AddRoute(Route{
+      .capabilities =
+          {
+              Config{"fuchsia.fshost.Blobfs"},
+              Config{"fuchsia.fshost.BlobfsInitialInodes"},
+              Config{"fuchsia.fshost.BlobfsMaxBytes"},
+              Config{"fuchsia.fshost.BlobfsUseDeprecatedPaddedFormat"},
+              Config{"fuchsia.fshost.BootPart"},
+              Config{"fuchsia.fshost.CheckFilesystems"},
+              Config{"fuchsia.fshost.Data"},
+              Config{"fuchsia.fshost.DataFilesystemFormat"},
+              Config{"fuchsia.fshost.DataMaxBytes"},
+              Config{"fuchsia.fshost.DisableBlockWatcher"},
+              Config{"fuchsia.fshost.Factory"},
+              Config{"fuchsia.fshost.FormatDataOnCorruption"},
+              Config{"fuchsia.fshost.Fvm"},
+              Config{"fuchsia.fshost.FvmSliceSize"},
+              Config{"fuchsia.fshost.FxfsBlob"},
+              Config{"fuchsia.fshost.Gpt"},
+              Config{"fuchsia.fshost.GptAll"},
+              Config{"fuchsia.fshost.Mbr"},
+              Config{"fuchsia.fshost.Nand"},
+              Config{"fuchsia.fshost.Netboot"},
+              Config{"fuchsia.fshost.NoZxcrypt"},
+              Config{"fuchsia.fshost.RamdiskImage"},
+              Config{"fuchsia.fshost.UseDiskMigration"},
+              Config{"fuchsia.fshost.FxfsCryptUrl"},
+          },
+      .source = {ChildRef{"fshost_config"}},
+      .targets = {ChildRef{"fshost"}},
+  });
+
   realm_builder.AddRoute(Route{
       .capabilities = {Protocol{"fuchsia.process.Launcher"}},
       .source = {ParentRef()},

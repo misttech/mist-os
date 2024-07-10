@@ -71,7 +71,7 @@ impl FshostBuilder {
         self
     }
 
-    pub(crate) async fn build(self, realm_builder: &RealmBuilder) -> ChildRef {
+    pub(crate) async fn build(mut self, realm_builder: &RealmBuilder) -> ChildRef {
         let fshost_url = format!("#meta/{}.cm", self.component_name);
         tracing::info!(%fshost_url, "building test fshost instance");
         let fshost = realm_builder
@@ -79,16 +79,77 @@ impl FshostBuilder {
             .await
             .unwrap();
 
-        realm_builder.init_mutable_config_from_package(&fshost).await.unwrap();
+        // This is a map from config keys to configuration capability names.
+        let mut map = HashMap::from([
+            ("no_zxcrypt", "fuchsia.fshost.NoZxcrypt"),
+            ("ramdisk_image", "fuchsia.fshost.RamdiskImage"),
+            ("gpt_all", "fuchsia.fshost.GptAll"),
+            ("check_filesystems", "fuchsia.fshost.CheckFilesystems"),
+            ("blobfs_max_bytes", "fuchsia.fshost.BlobfsMaxBytes"),
+            ("data_max_bytes", "fuchsia.fshost.DataMaxBytes"),
+            ("format_data_on_corruption", "fuchsia.fshost.FormatDataOnCorruption"),
+            ("data_filesystem_format", "fuchsia.fshost.DataFilesystemFormat"),
+            ("nand", "fuchsia.fshost.Nand"),
+            ("blobfs", "fuchsia.fshost.Blobfs"),
+            ("bootpart", "fuchsia.fshost.BootPart"),
+            ("factory", "fuchsia.fshost.Factory"),
+            ("fvm", "fuchsia.fshost.Fvm"),
+            ("gpt", "fuchsia.fshost.Gpt"),
+            ("mbr", "fuchsia.fshost.Mbr"),
+            ("data", "fuchsia.fshost.Data"),
+            ("netboot", "fuchsia.fshost.Netboot"),
+            ("use_disk_migration", "fuchsia.fshost.UseDiskMigration"),
+            ("disable_block_watcher", "fuchsia.fshost.DisableBlockWatcher"),
+            ("fvm_slice_size", "fuchsia.fshost.FvmSliceSize"),
+            ("blobfs_initial_inodes", "fuchsia.fshost.BlobfsInitialInodes"),
+            (
+                "blobfs_use_deprecated_padded_format",
+                "fuchsia.fshost.BlobfsUseDeprecatedPaddedFormat",
+            ),
+            ("fxfs_blob", "fuchsia.fshost.FxfsBlob"),
+            ("fxfs_crypt_url", "fuchsia.fshost.FxfsCryptUrl"),
+        ]);
 
-        // fshost config overrides
+        // Add the overrides as capabilities and route them.
+        self.config_values.insert("fxfs_crypt_url", "#meta/fxfs-crypt.cm".into_value_spec());
         for (key, value) in self.config_values {
-            realm_builder.set_config_value(&fshost, key, value.value).await.unwrap()
+            let cap_name = map[key];
+            realm_builder
+                .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                    name: cap_name.parse().unwrap(),
+                    value: value.value,
+                }))
+                .await
+                .unwrap();
+            realm_builder
+                .add_route(
+                    Route::new()
+                        .capability(Capability::configuration(cap_name))
+                        .from(Ref::self_())
+                        .to(&fshost),
+                )
+                .await
+                .unwrap();
+            map.remove(key);
         }
-        realm_builder
-            .set_config_value(&fshost, "fxfs_crypt_url", "#meta/fxfs-crypt.cm".into())
+
+        // Add the remaining keys from the config component.
+        let fshost_config_url = format!("#meta/{}_config.cm", self.component_name);
+        let fshost_config = realm_builder
+            .add_child("test-fshost-config", fshost_config_url, ChildOptions::new().eager())
             .await
             .unwrap();
+        for (_, value) in map.iter() {
+            realm_builder
+                .add_route(
+                    Route::new()
+                        .capability(Capability::configuration(*value))
+                        .from(&fshost_config)
+                        .to(&fshost),
+                )
+                .await
+                .unwrap();
+        }
 
         realm_builder
             .add_route(
