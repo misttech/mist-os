@@ -20,7 +20,7 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
-use fuchsia_zircon::HandleBased;
+use fuchsia_zircon::{HandleBased, Status};
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
@@ -1388,6 +1388,17 @@ impl FileOps for RemoteDirectoryObject {
         Ok(())
     }
 
+    fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
+        self.zxio.sync().map_err(|status| match status {
+            Status::NO_RESOURCES | Status::NO_MEMORY | Status::NO_SPACE => errno!(ENOSPC),
+            Status::INVALID_ARGS | Status::NOT_FILE => errno!(EINVAL),
+            Status::BAD_HANDLE => errno!(EBADFD),
+            Status::NOT_SUPPORTED => errno!(ENOTSUP),
+            Status::INTERRUPTED_RETRY => errno!(EINTR),
+            _ => errno!(EIO),
+        })
+    }
+
     fn to_handle(
         &self,
         _locked: &mut Locked<'_, FileOpsToHandle>,
@@ -1496,6 +1507,17 @@ impl FileOps for RemoteFileObject {
             .and_then(Zxio::release)
             .map(Some)
             .map_err(|status| from_status_like_fdio!(status))
+    }
+
+    fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
+        self.zxio.sync().map_err(|status| match status {
+            Status::NO_RESOURCES | Status::NO_MEMORY | Status::NO_SPACE => errno!(ENOSPC),
+            Status::INVALID_ARGS | Status::NOT_FILE => errno!(EINVAL),
+            Status::BAD_HANDLE => errno!(EBADFD),
+            Status::NOT_SUPPORTED => errno!(ENOTSUP),
+            Status::INTERRUPTED_RETRY => errno!(EINTR),
+            _ => errno!(EIO),
+        })
     }
 
     fn ioctl(
