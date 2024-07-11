@@ -95,12 +95,7 @@ class DirectoryConnection final : public Connection,
              Open2Completer::Sync& completer) final;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   void Open3(fuchsia_io::wire::Directory2Open3Request* request,
-             Open3Completer::Sync& completer) final {
-    if (request->object.is_valid()) {
-      fidl::ServerEnd<fuchsia_io::Node> server_end{std::move(request->object)};
-      server_end.Close(ZX_ERR_NOT_SUPPORTED);
-    }
-  }
+             Open3Completer::Sync& completer) final;
 #endif
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
   void CreateSymlink(fuchsia_io::wire::Directory2CreateSymlinkRequest* request,

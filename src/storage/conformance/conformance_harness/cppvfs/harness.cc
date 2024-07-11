@@ -54,7 +54,7 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
-    config.supports_open3(false);
+    config.supports_open3(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
     // TODO(https://fxbug.dev/324112857): Support append mode when adding open3 support.

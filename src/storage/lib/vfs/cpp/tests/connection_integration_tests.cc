@@ -527,6 +527,40 @@ TEST_F(ConnectionTest, NegotiateProtocolOpen2) {
   }
 }
 
+TEST_F(ConnectionTest, NegotiateProtocolOpen3) {
+  // Create connection to vfs
+  auto root = fidl::Endpoints<fio::Directory>::Create();
+  ASSERT_OK(ConnectClient(std::move(root.server)));
+
+  {
+    // Connect to polymorphic node as a directory.
+    zx::result dc = fidl::CreateEndpoints<fio::Node>();
+    ASSERT_OK(dc.status_value());
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open3(fidl::StringView("file_or_dir"),
+                          fio::Flags::kProtocolDirectory | fio::Flags::kFlagSendRepresentation, {},
+                          dc->server.TakeChannel())
+                  .status());
+    zx::result<fio::Representation> dir_info = GetOnRepresentation(dc->client);
+    ASSERT_OK(dir_info);
+    ASSERT_EQ(dir_info->Which(), fio::Representation::Tag::kDirectory);
+  }
+
+  {
+    // Connect to polymorphic node as a file.
+    zx::result fc = fidl::CreateEndpoints<fio::Node>();
+    ASSERT_OK(fc.status_value());
+    ASSERT_OK(fidl::WireCall(root.client)
+                  ->Open3(fidl::StringView("file_or_dir"),
+                          fio::Flags::kProtocolFile | fio::Flags::kFlagSendRepresentation, {},
+                          fc->server.TakeChannel())
+                  .status());
+    zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
+    ASSERT_OK(file_info);
+    ASSERT_EQ(file_info->Which(), fio::Representation::Tag::kFile);
+  }
+}
+
 TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
   // Create connection to vfs
   auto root = fidl::Endpoints<fio::Directory>::Create();

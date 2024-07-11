@@ -103,6 +103,27 @@ zx::result<CreationType> GetCreationType(const fio::wire::NodeProtocols& protoco
   return zx::ok(*type);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+constexpr zx::result<CreationType> GetCreationType(fio::Flags flags) {
+  // It's an error to specify no protocol or more than one protocol when trying to create an object.
+  // We also disallow the node protocol as that is ambiguous.
+  flags &= (fio::kMaskKnownProtocols & ~fio::Flags::kProtocolNode);
+  const uint64_t flags_raw = static_cast<uint64_t>(flags);
+  // Check that the flags is non-zero and that they are a power of 2 (e.g. a single unique protocol
+  // is set).
+  if (flags_raw == 0 || (flags_raw & (flags_raw - 1)) != 0) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  if (flags & fio::Flags::kProtocolDirectory) {
+    return zx::ok(CreationType::kDirectory);
+  }
+  if (flags & fio::Flags::kProtocolFile) {
+    return zx::ok(CreationType::kFile);
+  }
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+#endif
+
 }  // namespace
 
 Vfs::Vfs() = default;
@@ -339,6 +360,116 @@ zx::result<Vfs::Open2Result> Vfs::Open2(fbl::RefPtr<Vnode> vndir, std::string_vi
   }
   return opened_node;
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_view path,
+                                        fuchsia_io::Flags flags,
+                                        const fuchsia_io::wire::Options* options,
+                                        fuchsia_io::Rights connection_rights)
+    __TA_EXCLUDES(vfs_lock_) {
+  FS_PRETTY_TRACE_DEBUG("Vfs::Open3: path: '", path, "', flags: ", flags, ", options: ", *options,
+                        ", rights: ", connection_rights);
+
+  const bool should_truncate = static_cast<bool>(flags & fio::Flags::kFileTruncate);
+  if (should_truncate && !(connection_rights & fio::Rights::kWriteBytes)) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  std::lock_guard lock(vfs_lock_);
+  // Traverse directory tree until last component, updating |vndir| and |path| in-place.
+  if (zx_status_t status = Traverse(vndir, path); status != ZX_OK) {
+    return zx::error(status);
+  }
+  if (vndir->IsRemote()) {
+    // If we encountered a remote filesystem, forward the remainder of the request there.
+    return Open2Result::Remote(std::move(vndir), path);
+  }
+  // |Traverse()| should guarantee |path| is only a single and valid component.
+  ZX_DEBUG_ASSERT(!path.empty() && path.find('/') == std::string_view::npos && path != "..");
+
+  // Try to open or create the object at |path| inside |vndir|.
+  fbl::RefPtr<Vnode> vn;
+  bool vn_is_open;
+  {
+    const CreationMode mode = internal::CreationModeFromFidl(flags);
+    std::optional<CreationType> type;
+    if (mode != CreationMode::kNever) {
+      zx::result result = GetCreationType(flags);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      type = *result;
+    }
+    const fio::wire::MutableNodeAttributes* creation_attributes =
+        options && options->has_create_attributes() ? &options->create_attributes() : nullptr;
+    // It's an error to specify create attributes when opening an existing object.
+    if (mode == CreationMode::kNever && creation_attributes) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    // *NOTE*: All filesystems which allow setting mutable attributes currently support the *same*
+    // set of attributes for all object types. Thus, we use the parent directory to verify that the
+    // request is valid.  This assumption is verified afterwards with a debug assert.
+    //
+    // If a filesystem supports different attributes for files vs. directories, for example, we will
+    // need to  support atomic creation of objects with attributes in the |Vnode| interface.
+    std::optional<VnodeAttributesUpdate> new_attrs;
+    if (creation_attributes) {
+      new_attrs = VnodeAttributesUpdate::FromIo2(*creation_attributes);
+      if (new_attrs->Query() - vndir->SupportedMutableAttributes()) {
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
+      }
+    }
+    // Create or lookup the Vnode.
+    zx::result result = CreateOrLookup(std::move(vndir), path, mode, type, connection_rights);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    std::tie(vn, vn_is_open) = *std::move(result);
+    // If we created a new Vnode, set any attributes specified with the request.
+    if (vn_is_open && new_attrs) {
+      ZX_DEBUG_ASSERT(!(new_attrs->Query() - vn->SupportedMutableAttributes()));
+      zx::result result = vn->UpdateAttributes(*new_attrs);
+      ZX_DEBUG_ASSERT_MSG(result.is_ok(), "Updating attributes on a new vnode should never fail!");
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+  }
+
+  if (vn->IsRemote()) {
+    // Opening a mount point: Traverse across remote.
+    return Open2Result::Remote(std::move(vn), ".");
+  }
+
+  if (ReadonlyLocked() && (connection_rights & fs::kAllMutableIo2Rights)) {
+    FS_PRETTY_TRACE_DEBUG("Vfs::Open3: Rights incompatible, filesystem is read-only.");
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
+  zx::result protocol = internal::NegotiateProtocol(flags, vn->GetProtocols());
+  if (protocol.is_error()) {
+    return protocol.take_error();
+  }
+
+  const fuchsia_io::Rights rights = internal::FlagsToRights(flags);
+  if (!vn->ValidateRights(rights)) {
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
+
+  // If the Vnode is already opened (e.g. it was just created) we can return early.
+  if (vn_is_open) {
+    return Open2Result::Local(std::move(vn), *protocol);
+  }
+
+  zx::result opened_node = Open2Result::OpenVnode(std::move(vn), *protocol);
+  // If we opened the node as a file, truncate it if required.
+  if (opened_node.is_ok() && opened_node->protocol() == VnodeProtocol::kFile && should_truncate) {
+    if (zx_status_t status = opened_node->vnode()->Truncate(0); status != ZX_OK) {
+      return zx::error(status);
+    }
+  }
+  return opened_node;
+}
+#endif
 
 zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool must_be_dir) {
   {

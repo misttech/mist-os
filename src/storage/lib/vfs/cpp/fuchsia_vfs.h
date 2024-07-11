@@ -174,6 +174,12 @@ class FuchsiaVfs : public Vfs {
                       zx::channel object_request,
                       const fuchsia_io::wire::ConnectionProtocols* protocols);
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  zx::result<> Serve3(Open2Result open_result, fuchsia_io::Rights rights,
+                      zx::channel& object_request, fuchsia_io::Flags flags,
+                      const fuchsia_io::wire::Options& options);
+#endif
+
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
   // be a directory.
   zx_status_t ServeDirectory(fbl::RefPtr<Vnode> vn,
