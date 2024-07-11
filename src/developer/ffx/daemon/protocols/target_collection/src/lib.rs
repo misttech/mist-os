@@ -271,11 +271,8 @@ impl TargetCollectionProtocol {
         let (update, filter) = match query {
             TargetInfoQuery::Addr(addr) => {
                 addrs = [addr];
-                let update = TargetUpdateBuilder::new()
-                    .net_addresses(&addrs)
-                    .transient_target()
-                    .discovered(TargetProtocol::Ssh, TargetTransport::Network)
-                    .enable();
+                let update =
+                    TargetUpdateBuilder::new().net_addresses(&addrs).transient_target().enable();
                 let filter = [TargetUpdateFilter::NetAddrs(&addrs)];
                 (update, filter)
             }
