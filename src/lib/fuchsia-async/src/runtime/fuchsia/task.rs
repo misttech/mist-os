@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::atomic_future::AtomicFuture;
 use crate::{EHandle, ScopeRef};
 use futures::prelude::*;
 use std::marker::PhantomData;
@@ -85,8 +86,7 @@ impl<T: Send + 'static> Task<T> {
         scope: ScopeRef,
         future: impl Future<Output = T> + Send + 'static,
     ) -> Task<T> {
-        let executor = EHandle::local();
-        let task_id = executor.spawn(&scope, future);
+        let task_id = scope.executor().spawn(&scope, AtomicFuture::new(future, false));
         Task { scope, task_id, phantom: PhantomData }
     }
 }

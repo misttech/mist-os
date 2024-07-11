@@ -70,7 +70,7 @@ fn make_threads_state(sleeping: u8, notified: u8) -> u16 {
     sleeping as u16 | ((notified as u16) << 8)
 }
 
-pub(super) struct Executor {
+pub(crate) struct Executor {
     pub(super) port: zx::Port,
     pub(super) done: AtomicBool,
     is_local: bool,
