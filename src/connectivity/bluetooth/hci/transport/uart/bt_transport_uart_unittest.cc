@@ -767,9 +767,11 @@ TEST_F(BtTransportUartHciTransportProtocolTest, AclReadableSignalIgnoredUntilFir
     std::vector<uint8_t> kAclPacket = {i};
 
     auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kAclPacket);
-    auto send_result =
-        hci_transport_client_.sync()->Send(fhbt::wire::SentPacket::WithAcl(arena, packet_view));
-    ASSERT_EQ(send_result.status(), ZX_OK);
+
+    hci_transport_client_->Send(fhbt::wire::SentPacket::WithAcl(arena, packet_view))
+        .Then([](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+          ASSERT_EQ(result.status(), ZX_OK);
+        });
   }
 
   // Wait until the first packet has been received by fake serial device.
@@ -1164,9 +1166,10 @@ TEST_F(BtTransportUartHciTransportProtocolTest,
   fidl::Arena arena;
   {
     auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kCmd0);
-    auto send_result =
-        hci_transport_client_.sync()->Send(fhbt::wire::SentPacket::WithCommand(arena, packet_view));
-    ASSERT_EQ(send_result.status(), ZX_OK);
+    hci_transport_client_->Send(fhbt::wire::SentPacket::WithCommand(arena, packet_view))
+        .Then([](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+          ASSERT_EQ(result.status(), ZX_OK);
+        });
   }
 
   const std::vector<uint8_t> kUartCmd1 = {
@@ -1177,9 +1180,10 @@ TEST_F(BtTransportUartHciTransportProtocolTest,
 
   {
     auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kCmd1);
-    auto send_result =
-        hci_transport_client_.sync()->Send(fhbt::wire::SentPacket::WithCommand(arena, packet_view));
-    ASSERT_EQ(send_result.status(), ZX_OK);
+    hci_transport_client_->Send(fhbt::wire::SentPacket::WithCommand(arena, packet_view))
+        .Then([](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+          ASSERT_EQ(result.status(), ZX_OK);
+        });
   }
 
   // Wait until the first packet is received.
@@ -1411,8 +1415,11 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ScoReadableSignalIgnoredUntilFir
   for (uint8_t i = 0; i < kNumPackets; i++) {
     std::vector<uint8_t> kScoPacket = {i};
     auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kScoPacket);
-    auto send_result = sco_client_.sync()->Send(packet_view);
-    ASSERT_EQ(send_result.status(), ZX_OK);
+
+    sco_client_->Send(packet_view)
+        .Then([](fidl::WireUnownedResult<fhbt::ScoConnection::Send>& result) {
+          ASSERT_EQ(result.status(), ZX_OK);
+        });
   }
 
   // Wait for the first packet to be received.

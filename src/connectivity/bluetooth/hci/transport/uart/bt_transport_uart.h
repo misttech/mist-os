@@ -42,7 +42,7 @@ enum BtHciPacketIndicator : uint8_t {
 
 class BtTransportUart;
 class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoConnection> {
-  using SendHandler = fit::function<void(std::vector<uint8_t>&)>;
+  using SendHandler = fit::function<void(std::vector<uint8_t>&, fit::function<void(void)>)>;
   using StopHandler = fit::function<void(void)>;
 
  public:
@@ -171,16 +171,18 @@ class BtTransportUart
 
   void ChannelCleanupLocked(zx::channel* channel) __TA_REQUIRES(mutex_);
 
-  void SendSnoop(std::vector<uint8_t>&& packet, fuchsia_hardware_bluetooth::SnoopPacket::Tag type,
+  void SendSnoop(const std::vector<uint8_t>&& packet,
+                 fuchsia_hardware_bluetooth::SnoopPacket::Tag type,
                  fuchsia_hardware_bluetooth::PacketDirection direction);
   void SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, size_t length) __TA_REQUIRES(mutex_);
 
   void HciBeginShutdown() __TA_EXCLUDES(mutex_);
 
-  void OnScoData(std::vector<uint8_t>& packet);
+  void OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> callback);
   void OnScoStop();
 
-  void SerialWriteTransport(const std::vector<uint8_t>& data);
+  void ProcessOnePacketFromSendQueue();
+  void SerialWriteTransport(const std::vector<uint8_t>& data, fit::function<void(void)> callback);
 
   void SerialWrite(uint8_t* buffer, size_t length) __TA_EXCLUDES(mutex_);
 
@@ -239,8 +241,7 @@ class BtTransportUart
   // 1 byte packet indicator + 2 byte header + payload
   static constexpr uint32_t kEventBufSize = 255 + 3;
 
-  fdf::Dispatcher serial_dispatcher_;
-  fdf::WireSharedClient<fuchsia_hardware_serialimpl::Device> serial_client_;
+  fdf::WireClient<fuchsia_hardware_serialimpl::Device> serial_client_;
 
   zx::channel cmd_channel_ __TA_GUARDED(mutex_);
   Wait cmd_channel_wait_ __TA_GUARDED(mutex_){this, &cmd_channel_};
@@ -290,19 +291,40 @@ class BtTransportUart
   // TODO(b/343259617): Remove it after HciTransport migration.
   uint8_t write_buffer_[fuchsia_hardware_bluetooth::kAclPacketMax] __TA_GUARDED(mutex_);
 
-  // This buffer is used for the write operation of ACL and command packets that are received from
-  // HciTransport protocol.
-  std::vector<uint8_t> hci_write_buffer_;
+  struct BufferEntry {
+    std::vector<uint8_t> data_;
+    fit::function<void(void)> callback_;
+
+    BufferEntry(std::vector<uint8_t>&& packet, fit::function<void(void)> callback) : data_(packet) {
+      callback_ = std::move(callback);
+    }
+  };
+
+  // The send queue shouldn't be infinitely long, set a reasonable limit for the queue, so that when
+  // the limit is hit, it could indicate something goes wrong.(e.g. serial bus stucks)
+  static constexpr uint32_t kSendQueueLimit = 20;
+
+  // The buffer pool to store incoming SCO, ACL and command packets.
+  std::queue<std::vector<uint8_t>> available_buffers_;
+
+  // Queuing the data packets before the bus is available to send. The data buffer comes from
+  // |available_buffers_|. The driver will reply the FIDL completer to notify the caller of
+  // "ScoConnection::Send" or "HciTransport::Send" after it takes out a packet from the queue and
+  // throws it into the bus, for each protocol, the client side shouldn't send more packets if there
+  // are 10 sent packets' completers are not replied.
+  std::queue<BufferEntry> send_queue_;
+
+  // The task to fetch and send one packet in |send_queue_|, each task posted aims to deal with one
+  // packet, if the bus is not available, the task will post itself again until one packet gets
+  // sent.
+  async::TaskClosureMethod<BtTransportUart, &BtTransportUart::ProcessOnePacketFromSendQueue>
+      send_queue_task_{this};
 
   // Save the serial device pid for vendor drivers to fetch.
   uint32_t serial_pid_ = 0;
 
-  // In the era of HciTransport, this mutex protects the state of |can_send_| and |snoop_client_|.
+  // We don't need this in the era of HciTransport.
   std::mutex mutex_;
-
-  // The condition variable for waiting the completion of bus write operation in Send() request
-  // handlers of HciTransport and ScoConnection protocols.
-  std::condition_variable send_cv_;
 
   std::optional<async::Loop> loop_;
   // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.

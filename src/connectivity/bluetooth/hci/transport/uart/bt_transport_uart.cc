@@ -24,15 +24,14 @@ ScoConnectionServer::ScoConnectionServer(SendHandler send_handler, StopHandler s
     : send_handler_(std::move(send_handler)), stop_handler_(std::move(stop_handler)) {
   // Pre-allocate the vector size to avoid resizing. Reserve the space for packet indicator by +1 on
   // the size.
-  write_buffer_.reserve(fuchsia_hardware_bluetooth::kScoPacketMax + 1);
+  write_buffer_.reserve(fhbt::kScoPacketMax + 1);
 }
 
 // fhbt::ScoConnection overrides.
 void ScoConnectionServer::Send(SendRequest& request, SendCompleter::Sync& completer) {
-  completer.Reply();
   write_buffer_.push_back(BtHciPacketIndicator::kHciSco);
   write_buffer_.insert(write_buffer_.end(), request.packet().begin(), request.packet().end());
-  send_handler_(write_buffer_);
+  send_handler_(write_buffer_, [completer = completer.ToAsync()]() mutable { completer.Reply(); });
   write_buffer_.clear();
 }
 
@@ -52,27 +51,22 @@ BtTransportUart::BtTransportUart(fuchsia_driver_framework::DriverStartArgs start
     : DriverBase("bt-transport-uart", std::move(start_args), std::move(driver_dispatcher)),
       dispatcher_(dispatcher()),
       node_(fidl::WireClient(std::move(node()), dispatcher())),
-      sco_connection_server_([this](std::vector<uint8_t>& packet) { OnScoData(packet); },
-                             [this] { OnScoStop(); }) {
+      sco_connection_server_(
+          [this](std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
+            OnScoData(packet, std::move(callback));
+          },
+          [this] { OnScoStop(); }) {
   // Pre-allocate the vector size to avoid resizing. Reserve the space for packet indicator by +1 on
   // the size.
-  hci_write_buffer_.reserve(fuchsia_hardware_bluetooth::kAclPacketMax + 1);
+  for (size_t i = 0; i < kSendQueueLimit; i++) {
+    std::vector<uint8_t> buffer;
+    buffer.reserve(fhbt::kAclPacketMax + 1);
+    available_buffers_.push(std::move(buffer));
+  }
 }
 
 zx::result<> BtTransportUart::Start() {
   FDF_LOG(DEBUG, "Start");
-
-  // Create a dispatcher to wait on the runtime channel
-  auto serial_dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "bt-transport-uart-serial-client",
-      [&](fdf_dispatcher_t*) {});
-
-  if (serial_dispatcher.is_error()) {
-    FDF_LOG(ERROR, "Creating serial dispatcher error : %s",
-            zx_status_get_string(serial_dispatcher.status_value()));
-    return zx::error(serial_dispatcher.status_value());
-  }
-  serial_dispatcher_ = *std::move(serial_dispatcher);
 
   zx::result<fdf::ClientEnd<fuchsia_hardware_serialimpl::Device>> client_end =
       incoming()->Connect<fuchsia_hardware_serialimpl::Service::Device>();
@@ -85,8 +79,8 @@ zx::result<> BtTransportUart::Start() {
   {
     std::lock_guard guard(mutex_);
 
-    serial_client_ = fdf::WireSharedClient<fuchsia_hardware_serialimpl::Device>(
-        std::move(client_end.value()), serial_dispatcher_.get());
+    serial_client_ = fdf::WireClient<fuchsia_hardware_serialimpl::Device>(
+        std::move(client_end.value()), driver_dispatcher()->get());
     if (!serial_client_.is_valid()) {
       FDF_LOG(ERROR, "fuchsia_hardware_serialimpl::Device Client is not valid");
       return zx::error(ZX_ERR_BAD_HANDLE);
@@ -183,7 +177,7 @@ zx::result<> BtTransportUart::Start() {
 
   node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
 
-  queue_read_task_.Post(serial_dispatcher_.async_dispatcher());
+  queue_read_task_.Post(dispatcher_);
   return zx::ok();
 }
 
@@ -272,7 +266,7 @@ void BtTransportUart::ChannelCleanupLocked(zx::channel* channel) {
   channel->reset();
 }
 
-void BtTransportUart::SendSnoop(std::vector<uint8_t>&& packet,
+void BtTransportUart::SendSnoop(const std::vector<uint8_t>&& packet,
                                 fuchsia_hardware_bluetooth::SnoopPacket::Tag type,
                                 fhbt::PacketDirection direction) {
   if (!snoop_client_.is_valid()) {
@@ -359,11 +353,19 @@ void BtTransportUart::HciBeginShutdown() {
   }
 }
 
-void BtTransportUart::OnScoData(std::vector<uint8_t>& packet) {
-  SerialWriteTransport(packet);
-  std::vector<uint8_t> snoop_packet(packet.begin() + 1, packet.end());
-  SendSnoop(std::move(snoop_packet), fhbt::SnoopPacket::Tag::kSco,
-            fhbt::PacketDirection::kHostToController);
+void BtTransportUart::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
+  if (available_buffers_.empty()) {
+    FDF_LOG(ERROR, "Send queue is full, closing SCO connection");
+    callback();
+    sco_connection_binding_.RemoveBindings(&sco_connection_server_);
+    return;
+  }
+
+  auto& buffer = available_buffers_.front();
+  buffer = std::move(packet);
+  send_queue_.emplace(std::move(buffer), std::move(callback));
+  available_buffers_.pop();
+  send_queue_task_.Post(dispatcher_);
 }
 
 void BtTransportUart::OnScoStop() {
@@ -398,18 +400,44 @@ void BtTransportUart::SerialWrite(uint8_t* buffer, size_t length) {
       });
 }
 
-void BtTransportUart::SerialWriteTransport(const std::vector<uint8_t>& data) {
-  // Block the caller function and Wait Until the bus is available, keep any additional packets
-  // queued in the FIDL channel before
-  // that. Before, the channel-based mechanism keeps invoking the wait handler until the bus is
-  // available, and the data stays in the channel before it gets processed, it's similar to the
-  // approach here.
-  // TODO(b/349616554): Remove the usage of condition variable when driver buffers the packets.
-  std::unique_lock locked(mutex_);
-  send_cv_.wait(locked, [this] { return can_send_; });
-  // It's re-locked when we get here
+void BtTransportUart::ProcessOnePacketFromSendQueue() {
+  if (!can_send_) {
+    return;
+  }
+  if (send_queue_.empty()) {
+    return;
+  }
+
+  auto& buffer_entry = send_queue_.front();
+  SerialWriteTransport(buffer_entry.data_, std::move(buffer_entry.callback_));
+
+  const std::vector<uint8_t> snoop_data(buffer_entry.data_.begin() + 1, buffer_entry.data_.end());
+
+  fhbt::SnoopPacket::Tag snoop_type = fhbt::SnoopPacket::Tag::kIso;
+  switch (buffer_entry.data_[0]) {
+    case BtHciPacketIndicator::kHciAclData:
+      snoop_type = fhbt::SnoopPacket::Tag::kAcl;
+      break;
+    case BtHciPacketIndicator::kHciCommand:
+      snoop_type = fhbt::SnoopPacket::Tag::kCommand;
+      break;
+    case BtHciPacketIndicator::kHciSco:
+      snoop_type = fhbt::SnoopPacket::Tag::kSco;
+      break;
+    default:
+      FDF_LOG(DEBUG, "Unsupported snoop sent packet type: %u", buffer_entry.data_[0]);
+      send_queue_.pop();
+      return;
+  }
+  SendSnoop(std::move(snoop_data), snoop_type, fhbt::PacketDirection::kHostToController);
+  buffer_entry.data_.clear();
+  available_buffers_.push(std::move(buffer_entry.data_));
+  send_queue_.pop();
+}
+
+void BtTransportUart::SerialWriteTransport(const std::vector<uint8_t>& data,
+                                           fit::function<void(void)> callback) {
   can_send_ = false;
-  locked.unlock();
 
   fdf::Arena arena('WRIT');
   auto data_view = fidl::VectorView<uint8_t>::FromExternal(const_cast<std::vector<uint8_t>&>(data));
@@ -429,6 +457,7 @@ void BtTransportUart::SerialWriteTransport(const std::vector<uint8_t>& data) {
         }
         HciTransportWriteComplete(ZX_OK);
       });
+  callback();
 }
 
 // Returns false if there's an error while sending the packet to the hardware or
@@ -649,7 +678,7 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
           });
     }
 
-    fhbt::SnoopPacket::Tag type;
+    fhbt::SnoopPacket::Tag type = fhbt::SnoopPacket::Tag::kIso;
     if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
       type = fhbt::SnoopPacket::Tag::kAcl;
     } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
@@ -661,12 +690,7 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
       FDF_LOG(ERROR, "Unsupported packet type for snoop.");
     }
 
-    libsync::Completion snoop;
-    async::PostTask(dispatcher(), [&, this]() mutable {
-      SendSnoop(std::move(fidl_vec), type, fhbt::PacketDirection::kControllerToHost);
-      snoop.Signal();
-    });
-    snoop.Wait();
+    SendSnoop(std::move(fidl_vec), type, fhbt::PacketDirection::kControllerToHost);
   }
 
   // reset buffer
@@ -684,7 +708,7 @@ void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer,
 
   if (status == ZX_OK) {
     HciHandleUartReadEvents(buffer, length);
-    queue_read_task_.Post(serial_dispatcher_.async_dispatcher());
+    queue_read_task_.Post(dispatcher_);
   } else {
     // There is not much we can do in the event of a UART read error.  Do not
     // queue a read job and start the process of shutting down.
@@ -743,12 +767,11 @@ void BtTransportUart::HciTransportWriteComplete(zx_status_t status) {
     return;
   }
 
-  {
-    std::lock_guard guard(mutex_);
-    ZX_DEBUG_ASSERT(!can_send_);
-    can_send_ = true;
-  }
-  send_cv_.notify_one();
+  ZX_DEBUG_ASSERT(!can_send_);
+  can_send_ = true;
+
+  // Resume processing the data in queue.
+  send_queue_task_.Post(dispatcher_);
 }
 
 void BtTransportUart::OnChannelSignal(Wait* wait, zx_status_t status,
@@ -861,13 +884,15 @@ void BtTransportUart::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hc
 // fhbt::HciTransport protocol overrides.
 void BtTransportUart::Send(fidl::Server<fhbt::HciTransport>::SendRequest& request,
                            fidl::Server<fhbt::HciTransport>::SendCompleter::Sync& completer) {
-  // The data has been taken out from the FIDL channel, reply the completer to notify the caller
-  // that the data has arrived the driver.
-  completer.Reply();
+  if (available_buffers_.empty()) {
+    FDF_LOG(ERROR, "Send queue is full, closing HciTransport connection");
+    completer.Reply();
+    hci_transport_binding_.RemoveBindings(this);
+    return;
+  }
 
+  auto& buffer = available_buffers_.front();
   const char* data_type_name = nullptr;
-  std::vector<uint8_t> snoop_data;
-  fhbt::SnoopPacket::Tag snoop_type = fhbt::SnoopPacket::Tag::kIso;
   // Figure out which data type we are dealing with and the constants which go
   // along with it.
   switch (request.Which()) {
@@ -876,19 +901,14 @@ void BtTransportUart::Send(fidl::Server<fhbt::HciTransport>::SendRequest& reques
       FDF_LOG(ERROR, "Unexpected ISO data packet.");
       return;
     case fhbt::SentPacket::Tag::kAcl:
-      hci_write_buffer_.push_back(kHciAclData);
-      hci_write_buffer_.insert(hci_write_buffer_.end(), request.acl().value().begin(),
-                               request.acl().value().end());
-      snoop_data = std::move(request.acl().value());
-      snoop_type = fhbt::SnoopPacket::Tag::kAcl;
+      buffer.push_back(kHciAclData);
+      buffer.insert(buffer.end(), request.acl().value().begin(), request.acl().value().end());
       data_type_name = "ACL";
       break;
     case fhbt::SentPacket::Tag::kCommand:
-      hci_write_buffer_.push_back(kHciCommand);
-      hci_write_buffer_.insert(hci_write_buffer_.end(), request.command().value().begin(),
-                               request.command().value().end());
-      snoop_data = std::move(request.command().value());
-      snoop_type = fhbt::SnoopPacket::Tag::kCommand;
+      buffer.push_back(kHciCommand);
+      buffer.insert(buffer.end(), request.command().value().begin(),
+                    request.command().value().end());
       data_type_name = "command";
       break;
     default:
@@ -897,9 +917,10 @@ void BtTransportUart::Send(fidl::Server<fhbt::HciTransport>::SendRequest& reques
 
   FDF_LOG(TRACE, "received data type: %s", data_type_name);
 
-  SerialWriteTransport(hci_write_buffer_);
-  hci_write_buffer_.clear();
-  SendSnoop(std::move(snoop_data), snoop_type, fhbt::PacketDirection::kHostToController);
+  send_queue_.emplace(std::move(buffer),
+                      [completer = completer.ToAsync()]() mutable { completer.Reply(); });
+  available_buffers_.pop();
+  send_queue_task_.Post(dispatcher_);
 }
 
 void BtTransportUart::AckReceive(
@@ -1009,11 +1030,7 @@ void BtTransportUart::QueueUartRead() {
                                                               fuchsia_hardware_serialimpl::Device::
                                                                   Read>& result) {
     if (!result.ok()) {
-      // |serial_client_| is being destructed during this FIDL call, it won't happen when everything
-      // is arraged on a single dispatcher.
-      if (result.status() != ZX_ERR_CANCELED) {
-        FDF_LOG(ERROR, "Read request failed with FIDL error %s", result.status_string());
-      }
+      FDF_LOG(ERROR, "Read request failed with FIDL error %s", result.status_string());
       HciReadComplete(result.status(), nullptr, 0);
       return;
     }
