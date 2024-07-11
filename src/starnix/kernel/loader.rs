@@ -169,7 +169,7 @@ fn elf_load_error_to_errno(err: elf_load::ElfLoadError) -> Errno {
 
 struct Mapper<'a> {
     file: &'a FileHandle,
-    mm: &'a MemoryManager,
+    mm: &'a Arc<MemoryManager>,
     file_write_guard: FileWriteGuardRef,
 }
 impl elf_load::Mapper for Mapper<'_> {
@@ -214,7 +214,7 @@ impl elf_load::Mapper for Mapper<'_> {
 fn load_elf(
     elf: FileHandle,
     elf_memory: Arc<MemoryObject>,
-    mm: &MemoryManager,
+    mm: &Arc<MemoryManager>,
     file_write_guard: FileWriteGuardRef,
 ) -> Result<LoadedElf, Errno> {
     let vmo = elf_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;

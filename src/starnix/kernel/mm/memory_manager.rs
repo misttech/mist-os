@@ -709,6 +709,7 @@ impl MemoryManagerState {
 
     fn map_memory(
         &mut self,
+        mm: &Arc<MemoryManager>,
         addr: DesiredAddress,
         memory: Arc<MemoryObject>,
         memory_offset: u64,
@@ -738,7 +739,7 @@ impl MemoryManagerState {
 
         if let DesiredAddress::FixedOverwrite(addr) = addr {
             assert_eq!(addr, mapped_addr);
-            self.update_after_unmap(addr, end - addr, released_mappings)?;
+            self.update_after_unmap(mm, addr, end - addr, released_mappings)?;
         }
 
         let mut mapping = Mapping::new(mapped_addr, memory, memory_offset, flags, file_write_guard);
@@ -755,6 +756,7 @@ impl MemoryManagerState {
     #[cfg(feature = "alternate_anon_allocs")]
     fn map_private_anonymous(
         &mut self,
+        mm: &Arc<MemoryManager>,
         addr: DesiredAddress,
         length: usize,
         prot_flags: ProtectionFlags,
@@ -788,7 +790,7 @@ impl MemoryManagerState {
         let end = (mapped_addr + length).round_up(*PAGE_SIZE)?;
         if let DesiredAddress::FixedOverwrite(addr) = addr {
             assert_eq!(addr, mapped_addr);
-            self.update_after_unmap(addr, end - addr, released_mappings)?;
+            self.update_after_unmap(mm, addr, end - addr, released_mappings)?;
         }
 
         let mapping = Mapping::new_private_anonymous(flags, name);
@@ -803,6 +805,7 @@ impl MemoryManagerState {
 
     fn map_anonymous(
         &mut self,
+        mm: &Arc<MemoryManager>,
         addr: DesiredAddress,
         length: usize,
         prot_flags: ProtectionFlags,
@@ -824,6 +827,7 @@ impl MemoryManagerState {
         let memory = create_anonymous_mapping_memory(length as u64)?;
         let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
         self.map_memory(
+            mm,
             addr,
             memory,
             0,
@@ -839,6 +843,7 @@ impl MemoryManagerState {
     fn remap(
         &mut self,
         _current_task: &CurrentTask,
+        mm: &Arc<MemoryManager>,
         old_addr: UserAddress,
         old_length: usize,
         new_length: usize,
@@ -893,7 +898,7 @@ impl MemoryManagerState {
             // We are not requested to remap to a specific address, so first we see if we can remap
             // in-place. In-place copies (old_length == 0) are not allowed.
             if let Some(new_addr) =
-                self.try_remap_in_place(old_addr, old_length, new_length, released_mappings)?
+                self.try_remap_in_place(mm, old_addr, old_length, new_length, released_mappings)?
             {
                 return Ok(new_addr);
             }
@@ -903,7 +908,7 @@ impl MemoryManagerState {
         if flags.contains(MremapFlags::MAYMOVE) {
             let dst_address =
                 if flags.contains(MremapFlags::FIXED) { Some(new_addr) } else { None };
-            self.remap_move(old_addr, old_length, dst_address, new_length, released_mappings)
+            self.remap_move(mm, old_addr, old_length, dst_address, new_length, released_mappings)
         } else {
             error!(ENOMEM)
         }
@@ -913,6 +918,7 @@ impl MemoryManagerState {
     /// successful. Returns `Ok(None)` if there was no space to grow.
     fn try_remap_in_place(
         &mut self,
+        mm: &Arc<MemoryManager>,
         old_addr: UserAddress,
         old_length: usize,
         new_length: usize,
@@ -926,7 +932,7 @@ impl MemoryManagerState {
             // Shrink the mapping in-place, which should always succeed.
             // This is done by unmapping the extraneous region.
             if new_length != old_length {
-                self.unmap(new_range_in_place.end, old_length - new_length, released_mappings)?;
+                self.unmap(mm, new_range_in_place.end, old_length - new_length, released_mappings)?;
             }
             return Ok(Some(old_addr));
         }
@@ -975,6 +981,7 @@ impl MemoryManagerState {
 
                 // Re-map the original range, which may include pages before the requested range.
                 Ok(Some(self.map_memory(
+                    mm,
                     DesiredAddress::FixedOverwrite(original_range.start),
                     backing.memory,
                     backing.memory_offset,
@@ -1012,6 +1019,7 @@ impl MemoryManagerState {
     /// Grows or shrinks the mapping while moving it to a new destination.
     fn remap_move(
         &mut self,
+        mm: &Arc<MemoryManager>,
         src_addr: UserAddress,
         src_length: usize,
         dst_addr: Option<UserAddress>,
@@ -1034,7 +1042,7 @@ impl MemoryManagerState {
         // the source range in place. This must be done now and visible to processes, even if
         // a later failure causes the remap operation to fail.
         if src_length != 0 && src_length > dst_length {
-            self.unmap(src_addr + dst_length, src_length - dst_length, released_mappings)?;
+            self.unmap(mm, src_addr + dst_length, src_length - dst_length, released_mappings)?;
         }
 
         let dst_addr_for_map = match dst_addr {
@@ -1049,7 +1057,7 @@ impl MemoryManagerState {
 
                 // The destination range must be unmapped. This must be done now and visible to
                 // processes, even if a later failure causes the remap operation to fail.
-                self.unmap(dst_addr, dst_length, released_mappings)?;
+                self.unmap(mm, dst_addr, dst_length, released_mappings)?;
 
                 DesiredAddress::Fixed(dst_addr)
             }
@@ -1144,7 +1152,7 @@ impl MemoryManagerState {
                 );
 
                 if dst_addr != src_addr && src_length != 0 {
-                    self.unmap(src_addr, src_length, released_mappings)?;
+                    self.unmap(mm, src_addr, src_length, released_mappings)?;
                 }
 
                 return Ok(dst_addr);
@@ -1152,6 +1160,7 @@ impl MemoryManagerState {
         };
 
         let new_address = self.map_memory(
+            mm,
             dst_addr_for_map,
             memory,
             dst_memory_offset,
@@ -1166,7 +1175,7 @@ impl MemoryManagerState {
         if src_length != 0 {
             // Only unmap the source range if this is not a copy. It was checked earlier that
             // this mapping is MAP_SHARED.
-            self.unmap(src_addr, src_length, released_mappings)?;
+            self.unmap(mm, src_addr, src_length, released_mappings)?;
         }
 
         Ok(new_address)
@@ -1201,6 +1210,7 @@ impl MemoryManagerState {
     /// Unmaps the specified range. Unmapped mappings are placed in `released_mappings`.
     fn unmap(
         &mut self,
+        mm: &Arc<MemoryManager>,
         addr: UserAddress,
         length: usize,
         released_mappings: &mut Vec<Mapping>,
@@ -1228,7 +1238,7 @@ impl MemoryManagerState {
             }
         };
 
-        self.update_after_unmap(addr, length, released_mappings)?;
+        self.update_after_unmap(mm, addr, length, released_mappings)?;
 
         Ok(())
     }
@@ -1253,6 +1263,7 @@ impl MemoryManagerState {
     // Unmapped mappings are placed in `released_mappings`.
     fn update_after_unmap(
         &mut self,
+        _mm: &Arc<MemoryManager>,
         addr: UserAddress,
         length: usize,
         released_mappings: &mut Vec<Mapping>,
@@ -2644,7 +2655,7 @@ impl MemoryManager {
     }
 
     pub fn set_brk(
-        &self,
+        self: &Arc<Self>,
         current_task: &CurrentTask,
         addr: UserAddress,
     ) -> Result<UserAddress, Errno> {
@@ -2743,7 +2754,7 @@ impl MemoryManager {
 
                 // Remove `mappings` in the released range, and zero any pages that were mapped
                 // anonymously.
-                if state.update_after_unmap(new_end, delta, &mut released_mappings).is_err() {
+                if state.update_after_unmap(self, new_end, delta, &mut released_mappings).is_err() {
                     // Things are in an inconsistent state. Good luck, userspace.
                     return Ok(brk.current);
                 }
@@ -2759,7 +2770,14 @@ impl MemoryManager {
 
                 // TODO(b/310255065): Call `map_anonymous()` directly once
                 // `alternate_anon_allocs` is always on.
-                if !Self::extend_brk(&mut state, old_end, delta, brk.base, &mut released_mappings) {
+                if !Self::extend_brk(
+                    &mut state,
+                    self,
+                    old_end,
+                    delta,
+                    brk.base,
+                    &mut released_mappings,
+                ) {
                     return Ok(brk.current);
                 }
             }
@@ -2775,6 +2793,7 @@ impl MemoryManager {
 
     fn extend_brk(
         state: &mut MemoryManagerState,
+        mm: &Arc<MemoryManager>,
         old_end: UserAddress,
         delta: usize,
         brk_base: UserAddress,
@@ -2796,6 +2815,7 @@ impl MemoryManager {
                 let old_length = range.end - range.start;
                 return state
                     .try_remap_in_place(
+                        mm,
                         range_start,
                         old_length,
                         old_length + delta,
@@ -2814,6 +2834,7 @@ impl MemoryManager {
         // Otherwise, allocating fresh anonymous pages is good-enough.
         state
             .map_anonymous(
+                mm,
                 DesiredAddress::FixedOverwrite(old_end),
                 delta,
                 ProtectionFlags::READ | ProtectionFlags::WRITE,
@@ -2827,7 +2848,7 @@ impl MemoryManager {
     pub fn snapshot_to<L>(
         &self,
         locked: &mut Locked<'_, L>,
-        target: &MemoryManager,
+        target: &Arc<MemoryManager>,
     ) -> Result<(), Errno>
     where
         L: LockBefore<MmDumpable>,
@@ -2966,6 +2987,7 @@ impl MemoryManager {
 
                     let mut released_mappings = vec![];
                     target_state.map_memory(
+                        target,
                         DesiredAddress::Fixed(range.start),
                         target_memory,
                         memory_offset,
@@ -3052,7 +3074,7 @@ impl MemoryManager {
     }
 
     pub fn map_memory(
-        &self,
+        self: &Arc<Self>,
         addr: DesiredAddress,
         memory: Arc<MemoryObject>,
         memory_offset: u64,
@@ -3068,6 +3090,7 @@ impl MemoryManager {
         let mut released_mappings = vec![];
         let mut state = self.state.write();
         let result = state.map_memory(
+            self,
             addr,
             memory,
             memory_offset,
@@ -3089,7 +3112,7 @@ impl MemoryManager {
     }
 
     pub fn map_anonymous(
-        &self,
+        self: &Arc<Self>,
         addr: DesiredAddress,
         length: usize,
         prot_flags: ProtectionFlags,
@@ -3098,8 +3121,15 @@ impl MemoryManager {
     ) -> Result<UserAddress, Errno> {
         let mut released_mappings = vec![];
         let mut state = self.state.write();
-        let result =
-            state.map_anonymous(addr, length, prot_flags, options, name, &mut released_mappings);
+        let result = state.map_anonymous(
+            self,
+            addr,
+            length,
+            prot_flags,
+            options,
+            name,
+            &mut released_mappings,
+        );
 
         // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
         // in `DirEntry`'s `drop`.
@@ -3110,7 +3140,7 @@ impl MemoryManager {
     }
 
     pub fn remap(
-        &self,
+        self: &Arc<Self>,
         current_task: &CurrentTask,
         addr: UserAddress,
         old_length: usize,
@@ -3122,6 +3152,7 @@ impl MemoryManager {
         let mut state = self.state.write();
         let result = state.remap(
             current_task,
+            self,
             addr,
             old_length,
             new_length,
@@ -3138,10 +3169,10 @@ impl MemoryManager {
         result
     }
 
-    pub fn unmap(&self, addr: UserAddress, length: usize) -> Result<(), Errno> {
+    pub fn unmap(self: &Arc<Self>, addr: UserAddress, length: usize) -> Result<(), Errno> {
         let mut released_mappings = vec![];
         let mut state = self.state.write();
-        let result = state.unmap(addr, length, &mut released_mappings);
+        let result = state.unmap(self, addr, length, &mut released_mappings);
 
         // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
         // in `DirEntry`'s `drop`.
@@ -4309,7 +4340,7 @@ mod tests {
 
         let mut released_mappings = vec![];
         let unmap_result =
-            mm.state.write().unmap(addr, *PAGE_SIZE as usize, &mut released_mappings);
+            mm.state.write().unmap(mm, addr, *PAGE_SIZE as usize, &mut released_mappings);
         assert!(unmap_result.is_ok());
         assert_eq!(released_mappings.len(), 1);
     }
@@ -4324,7 +4355,7 @@ mod tests {
 
         let mut released_mappings = vec![];
         let unmap_result =
-            mm.state.write().unmap(addr, (*PAGE_SIZE * 3) as usize, &mut released_mappings);
+            mm.state.write().unmap(mm, addr, (*PAGE_SIZE * 3) as usize, &mut released_mappings);
         assert!(unmap_result.is_ok());
         assert_eq!(released_mappings.len(), 2);
     }
