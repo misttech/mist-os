@@ -6,6 +6,7 @@ from .lib import *
 
 __all__ = [
     "InspectData",
+    "InspectDataCollection",
     "InspectDataError",
     "InspectMetadata",
     "InspectMetadataError",
