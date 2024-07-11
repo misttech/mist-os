@@ -17,7 +17,7 @@ import stat
 import subprocess
 import sys
 
-from typing import Any, Dict, List, Optional, Set, TypeAlias
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
 # Directory where to find Starlark input files.
 _STARLARK_DIR = os.path.join(os.path.dirname(__file__), "..", "starlark")
@@ -481,14 +481,14 @@ class BazelLabelMapper(object):
                 else:
                     # No version, get rid of initial @@
                     file_prefix = file_prefix[1:]
-            else:
-                hash_file = os.path.join(
-                    self._root_workspace,
-                    "fuchsia_build_generated",
-                    file_prefix + ".hash",
-                )
-                if not os.path.exists(hash_file):
-                    hash_file = ""
+
+            hash_file = os.path.join(
+                self._root_workspace,
+                "fuchsia_build_generated",
+                file_prefix + ".hash",
+            )
+            if not os.path.exists(hash_file):
+                hash_file = ""
 
             self._repository_hash_map[repository_name] = hash_file
 
@@ -733,6 +733,88 @@ def label_requires_content_hash(label: str) -> bool:
     return not label.startswith(_BAZEL_NO_CONTENT_HASH_REPOSITORIES)
 
 
+def list_to_pairs(l: Iterable[Any]) -> Iterable[Tuple[Any, Any]]:
+    is_first = True
+    for val in l:
+        if is_first:
+            last_val = val
+            is_first = False
+        else:
+            yield (last_val, val)
+            is_first = True
+
+
+@dataclasses.dataclass
+class FileOutputs:
+    bazel_path: str
+    ninja_path: str
+
+
+class FileOutputsAction(argparse.Action):
+    """ArgumentParser action class to convert --file-outputs arguments into FileOutputs instances."""
+
+    def __init__(  # type: ignore
+        self, option_strings, dest, nargs=None, default=None, **kwargs
+    ):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        if default is not None:
+            raise ValueError("default not allowed")
+        super().__init__(option_strings, dest, nargs="+", default=[], **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string):  # type: ignore
+        if len(values) < 2:
+            raise ValueError(
+                f"expected at least 2 arguments for {option_string}"
+            )
+        if len(values) & 1 != 0:
+            raise ValueError(
+                f"expected an even number of arguments for {option_string}"
+            )
+        dest_list = getattr(namespace, self.dest, [])
+        dest_list.extend(
+            [
+                FileOutputs(bazel_path, ninja_path)
+                for bazel_path, ninja_path in list_to_pairs(values)
+            ]
+        )
+        setattr(namespace, self.dest, dest_list)
+
+
+@dataclasses.dataclass
+class DirectoryOutputs:
+    bazel_path: str
+    ninja_path: str
+    tracked_files: List[str] = dataclasses.field(default_factory=list)
+
+
+class DirectoryOutputsAction(argparse.Action):
+    """ArgumentParser action class to convert --directory-outputs arguments into DirectoryOutputs instances."""
+
+    def __init__(  # type: ignore
+        self, option_strings, dest, nargs=None, default=None, **kwargs
+    ):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        if default is not None:
+            raise ValueError("default not allowed")
+        super().__init__(option_strings, dest, nargs="+", default=[], **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string):  # type: ignore
+        if len(values) < 3:
+            raise ValueError(
+                f"expected at least 3 arguments for {option_string}"
+            )
+        dest_list = getattr(namespace, self.dest, [])
+        bazel_path = values[0]
+        ninja_path = values[1]
+        tracked_files = values[2:]
+        dest_list.append(
+            DirectoryOutputs(bazel_path, ninja_path, tracked_files)
+        )
+        setattr(namespace, self.dest, dest_list)
+
+
 @dataclasses.dataclass
 class PackageOutputs:
     package_label: str
@@ -744,7 +826,7 @@ class PackageOutputs:
 class PackageOutputsAction(argparse.Action):
     """ArgumentParser action class to convert --package-outputs arguments into PackageOutputs instances."""
 
-    def __init__(
+    def __init__(  # type: ignore
         self, option_strings, dest, nargs=None, default=None, **kwargs
     ):
         if nargs is not None:
@@ -753,7 +835,7 @@ class PackageOutputsAction(argparse.Action):
             raise ValueError("default not allowed")
         super().__init__(option_strings, dest, nargs=4, default=[], **kwargs)
 
-    def __call__(self, parser, namespace, values, option_string):
+    def __call__(self, parser, namespace, values, option_string):  # type: ignore
         assert len(values) == 4
         if not values[0]:
             raise ValueError("expected non-empty Bazel package label.")
@@ -803,29 +885,29 @@ def main() -> int:
     )
     parser.add_argument(
         "--bazel-targets",
-        action="append",
         default=[],
+        nargs="*",
         help="List of bazel target patterns.",
     )
     parser.add_argument(
-        "--bazel-outputs", default=[], nargs="*", help="Bazel output paths"
+        "--file-outputs",
+        action=FileOutputsAction,
+        help="A list of (bazel_path, ninja_path) file paths.",
     )
     parser.add_argument(
-        "--bazel-build-events-log-json",
-        help="Path to JSON formatted event log for build actions.",
+        "--directory-outputs",
+        action=DirectoryOutputsAction,
+        help="3 or more arguments to specify a single Bazel output directory. Begins with (bazel_path, ninja_path) values, followed by one or more tracked relative file",
     )
-
-    parser.add_argument(
-        "--ninja-outputs",
-        default=[],
-        nargs="*",
-        help="Ninja output paths relative to current directory.",
-    )
-
     parser.add_argument(
         "--package-outputs",
         action=PackageOutputsAction,
         help="A tuple of four values describing Fuchsia package related outputs. Fields are Bazel package target label, archive output path or 'NONE', manifest output path or 'NONE', and copy debug symbols flag as either 'true' or 'false' string",
+    )
+
+    parser.add_argument(
+        "--bazel-build-events-log-json",
+        help="Path to JSON formatted event log for build actions.",
     )
 
     parser.add_argument("--depfile", help="Ninja depfile output path.")
@@ -847,18 +929,6 @@ def main() -> int:
         return parser.error("A least one --bazel-targets value is needed!")
 
     _build_fuchsia_package = args.command == "build" and args.package_outputs
-
-    if args.command == "build" and not _build_fuchsia_package:
-        if not args.bazel_outputs:
-            return parser.error("At least one --bazel-outputs value is needed!")
-
-        if not args.ninja_outputs:
-            return parser.error("At least one --ninja-outputs value is needed!")
-
-    if len(args.bazel_outputs) != len(args.ninja_outputs):
-        return parser.error(
-            "The --bazel-outputs and --ninja-outputs lists must have the same size!"
-        )
 
     if args.extra_bazel_args and args.extra_bazel_args[0] != "--":
         return parser.error(
@@ -884,7 +954,9 @@ def main() -> int:
     def relative_workspace_dir(path: str) -> str:
         """Convert path relative to the workspace root to the path relative to current directory."""
         return os.path.relpath(
-            os.path.abspath(realpath(os.path.join(args.workspace_dir, path)))
+            os.path.abspath(
+                os.path.realpath(os.path.join(args.workspace_dir, path))
+            )
         )
 
     # LINT.IfChange
@@ -1097,21 +1169,51 @@ def main() -> int:
         )
         return 1
 
-    src_paths = [
-        os.path.join(args.workspace_dir, bazel_out)
-        for bazel_out in args.bazel_outputs
-    ]
-    if not args.allow_directory_in_outputs:
-        dirs = [p for p in src_paths if os.path.isdir(p)]
-        if dirs:
-            print(
-                "\nDirectories are not allowed in --bazel-outputs when --allow-directory-in-outputs is not specified, got directories:\n\n%s\n"
-                % "\n".join(dirs)
-            )
-            return 1
+    file_copies = []
+    unwanted_dirs = []
+    unwanted_files = []
+    invalid_tracked_files = []
 
-    for src_path, dst_path in zip(src_paths, args.ninja_outputs):
-        copy_file_if_changed(src_path, dst_path)
+    for file_output in args.file_outputs:
+        src_path = os.path.join(args.workspace_dir, file_output.bazel_path)
+        if os.path.isdir(src_path):
+            unwanted_dirs.append(src_path)
+            continue
+        dst_path = file_output.ninja_path
+        file_copies.append((src_path, dst_path))
+
+    if unwanted_dirs:
+        print(
+            "\nDirectories are not allowed in --file-outputs Bazel paths, got directories:\n\n%s\n"
+            % "\n".join(unwanted_dirs)
+        )
+        return 1
+
+    for dir_output in args.directory_outputs:
+        src_path = os.path.join(args.workspace_dir, dir_output.bazel_path)
+        if not os.path.isdir(src_path):
+            unwanted_files.append(src_path)
+            continue
+        for tracked_file in dir_output.tracked_files:
+            tracked_file = os.path.join(src_path, tracked_file)
+            if not os.path.isfile(tracked_file):
+                invalid_tracked_files.append(tracked_file)
+        dst_path = dir_output.ninja_path
+        file_copies.append((src_path, dst_path))
+
+    if unwanted_files:
+        print(
+            "\nNon-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
+            % "\n".join(unwanted_files)
+        )
+        return 1
+
+    if invalid_tracked_files:
+        print(
+            "\nMissing or non-directory tracked files from --directory-outputs Bazel path:\n\n%s\n"
+            % "\n".join(invalid_tracked_files)
+        )
+        return 1
 
     if _build_fuchsia_package:
         bazel_execroot = find_bazel_execroot(args.workspace_dir)
@@ -1119,7 +1221,7 @@ def main() -> int:
         def run_starlark_cquery(
             query_target: str, starlark_filename: str
         ) -> List[str]:
-            return get_bazel_query_output(
+            result = get_bazel_query_output(
                 "cquery",
                 [
                     "--config=quiet",
@@ -1130,6 +1232,8 @@ def main() -> int:
                 ]
                 + configured_args,
             )
+            assert result is not None
+            return result
 
         for entry in args.package_outputs:
             if entry.archive_path or entry.manifest_path:
@@ -1147,15 +1251,19 @@ def main() -> int:
                 bazel_debug_symbol_dirs = fuchsia_package_info[2:]
 
                 if entry.archive_path:
-                    copy_file_if_changed(
-                        os.path.join(bazel_execroot, bazel_archive_path),
-                        entry.archive_path,
+                    file_copies.append(
+                        (
+                            os.path.join(bazel_execroot, bazel_archive_path),
+                            entry.archive_path,
+                        )
                     )
 
                 if entry.manifest_path:
-                    copy_file_if_changed(
-                        os.path.join(bazel_execroot, bazel_manifest_path),
-                        entry.manifest_path,
+                    file_copies.append(
+                        (
+                            os.path.join(bazel_execroot, bazel_manifest_path),
+                            entry.manifest_path,
+                        )
                     )
 
             if entry.copy_debug_symbols:
@@ -1168,6 +1276,9 @@ def main() -> int:
                         os.path.join(bazel_execroot, debug_symbol_dir)
                     )
 
+    for src_path, dst_path in file_copies:
+        copy_file_if_changed(src_path, dst_path)
+
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get
         # out of bazel-bin, because the content of bazel-bin is not guaranteed
@@ -1178,7 +1289,7 @@ def main() -> int:
                     dst_path
                     + ":"
                     + os.path.relpath(os.path.realpath(src_path), current_dir)
-                    for src_path, dst_path in zip(src_paths, args.ninja_outputs)
+                    for src_path, dst_path in file_copies
                 )
             )
 
@@ -1238,7 +1349,7 @@ access when it is run.
             return 1
 
         depfile_content = "%s: %s\n" % (
-            " ".join(depfile_quote(c) for c in args.ninja_outputs),
+            " ".join(depfile_quote(c) for _, c in file_copies),
             " ".join(depfile_quote(c) for c in sorted(all_sources)),
         )
 

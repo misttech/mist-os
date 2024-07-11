@@ -254,8 +254,9 @@ template("bazel_action") {
       _copy_outputs != [] || _directory_outputs != [] || _package_outputs != [],
       "At least one of `copy_outputs`, `directory_outputs` or `package_outputs` must be a non-empty list!")
 
-  _needs_dir_copy = false
-  _needs_package_outputs = false
+  _has_file_outputs = false
+  _has_directory_outputs = false
+  _has_package_outputs = false
 
   _bazel_targets = invoker.bazel_targets
 
@@ -277,14 +278,47 @@ template("bazel_action") {
       _bazel_target = entry.bazel_target
     }
 
+    foreach(path, [ entry.bazel ]) {
+      assert(rebase_path(path, "//") != path,
+             "bazel output path must be relative: $path")
+      assert(string_replace("XX$path", "XX-", "") == "XX$path",
+             "bazel output path cannot begin with dash: $path")
+      if (string_replace(path, "{{BAZEL_TARGET_", "") != path) {
+        _bazel_target_name = get_label_info(_bazel_target, "name")
+        _bazel_target_package =
+            rebase_path(get_label_info(_bazel_target, "dir"), "//")
+        _bazel_target_out_dir = "bazel-bin/" + _bazel_target_package
+
+        path = string_replace(path, "{{BAZEL_TARGET_NAME}}", _bazel_target_name)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_PACKAGE}}",
+                              _bazel_target_package)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_DIR}}",
+                              _bazel_target_out_dir)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_PATH}}",
+                              "${_bazel_target_out_dir}/${_bazel_target_name}")
+      }
+
+      # In case of typo with a substitution (e.g. writing {{BAZEL_TARGET_O_DIR}})
+      # GN will complain with an error but will not display the problematic
+      # so use an assert to provide a user-friendly message.
+      assert(string_replace(path, "{{", "") == path,
+             "Unsupported substitution in Bazel output path: $path")
+
+      _bazel_file = path
+    }
+
     _all_outputs += [
       {
         type = "file"
         bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
-        bazel_file = entry.bazel
+        bazel_file = _bazel_file
         ninja_file = "$target_out_dir/${entry.ninja}"
       },
     ]
+    _has_file_outputs = true
   }
 
   foreach(entry, _directory_outputs) {
@@ -302,17 +336,49 @@ template("bazel_action") {
       _bazel_target = entry.bazel_target
     }
 
+    foreach(path, [ entry.bazel_dir ]) {
+      assert(rebase_path(path, "//") != path,
+             "bazel output path must be relative: $path")
+      assert(string_replace("XX$path", "XX-", "") == "XX$path",
+             "bazel output path cannot begin with dash: $path")
+      if (string_replace(path, "{{BAZEL_TARGET_", "") != path) {
+        _bazel_target_name = get_label_info(_bazel_target, "name")
+        _bazel_target_package =
+            rebase_path(get_label_info(_bazel_target, "dir"), "//")
+        _bazel_target_out_dir = "bazel-bin/" + _bazel_target_package
+
+        path = string_replace(path, "{{BAZEL_TARGET_NAME}}", _bazel_target_name)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_PACKAGE}}",
+                              _bazel_target_package)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_DIR}}",
+                              _bazel_target_out_dir)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_PATH}}",
+                              "${_bazel_target_out_dir}/${_bazel_target_name}")
+      }
+
+      # In case of typo with a substitution (e.g. writing {{BAZEL_TARGET_O_DIR}})
+      # GN will complain with an error but will not display the problematic
+      # so use an assert to provide a user-friendly message.
+      assert(string_replace(path, "{{", "") == path,
+             "Unsupported substitution in Bazel output path: $path")
+
+      _bazel_dir = path
+    }
+
     _all_outputs += [
       {
         type = "directory"
         bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
-        bazel_dir = entry.bazel_dir
+        bazel_dir = _bazel_dir
         ninja_dir = "$target_out_dir/${entry.ninja_dir}"
         tracked_files = entry.tracked_files
       },
     ]
 
-    _needs_dir_copy = true
+    _has_directory_outputs = true
   }
 
   foreach(entry, _package_outputs) {
@@ -339,67 +405,7 @@ template("bazel_action") {
       },
     ]
 
-    _needs_package_outputs = true
-  }
-
-  # Compute the list of Bazel output paths, after substitution expansion.
-  _bazel_outputs = []
-  _ninja_outputs = []
-  _ninja_tracked_outputs = []
-
-  foreach(output, _all_outputs) {
-    _bazel_target_name = get_label_info(output.bazel_target, "name")
-    _bazel_target_package =
-        rebase_path(get_label_info(output.bazel_target, "dir"), "//")
-    _bazel_target_out_dir = "bazel-bin/" + _bazel_target_package
-
-    not_needed([
-                 "_bazel_target_name",
-                 "_bazel_target_package",
-                 "_bazel_target_out_dir",
-               ])
-
-    _bazel_paths = []
-    if (output.type == "file") {
-      _bazel_paths = [ output.bazel_file ]
-      _ninja_outputs += [ output.ninja_file ]
-    } else if (output.type == "directory") {
-      _bazel_paths = [ output.bazel_dir ]
-      _ninja_outputs += [ output.ninja_dir ]
-      foreach(tracked_file, output.tracked_files) {
-        _ninja_tracked_outputs += [ "${output.ninja_dir}/${tracked_file}" ]
-      }
-    } else if (output.type == "package") {
-      # nothing to do here.
-    } else {
-      assert(false, "INTERNAL ERROR: output entry with unknown type: $output")
-    }
-    foreach(path, _bazel_paths) {
-      assert(rebase_path(path, "//") != path,
-             "bazel output path must be relative: $path")
-      assert(string_replace("XX$path", "XX-", "") == "XX$path",
-             "bazel output path cannot begin with dash: $path")
-      if (string_replace(path, "{{BAZEL_TARGET_", "") != path) {
-        path = string_replace(path, "{{BAZEL_TARGET_NAME}}", _bazel_target_name)
-        path = string_replace(path,
-                              "{{BAZEL_TARGET_PACKAGE}}",
-                              _bazel_target_package)
-        path = string_replace(path,
-                              "{{BAZEL_TARGET_OUT_DIR}}",
-                              _bazel_target_out_dir)
-        path = string_replace(path,
-                              "{{BAZEL_TARGET_OUT_PATH}}",
-                              "${_bazel_target_out_dir}/${_bazel_target_name}")
-      }
-
-      # In case of typo with a substitution (e.g. writing {{BAZEL_TARGET_O_DIR}})
-      # GN will complain with an error but will not display the problematic
-      # so use an assert to provide a user-friendly message.
-      assert(string_replace(path, "{{", "") == path,
-             "Unsupported substitution in Bazel output path: $path")
-
-      _bazel_outputs += [ path ]
-    }
+    _has_package_outputs = true
   }
 
   # Write the log of build events to a target-specific file.
@@ -516,7 +522,7 @@ template("bazel_action") {
 
     depfile = "$target_gen_dir/$target_name.d"
 
-    outputs = _ninja_outputs + _ninja_tracked_outputs
+    outputs = []
 
     _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
     outputs += [ _path_mapping ]
@@ -536,9 +542,8 @@ template("bazel_action") {
              rebase_path(_gn_targets_repository_manifest, root_build_dir),
              "--gn-targets-all-licenses-spdx",
              rebase_path(_all_licenses_spdx_file, root_build_dir),
-             "--bazel-outputs",
-           ] + _bazel_outputs + [ "--bazel-targets" ] + _bazel_targets +
-           [ "--ninja-outputs" ] + rebase_path(_ninja_outputs, root_build_dir) +
+             "--bazel-targets",
+           ] + _bazel_targets +
            [
              "--depfile",
              rebase_path(depfile, root_build_dir),
@@ -546,7 +551,36 @@ template("bazel_action") {
              rebase_path(_path_mapping, root_build_dir),
            ]
 
-    if (_needs_package_outputs) {
+    if (_has_file_outputs) {
+      args += [ "--file-outputs" ]
+      foreach(output, _all_outputs) {
+        if (output.type == "file") {
+          args += [
+            output.bazel_file,
+            rebase_path(output.ninja_file, root_build_dir),
+          ]
+          outputs += [ output.ninja_file ]
+        }
+      }
+    }
+
+    if (_has_directory_outputs) {
+      foreach(output, _all_outputs) {
+        if (output.type == "directory") {
+          args += [
+                    "--directory-outputs",
+                    output.bazel_dir,
+                    rebase_path(output.ninja_dir, root_build_dir),
+                  ] + output.tracked_files
+          outputs += [ output.ninja_dir ]
+          foreach(tracked_file, output.tracked_files) {
+            outputs += [ "${output.ninja_dir}/${tracked_file}" ]
+          }
+        }
+      }
+    }
+
+    if (_has_package_outputs) {
       # These starlark script are used to perform queries to get provider values
       # for each package.
       inputs += [
@@ -576,10 +610,6 @@ template("bazel_action") {
           ]
         }
       }
-    }
-
-    if (_needs_dir_copy) {
-      args += [ "--allow-directory-in-outputs" ]
     }
 
     if (invoker.command == "build") {
