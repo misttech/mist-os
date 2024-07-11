@@ -5,8 +5,9 @@
 #ifndef SRC_UI_INPUT_DRIVERS_HID_INPUT_REPORT_INPUT_REPORT_H_
 #define SRC_UI_INPUT_DRIVERS_HID_INPUT_REPORT_INPUT_REPORT_H_
 
-#include <fuchsia/hardware/hiddevice/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 
@@ -23,18 +24,17 @@
 namespace hid_input_report_dev {
 
 class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
-                    public InputReportBase,
-                    ddk::HidReportListenerProtocol<InputReport> {
+                    public InputReportBase {
  public:
-  explicit InputReport(ddk::HidDeviceProtocolClient hiddev) : hiddev_(hiddev) {}
+  explicit InputReport(fidl::ClientEnd<fuchsia_hardware_input::Device> input_device)
+      : input_device_(std::move(input_device)), loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+    zx_status_t status = loop_.StartThread("hid-input-report-reader-loop");
+    ZX_ASSERT(status == ZX_OK);
+  }
   virtual ~InputReport() = default;
 
   zx_status_t Start();
   zx_status_t Stop();
-
-  // HidReportListener functions.
-  void HidReportListenerReceiveReport(const uint8_t* report, size_t report_size,
-                                      zx_time_t report_time);
 
   // InputReportBase functions.
   void RemoveReaderFromList(InputReportsReader* reader) override;
@@ -78,14 +78,20 @@ class InputReport : public fidl::WireServer<fuchsia_input_report::InputDevice>,
 
   std::string GetDeviceTypesString() const;
 
-  ddk::HidDeviceProtocolClient hiddev_;
+  void HandleReports(
+      fidl::WireUnownedResult<fuchsia_hardware_input::DeviceReportsReader::ReadReports>& result);
+  void HandleReport(cpp20::span<const uint8_t> report, zx::time report_time);
+
+  fidl::WireSyncClient<fuchsia_hardware_input::Device> input_device_;
+  fidl::WireClient<fuchsia_hardware_input::DeviceReportsReader> dev_reader_;
+  std::atomic_bool is_stopped_ = false;
 
   std::vector<std::unique_ptr<hid_input_report::Device>> devices_;
 
   fbl::Mutex readers_lock_;
   uint32_t next_reader_id_ __TA_GUARDED(readers_lock_) = 0;
   std::list<std::unique_ptr<InputReportsReader>> readers_list_ __TA_GUARDED(readers_lock_);
-  std::optional<async::Loop> loop_ __TA_GUARDED(readers_lock_);
+  async::Loop loop_ __TA_GUARDED(readers_lock_);
   sync_completion_t next_reader_wait_;
 
   inspect::Inspector inspector_;

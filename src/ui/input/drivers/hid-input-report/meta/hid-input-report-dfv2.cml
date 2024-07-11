@@ -13,4 +13,7 @@
         bind: "meta/bind/hid-input-report.bindbc",
         colocate: "true",
     },
+    use: [
+        { service: "fuchsia.hardware.input.Service" },
+    ],
 }

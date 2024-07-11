@@ -35,7 +35,7 @@ class InputReportsReader : public fidl::WireServer<fuchsia_input_report::InputRe
   explicit InputReportsReader(InputReportBase* base, uint32_t reader_id)
       : reader_id_(reader_id), base_(base) {}
 
-  void ReceiveReport(const uint8_t* report, size_t report_size, zx_time_t time,
+  void ReceiveReport(cpp20::span<const uint8_t> raw_report, zx::time report_time,
                      hid_input_report::Device* device);
 
   // FIDL functions.

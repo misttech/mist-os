@@ -18,8 +18,9 @@ using DriverDeviceType = ddk::Device<InputReportDriver, ddk::Unbindable,
 class InputReportDriver : public DriverDeviceType,
                           public ddk::EmptyProtocol<ZX_PROTOCOL_INPUTREPORT> {
  public:
-  InputReportDriver(zx_device_t* parent, ddk::HidDeviceProtocolClient hiddev)
-      : DriverDeviceType(parent), input_report_(hiddev) {}
+  InputReportDriver(zx_device_t* parent,
+                    fidl::ClientEnd<fuchsia_hardware_input::Device> input_device)
+      : DriverDeviceType(parent), input_report_(std::move(input_device)) {}
 
   // DDK Functions.
   zx_status_t Bind();

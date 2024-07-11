@@ -39,8 +39,9 @@ source_set("driver-internals") {
   ]
 
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.hiddevice:fuchsia.hardware.hiddevice_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
     "//sdk/lib/inspect/component/cpp",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/ui/input/lib/hid-input-report",
@@ -91,7 +92,6 @@ fuchsia_driver("hid-input-report-driver-v2") {
     "//sdk/lib/driver/compat/cpp:symbols",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
-    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
@@ -110,6 +110,7 @@ test("hid-input-report-test-bin") {
   deps = [
     ":driver-internals",
     ":hid_input_report_bind",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/testing/mock-ddk",
@@ -117,6 +118,7 @@ test("hid-input-report-test-bin") {
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-input-report",
     "//src/ui/input/lib/hid-parser",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",

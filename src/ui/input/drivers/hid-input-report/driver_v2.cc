@@ -15,11 +15,11 @@
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <zircon/errors.h>
 
-#include "lib/fidl/cpp/wire/channel.h"
 #include "src/ui/input/drivers/hid-input-report/input-report.h"
 
 namespace fdf2 = fuchsia_driver_framework;
 namespace fio = fuchsia_io;
+namespace finput = fuchsia_hardware_input;
 
 namespace {
 
@@ -32,19 +32,21 @@ class InputReportDriver : public fdf::DriverBase {
         devfs_connector_(fit::bind_member<&InputReportDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
-    zx::result client_result = compat::ConnectBanjo<ddk::HidDeviceProtocolClient>(incoming());
-    if (client_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to connect to HidDeviceProtocolClient. %s",
-              client_result.status_string());
-      return client_result.take_error();
+    zx::result<fidl::ClientEnd<finput::Controller>> controller =
+        incoming()->Connect<finput::Service::Controller>();
+    if (controller.is_error()) {
+      FDF_LOG(ERROR, "Failed to connect to fuchsia_hardware_input service. %s",
+              controller.status_string());
+      return controller.take_error();
     }
 
-    ddk::HidDeviceProtocolClient hiddev = client_result.value();
-    if (!hiddev.is_valid()) {
-      FDF_LOG(ERROR, "Failed to create hiddev");
-      return zx::error(ZX_ERR_INTERNAL);
+    auto [client, server] = fidl::Endpoints<finput::Device>::Create();
+    auto result = fidl::WireCall(controller.value())->OpenSession(std::move(server));
+    if (!result.ok()) {
+      return zx::error(result.status());
     }
-    input_report_.emplace(std::move(hiddev));
+
+    input_report_.emplace(std::move(client));
 
     // Expose the driver's inspect data.
     InitInspectorExactlyOnce(input_report_->Inspector());

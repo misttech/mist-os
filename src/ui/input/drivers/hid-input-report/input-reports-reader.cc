@@ -101,8 +101,8 @@ void InputReportsReader::SendReportsToWaitingRead() {
   report_allocator_.Reset();
 }
 
-void InputReportsReader::ReceiveReport(const uint8_t* raw_report, size_t raw_report_size,
-                                       zx_time_t time, hid_input_report::Device* device) {
+void InputReportsReader::ReceiveReport(cpp20::span<const uint8_t> raw_report, zx::time report_time,
+                                       hid_input_report::Device* device) {
   fbl::AutoLock lock(&readers_lock_);
 
   fuchsia_input_report::wire::InputReport report(report_allocator_);
@@ -113,16 +113,16 @@ void InputReportsReader::ReceiveReport(const uint8_t* raw_report, size_t raw_rep
   }
 
   if (hid_input_report::ParseResult result =
-          device->ParseInputReport(raw_report, raw_report_size, report_allocator_, report);
+          device->ParseInputReport(raw_report.data(), raw_report.size(), report_allocator_, report);
       result != hid_input_report::ParseResult::kOk) {
     zxlogf(ERROR, "ReceiveReport: Device failed to parse report correctly %s (%d)",
            ParseResultGetString(result), static_cast<int>(result));
-    hexdump(cpp20::span<const uint8_t>{raw_report, raw_report_size});
+    hexdump(raw_report);
     return;
   }
 
   report.set_report_id(*device->InputReportId());
-  report.set_event_time(report_allocator_, time);
+  report.set_event_time(report_allocator_, report_time.get());
   report.set_trace_id(report_allocator_, TRACE_NONCE());
 
   // If we are full, pop the oldest report.

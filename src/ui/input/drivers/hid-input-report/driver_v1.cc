@@ -8,6 +8,8 @@
 
 namespace hid_input_report_dev {
 
+namespace finput = fuchsia_hardware_input;
+
 zx_status_t InputReportDriver::Bind() {
   zx_status_t status = input_report_.Start();
   if (status != ZX_OK) {
@@ -56,12 +58,18 @@ void InputReportDriver::GetInputReport(GetInputReportRequestView request,
 zx_status_t input_report_bind_v1(void* ctx, zx_device_t* parent) {
   fbl::AllocChecker ac;
 
-  ddk::HidDeviceProtocolClient hiddev(parent);
-  if (!hiddev.is_valid()) {
+  auto controller = ddk::Device<void>::DdkConnectFidlProtocol<finput::Service::Controller>(parent);
+  if (!controller.is_ok()) {
     return ZX_ERR_INTERNAL;
   }
 
-  auto dev = fbl::make_unique_checked<InputReportDriver>(&ac, parent, hiddev);
+  auto [client, server] = fidl::Endpoints<finput::Device>::Create();
+  auto result = fidl::WireCall(controller.value())->OpenSession(std::move(server));
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  auto dev = fbl::make_unique_checked<InputReportDriver>(&ac, parent, std::move(client));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

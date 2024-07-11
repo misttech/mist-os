@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/hiddevice/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.input/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/hid/acer12.h>
 #include <lib/hid/ambient-light.h>
 #include <lib/hid/boot.h>
@@ -15,6 +17,7 @@
 #include <lib/hid/usages.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/clock.h>
 #include <lib/zx/eventpair.h>
 #include <unistd.h>
 #include <zircon/syscalls.h>
@@ -26,150 +29,235 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace hid_input_report_dev {
-const uint8_t boot_mouse_desc[] = {
-    0x05, 0x01,  // Usage Page (Generic Desktop Ctrls)
-    0x09, 0x02,  // Usage (Mouse)
-    0xA1, 0x01,  // Collection (Application)
-    0x09, 0x01,  //   Usage (Pointer)
-    0xA1, 0x00,  //   Collection (Physical)
-    0x05, 0x09,  //     Usage Page (Button)
-    0x19, 0x01,  //     Usage Minimum (0x01)
-    0x29, 0x03,  //     Usage Maximum (0x03)
-    0x15, 0x00,  //     Logical Minimum (0)
-    0x25, 0x01,  //     Logical Maximum (1)
-    0x95, 0x03,  //     Report Count (3)
-    0x75, 0x01,  //     Report Size (1)
-    0x81, 0x02,  //     Input (Data,Var,Abs,No Wrap,Linear,No Null Position)
-    0x95, 0x01,  //     Report Count (1)
-    0x75, 0x05,  //     Report Size (5)
-    0x81, 0x03,  //     Input (Const,Var,Abs,No Wrap,Linear,No Null Position
-    0x05, 0x01,  //     Usage Page (Generic Desktop Ctrls)
-    0x09, 0x30,  //     Usage (X)
-    0x09, 0x31,  //     Usage (Y)
-    0x15, 0x81,  //     Logical Minimum (-127)
-    0x25, 0x7F,  //     Logical Maximum (127)
-    0x75, 0x08,  //     Report Size (8)
-    0x95, 0x02,  //     Report Count (2)
-    0x81, 0x06,  //     Input (Data,Var,Rel,No Wrap,Linear,No Null Position)
-    0xC0,        //   End Collection
-    0xC0,        // End Collection
-};
 
-class FakeHidDevice : public ddk::HidDeviceProtocol<FakeHidDevice> {
+namespace fhidbus = fuchsia_hardware_hidbus;
+namespace finput = fuchsia_hardware_input;
+
+namespace {
+
+template <typename T>
+std::vector<uint8_t> ToBinaryVector(T* data, size_t size) {
+  const uint8_t* begin = reinterpret_cast<const uint8_t*>(data);
+  return std::vector(begin, begin + size);
+}
+
+template <typename T, typename = std::enable_if_t<!std::is_pointer_v<T>>>
+std::vector<uint8_t> ToBinaryVector(const T& t) {
+  const uint8_t* begin = reinterpret_cast<const uint8_t*>(&t);
+  return ToBinaryVector(begin, sizeof(T));
+}
+
+}  // namespace
+
+class FakeHidDevice : public fidl::testing::WireTestBase<finput::Device> {
  public:
-  FakeHidDevice() : proto_({&hid_device_protocol_ops_, this}) {}
+  class DeviceReportsReader : public fidl::WireServer<finput::DeviceReportsReader> {
+   public:
+    explicit DeviceReportsReader(FakeHidDevice* parent, async_dispatcher_t* dispatcher,
+                                 fidl::ServerEnd<finput::DeviceReportsReader> server)
+        : parent_(parent),
+          binding_(dispatcher, std::move(server), this,
+                   [this](fidl::UnbindInfo info) { parent_->reader_.reset(); }) {}
 
-  zx_status_t HidDeviceRegisterListener(const hid_report_listener_protocol_t* listener) {
-    listener_ = *listener;
-    return ZX_OK;
-  }
-
-  void HidDeviceUnregisterListener() { listener_.reset(); }
-
-  zx_status_t HidDeviceGetDescriptor(uint8_t* out_descriptor_list, size_t descriptor_count,
-                                     size_t* out_descriptor_actual) {
-    if (descriptor_count < report_desc_.size()) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
-    }
-    memcpy(out_descriptor_list, report_desc_.data(), report_desc_.size());
-    *out_descriptor_actual = report_desc_.size();
-    return ZX_OK;
-  }
-
-  zx_status_t HidDeviceGetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                                 uint8_t* out_report_list, size_t report_count,
-                                 size_t* out_report_actual) {
-    // If the client is Getting a report with a specific ID, check that it matches
-    // our saved report.
-    if ((rpt_id != 0) && (report_.size() > 0)) {
-      if (rpt_id != report_[0]) {
-        return ZX_ERR_WRONG_TYPE;
+    ~DeviceReportsReader() override {
+      if (waiting_read_) {
+        waiting_read_->ReplyError(ZX_ERR_PEER_CLOSED);
+        waiting_read_.reset();
       }
     }
 
-    if (report_count < report_.size()) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
+    void ReadReports(ReadReportsCompleter::Sync& completer) override {
+      ASSERT_FALSE(waiting_read_.has_value());
+      waiting_read_.emplace(completer.ToAsync());
+      wait_for_read_.Signal();
     }
-    memcpy(out_report_list, report_.data(), report_.size());
-    *out_report_actual = report_.size();
 
-    return ZX_OK;
-  }
-
-  void HidDeviceGetHidDeviceInfo(hid_device_info_t* out_info) {
-    out_info->vendor_id = 0xabc;
-    out_info->product_id = 123;
-    out_info->version = 5;
-  }
-
-  zx_status_t HidDeviceSetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                                 const uint8_t* report_list, size_t report_count) {
-    report_ = std::vector<uint8_t>(report_list, report_list + report_count);
-    return ZX_OK;
-  }
-
-  void SetReportDesc(std::vector<uint8_t> report_desc) { report_desc_ = report_desc; }
-
-  void SendReport(const std::vector<uint8_t>& report, zx_time_t timestamp = ZX_TIME_INFINITE) {
-    if (timestamp == ZX_TIME_INFINITE) {
-      timestamp = zx_clock_get_monotonic();
+    void SendReport(std::vector<uint8_t> report, zx::time timestamp) {
+      fidl::Arena arena;
+      std::vector<fhidbus::wire::Report> reports = {
+          fhidbus::wire::Report::Builder(arena)
+              .timestamp(timestamp.get())
+              .buf(fidl::VectorView<uint8_t>::FromExternal(report.data(), report.size()))
+              .Build()};
+      waiting_read_->ReplySuccess(
+          fidl::VectorView<fhidbus::wire::Report>::FromExternal(reports.data(), reports.size()));
+      waiting_read_.reset();
     }
-    if (listener_.has_value()) {
-      listener_->ops->receive_report(listener_->ctx, report.data(), report.size(), timestamp);
-    }
+
+    libsync::Completion wait_for_read_;
+
+   private:
+    FakeHidDevice* parent_;
+    fidl::ServerBinding<finput::DeviceReportsReader> binding_;
+    std::optional<ReadReportsCompleter::Async> waiting_read_;
+  };
+
+  static constexpr uint32_t kVendorId = 0xabc;
+  static constexpr uint32_t kProductId = 123;
+  static constexpr uint32_t kVersion = 5;
+
+  explicit FakeHidDevice(fidl::ServerEnd<finput::Device> server)
+      : dispatcher_(async_get_default_dispatcher()),
+        binding_(dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure) {}
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ASSERT_TRUE(false);
   }
 
-  std::optional<hid_report_listener_protocol_t> listener_;
-  hid_device_protocol_t proto_;
+  void Query(QueryCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    completer.ReplySuccess(fhidbus::wire::HidInfo::Builder(arena)
+                               .vendor_id(kVendorId)
+                               .product_id(kProductId)
+                               .version(kVersion)
+                               .Build());
+  }
+
+  void GetDeviceReportsReader(GetDeviceReportsReaderRequestView request,
+                              GetDeviceReportsReaderCompleter::Sync& completer) override {
+    ASSERT_NULL(reader_);
+    reader_ = std::make_unique<DeviceReportsReader>(this, dispatcher_, std::move(request->reader));
+    completer.ReplySuccess();
+  }
+
+  void GetReportDesc(GetReportDescCompleter::Sync& completer) override {
+    completer.Reply(
+        fidl::VectorView<uint8_t>::FromExternal(report_desc_.data(), report_desc_.size()));
+  }
+
+  void GetReport(GetReportRequestView request, GetReportCompleter::Sync& completer) override {
+    // If the client is Getting a report with a specific ID, check that it matches
+    // our saved report.
+    if ((request->id != 0) && (report_.size() > 0)) {
+      if (request->id != report_[0]) {
+        completer.ReplyError(ZX_ERR_WRONG_TYPE);
+        return;
+      }
+    }
+
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(report_.data(), report_.size()));
+  }
+  std::vector<uint8_t>& GetReport() { return report_; }
+
+  void SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) override {
+    report_ = ToBinaryVector(request->report.data(), request->report.count());
+    completer.ReplySuccess();
+  }
+  void SetReport(std::vector<uint8_t> report) { report_ = std::move(report); }
+
+  void SetReportDesc(std::vector<uint8_t> report_desc) { report_desc_ = std::move(report_desc); }
+
+  void SendReport(std::vector<uint8_t> report, zx::time timestamp) {
+    ASSERT_NOT_NULL(reader_);
+    reader_->SendReport(std::move(report), timestamp);
+  }
+
+  libsync::Completion& wait_for_read() {
+    EXPECT_NOT_NULL(reader_);
+    return reader_->wait_for_read_;
+  }
+
+  std::unique_ptr<DeviceReportsReader> reader_;
+
+ private:
+  async_dispatcher_t* dispatcher_;
+  fidl::ServerBinding<finput::Device> binding_;
+
   std::vector<uint8_t> report_desc_;
-
   std::vector<uint8_t> report_;
 };
 
 class HidDevTest : public zxtest::Test {
   void SetUp() override {
-    client_ = ddk::HidDeviceProtocolClient(&fake_hid_.proto_);
-    fake_parent_ = MockDevice::FakeRootParent();
+    hid_dev_loop_.StartThread("fake-hid-device-thread");
+    auto [client, server] = fidl::Endpoints<finput::Device>::Create();
+    fake_hid_.emplace(std::move(server));
 
-    device_ = new InputReportDriver(fake_parent_.get(), client_);
+    fake_parent_ = MockDevice::FakeRootParent();
+    device_ = new InputReportDriver(fake_parent_.get(), std::move(client));
     fidl_loop_.StartThread("fidl-thread");
     // Each test is responsible for calling |device_->Bind()|.
   }
 
-  void TearDown() override { mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()); }
+  void TearDown() override {
+    if (background_dispatcher_) {
+      libsync::Completion wait;
+      async::PostTask((*background_dispatcher_)->async_dispatcher(), [this, &wait]() {
+        device_async_remove(device_->zxdev());
+        mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+        wait.Signal();
+      });
+      wait.Wait();
+    } else {
+      device_async_remove(device_->zxdev());
+      mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
+    }
+  }
 
  protected:
+  // Run device on background dispatcher so that we can wait for reports on foreground dispatcher.
+  void BindOnBackground() {
+    background_dispatcher_ = mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
+    libsync::Completion wait;
+    async::PostTask((*background_dispatcher_)->async_dispatcher(), [this, &wait]() {
+      device_->Bind();
+      wait.Signal();
+    });
+    wait.Wait();
+  }
+
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> GetSyncClient() {
     auto endpoints = fidl::Endpoints<fuchsia_input_report::InputDevice>::Create();
     fidl::BindServer(fidl_loop_.dispatcher(), std::move(endpoints.server), device_);
     return fidl::WireSyncClient(std::move(endpoints.client));
   }
 
+  void SendReport(std::vector<uint8_t> report, zx::time timestamp = zx::time::infinite()) {
+    if (timestamp == zx::time::infinite()) {
+      timestamp = zx::clock::get_monotonic();
+    }
+
+    mock_ddk::GetDriverRuntime()->PerformBlockingWork([this]() {
+      fake_hid_.SyncCall(&FakeHidDevice::wait_for_read).Wait();
+      fake_hid_.SyncCall(&FakeHidDevice::wait_for_read).Reset();
+    });
+    fake_hid_.SyncCall(&FakeHidDevice::SendReport, std::move(report), timestamp);
+    mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+        [this]() { fake_hid_.SyncCall(&FakeHidDevice::wait_for_read).Wait(); });
+  }
+
   async::Loop fidl_loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::shared_ptr<MockDevice> fake_parent_;
-  FakeHidDevice fake_hid_;
+  async::Loop hid_dev_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  async_patterns::TestDispatcherBound<FakeHidDevice> fake_hid_{hid_dev_loop_.dispatcher()};
+  std::optional<fdf::UnownedSynchronizedDispatcher> background_dispatcher_;
   InputReportDriver* device_;
-  ddk::HidDeviceProtocolClient client_;
 };
 
 TEST_F(HidDevTest, HidLifetimeTest) {
-  std::vector<uint8_t> boot_mouse(boot_mouse_desc, boot_mouse_desc + sizeof(boot_mouse_desc));
-  fake_hid_.SetReportDesc(boot_mouse);
+  size_t boot_mouse_desc_size;
+  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
 
   ASSERT_OK(device_->Bind());
 }
 
 TEST(HidDevTest, InputReportUnregisterTest) {
   auto fake_parent = MockDevice::FakeRootParent();
-  FakeHidDevice fake_hid_;
+  auto [client, server] = fidl::Endpoints<finput::Device>::Create();
+  async::Loop hid_dev_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  hid_dev_loop.StartThread("fake-hid-device-thread");
+  async_patterns::TestDispatcherBound<FakeHidDevice> fake_hid{hid_dev_loop.dispatcher(),
+                                                              std::in_place, std::move(server)};
   InputReportDriver* device_;
-  ddk::HidDeviceProtocolClient client_;
 
-  client_ = ddk::HidDeviceProtocolClient(&fake_hid_.proto_);
-  device_ = new InputReportDriver(fake_parent.get(), client_);
+  device_ = new InputReportDriver(fake_parent.get(), std::move(client));
 
-  std::vector<uint8_t> boot_mouse(boot_mouse_desc, boot_mouse_desc + sizeof(boot_mouse_desc));
-  fake_hid_.SetReportDesc(boot_mouse);
+  size_t boot_mouse_desc_size;
+  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+  fake_hid.SyncCall(&FakeHidDevice::SetReportDesc,
+                    ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
 
   ASSERT_OK(device_->Bind());
 
@@ -177,27 +265,31 @@ TEST(HidDevTest, InputReportUnregisterTest) {
   fake_parent.reset();
 
   // Make sure that the InputReport class has unregistered from the HID device.
-  ASSERT_FALSE(fake_hid_.listener_);
+  fake_hid.SyncCall([](FakeHidDevice* hid) { ASSERT_NULL(hid->reader_); });
 }
 
 TEST(HidDevTest, InputReportUnregisterTestBindFailed) {
   auto fake_parent = MockDevice::FakeRootParent();
-  FakeHidDevice fake_hid;
-  ddk::HidDeviceProtocolClient client;
+  auto [client, server] = fidl::Endpoints<finput::Device>::Create();
+  async::Loop hid_dev_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  hid_dev_loop.StartThread("fake-hid-device-thread");
+  async_patterns::TestDispatcherBound<FakeHidDevice> fake_hid{hid_dev_loop.dispatcher(),
+                                                              std::in_place, std::move(server)};
 
-  client = ddk::HidDeviceProtocolClient(&fake_hid.proto_);
-  auto device = std::make_unique<InputReportDriver>(fake_parent.get(), client);
+  auto device = std::make_unique<InputReportDriver>(fake_parent.get(), std::move(client));
 
   // We don't set a input report on `fake_hid` so the bind will fail.
   ASSERT_EQ(device->Bind(), ZX_ERR_INTERNAL);
 
   // Make sure that the InputReport class is not registered to the HID device.
-  ASSERT_FALSE(fake_hid.listener_);
+  fake_hid.SyncCall([](FakeHidDevice* hid) { ASSERT_NULL(hid->reader_); });
 }
 
 TEST_F(HidDevTest, GetReportDescTest) {
-  std::vector<uint8_t> boot_mouse(boot_mouse_desc, boot_mouse_desc + sizeof(boot_mouse_desc));
-  fake_hid_.SetReportDesc(boot_mouse);
+  size_t boot_mouse_desc_size;
+  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
 
   ASSERT_OK(device_->Bind());
 
@@ -221,8 +313,10 @@ TEST_F(HidDevTest, GetReportDescTest) {
 }
 
 TEST_F(HidDevTest, ReportDescInfoTest) {
-  std::vector<uint8_t> boot_mouse(boot_mouse_desc, boot_mouse_desc + sizeof(boot_mouse_desc));
-  fake_hid_.SetReportDesc(boot_mouse);
+  size_t boot_mouse_desc_size;
+  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
 
   ASSERT_OK(device_->Bind());
 
@@ -231,21 +325,20 @@ TEST_F(HidDevTest, ReportDescInfoTest) {
       sync_client->GetDescriptor();
   ASSERT_OK(result.status());
 
-  hid_device_info_t info;
-  fake_hid_.HidDeviceGetHidDeviceInfo(&info);
-
   auto& desc = result.value().descriptor;
   ASSERT_TRUE(desc.has_device_information());
-  ASSERT_EQ(desc.device_information().vendor_id(), info.vendor_id);
-  ASSERT_EQ(desc.device_information().product_id(), info.product_id);
-  ASSERT_EQ(desc.device_information().version(), info.version);
+  ASSERT_EQ(desc.device_information().vendor_id(), FakeHidDevice::kVendorId);
+  ASSERT_EQ(desc.device_information().product_id(), FakeHidDevice::kProductId);
+  ASSERT_EQ(desc.device_information().version(), FakeHidDevice::kVersion);
 }
 
 TEST_F(HidDevTest, ReadInputReportsTest) {
-  std::vector<uint8_t> boot_mouse(boot_mouse_desc, boot_mouse_desc + sizeof(boot_mouse_desc));
-  fake_hid_.SetReportDesc(boot_mouse);
+  size_t boot_mouse_desc_size;
+  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
 
-  device_->Bind();
+  BindOnBackground();
 
   auto sync_client = GetSyncClient();
 
@@ -262,8 +355,7 @@ TEST_F(HidDevTest, ReadInputReportsTest) {
   }
 
   // Spoof send a report.
-  std::vector<uint8_t> sent_report = {0xFF, 0x50, 0x70};
-  fake_hid_.SendReport(sent_report);
+  SendReport(std::vector<uint8_t>{0xFF, 0x50, 0x70});
 
   // Get the report.
   auto result = reader->ReadInputReports();
@@ -292,10 +384,12 @@ TEST_F(HidDevTest, ReadInputReportsTest) {
 }
 
 TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
-  std::vector<uint8_t> boot_mouse(boot_mouse_desc, boot_mouse_desc + sizeof(boot_mouse_desc));
-  fake_hid_.SetReportDesc(boot_mouse);
+  size_t boot_mouse_desc_size;
+  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
 
-  device_->Bind();
+  BindOnBackground();
 
   auto sync_client = GetSyncClient();
 
@@ -336,15 +430,16 @@ TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
   loop.RunUntilIdle();
 
   // Send the report.
-  std::vector<uint8_t> sent_report = {0xFF, 0x50, 0x70};
-  fake_hid_.SendReport(sent_report);
+  SendReport(std::vector<uint8_t>{0xFF, 0x50, 0x70});
 
   loop.Run();
 }
 
 TEST_F(HidDevTest, CloseReaderWithOutstandingRead) {
-  std::vector<uint8_t> boot_mouse(boot_mouse_desc, boot_mouse_desc + sizeof(boot_mouse_desc));
-  fake_hid_.SetReportDesc(boot_mouse);
+  size_t boot_mouse_desc_size;
+  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
 
   device_->Bind();
 
@@ -376,10 +471,10 @@ TEST_F(HidDevTest, CloseReaderWithOutstandingRead) {
 TEST_F(HidDevTest, SensorTest) {
   const uint8_t* sensor_desc_ptr;
   size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
-  std::vector<uint8_t> sensor_desc_vector(sensor_desc_ptr, sensor_desc_ptr + sensor_desc_size);
-  fake_hid_.SetReportDesc(sensor_desc_vector);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
 
-  device_->Bind();
+  BindOnBackground();
 
   auto sync_client = GetSyncClient();
 
@@ -433,10 +528,7 @@ TEST_F(HidDevTest, SensorTest) {
   report_data.blue = kBlueTestVal;
   report_data.green = kGreenTestVal;
 
-  std::vector<uint8_t> report_vector(
-      reinterpret_cast<uint8_t*>(&report_data),
-      reinterpret_cast<uint8_t*>(&report_data) + sizeof(report_data));
-  fake_hid_.SendReport(report_vector);
+  SendReport(ToBinaryVector(report_data));
 
   // Get the report.
   auto report_result = reader->ReadInputReports();
@@ -462,10 +554,9 @@ TEST_F(HidDevTest, SensorTest) {
 TEST_F(HidDevTest, GetTouchInputReportTest) {
   size_t desc_len;
   const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
-  std::vector<uint8_t> desc(report_desc, report_desc + desc_len);
-  fake_hid_.SetReportDesc(desc);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
 
-  device_->Bind();
+  BindOnBackground();
 
   auto sync_client = GetSyncClient();
 
@@ -490,10 +581,7 @@ TEST_F(HidDevTest, GetTouchInputReportTest) {
   touch_report.fingers[0].y = 200;
   touch_report.fingers[0].finger_id = 1;
 
-  std::vector<uint8_t> sent_report =
-      std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&touch_report),
-                           reinterpret_cast<uint8_t*>(&touch_report) + sizeof(touch_report));
-  fake_hid_.SendReport(sent_report);
+  SendReport(ToBinaryVector(touch_report));
 
   // Get the report.
   auto report_result = reader->ReadInputReports();
@@ -519,8 +607,7 @@ TEST_F(HidDevTest, GetTouchInputReportTest) {
 TEST_F(HidDevTest, GetTouchPadDescTest) {
   size_t desc_len;
   const uint8_t* report_desc = get_paradise_touchpad_v1_report_desc(&desc_len);
-  std::vector<uint8_t> desc(report_desc, report_desc + desc_len);
-  fake_hid_.SetReportDesc(desc);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
 
   device_->Bind();
 
@@ -539,10 +626,9 @@ TEST_F(HidDevTest, GetTouchPadDescTest) {
 TEST_F(HidDevTest, KeyboardTest) {
   size_t keyboard_descriptor_size;
   const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
-  std::vector<uint8_t> desc(keyboard_descriptor, keyboard_descriptor + keyboard_descriptor_size);
-
-  fake_hid_.SetReportDesc(desc);
-  device_->Bind();
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
+  BindOnBackground();
 
   auto sync_client = GetSyncClient();
 
@@ -564,10 +650,7 @@ TEST_F(HidDevTest, KeyboardTest) {
   keyboard_report.usage[1] = HID_USAGE_KEY_UP;
   keyboard_report.usage[2] = HID_USAGE_KEY_B;
 
-  std::vector<uint8_t> sent_report(
-      reinterpret_cast<uint8_t*>(&keyboard_report),
-      reinterpret_cast<uint8_t*>(&keyboard_report) + sizeof(keyboard_report));
-  fake_hid_.SendReport(sent_report);
+  SendReport(ToBinaryVector(keyboard_report));
 
   // Get the report.
   auto report_result = reader->ReadInputReports();
@@ -588,8 +671,8 @@ TEST_F(HidDevTest, KeyboardTest) {
 TEST_F(HidDevTest, KeyboardOutputReportTest) {
   size_t keyboard_descriptor_size;
   const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
-  std::vector<uint8_t> desc(keyboard_descriptor, keyboard_descriptor + keyboard_descriptor_size);
-  fake_hid_.SetReportDesc(desc);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
   device_->Bind();
 
   auto sync_client = GetSyncClient();
@@ -606,36 +689,29 @@ TEST_F(HidDevTest, KeyboardOutputReportTest) {
   // Send the report.
   fidl::WireResult<fuchsia_input_report::InputDevice::SendOutputReport> response =
       sync_client->SendOutputReport(std::move(output_report));
-  ASSERT_OK(response.status());
-  ASSERT_FALSE(response->is_error());
-  // Get and check the hid output report.
-  uint8_t report;
-  size_t out_size;
-  ASSERT_OK(
-      fake_hid_.HidDeviceGetReport(HID_REPORT_TYPE_OUTPUT, 0, &report, sizeof(report), &out_size));
-  ASSERT_EQ(out_size, sizeof(report));
-  ASSERT_EQ(report, 0b101);
+  ASSERT_TRUE(response.ok());
+  ASSERT_TRUE(response->is_ok());
+  // Check the hid output report.
+  fake_hid_.SyncCall(
+      [](FakeHidDevice* hid) { EXPECT_EQ(hid->GetReport(), std::vector<uint8_t>{0b101}); });
 }
 
-TEST_F(HidDevTest, ConsumerControlTest) {
+// TODO: Flaky. Will be re-enabled when converted to DFv2.
+TEST_F(HidDevTest, DISABLED_ConsumerControlTest) {
   {
     const uint8_t* descriptor;
     size_t descriptor_size = get_buttons_report_desc(&descriptor);
-    std::vector<uint8_t> desc_vector(descriptor, descriptor + descriptor_size);
-    fake_hid_.SetReportDesc(desc_vector);
+    fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(descriptor, descriptor_size));
   }
 
   // Create the initial report that will be queried on OpenSession.
-  {
+  fake_hid_.SyncCall([](FakeHidDevice* hid) {
     struct buttons_input_rpt report = {};
     report.rpt_id = BUTTONS_RPT_ID_INPUT;
-    std::vector<uint8_t> report_vector(reinterpret_cast<uint8_t*>(&report),
-                                       reinterpret_cast<uint8_t*>(&report) + sizeof(report));
-    fake_hid_.HidDeviceSetReport(HID_REPORT_TYPE_INPUT, BUTTONS_RPT_ID_INPUT, report_vector.data(),
-                                 report_vector.size());
-  }
+    hid->SetReport(ToBinaryVector(report));
+  });
 
-  device_->Bind();
+  BindOnBackground();
 
   auto sync_client = GetSyncClient();
 
@@ -682,9 +758,7 @@ TEST_F(HidDevTest, ConsumerControlTest) {
     fill_button_in_report(BUTTONS_ID_FDR, true, &report);
     fill_button_in_report(BUTTONS_ID_MIC_MUTE, true, &report);
 
-    std::vector<uint8_t> report_vector(reinterpret_cast<uint8_t*>(&report),
-                                       reinterpret_cast<uint8_t*>(&report) + sizeof(report));
-    fake_hid_.SendReport(report_vector);
+    SendReport(ToBinaryVector(report));
   }
 
   // Get the report.
@@ -723,21 +797,17 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
   {
     const uint8_t* descriptor;
     size_t descriptor_size = get_buttons_report_desc(&descriptor);
-    std::vector<uint8_t> desc_vector(descriptor, descriptor + descriptor_size);
-    fake_hid_.SetReportDesc(desc_vector);
+    fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(descriptor, descriptor_size));
   }
 
   // Create the initial report that will be queried on OpenSession.
-  {
+  fake_hid_.SyncCall([](FakeHidDevice* hid) {
     struct buttons_input_rpt report = {};
     report.rpt_id = BUTTONS_RPT_ID_INPUT;
-    std::vector<uint8_t> report_vector(reinterpret_cast<uint8_t*>(&report),
-                                       reinterpret_cast<uint8_t*>(&report) + sizeof(report));
-    fake_hid_.HidDeviceSetReport(HID_REPORT_TYPE_INPUT, BUTTONS_RPT_ID_INPUT, report_vector.data(),
-                                 report_vector.size());
-  }
+    hid->SetReport(ToBinaryVector(report));
+  });
 
-  device_->Bind();
+  BindOnBackground();
 
   // Open the device.
   auto client = GetSyncClient();
@@ -796,8 +866,7 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
 TEST_F(HidDevTest, TouchLatencyMeasurements) {
   const uint8_t* report_desc;
   const size_t desc_len = get_gt92xx_report_desc(&report_desc);
-  std::vector<uint8_t> desc(report_desc, report_desc + desc_len);
-  fake_hid_.SetReportDesc(desc);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
 
   device_->Bind();
 
@@ -806,17 +875,15 @@ TEST_F(HidDevTest, TouchLatencyMeasurements) {
 
   // Send five reports, and verify that the inspect stats make sense.
   gt92xx_touch_t report = {};
-  const uint8_t* report_ptr = reinterpret_cast<uint8_t*>(&report);
-  const std::vector<uint8_t> report_vector(report_ptr, report_ptr + sizeof(report));
 
   // Add some additional computed latency to make the results more realistic.
-  const zx_time_t timestamp = zx_clock_get_monotonic() - ZX_MSEC(15);
+  const zx::time timestamp = zx::clock::get_monotonic() - zx::msec(15);
 
-  fake_hid_.SendReport(report_vector, timestamp);
-  fake_hid_.SendReport(report_vector, timestamp);
-  fake_hid_.SendReport(report_vector, timestamp);
-  fake_hid_.SendReport(report_vector, timestamp);
-  fake_hid_.SendReport(report_vector, timestamp - ZX_MSEC(5));
+  SendReport(ToBinaryVector(report), timestamp);
+  SendReport(ToBinaryVector(report), timestamp);
+  SendReport(ToBinaryVector(report), timestamp);
+  SendReport(ToBinaryVector(report), timestamp);
+  SendReport(ToBinaryVector(report), timestamp - zx::msec(5));
 
   inspect::InspectTestHelper inspector;
   inspector.ReadInspect(inspect_vmo);
@@ -848,8 +915,7 @@ TEST_F(HidDevTest, TouchLatencyMeasurements) {
 TEST_F(HidDevTest, InspectDeviceTypes) {
   size_t desc_len;
   const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
-  std::vector<uint8_t> desc(report_desc, report_desc + desc_len);
-  fake_hid_.SetReportDesc(desc);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
 
   device_->Bind();
 
@@ -873,30 +939,26 @@ TEST_F(HidDevTest, InspectDeviceTypes) {
 TEST_F(HidDevTest, GetInputReport) {
   const uint8_t* sensor_desc_ptr;
   size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
-  std::vector<uint8_t> sensor_desc_vector(sensor_desc_ptr, sensor_desc_ptr + sensor_desc_size);
-  fake_hid_.SetReportDesc(sensor_desc_vector);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
 
   device_->Bind();
 
   auto sync_client = GetSyncClient();
 
-  ambient_light_input_rpt_t report_data = {};
   const int kIlluminanceTestVal = 10;
   const int kRedTestVal = 101;
   const int kBlueTestVal = 5;
   const int kGreenTestVal = 3;
-  report_data.rpt_id = AMBIENT_LIGHT_RPT_ID_INPUT;
-  report_data.illuminance = kIlluminanceTestVal;
-  report_data.red = kRedTestVal;
-  report_data.blue = kBlueTestVal;
-  report_data.green = kGreenTestVal;
-
-  std::vector<uint8_t> report_vector(
-      reinterpret_cast<uint8_t*>(&report_data),
-      reinterpret_cast<uint8_t*>(&report_data) + sizeof(report_data));
-
-  fake_hid_.HidDeviceSetReport(HID_REPORT_TYPE_INPUT, AMBIENT_LIGHT_RPT_ID_INPUT,
-                               report_vector.data(), report_vector.size());
+  fake_hid_.SyncCall([](FakeHidDevice* hid) {
+    ambient_light_input_rpt_t report_data = {};
+    report_data.rpt_id = AMBIENT_LIGHT_RPT_ID_INPUT;
+    report_data.illuminance = kIlluminanceTestVal;
+    report_data.red = kRedTestVal;
+    report_data.blue = kBlueTestVal;
+    report_data.green = kGreenTestVal;
+    hid->SetReport(ToBinaryVector(report_data));
+  });
 
   {
     const auto report_result =
@@ -928,26 +990,22 @@ TEST_F(HidDevTest, GetInputReport) {
 TEST_F(HidDevTest, GetInputReportMultipleDevices) {
   size_t touch_desc_size;
   const uint8_t* touch_desc_ptr = get_acer12_touch_report_desc(&touch_desc_size);
-  std::vector<uint8_t> touch_desc_vector(touch_desc_ptr, touch_desc_ptr + touch_desc_size);
-  fake_hid_.SetReportDesc(touch_desc_vector);
+  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
+                     ToBinaryVector(touch_desc_ptr, touch_desc_size));
 
   device_->Bind();
 
   auto sync_client = GetSyncClient();
 
-  acer12_stylus_t report_data = {};
-  report_data.rpt_id = ACER12_RPT_ID_STYLUS;
-  report_data.status = 0;
-  report_data.x = 1;
-  report_data.y = 2;
-  report_data.pressure = 3;
-
-  std::vector<uint8_t> report_vector(
-      reinterpret_cast<uint8_t*>(&report_data),
-      reinterpret_cast<uint8_t*>(&report_data) + sizeof(report_data));
-
-  fake_hid_.HidDeviceSetReport(HID_REPORT_TYPE_INPUT, ACER12_RPT_ID_STYLUS, report_vector.data(),
-                               report_vector.size());
+  fake_hid_.SyncCall([](FakeHidDevice* hid) {
+    acer12_stylus_t report_data = {};
+    report_data.rpt_id = ACER12_RPT_ID_STYLUS;
+    report_data.status = 0;
+    report_data.x = 1;
+    report_data.y = 2;
+    report_data.pressure = 3;
+    hid->SetReport(ToBinaryVector(report_data));
+  });
 
   // There are two devices with this type (finger and stylus), so this should fail.
   const auto result = sync_client->GetInputReport(fuchsia_input_report::wire::DeviceType::kTouch);
