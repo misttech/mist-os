@@ -174,14 +174,11 @@ zx_status_t DisplayControllerBanjo::DisplayControllerImplSetMinimumRgb(uint8_t m
   return result.status_value();
 }
 
-zx_status_t DisplayControllerBanjo::DdkGetProtocol(uint32_t proto_id, void* out) {
-  auto* proto = static_cast<ddk::AnyProtocol*>(out);
-  proto->ctx = this;
-  if (proto_id == ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL) {
-    proto->ops = &display_controller_impl_protocol_ops_;
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_SUPPORTED;
+display_controller_impl_protocol_t DisplayControllerBanjo::GetProtocol() {
+  return {
+      .ops = &display_controller_impl_protocol_ops_,
+      .ctx = this,
+  };
 }
 
 }  // namespace virtio_display

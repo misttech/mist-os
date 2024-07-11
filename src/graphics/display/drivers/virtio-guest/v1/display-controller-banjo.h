@@ -65,7 +65,7 @@ class DisplayControllerBanjo : public ddk::DisplayControllerImplProtocol<Display
   bool DisplayControllerImplIsCaptureCompleted();
   zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb);
 
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
+  display_controller_impl_protocol_t GetProtocol();
 
  private:
   // This data member is thread-safe because it is immutable.

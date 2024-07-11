@@ -256,9 +256,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -292,9 +290,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
 }
 
 TEST_F(VirtioGpuTest, SetConstraints) {
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Import buffer collection.
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
@@ -342,9 +338,7 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
   zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
@@ -409,9 +403,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
   zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
 
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);

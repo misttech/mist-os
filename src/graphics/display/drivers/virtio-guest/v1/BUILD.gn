@@ -108,10 +108,6 @@ fuchsia_driver("driver") {
   ]
   output_name = "virtio_gpu_v1"
   sources = [
-    "display-device-driver.cc",
-    "display-device-driver.h",
-    "gpu-control-device-driver.cc",
-    "gpu-control-device-driver.h",
     "gpu-device-driver.cc",
     "gpu-device-driver.h",
   ]
@@ -120,12 +116,15 @@ fuchsia_driver("driver") {
     ":virtio_gpu_bind_v1",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/incoming/cpp",
+    "//sdk/lib/driver/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bin/driver_runtime",
-    "//src/devices/lib/driver",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
   ]
 }
 
