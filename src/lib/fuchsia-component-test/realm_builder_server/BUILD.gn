@@ -88,10 +88,12 @@ fuchsia_package("pkg") {
   deps = [ ":realm_builder_server_component" ]
 }
 
-sdk_fuchsia_package("realm_builder_server_sdk") {
-  distribution_name = "realm_builder_server"
-  package_label = ":pkg"
-  category = "partner"
-  expected_files_exact = [ "meta/realm_builder_server.cm" ]
-  api_level_added = 18
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("realm_builder_server_sdk") {
+    distribution_name = "realm_builder_server"
+    package_label = ":pkg"
+    category = "partner"
+    expected_files_exact = [ "meta/realm_builder_server.cm" ]
+    api_level_added = 18
+  }
 }

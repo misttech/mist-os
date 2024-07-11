@@ -106,12 +106,14 @@ fuchsia_package("vkext-child-package") {
   ]
 }
 
-sdk_fuchsia_package("vkext-test-sdk") {
-  distribution_name = "vkext-test"
-  category = "partner"
-  package_label = ":vkext-child-package"
-  api_level_added = 19
-  expected_files_exact = [ "meta/vkext-test-child.cm" ]
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("vkext-test-sdk") {
+    distribution_name = "vkext-test"
+    category = "partner"
+    package_label = ":vkext-child-package"
+    api_level_added = 19
+    expected_files_exact = [ "meta/vkext-test-child.cm" ]
+  }
 }
 
 protected_libvulkan_envs = []

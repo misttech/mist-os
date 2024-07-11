@@ -270,12 +270,14 @@ fuchsia_package("magma_conformance_tests_for_sdk") {
   validate_structured_config = false
 }
 
-sdk_fuchsia_package("magma_conformance_tests_sdk") {
-  distribution_name = "magma_conformance_tests"
-  category = "partner"
-  package_label = ":magma_conformance_tests_for_sdk"
-  expected_files_exact = [ "meta/magma_conformance_tests.cm" ]
-  api_level_added = 16
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("magma_conformance_tests_sdk") {
+    distribution_name = "magma_conformance_tests"
+    category = "partner"
+    package_label = ":magma_conformance_tests_for_sdk"
+    expected_files_exact = [ "meta/magma_conformance_tests.cm" ]
+    api_level_added = 16
+  }
 }
 
 fuchsia_test_package("magma-conformance-tests-vsi") {

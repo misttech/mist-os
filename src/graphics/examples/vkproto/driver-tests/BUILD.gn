@@ -70,12 +70,14 @@ fuchsia_package("vkproto_driver_test_child_package") {
   deps += [ ":default_config" ]
 }
 
-sdk_fuchsia_package("vkproto-driver-test-sdk") {
-  distribution_name = "vkproto-driver-test"
-  category = "partner"
-  package_label = ":vkproto_driver_test_child_package"
-  api_level_added = 19
-  expected_files_exact = [ "meta/vkproto-driver-test-child.cm" ]
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("vkproto-driver-test-sdk") {
+    distribution_name = "vkproto-driver-test"
+    category = "partner"
+    package_label = ":vkproto_driver_test_child_package"
+    api_level_added = 19
+    expected_files_exact = [ "meta/vkproto-driver-test-child.cm" ]
+  }
 }
 
 fuchsia_test_component("vkproto_driver_tests_component") {

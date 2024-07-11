@@ -10,6 +10,7 @@ import("//tools/cmc/build/expect_includes.gni")
 # Defines an in-tree package for distribution in the SDK, landing
 # the end package manifest at
 # `sdk://packages/{arch}/release/${distribution_name}/package_manifest.json`.
+# May only be used in the default_toolchain.
 #
 # Example:
 # ```
@@ -86,6 +87,9 @@ import("//tools/cmc/build/expect_includes.gni")
 template("sdk_fuchsia_package") {
   assert(defined(invoker.api_level_added),
          "Must specify the API level at which the package was added")
+  assert(
+      current_toolchain == default_toolchain,
+      "Unexpected use of `sdk_fuchsia_package` template with non-default toolchain `${current_toolchain}`.")
 
   if (current_build_target_api_level == "PLATFORM") {
     # While we do not ship packages targeting "PLATFORM" in the SDK, they can be
@@ -115,7 +119,7 @@ template("sdk_fuchsia_package") {
     _api_level_arg_for_manifest_script = current_build_target_api_level
   }
 
-  if (package_in_target_api_level && current_toolchain == target_toolchain) {
+  if (package_in_target_api_level) {
     assert(defined(invoker.package_label),
            "Must define a package to distribute.")
     assert(defined(invoker.distribution_name),
@@ -312,8 +316,10 @@ template("sdk_fuchsia_package") {
         package_barrier = []
       }
     }
-  } else if (!package_in_target_api_level) {
+  } else {
     # Current API level is not supported, so create an empty atom.
+    print(
+        "Empty IDK atom created for package `${target_name}`, which is not supported in API level ${override_target_api_level}.")
     sdk_noop_atom(target_name) {
       forward_variables_from(invoker,
                              [
@@ -329,20 +335,5 @@ template("sdk_fuchsia_package") {
     # Suppress unused variable warnings.
     not_needed(invoker, "*")
     not_needed([ "_api_level_arg_for_manifest_script" ])
-  } else {
-    # Fuchsia SDK packages should only be built with target_toolchain. However, it
-    # is possible for package targets to be expanded in other toolchains (host,
-    # variant, etc.). In these cases, make sdk_fuchsia_package expand to nothing.
-    group(target_name) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-    }
-
-    # Suppress unused variable warnings.
-    not_needed(invoker, "*")
-    not_needed([ "_api_level_arg_for_manifest_script" ])
-  }
+  }  # end if (package_in_target_api_level)
 }

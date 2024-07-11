@@ -69,12 +69,14 @@ fuchsia_package("vkloop-child-package") {
   ]
 }
 
-sdk_fuchsia_package("vkloop-test-sdk") {
-  distribution_name = "vkloop-test"
-  category = "partner"
-  package_label = ":vkloop-child-package"
-  api_level_added = 19
-  expected_files_exact = [ "meta/vkloop-test-child.cm" ]
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("vkloop-test-sdk") {
+    distribution_name = "vkloop-test"
+    category = "partner"
+    package_label = ":vkloop-child-package"
+    api_level_added = 19
+    expected_files_exact = [ "meta/vkloop-test-child.cm" ]
+  }
 }
 
 fuchsia_test_component("vkloop-test-cmp") {
