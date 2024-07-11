@@ -10,7 +10,9 @@ use crate::vfs::socket::{
     Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketProtocol,
     SocketType,
 };
-use crate::vfs::{fileops_impl_nonseekable, FileHandle, FileObject, FileOps};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileHandle, FileObject, FileOps,
+};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
@@ -38,6 +40,7 @@ pub struct SocketFile {
 
 impl FileOps for SocketFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,

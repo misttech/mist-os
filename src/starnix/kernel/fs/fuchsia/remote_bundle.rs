@@ -7,11 +7,12 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::{
-    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable,
-    fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink, CacheConfig, CacheMode,
-    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget, ValueOrSize, DEFAULT_BYTES_PER_BLOCK,
+    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync,
+    fileops_impl_seekable, fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink,
+    CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget, ValueOrSize,
+    DEFAULT_BYTES_PER_BLOCK,
 };
 use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Metadata, Node, NodeInfo};
@@ -248,6 +249,7 @@ struct MemoryFile {
 
 impl FileOps for MemoryFile {
     fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,
@@ -326,6 +328,7 @@ struct DirectoryObject;
 
 impl FileOps for DirectoryObject {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,

@@ -137,7 +137,9 @@ use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
-use starnix_core::vfs::{Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryFileObject};
+use starnix_core::vfs::{
+    fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, MemoryFileObject,
+};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps};
@@ -452,6 +454,7 @@ impl MagmaFile {
 
 impl FileOps for MagmaFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn ioctl(
         &self,

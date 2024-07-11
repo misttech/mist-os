@@ -5,8 +5,8 @@
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecOutputBuffer};
 use crate::vfs::{
-    default_seek, fileops_impl_delegate_read_and_seek, FileObject, FileOps, FsNodeOps, SeekTarget,
-    SimpleFileNode,
+    default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps,
+    FsNodeOps, SeekTarget, SimpleFileNode,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::errors::Errno;
@@ -141,6 +141,8 @@ impl<Source: SequenceFileSource> DynamicFile<Source> {
 }
 
 impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
+    fileops_impl_noop_sync!();
+
     fn is_seekable(&self) -> bool {
         true
     }
@@ -315,6 +317,7 @@ impl ConstFile {
 
 impl FileOps for ConstFile {
     fileops_impl_delegate_read_and_seek!(self, self.0);
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

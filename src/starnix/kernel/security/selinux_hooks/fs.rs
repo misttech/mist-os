@@ -6,11 +6,12 @@ use crate::mm::memory::MemoryObject;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_nonseekable, fs_node_impl_dir_readonly,
-    fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek, BytesFile, BytesFileOps, CacheMode,
-    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    MemoryFileNode, SeekTarget, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
+    emit_dotdot, fileops_impl_directory, fileops_impl_nonseekable, fileops_impl_noop_sync,
+    fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
+    BytesFile, BytesFileOps, CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, SeekTarget, StaticDirectoryBuilder,
+    VecDirectory, VecDirectoryEntry,
 };
 use bstr::ByteSlice;
 use fuchsia_zircon as zx;
@@ -344,6 +345,7 @@ struct AccessFile {
 
 impl FileOps for AccessFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,
@@ -461,6 +463,7 @@ impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
 
 impl FileOps for SeLinuxBooleansDirectory {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,

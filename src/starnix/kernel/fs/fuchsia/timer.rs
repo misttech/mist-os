@@ -8,7 +8,9 @@ use crate::task::{
 };
 use crate::timer::{Timeline, TimerWakeup};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
+};
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
@@ -224,6 +226,8 @@ impl TimerFile {
 
 impl FileOps for TimerFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
+
     fn write(
         &self,
         _locked: &mut Locked<'_, WriteOps>,

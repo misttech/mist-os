@@ -6,7 +6,9 @@ use fidl_fuchsia_starnix_gralloc as fgralloc;
 use fuchsia_async::LocalExecutor;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileObject, FileOps, InputBuffer, OutputBuffer, SeekTarget};
+use starnix_core::vfs::{
+    fileops_impl_noop_sync, FileObject, FileOps, InputBuffer, OutputBuffer, SeekTarget,
+};
 use starnix_logging::{log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -78,6 +80,8 @@ impl GrallocFile {
 }
 
 impl FileOps for GrallocFile {
+    fileops_impl_noop_sync!();
+
     fn is_seekable(&self) -> bool {
         false
     }

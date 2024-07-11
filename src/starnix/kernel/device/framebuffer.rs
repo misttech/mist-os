@@ -9,7 +9,7 @@ use crate::fs::sysfs::DeviceDirectory;
 use crate::mm::memory::MemoryObject;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, Kernel};
-use crate::vfs::{fileops_impl_memory, FileObject, FileOps, FsNode};
+use crate::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
 use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_logging::{impossible_error, log_info, log_warn};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked};
@@ -184,6 +184,7 @@ impl DeviceOps for Arc<Framebuffer> {
 
 impl FileOps for Framebuffer {
     fileops_impl_memory!(self, &self.memory);
+    fileops_impl_noop_sync!();
 
     fn ioctl(
         &self,

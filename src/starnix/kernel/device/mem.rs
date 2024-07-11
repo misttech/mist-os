@@ -12,8 +12,8 @@ use crate::mm::{
 use crate::task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNode,
-    FsNodeInfo, NamespaceNode, SeekTarget,
+    fileops_impl_noop_sync, fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps,
+    FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
 };
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
@@ -46,6 +46,7 @@ pub fn new_null_file(current_task: &CurrentTask, flags: OpenFlags) -> FileHandle
 
 impl FileOps for DevNull {
     fileops_impl_seekless!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,
@@ -102,6 +103,7 @@ impl FileOps for DevNull {
 struct DevZero;
 impl FileOps for DevZero {
     fileops_impl_seekless!();
+    fileops_impl_noop_sync!();
 
     fn mmap(
         &self,
@@ -171,6 +173,7 @@ impl FileOps for DevZero {
 struct DevFull;
 impl FileOps for DevFull {
     fileops_impl_seekless!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,
@@ -202,6 +205,7 @@ impl FileOps for DevFull {
 pub struct DevRandom;
 impl FileOps for DevRandom {
     fileops_impl_seekless!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,
@@ -267,6 +271,8 @@ pub fn open_kmsg(
 struct DevKmsg(Option<Mutex<LogSubscription>>);
 
 impl FileOps for DevKmsg {
+    fileops_impl_noop_sync!();
+
     fn has_persistent_offsets(&self) -> bool {
         false
     }

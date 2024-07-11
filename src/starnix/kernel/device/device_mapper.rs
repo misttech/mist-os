@@ -10,8 +10,8 @@ use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::VecOutputBuffer;
 use crate::vfs::{
-    default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless, FileHandle,
-    FileObject, FileOps, FsNode, FsString, OutputBuffer,
+    default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
+    fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
 };
 use bitflags::bitflags;
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
@@ -307,6 +307,9 @@ fn verify_read(
 
 impl FileOps for DmDeviceFile {
     fileops_impl_seekable!();
+
+    // Writes aren't supported for these files, no need to sync the data.
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,
@@ -757,6 +760,7 @@ fn check_version_compatibility(major: u32, minor: u32) -> Result<(), Errno> {
 impl FileOps for DeviceMapper {
     fileops_impl_seekless!();
     fileops_impl_dataless!();
+    fileops_impl_noop_sync!();
 
     fn ioctl(
         &self,

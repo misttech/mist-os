@@ -8,7 +8,9 @@ use crate::task::{
     CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
+};
 use bstr::ByteSlice;
 use ebpf::converter::{bpf_addressing_mode, bpf_class};
 use ebpf::program::EbpfProgram;
@@ -860,6 +862,7 @@ struct SeccompNotifierFileObject {
 
 impl FileOps for SeccompNotifierFileObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         let mut state = self.notifier.lock();

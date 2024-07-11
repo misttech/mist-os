@@ -13,9 +13,9 @@ use crate::vfs::buffers::{
     UserBuffersOutputBuffer,
 };
 use crate::vfs::{
-    default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
-    SpecialNode,
+    default_fcntl, default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, CacheMode,
+    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNodeInfo, FsStr, SpecialNode,
 };
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, MutexGuard, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -420,6 +420,7 @@ pub struct PipeFileObject {
 
 impl FileOps for PipeFileObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
         self.on_close(file.flags());

@@ -10,10 +10,10 @@ use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle,
-    DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    SpecialNode, VecDirectory, VecDirectoryEntry,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly, CacheMode,
+    DirEntryHandle, DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
@@ -336,6 +336,7 @@ impl DevPtmxFile {
 
 impl FileOps for DevPtmxFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
         self.terminal.main_close();
@@ -436,6 +437,7 @@ impl DevPtsFile {
 
 impl FileOps for DevPtsFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.terminal.replica_close();

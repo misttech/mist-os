@@ -7,7 +7,10 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use crate::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString, NamespaceNode};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+    NamespaceNode,
+};
 use anyhow::{Context, Error};
 use derivative::Derivative;
 use fidl::endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd};
@@ -95,6 +98,7 @@ impl RemoteBinderFileOps {
 
 impl FileOps for RemoteBinderFileOps {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn query_events(
         &self,

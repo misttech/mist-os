@@ -4,9 +4,10 @@
 
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
-    fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek, CacheMode,
-    DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
+    fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly, unbounded_seek,
+    CacheMode, DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MountInfo,
+    SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
@@ -88,6 +89,7 @@ impl FsNodeOps for Arc<LayeredFs> {
 
 impl FileOps for LayeredFsRootNodeOps {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,

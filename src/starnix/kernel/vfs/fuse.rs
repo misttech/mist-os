@@ -10,12 +10,12 @@ use crate::vfs::buffers::{
 };
 use crate::vfs::{
     default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-    fs_args, fs_node_impl_dir_readonly, AppendLockGuard, CacheConfig, CacheMode, CheckAccessReason,
-    DirEntry, DirEntryOps, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget,
-    ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
+    fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly, AppendLockGuard, CacheConfig,
+    CacheMode, CheckAccessReason, DirEntry, DirEntryOps, DirectoryEntryType, DirentSink,
+    DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdNumber, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode,
+    StaticDirectoryBuilder, SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
 };
 use bstr::B;
 use fuchsia_zircon as zx;
@@ -70,6 +70,7 @@ fn attr_valid_to_duration(attr_valid: u64, attr_valid_nsec: u32) -> Result<zx::D
 
 impl FileOps for DevFuse {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.connection.lock().disconnect();
@@ -398,6 +399,7 @@ impl AbortFile {
 
 impl FileOps for AbortFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,
@@ -778,6 +780,11 @@ impl FileOps for FuseFileObject {
             let eof_offset = default_eof_offset(file, current_task)?;
             offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
         })
+    }
+
+    fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/352359968"), "FUSE fsync()");
+        Ok(())
     }
 
     fn wait_async(

@@ -9,7 +9,9 @@ use crate::task::{
     WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
+};
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
@@ -107,6 +109,7 @@ impl SyncFile {
 
 impl FileOps for SyncFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn to_handle(
         &self,

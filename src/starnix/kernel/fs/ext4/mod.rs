@@ -6,10 +6,10 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::ProtectionFlags;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
-    default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-    fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode, DirectoryEntryType,
-    DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    default_seek, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig,
+    CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
     MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp,
 };
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
@@ -304,6 +304,7 @@ struct ExtDirFileObject {
 
 impl FileOps for ExtDirFileObject {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,

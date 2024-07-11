@@ -172,17 +172,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Syncs cached state associated with the file descriptor to persistent storage.
     ///
     /// The method blocks until the synchronization is complete.
-    fn sync(&self, file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
-        if !file.node().is_reg() && !file.node().is_dir() {
-            return error!(EINVAL);
-        }
-        Ok(())
-    }
+    fn sync(&self, file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno>;
 
     /// Syncs cached data, and only enough metadata to retrieve said data, to persistent storage.
     ///
     /// The method blocks until the synchronization is complete.
     fn data_sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        // TODO(https://fxbug.dev/297305634) make a default macro once data can be done separately
         self.sync(file, current_task)
     }
 
@@ -619,6 +615,7 @@ pub fn unbounded_seek(current_offset: off_t, target: SeekTarget) -> Result<off_t
     default_seek(current_offset, target, |_| Ok(MAX_LFS_FILESIZE as off_t))
 }
 
+#[macro_export]
 macro_rules! fileops_impl_delegate_read_and_seek {
     ($self:ident, $delegate:expr) => {
         fn is_seekable(&self) -> bool {
@@ -716,6 +713,7 @@ macro_rules! fileops_impl_seekless {
     };
 }
 
+#[macro_export]
 macro_rules! fileops_impl_dataless {
     () => {
         fn write(
@@ -744,6 +742,7 @@ macro_rules! fileops_impl_dataless {
 
 /// Implements [`FileOps`] methods in a way that makes sense for directories. You must implement
 /// [`FileOps::seek`] and [`FileOps::readdir`].
+#[macro_export]
 macro_rules! fileops_impl_directory {
     () => {
         fn is_seekable(&self) -> bool {
@@ -774,11 +773,27 @@ macro_rules! fileops_impl_directory {
     };
 }
 
+#[macro_export]
+macro_rules! fileops_impl_noop_sync {
+    () => {
+        fn sync(
+            &self,
+            file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
+        ) -> Result<(), starnix_uapi::errors::Errno> {
+            if !file.node().is_reg() && !file.node().is_dir() {
+                return starnix_uapi::error!(EINVAL);
+            }
+            Ok(())
+        }
+    };
+}
+
 // Public re-export of macros allows them to be used like regular rust items.
 
-pub(crate) use {
+pub use {
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_nonseekable, fileops_impl_seekable, fileops_impl_seekless,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fileops_impl_seekable, fileops_impl_seekless,
 };
 
 pub fn default_ioctl(
@@ -870,6 +885,8 @@ impl OPathOps {
 }
 
 impl FileOps for OPathOps {
+    fileops_impl_noop_sync!();
+
     fn has_persistent_offsets(&self) -> bool {
         false
     }
@@ -981,6 +998,7 @@ impl FileOps for ProxyFileOps {
             cmd: u32,
             arg: u64,
         ) -> Result<SyscallResult, Errno>;
+        fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno>;
     }
     // These don't take &FileObject making it too hard to handle them properly in the macro
     fn query_events(

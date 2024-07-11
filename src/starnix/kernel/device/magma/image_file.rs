@@ -4,10 +4,10 @@
 
 use fuchsia_zircon::{AsHandleRef, HandleBased};
 use magma::magma_image_info_t;
-use starnix_core::fileops_impl_memory;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{Anon, FileHandle, FileOps, FsNodeInfo};
+use starnix_core::{fileops_impl_memory, fileops_impl_noop_sync};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Arc;
@@ -70,4 +70,5 @@ impl ImageFile {
 
 impl FileOps for ImageFile {
     fileops_impl_memory!(self, &self.memory);
+    fileops_impl_noop_sync!();
 }

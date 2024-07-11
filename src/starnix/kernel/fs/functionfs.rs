@@ -4,10 +4,10 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::{
-    fileops_impl_nonseekable, fs_args, fs_node_impl_dir_readonly, fs_node_impl_not_dir, CacheMode,
-    DirectoryEntryType, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr, InputBuffer, OutputBuffer,
-    VecDirectory, VecDirectoryEntry,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly,
+    fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
+    InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
 };
 use bstr::B;
 use starnix_logging::{log_warn, track_stub};
@@ -349,6 +349,7 @@ impl FsNodeOps for FunctionFsControlEndpoint {
 
 impl FileOps for FunctionFsControlEndpoint {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
         let rootdir = file
@@ -456,6 +457,7 @@ impl FsNodeOps for FunctionFsInputEndpoint {
 
 impl FileOps for FunctionFsInputEndpoint {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,
@@ -520,6 +522,7 @@ struct FunctionFsOutputFileObject;
 
 impl FileOps for FunctionFsOutputFileObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,

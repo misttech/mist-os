@@ -19,9 +19,9 @@ use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fs_node_impl_not_dir, Anon, CacheMode, FdNumber, FileHandle,
-    FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsContext,
-    FsNode, FsNodeOps, FsStr,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
+    FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::errors::Errno;
@@ -335,6 +335,7 @@ impl PanickingFile {
 
 impl FileOps for PanickingFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

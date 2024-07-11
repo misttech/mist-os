@@ -20,11 +20,11 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fs_node_impl_dir_readonly, BinderDriverReleaser, CacheMode,
-    DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode, VecDirectory,
-    VecDirectoryEntry,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    BinderDriverReleaser, CacheMode, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
+    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
+    VecDirectory, VecDirectoryEntry,
 };
 use bitflags::bitflags;
 use fidl::endpoints::ClientEnd;
@@ -172,6 +172,7 @@ impl BinderConnection {
 
 impl FileOps for BinderConnection {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
         self.close(current_task.kernel());

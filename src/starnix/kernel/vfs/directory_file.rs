@@ -4,8 +4,8 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::{
-    default_seek, fileops_impl_directory, DirectoryEntryType, DirentSink, FileObject, FileOps,
-    FsString, SeekTarget,
+    default_seek, fileops_impl_directory, fileops_impl_noop_sync, DirectoryEntryType, DirentSink,
+    FileObject, FileOps, FsString, SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
@@ -56,6 +56,7 @@ pub fn emit_dotdot(file: &FileObject, sink: &mut dyn DirentSink) -> Result<(), E
 
 impl FileOps for MemoryDirectoryFile {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,

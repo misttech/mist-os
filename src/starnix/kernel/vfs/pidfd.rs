@@ -6,7 +6,8 @@ use crate::task::{
     CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, ThreadGroup, WaitCanceler, Waiter,
 };
 use crate::vfs::{
-    fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
+    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
+    FileObject, FileOps,
 };
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use starnix_uapi::errors::Errno;
@@ -64,6 +65,7 @@ pub fn new_pidfd(current_task: &CurrentTask, proc: &ThreadGroup, flags: OpenFlag
 impl FileOps for PidFdFileObject {
     fileops_impl_nonseekable!();
     fileops_impl_dataless!();
+    fileops_impl_noop_sync!();
 
     fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
         Ok(self.pid)

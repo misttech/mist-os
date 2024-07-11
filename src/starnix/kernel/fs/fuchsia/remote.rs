@@ -12,11 +12,11 @@ use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
 use crate::vfs::{
     default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
-    fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink, Anon, AppendLockGuard,
-    CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
-    DEFAULT_BYTES_PER_BLOCK,
+    fileops_impl_noop_sync, fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink,
+    Anon, AppendLockGuard, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode,
+    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
+    SymlinkTarget, ValueOrSize, XattrOp, DEFAULT_BYTES_PER_BLOCK,
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
@@ -1571,6 +1571,7 @@ impl RemotePipeObject {
 
 impl FileOps for RemotePipeObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,

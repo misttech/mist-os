@@ -6,8 +6,8 @@
 
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
-    AppendLockGuard, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, InputBuffer,
-    OutputBuffer, SeekTarget,
+    fileops_impl_noop_sync, AppendLockGuard, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps,
+    FsStr, InputBuffer, OutputBuffer, SeekTarget,
 };
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -104,6 +104,8 @@ impl FsNodeOps for SysRqNode {
 pub struct SysRqFile {}
 
 impl FileOps for SysRqFile {
+    fileops_impl_noop_sync!();
+
     fn is_seekable(&self) -> bool {
         false
     }

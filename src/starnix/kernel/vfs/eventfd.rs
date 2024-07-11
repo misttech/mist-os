@@ -6,7 +6,9 @@ use starnix_sync::Mutex;
 
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
+};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -58,6 +60,7 @@ pub fn new_eventfd(
 
 impl FileOps for EventFdFileObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

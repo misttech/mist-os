@@ -13,10 +13,10 @@ use crate::mm::ProtectionFlags;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode,
-    FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryDirectoryFile,
-    MemoryXattrStorage, NamespaceNode, XattrOp,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir,
+    fs_node_impl_xattr_delegate, CacheMode, FdNumber, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
@@ -84,6 +84,7 @@ impl From<BpfTypeFormat> for BpfHandle {
 
 impl FileOps for BpfHandle {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
     fn read(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,

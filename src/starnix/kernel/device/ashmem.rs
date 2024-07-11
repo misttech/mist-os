@@ -9,7 +9,8 @@ use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::CurrentTask;
 use crate::vfs::{
-    default_ioctl, fileops_impl_memory, FileObject, FileOps, FileSystemCreator, FsNode, FsString,
+    default_ioctl, fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps,
+    FileSystemCreator, FsNode, FsString,
 };
 use fuchsia_zircon as zx;
 use linux_uapi::{
@@ -84,6 +85,7 @@ impl Ashmem {
 
 impl FileOps for Ashmem {
     fileops_impl_memory!(self, self.memory()?);
+    fileops_impl_noop_sync!();
 
     fn ioctl(
         &self,

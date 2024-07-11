@@ -4,8 +4,8 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, unbounded_seek, DirectoryEntryType, DirentSink,
-    FileObject, FileOps, FsString, SeekTarget,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, unbounded_seek,
+    DirectoryEntryType, DirentSink, FileObject, FileOps, FsString, SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
@@ -35,6 +35,7 @@ impl VecDirectory {
 
 impl FileOps for VecDirectory {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,

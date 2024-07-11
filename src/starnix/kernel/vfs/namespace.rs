@@ -24,10 +24,10 @@ use crate::vfs::fuse::{new_fuse_fs, new_fusectl_fs};
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
-    fs_node_impl_not_dir, CheckAccessReason, DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
-    FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode,
-    SymlinkTarget, UnlinkKind,
+    fileops_impl_noop_sync, fs_node_impl_not_dir, CheckAccessReason, DirEntry, DirEntryHandle,
+    DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, FileObject, FileOps,
+    FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
+    PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
 };
 use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
@@ -129,6 +129,7 @@ pub struct MountNamespaceFile(pub Arc<Namespace>);
 impl FileOps for MountNamespaceFile {
     fileops_impl_nonseekable!();
     fileops_impl_dataless!();
+    fileops_impl_noop_sync!();
 }
 
 /// An instance of a filesystem mounted in a namespace.
@@ -813,6 +814,7 @@ impl ProcMountsFile {
 
 impl FileOps for ProcMountsFile {
     fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

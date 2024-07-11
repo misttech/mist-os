@@ -6,8 +6,8 @@ use itertools::Itertools;
 
 use crate::task::CurrentTask;
 use crate::vfs::{
-    fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer,
-    SimpleFileNode,
+    fileops_impl_noop_sync, fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer,
+    OutputBuffer, SimpleFileNode,
 };
 use fidl_fuchsia_power_broker::PowerLevel;
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
@@ -83,6 +83,7 @@ impl PowerStateFile {
 
 impl FileOps for PowerStateFile {
     fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

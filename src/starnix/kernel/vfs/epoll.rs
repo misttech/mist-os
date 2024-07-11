@@ -8,7 +8,10 @@ use crate::task::{
     WaitQueue, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps, WeakFileHandle};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
+    WeakFileHandle,
+};
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_logging::log_warn;
@@ -470,6 +473,7 @@ impl EpollFileObject {
 
 impl FileOps for EpollFileObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

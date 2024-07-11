@@ -10,9 +10,9 @@ use crate::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless, Buffer,
-    FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString, InputBufferCallback,
-    PeekBufferSegmentsCallback,
+    default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
+    fileops_impl_seekless, Buffer, FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString,
+    InputBufferCallback, PeekBufferSegmentsCallback,
 };
 use bitflags::bitflags;
 use fuchsia_zircon::VmoChildOptions;
@@ -381,6 +381,14 @@ impl FileOps for LoopDeviceFile {
         Ok(Arc::new(memory_slice))
     }
 
+    fn sync(&self, _file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        if let Some(f) = self.device.backing_file() {
+            f.sync(current_task)
+        } else {
+            Ok(())
+        }
+    }
+
     fn ioctl(
         &self,
         _locked: &mut Locked<'_, Unlocked>,
@@ -705,6 +713,7 @@ impl LoopControlDevice {
 impl FileOps for LoopControlDevice {
     fileops_impl_seekless!();
     fileops_impl_dataless!();
+    fileops_impl_noop_sync!();
 
     fn ioctl(
         &self,

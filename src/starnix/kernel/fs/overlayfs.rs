@@ -6,12 +6,12 @@ use crate::mm::memory::MemoryObject;
 use crate::task::CurrentTask;
 use crate::vfs::rw_queue::RwQueueReadGuard;
 use crate::vfs::{
-    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable, fs_args,
-    AlreadyLockedAppendLockStrategy, AppendLockGuard, CacheMode, DirEntry, DirEntryHandle,
-    DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, InputBuffer, MountInfo, OutputBuffer, RenameFlags, SeekTarget,
-    SymlinkTarget, UnlinkKind, ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
+    default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync,
+    fileops_impl_seekable, fs_args, AlreadyLockedAppendLockStrategy, AppendLockGuard, CacheMode,
+    DirEntry, DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, InputBuffer, MountInfo, OutputBuffer, RenameFlags,
+    SeekTarget, SymlinkTarget, UnlinkKind, ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
 };
 use once_cell::sync::OnceCell;
 use rand::Rng;
@@ -816,6 +816,7 @@ impl OverlayDirectory {
 
 impl FileOps for OverlayDirectory {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,
@@ -923,6 +924,10 @@ impl FileOps for OverlayFile {
         };
         std::mem::drop(state);
         file.write_at(locked, current_task, offset, data)
+    }
+
+    fn sync(&self, _file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.state.read().file().sync(current_task)
     }
 
     fn get_memory(
