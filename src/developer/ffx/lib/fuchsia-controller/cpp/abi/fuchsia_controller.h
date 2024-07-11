@@ -40,8 +40,9 @@ extern zx_status_t ffx_connect_remote_control_proxy(ffx_env_context_t* ctx, zx_h
 extern zx_status_t ffx_connect_device_proxy(ffx_env_context_t* ctx, const char* moniker,
                                             const char* capability_name, zx_handle_t* out);
 // Attempts to wait (blocking) for a target to become available. Waits for `timeout_seconds`
-// fractional seconds before timing out.
-extern zx_status_t ffx_target_wait(ffx_env_context_t* ctx, double timeout_seconds);
+// seconds before timing out. Passing a timeout of zero means this function will wait an indefinite
+// amount of time.
+extern zx_status_t ffx_target_wait(ffx_env_context_t* ctx, uint64_t timeout_seconds);
 // Adds a fuchsia-target to the daemon instance of ffx.
 // Setting `wait` to true waits for an RCS connection to become available on the target before
 // returning.

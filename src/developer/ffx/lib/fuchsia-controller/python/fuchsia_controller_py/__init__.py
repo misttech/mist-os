@@ -219,11 +219,12 @@ class Context:
             self._handle, target, wait
         )
 
-    def target_wait(self, timeout: float) -> bool:
+    def target_wait(self, timeout: int) -> bool:
         """Waits for the target to be ready.
 
         Args:
-            timeout: The timeout in seconds.
+            timeout: The timeout in seconds. Zero is interpreted as an infinite
+                     timeout.
 
         Returns:
             True if the target is ready, False otherwise.

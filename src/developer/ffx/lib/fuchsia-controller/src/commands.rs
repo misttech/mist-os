@@ -142,7 +142,7 @@ pub(crate) enum LibraryCommand {
     },
     TargetWait {
         env: Arc<EnvContext>,
-        timeout: f64,
+        timeout: u64,
         responder: Responder<zx_status::Status>,
     },
 }
@@ -453,7 +453,7 @@ impl LibraryCommand {
                 };
                 responder.send(res).unwrap();
             }
-            Self::TargetWait { env, timeout: timeout_float, responder } => {
+            Self::TargetWait { env, timeout, responder } => {
                 let tc = match env.target_collection_proxy_factory().await {
                     Ok(tc) => tc,
                     Err(e) => {
@@ -472,11 +472,7 @@ impl LibraryCommand {
                         return;
                     }
                 };
-                let duration = if timeout_float > 0.0 {
-                    Some(Duration::from_secs_f64(timeout_float))
-                } else {
-                    None
-                };
+                let duration = if timeout > 0 { Some(Duration::from_secs(timeout)) } else { None };
                 match ffx_target::wait_for_device(
                     duration,
                     &env.context,
