@@ -914,6 +914,7 @@ async fn inspect_counters(name: &str) {
                     DroppedTentativeDst: 0u64,
                     DroppedNonUnicastSrc: 0u64,
                     DroppedExtensionHeader: 0u64,
+                    DroppedLoopedBackDadProbe: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,

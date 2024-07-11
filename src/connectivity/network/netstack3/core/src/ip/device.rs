@@ -51,8 +51,9 @@ use netstack3_ip::{
     self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
     IpSendFrameError, IpStateContext, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
-use packet::{EmptyBuf, Serializer};
-use packet_formats::icmp::ndp::{NeighborSolicitation, RouterSolicitation};
+use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
+use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
+use packet_formats::icmp::ndp::{NeighborSolicitation, OptionSequenceBuilder, RouterSolicitation};
 use packet_formats::icmp::IcmpUnusedCode;
 
 use crate::context::prelude::*;
@@ -798,19 +799,20 @@ impl<
         device_id: &Self::DeviceId,
         dst_ip: MulticastAddr<Ipv6Addr>,
         message: NeighborSolicitation,
+        nonce: NdpNonce<&[u8]>,
     ) -> Result<(), ()> {
-        let Self { config: _, core_ctx } = self;
+        let options = [NdpOptionBuilder::Nonce(nonce)];
         ip::icmp::send_ndp_packet(
-            core_ctx,
+            self,
             bindings_ctx,
             device_id,
             None,
             dst_ip.into_specified(),
-            EmptyBuf,
+            OptionSequenceBuilder::new(options.iter()).into_serializer(),
             IcmpUnusedCode,
             message,
         )
-        .map_err(|IpSendFrameError { serializer: EmptyBuf, error }| {
+        .map_err(|IpSendFrameError { serializer: _, error }| {
             debug!("error sending DAD packet: {error:?}")
         })
     }

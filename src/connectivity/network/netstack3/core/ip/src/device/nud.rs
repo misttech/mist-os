@@ -41,7 +41,7 @@ pub(crate) mod api;
 /// 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-const DEFAULT_MAX_MULTICAST_SOLICIT: NonZeroU16 =
+pub(crate) const DEFAULT_MAX_MULTICAST_SOLICIT: NonZeroU16 =
     const_unwrap::const_unwrap_option(NonZeroU16::new(3));
 
 /// The default maximum number of unicast solicitations as defined in [RFC 4861

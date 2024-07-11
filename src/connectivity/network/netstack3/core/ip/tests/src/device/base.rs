@@ -578,11 +578,11 @@ fn notify_on_dad_failure_ipv6() {
     // When DAD fails, an event should be emitted and the address should be
     // removed.
     assert_eq!(
-        Ipv6DeviceHandler::remove_duplicate_tentative_address(
+        Ipv6DeviceHandler::handle_received_neighbor_advertisement(
             &mut core_ctx.context(),
             bindings_ctx,
             &device_id,
-            assigned_addr.ipv6_unicast_addr()
+            assigned_addr.ipv6_unicast_addr(),
         ),
         IpAddressState::Tentative,
     );

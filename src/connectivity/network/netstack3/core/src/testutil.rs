@@ -661,6 +661,13 @@ impl FakeBindingsCtx {
     ) -> Vec<Vec<u8>> {
         self.state_mut().udp_state_mut::<I>().remove(conn).unwrap_or_else(Vec::default)
     }
+
+    /// Seed the RNG.
+    pub fn seed_rng(&self, seed: u128) {
+        self.with_inner_mut(|ctx| {
+            ctx.rng = FakeCryptoRng::new_xorshift(seed);
+        })
+    }
 }
 
 impl FilterBindingsTypes for FakeBindingsCtx {

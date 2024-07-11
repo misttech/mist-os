@@ -40,6 +40,8 @@ use crate::internal::gmp::mld::{MldGroupState, MldTimerId};
 use crate::internal::gmp::{GmpDelayedReportTimerId, GmpState, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
+use super::dad::NonceCollection;
+
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
@@ -784,7 +786,15 @@ pub enum Ipv6DadState<BT: DadBindingsTypes> {
     /// When `dad_transmits_remaining` is `None`, then no more DAD messages need
     /// to be sent and DAD may be resolved.
     #[allow(missing_docs)]
-    Tentative { dad_transmits_remaining: Option<NonZeroU16>, timer: BT::Timer },
+    Tentative {
+        dad_transmits_remaining: Option<NonZeroU16>,
+        timer: BT::Timer,
+        nonces: NonceCollection,
+        /// Initialized to false, and exists as a sentinel so that extra
+        /// transmits are added only after the first looped-back probe is
+        /// detected.
+        added_extra_transmits_after_detecting_looped_back_ns: bool,
+    },
 
     /// The address has not yet been initialized.
     Uninitialized,
@@ -1116,6 +1126,8 @@ mod tests {
                 Ipv6DadState::Tentative {
                     dad_transmits_remaining: None,
                     timer: bindings_ctx.new_timer(()),
+                    nonces: Default::default(),
+                    added_extra_transmits_after_detecting_looped_back_ns: false,
                 },
                 Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }),
             ))

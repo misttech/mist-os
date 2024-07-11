@@ -467,7 +467,7 @@ pub mod options {
     };
     use packet::BufferView as _;
     use zerocopy::byteorder::network_endian::U32;
-    use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell, Ref, Unaligned};
+    use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
 
     use super::NonZeroNdpLifetime;
     use crate::utils::NonZeroDuration;
@@ -499,6 +499,13 @@ pub mod options {
     ///
     /// [RFC 4861 section 4.6.4]: https://tools.ietf.org/html/rfc4861#section-4.6.4
     const MTU_OPTION_RESERVED_BYTES_LENGTH: usize = 2;
+
+    /// Minimum number of bytes in a Nonce option, excluding the kind and length bytes.
+    ///
+    /// See [RFC 3971 section 5.3.2] for more information.
+    ///
+    /// [RFC 3971 section 5.3.2]: https://tools.ietf.org/html/rfc3971#section-5.3.2
+    pub const MIN_NONCE_LENGTH: usize = 6;
 
     /// Minimum number of bytes in a Recursive DNS Server option, excluding the
     /// kind and length bytes.
@@ -842,10 +849,78 @@ pub mod options {
             PrefixInformation, 3, "Prefix Information";
             RedirectedHeader, 4, "Redirected Header";
             Mtu, 5, "MTU";
+            Nonce, 14, "Nonce";
             RouteInformation, 24, "Route Information";
             RecursiveDnsServer, 25, "Recursive DNS Server";
         }
     );
+
+    /// Nonce option used to make sure an advertisement is a fresh response to
+    /// a solicitation sent earlier.
+    ///
+    /// See [RFC 3971 section 5.3.2].
+    ///
+    /// [RFC 3971 section 5.3.2]: https://tools.ietf.org/html/rfc3971#section-5.3.2
+    #[derive(Debug, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+    pub struct NdpNonce<B: ByteSlice> {
+        nonce: B,
+    }
+
+    impl<B: ByteSlice> NdpNonce<B> {
+        /// The bytes of the nonce.
+        pub fn bytes(&self) -> &[u8] {
+            let Self { nonce } = self;
+            nonce.deref()
+        }
+
+        /// Constructs an `NdpNonce` from a `B: ByteSlice`, returning an error
+        /// if the resulting nonce would not have a valid length.
+        pub fn new(value: B) -> Result<Self, InvalidNonceError> {
+            let bytes = value.deref();
+            // As per RFC 3971 section 5.3.2, the length of the random number
+            // must be selected such that the length of the Nonce option
+            // (including the type and length bytes) is a multiple of 8 octets.
+            let nonce_option_length_bytes = bytes.len() + 2;
+            if nonce_option_length_bytes % 8 != 0 {
+                return Err(InvalidNonceError::ResultsInNonMultipleOf8);
+            }
+
+            let nonce_option_length_in_groups_of_8_bytes = nonce_option_length_bytes / 8;
+
+            // The nonce options's length (in terms of groups of 8 octets) would
+            // be too large to fit in a `u8`.
+            match u8::try_from(nonce_option_length_in_groups_of_8_bytes) {
+                Ok(_) => (),
+                Err(_) => return Err(InvalidNonceError::TooLong),
+            };
+
+            Ok(Self { nonce: value })
+        }
+    }
+
+    impl<B: ByteSlice> AsRef<[u8]> for NdpNonce<B> {
+        fn as_ref(&self) -> &[u8] {
+            self.bytes()
+        }
+    }
+
+    // Provide a `From` implementation for `[u8; MIN_NONCE_LENGTH]` since this
+    // is a common conversion and is convenient to make infallible.
+    impl<'a> From<&'a [u8; MIN_NONCE_LENGTH]> for NdpNonce<&'a [u8]> {
+        fn from(value: &'a [u8; MIN_NONCE_LENGTH]) -> Self {
+            Self { nonce: &value[..] }
+        }
+    }
+
+    /// Errors that may occur when constructing a Nonce option.
+    #[derive(Debug, PartialEq, Eq, Copy, Clone)]
+    pub enum InvalidNonceError {
+        /// The nonce's length is such that the nonce option's length would not
+        /// be a multiple of 8 octets.
+        ResultsInNonMultipleOf8,
+        /// The nonce is too long.
+        TooLong,
+    }
 
     /// NDP options that may be found in NDP messages.
     #[allow(missing_docs)]
@@ -858,9 +933,36 @@ pub mod options {
         RedirectedHeader { original_packet: &'a [u8] },
 
         Mtu(u32),
+        Nonce(NdpNonce<&'a [u8]>),
 
         RecursiveDnsServer(RecursiveDnsServer<'a>),
         RouteInformation(RouteInformation),
+    }
+
+    impl<'a> NdpOption<'a> {
+        /// Accessor for the `Nonce` case.
+        pub fn nonce(self) -> Option<NdpNonce<&'a [u8]>> {
+            match self {
+                NdpOption::Nonce(nonce) => Some(nonce),
+                _ => None,
+            }
+        }
+
+        /// Accessor for the `SourceLinkLayerAddress` case.
+        pub fn source_link_layer_address(self) -> Option<&'a [u8]> {
+            match self {
+                NdpOption::SourceLinkLayerAddress(a) => Some(a),
+                _ => None,
+            }
+        }
+
+        /// Accessor for the `TargetLinkLayerAddress` case.
+        pub fn target_link_layer_address(self) -> Option<&'a [u8]> {
+            match self {
+                NdpOption::TargetLinkLayerAddress(a) => Some(a),
+                _ => None,
+            }
+        }
     }
 
     /// An implementation of [`OptionsImpl`] for NDP options.
@@ -908,6 +1010,9 @@ pub mod options {
                 NdpOptionType::Mtu => NdpOption::Mtu(NetworkEndian::read_u32(
                     &data[MTU_OPTION_RESERVED_BYTES_LENGTH..],
                 )),
+                NdpOptionType::Nonce => NdpOption::Nonce(
+                    NdpNonce::new(data).map_err(|_: InvalidNonceError| OptionParseErr)?,
+                ),
                 NdpOptionType::RecursiveDnsServer => {
                     if data.len() < MIN_RECURSIVE_DNS_SERVER_OPTION_LENGTH {
                         return Err(OptionParseErr);
@@ -1012,6 +1117,7 @@ pub mod options {
         RedirectedHeader { original_packet: &'a [u8] },
 
         Mtu(u32),
+        Nonce(NdpNonce<&'a [u8]>),
 
         RouteInformation(RouteInformation),
         RecursiveDnsServer(RecursiveDnsServer<'a>),
@@ -1029,6 +1135,7 @@ pub mod options {
                 NdpOptionBuilder::PrefixInformation(_) => NdpOptionType::PrefixInformation,
                 NdpOptionBuilder::RedirectedHeader { .. } => NdpOptionType::RedirectedHeader,
                 NdpOptionBuilder::Mtu { .. } => NdpOptionType::Mtu,
+                NdpOptionBuilder::Nonce(_) => NdpOptionType::Nonce,
                 NdpOptionBuilder::RouteInformation(_) => NdpOptionType::RouteInformation,
                 NdpOptionBuilder::RecursiveDnsServer(_) => NdpOptionType::RecursiveDnsServer,
             }
@@ -1047,6 +1154,7 @@ pub mod options {
                     REDIRECTED_HEADER_OPTION_RESERVED_BYTES_LENGTH + original_packet.len()
                 }
                 NdpOptionBuilder::Mtu(_) => MTU_OPTION_LENGTH,
+                NdpOptionBuilder::Nonce(NdpNonce { nonce }) => nonce.len(),
                 NdpOptionBuilder::RouteInformation(o) => o.serialized_len(),
                 NdpOptionBuilder::RecursiveDnsServer(RecursiveDnsServer {
                     lifetime,
@@ -1088,6 +1196,9 @@ pub mod options {
                     reserved_bytes.copy_from_slice(&[0; MTU_OPTION_RESERVED_BYTES_LENGTH]);
                     mtu_bytes.copy_from_slice(U32::new(*mtu).as_bytes());
                 }
+                NdpOptionBuilder::Nonce(NdpNonce { nonce }) => {
+                    buffer.copy_from_slice(nonce);
+                }
                 NdpOptionBuilder::RouteInformation(p) => p.serialize(buffer),
                 NdpOptionBuilder::RecursiveDnsServer(RecursiveDnsServer {
                     lifetime,
@@ -1115,7 +1226,6 @@ pub mod options {
 
 #[cfg(test)]
 mod tests {
-
     use byteorder::{ByteOrder, NetworkEndian};
     use net_types::ip::{Ip, IpAddress, Subnet};
     use packet::serialize::Serializer;
@@ -1175,6 +1285,51 @@ mod tests {
         let parsed = parsed.iter().collect::<Vec<options::NdpOption<'_>>>();
         assert_eq!(parsed.len(), 1);
         assert_eq!(options::NdpOption::Mtu(expected_mtu), parsed[0]);
+    }
+
+    #[test_case(
+        options::MIN_NONCE_LENGTH - 1 =>
+            matches Err(options::InvalidNonceError::ResultsInNonMultipleOf8);
+        "resulting nonce option length must be multiple of 8")]
+    #[test_case(
+        options::MIN_NONCE_LENGTH => matches Ok(_);
+        "MIN_NONCE_LENGTH must validate successfully")]
+    #[test_case(
+        usize::from(u8::MAX) * 8 - 2 => matches Ok(_);
+        "maximum possible nonce length must validate successfully")]
+    #[test_case(
+        usize::from(u8::MAX) * 8 - 2 + 8 =>
+            matches Err(options::InvalidNonceError::TooLong);
+        "nonce option's length must fit in u8")]
+    fn nonce_length_validation(
+        length: usize,
+    ) -> Result<options::NdpNonce<&'static [u8]>, options::InvalidNonceError> {
+        let bytes = vec![0u8; length];
+        let bytes = Box::leak(Box::new(bytes));
+        options::NdpNonce::new(&bytes[..])
+    }
+
+    #[test]
+    fn parse_serialize_nonce_option() {
+        let expected_nonce: [u8; 6] = [1, 2, 3, 4, 5, 6];
+        let nonce = options::NdpNonce::new(&expected_nonce[..]).expect("should be valid nonce");
+        let options = &[options::NdpOptionBuilder::Nonce(nonce)];
+        let serialized = OptionSequenceBuilder::new(options.iter())
+            .into_serializer()
+            .serialize_vec_outer()
+            .unwrap();
+
+        // The first two bytes are the kind and length bytes, respectively,
+        // followed by the nonce bytes.
+        let mut expected_bytes: [u8; 8] = [14, 1, 0, 0, 0, 0, 0, 0];
+        expected_bytes[2..].copy_from_slice(&expected_nonce);
+
+        assert_eq!(serialized.as_ref(), expected_bytes);
+
+        let parsed = Options::parse(&expected_bytes[..]).unwrap();
+        let parsed = parsed.iter().collect::<Vec<options::NdpOption<'_>>>();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0], options::NdpOption::Nonce(nonce));
     }
 
     #[test]

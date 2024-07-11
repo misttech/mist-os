@@ -1426,6 +1426,9 @@ pub struct Ipv6RxCounters {
     /// Count of incoming IPv6 packets discarded while processing extension
     /// headers.
     pub extension_header_discard: Counter,
+    /// Count of incoming neighbor solicitations discarded as looped-back
+    /// DAD probes.
+    pub drop_looped_back_dad_probe: Counter,
 }
 
 impl Inspectable for Ipv6RxCounters {
@@ -1436,12 +1439,14 @@ impl Inspectable for Ipv6RxCounters {
             drop_for_tentative,
             non_unicast_source,
             extension_header_discard,
+            drop_looped_back_dad_probe,
         } = self;
         inspector.record_counter("DeliveredMulticast", deliver_multicast);
         inspector.record_counter("DeliveredUnicast", deliver_unicast);
         inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
         inspector.record_counter("DroppedNonUnicastSrc", non_unicast_source);
         inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
+        inspector.record_counter("DroppedLoopedBackDadProbe", drop_looped_back_dad_probe);
     }
 }
 

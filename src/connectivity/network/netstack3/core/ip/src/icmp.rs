@@ -1217,11 +1217,12 @@ fn receive_ndp_packet<
                     //       which this message is sent or (if Duplicate Address
                     //       Detection is in progress [ADDRCONF]) the
                     //       unspecified address.
-                    match Ipv6DeviceHandler::remove_duplicate_tentative_address(
+                    match Ipv6DeviceHandler::handle_received_dad_neighbor_solicitation(
                         core_ctx,
                         bindings_ctx,
                         &device_id,
                         target_address,
+                        p.body().iter().find_map(|option| option.nonce()),
                     ) {
                         IpAddressState::Assigned => {
                             // Address is assigned to us to we let the
@@ -1266,15 +1267,7 @@ fn receive_ndp_packet<
                         }
                     }
 
-                    let link_addr = p.body().iter().find_map(|o| match o {
-                        NdpOption::SourceLinkLayerAddress(a) => Some(a),
-                        NdpOption::TargetLinkLayerAddress(_)
-                        | NdpOption::PrefixInformation(_)
-                        | NdpOption::RedirectedHeader { .. }
-                        | NdpOption::RecursiveDnsServer(_)
-                        | NdpOption::RouteInformation(_)
-                        | NdpOption::Mtu(_) => None,
-                    });
+                    let link_addr = p.body().iter().find_map(|o| o.source_link_layer_address());
 
                     if let Some(link_addr) = link_addr {
                         NudIpHandler::handle_neighbor_probe(
@@ -1325,7 +1318,7 @@ fn receive_ndp_packet<
 
             core_ctx.increment(|counters| &counters.rx.neighbor_advertisement);
 
-            match Ipv6DeviceHandler::remove_duplicate_tentative_address(
+            match Ipv6DeviceHandler::handle_received_neighbor_advertisement(
                 core_ctx,
                 bindings_ctx,
                 &device_id,
@@ -1366,15 +1359,7 @@ fn receive_ndp_packet<
                 }
             }
 
-            let link_addr = p.body().iter().find_map(|o| match o {
-                NdpOption::TargetLinkLayerAddress(a) => Some(a),
-                NdpOption::SourceLinkLayerAddress(_)
-                | NdpOption::PrefixInformation(_)
-                | NdpOption::RedirectedHeader { .. }
-                | NdpOption::RecursiveDnsServer(_)
-                | NdpOption::RouteInformation(_)
-                | NdpOption::Mtu(_) => None,
-            });
+            let link_addr = p.body().iter().find_map(|o| o.target_link_layer_address());
             let link_addr = match link_addr {
                 Some(a) => a,
                 None => {
@@ -1463,7 +1448,8 @@ fn receive_ndp_packet<
                 match option {
                     NdpOption::TargetLinkLayerAddress(_)
                     | NdpOption::RedirectedHeader { .. }
-                    | NdpOption::RecursiveDnsServer(_) => {}
+                    | NdpOption::RecursiveDnsServer(_)
+                    | NdpOption::Nonce(_) => {}
                     NdpOption::SourceLinkLayerAddress(addr) => {
                         debug!("processing SourceLinkLayerAddress option in RA: {:?}", addr);
                         // As per RFC 4861 section 6.3.4,
@@ -2883,6 +2869,7 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
+    use packet_formats::icmp::ndp::options::NdpNonce;
 
     use core::time::Duration;
 
@@ -3394,7 +3381,17 @@ mod tests {
             unimplemented!()
         }
 
-        fn remove_duplicate_tentative_address(
+        fn handle_received_dad_neighbor_solicitation(
+            &mut self,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
+            _device_id: &Self::DeviceId,
+            _addr: UnicastAddr<Ipv6Addr>,
+            _nonce: Option<NdpNonce<&'_ [u8]>>,
+        ) -> IpAddressState {
+            unimplemented!()
+        }
+
+        fn handle_received_neighbor_advertisement(
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
