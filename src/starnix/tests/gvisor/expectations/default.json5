@@ -711,9 +711,6 @@
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.Sysemu_PokeUser",
 
-                // pty_test
-                "JobControlTest.ControllingProcessPersistsAfterChildExists",
-
                 // rlimits_test
                 "RlimitTest.RlimitNProc",
 

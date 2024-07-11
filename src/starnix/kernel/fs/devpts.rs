@@ -572,7 +572,7 @@ where
         }
         TIOCGPGRP => {
             // Get the foreground process group.
-            let pgid = current_task.thread_group.get_foreground_process_group(terminal, is_main)?;
+            let pgid = current_task.thread_group.get_foreground_process_group(terminal)?;
             current_task.write_object(UserRef::<pid_t>::new(user_addr), &pgid)?;
             Ok(SUCCESS)
         }
@@ -583,7 +583,6 @@ where
                 locked,
                 current_task,
                 terminal,
-                is_main,
                 pgid,
             )?;
             Ok(SUCCESS)
@@ -602,11 +601,10 @@ where
                 current_task.read_object(UserRef::<uapi::winsize>::new(user_addr))?;
 
             // Send a SIGWINCH signal to the foreground process group.
-            let foreground_process_group = terminal
-                .read()
-                .get_controlling_session(is_main)
-                .as_ref()
-                .and_then(|cs| cs.foregound_process_group.upgrade());
+            let foreground_process_group =
+                terminal.read().controller.as_ref().and_then(|terminal_controller| {
+                    terminal_controller.get_foreground_process_group()
+                });
             if let Some(process_group) = foreground_process_group {
                 process_group.send_signals(locked, &[SIGWINCH]);
             }
@@ -1205,10 +1203,14 @@ mod tests {
             error!(ENOTTY)
         );
 
-        set_controlling_terminal(&mut locked, &task2, &opened_replica, false).unwrap();
+        // Cannot steal terminal using the replica.
+        assert_eq!(
+            set_controlling_terminal(&mut locked, &task2, &opened_replica, false),
+            error!(EPERM)
+        );
         assert_eq!(
             ioctl::<i32>(&mut locked, &task2, &opened_replica, TIOCGPGRP, &0),
-            Ok(task2.thread_group.read().process_group.leader)
+            error!(ENOTTY)
         );
     }
 
@@ -1344,7 +1346,7 @@ mod tests {
         );
         assert!(task2.read().has_signal_pending(SIGTTOU));
 
-        // Set the foregound process to task2 process group
+        // Set the foreground process to task2 process group
         ioctl::<i32>(&mut locked, &task1, &opened_replica, TIOCSPGRP, &task2_pgid).unwrap();
 
         // Check that the foreground process has been changed.
@@ -1363,10 +1365,14 @@ mod tests {
         assert_eq!(
             terminal
                 .read()
-                .get_controlling_session(false)
+                .controller
                 .as_ref()
                 .unwrap()
-                .foregound_process_group_leader,
+                .session
+                .upgrade()
+                .unwrap()
+                .read()
+                .get_foreground_process_group_leader(),
             task2_pgid
         );
     }

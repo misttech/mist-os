@@ -22,9 +22,9 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGINT, SIGQUIT, SIGSTOP};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    cc_t, error, pid_t, tcflag_t, uapi, ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT,
-    ICANON, ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY,
-    VEOF, VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, VWERASE, XTABS,
+    cc_t, error, tcflag_t, uapi, ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT, ICANON,
+    ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF,
+    VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, VWERASE, XTABS,
 };
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of
@@ -151,11 +151,8 @@ pub struct TerminalMutableState {
     /// Wait queue for the replica side of the terminal.
     replica_wait_queue: WaitQueue,
 
-    /// The controlling sessions for the main side of the terminal.
-    main_controlling_session: Option<ControllingSession>,
-
-    /// The controlling sessions for the replica side of the terminal.
-    replica_controlling_session: Option<ControllingSession>,
+    /// The controller for the terminal.
+    pub controller: Option<TerminalController>,
 }
 
 /// State of a given terminal. This object handles both the main and the replica terminal.
@@ -218,16 +215,14 @@ impl Terminal {
     /// `read` implementation of the main side of the terminal.
     pub fn main_read<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let (bytes, signals) = self.write().main_read(current_task, data)?;
-        self.send_signals(locked, signals);
-        Ok(bytes)
+        self.write().main_read(current_task, data)
     }
 
     /// `write` implementation of the main side of the terminal.
@@ -273,31 +268,27 @@ impl Terminal {
     /// `read` implementation of the replica side of the terminal.
     pub fn replica_read<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let (bytes, signals) = self.write().replica_read(current_task, data)?;
-        self.send_signals(locked, signals);
-        Ok(bytes)
+        self.write().replica_read(current_task, data)
     }
 
     /// `write` implementation of the replica side of the terminal.
     pub fn replica_write<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let (bytes, signals) = self.write().replica_write(current_task, data)?;
-        self.send_signals(locked, signals);
-        Ok(bytes)
+        self.write().replica_write(current_task, data)
     }
 
     /// Send the pending signals to the associated foreground process groups if they exist.
@@ -305,18 +296,22 @@ impl Terminal {
     where
         L: LockBefore<ProcessGroupState>,
     {
-        for is_input in &[false, true] {
-            let signals = signals.signals(*is_input);
-            if !signals.is_empty() {
-                let process_group = self
-                    .read()
-                    .get_controlling_session(*is_input)
-                    .as_ref()
-                    .and_then(|cs| cs.foregound_process_group.upgrade());
-                if let Some(process_group) = process_group {
-                    process_group.send_signals(locked, signals);
-                }
-            }
+        let signals = signals.signals();
+        if !signals.is_empty() {
+            let process_group = {
+                let terminal_state = self.read();
+                let Some(controller) = terminal_state.controller.as_ref() else {
+                    return;
+                };
+                let Some(session) = controller.session.upgrade() else {
+                    return;
+                };
+                let Some(process_group) = session.read().get_foreground_process_group() else {
+                    return;
+                };
+                process_group
+            };
+            process_group.send_signals(locked, signals);
         }
     }
 
@@ -351,65 +346,31 @@ macro_rules! with_queue {
 /// Keep track of the signals to send when handling terminal content.
 #[must_use]
 pub struct PendingSignals {
-    pub input_signals: Vec<Signal>,
-    pub output_signals: Vec<Signal>,
+    signals: Vec<Signal>,
 }
 
 impl PendingSignals {
     pub fn new() -> Self {
-        Self { input_signals: vec![], output_signals: vec![] }
+        Self { signals: vec![] }
     }
 
     /// Add the given signal to the list of signal to send to the associate process group.
-    pub fn add(&mut self, signal: Signal, is_input: bool) {
-        if is_input {
-            self.input_signals.push(signal);
-        } else {
-            self.output_signals.push(signal);
-        }
+    fn add(&mut self, signal: Signal) {
+        self.signals.push(signal);
     }
 
     /// Append all pending signals in `other` to `self`.
-    pub fn append(&mut self, mut other: Self) {
-        self.input_signals.append(&mut other.input_signals);
-        self.output_signals.append(&mut other.output_signals);
+    fn append(&mut self, mut other: Self) {
+        self.signals.append(&mut other.signals);
     }
 
-    pub fn signals(&self, is_input: bool) -> &[Signal] {
-        if is_input {
-            &self.input_signals[..]
-        } else {
-            &self.output_signals[..]
-        }
+    pub fn signals(&self) -> &[Signal] {
+        &self.signals[..]
     }
 }
 
 #[apply(state_implementation!)]
 impl TerminalMutableState<Base = Terminal> {
-    /// Returns the controlling session of the terminal. |is_main| is used to choose whether the
-    /// caller needs the controlling session of the main part of the terminal or the replica.
-    pub fn get_controlling_session(&self, is_main: bool) -> &Option<ControllingSession> {
-        if is_main {
-            &self.main_controlling_session
-        } else {
-            &self.replica_controlling_session
-        }
-    }
-
-    /// Returns a mutable reference to the session of the terminal. |is_main| is used to choose
-    /// whether the caller needs the controlling session of the main part of the terminal or the
-    /// replica.
-    pub fn get_controlling_session_mut(
-        &mut self,
-        is_main: bool,
-    ) -> &mut Option<ControllingSession> {
-        if is_main {
-            &mut self.main_controlling_session
-        } else {
-            &mut self.replica_controlling_session
-        }
-    }
-
     /// Returns the terminal configuration.
     pub fn termios(&self) -> &uapi::termios {
         &self.termios
@@ -473,7 +434,7 @@ impl TerminalMutableState<Base = Terminal> {
         &mut self,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-    ) -> Result<(usize, PendingSignals), Errno> {
+    ) -> Result<usize, Errno> {
         if self.is_replica_closed() && self.output_queue().readable_size() == 0 {
             return error!(EIO);
         }
@@ -531,9 +492,9 @@ impl TerminalMutableState<Base = Terminal> {
         &mut self,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-    ) -> Result<(usize, PendingSignals), Errno> {
+    ) -> Result<usize, Errno> {
         if self.is_main_closed() {
-            return Ok((0, PendingSignals::new()));
+            return Ok(0);
         }
         let result = with_queue!(self.input_queue.read(self.as_mut(), current_task, data))?;
         self.notify_waiters();
@@ -545,13 +506,15 @@ impl TerminalMutableState<Base = Terminal> {
         &mut self,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
-    ) -> Result<(usize, PendingSignals), Errno> {
+    ) -> Result<usize, Errno> {
         if self.is_main_closed() {
             return error!(EIO);
         }
-        let result = with_queue!(self.output_queue.write(self.as_mut(), current_task, data))?;
+        let (read_from_userspace, signals) =
+            with_queue!(self.output_queue.write(self.as_mut(), current_task, data))?;
+        assert!(signals.signals().is_empty());
         self.notify_waiters();
-        Ok(result)
+        Ok(read_from_userspace)
     }
 
     /// Returns the input_queue. The Option is always filled, see `input_queue` description.
@@ -601,16 +564,12 @@ impl TerminalMutableState<Base = Terminal> {
         if is_input {
             self.transform_input(queue, buffer)
         } else {
-            self.transform_output(queue, buffer)
+            (self.transform_output(queue, buffer), PendingSignals::new())
         }
     }
 
     /// Transformation method for the output queue. See `transform`.
-    fn transform_output(
-        &mut self,
-        queue: &mut Queue,
-        original_buffer: &[RawByte],
-    ) -> (usize, PendingSignals) {
+    fn transform_output(&mut self, queue: &mut Queue, original_buffer: &[RawByte]) -> usize {
         let mut buffer = original_buffer;
 
         // transform_output is effectively always in noncanonical mode, as the
@@ -621,20 +580,15 @@ impl TerminalMutableState<Base = Terminal> {
             if !queue.read_buffer.is_empty() {
                 queue.readable = true;
             }
-            return (buffer.len(), PendingSignals::new());
+            return buffer.len();
         }
 
         let mut return_value = 0;
-        let mut signals = PendingSignals::new();
         while !buffer.is_empty() {
             let size = compute_next_character_size(buffer, &self.termios);
             let mut character_bytes = buffer[..size].to_vec();
             return_value += size;
             buffer = &buffer[size..];
-            // It is guaranteed that character_bytes has at least one element.
-            if let Some(signal) = self.handle_signals(character_bytes[0]) {
-                signals.add(signal, false);
-            }
             match character_bytes[0] {
                 b'\n' => {
                     if self.termios.has_output_flags(ONLRET) {
@@ -681,7 +635,7 @@ impl TerminalMutableState<Base = Terminal> {
         if !queue.read_buffer.is_empty() {
             queue.readable = true;
         }
-        (return_value, signals)
+        return_value
     }
 
     /// Transformation method for the input queue. See `transform`.
@@ -711,7 +665,7 @@ impl TerminalMutableState<Base = Terminal> {
             let mut character_bytes = buffer[..size].to_vec();
             // It is guaranteed that character_bytes has at least one element.
             if let Some(signal) = self.handle_signals(character_bytes[0]) {
-                signals.add(signal, true);
+                signals.add(signal);
             }
             match character_bytes[0] {
                 b'\r' => {
@@ -850,28 +804,17 @@ impl Drop for Terminal {
 /// The controlling session of a terminal. Is is associated to a single side of the terminal,
 /// either main or replica.
 #[derive(Debug)]
-pub struct ControllingSession {
-    /// The controlling session.
+pub struct TerminalController {
     pub session: Weak<Session>,
-    /// The foreground process group.
-    pub foregound_process_group: Weak<ProcessGroup>,
-    /// The identifier of the foreground process group. This is necessary because the leader must
-    /// be returned even if the process group has already been deleted.
-    pub foregound_process_group_leader: pid_t,
 }
 
-impl ControllingSession {
-    pub fn new(process_group: &Arc<ProcessGroup>) -> Option<Self> {
-        Some(Self {
-            session: Arc::downgrade(&process_group.session),
-            foregound_process_group: Arc::downgrade(process_group),
-            foregound_process_group_leader: process_group.leader,
-        })
+impl TerminalController {
+    pub fn new(session: &Arc<Session>) -> Option<Self> {
+        Some(Self { session: Arc::downgrade(&session) })
     }
 
-    pub fn set_foregound_process_group(&self, process_group: &Arc<ProcessGroup>) -> Option<Self> {
-        assert!(self.session.upgrade().as_ref() == Some(&process_group.session));
-        Self::new(process_group)
+    pub fn get_foreground_process_group(&self) -> Option<Arc<ProcessGroup>> {
+        self.session.upgrade().and_then(|session| session.read().get_foreground_process_group())
     }
 }
 
@@ -1136,7 +1079,7 @@ impl Queue {
         terminal: TerminalStateMutRef<'_>,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-    ) -> Result<(usize, PendingSignals), Errno> {
+    ) -> Result<usize, Errno> {
         if !self.readable {
             return error!(EAGAIN);
         }
@@ -1149,8 +1092,8 @@ impl Queue {
         }
 
         let signals = self.drain_waiting_buffer(terminal);
-
-        Ok((written_to_userspace, signals))
+        assert!(signals.signals().is_empty());
+        Ok(written_to_userspace)
     }
 
     /// Writes to the queue from `data`. Returns the number of bytes copied.

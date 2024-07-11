@@ -22,6 +22,10 @@ pub struct SessionMutableState {
     /// themselves before they are deleted.
     process_groups: BTreeMap<pid_t, Weak<ProcessGroup>>,
 
+    /// The leader of the foreground process group. This is necessary because the leader must
+    /// be returned even if the process group has already been deleted.
+    foreground_process_group: pid_t,
+
     /// The controlling terminal of the session.
     pub controlling_terminal: Option<ControllingTerminal>,
 }
@@ -59,6 +63,7 @@ impl Session {
             leader,
             mutable_state: RwLock::new(SessionMutableState {
                 process_groups: BTreeMap::new(),
+                foreground_process_group: leader,
                 controlling_terminal: None,
             }),
         })
@@ -77,6 +82,18 @@ impl SessionMutableState<Base = Session> {
     pub fn insert(&mut self, process_group: &Arc<ProcessGroup>) {
         self.process_groups.insert(process_group.leader, Arc::downgrade(process_group));
     }
+
+    pub fn get_foreground_process_group_leader(&self) -> pid_t {
+        self.foreground_process_group
+    }
+
+    pub fn get_foreground_process_group(&self) -> Option<Arc<ProcessGroup>> {
+        self.process_groups.get(&self.foreground_process_group).and_then(Weak::upgrade)
+    }
+
+    pub fn set_foreground_process_group(&mut self, process_group: &Arc<ProcessGroup>) {
+        self.foreground_process_group = process_group.leader;
+    }
 }
 
 /// The controlling terminal of a session.
@@ -91,5 +108,9 @@ pub struct ControllingTerminal {
 impl ControllingTerminal {
     pub fn new(terminal: Arc<Terminal>, is_main: bool) -> Self {
         Self { terminal, is_main }
+    }
+
+    pub fn matches(&self, terminal: &Arc<Terminal>, is_main: bool) -> bool {
+        Arc::ptr_eq(terminal, &self.terminal) && is_main == self.is_main
     }
 }
