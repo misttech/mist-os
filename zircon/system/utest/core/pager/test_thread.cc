@@ -33,6 +33,7 @@ TestThread::~TestThread() {
 
 bool TestThread::Start() {
   constexpr const char* kName = "test_thread";
+  ZX_ASSERT(thrd_ == 0);
 
   if (thrd_create_with_name(&thrd_, test_thread_fn, this, kName) != thrd_success) {
     return false;
