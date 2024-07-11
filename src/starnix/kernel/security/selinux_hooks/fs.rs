@@ -30,8 +30,6 @@ use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::sync::Arc;
 
-const SELINUX_PERMS: &[&str] = &["add", "find", "read", "set"];
-
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
@@ -598,16 +596,73 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
             self.security_server.class_id_by_name(&name.to_string()).map_err(|_| errno!(EINVAL))?;
         let index_bytes = format!("{}", id).into_bytes();
         dir.entry(current_task, "index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
-        // TODO(329440571): Get the correct permission for the class and any others listed in CommonSymbol.
-        if self.security_server.is_fake() {
-            dir.subdir(current_task, "perms", 0o555, |perms| {
-                for (i, perm) in SELINUX_PERMS.iter().enumerate() {
-                    let node = BytesFile::new_node(format!("{}", i + 1).into_bytes());
-                    perms.entry(current_task, perm, node, mode!(IFREG, 0o444));
-                }
-            });
-        }
+        dir.entry(
+            current_task,
+            "perms",
+            SeLinuxPermsDirectory::new(self.security_server.clone(), name.to_string()),
+            mode!(IFDIR, 0o555),
+        );
         Ok(dir.build(current_task).clone())
+    }
+}
+
+/// Represents the perms/ directory under each class entry of the SeLinuxClassDirectory.
+struct SeLinuxPermsDirectory {
+    security_server: Arc<SecurityServer>,
+    class_name: String,
+}
+
+impl SeLinuxPermsDirectory {
+    fn new(security_server: Arc<SecurityServer>, class_name: String) -> Arc<Self> {
+        Arc::new(Self { security_server, class_name })
+    }
+}
+
+impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
+    fs_node_impl_dir_readonly!();
+
+    /// Lists all available permissions for the corresponding class.
+    fn create_file_ops(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(VecDirectory::new_file(
+            self.security_server
+                .class_permissions_by_name(&self.class_name)
+                .map_err(|_| errno!(ENOENT))?
+                .iter()
+                .map(|(_permission_id, permission_name)| VecDirectoryEntry {
+                    entry_type: DirectoryEntryType::DIR,
+                    name: permission_name.clone().into(),
+                    inode: None,
+                })
+                .collect(),
+        ))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        let found_permission_id = self
+            .security_server
+            .class_permissions_by_name(&(self.class_name))
+            .map_err(|_| errno!(ENOENT))?
+            .iter()
+            .find(|(_permission_id, permission_name)| permission_name == name.as_bytes())
+            .ok_or(errno!(ENOENT))?
+            .0;
+
+        Ok(node.fs().create_node(
+            current_task,
+            BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
+            FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
+        ))
     }
 }
 

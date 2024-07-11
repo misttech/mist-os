@@ -357,7 +357,7 @@ impl SecurityServer {
     /// Returns the class identifier of a class, if it exists.
     pub fn class_id_by_name(&self, name: &str) -> Result<u32, ()> {
         let locked_state = self.state.lock();
-        let found_class_id = locked_state
+        Ok(locked_state
             .policy
             .as_ref()
             .unwrap()
@@ -366,8 +366,13 @@ impl SecurityServer {
             .iter()
             .find(|class| class.class_name == name.as_bytes())
             .ok_or(())?
-            .class_id;
-        Ok(found_class_id)
+            .class_id)
+    }
+
+    /// Returns the class identifier of a class, if it exists.
+    pub fn class_permissions_by_name(&self, name: &str) -> Result<Vec<(u32, Vec<u8>)>, ()> {
+        let locked_state = self.state.lock();
+        locked_state.policy.as_ref().unwrap().parsed.find_class_permissions_by_name(name)
     }
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
