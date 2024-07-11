@@ -26,7 +26,6 @@ group("tools") {
   # as `testonly` to achieve that purpose.
   testonly = true
   deps = [
-    "bin/display-factory-test",
     "bin/display-png",
     "bin/display-tool",
     "bin/display-tweak",
