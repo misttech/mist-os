@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-gpu-device.h"
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -20,6 +19,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {

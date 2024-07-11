@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/pmt.h>
@@ -18,6 +17,7 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {

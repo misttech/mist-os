@@ -6,10 +6,11 @@
 
 #include <fidl/fuchsia.gpu.virtio/cpp/wire.h>
 #include <lib/async/dispatcher.h>
-#include <lib/ddk/debug.h>
 #include <lib/stdcompat/span.h>
 
 #include <cstdint>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio_display {
 

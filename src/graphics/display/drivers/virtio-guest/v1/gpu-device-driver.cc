@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/virtio-guest/v1/gpu-device-driver.h"
 
 #include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/virtio/driver_utils.h>
 #include <lib/zx/result.h>
@@ -26,6 +25,7 @@
 #include "src/graphics/display/drivers/virtio-guest/v1/display-device-driver.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/gpu-control-device-driver.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio_display {
 

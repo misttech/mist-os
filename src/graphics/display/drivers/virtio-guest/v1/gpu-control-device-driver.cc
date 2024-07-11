@@ -5,11 +5,12 @@
 #include "src/graphics/display/drivers/virtio-guest/v1/gpu-control-device-driver.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <ddktl/device.h>
 #include <fbl/alloc_checker.h>
+
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio_display {
 

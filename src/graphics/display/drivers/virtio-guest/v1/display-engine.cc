@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/stdcompat/span.h>
@@ -45,6 +44,7 @@
 #include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 #include "src/lib/fxl/strings/string_printf.h"
 

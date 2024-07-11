@@ -28,19 +28,14 @@ group("tests") {
 
 source_set("gpu_control_server") {
   sources = [
-    "gpu-control-device-driver.cc",
-    "gpu-control-device-driver.h",
     "gpu-control-server.cc",
     "gpu-control-server.h",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.gpu.virtio:fuchsia.gpu.virtio_cpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/bin/driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//sdk/lib/stdcompat",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
+    "//zircon/system/ulib/async",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -53,13 +48,9 @@ source_set("common_srcs") {
     "display-coordinator-events-banjo.cc",
     "display-coordinator-events-banjo.h",
     "display-coordinator-events-interface.h",
-    "display-device-driver.cc",
-    "display-device-driver.h",
     "display-engine-interface.h",
     "display-engine.cc",
     "display-engine.h",
-    "gpu-device-driver.cc",
-    "gpu-device-driver.h",
     "virtio-gpu-device.cc",
     "virtio-gpu-device.h",
     "virtio-pci-device.cc",
@@ -71,12 +62,10 @@ source_set("common_srcs") {
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
-    "//src/devices/bus/lib/virtio",
-    "//src/devices/lib/driver",
+    "//src/devices/bus/lib/virtio:virtio-common",
     "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/graphics/lib/virtio:virtio-spec",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/fxl",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/sysmem-version",
@@ -102,6 +91,7 @@ test("virtio-gpu-test") {
     "//sdk/lib/async-loop-testing/cpp",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/no_ddk",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
@@ -117,9 +107,25 @@ fuchsia_driver("driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   output_name = "virtio_gpu_v1"
+  sources = [
+    "display-device-driver.cc",
+    "display-device-driver.h",
+    "gpu-control-device-driver.cc",
+    "gpu-control-device-driver.h",
+    "gpu-device-driver.cc",
+    "gpu-device-driver.h",
+  ]
   deps = [
     ":common_srcs",
     ":virtio_gpu_bind_v1",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/lib/driver",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
   ]
 }
 

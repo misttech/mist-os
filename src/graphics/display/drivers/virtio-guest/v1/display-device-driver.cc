@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v1/display-device-driver.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -17,6 +16,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v1/display-controller-banjo.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio_display {
 
