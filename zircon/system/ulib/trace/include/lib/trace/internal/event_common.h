@@ -4,6 +4,8 @@
 
 // This file contains definitions common to userspace and DDK tracing.
 
+// IWYU pragma: private, include <lib/trace/event.h>
+
 #ifndef LIB_TRACE_INTERNAL_EVENT_COMMON_H_
 #define LIB_TRACE_INTERNAL_EVENT_COMMON_H_
 
