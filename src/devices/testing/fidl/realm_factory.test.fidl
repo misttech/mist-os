@@ -22,16 +22,20 @@ type RealmOptions = resource table {
     /// This is optional.
     2: driver_test_realm_url fuchsia.url.Url;
 
+    /// DEPRECATED: In API level 20 and up, the |dictionary| can provide access to the devfs.
     /// The server end that the topological devfs gets served on.
     /// This is optional.
     3: dev_topological server_end:fuchsia.io.Directory;
+
+    /// DEPRECATED: In API level 20 and up, the |dictionary| can provide access to the devfs.
     /// The server end that the class based devfs gets served on.
     /// This is optional.
     4: dev_class server_end:fuchsia.io.Directory;
 
-    /// This is the client end to a directory that provides all of the |offers| specified in the
-    /// |driver_test_realm_start_args| to drivers under test.
-    /// This is required if and only if |offers| is provided in |driver_test_realm_start_args|.
+    /// This is the client end to a directory that provides all of the |dtr_offers|, or the
+    /// deprecated |offers|, specified in the |driver_test_realm_start_args| to drivers under test.
+    /// This is required if and only if |dtr_offers| or |offers| is provided in
+    /// |driver_test_realm_start_args|.
     5: offers_client client_end:fuchsia.io.Directory;
 };
 

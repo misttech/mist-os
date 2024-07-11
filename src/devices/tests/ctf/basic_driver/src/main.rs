@@ -50,8 +50,6 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace
     Ok(ns)
 }
 
-// TODO(b/324834340): Re-enable once no longer flaky
-#[ignore]
 #[fuchsia::test]
 async fn test_basic_driver() -> Result<()> {
     let (pkg_client, pkg_server) = create_endpoints();
@@ -63,24 +61,24 @@ async fn test_basic_driver() -> Result<()> {
     .expect("Could not open /pkg");
 
     let (offers_client, offers_server) = create_endpoints();
-
-    let (devfs_client, devfs_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-
     let realm_options = ftest::RealmOptions {
         driver_test_realm_start_args: Some(fdt::RealmArgs {
             pkg: Some(pkg_client),
-            offers: Some(vec![fdt::Offer {
-                protocol_name: ctf::WaiterMarker::PROTOCOL_NAME.to_string(),
-                collection: fdt::Collection::PackageDrivers,
-            }]),
-            exposes: Some(vec![fdt::Expose {
-                service_name: ctf::ServiceMarker::SERVICE_NAME.to_string(),
-                collection: fdt::Collection::PackageDrivers,
-            }]),
+            dtr_offers: Some(vec![fidl_fuchsia_component_test::Capability::Protocol(
+                fidl_fuchsia_component_test::Protocol {
+                    name: Some(ctf::WaiterMarker::PROTOCOL_NAME.to_string()),
+                    ..Default::default()
+                },
+            )]),
+            dtr_exposes: Some(vec![fidl_fuchsia_component_test::Capability::Service(
+                fidl_fuchsia_component_test::Service {
+                    name: Some(ctf::ServiceMarker::SERVICE_NAME.to_string()),
+                    ..Default::default()
+                },
+            )]),
             ..Default::default()
         }),
         offers_client: Some(offers_client),
-        dev_topological: Some(devfs_server),
         ..Default::default()
     };
     let test_ns = create_realm(realm_options).await?;
@@ -98,6 +96,13 @@ async fn test_basic_driver() -> Result<()> {
     }
 
     // Check to make sure our topological devfs connections is working.
+    let (devfs_client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+    fdio::open(
+        &format!("{}/dev-topological", test_ns.prefix()),
+        fio::OpenFlags::RIGHT_READABLE,
+        server.into_channel(),
+    )
+    .unwrap();
     device_watcher::recursive_wait(&devfs_client, "sys/test").await?;
 
     // Connect to the device. We have already received an ack from the driver, but sometimes
@@ -110,6 +115,7 @@ async fn test_basic_driver() -> Result<()> {
         server.into_channel(),
     )
     .unwrap();
+
     let mut watcher = fuchsia_fs::directory::Watcher::new(&service).await?;
     let mut instances: HashSet<String> = Default::default();
     let mut event = None;

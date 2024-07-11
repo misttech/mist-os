@@ -34,42 +34,58 @@ async fn serve_realm_factory(stream: RealmFactoryRequestStream) {
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut task_group = fasync::TaskGroup::new();
     let mut realms = vec![];
-    while let Ok(Some(request)) = stream.try_next().await {
-        match request {
-            RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
-                let realm_result = create_realm(options).await;
-                match realm_result {
-                    Ok(realm) => {
-                        let request_stream = realm_server.into_stream()?;
-                        task_group.spawn(async move {
-                            realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                        });
+    loop {
+        match stream.try_next().await {
+            Ok(Some(request)) => match request {
+                RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
+                    let realm_result = create_realm(options).await;
+                    match realm_result {
+                        Ok(realm) => {
+                            let request_stream = realm_server.into_stream()?;
+                            task_group.spawn(async move {
+                                realm_proxy::service::serve(realm, request_stream).await.unwrap();
+                            });
 
-                        responder.send(Ok(()))?;
-                    }
-                    Err(e) => {
-                        error!("Failed to create realm: {:?}", e);
-                        responder.send(Err(OperationError::Invalid))?;
+                            responder.send(Ok(()))?;
+                        }
+                        Err(e) => {
+                            error!("Failed to create realm: {:?}", e);
+                            responder.send(Err(OperationError::Invalid))?;
+                        }
                     }
                 }
-            }
-            RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
-                let realm_result = create_realm(options).await;
-                match realm_result {
-                    Ok(realm) => {
-                        realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
-                        realms.push(realm);
-                        responder.send(Ok(()))?;
-                    }
-                    Err(e) => {
-                        error!("Failed to create realm: {:?}", e);
-                        responder.send(Err(OperationError::Invalid))?;
+                RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
+                    let realm_result = create_realm(options).await;
+                    match realm_result {
+                        Ok(realm) => {
+                            realm
+                                .root
+                                .controller()
+                                .get_exposed_dictionary(dictionary)
+                                .await?
+                                .unwrap();
+                            realms.push(realm);
+                            responder.send(Ok(()))?;
+                        }
+                        Err(e) => {
+                            error!("Failed to create realm: {:?}", e);
+                            responder.send(Err(OperationError::Invalid))?;
+                        }
                     }
                 }
-            }
 
-            RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
-                control_handle.shutdown_with_epitaph(fuchsia_zircon_status::Status::NOT_SUPPORTED);
+                RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
+                    control_handle
+                        .shutdown_with_epitaph(fuchsia_zircon_status::Status::NOT_SUPPORTED);
+                }
+            },
+            Ok(None) => {
+                warn!("handle_request_stream got None stream item.");
+                break;
+            }
+            Err(e) => {
+                error!("handle_request_stream failed to get next stream item: {:?}", e);
+                break;
             }
         }
     }
@@ -95,7 +111,7 @@ async fn run_offers_forward(
     Ok(fs.collect::<()>().await)
 }
 
-async fn add_dynamic_expose(
+async fn add_dynamic_expose_deprecated(
     expose: String,
     builder: &RealmBuilder,
     driver_test_realm_component_name: &str,
@@ -138,7 +154,7 @@ async fn add_dynamic_expose(
     Ok(())
 }
 
-async fn add_dynamic_offer(
+async fn add_dynamic_offer_deprecated(
     offer: String,
     builder: &RealmBuilder,
     offer_provider_ref: &fuchsia_component_test::ChildRef,
@@ -172,6 +188,98 @@ async fn add_dynamic_offer(
                 .capability(Capability::protocol_by_name(&offer))
                 .from(offer_provider_ref)
                 .to(driver_test_realm_ref),
+        )
+        .await?;
+    Ok(())
+}
+
+async fn add_dynamic_expose(
+    expose: fidl_fuchsia_component_test::Capability,
+    builder: &RealmBuilder,
+    driver_test_realm_component_name: &str,
+    driver_test_realm_ref: &fuchsia_component_test::ChildRef,
+) -> Result<(), Error> {
+    let name = match &expose {
+        fidl_fuchsia_component_test::Capability::Protocol(p) => p.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Directory(d) => d.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Storage(s) => s.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Service(s) => s.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::EventStream(e) => e.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Config(c) => c.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Dictionary(d) => d.name.as_ref(),
+        _ => None,
+    };
+    let expose_parsed = name
+        .expect("No name found in capability.")
+        .parse::<cm_types::Name>()
+        .expect("Not a valid capability name");
+
+    // Dynamic exposes are not hardcoded in the driver test realm cml so we have to add them here.
+    // The source of this capability is the realm_builder collection which is where the
+    // driver_test_realm's own realm builder will spin up the driver framework and drivers.
+    let mut decl = builder.get_component_decl(driver_test_realm_component_name).await?;
+    decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
+        source: cm_rust::ExposeSource::Collection(
+            "realm_builder".parse::<cm_types::Name>().unwrap(),
+        ),
+        source_name: expose_parsed.clone(),
+        source_dictionary: Default::default(),
+        target_name: expose_parsed.clone(),
+        target: cm_rust::ExposeTarget::Parent,
+        availability: cm_rust::Availability::Required,
+    }));
+    builder.replace_component_decl(driver_test_realm_component_name, decl).await?;
+
+    // Add the route through the realm builder.
+    builder
+        .add_route(Route::new().capability(expose).from(driver_test_realm_ref).to(Ref::parent()))
+        .await?;
+    Ok(())
+}
+
+async fn add_dynamic_offer(
+    offer: fidl_fuchsia_component_test::Capability,
+    builder: &RealmBuilder,
+    offer_provider_ref: &fuchsia_component_test::ChildRef,
+    driver_test_realm_component_name: &str,
+    driver_test_realm_ref: &fuchsia_component_test::ChildRef,
+) -> Result<(), Error> {
+    let name = match &offer {
+        fidl_fuchsia_component_test::Capability::Protocol(p) => p.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Directory(d) => d.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Storage(s) => s.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Service(s) => s.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::EventStream(e) => e.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Config(c) => c.name.as_ref(),
+        fidl_fuchsia_component_test::Capability::Dictionary(d) => d.name.as_ref(),
+        _ => None,
+    };
+    let offer_parsed = name
+        .expect("No name found in capability.")
+        .parse::<cm_types::Name>()
+        .expect("Not a valid capability name");
+
+    // Dynamic offers are not hardcoded in the driver test realm cml so we have to add them here.
+    // The target of this capability is the realm_builder collection which is where the
+    // driver_test_realm's own realm builder will spin up the driver framework and drivers.
+    let mut decl = builder.get_component_decl(driver_test_realm_component_name).await?;
+    decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
+        source: cm_rust::OfferSource::Parent,
+        source_name: offer_parsed.clone(),
+        source_dictionary: Default::default(),
+        target_name: offer_parsed.clone(),
+        target: cm_rust::OfferTarget::Collection(
+            "realm_builder".parse::<cm_types::Name>().unwrap(),
+        ),
+        dependency_type: cm_rust::DependencyType::Strong,
+        availability: cm_rust::Availability::Required,
+    }));
+    builder.replace_component_decl(driver_test_realm_component_name, decl).await?;
+
+    // Add the route through the realm builder.
+    builder
+        .add_route(
+            Route::new().capability(offer).from(offer_provider_ref).to(driver_test_realm_ref),
         )
         .await?;
     Ok(())
@@ -221,10 +329,27 @@ async fn add_capabilities(
         )
         .await?;
 
-    let exposes =
+    let deprecated_exposes =
         driver_test_realm_start_args.as_ref().and_then(|args| args.exposes.as_ref()).and_then(
             |exposes| Some(exposes.iter().map(|e| e.service_name.clone()).collect::<Vec<_>>()),
         );
+
+    let exposes = driver_test_realm_start_args
+        .as_ref()
+        .and_then(|args| args.dtr_exposes.as_ref())
+        .and_then(|exposes| Some(exposes.clone()));
+
+    if let Some(deprecated_exposes) = deprecated_exposes {
+        for deprecated_expose in deprecated_exposes {
+            add_dynamic_expose_deprecated(
+                deprecated_expose,
+                builder,
+                driver_test_realm_component_name,
+                &driver_test_realm_ref,
+            )
+            .await?;
+        }
+    }
 
     if let Some(exposes) = exposes {
         for expose in exposes {
@@ -238,29 +363,54 @@ async fn add_capabilities(
         }
     }
 
-    let offers =
+    let deprecated_offers =
         driver_test_realm_start_args.as_ref().and_then(|args| args.offers.as_ref()).and_then(
             |offers| Some(offers.iter().map(|o| o.protocol_name.clone()).collect::<Vec<_>>()),
         );
+    let offers = driver_test_realm_start_args
+        .as_ref()
+        .and_then(|args| args.dtr_offers.as_ref())
+        .and_then(|offers| Some(offers.clone()));
 
-    if let Some(offers) = offers {
-        let client = offers_client.expect("Offers provided without an offers_client.");
-        let arc_client = Arc::new(client);
-        let offer_provider_ref = builder
-            .add_local_child(
-                "offer_provider",
-                move |handles: LocalComponentHandles| {
-                    run_offers_forward(handles, arc_client.clone()).boxed()
-                },
-                ChildOptions::new(),
+    let offer_provider_ref = {
+        if deprecated_offers.is_some() || offers.is_some() {
+            let client = offers_client.expect("Offers provided without an offers_client.");
+            let arc_client = Arc::new(client);
+            Some(
+                builder
+                    .add_local_child(
+                        "offer_provider",
+                        move |handles: LocalComponentHandles| {
+                            run_offers_forward(handles, arc_client.clone()).boxed()
+                        },
+                        ChildOptions::new(),
+                    )
+                    .await?,
+            )
+        } else {
+            None
+        }
+    };
+
+    if let Some(deprecated_offers) = deprecated_offers {
+        for deprecated_offer in deprecated_offers {
+            add_dynamic_offer_deprecated(
+                deprecated_offer,
+                builder,
+                offer_provider_ref.as_ref().unwrap(),
+                driver_test_realm_component_name,
+                &driver_test_realm_ref,
             )
             .await?;
+        }
+    }
 
+    if let Some(offers) = offers {
         for offer in offers {
             add_dynamic_offer(
                 offer,
                 builder,
-                &offer_provider_ref,
+                offer_provider_ref.as_ref().unwrap(),
                 driver_test_realm_component_name,
                 &driver_test_realm_ref,
             )
