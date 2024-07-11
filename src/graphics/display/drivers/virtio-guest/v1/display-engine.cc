@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
 #include <lib/stdcompat/span.h>
@@ -44,7 +45,6 @@
 #include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -113,7 +113,7 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
-    zxlogf(ERROR, "CheckBuffersAllocated IPC failed: %s", check_result.status_string());
+    FDF_LOG(ERROR, "CheckBuffersAllocated IPC failed: %s", check_result.status_string());
     return zx::error(check_result.status());
   }
   const auto& check_response = check_result.value();
@@ -122,7 +122,7 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
       return zx::error(ZX_ERR_SHOULD_WAIT);
     }
     const auto error_value = sysmem::V1CopyFromV2Error(check_response.error_value());
-    zxlogf(ERROR, "CheckBuffersAllocated returned error: %s", zx_status_get_string(error_value));
+    FDF_LOG(ERROR, "CheckBuffersAllocated returned error: %s", zx_status_get_string(error_value));
     return zx::error(error_value);
   }
 
@@ -131,7 +131,7 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
-    zxlogf(ERROR, "WaitForBuffersAllocated IPC failed: %s", wait_result.status_string());
+    FDF_LOG(ERROR, "WaitForBuffersAllocated IPC failed: %s", wait_result.status_string());
     return zx::error(wait_result.status());
   }
   auto& wait_response = wait_result.value();
@@ -141,14 +141,14 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
     }
     const auto error_value = sysmem::V1CopyFromV2Error(wait_response.error_value());
 
-    zxlogf(ERROR, "WaitForBuffersAllocated returned error: %s", zx_status_get_string(error_value));
+    FDF_LOG(ERROR, "WaitForBuffersAllocated returned error: %s", zx_status_get_string(error_value));
     return zx::error(error_value);
   }
   fuchsia_sysmem2::wire::BufferCollectionInfo& collection_info =
       wait_response->buffer_collection_info();
 
   if (!collection_info.settings().has_image_format_constraints()) {
-    zxlogf(ERROR, "Bad image format constraints");
+    FDF_LOG(ERROR, "Bad image format constraints");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -166,7 +166,7 @@ zx::result<DisplayEngine::BufferInfo> DisplayEngine::GetAllocatedBufferInfoForIm
   const auto& format_constraints = collection_info.settings().image_format_constraints();
   uint32_t minimum_row_bytes;
   if (!ImageFormatMinimumRowBytes(format_constraints, image_metadata.width(), &minimum_row_bytes)) {
-    zxlogf(ERROR, "Invalid image width %" PRId32 " for collection", image_metadata.width());
+    FDF_LOG(ERROR, "Invalid image width %" PRId32 " for collection", image_metadata.width());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -184,7 +184,8 @@ zx::result<> DisplayEngine::ImportBufferCollection(
     display::DriverBufferCollectionId driver_buffer_collection_id,
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) {
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists",
+            driver_buffer_collection_id.value());
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
 
@@ -200,8 +201,8 @@ zx::result<> DisplayEngine::ImportBufferCollection(
           .buffer_collection_request(std::move(collection_server_endpoint))
           .Build());
   if (!bind_result.ok()) {
-    zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
-           bind_result.status_string());
+    FDF_LOG(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
+            bind_result.status_string());
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -213,8 +214,8 @@ zx::result<> DisplayEngine::ImportBufferCollection(
 zx::result<> DisplayEngine::ReleaseBufferCollection(
     display::DriverBufferCollectionId driver_buffer_collection_id) {
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-           driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
+            driver_buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
   buffer_collections_.erase(driver_buffer_collection_id);
@@ -226,8 +227,8 @@ zx::result<display::DriverImageId> DisplayEngine::ImportImage(
     display::DriverBufferCollectionId driver_buffer_collection_id, uint32_t index) {
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-           driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
+            driver_buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -259,14 +260,14 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
   zx_status_t status = gpu_device_->bti().pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, vmo, offset,
                                               size, &paddr, 1, &import_data->pmt);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to pin VMO: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
   zx::result<uint32_t> create_resource_result =
       gpu_device_->Create2DResource(row_bytes / pixel_size, image_metadata.height(), pixel_format);
   if (create_resource_result.is_error()) {
-    zxlogf(ERROR, "Failed to allocate 2D resource: %s", create_resource_result.status_string());
+    FDF_LOG(ERROR, "Failed to allocate 2D resource: %s", create_resource_result.status_string());
     return create_resource_result.take_error();
   }
   import_data->resource_id = create_resource_result.value();
@@ -274,7 +275,7 @@ zx::result<display::DriverImageId> DisplayEngine::Import(
   zx::result<> attach_result =
       gpu_device_->AttachResourceBacking(import_data->resource_id, paddr, size);
   if (attach_result.is_error()) {
-    zxlogf(ERROR, "Failed to attach resource backing store: %s", attach_result.status_string());
+    FDF_LOG(ERROR, "Failed to attach resource backing store: %s", attach_result.status_string());
     return attach_result.take_error();
   }
 
@@ -359,8 +360,9 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
     display::DriverBufferCollectionId driver_buffer_collection_id) {
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
-           driver_buffer_collection_id.value());
+    FDF_LOG(ERROR,
+            "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
+            driver_buffer_collection_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -396,7 +398,7 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
           .status();
 
   if (status != ZX_OK) {
-    zxlogf(ERROR, "virtio::DisplayEngine: Failed to set constraints");
+    FDF_LOG(ERROR, "virtio::DisplayEngine: Failed to set constraints");
     return zx::error(status);
   }
 
@@ -451,20 +453,20 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
   auto gpu_device = fbl::make_unique_checked<VirtioGpuDevice>(
       &alloc_checker, std::move(virtio_device_result).value());
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for VirtioGpuDevice");
+    FDF_LOG(ERROR, "Failed to allocate memory for VirtioGpuDevice");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(
       &alloc_checker, coordinator_events, std::move(sysmem_client), std::move(gpu_device));
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for DisplayEngine");
+    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx_status_t status = display_engine->Init();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize device");
+    FDF_LOG(ERROR, "Failed to initialize device");
     return zx::error(status);
   }
 
@@ -472,7 +474,7 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
 }
 
 void DisplayEngine::virtio_gpu_flusher() {
-  zxlogf(TRACE, "Entering VirtioGpuFlusher()");
+  FDF_LOG(TRACE, "Entering VirtioGpuFlusher()");
 
   zx_time_t next_deadline = zx_clock_get_monotonic();
   zx_time_t period = ZX_SEC(1) / kRefreshRateHz;
@@ -487,7 +489,7 @@ void DisplayEngine::virtio_gpu_flusher() {
       displayed_config_stamp_ = latest_config_stamp_;
     }
 
-    zxlogf(TRACE, "flushing");
+    FDF_LOG(TRACE, "flushing");
 
     if (fb_change) {
       uint32_t resource_id =
@@ -496,7 +498,7 @@ void DisplayEngine::virtio_gpu_flusher() {
           current_display_.scanout_id, resource_id, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
       if (set_scanout_result.is_error()) {
-        zxlogf(ERROR, "Failed to set scanout: %s", set_scanout_result.status_string());
+        FDF_LOG(ERROR, "Failed to set scanout: %s", set_scanout_result.status_string());
         continue;
       }
     }
@@ -506,7 +508,7 @@ void DisplayEngine::virtio_gpu_flusher() {
           displayed_fb_->resource_id, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
       if (transfer_result.is_error()) {
-        zxlogf(ERROR, "Failed to transfer resource: %s", transfer_result.status_string());
+        FDF_LOG(ERROR, "Failed to transfer resource: %s", transfer_result.status_string());
         continue;
       }
 
@@ -514,7 +516,7 @@ void DisplayEngine::virtio_gpu_flusher() {
           displayed_fb_->resource_id, current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height);
       if (flush_result.is_error()) {
-        zxlogf(ERROR, "Failed to flush resource: %s", flush_result.status_string());
+        FDF_LOG(ERROR, "Failed to flush resource: %s", flush_result.status_string());
         continue;
       }
     }
@@ -529,35 +531,35 @@ void DisplayEngine::virtio_gpu_flusher() {
 }
 
 zx_status_t DisplayEngine::Start() {
-  zxlogf(TRACE, "Start()");
+  FDF_LOG(TRACE, "Start()");
 
   // Get the display info and see if we find a valid pmode
   zx::result<fbl::Vector<DisplayInfo>> display_infos_result = gpu_device_->GetDisplayInfo();
   if (display_infos_result.is_error()) {
-    zxlogf(ERROR, "Failed to get display info: %s", display_infos_result.status_string());
+    FDF_LOG(ERROR, "Failed to get display info: %s", display_infos_result.status_string());
     return display_infos_result.error_value();
   }
 
   const DisplayInfo* current_display = FirstValidDisplay(display_infos_result.value());
   if (current_display == nullptr) {
-    zxlogf(ERROR, "Failed to find a usable display");
+    FDF_LOG(ERROR, "Failed to find a usable display");
     return ZX_ERR_NOT_FOUND;
   }
   current_display_ = *current_display;
 
-  zxlogf(INFO,
-         "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
-         ", flags 0x%08" PRIx32,
-         current_display_.scanout_info.geometry.placement_x,
-         current_display_.scanout_info.geometry.placement_y,
-         current_display_.scanout_info.geometry.width,
-         current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
+  FDF_LOG(INFO,
+          "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
+          ", flags 0x%08" PRIx32,
+          current_display_.scanout_info.geometry.placement_x,
+          current_display_.scanout_info.geometry.placement_y,
+          current_display_.scanout_info.geometry.width,
+          current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
 
   // Set the mouse cursor position to (0,0); the result is not critical.
   zx::result<uint32_t> move_cursor_result =
       gpu_device_->SetCursorPosition(current_display_.scanout_id, 0, 0, 0);
   if (move_cursor_result.is_error()) {
-    zxlogf(WARNING, "Failed to move cursor: %s", move_cursor_result.status_string());
+    FDF_LOG(WARNING, "Failed to move cursor: %s", move_cursor_result.status_string());
   }
 
   // Run a worker thread to shove in flush events
@@ -568,7 +570,7 @@ zx_status_t DisplayEngine::Start() {
   thrd_create_with_name(&flush_thread_, virtio_gpu_flusher_entry, this, "virtio-gpu-flusher");
   thrd_detach(flush_thread_);
 
-  zxlogf(TRACE, "Start() completed");
+  FDF_LOG(TRACE, "Start() completed");
   return ZX_OK;
 }
 
@@ -584,7 +586,7 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 }
 
 zx_status_t DisplayEngine::Init() {
-  zxlogf(TRACE, "Init()");
+  FDF_LOG(TRACE, "Init()");
 
   auto pid = GetKoid(zx_process_self());
   std::string debug_name = fxl::StringPrintf("virtio-gpu-display[%lu]", pid);
@@ -595,7 +597,7 @@ zx_status_t DisplayEngine::Init() {
           .id(pid)
           .Build());
   if (!set_debug_status.ok()) {
-    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+    FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
     return set_debug_status.error().status();
   }
 

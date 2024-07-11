@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_VIRTIO_PCI_DEVICE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_VIRTIO_PCI_DEVICE_H_
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/span.h>
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
@@ -25,8 +26,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
-
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio_display {
 
@@ -228,8 +227,8 @@ template <typename ResponseType, typename RequestType>
 const ResponseType& VirtioPciDevice::ExchangeCursorqRequestResponse(const RequestType& request) {
   static constexpr size_t request_size = sizeof(RequestType);
   static constexpr size_t response_size = sizeof(ResponseType);
-  zxlogf(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
-         response_size);
+  FDF_LOG(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
+          response_size);
 
   // Request/response exchanges are fully serialized.
   //

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/pmt.h>
@@ -17,7 +18,6 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {
@@ -30,16 +30,16 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
   zx_status_t status = zx::vmo::create(zx_system_get_page_size(), /*options=*/0,
                                        &virtio_control_queue_buffer_pool_vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate virtqueue controlq buffers VMO: %s",
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to allocate virtqueue controlq buffers VMO: %s",
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
   uint64_t virtio_control_queue_buffer_pool_size;
   status = virtio_control_queue_buffer_pool_vmo.get_size(&virtio_control_queue_buffer_pool_size);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get virtqueue controlq buffers VMO size: %s",
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to get virtqueue controlq buffers VMO size: %s",
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -51,7 +51,8 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
                    &virtio_control_queue_buffer_pool_physical_address, 1,
                    &virtio_control_queue_buffer_pool_pin);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin virtqueue controlq buffers VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to pin virtqueue controlq buffers VMO: %s",
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -61,14 +62,15 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
                                       /*vmo_offset=*/0, virtio_control_queue_buffer_pool_size,
                                       &virtio_control_queue_buffer_pool_begin);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map virtqueue buffers VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map virtqueue buffers VMO: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  zxlogf(INFO,
-         "Allocated virtqueue controlq buffers at virtual address 0x%016" PRIx64
-         ", physical address 0x%016" PRIx64,
-         virtio_control_queue_buffer_pool_begin, virtio_control_queue_buffer_pool_physical_address);
+  FDF_LOG(INFO,
+          "Allocated virtqueue controlq buffers at virtual address 0x%016" PRIx64
+          ", physical address 0x%016" PRIx64,
+          virtio_control_queue_buffer_pool_begin,
+          virtio_control_queue_buffer_pool_physical_address);
 
   // NOLINTBEGIN(performance-no-int-to-ptr): Casting from zx_vaddr_t to a
   // pointer is unavoidable due to the zx::vmar::map() API.
@@ -82,16 +84,16 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
   status = zx::vmo::create(zx_system_get_page_size(), /*options=*/0,
                            &virtio_cursor_queue_buffer_pool_vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate virtqueue cursorq buffers VMO: %s",
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to allocate virtqueue cursorq buffers VMO: %s",
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
   uint64_t virtio_cursor_queue_buffer_pool_size;
   status = virtio_cursor_queue_buffer_pool_vmo.get_size(&virtio_cursor_queue_buffer_pool_size);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get virtqueue cursorq buffers VMO size: %s",
-           zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to get virtqueue cursorq buffers VMO size: %s",
+            zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -103,7 +105,7 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
                    &virtio_cursor_queue_buffer_pool_physical_address, 1,
                    &virtio_cursor_queue_buffer_pool_pin);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin virtqueue cursorq buffers VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to pin virtqueue cursorq buffers VMO: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -113,14 +115,14 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
                                       /*vmo_offset=*/0, virtio_cursor_queue_buffer_pool_size,
                                       &virtio_cursor_queue_buffer_pool_begin);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map virtqueue cursorq buffers VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map virtqueue cursorq buffers VMO: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  zxlogf(INFO,
-         "Allocated virtqueue cursorq buffers at virtual address 0x%016" PRIx64
-         ", physical address 0x%016" PRIx64,
-         virtio_cursor_queue_buffer_pool_begin, virtio_cursor_queue_buffer_pool_physical_address);
+  FDF_LOG(INFO,
+          "Allocated virtqueue cursorq buffers at virtual address 0x%016" PRIx64
+          ", physical address 0x%016" PRIx64,
+          virtio_cursor_queue_buffer_pool_begin, virtio_cursor_queue_buffer_pool_physical_address);
 
   // NOLINTBEGIN(performance-no-int-to-ptr): Casting from zx_vaddr_t to a
   // pointer is unavoidable due to the zx::vmar::map() API.
@@ -139,7 +141,7 @@ zx::result<std::unique_ptr<VirtioPciDevice>> VirtioPciDevice::Create(
       std::move(virtio_cursor_queue_buffer_pool_pin),
       virtio_cursor_queue_buffer_pool_physical_address, virtio_cursor_queue_buffer_pool);
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for VirtioPciDevice");
+    FDF_LOG(ERROR, "Failed to allocate memory for VirtioPciDevice");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -197,9 +199,9 @@ zx_status_t VirtioPciDevice::Init() {
 
   virtio_abi::GpuDeviceConfig config;
   CopyDeviceConfig(&config, sizeof(config));
-  zxlogf(TRACE, "GpuDeviceConfig - pending events: 0x%08" PRIx32, config.pending_events);
-  zxlogf(TRACE, "GpuDeviceConfig - scanout limit: %d", config.scanout_limit);
-  zxlogf(TRACE, "GpuDeviceConfig - capability set limit: %d", config.capability_set_limit);
+  FDF_LOG(TRACE, "GpuDeviceConfig - pending events: 0x%08" PRIx32, config.pending_events);
+  FDF_LOG(TRACE, "GpuDeviceConfig - scanout limit: %d", config.scanout_limit);
+  FDF_LOG(TRACE, "GpuDeviceConfig - capability set limit: %d", config.capability_set_limit);
 
   capability_set_limit_ = config.capability_set_limit;
 
@@ -208,7 +210,7 @@ zx_status_t VirtioPciDevice::Init() {
 
   if (!(DeviceFeaturesSupported() & VIRTIO_F_VERSION_1)) {
     // Declaring non-support until there is a need in the future.
-    zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
+    FDF_LOG(ERROR, "Legacy virtio interface is not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -216,7 +218,7 @@ zx_status_t VirtioPciDevice::Init() {
 
   zx_status_t status = DeviceStatusFeaturesOk();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -224,14 +226,14 @@ zx_status_t VirtioPciDevice::Init() {
   fbl::AutoLock virtio_control_queue_lock(&virtio_control_queue_mutex_);
   status = virtio_control_queue_.Init(0, 16);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate controlq vring: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to allocate controlq vring: %s", zx_status_get_string(status));
     return status;
   }
 
   fbl::AutoLock virtio_cursor_queue_lock(&virtio_cursor_queue_mutex_);
   status = virtio_cursor_queue_.Init(1, 16);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to allocate cursor vring: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to allocate cursor vring: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -242,7 +244,7 @@ zx_status_t VirtioPciDevice::Init() {
 }
 
 void VirtioPciDevice::IrqRingUpdate() {
-  zxlogf(TRACE, "IrqRingUpdate()");
+  FDF_LOG(TRACE, "IrqRingUpdate()");
 
   // The lambda passed to virtio::Ring::IrqRingUpdate() should be annotated
   // __TA_REQUIRES(virtio_control_queue_mutex_). However, Clang's Thread Safety analysis
@@ -268,15 +270,15 @@ void VirtioPciDevice::IrqRingUpdate() {
       });
 }
 
-void VirtioPciDevice::IrqConfigChange() { zxlogf(TRACE, "IrqConfigChange()"); }
+void VirtioPciDevice::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }
 
 const char* VirtioPciDevice::tag() const { return "virtio-gpu"; }
 
 void VirtioPciDevice::VirtioControlqBufferUsedByDevice(uint32_t used_descriptor_index,
                                                        uint32_t chain_written_length) {
   if (unlikely(used_descriptor_index > std::numeric_limits<uint16_t>::max())) {
-    zxlogf(WARNING, "GPU device reported invalid used descriptor index: %" PRIu32,
-           used_descriptor_index);
+    FDF_LOG(WARNING, "GPU device reported invalid used descriptor index: %" PRIu32,
+            used_descriptor_index);
     return;
   }
   // The check above ensures that the static_cast below does not lose any
@@ -321,8 +323,8 @@ void VirtioPciDevice::VirtioControlqBufferUsedByDevice(uint32_t used_descriptor_
 
 void VirtioPciDevice::VirtioCursorqBufferUsedByDevice(uint32_t used_descriptor_index) {
   if (unlikely(used_descriptor_index > std::numeric_limits<uint16_t>::max())) {
-    zxlogf(WARNING, "GPU device reported invalid used descriptor index: %" PRIu32,
-           used_descriptor_index);
+    FDF_LOG(WARNING, "GPU device reported invalid used descriptor index: %" PRIu32,
+            used_descriptor_index);
     return;
   }
   // The check above ensures that the static_cast below does not lose any
@@ -427,8 +429,8 @@ void VirtioPciDevice::ExchangeControlqVariableLengthRequestResponse(
   response_descriptor->len = static_cast<uint32_t>(max_response_size);
   response_descriptor->flags = VRING_DESC_F_WRITE;
 
-  zxlogf(TRACE, "Sending %zu-byte request descriptor %" PRIu16, request_size,
-         request_descriptor_index);
+  FDF_LOG(TRACE, "Sending %zu-byte request descriptor %" PRIu16, request_size,
+          request_descriptor_index);
 
   // Submit the transfer & wait for the response
   virtio_control_queue_.SubmitChain(request_descriptor_index);
@@ -441,7 +443,7 @@ void VirtioPciDevice::ExchangeControlqVariableLengthRequestResponse(
 
   virtio_control_queue_request_response_.reset();
 
-  zxlogf(TRACE, "Got written_length %" PRIu32, written_length);
+  FDF_LOG(TRACE, "Got written_length %" PRIu32, written_length);
 
   callback(virtio_control_queue_buffer_pool_.subspan(request_size, written_length));
 }

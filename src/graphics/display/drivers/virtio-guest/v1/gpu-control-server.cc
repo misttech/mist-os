@@ -6,11 +6,10 @@
 
 #include <fidl/fuchsia.gpu.virtio/cpp/wire.h>
 #include <lib/async/dispatcher.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/span.h>
 
 #include <cstdint>
-
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio_display {
 
@@ -25,7 +24,7 @@ fuchsia_gpu_virtio::Service::InstanceHandler GpuControlServer::GetInstanceHandle
 }
 
 void GpuControlServer::GetCapabilitySetLimit(GetCapabilitySetLimitCompleter::Sync& completer) {
-  zxlogf(TRACE, "GpuControlServer::GetCapabilitySetLimit returning %lu", capability_set_limit_);
+  FDF_LOG(TRACE, "GpuControlServer::GetCapabilitySetLimit returning %lu", capability_set_limit_);
 
   completer.Reply(capability_set_limit_);
 }
@@ -33,7 +32,7 @@ void GpuControlServer::GetCapabilitySetLimit(GetCapabilitySetLimitCompleter::Syn
 void GpuControlServer::SendHardwareCommand(
     fuchsia_gpu_virtio::wire::GpuControlSendHardwareCommandRequest* request,
     SendHardwareCommandCompleter::Sync& completer) {
-  zxlogf(TRACE, "GpuControlServer::SendHardwareCommand");
+  FDF_LOG(TRACE, "GpuControlServer::SendHardwareCommand");
 
   auto callback = [&completer](cpp20::span<uint8_t> response) {
     completer.ReplySuccess(
