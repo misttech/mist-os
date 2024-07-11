@@ -16,39 +16,33 @@ group("tests") {
   ]
 }
 
-fuchsia_driver("virtio_gpu-driver") {
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+fuchsia_driver_component("virtio-gpu-component-v1") {
   if (use_virtio_gpu_v2) {
-    output_name = "virtio_gpu"
-    deps = [
-      "v2:common_srcs",
-      "v2:virtio_gpu_bind",
-    ]
+    component_name = "virtio_gpu_v1_unused"
   } else {
-    output_name = "virtio_gpu_v1"
-    deps = [
-      "v1:common_srcs",
-      "v1:virtio_gpu_bind_v1",
-    ]
+    component_name = "virtio_gpu"
   }
+  info = "v1/virtio_gpu-info.json"
+  manifest = "v1/meta/virtio_gpu.cml"
+  deps = [ "v1:driver" ]
 }
 
-fuchsia_driver_component("virtio_gpu") {
-  component_name = "virtio_gpu"
+fuchsia_driver_component("virtio-gpu-component-v2") {
   if (use_virtio_gpu_v2) {
-    info = "v2/virtio_gpu-info.json"
-    manifest = "v2/meta/virtio_gpu.cml"
+    component_name = "virtio_gpu"
   } else {
-    info = "v1/virtio_gpu-info.json"
-    manifest = "v1/meta/virtio_gpu.cml"
+    component_name = "virtio_gpu_v2_unused"
   }
-  deps = [ ":virtio_gpu-driver" ]
+  info = "v2/virtio_gpu-info.json"
+  manifest = "v2/meta/virtio_gpu.cml"
+  deps = [ "v2:driver" ]
 }
 
 fuchsia_driver_package("package") {
   package_name = "virtio_gpu"
-  driver_components = [ ":virtio_gpu" ]
+  if (use_virtio_gpu_v2) {
+    driver_components = [ ":virtio-gpu-component-v2" ]
+  } else {
+    driver_components = [ ":virtio-gpu-component-v1" ]
+  }
 }

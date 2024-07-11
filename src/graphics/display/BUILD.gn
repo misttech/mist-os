@@ -15,7 +15,8 @@ group("drivers") {
     "drivers/simple:simple.bochs",
     "drivers/simple:simple.intel",
     "drivers/vim3-display-detect:vim3-display-detect",
-    "drivers/virtio-guest:virtio_gpu",
+    "drivers/virtio-guest:virtio-gpu-component-v1",
+    "drivers/virtio-guest:virtio-gpu-component-v2",
   ]
 }
 
