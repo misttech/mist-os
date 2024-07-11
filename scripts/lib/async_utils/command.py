@@ -28,7 +28,7 @@ import signal
 import time
 import typing
 from dataclasses import dataclass, field
-from io import StringIO
+from io import BytesIO, StringIO
 
 
 @dataclass
@@ -343,8 +343,34 @@ class AsyncCommand:
                 input_stream (asyncio.StreamReader): Reader to read from.
                 event_type: Either StdoutEvent or StderrEvent type, to wrap each line.
             """
-            async for line in input_stream:
-                await self._event_queue.put(event_type(text=line))
+
+            # Iteratively read blocks of data from the stream, splitting on newlines.
+
+            # buf is used to contain the line in progress, it will contain only
+            # one line and will never contain anything after a newline character.
+            buf = BytesIO()
+
+            while not input_stream.at_eof():
+                more: bytes = await input_stream.read(128 * 1024)
+                # Process the current buffer, splitting by lines.
+                while True:
+                    # Find the end of the line.
+                    if (idx := more.find(b"\n")) == -1:
+                        # No newline yet, buffer this batch and fetch more.
+                        buf.write(more)
+                        break
+
+                    # Append the rest of the line to the current line, then send as an event.
+                    buf.write(more[: idx + 1])
+                    await self._event_queue.put(event_type(text=buf.getvalue()))
+
+                    # Reset the buffer and continue with the next line.
+                    buf = BytesIO()
+                    more = more[idx + 1 :]
+
+            # Publish any remaining data as a line.
+            if len(buf.getvalue()) > 0:
+                await self._event_queue.put(event_type(text=buf.getvalue()))
 
         async def timeout_handler(
             timeout: float, timeout_signal: asyncio.Event
@@ -409,7 +435,7 @@ class AsyncCommand:
             tasks.append(timeout_task)
 
         # Wait for all output to drain before termination event.
-        await asyncio.wait(tasks)
+        await asyncio.wait(tasks, return_when="FIRST_EXCEPTION")
         await self._event_queue.put(
             TerminationEvent(
                 return_code,
