@@ -6,6 +6,8 @@
 #ifndef ZIRCON_KERNEL_VM_PMM_NODE_H_
 #define ZIRCON_KERNEL_VM_PMM_NODE_H_
 
+#include <lib/zbi-format/memory.h>
+
 #include <fbl/canary.h>
 #include <fbl/intrusive_double_list.h>
 #include <kernel/event.h>
@@ -29,6 +31,8 @@ class PmmNode {
   ~PmmNode() = default;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PmmNode);
+
+  zx_status_t Init(ktl::span<const zbi_mem_range_t> ranges);
 
   paddr_t PageToPaddr(const vm_page_t* page) TA_NO_THREAD_SAFETY_ANALYSIS;
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;
@@ -73,8 +77,6 @@ class PmmNode {
   // though the data they return may be questionable
   void DumpFree() const TA_NO_THREAD_SAFETY_ANALYSIS;
   void Dump(bool is_panic) const TA_NO_THREAD_SAFETY_ANALYSIS;
-
-  zx_status_t AddArena(const pmm_arena_info_t* info);
 
   // Returns the number of active arenas.
   size_t NumArenas() const {
@@ -152,6 +154,8 @@ class PmmNode {
   void ReportAllocFailure() TA_EXCL(lock_);
 
  private:
+  zx_status_t InitArena(const zbi_mem_range_t& range);
+
   void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
   void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);
 

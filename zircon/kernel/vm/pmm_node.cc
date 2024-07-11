@@ -12,6 +12,7 @@
 #include <lib/counters.h>
 #include <lib/crypto/global_prng.h>
 #include <lib/instrumentation/asan.h>
+#include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <trace.h>
 
@@ -23,6 +24,7 @@
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <pretty/cpp/sizes.h>
+#include <vm/bootreserve.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/pmm_checker.h>
@@ -62,34 +64,43 @@ void AsanUnpoisonPage(vm_page_t* p) {
 
 // We disable thread safety analysis here, since this function is only called
 // during early boot before threading exists.
-zx_status_t PmmNode::AddArena(const pmm_arena_info_t* info) TA_NO_THREAD_SAFETY_ANALYSIS {
-  dprintf(INFO, "PMM: adding arena %p name '%s' base %#" PRIxPTR " size %#zx\n", info, info->name,
-          info->base, info->size);
-
+zx_status_t PmmNode::Init(ktl::span<const zbi_mem_range_t> ranges) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Make sure we're in early boot (ints disabled and no active Schedulers)
   DEBUG_ASSERT(Scheduler::PeekActiveMask() == 0);
   DEBUG_ASSERT(arch_ints_disabled());
 
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(info->base));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(info->size));
-  DEBUG_ASSERT(info->size > 0);
+  // TODO(https://fxbug.dev/347766366): This is only actually needed in the PC
+  // case, but easy enough and harmless to do it uniformly. This logic will all
+  // go away soon in any case.
+  zbitl::MemRangeMerger merged(ranges.begin(), ranges.end());
 
-  // Allocate an arena object out of the array inside PmmNode
-  if (used_arena_count_ >= kArenaCount) {
-    printf("PMM: pmm_add_arena failed to allocate arena\n");
-    return ZX_ERR_NO_MEMORY;
+  // First process all the reserved ranges. We do this in case there are reserved regions that
+  // overlap with the RAM regions that occur later in the list. If we didn't process the reserved
+  // regions first, then we might add a pmm arena and have it carve out its vm_page_t array from
+  // what we will later learn is reserved memory.
+  for (const zbi_mem_range_t& range : merged) {
+    switch (range.type) {
+      case ZBI_MEM_TYPE_RAM:
+        [[fallthrough]];
+      case ZBI_MEM_TYPE_PERIPHERAL:
+        break;
+      default:
+        boot_reserve_add_range(range.paddr, range.length);
+    }
   }
-  PmmArena* arena = &arenas_[used_arena_count_++];
 
-  // Initialize the object.
-  auto status = arena->Init(info, this);
-  if (status != ZX_OK) {
-    used_arena_count_--;
-    printf("PMM: pmm_add_arena failed to initialize arena\n");
-    return status;
+  for (const zbi_mem_range_t& range : merged) {
+    if (range.type != ZBI_MEM_TYPE_RAM || range.length == 0) {
+      continue;
+    }
+    zx_status_t status = InitArena(range);
+    if (status != ZX_OK) {
+      printf("PMM: Failed to initialize arena at [%#" PRIx64 ", %#" PRIx64 "): %d\n", range.paddr,
+             range.paddr + range.length, status);
+    }
   }
 
-  arena_cumulative_size_ += info->size;
+  boot_reserve_wire();
 
   return ZX_OK;
 }
@@ -538,6 +549,34 @@ zx_status_t PmmNode::AllocContiguous(const size_t count, uint alloc_flags, uint8
   // allocations, but for now...
   LTRACEF("couldn't find run\n");
   return ZX_ERR_NOT_FOUND;
+}
+
+// We disable thread safety analysis here, since this function is only called
+// during early boot before threading exists.
+zx_status_t PmmNode::InitArena(const zbi_mem_range_t& range) TA_NO_THREAD_SAFETY_ANALYSIS {
+  DEBUG_ASSERT(range.type == ZBI_MEM_TYPE_RAM);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.paddr));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.length));
+  DEBUG_ASSERT(range.length > 0);
+
+  pmm_arena_info_t info{.flags = 0, .base = range.paddr, .size = range.length};
+  snprintf(info.name, sizeof(info.name), "%s", "ram");
+
+  dprintf(INFO, "PMM: adding arena base %#" PRIxPTR " size %#zx\n", info.base, info.size);
+
+  if (used_arena_count_ >= kArenaCount) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Initialize the object.
+  PmmArena& arena = arenas_[used_arena_count_];
+  if (zx_status_t status = arena.Init(&info, this); status != ZX_OK) {
+    return status;
+  }
+
+  ++used_arena_count_;
+  arena_cumulative_size_ += info.size;
+  return ZX_OK;
 }
 
 void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {

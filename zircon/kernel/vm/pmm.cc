@@ -72,9 +72,9 @@ LK_INIT_HOOK(pmm_init_alloc_random_should_wait, &pmm_init_alloc_random_should_wa
 static void pmm_fill_free_pages(uint level) { pmm_node.FillFreePagesAndArm(); }
 LK_INIT_HOOK(pmm_fill, &pmm_fill_free_pages, LK_INIT_LEVEL_VM)
 
-vm_page_t* paddr_to_vm_page(paddr_t addr) { return pmm_node.PaddrToPage(addr); }
+zx_status_t pmm_init(ktl::span<const zbi_mem_range_t> ranges) { return pmm_node.Init(ranges); }
 
-zx_status_t pmm_add_arena(const pmm_arena_info_t* info) { return pmm_node.AddArena(info); }
+vm_page_t* paddr_to_vm_page(paddr_t addr) { return pmm_node.PaddrToPage(addr); }
 
 size_t pmm_num_arenas() { return pmm_node.NumArenas(); }
 

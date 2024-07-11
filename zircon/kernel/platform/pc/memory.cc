@@ -78,56 +78,33 @@ void mark_pio_region_to_reserve(uint64_t base, size_t len) {
 
 // Populate global memory arenas from the given memory ranges.
 static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
-  // Create the kernel's singleton for address space management.
-  pmm_arena_info_t base_arena;
-  snprintf(base_arena.name, sizeof(base_arena.name), "%s", "memory");
-  base_arena.flags = 0;
-
-  LTRACEF("%zu memory ranges from physboot\n", ranges.size());
-  zbitl::MemRangeMerger merged_ranges(ranges.begin(), ranges.end());
-  // First process all the reserved ranges. We do this in case there are reserved regions that
-  // overlap with the RAM regions that occur later in the list. If we didn't process the reserved
-  // regions first, then we might add a pmm arena and have it carve out its vm_page_t array from
-  // what we will later learn is reserved memory.
-  for (const zbi_mem_range_t& range : merged_ranges) {
-    LTRACEF("Range at %#" PRIx64 " of %#" PRIx64 " bytes is %sreserved.\n", range.paddr,
-            range.length, range.type == ZBI_MEM_TYPE_RESERVED ? "" : "not ");
-    if (range.type == ZBI_MEM_TYPE_RESERVED) {
-      boot_reserve_add_range(range.paddr, range.length);
-    }
-  }
-  for (const zbi_mem_range_t& range : merged_ranges) {
-    LTRACEF("Range at %#" PRIx64 " of %#" PRIx64 " bytes is %smemory.\n", range.paddr, range.length,
-            range.type == ZBI_MEM_TYPE_RAM ? "" : "not ");
+  // We don't want RAM under 1MiB to feature in to any arenas, so normalize that
+  // here.
+  //
+  // TODO(https://fxbug.dev/347766366): Once PMM initialization deals in a span
+  // of normalized memory, we can just pass in the subspan of ranges that
+  // excludes RAM under 1 MiB and forgo this.
+  for (const zbi_mem_range_t& range : ranges) {
     if (range.type != ZBI_MEM_TYPE_RAM) {
       continue;
     }
-
-    // trim off parts of memory ranges that are smaller than a page
-    uint64_t base = ROUNDUP(range.paddr, PAGE_SIZE);
-    uint64_t size = ROUNDDOWN(range.paddr + range.length, PAGE_SIZE) - base;
-
-    // trim any memory below 1MB for safety and SMP booting purposes
-    if (base < 1 * MB) {
-      uint64_t adjust = 1 * MB - base;
-      if (adjust >= size)
-        continue;
-
-      base += adjust;
-      size -= adjust;
+    zbi_mem_range_t& ram = const_cast<zbi_mem_range_t&>(range);
+    if (ram.paddr >= 1 * MB) {
+      break;
     }
+    uint64_t end = ram.paddr + ram.length;
+    ram.paddr = 1 * MB;
+    ram.length = ram.paddr < end ? end - ram.paddr : 0;
+  }
 
-    mark_mmio_region_to_reserve(base, static_cast<size_t>(size));
-    auto arena = base_arena;
-    arena.base = base;
-    arena.size = size;
+  if (zx_status_t status = pmm_init(ranges); status != ZX_OK) {
+    return status;
+  }
 
-    LTRACEF("Adding pmm range at %#" PRIxPTR " of %#zx bytes.\n", arena.base, arena.size);
-    zx_status_t status = pmm_add_arena(&arena);
-
-    // print a warning and continue
-    if (status != ZX_OK) {
-      printf("MEM: Failed to add pmm range at %#" PRIxPTR " size %#zx\n", arena.base, arena.size);
+  zbitl::MemRangeMerger merged(ranges.begin(), ranges.end());
+  for (const zbi_mem_range_t& range : merged) {
+    if (range.type == ZBI_MEM_TYPE_RAM) {
+      mark_mmio_region_to_reserve(range.paddr, static_cast<size_t>(range.length));
     }
   }
 

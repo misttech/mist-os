@@ -236,9 +236,6 @@ void platform_early_init(void) {
 
   /* initialize physical memory arenas */
   pc_mem_init(gPhysHandoff->mem_config.get());
-
-  /* wire all of the reserved boot sections */
-  boot_reserve_wire();
 }
 
 void platform_prevm_init() {}

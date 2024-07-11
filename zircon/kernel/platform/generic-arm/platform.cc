@@ -80,11 +80,6 @@ extern paddr_t kernel_entry_paddr;
 
 static bool uart_disabled = false;
 
-// all of the configured memory arenas from the zbi
-static constexpr size_t kNumArenas = 16;
-static pmm_arena_info_t mem_arena[kNumArenas];
-static size_t arena_count = 0;
-
 static ktl::atomic<int> panic_started;
 static ktl::atomic<int> halted;
 
@@ -198,51 +193,6 @@ static void topology_cpu_init(void) {
         DEBUG_ASSERT(status == ZX_OK);
         continue;
       }
-    }
-  }
-}
-
-static void process_mem_ranges(ktl::span<const zbi_mem_range_t> ranges) {
-  // First process all the reserved ranges. We do this in case there are reserved regions that
-  // overlap with the RAM regions that occur later in the list. If we didn't process the reserved
-  // regions first, then we might add a pmm arena and have it carve out its vm_page_t array from
-  // what we will later learn is reserved memory.
-  for (const zbi_mem_range_t& mem_range : ranges) {
-    if (mem_range.type == ZBI_MEM_TYPE_RESERVED) {
-      dprintf(INFO, "ZBI: reserve mem range base %#" PRIx64 " size %#" PRIx64 "\n", mem_range.paddr,
-              mem_range.length);
-      boot_reserve_add_range(mem_range.paddr, mem_range.length);
-    }
-  }
-  for (const zbi_mem_range_t& mem_range : ranges) {
-    switch (mem_range.type) {
-      case ZBI_MEM_TYPE_RAM:
-        dprintf(INFO, "ZBI: mem arena base %#" PRIx64 " size %#" PRIx64 "\n", mem_range.paddr,
-                mem_range.length);
-        if (arena_count >= kNumArenas) {
-          printf("ZBI: Warning, too many memory arenas, dropping additional\n");
-          break;
-        }
-        mem_arena[arena_count] = pmm_arena_info_t{"ram", 0, mem_range.paddr, mem_range.length};
-        arena_count++;
-        break;
-      case ZBI_MEM_TYPE_PERIPHERAL: {
-        dprintf(INFO, "ZBI: peripheral range base %#" PRIx64 " size %#" PRIx64 "\n",
-                mem_range.paddr, mem_range.length);
-        auto status = add_periph_range(mem_range.paddr, mem_range.length);
-        ASSERT(status == ZX_OK);
-        break;
-      }
-      case ZBI_MEM_TYPE_RESERVED:
-        // Already handled the reserved ranges.
-        break;
-      default:
-        // Treat unknown memory range types as reserved.
-        dprintf(INFO,
-                "ZBI: unknown mem range base %#" PRIx64 " size %#" PRIx64 " (type %" PRIu32 ")\n",
-                mem_range.paddr, mem_range.length, mem_range.type);
-        boot_reserve_add_range(mem_range.paddr, mem_range.length);
-        break;
     }
   }
 }
@@ -375,8 +325,10 @@ static void allocate_persistent_ram(paddr_t pa, size_t length) {
   }
 }
 
-// Called during platform_init_early.
-static void ProcessPhysHandoff() {
+void platform_early_init(void) {
+  // initialize the boot memory reservation system
+  boot_reserve_init();
+
   if (gPhysHandoff->nvram) {
     const zbi_nvram_t& nvram = gPhysHandoff->nvram.value();
     dprintf(INFO, "boot reserve NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n",
@@ -384,15 +336,6 @@ static void ProcessPhysHandoff() {
     allocate_persistent_ram(nvram.base, nvram.length);
     boot_reserve_add_range(nvram.base, nvram.length);
   }
-
-  process_mem_ranges(gPhysHandoff->mem_config.get());
-}
-
-void platform_early_init(void) {
-  // initialize the boot memory reservation system
-  boot_reserve_init();
-
-  ProcessPhysHandoff();
 
   // is the cmdline option to bypass dlog set ?
   dlog_bypass_init();
@@ -413,12 +356,16 @@ void platform_early_init(void) {
           ramdisk_end_phys - 1);
   boot_reserve_add_range(ramdisk_start_phys, ramdisk_end_phys - ramdisk_start_phys);
 
-  for (size_t i = 0; i < arena_count; i++) {
-    pmm_add_arena(&mem_arena[i]);
+  for (const zbi_mem_range_t& mem_range : gPhysHandoff->mem_config.get()) {
+    if (mem_range.type == ZBI_MEM_TYPE_PERIPHERAL) {
+      dprintf(INFO, "ZBI: peripheral range base %#" PRIx64 " size %#" PRIx64 "\n", mem_range.paddr,
+              mem_range.length);
+      auto status = add_periph_range(mem_range.paddr, mem_range.length);
+      ASSERT(status == ZX_OK);
+    }
   }
 
-  // tell the boot allocator to mark ranges we've reserved as off limits
-  boot_reserve_wire();
+  ASSERT(pmm_init(gPhysHandoff->mem_config.get()) == ZX_OK);
 
   // give the mmu code a chance to do some bookkeeping
   arm64_mmu_early_init();
