@@ -304,7 +304,7 @@ async fn run_all_futures() -> Result<(), Error> {
     let connection_selection_requester =
         ConnectionSelectionRequester::new(connection_selection_request_sender);
 
-    info!("Roaming profile: {}", cfg.roaming_profile);
+    info!("Roaming policy: {}", cfg.roaming_policy);
     let (roam_service_request_sender, roam_service_request_receiver) =
         mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
     let roam_manager_service_fut = serve_local_roam_manager_requests(

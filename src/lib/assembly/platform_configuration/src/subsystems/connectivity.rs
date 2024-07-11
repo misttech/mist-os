@@ -8,7 +8,7 @@ use anyhow::bail;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
-    WlanRecoveryProfile, WlanRoamingProfile,
+    WlanRecoveryProfile, WlanRoamingMode, WlanRoamingPolicy, WlanRoamingProfile,
 };
 use assembly_file_relative_path::FileRelativePathBuf;
 use assembly_util::{FileEntry, PackageDestination, PackageSetDestination};
@@ -199,10 +199,11 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                         }
 
                         // Ensure we don't have invalid roaming settings
-                        if connectivity_config.wlan.roaming_profile.is_some() {
-                            bail!(
-                                "wlan.roaming_profile is invalid with wlan.policy_layer ViaWlanix"
-                            )
+                        match connectivity_config.wlan.roaming_policy {
+                            WlanRoamingPolicy::Enabled { .. } => bail!(
+                                "wlan.roaming_policy is invalid with wlan.policy_layer ViaWlanix"
+                            ),
+                            _ => {}
                         }
                     }
                     WlanPolicyLayer::Platform => {
@@ -230,20 +231,26 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                             ),
                         )?;
 
-                        let roaming_profile = match connectivity_config.wlan.roaming_profile {
-                            Some(WlanRoamingProfile::StationaryRoaming) => {
-                                String::from("stationary_roaming")
-                            }
-                            Some(WlanRoamingProfile::MetricsOnly) => String::from("metrics_only"),
-                            Some(WlanRoamingProfile::RoamingOff) | None => {
-                                String::from("roaming_off")
-                            }
+                        let roaming_policy_str = match connectivity_config.wlan.roaming_policy {
+                            // All roaming related behavior is disabled
+                            WlanRoamingPolicy::Disabled => String::from("disabled"),
+                            // Roaming fully enabled, based on the stationary profile implementation.
+                            WlanRoamingPolicy::Enabled {
+                                profile: WlanRoamingProfile::Stationary,
+                                mode: WlanRoamingMode::CanRoam,
+                            } => String::from("enabled_stationary_can_roam"),
+                            // Only metrics are logged from the stationary profile implementation.
+                            // Roam scanning can occur, but roams are not executed.
+                            WlanRoamingPolicy::Enabled {
+                                profile: WlanRoamingProfile::Stationary,
+                                mode: WlanRoamingMode::MetricsOnly,
+                            } => String::from("enabled_stationary_metrics_only"),
                         };
                         builder.set_config_capability(
-                            "fuchsia.wlan.RoamingProfile",
+                            "fuchsia.wlan.RoamingPolicy",
                             Config::new(
                                 ConfigValueType::String { max_size: 512 },
-                                roaming_profile.into(),
+                                roaming_policy_str.into(),
                             ),
                         )?;
                     }

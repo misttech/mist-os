@@ -48,7 +48,7 @@
                 "fuchsia.ui.ViewingDistance",
                 "fuchsia.wlan.RecoveryEnabled",
                 "fuchsia.wlan.RecoveryProfile",
-                "fuchsia.wlan.RoamingProfile",
+                "fuchsia.wlan.RoamingPolicy",
             ],
             availability: "same_as_target",
         },

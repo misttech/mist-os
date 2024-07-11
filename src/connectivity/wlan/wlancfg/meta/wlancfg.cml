@@ -35,8 +35,8 @@
             type: "bool",
         },
         {
-            config: "fuchsia.wlan.RoamingProfile",
-            key: "roaming_profile",
+            config: "fuchsia.wlan.RoamingPolicy",
+            key: "roaming_policy",
             type: "string",
             max_size: 512,
         },

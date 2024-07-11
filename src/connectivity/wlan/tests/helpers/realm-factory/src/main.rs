@@ -230,7 +230,7 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
         .await?;
     builder
         .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-            name: "fuchsia.wlan.RoamingProfile".parse()?,
+            name: "fuchsia.wlan.RoamingPolicy".parse()?,
             value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String("".into())),
         }))
         .await?;
@@ -239,7 +239,7 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
             Route::new()
                 .capability(Capability::configuration("fuchsia.wlan.RecoveryProfile"))
                 .capability(Capability::configuration("fuchsia.wlan.RecoveryEnabled"))
-                .capability(Capability::configuration("fuchsia.wlan.RoamingProfile"))
+                .capability(Capability::configuration("fuchsia.wlan.RoamingPolicy"))
                 .from(Ref::self_())
                 .to(&wlancfg),
         )
