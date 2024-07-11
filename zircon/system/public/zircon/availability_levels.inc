@@ -7,9 +7,8 @@
 // API level-independent macros in that file.
 
 // Special named API levels, which are defined in
-// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0246_api_levels_are_32_bits.
-// TODO(https://fxbug.dev/326277078): Add support for `NEXT` as a parameter.
-// #define FUCHSIA_INTERNAL_LEVEL_NEXT_() 4291821568
+// https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0246_api_levels_are_32_bits#special_api_levels.
+#define FUCHSIA_INTERNAL_LEVEL_NEXT_() 4291821568
 #define FUCHSIA_INTERNAL_LEVEL_HEAD_() 4292870144
 #define FUCHSIA_INTERNAL_LEVEL_PLATFORM_() 4293918720
 
@@ -26,9 +25,9 @@
 // retired API levels must be carefully considered and only applied at the
 // `NEXT` API level.
 //
-// TODO(https://fxbug.dev/42084512): Generate the numbered levels from version_history.json.
+// TODO(https://fxbug.dev/349622444): Generate the numbered levels from version_history.json.
 // TODO(https://fxbug.dev/326277078): Remove the in-development API level number
-// once `NEXT` is supported.
+// when switching to `NEXT`.
 #define FUCHSIA_INTERNAL_LEVEL_22_() 22
 #define FUCHSIA_INTERNAL_LEVEL_21_() 21
 #define FUCHSIA_INTERNAL_LEVEL_20_() 20

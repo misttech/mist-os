@@ -13,7 +13,6 @@
 //    * Valid levels are defined in availability_levels.inc.
 //    * Support for older retired API levels as parameters may be removed over time.
 //  * `NEXT` - for code to be included in the next stable API level.
-//    * TODO(https://fxbug.dev/326277078): Add support for NEXT as a parameter.
 //  * `HEAD` - for either of the following:
 //    * In-development code that is not ready to be exposed in an SDK
 //    * Code that should only be in Platform builds.
@@ -135,7 +134,7 @@
 
 // To avoid mistakenly using a non-existent name or unpublished API level, the levels specified in
 // the following macros are converted to calls to a macro containing the specified API level in its
-// name. If the macro does not exist, the build will fail. See https://fxbug.dev/42084512.
+// name. If the macro does not exist, the build will fail. See https://fxbug.dev/349622444.
 #define FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level) prefix##level##_
 #define FUCHSIA_API_LEVEL_CAT_(prefix, level) FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level)
 #define FUCHSIA_API_LEVEL_(level) FUCHSIA_API_LEVEL_CAT_(FUCHSIA_INTERNAL_LEVEL_, level)()
