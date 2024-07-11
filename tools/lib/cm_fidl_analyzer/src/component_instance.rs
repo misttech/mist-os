@@ -185,7 +185,7 @@ impl ComponentInstanceForAnalyzer {
             &new_outgoing_dir_router,
         );
         let (sandbox, child_inputs) = build_component_sandbox(
-            &moniker,
+            &self_,
             children_component_output_dictionary_routers,
             &decl,
             input,
