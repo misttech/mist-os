@@ -78,6 +78,13 @@ pub struct ServeCommand {
     /// Default is `false`.
     #[argh(switch)]
     pub no_device: bool,
+
+    /// refresh repository metadata during startup.
+    /// Note that this is not necessary if package-tool runs in the background
+    /// taking care of it, e.g. as part of `fx serve`.
+    /// Default is `false`.
+    #[argh(switch)]
+    pub refresh_metadata: bool,
 }
 
 fn default_address() -> SocketAddr {
