@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "src/developer/forensics/testing/stubs/fidl_server.h"
+#include "src/developer/forensics/testing/stubs/power_broker_current_level.h"
 #include "src/developer/forensics/testing/stubs/power_broker_element_control.h"
 #include "src/developer/forensics/testing/stubs/power_broker_lessor.h"
 #include "src/developer/forensics/testing/stubs/power_broker_required_level.h"
@@ -46,6 +47,8 @@ class PowerBrokerTopologyBase : public FidlServer<fuchsia_power_broker::Topology
 
   void SetRequiredLevel(const std::string& element_name, uint8_t level);
 
+  uint8_t GetCurrentLevel(const std::string& element_name) const;
+
  protected:
   explicit PowerBrokerTopologyBase(fidl::ServerEnd<fuchsia_power_broker::Topology> server_end,
                                    async_dispatcher_t* dispatcher, uint8_t initial_required_level,
@@ -61,6 +64,7 @@ class PowerBrokerTopologyBase : public FidlServer<fuchsia_power_broker::Topology
     std::unique_ptr<PowerBrokerElementControl> element_control_server;
     std::unique_ptr<PowerBrokerLessorBase> lessor_server;
     std::unique_ptr<PowerBrokerRequiredLevel> required_level_server;
+    std::unique_ptr<PowerBrokerCurrentLevel> current_level_server;
   };
 
   async_dispatcher_t* Dispatcher() { return dispatcher_; }

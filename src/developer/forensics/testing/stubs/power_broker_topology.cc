@@ -17,6 +17,7 @@ void PowerBrokerTopology::AddElement(AddElementRequest& request,
   FX_CHECK(request.dependencies().has_value());
   FX_CHECK(request.valid_levels().has_value());
   FX_CHECK(request.level_control_channels().has_value());
+  FX_CHECK(request.initial_current_level().has_value());
 
   FX_CHECK(AddedElements().count(*request.element_name()) == 0)
       << "Duplicate element added to topology";
@@ -31,6 +32,10 @@ void PowerBrokerTopology::AddElement(AddElementRequest& request,
       std::move(request.level_control_channels()->required()), Dispatcher(),
       InitialRequiredLevel());
 
+  auto current_level_server = std::make_unique<PowerBrokerCurrentLevel>(
+      std::move(request.level_control_channels()->current()), Dispatcher(),
+      *request.initial_current_level());
+
   std::unique_ptr<PowerBrokerLessorBase> lessor_server =
       ConstructLessor()(std::move(request.lessor_channel()).value(),
                         /*level_changed=*/cpp20::bind_front(&PowerBrokerRequiredLevel::SetLevel,
@@ -42,6 +47,7 @@ void PowerBrokerTopology::AddElement(AddElementRequest& request,
                                     .element_control_server = std::move(element_control_server),
                                     .lessor_server = std::move(lessor_server),
                                     .required_level_server = std::move(required_level_server),
+                                    .current_level_server = std::move(current_level_server),
                                 }});
 
   fuchsia_power_broker::TopologyAddElementResponse response(
@@ -58,6 +64,7 @@ void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
   FX_CHECK(request.dependencies().has_value());
   FX_CHECK(request.valid_levels().has_value());
   FX_CHECK(request.level_control_channels().has_value());
+  FX_CHECK(request.initial_current_level().has_value());
 
   FX_CHECK(AddedElements().count(*request.element_name()) == 0)
       << "Duplicate element added to topology";
@@ -72,6 +79,10 @@ void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
       std::move(request.level_control_channels()->required()), Dispatcher(),
       InitialRequiredLevel());
 
+  auto current_level_server = std::make_unique<PowerBrokerCurrentLevel>(
+      std::move(request.level_control_channels()->current()), Dispatcher(),
+      *request.initial_current_level());
+
   std::unique_ptr<PowerBrokerLessorBase> lessor_server =
       ConstructLessor()(std::move(request.lessor_channel()).value(),
                         /*level_changed=*/cpp20::bind_front(&PowerBrokerRequiredLevel::SetLevel,
@@ -83,6 +94,7 @@ void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
                                     .element_control_server = std::move(element_control_server),
                                     .lessor_server = std::move(lessor_server),
                                     .required_level_server = std::move(required_level_server),
+                                    .current_level_server = std::move(current_level_server),
                                 }});
 
   fuchsia_power_broker::TopologyAddElementResponse response(
@@ -129,6 +141,13 @@ void PowerBrokerTopologyBase::SetRequiredLevel(const std::string& element_name,
   FX_CHECK(element != added_elements_.end());
 
   element->second.required_level_server->SetLevel(level);
+}
+
+uint8_t PowerBrokerTopologyBase::GetCurrentLevel(const std::string& element_name) const {
+  const auto element = added_elements_.find(element_name);
+  FX_CHECK(element != added_elements_.end());
+
+  return element->second.current_level_server->GetLevel();
 }
 
 }  // namespace forensics::stubs

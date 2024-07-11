@@ -543,5 +543,47 @@ TEST_F(WakeLeaseTest, LeaseFailsOnTimeout) {
   EXPECT_EQ(error, Error::kTimeout);
 }
 
+TEST_F(WakeLeaseTest, SetsCurrentLevel) {
+  auto sag_client_and_stub = CreateSag<stubs::SystemActivityGovernor>(dispatcher());
+  ASSERT_TRUE(sag_client_and_stub.has_value());
+  auto& [sag_client, sag] = *sag_client_and_stub;
+
+  auto topology_client_and_stub = CreateTopology<stubs::PowerBrokerTopology>(
+      dispatcher(), /*initial_required_level=*/kPowerLevelInactive,
+      /*construct_lessor=*/
+      [dispatcher = dispatcher()](fidl::ServerEnd<fuchsia_power_broker::Lessor> server_end,
+                                  std::function<void(uint8_t)> level_changed) {
+        return std::make_unique<stubs::PowerBrokerLessorDelaysRequiredLevel>(
+            std::move(server_end), dispatcher, std::move(level_changed));
+      });
+  ASSERT_TRUE(topology_client_and_stub.has_value());
+  auto& [topology_client, topology] = *topology_client_and_stub;
+
+  WakeLease wake_lease(dispatcher(), "exceptions-element-001", std::move(sag_client),
+                       std::move(topology_client));
+
+  std::optional<fidl::Client<fuchsia_power_broker::LeaseControl>> lease;
+  GetExecutor().schedule_task(
+      wake_lease.Acquire(kTimeout)
+          .and_then([&lease](fidl::Client<fuchsia_power_broker::LeaseControl>& acquired_lease) {
+            lease = std::move(acquired_lease);
+          })
+          .or_else([](const Error& error) {
+            FX_LOGS(FATAL) << "Unexpected error while acquiring lease: " << ToString(error);
+          }));
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(topology->ElementInTopology("exceptions-element-001"));
+  EXPECT_EQ(topology->GetCurrentLevel("exceptions-element-001"), kPowerLevelInactive);
+
+  topology->SetRequiredLevel("exceptions-element-001", kPowerLevelActive);
+  RunLoopUntilIdle();
+  EXPECT_EQ(topology->GetCurrentLevel("exceptions-element-001"), kPowerLevelActive);
+
+  topology->SetRequiredLevel("exceptions-element-001", kPowerLevelInactive);
+  RunLoopUntilIdle();
+  EXPECT_EQ(topology->GetCurrentLevel("exceptions-element-001"), kPowerLevelInactive);
+}
+
 }  // namespace
 }  // namespace forensics::exceptions::handler

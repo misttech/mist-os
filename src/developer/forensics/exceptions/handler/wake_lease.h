@@ -81,7 +81,6 @@ class WakeLease : public WakeLeaseBase {
 
   AsyncEventHandlerOpen<fuchsia_power_broker::LeaseControl> lease_control_event_handler_;
 
-  // |current_level_client_| is currently unused but the API requires us to keep the channel open.
   fidl::Client<fuchsia_power_broker::CurrentLevel> current_level_client_;
   fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_client_;
   uint8_t required_level_;

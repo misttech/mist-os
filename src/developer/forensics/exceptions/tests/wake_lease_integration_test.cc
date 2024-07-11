@@ -278,10 +278,13 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // Drop the AA lease but leave |lease| intact.
   aa_element->lease_control.reset();
   ASSERT_FALSE(aa_element->lease_control.is_valid());
+
+  RunLoopUntilIdle();
   ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kWakeHandling));
 
   // Drop |lease| so nothing is holding the system awake anymore.
   ASSERT_TRUE(lease.UnbindMaybeGetEndpoint().is_ok());
+  RunLoopUntilIdle();
   EXPECT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kInactive));
 }
 

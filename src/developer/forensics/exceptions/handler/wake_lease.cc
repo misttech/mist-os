@@ -219,14 +219,23 @@ void WakeLease::WatchRequiredLevel() {
 
         required_level_ = result->required_level();
 
-        // Unblocks all tasks waiting for the required level to become active. Note, promises will
-        // re-block themselves if the power level is not active.
-        for (fpromise::suspended_task& task : waiting_for_required_level_) {
-          task.resume_task();
-        }
-        waiting_for_required_level_.clear();
+        current_level_client_->Update(required_level_)
+            .Then([this](const fidl::Result<fpb::CurrentLevel::Update>& result) {
+              if (result.is_error()) {
+                FX_LOGS(ERROR) << "Failed to update current level: "
+                               << result.error_value().FormatDescription();
+                return;
+              }
 
-        WatchRequiredLevel();
+              // Unblocks all tasks waiting for the required level to become active. Note, promises
+              // will re-block themselves if the power level is not active.
+              for (fpromise::suspended_task& task : waiting_for_required_level_) {
+                task.resume_task();
+              }
+              waiting_for_required_level_.clear();
+
+              WatchRequiredLevel();
+            });
       });
 }
 
