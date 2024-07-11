@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 
@@ -53,19 +54,20 @@ static uint32_t get_fg_color() {
 }
 
 // Checks if two rectangles intersect, and if so, returns their intersection.
-static bool compute_intersection(const fhdt::wire::Frame& a, const fhdt::wire::Frame& b,
-                                 fhdt::wire::Frame* intersection) {
-  uint32_t left = std::max(a.x_pos, b.x_pos);
-  uint32_t right = std::min(a.x_pos + a.width, b.x_pos + b.width);
-  uint32_t top = std::max(a.y_pos, b.y_pos);
-  uint32_t bottom = std::min(a.y_pos + a.height, b.y_pos + b.height);
+static bool compute_intersection(const fuchsia_math::wire::RectU& a,
+                                 const fuchsia_math::wire::RectU& b,
+                                 fuchsia_math::wire::RectU* intersection) {
+  uint32_t left = std::max(a.x, b.x);
+  uint32_t right = std::min(a.x + a.width, b.x + b.width);
+  uint32_t top = std::max(a.y, b.y);
+  uint32_t bottom = std::min(a.y + a.height, b.y + b.height);
 
   if (left >= right || top >= bottom) {
     return false;
   }
 
-  intersection->x_pos = left;
-  intersection->y_pos = top;
+  intersection->x = left;
+  intersection->y = top;
   intersection->width = right - left;
   intersection->height = bottom - top;
 
@@ -218,11 +220,12 @@ void PrimaryLayer::StepLayout(int32_t frame_num) {
     alt_image_ = frame_num % 2;
   }
   if (pan_src_) {
-    src_frame_.x_pos =
-        interpolate(image_width_ - src_frame_.width, frame_num, kSrcFrameBouncePeriod);
+    image_source_.x =
+        interpolate(image_width_ - image_source_.width, frame_num, kSrcFrameBouncePeriod);
   }
   if (pan_dest_) {
-    dest_frame_.x_pos = interpolate(width_ - dest_frame_.width, frame_num, kDestFrameBouncePeriod);
+    display_destination_.x =
+        interpolate(width_ - display_destination_.width, frame_num, kDestFrameBouncePeriod);
   }
   if (rotates_) {
     switch ((frame_num / kRotationPeriod) % 4) {
@@ -241,24 +244,24 @@ void PrimaryLayer::StepLayout(int32_t frame_num) {
     }
 
     if (frame_num % kRotationPeriod == 0 && frame_num != 0) {
-      uint32_t tmp = dest_frame_.width;
-      dest_frame_.width = dest_frame_.height;
-      dest_frame_.height = tmp;
+      uint32_t tmp = display_destination_.width;
+      display_destination_.width = display_destination_.height;
+      display_destination_.height = tmp;
     }
   }
 
-  fhdt::wire::Frame display = {};
+  fuchsia_math::wire::RectU display = {};
   for (unsigned i = 0; i < displays_.size(); i++) {
     display.height = displays_[i]->mode().vertical_resolution;
     display.width = displays_[i]->mode().horizontal_resolution;
 
     if (mirrors_) {
-      layers_[i].src.x_pos = 0;
-      layers_[i].src.y_pos = 0;
+      layers_[i].src.x = 0;
+      layers_[i].src.y = 0;
       layers_[i].src.width = image_width_;
       layers_[i].src.height = image_height_;
-      layers_[i].dest.x_pos = 0;
-      layers_[i].dest.y_pos = 0;
+      layers_[i].dest.x = 0;
+      layers_[i].dest.y = 0;
       layers_[i].dest.width = display.width;
       layers_[i].dest.height = display.height;
       layers_[i].active = true;
@@ -266,37 +269,37 @@ void PrimaryLayer::StepLayout(int32_t frame_num) {
     }
 
     // Calculate the portion of the dest frame which shows up on this display
-    if (compute_intersection(display, dest_frame_, &layers_[i].dest)) {
+    if (compute_intersection(display, display_destination_, &layers_[i].dest)) {
       // Find the subset of the src region which shows up on this display
       if (rotation_ == Transform::kIdentity || rotation_ == Transform::kRot180) {
         if (!scaling_) {
-          layers_[i].src.x_pos = src_frame_.x_pos + (layers_[i].dest.x_pos - dest_frame_.x_pos);
-          layers_[i].src.y_pos = src_frame_.y_pos;
+          layers_[i].src.x = image_source_.x + (layers_[i].dest.x - display_destination_.x);
+          layers_[i].src.y = image_source_.y;
           layers_[i].src.width = layers_[i].dest.width;
           layers_[i].src.height = layers_[i].dest.height;
         } else {
-          layers_[i].src.x_pos =
-              src_frame_.x_pos +
-              interpolate_scaling(layers_[i].dest.x_pos - dest_frame_.x_pos, frame_num);
-          layers_[i].src.y_pos = src_frame_.y_pos;
+          layers_[i].src.x =
+              image_source_.x +
+              interpolate_scaling(layers_[i].dest.x - display_destination_.x, frame_num);
+          layers_[i].src.x = image_source_.x;
           layers_[i].src.width = interpolate_scaling(layers_[i].dest.width, frame_num);
           layers_[i].src.height = interpolate_scaling(layers_[i].dest.height, frame_num);
         }
       } else {
-        layers_[i].src.x_pos = src_frame_.x_pos;
-        layers_[i].src.y_pos = src_frame_.y_pos + (layers_[i].dest.y_pos - dest_frame_.y_pos);
+        layers_[i].src.x = image_source_.x;
+        layers_[i].src.y = image_source_.y + (layers_[i].dest.y - display_destination_.y);
         layers_[i].src.height = layers_[i].dest.width;
         layers_[i].src.width = layers_[i].dest.height;
       }
 
       // Put the dest frame coordinates in the display's coord space
-      layers_[i].dest.x_pos -= display.x_pos;
+      layers_[i].dest.x -= display.x;
       layers_[i].active = true;
     } else {
       layers_[i].active = false;
     }
 
-    display.x_pos += display.width;
+    display.x += display.width;
   }
 
   if (layer_toggle_) {

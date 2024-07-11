@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <zircon/assert.h>
 
@@ -246,19 +247,23 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   config_change_ = true;
 }
 
-void Layer::SetPrimaryPosition(fhdt::wire::Transform transform, fhdt::wire::Frame src_frame,
-                               fhdt::wire::Frame dest_frame) {
+void Layer::SetPrimaryPosition(fhdt::wire::Transform transform,
+                               fuchsia_math::wire::RectU image_source,
+                               fuchsia_math::wire::RectU display_destination) {
   primary_layer_t* primary_layer = &pending_layer_.cfg.primary;
 
-  static_assert(sizeof(fhdt::wire::Frame) == sizeof(frame_t), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, x_pos) == offsetof(frame_t, x_pos), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, y_pos) == offsetof(frame_t, y_pos), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, width) == offsetof(frame_t, width), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, height) == offsetof(frame_t, height),
+  static_assert(sizeof(fuchsia_math::wire::RectU) == sizeof(frame_t), "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, x) == offsetof(frame_t, x_pos),
+                "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, y) == offsetof(frame_t, y_pos),
+                "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, width) == offsetof(frame_t, width),
+                "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, height) == offsetof(frame_t, height),
                 "Struct mismatch");
 
-  memcpy(&primary_layer->src_frame, &src_frame, sizeof(frame_t));
-  memcpy(&primary_layer->dest_frame, &dest_frame, sizeof(frame_t));
+  memcpy(&primary_layer->src_frame, &image_source, sizeof(frame_t));
+  memcpy(&primary_layer->dest_frame, &display_destination, sizeof(frame_t));
   primary_layer->transform_mode = static_cast<uint8_t>(transform);
 
   config_change_ = true;

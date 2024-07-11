@@ -990,8 +990,8 @@ int main(int argc, const char* argv[]) {
     uint32_t height = std::min(displays[0].mode().vertical_resolution / 2,
                                displays[0].mode().horizontal_resolution / 2);
     layer3->SetImageDimens(width * 2, height);
-    layer3->SetDestFrame(width, height);
-    layer3->SetSrcFrame(width, height);
+    layer3->SetDisplayDestination(width, height);
+    layer3->SetImageSource(width, height);
     layer3->SetPanDest(true);
     layer3->SetPanSrc(true);
     layer3->SetRotates(true);
@@ -1007,8 +1007,8 @@ int main(int argc, const char* argv[]) {
     }
     layer1->SetAlpha(true, (float)0.2);
     layer1->SetImageDimens(width, height);
-    layer1->SetSrcFrame(width / 2, height / 2);
-    layer1->SetDestFrame(width / 2, height / 2);
+    layer1->SetImageSource(width / 2, height / 2);
+    layer1->SetDisplayDestination(width / 2, height / 2);
     layer1->SetPanSrc(true);
     layer1->SetPanDest(true);
     layers.push_back(std::move(layer1));

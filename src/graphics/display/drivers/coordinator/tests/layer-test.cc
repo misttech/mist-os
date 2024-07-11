@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/defer.h>
@@ -69,9 +70,9 @@ TEST_F(LayerTest, PrimaryBasic) {
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
   layer.SetImage(image, kInvalidEventId, kInvalidEventId);
@@ -83,9 +84,9 @@ TEST_F(LayerTest, CleanUpImage) {
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
@@ -157,9 +158,9 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up images, which doesn't change the current config.
@@ -205,9 +206,9 @@ TEST_F(LayerTest, CleanUpAllImages) {
   fhdt::wire::ImageMetadata image_metadata = {.width = kDisplayWidth,
                                               .height = kDisplayHeight,
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
@@ -256,9 +257,9 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   fhdt::wire::ImageMetadata image_config = {.width = kDisplayWidth,
                                             .height = kDisplayHeight,
                                             .tiling_type = fhdt::wire::kImageTilingTypeLinear};
-  fhdt::wire::Frame frame = {.width = kDisplayWidth, .height = kDisplayHeight};
+  fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, frame, frame);
+  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up all images, which doesn't change the current config.

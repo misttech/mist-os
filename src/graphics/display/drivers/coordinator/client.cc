@@ -526,7 +526,8 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
     TearDown();
     return;
   }
-  layer->SetPrimaryPosition(request->transform, request->src_frame, request->dest_frame);
+  layer->SetPrimaryPosition(request->transform, request->image_source,
+                            request->display_destination);
   pending_config_valid_ = false;
   // no Reply defined
 }

@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
+#include <fuchsia/math/cpp/fidl.h>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -30,19 +31,19 @@ struct DisplayInfo {
 struct RenderData {
   std::vector<ImageRect> rectangles;
   std::vector<allocation::ImageMetadata> images;
-  // TODO(https://fxbug.dev/42149711): should we remove this, and pass to RenderFrame() as a std::map of
-  // RenderData keyed by display_id?  That would have the benefit of guaranteeing by construction
-  // that each display_id could only appear once.
+  // TODO(https://fxbug.dev/42149711): should we remove this, and pass to RenderFrame() as a
+  // std::map of RenderData keyed by display_id?  That would have the benefit of guaranteeing by
+  // construction that each display_id could only appear once.
   fuchsia::hardware::display::types::DisplayId display_id;
 };
 
-// Struct to combine the source and destination frames used to set a layer's
-// position on the display. The src frame represents the (cropped) UV coordinates
-// of the image and the dst frame represents the position in screen space that
+// Struct to combine the source and destination rectangles used to set a layer's
+// position on the display. The src rectangle represents the (cropped) UV coordinates
+// of the image and the dst rectangle represents the position in screen space where
 // the layer will be placed.
 struct DisplaySrcDstFrames {
-  fuchsia::hardware::display::types::Frame src;
-  fuchsia::hardware::display::types::Frame dst;
+  fuchsia::math::RectU src;
+  fuchsia::math::RectU dst;
 
   // When setting an image on a layer in the display, you have to specify the "source"
   // and "destination", where the source represents the pixel offsets and dimensions to

@@ -5,17 +5,19 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_FRAME_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_FRAME_H_
 
-#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 
 #include <cstdint>
 
 namespace display {
 
-// Equivalent to the FIDL type [`fuchsia.hardware.display.types/Frame`] and the banjo
-// type [`fuchsia.hardware.display.controller/Frame`].
+// FIDL type [`fuchsia.math/RectU`] instances used in the display stack.
 //
-// See `::fuchsia_hardware_display_types::wire::Frame` for references.
+// Equivalent to the the banjo type
+// [`fuchsia.hardware.display.controller/Frame`].
+//
+// See `::fuchsia_math::wire::RectU` for references.
 //
 // Note that the struct uses signed `int32_t` values for all coordinate and size
 // fields instead of the unsigned `uint32` used by FIDL / banjo counterparts.
@@ -46,10 +48,10 @@ inline bool operator==(const Frame& lhs, const Frame& rhs) {
 
 inline bool operator!=(const Frame& lhs, const Frame& rhs) { return !(lhs == rhs); }
 
-Frame ToFrame(const fuchsia_hardware_display_types::wire::Frame& frame_fidl);
+Frame ToFrame(const fuchsia_math::wire::RectU& rectangle_fidl);
 Frame ToFrame(const frame_t& frame_banjo);
 
-fuchsia_hardware_display_types::wire::Frame ToFidlFrame(const Frame& frame);
+fuchsia_math::wire::RectU ToFidlFrame(const Frame& frame);
 frame_t ToBanjoFrame(const Frame& frame);
 
 }  // namespace display
