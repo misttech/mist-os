@@ -196,7 +196,6 @@ class CommandTransformer(typing.Generic[EventType, ReturnType], ABC):
             def event_callback(event: CommandEvent) -> None:
                 nonlocal event_exception
                 try:
-                    print("handling event")
                     self._handle_event(event, do_event_add)
                 except Exception as e:
                     event_exception = e

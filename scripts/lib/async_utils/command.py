@@ -105,6 +105,17 @@ class CommandOutput:
 CommandEvent = StdoutEvent | StderrEvent | TerminationEvent
 
 
+@dataclass
+class _InputWriter:
+    input_bytes: bytes
+    writer: asyncio.StreamWriter
+
+    async def write_stream(self) -> None:
+        self.writer.write(self.input_bytes)
+        self.writer.write_eof()
+        await self.writer.drain()
+
+
 class AsyncCommand:
     """Asynchronously executed subprocess command.
 
@@ -118,6 +129,7 @@ class AsyncCommand:
         process: asyncio.subprocess.Process,
         wrapped_process: asyncio.subprocess.Process | None = None,
         timeout: float | None = None,
+        input_writer: _InputWriter | None = None,
     ):
         """Create an AsyncCommand that wraps a subprocess.
 
@@ -136,8 +148,9 @@ class AsyncCommand:
         self._event_queue: asyncio.Queue[CommandEvent] = asyncio.Queue(128)
         self._done_iterating = False
         self._start = time.time()
-        self._runner_task = asyncio.create_task(self._task())
         self._timeout = timeout
+        self._input_writer = input_writer
+        self._runner_task = asyncio.create_task(self._task())
 
     @classmethod
     async def create(
@@ -147,6 +160,7 @@ class AsyncCommand:
         symbolizer_args: list[str] | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        input_bytes: bytes | None = None,
     ) -> "AsyncCommand":
         """Create a new AsyncCommand that runs the given program.
 
@@ -162,6 +176,7 @@ class AsyncCommand:
                 Note: fx test's own environment is inherited and overridden by
                     the values in this dict, if set.
             timeout (float, optional): Terminate the command after the given number of seconds.
+            input_bytes (bytes, optional): If set, send this input to the running command.
 
         Returns:
             AsyncCommand: A new AsyncCommand executing the process.
@@ -187,19 +202,22 @@ class AsyncCommand:
         try:
 
             async def make_process(
-                output_pipe: typing.Union[int, typing.TextIO]
+                output_pipe: int | typing.TextIO, input_pipe: int | None = None
             ) -> asyncio.subprocess.Process:
                 return await asyncio.subprocess.create_subprocess_exec(
                     program,
                     *args,
                     stdout=output_pipe,
                     stderr=output_pipe,
+                    stdin=input_pipe,
                     env=env,
                     cwd=cwd,
                     preexec_fn=os.setpgrp,  # To support killing by pgid.
                 )
 
             base_command = None
+            input_pipe = None if input is None else asyncio.subprocess.PIPE
+            input_writer: _InputWriter | None = None
             if symbolizer_args:
                 # Wrap the base command we want to run in another
                 # command that executes the symbolizer. We need to explicitly
@@ -208,7 +226,7 @@ class AsyncCommand:
 
                 read_pipe, write_pipe = os.pipe()
 
-                base_command = await make_process(write_pipe)
+                base_command = await make_process(write_pipe, input_pipe)
                 os.close(write_pipe)
                 command = await asyncio.subprocess.create_subprocess_exec(
                     *symbolizer_args,
@@ -217,11 +235,22 @@ class AsyncCommand:
                     stdin=read_pipe,
                     preexec_fn=os.setpgrp,  # To support killing by pgid.
                 )
+                if input_bytes is not None and base_command.stdin is not None:
+                    input_writer = _InputWriter(input_bytes, base_command.stdin)
                 os.close(read_pipe)
             else:
-                command = await make_process(asyncio.subprocess.PIPE)
+                command = await make_process(
+                    asyncio.subprocess.PIPE, input_pipe
+                )
+                if input_bytes is not None and command.stdin is not None:
+                    input_writer = _InputWriter(input_bytes, command.stdin)
 
-            return AsyncCommand(command, base_command, timeout=timeout)
+            return AsyncCommand(
+                command,
+                base_command,
+                timeout=timeout,
+                input_writer=input_writer,
+            )
         except FileNotFoundError as e:
             raise AsyncCommandError(
                 f"The program '{e.filename}' was not found."
@@ -353,6 +382,8 @@ class AsyncCommand:
         tasks.append(
             asyncio.create_task(read_stream(self._process.stderr, StderrEvent))
         )
+        if self._input_writer is not None:
+            tasks.append(asyncio.create_task(self._input_writer.write_stream()))
 
         # Wait for the process to exit and get its return code.
         return_code = await self._process.wait()
