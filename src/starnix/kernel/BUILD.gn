@@ -179,6 +179,7 @@ rustc_library("starnix_core") {
     "mm/mod.rs",
     "mm/syscalls.rs",
     "mm/vmex_resource.rs",
+    "mm/vmsplice.rs",
     "mutable_state.rs",
     "power/manager.rs",
     "power/mod.rs",

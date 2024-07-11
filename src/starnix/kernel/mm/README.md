@@ -60,6 +60,15 @@ Access from Starnix's "kernel mode" to user memory is handled by first examining
 map to identify the VMO(s) backing the range of interest and then issuing zx_vmo_{read,write} calls
 to interact with these objects.
 
+## Invariants
+
+The memory manager must make sure that it is in a consistent state from internal (kernel mode) and
+external (user mode) POVs. That is, write operations on memory manager (e.g. mmap, munmap, remap,
+etc.) must never allow another operation to consider partially updated state as final. This is
+because there exists certain read operations (e.g. vmsplce, fork, clone) that take a snapshot of
+the whole memory manager, or a subset of its mappings, and that snapshot must represent a valid
+state of memory for user space.
+
 ## Future work
 
 TODO

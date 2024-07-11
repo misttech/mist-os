@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 
 use crate::mm::memory::MemoryObject;
-use crate::mm::{FutexTable, PrivateFutexKey, VMEX_RESOURCE};
+use crate::mm::{
+    FutexTable, InflightVmsplicedPayloads, PrivateFutexKey, VmsplicePayload,
+    VmsplicePayloadSegment, VMEX_RESOURCE,
+};
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
+
 use crate::vfs::{
     AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString,
     NamespaceNode, SequenceFileSource,
@@ -38,7 +42,7 @@ use static_assertions::const_assert_eq;
 use std::collections::HashMap;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
-use std::ops::Range;
+use std::ops::{Deref, DerefMut, Range};
 use std::sync::Arc;
 use syncio::zxio::zxio_default_maybe_faultable_copy;
 use usercopy::slice_to_maybe_uninit_mut;
@@ -593,14 +597,14 @@ pub struct MemoryManagerForkableState {
     pub vdso_base: UserAddress,
 }
 
-impl std::ops::Deref for MemoryManagerState {
+impl Deref for MemoryManagerState {
     type Target = MemoryManagerForkableState;
     fn deref(&self) -> &Self::Target {
         &self.forkable_state
     }
 }
 
-impl std::ops::DerefMut for MemoryManagerState {
+impl DerefMut for MemoryManagerState {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.forkable_state
     }
@@ -1263,21 +1267,25 @@ impl MemoryManagerState {
     // Unmapped mappings are placed in `released_mappings`.
     fn update_after_unmap(
         &mut self,
-        _mm: &Arc<MemoryManager>,
+        mm: &Arc<MemoryManager>,
         addr: UserAddress,
         length: usize,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<(), Errno> {
         profile_duration!("UpdateAfterUnmap");
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+        let unmap_range = addr..end_addr;
 
         #[cfg(feature = "alternate_anon_allocs")]
         {
-            let unmap_range = addr..end_addr;
             for (range, mapping) in self.mappings.intersection(&unmap_range) {
                 // Deallocate any pages in the private, anonymous backing that are now unreachable.
                 if let MappingBacking::PrivateAnonymous = mapping.backing {
                     let unmapped_range = &unmap_range.intersect(range);
+
+                    mm.inflight_vmspliced_payloads
+                        .handle_unmapping(&self.private_anonymous.backing, unmapped_range)?;
+
                     self.private_anonymous
                         .zero(unmapped_range.start, unmapped_range.end - unmapped_range.start)?;
                 }
@@ -1309,6 +1317,9 @@ impl MemoryManagerState {
 
             if let Some((range, mut mapping)) = truncated_tail {
                 let MappingBacking::Memory(backing) = &mut mapping.backing;
+                mm.inflight_vmspliced_payloads
+                    .handle_unmapping(&backing.memory, &unmap_range.intersect(&range))?;
+
                 // Create and map a child COW memory object mapping that represents the truncated tail.
                 let memory_info = backing.memory.basic_info();
                 let child_memory_offset =
@@ -1348,6 +1359,9 @@ impl MemoryManagerState {
 
             if let Some((range, mapping)) = truncated_head {
                 let MappingBacking::Memory(backing) = &mapping.backing;
+                mm.inflight_vmspliced_payloads
+                    .handle_unmapping(&backing.memory, &unmap_range.intersect(&range))?;
+
                 // Resize the memory object of the head mapping, whose tail was cut off.
                 let new_mapping_size = (range.end - range.start) as u64;
                 let new_memory_size = backing.memory_offset + new_mapping_size;
@@ -1539,6 +1553,40 @@ impl MemoryManagerState {
             return Err(());
         }
         Ok((addr - self.user_vmar_info.base).ptr())
+    }
+
+    fn get_mappings_for_vmsplice(
+        &self,
+        mm: &Arc<MemoryManager>,
+        buffers: &UserBuffers,
+    ) -> Result<Vec<Arc<VmsplicePayload>>, Errno> {
+        let mut vmsplice_mappings = Vec::new();
+
+        for UserBuffer { mut address, length } in buffers.iter().copied() {
+            let mappings = self.get_contiguous_mappings_at(address, length)?;
+            for (mapping, length) in mappings {
+                let vmsplice_payload = match &mapping.backing {
+                    MappingBacking::Memory(m) => VmsplicePayloadSegment {
+                        addr_offset: address,
+                        length,
+                        memory: m.memory.clone(),
+                        memory_offset: m.address_to_offset(address),
+                    },
+                    #[cfg(feature = "alternate_anon_allocs")]
+                    MappingBacking::PrivateAnonymous => VmsplicePayloadSegment {
+                        addr_offset: address,
+                        length,
+                        memory: self.private_anonymous.backing.clone(),
+                        memory_offset: address.ptr() as u64,
+                    },
+                };
+                vmsplice_mappings.push(VmsplicePayload::new(Arc::downgrade(mm), vmsplice_payload));
+
+                address += length;
+            }
+        }
+
+        Ok(vmsplice_mappings)
     }
 
     /// Returns all the mappings starting at `addr`, and continuing until either `length` bytes have
@@ -2388,6 +2436,13 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 }
 
 impl MemoryManager {
+    pub fn get_mappings_for_vmsplice(
+        self: &Arc<MemoryManager>,
+        buffers: &UserBuffers,
+    ) -> Result<Vec<Arc<VmsplicePayload>>, Errno> {
+        self.state.read().get_mappings_for_vmsplice(self, buffers)
+    }
+
     pub fn has_same_address_space(&self, other: &Self) -> bool {
         self.root_vmar == other.root_vmar
     }
@@ -2604,6 +2659,16 @@ pub struct MemoryManager {
 
     /// Maximum valid user address for this vmar.
     pub maximum_valid_user_address: UserAddress,
+
+    /// In-flight payloads enqueued to a pipe as a consequence of a `vmsplice(2)`
+    /// operation.
+    ///
+    /// For details on why we need to keep track of in-flight vmspliced payloads,
+    /// see [`VmsplicePayload`].
+    ///
+    /// For details on why this isn't under the `RwLock` protected `MemoryManagerState`,
+    /// See [`InflightVmsplicedPayloads::payloads`].
+    pub inflight_vmspliced_payloads: InflightVmsplicedPayloads,
 }
 
 impl MemoryManager {
@@ -2651,6 +2716,7 @@ impl MemoryManager {
             maximum_valid_user_address: UserAddress::from_ptr(
                 user_vmar_info.base + user_vmar_info.len,
             ),
+            inflight_vmspliced_payloads: Default::default(),
         }
     }
 
@@ -2665,6 +2731,8 @@ impl MemoryManager {
         );
 
         let mut released_mappings = vec![];
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
         let mut state = self.state.write();
 
         // Ensure that there is address-space set aside for the program break.
@@ -2926,6 +2994,8 @@ impl MemoryManager {
             Ok(Arc::new(cloned_memory))
         }
 
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
         let state: &mut MemoryManagerState = &mut self.state.write();
         let mut target_state = target.state.write();
         let mut child_memorys = HashMap::<zx::Koid, MemoryInfo>::new();
@@ -3088,6 +3158,8 @@ impl MemoryManager {
 
         // Unmapped mappings must be released after the state is unlocked.
         let mut released_mappings = vec![];
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
         let mut state = self.state.write();
         let result = state.map_memory(
             self,
@@ -3120,6 +3192,8 @@ impl MemoryManager {
         name: MappingName,
     ) -> Result<UserAddress, Errno> {
         let mut released_mappings = vec![];
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
         let mut state = self.state.write();
         let result = state.map_anonymous(
             self,
@@ -3149,6 +3223,8 @@ impl MemoryManager {
         new_addr: UserAddress,
     ) -> Result<UserAddress, Errno> {
         let mut released_mappings = vec![];
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
         let mut state = self.state.write();
         let result = state.remap(
             current_task,
@@ -3171,6 +3247,8 @@ impl MemoryManager {
 
     pub fn unmap(self: &Arc<Self>, addr: UserAddress, length: usize) -> Result<(), Errno> {
         let mut released_mappings = vec![];
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
         let mut state = self.state.write();
         let result = state.unmap(self, addr, length, &mut released_mappings);
 
@@ -3188,6 +3266,8 @@ impl MemoryManager {
         length: usize,
         prot_flags: ProtectionFlags,
     ) -> Result<(), Errno> {
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
         let mut state = self.state.write();
         state.protect(addr, length, prot_flags)
     }
@@ -3831,7 +3911,6 @@ mod tests {
         PR_SET_VMA_ANON_NAME,
     };
     use std::ffi::CString;
-    use std::ops::Deref as _;
     use zerocopy::FromZeros;
 
     #[::fuchsia::test]

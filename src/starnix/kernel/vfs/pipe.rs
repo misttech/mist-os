@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{read_to_vec, MemoryAccessorExt, NumberOfElementsRead, PAGE_SIZE};
+use crate::mm::{
+    read_to_vec, MemoryAccessorExt, NumberOfElementsRead, TaskMemoryAccessor, PAGE_SIZE,
+};
 use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::{
     CurrentTask, EventHandler, Kernel, WaitCallback, WaitCanceler, WaitQueue, Waiter,
 };
 use crate::vfs::buffers::{
     Buffer, InputBuffer, InputBufferCallback, MessageData, MessageQueue, OutputBuffer,
-    OutputBufferCallback, PeekBufferSegmentsCallback, PipeMessageData, UserBuffersInputBuffer,
-    UserBuffersOutputBuffer,
+    OutputBufferCallback, PeekBufferSegmentsCallback, PipeMessageData, UserBuffersOutputBuffer,
 };
 use crate::vfs::{
     default_fcntl, default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, CacheMode,
@@ -608,7 +609,7 @@ impl<'a> Buffer for SpliceInputBuffer<'a> {
         for message in self.pipe.messages.messages() {
             let to_read = std::cmp::min(available, message.len());
             callback(&UserBuffer {
-                address: UserAddress::from(message.data.ptr() as u64),
+                address: UserAddress::from(message.data.ptr()? as u64),
                 length: to_read,
             });
             available -= to_read;
@@ -870,34 +871,45 @@ impl PipeFileObject {
         }
     }
 
-    /// Copy data from the given input buffer into the pipe.
+    /// Share the mappings backing the given input buffer into the pipe.
     ///
-    /// Returns the number of bytes transferred.
+    /// Returns the number of bytes enqueued.
     pub fn vmsplice_from(
         &self,
         current_task: &CurrentTask,
         self_file: &FileHandle,
-        iovec: UserBuffers,
+        mut iovec: UserBuffers,
         non_blocking: bool,
     ) -> Result<usize, Errno> {
-        let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
-        let data_len = data.available();
+        let available = UserBuffer::cap_buffers_to_max_rw_count(
+            current_task.maximum_valid_address(),
+            &mut iovec,
+        )?;
+        let mappings = current_task.mm().get_mappings_for_vmsplice(&iovec)?;
+
         let mut pipe =
-            self.lock_pipe_for_writing(current_task, self_file, non_blocking, data_len)?;
+            self.lock_pipe_for_writing(current_task, self_file, non_blocking, available)?;
 
         if pipe.reader_count == 0 {
             send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
             return error!(EPIPE);
         }
 
-        let mut available = std::cmp::min(data_len, pipe.messages.available_capacity());
+        let mut remaining = std::cmp::min(available, pipe.messages.available_capacity());
 
-        let bytes_transferred = data.read_each(&mut |bytes| {
-            let actual = std::cmp::min(bytes.len(), available);
-            pipe.messages.write_message(PipeMessageData::from(bytes[0..actual].to_vec()).into());
-            available -= actual;
-            Ok(actual)
-        })?;
+        let mut bytes_transferred = 0;
+        for mut mapping in mappings.into_iter() {
+            mapping.truncate(remaining);
+            let actual = mapping.len();
+
+            pipe.messages.write_message(PipeMessageData::Vmspliced(mapping).into());
+            remaining -= actual;
+            bytes_transferred += actual;
+
+            if remaining == 0 {
+                break;
+            }
+        }
         if bytes_transferred > 0 {
             pipe.notify_write();
         }

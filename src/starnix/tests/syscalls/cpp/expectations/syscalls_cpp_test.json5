@@ -60,12 +60,6 @@
 
                 // TODO(https://fxbug.dev/335701084)
                 "VmspliceTest.FileInPipe",
-                "VmspliceTest.ForkWithBufferInPipe",
-                "VmspliceTest.ModifyBufferInPipe",
-                "VmspliceTest.UnmapBufferInPipe",
-                "VmspliceTest.UnmapBufferInPipeThenMapInPlace",
-                "VmspliceTest.RemapSharedBufferInPipeThenModify",
-                "VmspliceTest/VmspliceUnmapBufferAfterVmsplicingRemappedBufferTest.UnmapBufferAfterVmsplicingRemappedBuffer/*",
 
                 // TODO(https://fxbug.dev/331965426)
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/4",

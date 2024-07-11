@@ -7,7 +7,9 @@ pub mod memory;
 mod memory_manager;
 pub mod syscalls;
 mod vmex_resource;
+mod vmsplice;
 
 pub use futex_table::*;
 pub use memory_manager::*;
 pub use vmex_resource::VMEX_RESOURCE;
+pub use vmsplice::*;

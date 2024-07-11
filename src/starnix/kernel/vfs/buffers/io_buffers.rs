@@ -428,7 +428,7 @@ impl<'a> UserBuffersOutputBuffer<'a, Task> {
 
 impl<'a, M: TaskMemoryAccessor> Buffer for UserBuffersOutputBuffer<'a, M> {
     fn segments_count(&self) -> Result<usize, Errno> {
-        Ok(self.buffers.iter().filter(|b| b.is_null()).count())
+        Ok(self.buffers.len())
     }
 
     fn peek_each_segment(

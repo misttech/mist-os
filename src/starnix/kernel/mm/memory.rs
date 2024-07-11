@@ -106,6 +106,22 @@ impl MemoryObject {
         }
     }
 
+    /// Reads from the memory.
+    ///
+    /// # Safety
+    ///
+    /// Callers must guarantee that the buffer is valid to write to.
+    pub unsafe fn read_raw(
+        &self,
+        buffer: *mut u8,
+        buffer_length: usize,
+        offset: u64,
+    ) -> Result<(), zx::Status> {
+        match self {
+            Self::Vmo(vmo) => vmo.read_raw(buffer, buffer_length, offset),
+        }
+    }
+
     pub fn write(&self, data: &[u8], offset: u64) -> Result<(), zx::Status> {
         match self {
             Self::Vmo(vmo) => vmo.write(data, offset),
