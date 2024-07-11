@@ -27,11 +27,21 @@ type FixedValuesPlaybackConfig = table {
     2: sensor_events vector<types.SensorEvent>:MAX;
 };
 
+/// A playback configuration which specifies a file from which to read sensor
+/// events.
+type FilePlaybackConfig = table {
+    /// The path of the data file to read.
+    1: file_path string:MAX;
+};
+
 /// Multiple types of playback are supported. Which type is used depends on
 /// which configuration is provided to Playback::ConfigurePlayback.
 type PlaybackSourceConfig = flexible union {
     /// Configure for fixed values playback. See FixedValuesPlaybackConfig.
     1: fixed_values_config FixedValuesPlaybackConfig;
+
+    /// Configure to play back events from a data file. See FilePlaybackConfig.
+    2: file_playback_config FilePlaybackConfig;
 };
 
 /// Errors that may be returned by ConfigurePlayback.
@@ -59,6 +69,18 @@ type ConfigurePlaybackError = flexible enum : uint32 {
     /// A SensorEvent was seen with an EventPayload that doesn't match its
     /// SensorType.
     EVENT_PAYLOAD_TYPE_MISMATCH = 7;
+
+    /// The specified data file could not be opened.
+    FILE_OPEN_FAILED = 8;
+
+    /// The data in the specified file was not in the expected format.
+    ///
+    /// NOTE: Some file types may allow for situations where the file is not
+    /// fully read by the time configuration is complete. For example a call to
+    /// ConfigurePlayback may only result in a file's header being read and
+    /// parsed. Thus ConfigurePlayback not returning this error is not always a
+    /// guarantee that the whole file contains valid data.
+    FILE_PARSE_ERROR = 9;
 };
 
 /// Implemented by components which pretend to be a sensor driver but instead
