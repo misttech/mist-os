@@ -106,19 +106,15 @@ build_api_module("sdk_source_set_list") {
   deps = _sdk_public_deps
 }
 
-# Compatibility testing goldens for SDK publishable FIDLs.
-# This is a list of scopes like { src = "", dst = "" } specifying which files
-# to copy from the build directory into the source tree.
-generated_file("compatibility_testing_goldens") {
-  visibility += [ "*" ]
-  testonly = true
-  deps = [
-    # Pulls in SDKs containing the FIDLs to generate golden files for
-    "//sdk",
-  ]
-  outputs = [ "$root_build_dir/compatibility_testing_goldens.json" ]
-  output_conversion = "json"
-  data_keys = [ "compatibility_testing_goldens" ]
+if (current_toolchain == default_toolchain) {
+  # Generates compatibility testing goldens for FIDL libraries in the IDK.
+  # TODO(https://fxbug.dev/324656719): Ensure this covers APIs, libraries, etc.
+  # that are not present at all levels, especially "PLATFORM".
+  group("generate_compatibility_goldens") {
+    visibility += [ "//scripts/versioning:*" ]
+    testonly = true
+    deps = [ "//sdk" ]
+  }
 }
 
 # Contains the list of all plasa fragment files, which have a dump of the

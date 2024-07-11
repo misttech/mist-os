@@ -360,7 +360,7 @@ template("fidl_library") {
       # It's needed because we use the goldens as action.inputs so the build
       # expects them to exist, but APIs outside the "fuchsia" namespace aren't
       # compatibility tested and don't have goldens.
-      if (in_fuchsia_namespace && !bump_api_level) {
+      if (in_fuchsia_namespace) {
         test_target = "${target_name}_${level}_compatibility_test"
         fidl_api_compatibility_test(test_target) {
           forward_variables_from(invoker, [ "testonly" ])
@@ -368,7 +368,7 @@ template("fidl_library") {
           current = "$target_gen_dir/$level/$library_name.api_summary.json"
           golden = "$goldens_dir/$level/$library_name.api_summary.json"
 
-          if (update_goldens) {
+          if (update_goldens || bump_api_level) {
             policy = "update_golden"
           } else if (level == "$current_level") {
             policy = policy_for_current_level

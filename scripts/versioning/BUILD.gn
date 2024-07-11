@@ -4,7 +4,6 @@
 
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/python/python_host_test.gni")
-import("//build/testing/golden_files.gni")
 
 assert(is_host)
 
@@ -63,18 +62,19 @@ if (bump_api_level) {
   action("bump_api_level") {
     testonly = true
 
-    # TODO(https://fxbug.dev/349204008: Remove in the next CL, which fixes.
-    assert(!update_goldens, "Temporarily incompatible with `bump_api_level`.")
-
-    # Generate the golden files and manifest before updating the platform version.
-    deps = [ "//sdk:compatibility_testing_goldens($target_toolchain)" ]
+    # The target below generates and checks the golden files for all Supported
+    # and Sunset API levels. When `bump_api_level=true`, it also generates
+    # golden files for the new API level. Since the levels are determined by GN
+    # args whose values are generated from the version_history file before it
+    # can be modified, the target below can be built before this target modifies
+    # the version_history file.
+    deps = [ "//sdk:generate_compatibility_goldens($default_toolchain)" ]
 
     script = "//scripts/versioning/update_platform_version.py"
 
     _version_history_file = "//sdk/version_history.json"
     _fidl_compatiblity_doc_path =
         "//docs/development/testing/ctf/fidl_api_compatibility_testing.md"
-    _goldens_manifest = "$root_build_dir/compatibility_testing_goldens.json"
     _stamp_file = "$target_out_dir/$target_name.status"
 
     # There must be no in-development (unfrozen) API level when adding a new one.
@@ -103,24 +103,17 @@ if (bump_api_level) {
     args = [
       "--stamp-file",
       rebase_path(_stamp_file, root_build_dir),
-      "--root-build-dir",
-      ".",
       "--root-source-dir",
       rebase_path("//", root_build_dir),
       "--sdk-version-history",
       rebase_path(_version_history_file, root_build_dir),
       "--fidl-compatibility-doc-path",
       rebase_path(_fidl_compatiblity_doc_path, root_build_dir),
-      "--goldens-manifest",
-      rebase_path(_goldens_manifest, root_build_dir),
-      "--fuchsia-api-level",
+      "--new-api-level",
       "$_next_level",
     ]
 
-    inputs = [
-      _version_history_file,
-      _goldens_manifest,
-    ]
+    inputs = [ _version_history_file ]
 
     outputs = [ _stamp_file ]
   }

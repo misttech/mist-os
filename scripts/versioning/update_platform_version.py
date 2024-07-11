@@ -121,52 +121,17 @@ def create_owners_file_for_in_development_level(level_dir_path: str) -> None:
         f.write("include /sdk/history/IN_DEVELOPMENT_API_LEVEL_OWNERS\n")
 
 
-def copy_compatibility_test_goldens(
-    root_build_dir: str, fuchsia_api_level: int
-) -> bool:
-    """Updates the golden files used for compatibility testing.
-
-    This assumes a clean build with:
-      fx set core.x64 --with //sdk:compatibility_testing_goldens
-
-    Any files that can't be copied are logged and must be updated manually.
-    """
-    goldens_manifest = os.path.join(
-        root_build_dir, "compatibility_testing_goldens.json"
-    )
-
-    with open(goldens_manifest) as f:
-        for entry in json.load(f):
-            src = os.path.join(root_build_dir, entry["src"])
-            dst = os.path.join(root_build_dir, entry["dst"])
-            try:
-                print(f"copying {src} to {dst}")
-                shutil.copyfile(src, dst)
-            except Exception as e:
-                print(f"failed to copy {src} to {dst}: {e}")
-                return False
-    return True
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--fuchsia-api-level", type=int, required=True)
+    parser.add_argument("--new-api-level", type=int, required=True)
     parser.add_argument("--sdk-version-history", required=True)
-    parser.add_argument("--goldens-manifest", required=True)
     parser.add_argument("--fidl-compatibility-doc-path", required=True)
-    parser.add_argument("--update-goldens", type=bool, default=True)
-    parser.add_argument("--root-build-dir", default="out/default")
     parser.add_argument("--root-source-dir")
     parser.add_argument("--stamp-file")
-    parser.add_argument(
-        "--revert-on-error",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-    )
 
     args = parser.parse_args()
 
-    new_level = args.fuchsia_api_level
+    new_level = args.new_api_level
 
     if not update_version_history(new_level, args.sdk_version_history):
         return 1
@@ -176,22 +141,17 @@ def main() -> int:
     ):
         return 1
 
-    if args.update_goldens:
-        level_dir_path = os.path.join(
-            args.root_source_dir, "sdk", "history", str(new_level)
-        )
-        try:
-            os.mkdir(level_dir_path)
-        except Exception as e:
-            print(f"Failed to create directory for new level: {e}")
-            return 1
+    level_dir_path = os.path.join(
+        args.root_source_dir, "sdk", "history", str(new_level)
+    )
 
-        create_owners_file_for_in_development_level(level_dir_path)
+    try:
+        os.makedirs(level_dir_path, exist_ok=True)
+    except Exception as e:
+        print(f"Failed to create directory for new level: {e}")
+        return 1
 
-        if not copy_compatibility_test_goldens(
-            args.root_build_dir, args.fuchsia_api_level
-        ):
-            return 1
+    create_owners_file_for_in_development_level(level_dir_path)
 
     # TODO(https://fxbug.dev/349622444): Automate this.
     # TODO(https://fxbug.dev/326277078): Move this to the instructions for
