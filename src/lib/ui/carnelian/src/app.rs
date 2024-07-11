@@ -398,7 +398,7 @@ pub struct App {
     assistant: AppAssistantPtr,
     messages: Vec<(ViewKey, Message)>,
     sender: InternalSender,
-    _inspect_server: Option<fasync::Task<()>>,
+    _inspect_server: Option<inspect_runtime::PublishedInspectController>,
 }
 
 #[derive(Debug)]

@@ -45,7 +45,7 @@ impl<'a> InspectPublisher<'a> {
         self.inspector
     }
 
-    pub(crate) fn publish(self) -> Option<fuchsia_async::Task<()>> {
+    pub(crate) fn publish(self) -> Option<inspect_runtime::PublishedInspectController> {
         self.should_publish.then(|| {
             inspect_runtime::publish(self.inspector, inspect_runtime::PublishOptions::default())
                 .expect("publish Inspect task")

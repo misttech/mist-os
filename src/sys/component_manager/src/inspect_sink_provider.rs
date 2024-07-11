@@ -48,7 +48,7 @@ impl ComponentManagerEventSynthesisProvider for InspectSinkProvider {
         else {
             return None;
         };
-        self.inspect_tree_server_tasks.lock().add(server_task);
+        self.inspect_tree_server_tasks.lock().spawn(server_task);
 
         // this value is irrelevant, archivist won't do anything with it but it is part of
         // the protocol

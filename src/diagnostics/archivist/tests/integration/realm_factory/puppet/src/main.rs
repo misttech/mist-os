@@ -17,7 +17,7 @@ use diagnostics_log_encoding::encode::{Argument, Value};
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_diagnostics::Severity;
 use fidl_table_validation::ValidFidlTable;
-use fuchsia_async::{Task, TaskGroup, Timer};
+use fuchsia_async::{TaskGroup, Timer};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{component, Inspector};
@@ -45,10 +45,9 @@ async fn main() -> Result<(), Error> {
     let puppet_server = Arc::new(PuppetServer::new(interest_recv));
 
     let mut fs = ServiceFs::new();
-    let _inspect_publish_task: Option<Task<()>>;
 
     let publish_options = inspect_runtime::PublishOptions::default();
-    _inspect_publish_task = inspect_runtime::publish(component::inspector(), publish_options);
+    let _inspect_publish_task = inspect_runtime::publish(component::inspector(), publish_options);
 
     fs.dir("svc")
         .add_fidl_service(IncomingServices::Puppet)

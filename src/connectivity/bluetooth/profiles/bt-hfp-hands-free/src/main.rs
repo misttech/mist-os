@@ -48,8 +48,8 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn start_inspect() -> Option<fuchsia_async::Task<()>> {
-    // TODO(fxb/136817) Add inspect.
+fn start_inspect() -> Option<inspect_runtime::PublishedInspectController> {
+    // TODO(https://fxbug.dev/136817): Add inspect.
     let inspector = fuchsia_inspect::Inspector::default();
     inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default())
 }
