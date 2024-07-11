@@ -25,9 +25,7 @@ Status ZirconPlatformPort::Wait(uint64_t* key_out, uint64_t timeout_ms,
   zx_status_t status =
       port_.wait(zx::deadline_after(zx::duration(magma::ms_to_signed_ns(timeout_ms))), &packet);
   if (status == ZX_ERR_TIMED_OUT) {
-    return timeout_ms == 0 ? MAGMA_STATUS_TIMED_OUT
-                           : DRET_MSG(MAGMA_STATUS_TIMED_OUT, "port wait timed out: timeout_ms %lu",
-                                      timeout_ms);
+    return MAGMA_STATUS_TIMED_OUT;
   }
 
   DLOG("port received key 0x%" PRIx64 " status %d", packet.key, status);
