@@ -557,6 +557,7 @@ __NO_INLINE void Mutex::ReleaseContendedMutex(Thread* current_thread, uintptr_t 
       DEBUG_ASSERT(wake_result.owner == nullptr);
       DEBUG_ASSERT(wait_.owner() == nullptr);
     }
+    LOCK_TRACE_FLOW_STEP("contend_mutex", new_owner->lock_flow_id());
   }
 
   // Finally release the OWQ's lock and we are finished.  Note: there are a few
