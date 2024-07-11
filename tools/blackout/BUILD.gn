@@ -6,7 +6,7 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 
 group("blackout") {
   testonly = true
-  deps = [ "blobfs-checkerboard" ]
+  deps = []
 }
 
 ffx_plugin("ffx_storage_blackout") {
@@ -15,10 +15,7 @@ ffx_plugin("ffx_storage_blackout") {
 
   args_sources = [ "src/args.rs" ]
 
-  plugin_deps = [
-    "blackout-host/ffx:ffx_storage_blackout_step",
-    "blobfs-checkerboard:ffx_storage_blackout_blobfs_checkerboard",
-  ]
+  plugin_deps = [ "blackout-host/ffx:ffx_storage_blackout_step" ]
 }
 
 group("tests") {
@@ -31,8 +28,5 @@ group("tests") {
 # conditions in CI as opposed to for every change in CQ or being run locally.
 group("integration") {
   testonly = true
-  deps = [
-    # "blackout-integration:integration",
-    "blobfs-checkerboard:integration",
-  ]
+  deps = []
 }
