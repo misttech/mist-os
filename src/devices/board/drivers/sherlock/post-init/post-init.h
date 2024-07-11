@@ -59,7 +59,8 @@ class PostInit : public fdf::DriverBase {
   inspect::Node root_;
   inspect::UintProperty board_rev_property_;
   inspect::UintProperty board_option_property_;
-  inspect::UintProperty display_id_property_;
+  inspect::StringProperty display_vendor_property_;
+  inspect::UintProperty ddic_version_property_;
 };
 
 }  // namespace sherlock

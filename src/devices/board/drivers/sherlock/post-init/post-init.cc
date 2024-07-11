@@ -28,6 +28,10 @@ constexpr std::array<const char*, 1> kDdicVersionNodeNames = {
     "disp-soc-id2",
 };
 
+constexpr const char* IdValueToPanelVendor(uint8_t id_value) {
+  return id_value ? "Innolux" : "BOE";
+}
+
 }  // namespace
 
 namespace sherlock {
@@ -237,7 +241,9 @@ zx::result<> PostInit::SetInspectProperties() {
   board_option_property_ = root_.CreateUint("board_option", board_option_);
   // PANEL_DETECT -> DISP_SOC_ID1
   // DDIC_DETECT -> DISP_SOC_ID2
-  display_id_property_ = root_.CreateUint("display_id", display_vendor_ | (ddic_version_ << 1));
+  display_vendor_property_ =
+      root_.CreateString("MIPI device detect type", IdValueToPanelVendor(display_vendor_));
+  ddic_version_property_ = root_.CreateUint("DDIC version", ddic_version_);
 
   return zx::ok();
 }
