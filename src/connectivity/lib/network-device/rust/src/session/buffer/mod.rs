@@ -597,7 +597,7 @@ mod tests {
     const BUFFER_STRIDE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(4));
 
     #[test]
-    fn test_get_descriptor_after_vmo_write() {
+    fn get_descriptor_after_vmo_write() {
         let (descriptors, vmo, tx, rx) =
             Descriptors::new(TX_BUFFERS, RX_BUFFERS, BUFFER_STRIDE).expect("create descriptors");
         vmo.write(&[netdev::FrameType::Ethernet.into_primitive()][..], 0).expect("vmo write");
@@ -610,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    fn test_init_descriptor() {
+    fn init_descriptor() {
         const HEAD_LEN: u16 = 1;
         const DATA_LEN: u32 = 2;
         const TAIL_LEN: u16 = 3;
@@ -630,7 +630,7 @@ mod tests {
     }
 
     #[test]
-    fn test_chain_length() {
+    fn chain_length() {
         for raw in 0..=netdev::MAX_DESCRIPTOR_CHAIN {
             let got = ChainLength::try_from(raw)
                 .expect("the conversion should succeed with length <= MAX_DESCRIPTOR_CHAIN");
