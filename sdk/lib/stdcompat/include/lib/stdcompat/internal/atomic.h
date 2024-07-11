@@ -204,7 +204,7 @@ struct atomic_difference_type<T, std::enable_if_t<std::is_pointer_v<T>>> {
 template <typename T>
 struct atomic_difference_type<
     T, std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T>>> {
-  using difference_type = std::remove_volatile_t<T>;
+  using difference_type = T;
 };
 
 // Arithmetic operations.
