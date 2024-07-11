@@ -48,8 +48,8 @@ type Io1Config = struct {
     /// GetToken is supported.
     supports_get_token bool;
 
-    /// Supports fuchsia.io's Open2 method.
-    supports_open2 bool;
+    /// Directories support [`fuchsia.io/Directory.Open3`].
+    supports_open3 bool;
 
     /// Supports fuchsia.io's LinkInto method.
     supports_link_into bool;

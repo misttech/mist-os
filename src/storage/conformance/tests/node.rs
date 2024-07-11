@@ -11,7 +11,7 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 async fn test_open_node_on_directory() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -19,27 +19,32 @@ async fn test_open_node_on_directory() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
     let (_proxy, on_representation) = test_dir
-        .open2_node_get_representation::<fio::NodeMarker>(
+        .open3_node_repr::<fio::NodeMarker>(
             ".",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    node: Some(fio::NodeProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_NODE,
+            None,
         )
         .await
         .unwrap();
     assert_matches!(on_representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
+
+    // If other protocol types are specified, the target must match at least one.
+    let error: zx::Status = test_dir
+        .open3_node::<fio::NodeMarker>(
+            ".",
+            fio::Flags::PROTOCOL_NODE | fio::Flags::PROTOCOL_FILE,
+            None,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error, zx::Status::NOT_FILE);
 }
 
 #[fuchsia::test]
 async fn test_open_node_on_file() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -47,32 +52,21 @@ async fn test_open_node_on_file() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
     let (_proxy, representation) = test_dir
-        .open2_node_get_representation::<fio::NodeMarker>(
+        .open3_node_repr::<fio::NodeMarker>(
             "file",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    node: Some(fio::NodeProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_NODE,
+            None,
         )
         .await
         .unwrap();
     assert_matches!(representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
 
-    // Test the must-be-directory flag which should result in an error.
+    // If other protocol types are specified, the target must match at least one.
     let error: zx::Status = test_dir
-        .open2_node::<fio::NodeMarker>(
+        .open3_node::<fio::NodeMarker>(
             "file",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    node: Some(fio::NodeProtocolFlags::MUST_BE_DIRECTORY),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::PROTOCOL_NODE | fio::Flags::PROTOCOL_DIRECTORY,
+            None,
         )
         .await
         .unwrap_err();
@@ -83,7 +77,7 @@ async fn test_open_node_on_file() {
 async fn test_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -91,16 +85,7 @@ async fn test_set_attr_and_set_flags_on_node() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
     let proxy = test_dir
-        .open2_node::<fio::NodeMarker>(
-            "file",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    node: Some(fio::NodeProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
+        .open3_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None)
         .await
         .unwrap();
 
@@ -134,7 +119,7 @@ async fn test_set_attr_and_set_flags_on_node() {
 async fn test_node_clone() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -142,29 +127,20 @@ async fn test_node_clone() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
     let proxy = test_dir
-        .open2_node::<fio::NodeMarker>(
+        .open3_node::<fio::NodeMarker>(
             "file",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    node: Some(fio::NodeProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                rights: Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES),
-                ..Default::default()
-            },
+            fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
+            None,
         )
         .await
         .unwrap();
 
-    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
     proxy.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).expect("clone failed");
 
     assert_matches!(
-        proxy2.get_connection_info().await.expect("get_connection_info failed"),
-        fio::ConnectionInfo {
-            rights: Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES),
-            ..
-        }
+        cloned.get_connection_info().await.expect("get_connection_info failed"),
+        fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), .. }
     );
 }
 
@@ -172,7 +148,7 @@ async fn test_node_clone() {
 async fn test_open_node_with_attributes() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -180,19 +156,15 @@ async fn test_open_node_with_attributes() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
     let (_proxy, representation) = test_dir
-        .open2_node_get_representation::<fio::NodeMarker>(
+        .open3_node_repr::<fio::NodeMarker>(
             ".",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    node: Some(fio::NodeProtocolFlags::default()),
-                    ..Default::default()
-                }),
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_NODE,
+            Some(fio::Options {
                 attributes: Some(
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
                 ),
                 ..Default::default()
-            },
+            }),
         )
         .await
         .unwrap();

@@ -265,79 +265,78 @@ pub fn executable_file(name: &str) -> io_test::DirectoryEntry {
 /// less verbose.
 #[async_trait]
 pub trait DirectoryProxyExt {
-    /// Open `path` using `node_options`, returning a proxy to the remote resource.
+    /// Open `path` specified using `flags` and `options`, returning a proxy to the remote resource.
     ///
-    /// Waits for [`fio::NodeEvent::OnRepresentation`] if [`fio::NodeFlags::GET_REPRESENTATION`]
+    /// Waits for [`fio::NodeEvent::OnRepresentation`] if [`fio::Flags::FLAG_SEND_REPRESENTATION`]
     /// is specified, otherwise calls `fuchsia.io/Node.GetConnectionInfo` to verify the result.
-    async fn open2_node<T: ProtocolMarker>(
+    async fn open3_node<T: ProtocolMarker>(
         &self,
         path: &str,
-        node_options: fio::NodeOptions,
+        flags: fio::Flags,
+        options: Option<fio::Options>,
     ) -> Result<T::Proxy, zx::Status>;
 
-    /// Similar to [`DirectoryProxyExt::open2_node`], but waits for and returns the
+    /// Similar to [`DirectoryProxyExt::open3_node`], but waits for and returns the
     /// [`fio::NodeEvent::OnRepresentation`] event sent when opening a resource.
     ///
-    /// Requires [`fio::NodeFlags::GET_REPRESENTATION`] to be specified in `node_options`.
-    async fn open2_node_get_representation<T: ProtocolMarker>(
+    /// Requires [`fio::Flags::FLAG_SEND_REPRESENTATION`] to be specified in `flags`.
+    async fn open3_node_repr<T: ProtocolMarker>(
         &self,
         path: &str,
-        node_options: fio::NodeOptions,
+        flags: fio::Flags,
+        options: Option<fio::Options>,
     ) -> Result<(T::Proxy, fio::Representation), zx::Status>;
 }
 
 #[async_trait]
 impl DirectoryProxyExt for fio::DirectoryProxy {
-    async fn open2_node<T: ProtocolMarker>(
+    async fn open3_node<T: ProtocolMarker>(
         &self,
         path: &str,
-        node_options: fio::NodeOptions,
+        flags: fio::Flags,
+        options: Option<fio::Options>,
     ) -> Result<T::Proxy, zx::Status> {
-        Ok(open2_node_impl::<T>(self, path, node_options).await?.0)
+        open3_node_impl::<T>(self, path, flags, options).await.map(|(proxy, _representation)| proxy)
     }
 
-    async fn open2_node_get_representation<T: ProtocolMarker>(
+    async fn open3_node_repr<T: ProtocolMarker>(
         &self,
         path: &str,
-        node_options: fio::NodeOptions,
+        flags: fio::Flags,
+        options: Option<fio::Options>,
     ) -> Result<(T::Proxy, fio::Representation), zx::Status> {
-        let get_representation = node_options
-            .flags
-            .is_some_and(|flags| flags.contains(fio::NodeFlags::GET_REPRESENTATION));
         assert!(
-            get_representation,
-            "node_options must specify the GET_REPRESENTATION flag to use this function!"
+            flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION),
+            "flags must specify the FLAG_SEND_REPRESENTATION flag to use this function!"
         );
-        let (proxy, on_representation) = open2_node_impl::<T>(self, path, node_options).await?;
-        Ok((proxy, on_representation.unwrap()))
+        let (proxy, representation) = open3_node_impl::<T>(self, path, flags, options).await?;
+        Ok((proxy, representation.unwrap()))
     }
 }
 
-async fn open2_node_impl<T: ProtocolMarker>(
+async fn open3_node_impl<T: ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     path: &str,
-    node_options: fio::NodeOptions,
+    flags: fio::Flags,
+    options: Option<fio::Options>,
 ) -> Result<(T::Proxy, Option<fio::Representation>), zx::Status> {
-    let get_representation =
-        node_options.flags.is_some_and(|flags| flags.contains(fio::NodeFlags::GET_REPRESENTATION));
     let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
-    dir.open2(path, &fio::ConnectionProtocols::Node(node_options), server.into_channel())
-        .expect("Failed to call open2");
-    if get_representation {
-        // Wait for the OnRepresentation event to verify if opening the resource succeeded.
-        let representation = Some(get_on_representation_event(&proxy).await?);
-        return Ok((convert_node_proxy(proxy), representation));
-    }
-    // Protocols didn't specify GET_REPRESENTATION, call GetConnectionInfo to test that opening the
-    // resource succeeded. If that fails, return the epitaph from the channel closure.
-    proxy.get_connection_info().await.map_err(|e| {
-        if let fidl::Error::ClientChannelClosed { status, .. } = e {
-            status
-        } else {
-            panic!("Unhandled FIDL error: {:?}", e);
-        }
-    })?;
-    Ok((convert_node_proxy(proxy), None))
+    dir.open3(path, flags, &options.unwrap_or_default(), server.into_channel())
+        .expect("Failed to call open3");
+    let representation = if flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION) {
+        Some(get_on_representation_event(&proxy).await?)
+    } else {
+        // We use GetConnectionInfo to test that opening the resource succeeded.
+        proxy.get_connection_info().await.map_err(|e| {
+            if let fidl::Error::ClientChannelClosed { status, .. } = e {
+                status
+            } else {
+                panic!("Unhandled FIDL error: {:?}", e);
+            }
+        })?;
+        None
+    };
+    Ok((convert_node_proxy(proxy), representation))
 }
 
 /// Wait for and return a [`fio::NodeEvent::OnRepresentation`] event sent via `node_proxy`.

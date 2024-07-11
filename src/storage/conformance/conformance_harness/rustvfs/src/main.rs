@@ -77,7 +77,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_executable_file: true,
                     supports_get_backing_memory: true,
                     supports_remote_dir: true,
-                    supports_open2: true,
+                    supports_open3: false,
                     supports_append: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
                         | fio::NodeAttributesQuery::ABILITIES

@@ -14,6 +14,8 @@ use crate::path::Path;
 use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 
 use anyhow::Error;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use fidl::endpoints::ControlHandle as _;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
@@ -293,8 +295,11 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::DirectoryRequest::Open3 { .. } => {
-                todo!()
+            fio::DirectoryRequest::Open3 { object, .. } => {
+                let (_, control_handle) = ServerEnd::<fio::NodeMarker>::new(object)
+                    .into_stream_and_control_handle()
+                    .unwrap();
+                control_handle.shutdown_with_epitaph(Status::NOT_SUPPORTED);
             }
         }
         Ok(ConnectionState::Alive)
