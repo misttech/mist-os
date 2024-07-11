@@ -6,10 +6,8 @@
 #define SRC_UI_INPUT_DRIVERS_HID_INPUT_REPORT_INPUT_REPORTS_READER_H_
 
 #include <fidl/fuchsia.input.report/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/fdf/cpp/dispatcher.h>
 
-#include <fbl/mutex.h>
 #include <fbl/ring_buffer.h>
 
 #include "src/ui/input/lib/hid-input-report/device.h"
@@ -28,12 +26,13 @@ class InputReportsReader : public fidl::WireServer<fuchsia_input_report::InputRe
   // The InputReportBase has to exist for the lifetime of the InputReportsReader.
   // The pointer to InputReportBase is unowned.
   // InputReportsReader will be freed by InputReportBase.
-  static std::unique_ptr<InputReportsReader> Create(
-      InputReportBase* base, uint32_t reader_id, async_dispatcher_t* dispatcher,
-      fidl::ServerEnd<fuchsia_input_report::InputReportsReader> request);
-
-  explicit InputReportsReader(InputReportBase* base, uint32_t reader_id)
-      : reader_id_(reader_id), base_(base) {}
+  explicit InputReportsReader(InputReportBase* base, uint32_t reader_id,
+                              fidl::ServerEnd<fuchsia_input_report::InputReportsReader> server)
+      : reader_id_(reader_id),
+        binding_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this,
+                 [this](fidl::UnbindInfo) { base_->RemoveReaderFromList(this); }),
+        base_(base) {}
+  ~InputReportsReader() override { binding_.Close(ZX_ERR_PEER_CLOSED); }
 
   void ReceiveReport(cpp20::span<const uint8_t> raw_report, zx::time report_time,
                      hid_input_report::Device* device);
@@ -48,18 +47,15 @@ class InputReportsReader : public fidl::WireServer<fuchsia_input_report::InputRe
   // rest of the memory will be heap allocated.
   static constexpr size_t kFidlReportBufferSize = 8192;
 
-  void SendReportsToWaitingRead() __TA_REQUIRES(readers_lock_);
+  void SendReportsToWaitingRead();
 
   const uint32_t reader_id_;
-  fbl::Mutex readers_lock_;
-  std::optional<InputReportsReader::ReadInputReportsCompleter::Async> waiting_read_
-      __TA_GUARDED(readers_lock_);
-  std::optional<fidl::ServerBindingRef<fuchsia_input_report::InputReportsReader>> binding_
-      __TA_GUARDED(readers_lock_);
-  fidl::Arena<kFidlReportBufferSize> report_allocator_ __TA_GUARDED(readers_lock_);
+  std::optional<InputReportsReader::ReadInputReportsCompleter::Async> waiting_read_;
+  fidl::ServerBinding<fuchsia_input_report::InputReportsReader> binding_;
+  fidl::Arena<kFidlReportBufferSize> report_allocator_;
   fbl::RingBuffer<fuchsia_input_report::wire::InputReport,
                   fuchsia_input_report::wire::kMaxDeviceReportCount>
-      reports_data_ __TA_GUARDED(readers_lock_);
+      reports_data_;
 
   InputReportBase* base_;
 };

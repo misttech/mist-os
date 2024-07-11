@@ -19,7 +19,6 @@ group("drivers") {
     "drivers/gt6853:gt6853-module",
     "drivers/hid",
     "drivers/hid-input-report",
-    "drivers/hid-input-report:hid-input-report-v2",
     "drivers/hidctl",
     "drivers/i2c-hid",
     "drivers/usb-hid:usb-hid",

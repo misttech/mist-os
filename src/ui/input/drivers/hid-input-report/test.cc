@@ -3,11 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.input/cpp/wire_test_base.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async/cpp/task.h>
-#include <lib/async/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
 #include <lib/hid/acer12.h>
 #include <lib/hid/ambient-light.h>
 #include <lib/hid/boot.h>
@@ -15,18 +11,13 @@
 #include <lib/hid/gt92xx.h>
 #include <lib/hid/paradise.h>
 #include <lib/hid/usages.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
-#include <lib/zx/channel.h>
-#include <lib/zx/clock.h>
-#include <lib/zx/eventpair.h>
-#include <unistd.h>
-#include <zircon/syscalls.h>
 
 #include <ddk/metadata/buttons.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+#include <sdk/lib/inspect/testing/cpp/inspect.h>
+#include <src/lib/testing/predicates/status.h>
 
-#include "driver_v1.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/ui/input/drivers/hid-input-report/driver.h"
 
 namespace hid_input_report_dev {
 
@@ -49,22 +40,17 @@ std::vector<uint8_t> ToBinaryVector(const T& t) {
 
 }  // namespace
 
-class FakeHidDevice : public fidl::testing::WireTestBase<finput::Device> {
+class FakeHidDevice : public fidl::WireServer<finput::Controller>,
+                      public fidl::testing::WireTestBase<finput::Device> {
  public:
   class DeviceReportsReader : public fidl::WireServer<finput::DeviceReportsReader> {
    public:
-    explicit DeviceReportsReader(FakeHidDevice* parent, async_dispatcher_t* dispatcher,
-                                 fidl::ServerEnd<finput::DeviceReportsReader> server)
-        : parent_(parent),
-          binding_(dispatcher, std::move(server), this,
-                   [this](fidl::UnbindInfo info) { parent_->reader_.reset(); }) {}
+    explicit DeviceReportsReader(fidl::ServerEnd<finput::DeviceReportsReader> server,
+                                 libsync::Completion& unbound)
+        : binding_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this,
+                   [&unbound](fidl::UnbindInfo) { unbound.Signal(); }) {}
 
-    ~DeviceReportsReader() override {
-      if (waiting_read_) {
-        waiting_read_->ReplyError(ZX_ERR_PEER_CLOSED);
-        waiting_read_.reset();
-      }
-    }
+    ~DeviceReportsReader() override { binding_.Close(ZX_ERR_PEER_CLOSED); }
 
     void ReadReports(ReadReportsCompleter::Sync& completer) override {
       ASSERT_FALSE(waiting_read_.has_value());
@@ -87,7 +73,6 @@ class FakeHidDevice : public fidl::testing::WireTestBase<finput::Device> {
     libsync::Completion wait_for_read_;
 
    private:
-    FakeHidDevice* parent_;
     fidl::ServerBinding<finput::DeviceReportsReader> binding_;
     std::optional<ReadReportsCompleter::Async> waiting_read_;
   };
@@ -96,9 +81,17 @@ class FakeHidDevice : public fidl::testing::WireTestBase<finput::Device> {
   static constexpr uint32_t kProductId = 123;
   static constexpr uint32_t kVersion = 5;
 
-  explicit FakeHidDevice(fidl::ServerEnd<finput::Device> server)
-      : dispatcher_(async_get_default_dispatcher()),
-        binding_(dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure) {}
+  zx_status_t Serve(fdf::OutgoingDirectory& to_driver_vfs) {
+    finput::Service::InstanceHandler instance_handler({
+        .controller =
+            [this](fidl::ServerEnd<finput::Controller> server) {
+              EXPECT_FALSE(binding_);
+              binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server),
+                               this, fidl::kIgnoreBindingClosure);
+            },
+    });
+    return to_driver_vfs.AddService<finput::Service>(std::move(instance_handler)).status_value();
+  }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     ASSERT_TRUE(false);
@@ -113,10 +106,16 @@ class FakeHidDevice : public fidl::testing::WireTestBase<finput::Device> {
                                .Build());
   }
 
+  void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override {
+    EXPECT_FALSE(device_binding_);
+    device_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                            std::move(request->session), this, fidl::kIgnoreBindingClosure);
+  }
+
   void GetDeviceReportsReader(GetDeviceReportsReaderRequestView request,
                               GetDeviceReportsReaderCompleter::Sync& completer) override {
-    ASSERT_NULL(reader_);
-    reader_ = std::make_unique<DeviceReportsReader>(this, dispatcher_, std::move(request->reader));
+    ASSERT_FALSE(reader_);
+    reader_ = std::make_unique<DeviceReportsReader>(std::move(request->reader), unbound_);
     completer.ReplySuccess();
   }
 
@@ -147,69 +146,72 @@ class FakeHidDevice : public fidl::testing::WireTestBase<finput::Device> {
 
   void SetReportDesc(std::vector<uint8_t> report_desc) { report_desc_ = std::move(report_desc); }
 
-  void SendReport(std::vector<uint8_t> report, zx::time timestamp) {
-    ASSERT_NOT_NULL(reader_);
+  void SendReport(std::vector<uint8_t> report, zx::time timestamp) const {
+    ASSERT_TRUE(reader_);
     reader_->SendReport(std::move(report), timestamp);
   }
 
-  libsync::Completion& wait_for_read() {
-    EXPECT_NOT_NULL(reader_);
-    return reader_->wait_for_read_;
-  }
-
   std::unique_ptr<DeviceReportsReader> reader_;
+  libsync::Completion unbound_;
 
  private:
-  async_dispatcher_t* dispatcher_;
-  fidl::ServerBinding<finput::Device> binding_;
+  std::optional<fidl::ServerBinding<finput::Controller>> binding_;
+  std::optional<fidl::ServerBinding<finput::Device>> device_binding_;
 
   std::vector<uint8_t> report_desc_;
   std::vector<uint8_t> report_;
 };
 
-class HidDevTest : public zxtest::Test {
-  void SetUp() override {
-    hid_dev_loop_.StartThread("fake-hid-device-thread");
-    auto [client, server] = fidl::Endpoints<finput::Device>::Create();
-    fake_hid_.emplace(std::move(server));
-
-    fake_parent_ = MockDevice::FakeRootParent();
-    device_ = new InputReportDriver(fake_parent_.get(), std::move(client));
-    fidl_loop_.StartThread("fidl-thread");
-    // Each test is responsible for calling |device_->Bind()|.
+class InputReportTestEnvironment : public fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    EXPECT_OK(fake_hid_.Serve(to_driver_vfs));
+    return zx::ok();
   }
 
-  void TearDown() override {
-    if (background_dispatcher_) {
-      libsync::Completion wait;
-      async::PostTask((*background_dispatcher_)->async_dispatcher(), [this, &wait]() {
-        device_async_remove(device_->zxdev());
-        mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
-        wait.Signal();
-      });
-      wait.Wait();
-    } else {
-      device_async_remove(device_->zxdev());
-      mock_ddk::ReleaseFlaggedDevices(fake_parent_.get());
-    }
-  }
+  FakeHidDevice& fake_hid() { return fake_hid_; }
 
- protected:
-  // Run device on background dispatcher so that we can wait for reports on foreground dispatcher.
-  void BindOnBackground() {
-    background_dispatcher_ = mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
-    libsync::Completion wait;
-    async::PostTask((*background_dispatcher_)->async_dispatcher(), [this, &wait]() {
-      device_->Bind();
-      wait.Signal();
-    });
-    wait.Wait();
-  }
+ private:
+  FakeHidDevice fake_hid_;
+};
 
+class FixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = false;
+  static constexpr bool kAutoStartDriver = false;
+  static constexpr bool kAutoStopDriver = true;
+
+  using DriverType = InputReportDriver;
+  using EnvironmentType = InputReportTestEnvironment;
+};
+
+class HidDevTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
+ public:
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> GetSyncClient() {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputDevice>::Create();
-    fidl::BindServer(fidl_loop_.dispatcher(), std::move(endpoints.server), device_);
-    return fidl::WireSyncClient(std::move(endpoints.client));
+    auto connect_result =
+        RunInNodeContext<zx::result<zx::channel>>([](fdf_testing::TestNode& node) {
+          return node.children().at("InputReport").ConnectToDevice();
+        });
+    EXPECT_TRUE(connect_result.is_ok());
+    return fidl::WireSyncClient(
+        fidl::ClientEnd<fuchsia_input_report::InputDevice>(std::move(connect_result.value())));
+  }
+
+  fidl::ClientEnd<fuchsia_input_report::InputReportsReader> GetReader() {
+    return GetReader(GetSyncClient());
+  }
+  fidl::ClientEnd<fuchsia_input_report::InputReportsReader> GetReader(
+      const fidl::WireSyncClient<fuchsia_input_report::InputDevice>& sync_client) {
+    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
+    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
+    EXPECT_OK(result.status());
+    sync_completion_t* next_reader_wait;
+    RunInDriverContext([&next_reader_wait](InputReportDriver& driver) {
+      next_reader_wait = &driver.input_report_for_testing().next_reader_wait();
+    });
+    EXPECT_OK(sync_completion_wait(next_reader_wait, ZX_TIME_INFINITE));
+    sync_completion_reset(next_reader_wait);
+    return std::move(endpoints.client);
   }
 
   void SendReport(std::vector<uint8_t> report, zx::time timestamp = zx::time::infinite()) {
@@ -217,81 +219,76 @@ class HidDevTest : public zxtest::Test {
       timestamp = zx::clock::get_monotonic();
     }
 
-    mock_ddk::GetDriverRuntime()->PerformBlockingWork([this]() {
-      fake_hid_.SyncCall(&FakeHidDevice::wait_for_read).Wait();
-      fake_hid_.SyncCall(&FakeHidDevice::wait_for_read).Reset();
+    libsync::Completion* wait_for_read;
+    RunInEnvironmentTypeContext([&wait_for_read](InputReportTestEnvironment& env) {
+      ASSERT_TRUE(env.fake_hid().reader_);
+      wait_for_read = &env.fake_hid().reader_->wait_for_read_;
     });
-    fake_hid_.SyncCall(&FakeHidDevice::SendReport, std::move(report), timestamp);
-    mock_ddk::GetDriverRuntime()->PerformBlockingWork(
-        [this]() { fake_hid_.SyncCall(&FakeHidDevice::wait_for_read).Wait(); });
+    wait_for_read->Wait();
+    wait_for_read->Reset();
+    RunInEnvironmentTypeContext([&report, &timestamp](InputReportTestEnvironment& env) {
+      ASSERT_TRUE(env.fake_hid().reader_);
+      env.fake_hid().reader_->SendReport(std::move(report), timestamp);
+    });
+    wait_for_read->Wait();
   }
-
-  async::Loop fidl_loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  std::shared_ptr<MockDevice> fake_parent_;
-  async::Loop hid_dev_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<FakeHidDevice> fake_hid_{hid_dev_loop_.dispatcher()};
-  std::optional<fdf::UnownedSynchronizedDispatcher> background_dispatcher_;
-  InputReportDriver* device_;
 };
 
 TEST_F(HidDevTest, HidLifetimeTest) {
-  size_t boot_mouse_desc_size;
-  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
-
-  ASSERT_OK(device_->Bind());
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t boot_mouse_desc_size;
+    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 }
 
-TEST(HidDevTest, InputReportUnregisterTest) {
-  auto fake_parent = MockDevice::FakeRootParent();
-  auto [client, server] = fidl::Endpoints<finput::Device>::Create();
-  async::Loop hid_dev_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  hid_dev_loop.StartThread("fake-hid-device-thread");
-  async_patterns::TestDispatcherBound<FakeHidDevice> fake_hid{hid_dev_loop.dispatcher(),
-                                                              std::in_place, std::move(server)};
-  InputReportDriver* device_;
+class UnregisterFixtureConfig final {
+ public:
+  static constexpr bool kDriverOnForeground = true;
+  static constexpr bool kAutoStartDriver = false;
+  static constexpr bool kAutoStopDriver = false;
 
-  device_ = new InputReportDriver(fake_parent.get(), std::move(client));
+  using DriverType = InputReportDriver;
+  using EnvironmentType = InputReportTestEnvironment;
+};
 
-  size_t boot_mouse_desc_size;
-  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  fake_hid.SyncCall(&FakeHidDevice::SetReportDesc,
-                    ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+class UnregisterHidDevTest : public fdf_testing::DriverTestFixture<UnregisterFixtureConfig>,
+                             public ::testing::Test {};
 
-  ASSERT_OK(device_->Bind());
+TEST_F(UnregisterHidDevTest, InputReportUnregisterTest) {
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t boot_mouse_desc_size;
+    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
-  mock_ddk::ReleaseFlaggedDevices(fake_parent.get());
-  fake_parent.reset();
+  zx::result prepare_stop_result = StopDriver();
+  EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
 
-  // Make sure that the InputReport class has unregistered from the HID device.
-  fake_hid.SyncCall([](FakeHidDevice* hid) { ASSERT_NULL(hid->reader_); });
+  libsync::Completion* unbound;
+  RunInEnvironmentTypeContext(
+      [&unbound](InputReportTestEnvironment& env) { unbound = &env.fake_hid().unbound_; });
+  unbound->Wait();
 }
 
-TEST(HidDevTest, InputReportUnregisterTestBindFailed) {
-  auto fake_parent = MockDevice::FakeRootParent();
-  auto [client, server] = fidl::Endpoints<finput::Device>::Create();
-  async::Loop hid_dev_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-  hid_dev_loop.StartThread("fake-hid-device-thread");
-  async_patterns::TestDispatcherBound<FakeHidDevice> fake_hid{hid_dev_loop.dispatcher(),
-                                                              std::in_place, std::move(server)};
-
-  auto device = std::make_unique<InputReportDriver>(fake_parent.get(), std::move(client));
-
+TEST_F(HidDevTest, InputReportUnregisterTestBindFailed) {
   // We don't set a input report on `fake_hid` so the bind will fail.
-  ASSERT_EQ(device->Bind(), ZX_ERR_INTERNAL);
+  ASSERT_EQ(StartDriver().status_value(), ZX_ERR_INTERNAL);
 
   // Make sure that the InputReport class is not registered to the HID device.
-  fake_hid.SyncCall([](FakeHidDevice* hid) { ASSERT_NULL(hid->reader_); });
+  RunInEnvironmentTypeContext(
+      [](InputReportTestEnvironment& env) { ASSERT_FALSE(env.fake_hid().reader_); });
 }
 
 TEST_F(HidDevTest, GetReportDescTest) {
-  size_t boot_mouse_desc_size;
-  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
-
-  ASSERT_OK(device_->Bind());
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t boot_mouse_desc_size;
+    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   fidl::WireResult<fuchsia_input_report::InputDevice::GetDescriptor> result =
@@ -301,8 +298,8 @@ TEST_F(HidDevTest, GetReportDescTest) {
   auto& desc = result->descriptor;
   ASSERT_TRUE(desc.has_mouse());
   ASSERT_TRUE(desc.mouse().has_input());
-  fuchsia_input_report::wire::MouseInputDescriptor& mouse = desc.mouse().input();
 
+  fuchsia_input_report::wire::MouseInputDescriptor& mouse = desc.mouse().input();
   ASSERT_TRUE(mouse.has_movement_x());
   ASSERT_EQ(-127, mouse.movement_x().range.min);
   ASSERT_EQ(127, mouse.movement_x().range.max);
@@ -313,12 +310,12 @@ TEST_F(HidDevTest, GetReportDescTest) {
 }
 
 TEST_F(HidDevTest, ReportDescInfoTest) {
-  size_t boot_mouse_desc_size;
-  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
-
-  ASSERT_OK(device_->Bind());
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t boot_mouse_desc_size;
+    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   fidl::WireResult<fuchsia_input_report::InputDevice::GetDescriptor> result =
@@ -333,37 +330,24 @@ TEST_F(HidDevTest, ReportDescInfoTest) {
 }
 
 TEST_F(HidDevTest, ReadInputReportsTest) {
-  size_t boot_mouse_desc_size;
-  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t boot_mouse_desc_size;
+    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
-  BindOnBackground();
-
-  auto sync_client = GetSyncClient();
-
-  // Get an InputReportsReader.
-  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
-  {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints.client));
-    ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-  }
-
-  // Spoof send a report.
+  // GetReader() must be called before SendReport() because SendReport() only sends reports to
+  // existing readers.
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(GetReader());
   SendReport(std::vector<uint8_t>{0xFF, 0x50, 0x70});
 
-  // Get the report.
   auto result = reader->ReadInputReports();
   ASSERT_OK(result.status());
   ASSERT_FALSE(result->is_error());
   auto& reports = result->value()->reports;
 
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1UL, reports.count());
 
   auto& report = reports[0];
   ASSERT_TRUE(report.has_event_time());
@@ -384,28 +368,15 @@ TEST_F(HidDevTest, ReadInputReportsTest) {
 }
 
 TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
-  size_t boot_mouse_desc_size;
-  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t boot_mouse_desc_size;
+    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
-  BindOnBackground();
-
-  auto sync_client = GetSyncClient();
-
-  // Get an InputReportsReader.
-
-  async::Loop loop = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fidl::WireClient<fuchsia_input_report::InputReportsReader> reader;
-  {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
-    ASSERT_OK(result.status());
-    reader.Bind(std::move(endpoints.client), loop.dispatcher());
-    ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-  }
-
+  fidl::WireClient<fuchsia_input_report::InputReportsReader> reader(
+      GetReader(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
   // Read the report. This will hang until a report is sent.
   reader->ReadInputReports().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_input_report::InputReportsReader::ReadInputReports>&
@@ -413,7 +384,7 @@ TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
         ASSERT_OK(response.status());
         ASSERT_FALSE(response->is_error());
         auto& reports = response->value()->reports;
-        ASSERT_EQ(1, reports.count());
+        ASSERT_EQ(1UL, reports.count());
 
         auto& report = reports[0];
         ASSERT_TRUE(report.has_event_time());
@@ -425,56 +396,44 @@ TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
 
         ASSERT_TRUE(mouse.has_movement_y());
         ASSERT_EQ(0x70, mouse.movement_y());
-        loop.Quit();
+        runtime().Quit();
       });
-  loop.RunUntilIdle();
+  runtime().RunUntilIdle();
 
   // Send the report.
   SendReport(std::vector<uint8_t>{0xFF, 0x50, 0x70});
 
-  loop.Run();
+  runtime().Run();
 }
 
 TEST_F(HidDevTest, CloseReaderWithOutstandingRead) {
-  size_t boot_mouse_desc_size;
-  const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t boot_mouse_desc_size;
+    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
-  device_->Bind();
-
-  auto sync_client = GetSyncClient();
-
-  // Get an InputReportsReader.
-
-  async::Loop loop = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  fidl::WireClient<fuchsia_input_report::InputReportsReader> reader;
-  {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
-    ASSERT_OK(result.status());
-    reader.Bind(std::move(endpoints.client), loop.dispatcher());
-    ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-  }
+  fidl::WireClient<fuchsia_input_report::InputReportsReader> reader(
+      GetReader(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   // Queue a report.
   reader->ReadInputReports().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_input_report::InputReportsReader::ReadInputReports>&
               result) { ASSERT_TRUE(result.is_canceled()); });
-  loop.RunUntilIdle();
+  runtime().RunUntilIdle();
 
   // Unbind the reader now that the report is waiting.
   reader = {};
 }
 
 TEST_F(HidDevTest, SensorTest) {
-  const uint8_t* sensor_desc_ptr;
-  size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
-
-  BindOnBackground();
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    const uint8_t* sensor_desc_ptr;
+    size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
+    env.fake_hid().SetReportDesc(ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
@@ -485,10 +444,10 @@ TEST_F(HidDevTest, SensorTest) {
   fuchsia_input_report::wire::DeviceDescriptor& desc = result.value().descriptor;
   ASSERT_TRUE(desc.has_sensor());
   ASSERT_TRUE(desc.sensor().has_input());
-  ASSERT_EQ(desc.sensor().input().count(), 1);
+  ASSERT_EQ(desc.sensor().input().count(), 1UL);
   fuchsia_input_report::wire::SensorInputDescriptor& sensor_desc = desc.sensor().input()[0];
   ASSERT_TRUE(sensor_desc.has_values());
-  ASSERT_EQ(4, sensor_desc.values().count());
+  ASSERT_EQ(4UL, sensor_desc.values().count());
 
   ASSERT_EQ(sensor_desc.values()[0].type,
             fuchsia_input_report::wire::SensorType::kLightIlluminance);
@@ -503,17 +462,7 @@ TEST_F(HidDevTest, SensorTest) {
   ASSERT_EQ(sensor_desc.values()[3].type, fuchsia_input_report::wire::SensorType::kLightGreen);
   ASSERT_EQ(sensor_desc.values()[3].axis.unit.type, fuchsia_input_report::wire::UnitType::kNone);
 
-  // Get an InputReportsReader.
-  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
-  {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints.client));
-    ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-  }
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(GetReader(sync_client));
 
   // Create the report.
   ambient_light_input_rpt_t report_data = {};
@@ -536,12 +485,12 @@ TEST_F(HidDevTest, SensorTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1UL, reports.count());
 
   ASSERT_TRUE(reports[0].has_sensor());
   const fuchsia_input_report::wire::SensorInputReport& sensor_report = reports[0].sensor();
   EXPECT_TRUE(sensor_report.has_values());
-  EXPECT_EQ(4, sensor_report.values().count());
+  EXPECT_EQ(4UL, sensor_report.values().count());
 
   // Check the report.
   // These will always match the ordering in the descriptor.
@@ -552,25 +501,15 @@ TEST_F(HidDevTest, SensorTest) {
 }
 
 TEST_F(HidDevTest, GetTouchInputReportTest) {
-  size_t desc_len;
-  const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
-
-  BindOnBackground();
-
-  auto sync_client = GetSyncClient();
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t desc_len;
+    const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
+    env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   // Get an InputReportsReader.
-  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
-  {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints.client));
-    ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-  }
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(GetReader());
 
   // Spoof send a report.
   paradise_touch_t touch_report = {};
@@ -589,12 +528,12 @@ TEST_F(HidDevTest, GetTouchInputReportTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1UL, reports.count());
 
   const auto& report = reports[0];
   const auto& touch = report.touch();
   ASSERT_TRUE(touch.has_contacts());
-  ASSERT_EQ(1, touch.contacts().count());
+  ASSERT_EQ(1UL, touch.contacts().count());
   const auto& contact = touch.contacts()[0];
 
   ASSERT_TRUE(contact.has_position_x());
@@ -605,11 +544,12 @@ TEST_F(HidDevTest, GetTouchInputReportTest) {
 }
 
 TEST_F(HidDevTest, GetTouchPadDescTest) {
-  size_t desc_len;
-  const uint8_t* report_desc = get_paradise_touchpad_v1_report_desc(&desc_len);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
-
-  device_->Bind();
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t desc_len;
+    const uint8_t* report_desc = get_paradise_touchpad_v1_report_desc(&desc_len);
+    env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   fidl::WireResult<fuchsia_input_report::InputDevice::GetDescriptor> result =
@@ -624,25 +564,15 @@ TEST_F(HidDevTest, GetTouchPadDescTest) {
 }
 
 TEST_F(HidDevTest, KeyboardTest) {
-  size_t keyboard_descriptor_size;
-  const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
-  BindOnBackground();
-
-  auto sync_client = GetSyncClient();
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t keyboard_descriptor_size;
+    const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   // Get an InputReportsReader.
-  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
-  {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints.client));
-    ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-  }
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(GetReader());
 
   // Spoof send a report.
   hid_boot_kbd_report keyboard_report = {};
@@ -658,22 +588,23 @@ TEST_F(HidDevTest, KeyboardTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(1, reports.count());
+  ASSERT_EQ(1UL, reports.count());
 
   const auto& report = reports[0];
   const auto& keyboard = report.keyboard();
-  ASSERT_EQ(3, keyboard.pressed_keys3().count());
+  ASSERT_EQ(3UL, keyboard.pressed_keys3().count());
   EXPECT_EQ(fuchsia_input::wire::Key::kA, keyboard.pressed_keys3()[0]);
   EXPECT_EQ(fuchsia_input::wire::Key::kUp, keyboard.pressed_keys3()[1]);
   EXPECT_EQ(fuchsia_input::wire::Key::kB, keyboard.pressed_keys3()[2]);
 }
 
 TEST_F(HidDevTest, KeyboardOutputReportTest) {
-  size_t keyboard_descriptor_size;
-  const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
-  device_->Bind();
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t keyboard_descriptor_size;
+    const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   // Make an output report.
@@ -692,26 +623,23 @@ TEST_F(HidDevTest, KeyboardOutputReportTest) {
   ASSERT_TRUE(response.ok());
   ASSERT_TRUE(response->is_ok());
   // Check the hid output report.
-  fake_hid_.SyncCall(
-      [](FakeHidDevice* hid) { EXPECT_EQ(hid->GetReport(), std::vector<uint8_t>{0b101}); });
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    EXPECT_EQ(env.fake_hid().GetReport(), std::vector<uint8_t>{0b101});
+  });
 }
 
-// TODO: Flaky. Will be re-enabled when converted to DFv2.
-TEST_F(HidDevTest, DISABLED_ConsumerControlTest) {
-  {
+TEST_F(HidDevTest, ConsumerControlTest) {
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     const uint8_t* descriptor;
     size_t descriptor_size = get_buttons_report_desc(&descriptor);
-    fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(descriptor, descriptor_size));
-  }
+    env.fake_hid().SetReportDesc(ToBinaryVector(descriptor, descriptor_size));
 
-  // Create the initial report that will be queried on OpenSession.
-  fake_hid_.SyncCall([](FakeHidDevice* hid) {
+    // Create the initial report that will be queried on OpenSession.
     struct buttons_input_rpt report = {};
     report.rpt_id = BUTTONS_RPT_ID_INPUT;
-    hid->SetReport(ToBinaryVector(report));
+    env.fake_hid().SetReport(ToBinaryVector(report));
   });
-
-  BindOnBackground();
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
@@ -725,7 +653,7 @@ TEST_F(HidDevTest, DISABLED_ConsumerControlTest) {
   fuchsia_input_report::wire::ConsumerControlInputDescriptor& consumer_control_desc =
       desc.consumer_control().input();
   ASSERT_TRUE(consumer_control_desc.has_buttons());
-  ASSERT_EQ(5, consumer_control_desc.buttons().count());
+  ASSERT_EQ(5UL, consumer_control_desc.buttons().count());
 
   ASSERT_EQ(consumer_control_desc.buttons()[0],
             fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
@@ -738,28 +666,16 @@ TEST_F(HidDevTest, DISABLED_ConsumerControlTest) {
   ASSERT_EQ(consumer_control_desc.buttons()[4],
             fuchsia_input_report::wire::ConsumerControlButton::kMicMute);
 
-  // Get an InputReportsReader.
-  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
-  {
-    auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-    auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
-    ASSERT_OK(result.status());
-    reader =
-        fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(std::move(endpoints.client));
-    ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-  }
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(GetReader(sync_client));
 
   // Create another report.
-  {
-    struct buttons_input_rpt report = {};
-    report.rpt_id = BUTTONS_RPT_ID_INPUT;
-    fill_button_in_report(BUTTONS_ID_VOLUME_UP, true, &report);
-    fill_button_in_report(BUTTONS_ID_FDR, true, &report);
-    fill_button_in_report(BUTTONS_ID_MIC_MUTE, true, &report);
+  struct buttons_input_rpt report = {};
+  report.rpt_id = BUTTONS_RPT_ID_INPUT;
+  fill_button_in_report(BUTTONS_ID_VOLUME_UP, true, &report);
+  fill_button_in_report(BUTTONS_ID_FDR, true, &report);
+  fill_button_in_report(BUTTONS_ID_MIC_MUTE, true, &report);
 
-    SendReport(ToBinaryVector(report));
-  }
+  SendReport(ToBinaryVector(report));
 
   // Get the report.
   auto report_result = reader->ReadInputReports();
@@ -767,14 +683,14 @@ TEST_F(HidDevTest, DISABLED_ConsumerControlTest) {
 
   const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
       report_result->value()->reports;
-  ASSERT_EQ(2, reports.count());
+  ASSERT_EQ(2UL, reports.count());
 
   // Check the initial report.
   {
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(0, report.pressed_buttons().count());
+    EXPECT_EQ(0UL, report.pressed_buttons().count());
   }
 
   // Check the second report.
@@ -782,7 +698,7 @@ TEST_F(HidDevTest, DISABLED_ConsumerControlTest) {
     ASSERT_TRUE(reports[1].has_consumer_control());
     const auto& report = reports[1].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(3, report.pressed_buttons().count());
+    EXPECT_EQ(3UL, report.pressed_buttons().count());
 
     EXPECT_EQ(report.pressed_buttons()[0],
               fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
@@ -794,84 +710,110 @@ TEST_F(HidDevTest, DISABLED_ConsumerControlTest) {
 }
 
 TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
-  {
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     const uint8_t* descriptor;
     size_t descriptor_size = get_buttons_report_desc(&descriptor);
-    fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(descriptor, descriptor_size));
-  }
+    env.fake_hid().SetReportDesc(ToBinaryVector(descriptor, descriptor_size));
 
-  // Create the initial report that will be queried on OpenSession.
-  fake_hid_.SyncCall([](FakeHidDevice* hid) {
+    // Create the initial report that will be queried on OpenSession.
     struct buttons_input_rpt report = {};
     report.rpt_id = BUTTONS_RPT_ID_INPUT;
-    hid->SetReport(ToBinaryVector(report));
+    env.fake_hid().SetReport(ToBinaryVector(report));
   });
-
-  BindOnBackground();
+  ASSERT_TRUE(StartDriver().is_ok());
 
   // Open the device.
   auto client = GetSyncClient();
 
-  // Get an input reader and check reports.
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader1(GetReader(client));
   {
-    // Get an InputReportsReader.
-    fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
-    {
-      auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-      auto result = client->GetInputReportsReader(std::move(endpoints.server));
-      ASSERT_OK(result.status());
-      reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
-          std::move(endpoints.client));
-    }
-
-    auto report_result = reader->ReadInputReports();
+    auto report_result = reader1->ReadInputReports();
     ASSERT_OK(report_result.status());
     const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
         report_result->value()->reports;
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1UL, reports.count());
 
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(0, report.pressed_buttons().count());
+    EXPECT_EQ(0UL, report.pressed_buttons().count());
   }
 
+  fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader2(GetReader(client));
   {
-    // Get an InputReportsReader.
-    fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader;
-    {
-      auto endpoints = fidl::Endpoints<fuchsia_input_report::InputReportsReader>::Create();
-
-      auto result = client->GetInputReportsReader(std::move(endpoints.server));
-      ASSERT_OK(result.status());
-      reader = fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>(
-          std::move(endpoints.client));
-      ASSERT_OK(device_->input_report().WaitForNextReader(zx::duration::infinite()));
-    }
-
-    auto report_result = reader->ReadInputReports();
+    auto report_result = reader2->ReadInputReports();
     ASSERT_OK(report_result.status());
     const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
         report_result->value()->reports;
-    ASSERT_EQ(1, reports.count());
+    ASSERT_EQ(1UL, reports.count());
 
     ASSERT_TRUE(reports[0].has_consumer_control());
     const auto& report = reports[0].consumer_control();
     EXPECT_TRUE(report.has_pressed_buttons());
-    EXPECT_EQ(0, report.pressed_buttons().count());
+    EXPECT_EQ(0UL, report.pressed_buttons().count());
+  }
+
+  // Create another report.
+  struct buttons_input_rpt report = {};
+  report.rpt_id = BUTTONS_RPT_ID_INPUT;
+  fill_button_in_report(BUTTONS_ID_VOLUME_UP, true, &report);
+  fill_button_in_report(BUTTONS_ID_FDR, true, &report);
+  fill_button_in_report(BUTTONS_ID_MIC_MUTE, true, &report);
+
+  SendReport(std::vector<uint8_t>(reinterpret_cast<uint8_t*>(&report),
+                                  reinterpret_cast<uint8_t*>(&report) + sizeof(report)));
+
+  {
+    auto report_result = reader1->ReadInputReports();
+    ASSERT_OK(report_result.status());
+    const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
+        report_result->value()->reports;
+    ASSERT_EQ(1UL, reports.count());
+    ASSERT_TRUE(reports[0].has_consumer_control());
+    const auto& report = reports[0].consumer_control();
+    EXPECT_TRUE(report.has_pressed_buttons());
+    EXPECT_EQ(3UL, report.pressed_buttons().count());
+
+    EXPECT_EQ(report.pressed_buttons()[0],
+              fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
+    EXPECT_EQ(report.pressed_buttons()[1],
+              fuchsia_input_report::wire::ConsumerControlButton::kFactoryReset);
+    EXPECT_EQ(report.pressed_buttons()[2],
+              fuchsia_input_report::wire::ConsumerControlButton::kMicMute);
+  }
+  {
+    auto report_result = reader2->ReadInputReports();
+    ASSERT_OK(report_result.status());
+    const fidl::VectorView<fuchsia_input_report::wire::InputReport>& reports =
+        report_result->value()->reports;
+    ASSERT_EQ(1UL, reports.count());
+    ASSERT_TRUE(reports[0].has_consumer_control());
+    const auto& report = reports[0].consumer_control();
+    EXPECT_TRUE(report.has_pressed_buttons());
+    EXPECT_EQ(3UL, report.pressed_buttons().count());
+
+    EXPECT_EQ(report.pressed_buttons()[0],
+              fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
+    EXPECT_EQ(report.pressed_buttons()[1],
+              fuchsia_input_report::wire::ConsumerControlButton::kFactoryReset);
+    EXPECT_EQ(report.pressed_buttons()[2],
+              fuchsia_input_report::wire::ConsumerControlButton::kMicMute);
   }
 }
 
 TEST_F(HidDevTest, TouchLatencyMeasurements) {
-  const uint8_t* report_desc;
-  const size_t desc_len = get_gt92xx_report_desc(&report_desc);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    const uint8_t* report_desc;
+    const size_t desc_len = get_gt92xx_report_desc(&report_desc);
+    env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
-  device_->Bind();
-
-  const zx::vmo& inspect_vmo = fake_parent_->GetLatestChild()->GetInspectVmo();
-  ASSERT_TRUE(inspect_vmo.is_valid());
+  using namespace inspect::testing;
+  RunInDriverContext([](InputReportDriver& driver) {
+    auto hierarchy = inspect::ReadFromVmo(driver.input_report_for_testing().InspectVmo());
+    EXPECT_TRUE(hierarchy.is_ok());
+  });
 
   // Send five reports, and verify that the inspect stats make sense.
   gt92xx_touch_t report = {};
@@ -885,64 +827,64 @@ TEST_F(HidDevTest, TouchLatencyMeasurements) {
   SendReport(ToBinaryVector(report), timestamp);
   SendReport(ToBinaryVector(report), timestamp - zx::msec(5));
 
-  inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(inspect_vmo);
+  RunInDriverContext([](InputReportDriver& driver) {
+    auto hierarchy = inspect::ReadFromVmo(driver.input_report_for_testing().InspectVmo());
+    EXPECT_TRUE(hierarchy.is_ok());
+    const inspect::Hierarchy* root = hierarchy.value().GetByPath({"hid-input-report-touch"});
+    ASSERT_TRUE(root);
 
-  const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"hid-input-report-touch"});
-  ASSERT_NOT_NULL(root);
+    const auto* latency_histogram =
+        root->node().get_property<inspect::UintArrayValue>("latency_histogram_usecs");
+    ASSERT_TRUE(latency_histogram);
+    uint64_t latency_bucket_sum = 0;
+    for (const inspect::UintArrayValue::HistogramBucket& bucket : latency_histogram->GetBuckets()) {
+      latency_bucket_sum += bucket.count;
+    }
 
-  const auto* latency_histogram =
-      root->node().get_property<inspect::UintArrayValue>("latency_histogram_usecs");
-  ASSERT_NOT_NULL(latency_histogram);
-  uint64_t latency_bucket_sum = 0;
-  for (const inspect::UintArrayValue::HistogramBucket& bucket : latency_histogram->GetBuckets()) {
-    latency_bucket_sum += bucket.count;
-  }
+    EXPECT_EQ(latency_bucket_sum, 5UL);
 
-  EXPECT_EQ(latency_bucket_sum, 5);
+    const auto* average_latency =
+        root->node().get_property<inspect::UintPropertyValue>("average_latency_usecs");
+    ASSERT_TRUE(average_latency);
 
-  const auto* average_latency =
-      root->node().get_property<inspect::UintPropertyValue>("average_latency_usecs");
-  ASSERT_NOT_NULL(average_latency);
+    const auto* max_latency =
+        root->node().get_property<inspect::UintPropertyValue>("max_latency_usecs");
+    ASSERT_TRUE(max_latency);
 
-  const auto* max_latency =
-      root->node().get_property<inspect::UintPropertyValue>("max_latency_usecs");
-  ASSERT_NOT_NULL(max_latency);
-
-  EXPECT_GE(max_latency->value(), average_latency->value());
+    EXPECT_GE(max_latency->value(), average_latency->value());
+  });
 }
 
 TEST_F(HidDevTest, InspectDeviceTypes) {
-  size_t desc_len;
-  const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc, ToBinaryVector(report_desc, desc_len));
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t desc_len;
+    const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
+    env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
-  device_->Bind();
+  RunInDriverContext([](InputReportDriver& driver) {
+    auto hierarchy = inspect::ReadFromVmo(driver.input_report_for_testing().InspectVmo());
+    EXPECT_TRUE(hierarchy.is_ok());
+    const inspect::Hierarchy* root =
+        hierarchy.value().GetByPath({"hid-input-report-touch,touch,mouse"});
+    ASSERT_TRUE(root);
 
-  const zx::vmo& inspect_vmo = fake_parent_->GetLatestChild()->GetInspectVmo();
-  ASSERT_TRUE(inspect_vmo.is_valid());
+    const auto* device_types =
+        root->node().get_property<inspect::StringPropertyValue>("device_types");
+    ASSERT_TRUE(device_types);
 
-  inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(inspect_vmo);
-
-  const inspect::Hierarchy* root =
-      inspector.hierarchy().GetByPath({"hid-input-report-touch,touch,mouse"});
-  ASSERT_NOT_NULL(root);
-
-  const auto* device_types =
-      root->node().get_property<inspect::StringPropertyValue>("device_types");
-  ASSERT_NOT_NULL(device_types);
-
-  EXPECT_STREQ(device_types->value().c_str(), "touch,touch,mouse");
+    EXPECT_STREQ(device_types->value().c_str(), "touch,touch,mouse");
+  });
 }
 
 TEST_F(HidDevTest, GetInputReport) {
-  const uint8_t* sensor_desc_ptr;
-  size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
-
-  device_->Bind();
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    const uint8_t* sensor_desc_ptr;
+    size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
+    env.fake_hid().SetReportDesc(ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
@@ -950,14 +892,14 @@ TEST_F(HidDevTest, GetInputReport) {
   const int kRedTestVal = 101;
   const int kBlueTestVal = 5;
   const int kGreenTestVal = 3;
-  fake_hid_.SyncCall([](FakeHidDevice* hid) {
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     ambient_light_input_rpt_t report_data = {};
     report_data.rpt_id = AMBIENT_LIGHT_RPT_ID_INPUT;
     report_data.illuminance = kIlluminanceTestVal;
     report_data.red = kRedTestVal;
     report_data.blue = kBlueTestVal;
     report_data.green = kGreenTestVal;
-    hid->SetReport(ToBinaryVector(report_data));
+    env.fake_hid().SetReport(ToBinaryVector(report_data));
   });
 
   {
@@ -971,7 +913,7 @@ TEST_F(HidDevTest, GetInputReport) {
     ASSERT_TRUE(report.has_sensor());
     const fuchsia_input_report::wire::SensorInputReport& sensor_report = report.sensor();
     EXPECT_TRUE(sensor_report.has_values());
-    EXPECT_EQ(4, sensor_report.values().count());
+    EXPECT_EQ(4UL, sensor_report.values().count());
 
     EXPECT_EQ(kIlluminanceTestVal, sensor_report.values()[0]);
     EXPECT_EQ(kRedTestVal, sensor_report.values()[1]);
@@ -988,23 +930,23 @@ TEST_F(HidDevTest, GetInputReport) {
 }
 
 TEST_F(HidDevTest, GetInputReportMultipleDevices) {
-  size_t touch_desc_size;
-  const uint8_t* touch_desc_ptr = get_acer12_touch_report_desc(&touch_desc_size);
-  fake_hid_.SyncCall(&FakeHidDevice::SetReportDesc,
-                     ToBinaryVector(touch_desc_ptr, touch_desc_size));
-
-  device_->Bind();
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+    size_t touch_desc_size;
+    const uint8_t* touch_desc_ptr = get_acer12_touch_report_desc(&touch_desc_size);
+    env.fake_hid().SetReportDesc(ToBinaryVector(touch_desc_ptr, touch_desc_size));
+  });
+  ASSERT_TRUE(StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
-  fake_hid_.SyncCall([](FakeHidDevice* hid) {
+  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     acer12_stylus_t report_data = {};
     report_data.rpt_id = ACER12_RPT_ID_STYLUS;
     report_data.status = 0;
     report_data.x = 1;
     report_data.y = 2;
     report_data.pressure = 3;
-    hid->SetReport(ToBinaryVector(report_data));
+    env.fake_hid().SetReport(ToBinaryVector(report_data));
   });
 
   // There are two devices with this type (finger and stylus), so this should fail.

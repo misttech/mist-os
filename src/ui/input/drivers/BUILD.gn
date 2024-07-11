@@ -12,7 +12,6 @@ group("drivers") {
     "goodix",
     "hid",
     "hid-input-report",
-    "hid-input-report:hid-input-report-v2",
     "hidctl",
     "i2c-hid:drivers",
     "usb-hid",
