@@ -10,8 +10,10 @@
 // the sake of verifying that the accessor API is stable in CTS.
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto inspector =
-      std::make_unique<inspect::ComponentInspector>(loop.dispatcher(), inspect::PublishOptions{});
+  auto inspector = std::make_unique<inspect::ComponentInspector>(
+      loop.dispatcher(), inspect::PublishOptions{
+                             .tree_name = "inspect-publisher",
+                         });
 
   auto numeric_properties = inspector->root().CreateChild("numeric");
   numeric_properties.RecordInt("int", -1);
