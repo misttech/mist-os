@@ -1148,12 +1148,21 @@ TEST_F(FuseServerTest, OverlongHeaderLength) {
       struct fuse_out_header out_header = {};
       uint32_t payload_len = sizeof(open_out);
       uint32_t response_len = payload_len + sizeof(out_header);
-      out_header.len = response_len + kBogusHeaderLengthAddition;
-      out_header.unique = in_header.unique;
       std::vector<std::byte> response(response_len);
+      out_header.unique = in_header.unique;
+
+      // Test an length longer than what we wil write.
+      out_header.len = response_len + kBogusHeaderLengthAddition;
       memcpy(response.data(), &out_header, sizeof(out_header));
       memcpy(response.data() + sizeof(out_header), &open_out, sizeof(open_out));
-      return WriteResponse(response);
+      EXPECT_FALSE(WriteResponse(response));
+
+      // Test the right length.
+      out_header.len -= kBogusHeaderLengthAddition;
+      memcpy(response.data(), &out_header, sizeof(out_header));
+      EXPECT_TRUE(WriteResponse(response));
+
+      return testing::AssertionSuccess();
     }
   };
 
