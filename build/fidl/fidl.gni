@@ -234,7 +234,11 @@ template("fidl") {
     not_needed(invoker, fidl_only)
   }
 
-  if (is_host) {
+  # The check here is to prevent builds using different host toolchain bases from causing build
+  # conflicts.
+  # TODO(b/346586023): This is only really used for Fuchsia Controller, which should instead be
+  # packaging this as a Python data resource.
+  if (is_host && current_toolchain == toolchain_variant.base) {
     fidl_ir_root_target = "${target_name}_ir_root"
     fidl_ir_root_base = get_label_info(":anything($fidl_toolchain)",
                                        "root_gen_dir") + "/ir_root"
@@ -424,6 +428,10 @@ template("fidl") {
                                       "label_no_toolchain")
           is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
                                [ label_name ] != ffx_subtool_fidl_allowlist
+          marker_category = "unknown"
+          if (defined(invoker.sdk_category)) {
+            marker_category = invoker.sdk_category
+          }
           if (is_allowed_for_ffx) {
             marker_category = "allowed-for-ffx-subtool"
           }

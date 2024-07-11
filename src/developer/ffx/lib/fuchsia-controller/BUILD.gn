@@ -33,7 +33,7 @@ python_host_test("fuchsia_controller_conformance_tests") {
   deps = [ ":conformance_tests_py" ]
   test_data_deps = [
     "tests:fuchsia_controller_host_test_data",
-    "//src/tests/fidl/conformance_suite:conformance_fidl_host_test_data",
+    "//src/tests/fidl/conformance_suite:conformance_fidl_host_test_data(${toolchain_variant.base})",
   ]
   main_source = conformance_test_source
 }

@@ -138,22 +138,22 @@ group("honeydew_fidl_ir_and_deps") {
 
   deps = [
     # Required by Fuchsia Controller usage in Honeydew affordances and device claseses.
-    "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_host_test_data",
-    "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_host_test_data",
-    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_host_test_data",
-    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_host_test_data",
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_host_test_data",
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
-    "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_host_test_data",
-    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_host_test_data",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
-    "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data",
-    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_host_test_data",
+    "//sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_host_test_data(${toolchain_variant.base})",
 
     # Required by Fuchsia Controller itself.
-    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data(${toolchain_variant.base})",
   ]
 }
 

@@ -119,7 +119,7 @@ allow infra tests to run correctly, given they need access to the IR on test
 runners as well), for example:
 
 ```gn
-"//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data"
+"//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data(${toolchain_variant.base})"
 ```
 
 Including the host test data rule will also include the FIDL IR, so no need
