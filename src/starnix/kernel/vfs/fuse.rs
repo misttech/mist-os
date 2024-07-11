@@ -1777,10 +1777,11 @@ impl FuseMutableState {
             _ => {}
         }
         let header: uapi::fuse_out_header = data.read_to_object()?;
-        let payload_size = std::cmp::min(
-            (header.len as usize).saturating_sub(std::mem::size_of::<uapi::fuse_out_header>()),
-            data.available(),
-        );
+        let payload_size =
+            (header.len as usize).saturating_sub(std::mem::size_of::<uapi::fuse_out_header>());
+        if payload_size > data.available() {
+            return error!(EINVAL);
+        }
         self.waiters.notify_value(header.unique);
         let mut running_operation = match self.operations.entry(header.unique) {
             Entry::Occupied(e) => e,

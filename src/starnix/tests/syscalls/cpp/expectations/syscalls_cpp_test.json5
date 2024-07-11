@@ -28,8 +28,6 @@
         {
             type: "expect_failure",
             matchers: [
-                "FuseServerTest.OverlongHeaderLength",
-
                 // TODO(https://fxbug.dev/42072786)
                 "MMapProcTest.AdjacentFileMappings",
 
