@@ -1017,7 +1017,7 @@ pub struct zx_exception_info_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, FromBytes, FromZeros, NoCell)]
 pub struct zx_x86_64_exc_data_t {
     pub vector: u64,
     pub err_code: u64,
@@ -1025,7 +1025,7 @@ pub struct zx_x86_64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, FromBytes, FromZeros, NoCell)]
 pub struct zx_arm64_exc_data_t {
     pub esr: u32,
     pub padding1: [PadByte; 4],
@@ -1034,7 +1034,7 @@ pub struct zx_arm64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, FromBytes, FromZeros, NoCell)]
 pub struct zx_riscv64_exc_data_t {
     pub cause: u64,
     pub tval: u64,
@@ -1042,7 +1042,7 @@ pub struct zx_riscv64_exc_data_t {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeros, NoCell)]
 pub union zx_exception_header_arch_t {
     pub x86_64: zx_x86_64_exc_data_t,
     pub arm_64: zx_arm64_exc_data_t,
@@ -1069,7 +1069,7 @@ impl Debug for zx_exception_header_arch_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, FromBytes, FromZeros, NoCell)]
 pub struct zx_exception_header_t {
     pub size: u32,
     pub type_: zx_excp_type_t,
@@ -1101,7 +1101,7 @@ multiconst!(zx_excp_policy_code_t, [
 ]);
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, FromBytes, FromZeros, NoCell)]
 pub struct zx_exception_context_t {
     pub arch: zx_exception_header_arch_t,
     pub synth_code: zx_excp_policy_code_t,
@@ -1109,7 +1109,7 @@ pub struct zx_exception_context_t {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, FromBytes, FromZeros, NoCell)]
 pub struct zx_exception_report_t {
     pub header: zx_exception_header_t,
     pub context: zx_exception_context_t,
@@ -1132,7 +1132,7 @@ multiconst!(zx_exception_state_t, [
 
 #[cfg(target_arch = "x86_64")]
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, FromBytes, FromZeros, NoCell)]
 pub struct zx_thread_state_general_regs_t {
     pub rax: u64,
     pub rbx: u64,
@@ -1567,7 +1567,7 @@ macro_rules! struct_decl_macro {
 
 // Don't need struct_decl_macro for this, the wrapper is different.
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, FromBytes, FromZeros, NoCell, PartialEq)]
 pub struct zx_info_handle_basic_t {
     pub koid: zx_koid_t,
     pub rights: zx_rights_t,
@@ -1579,6 +1579,7 @@ pub struct zx_info_handle_basic_t {
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_handle_count_t> {
         pub handle_count: u32,
     }
@@ -1588,7 +1589,7 @@ zx_info_handle_count_t!(zx_info_handle_count_t);
 
 // Don't need struct_decl_macro for this, the wrapper is different.
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, FromBytes, FromZeros, NoCell)]
 pub struct zx_info_socket_t {
     pub options: u32,
     pub rx_buf_max: usize,
@@ -1607,6 +1608,7 @@ multiconst!(u32, [
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_process_t> {
         pub return_code: i64,
         pub start_time: zx_time_t,
@@ -1619,11 +1621,12 @@ zx_info_process_t!(zx_info_process_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_job_t> {
         pub return_code: i64,
-        pub exited: bool,
-        pub kill_on_oom: bool,
-        pub debugger_attached: bool,
+        pub exited: u8,
+        pub kill_on_oom: u8,
+        pub debugger_attached: u8,
     }
 }
 
@@ -1690,7 +1693,7 @@ multiconst!(u32, [
 
 // Don't use struct_decl_macro, wrapper is different.
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq, FromBytes, FromZeros, NoCell)]
 pub struct zx_info_vmo_t {
     pub koid: zx_koid_t,
     pub name: [u8; ZX_MAX_NAME_LEN],
@@ -1712,6 +1715,7 @@ pub struct zx_info_vmo_t {
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_cpu_stats_t> {
         pub cpu_number: u32,
         pub flags: u32,
@@ -1737,6 +1741,7 @@ zx_info_cpu_stats_t!(zx_info_cpu_stats_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_kmem_stats_t> {
         pub total_bytes: u64,
         pub free_bytes: u64,
@@ -1755,6 +1760,7 @@ zx_info_kmem_stats_t!(zx_info_kmem_stats_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_kmem_stats_extended_t> {
         pub total_bytes: u64,
         pub free_bytes: u64,
@@ -1779,6 +1785,7 @@ zx_info_kmem_stats_extended_t!(zx_info_kmem_stats_extended_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_kmem_stats_compression_t> {
         pub uncompressed_storage_bytes: u64,
         pub compressed_storage_bytes: u64,
@@ -1802,6 +1809,7 @@ zx_info_kmem_stats_compression_t!(zx_info_kmem_stats_compression_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_resource_t> {
         pub kind: u32,
         pub flags: u32,
@@ -1814,6 +1822,7 @@ struct_decl_macro! {
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_thread_stats_t> {
         pub total_runtime: zx_duration_t,
         pub last_scheduled_cpu: u32,
@@ -1827,6 +1836,7 @@ zx_info_resource_t!(zx_info_resource_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_vmar_t> {
         pub base: usize,
         pub len: usize,
@@ -1838,6 +1848,7 @@ zx_info_vmar_t!(zx_info_vmar_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_task_stats_t> {
         pub mem_mapped_bytes: usize,
         pub mem_private_bytes: usize,
@@ -1851,6 +1862,7 @@ zx_info_task_stats_t!(zx_info_task_stats_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_task_runtime_t> {
         pub cpu_time: zx_duration_t,
         pub queue_time: zx_duration_t,
@@ -1871,6 +1883,7 @@ multiconst!(zx_info_maps_type_t, [
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_maps_mapping_t> {
         pub mmu_flags: zx_vm_option_t,
         pub padding1: [PadByte; 4],
@@ -1884,7 +1897,7 @@ struct_decl_macro! {
 zx_info_maps_mapping_t!(zx_info_maps_mapping_t);
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeros, NoCell)]
 pub union InfoMapsTypeUnion {
     pub mapping: zx_info_maps_mapping_t,
 }
@@ -1892,6 +1905,7 @@ pub union InfoMapsTypeUnion {
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Copy, Clone)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_maps_t> {
         pub name: [u8; ZX_MAX_NAME_LEN],
         pub base: zx_vaddr_t,
@@ -1907,6 +1921,7 @@ zx_info_maps_t!(zx_info_maps_t);
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_info_process_handle_stats_t> {
         pub handle_count: [u32; ZX_OBJ_TYPE_UPPER_BOUND],
     }
@@ -1937,6 +1952,7 @@ pub const ZX_LOG_RECORD_DATA_MAX: usize = 216;
 struct_decl_macro! {
     #[repr(C)]
     #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::FromZeros, zerocopy::NoCell)]
     pub struct <zx_log_record_t> {
         pub sequence: u64,
         pub padding1: [PadByte; 4],

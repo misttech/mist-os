@@ -6,6 +6,7 @@
 
 use fuchsia_zircon_sys as sys;
 use std::ops::Deref;
+use zerocopy::{FromBytes, FromZeroes, NoCell};
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[repr(transparent)]
@@ -23,14 +24,12 @@ impl Deref for Topic {
 ///
 /// # Safety
 ///
-/// `TOPIC` must correspond to a valid `zx_object_get_info` topic,
-/// and `InfoTy` must be a type that can be safely replaced with the byte
-/// representation of the associated `zx_object_get_info` buffer type.
-pub unsafe trait ObjectQuery {
+/// `InfoTy` must be the same size as what the kernel expects to return for the provided topic.
+pub(crate) unsafe trait ObjectQuery {
     /// A `Topic` identifying this query.
     const TOPIC: Topic;
-    /// The datatype returned by this query.
-    type InfoTy;
+    /// The datatype returned by querying for Self::TOPIC.
+    type InfoTy: FromBytes + FromZeroes + NoCell;
 }
 
 assoc_values!(Topic, [

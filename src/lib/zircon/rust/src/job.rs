@@ -21,19 +21,32 @@ use fuchsia_zircon_sys as sys;
 pub struct Job(Handle);
 impl_handle_based!(Job);
 
-sys::zx_info_job_t!(JobInfo);
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct JobInfo {
+    pub return_code: i64,
+    pub exited: bool,
+    pub kill_on_oom: bool,
+    pub debugger_attached: bool,
+}
 
 impl From<sys::zx_info_job_t> for JobInfo {
-    fn from(info: sys::zx_info_job_t) -> JobInfo {
-        let sys::zx_info_job_t { return_code, exited, kill_on_oom, debugger_attached } = info;
-        JobInfo { return_code, exited, kill_on_oom, debugger_attached }
+    fn from(
+        sys::zx_info_job_t { return_code, exited, kill_on_oom, debugger_attached }: sys::zx_info_job_t,
+    ) -> Self {
+        Self {
+            return_code,
+            exited: exited != 0,
+            kill_on_oom: kill_on_oom != 0,
+            debugger_attached: debugger_attached != 0,
+        }
     }
 }
 
 // JobInfo is able to be safely replaced with a byte representation and is a PoD type.
-unsafe impl ObjectQuery for JobInfo {
+struct JobInfoQuery;
+unsafe impl ObjectQuery for JobInfoQuery {
     const TOPIC: Topic = Topic::JOB;
-    type InfoTy = JobInfo;
+    type InfoTy = sys::zx_info_job_t;
 }
 
 struct JobProcessesInfo;
@@ -106,9 +119,9 @@ impl Job {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_JOB topic.
     pub fn info(&self) -> Result<JobInfo, Status> {
-        let mut info = JobInfo::default();
-        object_get_info::<JobInfo>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        let mut info = sys::zx_info_job_t::default();
+        object_get_info::<JobInfoQuery>(self.as_handle_ref(), std::slice::from_mut(&mut info))
+            .map(|_| JobInfo::from(info))
     }
 
     /// Wraps the [zx_job_set_policy](//docs/reference/syscalls/job_set_policy.md) syscall.

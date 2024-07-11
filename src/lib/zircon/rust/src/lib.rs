@@ -258,7 +258,7 @@ pub fn object_wait_many(items: &mut [WaitItem<'_>], deadline: Time) -> Result<bo
 
 /// Query information about a zircon object.
 /// Returns `(num_returned, num_remaining)` on success.
-pub fn object_get_info<Q: ObjectQuery>(
+pub(crate) fn object_get_info<Q: ObjectQuery>(
     handle: HandleRef<'_>,
     out: &mut [Q::InfoTy],
 ) -> Result<(usize, usize), Status> {
@@ -280,7 +280,7 @@ pub fn object_get_info<Q: ObjectQuery>(
 /// Query multiple records of information about a zircon object.
 /// Returns a vec of Q::InfoTy on success.
 /// Intended for calls that return multiple small objects.
-pub fn object_get_info_vec<Q: ObjectQuery>(
+pub(crate) fn object_get_info_vec<Q: ObjectQuery>(
     handle: HandleRef<'_>,
 ) -> Result<Vec<Q::InfoTy>, Status> {
     // Start with a few slots

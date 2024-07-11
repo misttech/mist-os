@@ -14,7 +14,19 @@ use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Ord,
+    PartialOrd,
+    Hash,
+    zerocopy::FromBytes,
+    zerocopy::FromZeros,
+    zerocopy::NoCell,
+)]
 #[repr(transparent)]
 pub struct Koid(sys::zx_koid_t);
 
@@ -190,6 +202,14 @@ impl<'a, T: HandleBased> Unowned<'a, T> {
             )
         };
         ok(status)
+    }
+}
+
+impl<'a> Unowned<'a, Handle> {
+    /// Convert this HandleRef to one of a specific type.
+    pub fn cast<T: HandleBased>(self) -> Unowned<'a, T> {
+        // SAFETY: this function's guarantees are upheld by the self input.
+        unsafe { Unowned::from_raw_handle(self.raw_handle()) }
     }
 }
 
