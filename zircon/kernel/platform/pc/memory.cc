@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/arch/x86/boot-cpuid.h>
+#include <lib/memalloc/range.h>
 #include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -28,6 +29,7 @@
 #include <lk/init.h>
 #include <object/handle.h>
 #include <object/resource_dispatcher.h>
+#include <phys/handoff.h>
 #include <vm/bootreserve.h>
 #include <vm/vm.h>
 
@@ -152,36 +154,27 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges) {
   }
 
   // Find an area that we can use for 16 bit bootstrapping of other SMP cores.
-  bool initialized_bootstrap16 = false;
   constexpr uint64_t kAllocSize = k_x86_bootstrap16_buffer_size;
   constexpr uint64_t kMinBase = 2UL * PAGE_SIZE;
-  for (const auto& range : ranges) {
-    // Ignore ranges that are not normal RAM.
-    if (range.type != ZBI_MEM_TYPE_RAM) {
-      continue;
+
+  // TODO(https://fxbug.dev/347766366): Eventually gPhysHandoff->memory will be
+  // what is effectively passed to this function, and the subspan past the
+  // kReservedLow ranges is what will be passed to mem_arena_init().
+  for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
+    if (range.type != memalloc::Type::kReservedLow) {
+      TRACEF("WARNING - Failed to assign bootstrap16 region, SMP won't work\n");
+      break;
     }
 
-    // Only consider parts of the range that are in [kMinBase, 1MiB).
-    uint64_t base, length;
-    bool overlap =
-        GetIntersect(kMinBase, 1 * MB - kMinBase, range.paddr, range.length, &base, &length);
-    if (!overlap) {
-      continue;
-    }
-
-    // Ignore ranges that are too small.
-    if (length < kAllocSize) {
+    uint64_t base = ktl::max(range.addr, kMinBase);
+    if (base >= range.end() || range.end() - base < kAllocSize) {
       continue;
     }
 
     // We have a valid range.
     LTRACEF("Selected %" PRIxPTR " as bootstrap16 region\n", base);
     x86_bootstrap16_init(base);
-    initialized_bootstrap16 = true;
     break;
-  }
-  if (!initialized_bootstrap16) {
-    TRACEF("WARNING - Failed to assign bootstrap16 region, SMP won't work\n");
   }
 }
 

@@ -54,7 +54,7 @@ zx_library("pc") {
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/lib/unittest",
     "//zircon/kernel/phys:handoff",
-    "//zircon/kernel/phys:handoff",
+    "//zircon/kernel/phys/lib/memalloc",
     "//zircon/kernel/platform:headers",
     "//zircon/system/ulib/explicit-memory",
     "//zircon/system/ulib/ram-crashlog",

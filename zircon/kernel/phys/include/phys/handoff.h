@@ -30,6 +30,10 @@
 
 struct BootOptions;
 
+namespace memalloc {
+struct Range;
+}
+
 // This holds arch::EarlyTicks timestamps collected by physboot before the
 // kernel proper is cognizant.  Once the platform timer hardware is set up for
 // real, platform_convert_early_ticks translates these values into zx_ticks_t
@@ -122,6 +126,11 @@ struct PhysHandoff {
   // TODO(https://fxbug.dev/347766366): Replace this with a span of normalized
   // memalloc::Range.
   PhysHandoffTemporarySpan<const zbi_mem_range_t> mem_config;
+
+  // A normalized accounting of RAM (and peripheral ranges). It consists of
+  // ranges that are maximally contiguous and in sorted order, and features
+  // allocations that are of interest to the kernel.
+  PhysHandoffTemporarySpan<const memalloc::Range> memory;
 
   // ZBI_TYPE_CPU_TOPOLOGY payload (or translated legacy equivalents).
   PhysHandoffTemporarySpan<const zbi_topology_node_t> cpu_topology;

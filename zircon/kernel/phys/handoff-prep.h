@@ -157,6 +157,9 @@ class HandoffPrep {
   // so this does not invalidate pointers from PublishVmo.
   void FinishVmos();
 
+  // Normalizes and publishes RAM and the allocations of interest to the kernel.
+  void SetMemory();
+
   Allocator allocator_;
   PhysHandoff* handoff_ = nullptr;
   zbitl::Image<Allocation> mexec_image_;
