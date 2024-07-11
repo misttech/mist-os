@@ -295,7 +295,12 @@ class ScopedMMap {
     return fit::ok(ScopedMMap(mapping, length));
   }
 
-  ScopedMMap(ScopedMMap &&other) noexcept { *this = std::move(other); }
+  ScopedMMap(const ScopedMMap &) = delete;
+  ScopedMMap &operator=(const ScopedMMap &) = delete;
+
+  ScopedMMap(ScopedMMap &&other) noexcept : mapping_(MAP_FAILED), length_(0) {
+    *this = std::move(other);
+  }
 
   ~ScopedMMap() { Unmap(); }
 
@@ -321,7 +326,7 @@ class ScopedMMap {
   void *mapping() const { return mapping_; }
 
  private:
-  ScopedMMap(void *mapping, size_t length) : mapping_(mapping), length_(length) {}
+  explicit ScopedMMap(void *mapping, size_t length) : mapping_(mapping), length_(length) {}
 
   void *mapping_;
   size_t length_;
