@@ -151,7 +151,7 @@ template("bazel_product_bundle") {
   assert(defined(invoker.bazel_inputs_from_gn),
          "bazel_inputs_from_gn is required")
 
-  labels = {
+  targets = {
     bazel_product_bundle = "${target_name}_bazel_action"
     package_manifest_list = "${target_name}_package_manifests_list"
     transfer_manifest = "${target_name}_transfer_manifest"
@@ -178,8 +178,8 @@ template("bazel_product_bundle") {
     transfer_json = "${out_dir}/transfer.json"
 
     if (defined(invoker.bazel_product_image_target)) {
-      product_assembly_out_dir = labels.bazel_product_assembly
-      create_system_out_dir = labels.bazel_create_system
+      product_assembly_out_dir = targets.bazel_product_assembly
+      create_system_out_dir = targets.bazel_create_system
     }
   }
 
@@ -494,7 +494,7 @@ template("bazel_product_bundle") {
   }
 
   if (defined(invoker.bazel_license_review_target)) {
-    bazel_build_action(labels.license_review_bazel_action_target) {
+    bazel_build_action(targets.license_review_bazel_action_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
@@ -526,7 +526,7 @@ template("bazel_product_bundle") {
     }
   }
 
-  bazel_build_action(labels.bazel_product_bundle) {
+  bazel_build_action(targets.bazel_product_bundle) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -811,7 +811,7 @@ template("bazel_product_bundle") {
     }
   }
 
-  package_tool_package_manifest_list_create(labels.package_manifest_list) {
+  package_tool_package_manifest_list_create(targets.package_manifest_list) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -819,16 +819,16 @@ template("bazel_product_bundle") {
                            ])
     product_bundle = "${target_out_dir}/${files.product_bundle_out_dir}"
     manifests_dir = "${target_out_dir}/${files.package_manifests_out_dir}"
-    deps = [ ":${labels.bazel_product_bundle}" ]
+    deps = [ ":${targets.bazel_product_bundle}" ]
   }
 
-  product_bundle_transfer_manifest(labels.transfer_manifest) {
+  product_bundle_transfer_manifest(targets.transfer_manifest) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    product_bundle_target = ":${labels.bazel_product_bundle}"
+    product_bundle_target = ":${targets.bazel_product_bundle}"
     product_bundle_dir = "${target_out_dir}/${files.product_bundle_out_dir}"
     outputs = [ "${target_out_dir}/${files.out_dir}/transfer.json" ]
   }
@@ -841,15 +841,15 @@ template("bazel_product_bundle") {
                              "visibility",
                            ])
     deps = [
-      ":${labels.package_manifest_list}",
-      ":${labels.transfer_manifest}",
+      ":${targets.package_manifest_list}",
+      ":${targets.transfer_manifest}",
     ]
 
     if (defined(invoker.bazel_license_review_target)) {
-      deps += [ ":${labels.license_review_bazel_action_target}" ]
+      deps += [ ":${targets.license_review_bazel_action_target}" ]
     }
 
     # Some dependents want to claim outputs from these targets as inputs.
-    public_deps = [ ":${labels.bazel_product_bundle}" ]
+    public_deps = [ ":${targets.bazel_product_bundle}" ]
   }
 }
