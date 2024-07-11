@@ -157,21 +157,15 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  frame_t dest_frame = {
-      .x_pos = 0,
-      .y_pos = 0,
-      .width = 1024,
-      .height = 768,
-  };
-  frame_t src_frame = {
+  static constexpr frame_t kDisplayArea = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 1024,
       .height = 768,
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].cfg.primary.dest_frame = dest_frame;
-    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.dest_frame = kDisplayArea;
+    layer_[i][0].cfg.primary.src_frame = kDisplayArea;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
     layer_[i][0].cfg.primary.alpha_mode = 0;
@@ -191,21 +185,21 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  frame_t dest_frame = {
+  static constexpr frame_t kDisplayDestination = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 768,
       .height = 768,
   };
-  frame_t src_frame = {
+  static constexpr frame_t kImageSource = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 1024,
       .height = 768,
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].cfg.primary.dest_frame = dest_frame;
-    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.dest_frame = kDisplayDestination;
+    layer_[i][0].cfg.primary.src_frame = kImageSource;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
   }
@@ -223,21 +217,21 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  frame_t dest_frame = {
+  static constexpr frame_t kDisplayArea = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 1024,
       .height = 768,
   };
-  frame_t src_frame = {
+  static constexpr frame_t kImageSource = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 768,
       .height = 768,
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].cfg.primary.dest_frame = dest_frame;
-    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.dest_frame = kDisplayArea;
+    layer_[i][0].cfg.primary.src_frame = kImageSource;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
   }
@@ -255,21 +249,15 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  frame_t dest_frame = {
-      .x_pos = 0,
-      .y_pos = 0,
-      .width = 1024,
-      .height = 768,
-  };
-  frame_t src_frame = {
+  static constexpr frame_t kDisplayArea = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 1024,
       .height = 768,
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].cfg.primary.dest_frame = dest_frame;
-    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.dest_frame = kDisplayArea;
+    layer_[i][0].cfg.primary.src_frame = kDisplayArea;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
     layer_[i][0].cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
@@ -288,21 +276,15 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  frame_t dest_frame = {
-      .x_pos = 0,
-      .y_pos = 0,
-      .width = 1024,
-      .height = 768,
-  };
-  frame_t src_frame = {
+  static constexpr frame_t kDisplayArea = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 1024,
       .height = 768,
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].cfg.primary.dest_frame = dest_frame;
-    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.dest_frame = kDisplayArea;
+    layer_[i][0].cfg.primary.src_frame = kDisplayArea;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
     layer_[i][0].cfg.primary.transform_mode = FRAME_TRANSFORM_REFLECT_X;
@@ -321,21 +303,15 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  frame_t dest_frame = {
-      .x_pos = 0,
-      .y_pos = 0,
-      .width = 1024,
-      .height = 768,
-  };
-  frame_t src_frame = {
+  static constexpr frame_t kDisplayArea = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 1024,
       .height = 768,
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].cfg.primary.dest_frame = dest_frame;
-    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.dest_frame = kDisplayArea;
+    layer_[i][0].cfg.primary.src_frame = kDisplayArea;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
@@ -356,21 +332,21 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
 TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
   constexpr int kNumLayersPerDisplay = 1;
   // First create layer for each device
-  frame_t dest_frame = {
+  static constexpr frame_t kDisplayDestination = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 768,
       .height = 768,
   };
-  frame_t src_frame = {
+  static constexpr frame_t kImageSource = {
       .x_pos = 0,
       .y_pos = 0,
       .width = 768,
       .height = 768,
   };
   for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].cfg.primary.dest_frame = dest_frame;
-    layer_[i][0].cfg.primary.src_frame = src_frame;
+    layer_[i][0].cfg.primary.dest_frame = kDisplayDestination;
+    layer_[i][0].cfg.primary.src_frame = kImageSource;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
     layer_[i][0].cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
