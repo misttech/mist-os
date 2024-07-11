@@ -25,6 +25,7 @@
 #include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/display-device-driver.h"
 #include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
+#include "src/graphics/display/drivers/virtio-guest/v1/gpu-control-device-driver.h"
 
 namespace virtio_display {
 
@@ -99,6 +100,14 @@ GpuDeviceDriver::~GpuDeviceDriver() {
 }
 
 zx::result<> GpuDeviceDriver::Init() {
+  fbl::AllocChecker alloc_checker;
+  gpu_control_server_ = fbl::make_unique_checked<GpuControlServer>(
+      &alloc_checker, this, display_engine_->pci_device().GetCapabilitySetLimit());
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Failed to allocate memory for GpuControlServer");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
   zx_status_t status =
       DdkAdd(ddk::DeviceAddArgs("virtio-gpu-root").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
@@ -114,13 +123,12 @@ zx::result<> GpuDeviceDriver::Init() {
     return add_display_device_result;
   }
 
-  gpu_control_server_ = std::make_unique<GpuControlServer>(
-      this, display_engine_->pci_device().GetCapabilitySetLimit());
-
-  zx::result<> result = gpu_control_server_->Init(zxdev());
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to init virtio gpu server: %s", result.status_string());
-    return zx::error(result.status_value());
+  zx::result<> add_gpu_control_device_result =
+      GpuControlDeviceDriver::Create(zxdev(), gpu_control_server_.get());
+  if (add_gpu_control_device_result.is_error()) {
+    zxlogf(ERROR, "Failed to add gpu control device driver: %s",
+           add_gpu_control_device_result.status_string());
+    return add_gpu_control_device_result.take_error();
   }
 
   zxlogf(TRACE, "GpuDeviceDriver::Init success");

@@ -6,9 +6,12 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_GPU_CONTROL_SERVER_H_
 
 #include <fidl/fuchsia.gpu.virtio/cpp/wire.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/device.h>
+#include <lib/async/dispatcher.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 
+#include <cstddef>
 #include <functional>
 
 namespace virtio_display {
@@ -23,24 +26,29 @@ class GpuControlServer : public fidl::WireServer<fuchsia_gpu_virtio::GpuControl>
 
   GpuControlServer(Owner* device_accessor, size_t capability_set_limit);
 
-  zx::result<> Init(zx_device_t* parent_device);
+  GpuControlServer(const GpuControlServer&) = delete;
+  GpuControlServer& operator=(const GpuControlServer&) = delete;
+  GpuControlServer(GpuControlServer&&) = delete;
+  GpuControlServer& operator=(GpuControlServer&&) = delete;
 
-  // virtio-gpu implementation
+  ~GpuControlServer() = default;
+
+  // fidl::WireServer<fuchsia_gpu_virtio::GpuControl>:
   void GetCapabilitySetLimit(GetCapabilitySetLimitCompleter::Sync& completer) override;
   void SendHardwareCommand(fuchsia_gpu_virtio::wire::GpuControlSendHardwareCommandRequest* request,
                            SendHardwareCommandCompleter::Sync& completer) override;
 
   Owner* owner() { return owner_; }
 
+  fuchsia_gpu_virtio::Service::InstanceHandler GetInstanceHandler(async_dispatcher_t* dispatcher);
+
  private:
   zx::result<zx::vmo> GetCapset(uint32_t capset_id, uint32_t capset_version);
 
   Owner* owner_;
-  component::OutgoingDirectory outgoing_;
   size_t capability_set_limit_;
 
   fidl::ServerBindingGroup<fuchsia_gpu_virtio::GpuControl> bindings_;
-  zx_device_t* gpu_control_device_ = nullptr;
 };
 
 }  // namespace virtio_display
