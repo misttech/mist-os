@@ -544,7 +544,8 @@ closed protocol Object {
     ///
     /// ### ZX_PROP_NAME
     ///
-    /// *handle* type: `Any of the following`
+    /// *handle* type: Any of the following:
+    ///
     /// - Job
     /// - Process
     /// - Thread
