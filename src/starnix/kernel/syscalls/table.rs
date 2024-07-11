@@ -62,8 +62,8 @@ pub fn dispatch_syscall(
         sys_tkill, sys_wait4, sys_waitid,
     };
     use crate::syscalls::misc::{
-        sys_getrandom, sys_perf_event_open, sys_personality, sys_reboot, sys_sched_yield,
-        sys_setdomainname, sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
+        sys_delete_module, sys_getrandom, sys_perf_event_open, sys_personality, sys_reboot,
+        sys_sched_yield, sys_setdomainname, sys_sethostname, sys_sysinfo, sys_uname, sys_unknown,
     };
     use crate::syscalls::time::{
         sys_clock_getres, sys_clock_gettime, sys_clock_nanosleep, sys_getitimer, sys_gettimeofday,
@@ -205,6 +205,7 @@ pub fn dispatch_syscall(
         connect[3],
         copy_file_range[6],
         #[cfg(target_arch = "x86_64")] creat[2],
+        delete_module[2],
         #[cfg(target_arch = "x86_64")] dup2[2],
         dup3[3],
         dup[1],
