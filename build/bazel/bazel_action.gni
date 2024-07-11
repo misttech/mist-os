@@ -86,44 +86,41 @@ declare_args() {
 #
 #     Type: list of scopes (cannot be empty)
 #
-#   allow_directory_in_outputs (optional):
-#     If true, directories are allowed in `copy_outputs`, which will allow
-#     users to send directories as a whole from Bazel to GN.
+#   directory_outputs: (optional)
+#     A list of scopes, where each item describes a Bazel output directory
+#     (a.k.a. TreeArtifact) and the corresponding Ninja output location where
+#     it will be copied.
 #
-#     NOTE: Using directories as outputs can usually lead to incremental build
-#     issues in GN/Ninja, because timestamps on directories may not correctly
-#     represent freshness of its contents. See directory_timestamp_outputs below.
+#     Each scope uses the following schema:
 #
-#     Type: boolean
-#     Default: false
+#       bazel_target  (optional)
+#          A Bazel target label generating the directory. Must be reachable from
+#          one of the bazel_targets labels. Defaults to bazel_targets[0].
 #
-#   directory_timestamp_outputs: (optional)
+#       bazel_dir  (required)
+#          A path string to the location of the directory, relative to the
+#          Bazel workspace. This can use the same substitution expressions
+#          as `copy_outputs` items.
 #
-#     When allow_directory_in_outputs is set, a list of one ore more output
-#     files inside the output directories. Paths are relative to target_out_dir.
-#     This is useful to provide Ninja with a file timestamp it can rely on
-#     (directory timestamps are not usable, and not managed in a consistent way
-#     across platforms).
+#       ninja_dir  (required)
+#          A path string, relative to $target_out_dir, where the
+#          directory will be recursively copied to. Previous instances are
+#          replaced, instead of being overwritten, to avoid keeping stale
+#          files from previous builds.
 #
-#     IMPORTANT: For incremental build correctness, these timestamps must always
-#     reflect the freshness of the whole directory content. For example:
+#       tracked_files  (required)
+#          A non-empty list of file paths, relative to ninja_dir, corresponding
+#          to files (not directories), whose timestamps will be used by Ninja
+#          to determine when to re-run the current action.
 #
-#       bazel_action("foo_product_bundle") {
-#          command = "build"
-#          ...
-#          copy_outputs = [
-#            {
-#              bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
-#              ninja = "product_bundle"
-#            }
-#          ]
-#          directory_timestamp_outputs = [
-#            "product_bundle/product_bundle.json",
-#          ]
-#       }
+#          These will also be listed as outputs for this GN action, as using
+#          directories as outputs can lead to incremental build issues in GN/Ninja,
+#          because timestamps on directories may not correctly represent freshness
+#          of its contents.
 #
-#     Type: list of paths relative to target_out_dir.
-#     Default: empty
+#          IMPORTANT: For incremental build correctness, these tracked files
+#          timestamps must always reflect the freshness of the whole directory
+#          content.
 #
 #   package_outputs: (optional)
 #      A list of scopes describing where to place various Fuchsia package
@@ -238,92 +235,171 @@ template("bazel_action") {
   assert(defined(invoker.bazel_targets), "bazel_targets must be defined!")
   assert(invoker.bazel_targets != [], "bazel_targets cannot be empty!")
 
-  assert(defined(invoker.copy_outputs) || defined(invoker.package_outputs),
-         "`copy_outputs` or `package_outputs` must be defined")
-
-  if (defined(invoker.copy_outputs) && !defined(invoker.package_outputs)) {
-    assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty.")
-  }
   _copy_outputs = []
   if (defined(invoker.copy_outputs)) {
     _copy_outputs = invoker.copy_outputs
   }
 
-  _needs_dir_copy = false
-  _bazel_output_list = []
-  _ninja_output_list = []
-  _directory_timestamp_outputs = []
-  if (defined(invoker.directory_timestamp_outputs)) {
-    _needs_dir_copy = true
-    _directory_timestamp_outputs += invoker.directory_timestamp_outputs
+  _directory_outputs = []
+  if (defined(invoker.directory_outputs)) {
+    _directory_outputs = invoker.directory_outputs
   }
 
+  _package_outputs = []
+  if (defined(invoker.package_outputs)) {
+    _package_outputs = invoker.package_outputs
+  }
+
+  assert(
+      _copy_outputs != [] || _directory_outputs != [] || _package_outputs != [],
+      "At least one of `copy_outputs`, `directory_outputs` or `package_outputs` must be a non-empty list!")
+
+  _needs_dir_copy = false
+  _needs_package_outputs = false
+
   _bazel_targets = invoker.bazel_targets
+
+  # Collect all outputs into a single list of scopes with different schemas.
+  # All of them have a "type" string key, and a "bazel_target" label string.
+
+  _all_outputs = []
 
   foreach(entry, _copy_outputs) {
     assert("$entry" != entry,
            "`copy_outputs` items must be scopes, string found: \"$entry\"")
-
     assert(defined(entry.bazel),
            "`copy_outputs` scope requires bazel key: $entry")
-    _bazel_output_list += [ entry.bazel ]
-
     assert(defined(entry.ninja),
            "`copy_outputs` scope requires ninja key: $entry")
-    _ninja_output_list += [ entry.ninja ]
-  }
 
-  _allow_directory_in_outputs = false
-  if (defined(invoker.allow_directory_in_outputs)) {
-    _allow_directory_in_outputs = invoker.allow_directory_in_outputs
-  }
-
-  _bazel_outputs = []
-
-  # Compute the value of the TARGET_OUT_XXX shortcuts.
-  _bazel_target = get_label_info(_bazel_targets[0], "name")
-  _bazel_target_package =
-      rebase_path(get_label_info(_bazel_targets[0], "dir"), "//")
-  _bazel_target_out_dir = "bazel-bin/" + _bazel_target_package
-
-  not_needed([
-               "_bazel_target",
-               "_bazel_target_package",
-               "_bazel_target_out_dir",
-             ])
-
-  _bazel_outputs = []
-  foreach(path, _bazel_output_list) {
-    assert(rebase_path(path, "//") != path,
-           "bazel output path must be relative: $path")
-    assert(string_replace("XX$path", "XX-", "") == "XX$path",
-           "bazel output path cannot begin with dash: $path")
-    if (string_replace(path, "{{BAZEL_TARGET_", "") != path) {
-      path = string_replace(path, "{{BAZEL_TARGET_NAME}}", _bazel_target)
-      path = string_replace(path,
-                            "{{BAZEL_TARGET_PACKAGE}}",
-                            _bazel_target_package)
-      path = string_replace(path,
-                            "{{BAZEL_TARGET_OUT_DIR}}",
-                            _bazel_target_out_dir)
-      path = string_replace(path,
-                            "{{BAZEL_TARGET_OUT_PATH}}",
-                            "${_bazel_target_out_dir}/${_bazel_target}")
+    _bazel_target = _bazel_targets[0]
+    if (defined(entry.bazel_target)) {
+      _bazel_target = entry.bazel_target
     }
 
-    # In case of typo with a substitution (e.g. writing {{BAZEL_TARGET_O_DIR}})
-    # GN will complain with an error but will not display the problematic
-    # so use an assert to provide a user-friendly message.
-    assert(string_replace(path, "{{", "") == path,
-           "Unsupported substitution in `copy_outputs` path: $path")
-
-    _bazel_outputs += [ path ]
+    _all_outputs += [
+      {
+        type = "file"
+        bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
+        bazel_file = entry.bazel
+        ninja_file = "$target_out_dir/${entry.ninja}"
+      },
+    ]
   }
 
-  _ninja_outputs = _ninja_output_list
-  _outputs = []
-  foreach(path, _ninja_outputs) {
-    _outputs += [ "${target_out_dir}/${path}" ]
+  foreach(entry, _directory_outputs) {
+    assert("$entry" != entry,
+           "`directory_outputs` items must be scopes, string found: \"$entry\"")
+    assert(defined(entry.bazel_dir),
+           "`directory_outputs` scope requires bazel_dir key: $entry")
+    assert(defined(entry.ninja_dir),
+           "`directory_outputs` scope requires ninja_dir key: $entry")
+    assert(defined(entry.tracked_files),
+           "`directory_outputs` scope requires tracked_files key: $entry")
+
+    _bazel_target = _bazel_targets[0]
+    if (defined(entry.bazel_target)) {
+      _bazel_target = entry.bazel_target
+    }
+
+    _all_outputs += [
+      {
+        type = "directory"
+        bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
+        bazel_dir = entry.bazel_dir
+        ninja_dir = "$target_out_dir/${entry.ninja_dir}"
+        tracked_files = entry.tracked_files
+      },
+    ]
+
+    _needs_dir_copy = true
+  }
+
+  foreach(entry, _package_outputs) {
+    assert("$entry" != entry,
+           "`package_outputs` items must be scopes, string found: \"$entry\"")
+    assert(defined(entry.package_label),
+           "`package_outputs` scope requires package_label key: $entry")
+    _archive = ""
+    if (defined(entry.archive)) {
+      _archive = "$target_out_dir/${entry.archive}"
+    }
+    _manifest = ""
+    if (defined(entry.manifest)) {
+      _manifest = "$target_out_dir/${entry.archive}"
+    }
+    _all_outputs += [
+      {
+        type = "package"
+        bazel_target = get_label_info(entry.package_label, "label_no_toolchain")
+        ninja_archive = _archive
+        ninja_manifest = _manifest
+        copy_debug_symbols =
+            defined(entry.copy_debug_symbols) && entry.copy_debug_symbols
+      },
+    ]
+
+    _needs_package_outputs = true
+  }
+
+  # Compute the list of Bazel output paths, after substitution expansion.
+  _bazel_outputs = []
+  _ninja_outputs = []
+  _ninja_tracked_outputs = []
+
+  foreach(output, _all_outputs) {
+    _bazel_target_name = get_label_info(output.bazel_target, "name")
+    _bazel_target_package =
+        rebase_path(get_label_info(output.bazel_target, "dir"), "//")
+    _bazel_target_out_dir = "bazel-bin/" + _bazel_target_package
+
+    not_needed([
+                 "_bazel_target_name",
+                 "_bazel_target_package",
+                 "_bazel_target_out_dir",
+               ])
+
+    _bazel_paths = []
+    if (output.type == "file") {
+      _bazel_paths = [ output.bazel_file ]
+      _ninja_outputs += [ output.ninja_file ]
+    } else if (output.type == "directory") {
+      _bazel_paths = [ output.bazel_dir ]
+      _ninja_outputs += [ output.ninja_dir ]
+      foreach(tracked_file, output.tracked_files) {
+        _ninja_tracked_outputs += [ "${output.ninja_dir}/${tracked_file}" ]
+      }
+    } else if (output.type == "package") {
+      # nothing to do here.
+    } else {
+      assert(false, "INTERNAL ERROR: output entry with unknown type: $output")
+    }
+    foreach(path, _bazel_paths) {
+      assert(rebase_path(path, "//") != path,
+             "bazel output path must be relative: $path")
+      assert(string_replace("XX$path", "XX-", "") == "XX$path",
+             "bazel output path cannot begin with dash: $path")
+      if (string_replace(path, "{{BAZEL_TARGET_", "") != path) {
+        path = string_replace(path, "{{BAZEL_TARGET_NAME}}", _bazel_target_name)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_PACKAGE}}",
+                              _bazel_target_package)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_DIR}}",
+                              _bazel_target_out_dir)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_PATH}}",
+                              "${_bazel_target_out_dir}/${_bazel_target_name}")
+      }
+
+      # In case of typo with a substitution (e.g. writing {{BAZEL_TARGET_O_DIR}})
+      # GN will complain with an error but will not display the problematic
+      # so use an assert to provide a user-friendly message.
+      assert(string_replace(path, "{{", "") == path,
+             "Unsupported substitution in Bazel output path: $path")
+
+      _bazel_outputs += [ path ]
+    }
   }
 
   # Write the log of build events to a target-specific file.
@@ -440,17 +516,7 @@ template("bazel_action") {
 
     depfile = "$target_gen_dir/$target_name.d"
 
-    outputs = _outputs
-    if (_needs_dir_copy) {
-      assert(
-          _allow_directory_in_outputs,
-          "directory_timestamp_outputs is not useful when there are no directory copies (allow_directory_in_outputs=false)")
-      foreach(path, _directory_timestamp_outputs) {
-        outputs += [ target_out_dir + "/" + path ]
-      }
-    } else {
-      not_needed([ "_directory_timestamp_outputs" ])
-    }
+    outputs = _ninja_outputs + _ninja_tracked_outputs
 
     _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
     outputs += [ _path_mapping ]
@@ -472,7 +538,7 @@ template("bazel_action") {
              rebase_path(_all_licenses_spdx_file, root_build_dir),
              "--bazel-outputs",
            ] + _bazel_outputs + [ "--bazel-targets" ] + _bazel_targets +
-           [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
+           [ "--ninja-outputs" ] + rebase_path(_ninja_outputs, root_build_dir) +
            [
              "--depfile",
              rebase_path(depfile, root_build_dir),
@@ -480,40 +546,39 @@ template("bazel_action") {
              rebase_path(_path_mapping, root_build_dir),
            ]
 
-    if (defined(invoker.package_outputs)) {
+    if (_needs_package_outputs) {
       # These starlark script are used to perform queries to get provider values
       # for each package.
       inputs += [
         "//build/bazel/starlark/FuchsiaPackageInfo_archive_and_manifest.cquery",
         "//build/bazel/starlark/FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
       ]
-      foreach(_entry, invoker.package_outputs) {
-        _archive_arg = "NONE"
-        if (defined(_entry.archive)) {
-          _archive = "$target_out_dir/${_entry.archive}"
-          outputs += [ _archive ]
-          _archive_arg = rebase_path(_archive, root_build_dir)
-        }
-        _manifest_arg = "NONE"
-        if (defined(_entry.manifest)) {
-          _manifest = "$target_out_dir/${_entry.manifest}"
-          outputs += [ _manifest ]
-          _manifest_arg = rebase_path(_manifest, root_build_dir)
-        }
-        _copy_debug_symbols =
-            defined(_entry.copy_debug_symbols) && _entry.copy_debug_symbols
+      foreach(output, _all_outputs) {
+        if (output.type == "package") {
+          _archive_arg = "NONE"
+          if (output.ninja_archive != "") {
+            outputs += [ output.ninja_archive ]
+            _archive_arg = rebase_path(output.ninja_archive, root_build_dir)
+          }
+          _manifest_arg = "NONE"
+          if (output.ninja_manifest != "") {
+            outputs += [ output.ninja_manifest ]
+            _manifest_arg = rebase_path(output.ninja_manifest, root_build_dir)
+          }
+          _copy_debug_symbols = output.copy_debug_symbols
 
-        args += [
-          "--package-outputs",
-          get_label_info(_entry.package_label, "label_no_toolchain"),
-          _archive_arg,
-          _manifest_arg,
-          "${_copy_debug_symbols}",
-        ]
+          args += [
+            "--package-outputs",
+            output.bazel_target,
+            _archive_arg,
+            _manifest_arg,
+            "${output.copy_debug_symbols}",
+          ]
+        }
       }
     }
 
-    if (_allow_directory_in_outputs) {
+    if (_needs_dir_copy) {
       args += [ "--allow-directory-in-outputs" ]
     }
 

@@ -65,44 +65,41 @@ import("//build/bazel/bazel_action.gni")
 #
 #     Type: list of scopes (cannot be empty, unless package_outputs is used)
 #
-#   allow_directory_in_outputs (optional):
-#     If true, directories are allowed in `copy_outputs`, which will allow
-#     users to send directories as a whole from Bazel to GN.
+#   directory_outputs: (optional)
+#     A list of scopes, where each item describes a Bazel output directory
+#     (a.k.a. TreeArtifact) and the corresponding Ninja output location where
+#     it will be copied.
 #
-#     NOTE: Using directories as outputs can usually lead to incremental build
-#     issues in GN/Ninja, because timestamps on directories may not correctly
-#     represent freshness of its contents. See directory_timestamp_outputs below.
+#     Each scope uses the following schema:
 #
-#     Type: boolean
-#     Default: false
+#       bazel_target  (optional)
+#          A Bazel target label generating the directory. Must be reachable from
+#          one of the bazel_targets labels. Defaults to bazel_targets[0].
 #
-#   directory_timestamp_outputs: (optional)
+#       bazel_dir  (required)
+#          A path string to the location of the directory, relative to the
+#          Bazel workspace. This can use the same substitution expressions
+#          as `copy_outputs` items.
 #
-#     When allow_directory_in_outputs is set, a list of one ore more output
-#     files inside the output directories. Paths are relative to target_out_dir.
-#     This is useful to provide Ninja with a file timestamp it can rely on
-#     (directory timestamps are not usable, and not managed in a consistent way
-#     across platforms).
+#       ninja_dir  (required)
+#          A path string, relative to $target_out_dir, where the Bazel
+#          directory will be recursively copied to. Previous instances are
+#          replaced, instead of being overwritten, to avoid keeping stale
+#          files from previous builds.
 #
-#     IMPORTANT: For incremental build correctness, these timestamps must always
-#     reflect the freshness of the whole directory content. For example:
+#       tracked_files  (required)
+#          A non-empty list of file paths, relative to ninja_dir, corresponding
+#          to files (not directories), whose timestamps will be used by Ninja
+#          to determine when to re-run the current action.
 #
-#       bazel_action("foo_product_bundle") {
-#          command = "build"
-#          ...
-#          copy_outputs = [
-#            {
-#              bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
-#              ninja = "product_bundle"
-#            }
-#          ]
-#          directory_timestamp_outputs = [
-#            "product_bundle/product_bundle.json",
-#          ]
-#       }
+#          These will also be listed as outputs for this GN action, as using
+#          directories as outputs can lead to incremental build issues in GN/Ninja,
+#          because timestamps on directories may not correctly represent freshness
+#          of its contents.
 #
-#     Type: list of paths relative to target_out_dir.
-#     Default: empty
+#          IMPORTANT: For incremental build correctness, these tracked files
+#          timestamps must always reflect the freshness of the whole directory
+#          content.
 #
 #   package_outputs: (optional)
 #     A list of scopes describing where to place various Fuchsia package related
