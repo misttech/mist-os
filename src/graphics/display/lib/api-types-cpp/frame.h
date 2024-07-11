@@ -14,8 +14,7 @@ namespace display {
 
 // FIDL type [`fuchsia.math/RectU`] instances used in the display stack.
 //
-// Equivalent to the the banjo type
-// [`fuchsia.hardware.display.controller/Frame`].
+// Equivalent to the the banjo type [`fuchsia.hardware.display.controller/RectU`].
 //
 // See `::fuchsia_math::wire::RectU` for references.
 //
@@ -49,10 +48,10 @@ inline bool operator==(const Frame& lhs, const Frame& rhs) {
 inline bool operator!=(const Frame& lhs, const Frame& rhs) { return !(lhs == rhs); }
 
 Frame ToFrame(const fuchsia_math::wire::RectU& rectangle_fidl);
-Frame ToFrame(const frame_t& frame_banjo);
+Frame ToFrame(const rect_u_t& rectangle_banjo);
 
 fuchsia_math::wire::RectU ToFidlFrame(const Frame& frame);
-frame_t ToBanjoFrame(const Frame& frame);
+rect_u_t ToBanjoFrame(const Frame& frame);
 
 }  // namespace display
 

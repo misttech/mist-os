@@ -215,11 +215,10 @@ type FrameTransform = strict enum : uint32 {
     ROT_90_REFLECT_Y = 7;
 };
 
-type Frame = struct {
-    /// (|x_pos|, |y_pos|) specifies the position of the upper-left corner
-    /// of the frame.
-    x_pos uint32;
-    y_pos uint32;
+/// Equivalent to the [`fuchsia.math/RectU`] FIDL type.
+type RectU = struct {
+    x uint32;
+    y uint32;
     width uint32;
     height uint32;
 };
@@ -249,14 +248,34 @@ type PrimaryLayer = struct {
 
     transform_mode FrameTransform;
 
-    /// The source frame, where (0,0) is the top-left corner of the image. The
-    /// client guarantees that src_frame lies entirely within the image.
-    src_frame Frame;
+    /// The associated image region whose pixels are drawn by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// image's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid non-empty image source
+    /// rectangle that is entirely contained within the image.
+    ///
+    /// Hardware image cropping is requested implicitly, when the source
+    /// region's dimensions differ from the image's dimensions. Some display
+    /// hardware may not support cropping.
+    image_source RectU;
 
-    /// The destination frame, where (0,0) is the top-left corner of the
-    /// composed output. The client guarantees that dest_frame lies entirely
-    /// within the composed output.
-    dest_frame Frame;
+    /// The display image (composited output) region occupied by the layer.
+    ///
+    /// The rectangle uses the Vulkan coordinate space. The origin is at the
+    /// display's top-left corner. The X axis points to the right, and the Y axis
+    /// points downwards.
+    ///
+    /// A valid layer definition requires a valid non-empty display destination
+    /// rectangle that is entirely contained within the display.
+    ///
+    /// Hardware image scaling is requested implicitly, when the output region's
+    /// dimensions differ from the dimensions of `image_source`. Some display
+    /// hardware may not support scaling. All display hardware has limitations
+    /// in scaling support.
+    display_destination RectU;
 };
 
 type ColorLayer = struct {

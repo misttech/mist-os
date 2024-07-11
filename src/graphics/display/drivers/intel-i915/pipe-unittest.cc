@@ -81,8 +81,8 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle, uint32_t z_index = 1u) {
           },
       .alpha_mode = ALPHA_DISABLE,
       .transform_mode = FRAME_TRANSFORM_IDENTITY,
-      .src_frame = {0, 0, kWidth, kHeight},
-      .dest_frame = {0, 0, kWidth, kHeight},
+      .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
+      .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
   };
   return layer;
 }

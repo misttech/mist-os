@@ -316,9 +316,9 @@ config_check_result_t DisplayEngine::CheckConfiguration(
     success = display_configs[0].layer_count == 0;
   } else {
     const primary_layer_t* layer = &display_configs[0].layer_list[0].cfg.primary;
-    frame_t frame = {
-        .x_pos = 0,
-        .y_pos = 0,
+    const rect_u_t display_area = {
+        .x = 0,
+        .y = 0,
         .width = current_display_.scanout_info.geometry.width,
         .height = current_display_.scanout_info.geometry.height,
     };
@@ -326,8 +326,8 @@ config_check_result_t DisplayEngine::CheckConfiguration(
               layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
               layer->image_metadata.width == current_display_.scanout_info.geometry.width &&
               layer->image_metadata.height == current_display_.scanout_info.geometry.height &&
-              memcmp(&layer->dest_frame, &frame, sizeof(frame_t)) == 0 &&
-              memcmp(&layer->src_frame, &frame, sizeof(frame_t)) == 0 &&
+              memcmp(&layer->display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
+              memcmp(&layer->image_source, &display_area, sizeof(rect_u_t)) == 0 &&
               display_configs[0].cc_flags == 0 && layer->alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {

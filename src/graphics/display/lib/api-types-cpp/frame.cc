@@ -25,16 +25,16 @@ Frame ToFrame(const fuchsia_math::wire::RectU& rectangle_fidl) {
   };
 }
 
-Frame ToFrame(const frame_t& frame_banjo) {
-  ZX_DEBUG_ASSERT(frame_banjo.x_pos <= std::numeric_limits<int32_t>::max());
-  ZX_DEBUG_ASSERT(frame_banjo.y_pos <= std::numeric_limits<int32_t>::max());
-  ZX_DEBUG_ASSERT(frame_banjo.width <= std::numeric_limits<int32_t>::max());
-  ZX_DEBUG_ASSERT(frame_banjo.height <= std::numeric_limits<int32_t>::max());
+Frame ToFrame(const rect_u_t& rectangle_banjo) {
+  ZX_DEBUG_ASSERT(rectangle_banjo.x <= std::numeric_limits<int32_t>::max());
+  ZX_DEBUG_ASSERT(rectangle_banjo.y <= std::numeric_limits<int32_t>::max());
+  ZX_DEBUG_ASSERT(rectangle_banjo.width <= std::numeric_limits<int32_t>::max());
+  ZX_DEBUG_ASSERT(rectangle_banjo.height <= std::numeric_limits<int32_t>::max());
   return Frame{
-      .x_pos = static_cast<int32_t>(frame_banjo.x_pos),
-      .y_pos = static_cast<int32_t>(frame_banjo.y_pos),
-      .width = static_cast<int32_t>(frame_banjo.width),
-      .height = static_cast<int32_t>(frame_banjo.height),
+      .x_pos = static_cast<int32_t>(rectangle_banjo.x),
+      .y_pos = static_cast<int32_t>(rectangle_banjo.y),
+      .width = static_cast<int32_t>(rectangle_banjo.width),
+      .height = static_cast<int32_t>(rectangle_banjo.height),
   };
 }
 
@@ -51,14 +51,14 @@ fuchsia_math::wire::RectU ToFidlFrame(const Frame& frame) {
   };
 }
 
-frame_t ToBanjoFrame(const Frame& frame) {
+rect_u_t ToBanjoFrame(const Frame& frame) {
   ZX_DEBUG_ASSERT(frame.x_pos >= 0);
   ZX_DEBUG_ASSERT(frame.y_pos >= 0);
   ZX_DEBUG_ASSERT(frame.width >= 0);
   ZX_DEBUG_ASSERT(frame.height >= 0);
-  return frame_t{
-      .x_pos = static_cast<uint32_t>(frame.x_pos),
-      .y_pos = static_cast<uint32_t>(frame.y_pos),
+  return rect_u_t{
+      .x = static_cast<uint32_t>(frame.x_pos),
+      .y = static_cast<uint32_t>(frame.y_pos),
       .width = static_cast<uint32_t>(frame.width),
       .height = static_cast<uint32_t>(frame.height),
   };

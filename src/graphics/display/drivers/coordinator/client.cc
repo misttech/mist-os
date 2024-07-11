@@ -90,16 +90,16 @@ constexpr uint32_t kFallbackVerticalSizeMm = 90;
 //
 // `outer` must be positioned at the coordinate system's origin. Both `inner` and `outer` must be
 // non-empty.
-constexpr bool OriginFrameContains(const frame_t& outer, const frame_t& inner) {
-  ZX_DEBUG_ASSERT(outer.x_pos == 0);
-  ZX_DEBUG_ASSERT(outer.y_pos == 0);
+constexpr bool OriginRectangleContains(const rect_u_t& outer, const rect_u_t& inner) {
+  ZX_DEBUG_ASSERT(outer.x == 0);
+  ZX_DEBUG_ASSERT(outer.y == 0);
   ZX_DEBUG_ASSERT(outer.width > 0);
   ZX_DEBUG_ASSERT(outer.height > 0);
   ZX_DEBUG_ASSERT(inner.width > 0);
   ZX_DEBUG_ASSERT(inner.height > 0);
 
-  return inner.x_pos < outer.width && inner.y_pos < outer.height &&
-         inner.x_pos + inner.width <= outer.width && inner.y_pos + inner.height <= outer.height;
+  return inner.x < outer.width && inner.y < outer.height && inner.x + inner.width <= outer.width &&
+         inner.y + inner.height <= outer.height;
 }
 
 // We allocate some variable sized stack allocations based on the number of
@@ -945,9 +945,9 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
     // Frame used for checking that each layer's dest_frame lies entirely
     // within the composed output.
-    const frame_t display_area = {
-        .x_pos = 0,
-        .y_pos = 0,
+    const rect_u_t display_area = {
+        .x = 0,
+        .y = 0,
         .width = banjo_display_config.mode.h_addressable,
         .height = banjo_display_config.mode.v_addressable,
     };
@@ -967,14 +967,14 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         primary_layer_t* primary_layer = &banjo_layer.cfg.primary;
         // Frame for checking that the layer's src_frame lies entirely
         // within the source image.
-        const frame_t image_area = {
-            .x_pos = 0,
-            .y_pos = 0,
+        const rect_u_t image_area = {
+            .x = 0,
+            .y = 0,
             .width = primary_layer->image_metadata.width,
             .height = primary_layer->image_metadata.height,
         };
-        invalid = (!OriginFrameContains(image_area, primary_layer->src_frame) ||
-                   !OriginFrameContains(display_area, primary_layer->dest_frame));
+        invalid = (!OriginRectangleContains(image_area, primary_layer->image_source) ||
+                   !OriginRectangleContains(display_area, primary_layer->display_destination));
         // The formats of layer images are negotiated by sysmem between clients
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.

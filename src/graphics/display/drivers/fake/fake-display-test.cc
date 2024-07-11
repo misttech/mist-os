@@ -309,17 +309,17 @@ layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& 
                       .alpha_mode = ALPHA_DISABLE,
                       .alpha_layer_val = 1.0,
                       .transform_mode = FRAME_TRANSFORM_IDENTITY,
-                      .src_frame =
+                      .image_source =
                           {
-                              .x_pos = 0,
-                              .y_pos = 0,
+                              .x = 0,
+                              .y = 0,
                               .width = image_metadata.width,
                               .height = image_metadata.height,
                           },
-                      .dest_frame =
+                      .display_destination =
                           {
-                              .x_pos = 0,
-                              .y_pos = 0,
+                              .x = 0,
+                              .y = 0,
                               .width = image_metadata.width,
                               .height = image_metadata.height,
                           },

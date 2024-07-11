@@ -5,6 +5,7 @@
 #include "src/graphics/display/lib/api-types-cpp/frame.h"
 
 #include <fidl/fuchsia.math/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 
 #include <gtest/gtest.h>
 
@@ -34,9 +35,9 @@ TEST(Frame, FidlConversion) {
 }
 
 TEST(Frame, BanjoConversion) {
-  frame_t banjo_from = {
-      .x_pos = 1,
-      .y_pos = 2,
+  rect_u_t banjo_from = {
+      .x = 1,
+      .y = 2,
       .width = 3,
       .height = 4,
   };
@@ -47,9 +48,9 @@ TEST(Frame, BanjoConversion) {
   EXPECT_EQ(frame.width, 3);
   EXPECT_EQ(frame.height, 4);
 
-  frame_t banjo_to = ToBanjoFrame(frame);
-  EXPECT_EQ(banjo_to.x_pos, 1u);
-  EXPECT_EQ(banjo_to.y_pos, 2u);
+  rect_u_t banjo_to = ToBanjoFrame(frame);
+  EXPECT_EQ(banjo_to.x, 1u);
+  EXPECT_EQ(banjo_to.y, 2u);
   EXPECT_EQ(banjo_to.width, 3u);
   EXPECT_EQ(banjo_to.height, 4u);
 }

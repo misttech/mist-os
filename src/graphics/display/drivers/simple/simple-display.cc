@@ -356,13 +356,14 @@ bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_
       .width = properties_.width_px,
       .height = properties_.height_px,
   };
-  const display::Frame actual_dest_frame = display::ToFrame(banjo_layer.dest_frame);
-  if (actual_dest_frame != expected_frame) {
+  const display::Frame actual_display_destination =
+      display::ToFrame(banjo_layer.display_destination);
+  if (actual_display_destination != expected_frame) {
     return false;
   }
 
-  const display::Frame actual_src_frame = display::ToFrame(banjo_layer.src_frame);
-  if (actual_src_frame != expected_frame) {
+  const display::Frame actual_image_source = display::ToFrame(banjo_layer.image_source);
+  if (actual_image_source != expected_frame) {
     return false;
   }
 
