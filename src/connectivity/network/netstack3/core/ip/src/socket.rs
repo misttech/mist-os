@@ -705,9 +705,13 @@ where
         local_delivery_device = new_local_delivery_device;
     }
 
-    let loopback_packet = (options.multicast_loop()
-        && remote_ip.addr().is_multicast()
-        && !egress_device.is_loopback())
+    // The packet needs to be delivered locally if it's sent to a broadcast
+    // or multicast address. For multicast packets this feature can be disabled
+    // with IP_MULTICAST_LOOP.
+
+    let loopback_packet = (!egress_device.is_loopback()
+        && ((options.multicast_loop() && remote_ip.addr().is_multicast())
+            || next_hop.is_broadcast()))
     .then(|| body.serialize_new_buf(PacketConstraints::UNCONSTRAINED, packet::new_buf_vec))
     .transpose()?
     .map(|buf| RawIpBody::new(*proto, local_ip.addr(), remote_ip.addr(), buf));
@@ -753,11 +757,11 @@ where
                 packet_metadata,
             )
             .unwrap_or_else(|IpSendFrameError { serializer: _, error }| {
-                error!("failed to send multicast loopback packet: {error:?}")
+                error!("failed to send loopback packet: {error:?}")
             });
         }
         (Some(_loopback_packet), None) => {
-            error!("can't send multicast loopback packet without the loopback device")
+            error!("can't send a loopback packet without the loopback device")
         }
         _ => (),
     }

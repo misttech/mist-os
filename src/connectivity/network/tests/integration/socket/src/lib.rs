@@ -4534,6 +4534,7 @@ async fn broadcast_recv<N: Netstack>(name: &str) {
 #[variant(I, Ip)]
 async fn broadcast_send<N: Netstack, I: TestIpExt>(name: &str) {
     const NETWORK: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    const PORT: u16 = 3513;
     const BROADCAST_ADDR: std::net::SocketAddr = std_socket_addr!("192.0.2.255:3513");
 
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -4545,6 +4546,15 @@ async fn broadcast_send<N: Netstack, I: TestIpExt>(name: &str) {
     let iface = client.join_network(&net, format!("if0")).await.expect("failed to join network");
     iface.add_address_and_subnet_route(NETWORK.clone()).await.expect("failed to set ip");
     let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
+
+    let recv_socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+    recv_socket
+        .bind(&std::net::SocketAddr::from((I::UNSPECIFIED_ADDRESS.to_ip_addr(), PORT)).into())
+        .expect("failed to bind socket");
+    let recv_socket = fasync::net::UdpSocket::from_socket(recv_socket.into()).unwrap();
 
     let socket = client
         .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
@@ -4601,4 +4611,15 @@ async fn broadcast_send<N: Netstack, I: TestIpExt>(name: &str) {
     })
     .await
     .expect("didn't receive the packet before end of the stream");
+
+    // Check that the packet is delivered to local sockets.
+    let mut buf = [0u8; 1024];
+    let (size, _addr) = recv_socket
+        .recv_from(&mut buf)
+        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+            panic!("Broadcast packet wasn't delivered to a listening socket")
+        })
+        .await
+        .expect("recv_from failed");
+    assert_eq!(size, test_packet.len());
 }

@@ -352,6 +352,19 @@ where
     Broadcast(<A::Version as BroadcastIpExt>::BroadcastMarker),
 }
 
+impl<A: IpAddress> NextHop<A>
+where
+    A::Version: BroadcastIpExt,
+{
+    /// True if the `NextHop` is `Broadcast`.
+    pub fn is_broadcast(self) -> bool {
+        match self {
+            Self::Broadcast(_) => true,
+            Self::RemoteAsNeighbor | Self::Gateway(_) => false,
+        }
+    }
+}
+
 impl<A: IpAddress, NewIp: BroadcastIpExt> GenericOverIp<NewIp> for NextHop<A>
 where
     A::Version: BroadcastIpExt,
