@@ -308,14 +308,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/security/lib/tee/tee-client-api",
-
-    #------------------
-    #------------------
-    "//src/security/lib/tee/tee-client-api:tee-client-api-static",
-
-    #------------------
-    #------------------
     "//src/storage/bin/mount",
 
     #------------------

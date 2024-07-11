@@ -215,16 +215,16 @@ void PreprocessValue(fidl::AnyArena& allocator, uint32_t param_type, const TEEC_
       ZX_PANIC("Unknown param type");
   }
 
-  fuchsia_tee::wire::Value value(allocator);
-  value.set_direction(direction);
+  auto value = fuchsia_tee::wire::Value::Builder(allocator);
+  value.direction(direction);
   if (IsDirectionInput(direction)) {
     // The TEEC_Value type only includes two generic fields, whereas the Fuchsia TEE interface
     // supports three. The c field cannot be used by the TEE Client API.
-    value.set_a(allocator, teec_value.a);
-    value.set_b(allocator, teec_value.b);
+    value.a(teec_value.a);
+    value.b(teec_value.b);
   }
 
-  *out_parameter = fuchsia_tee::wire::Parameter::WithValue(allocator, std::move(value));
+  *out_parameter = fuchsia_tee::wire::Parameter::WithValue(allocator, value.Build());
 }
 
 TEEC_Result PreprocessTemporaryMemref(fidl::AnyArena& allocator, uint32_t param_type,
@@ -267,15 +267,15 @@ TEEC_Result PreprocessTemporaryMemref(fidl::AnyArena& allocator, uint32_t param_
     }
   }
 
-  fuchsia_tee::wire::Buffer buffer(allocator);
-  buffer.set_direction(direction);
+  auto buffer = fuchsia_tee::wire::Buffer::Builder(allocator);
+  buffer.direction(direction);
   if (vmo.is_valid()) {
-    buffer.set_vmo(std::move(vmo));
+    buffer.vmo(std::move(vmo));
   }
-  buffer.set_offset(allocator, 0);
-  buffer.set_size(allocator, temp_memory_ref.size);
+  buffer.offset(0);
+  buffer.size(temp_memory_ref.size);
 
-  *out_parameter = fuchsia_tee::wire::Parameter::WithBuffer(allocator, std::move(buffer));
+  *out_parameter = fuchsia_tee::wire::Parameter::WithBuffer(allocator, buffer.Build());
   return TEEC_SUCCESS;
 }
 
@@ -306,13 +306,13 @@ TEEC_Result PreprocessWholeMemref(fidl::AnyArena& allocator,
     return ConvertStatusToResult(status);
   }
 
-  fuchsia_tee::wire::Buffer buffer(allocator);
-  buffer.set_direction(direction);
-  buffer.set_vmo(std::move(vmo));
-  buffer.set_offset(allocator, 0);
-  buffer.set_size(allocator, shared_mem->size);
+  auto buffer = fuchsia_tee::wire::Buffer::Builder(allocator);
+  buffer.direction(direction);
+  buffer.vmo(std::move(vmo));
+  buffer.offset(0);
+  buffer.size(shared_mem->size);
 
-  *out_parameter = fuchsia_tee::wire::Parameter::WithBuffer(allocator, std::move(buffer));
+  *out_parameter = fuchsia_tee::wire::Parameter::WithBuffer(allocator, buffer.Build());
   return TEEC_SUCCESS;
 }
 
@@ -358,13 +358,13 @@ TEEC_Result PreprocessPartialMemref(fidl::AnyArena& allocator, uint32_t param_ty
     return ConvertStatusToResult(status);
   }
 
-  fuchsia_tee::wire::Buffer buffer(allocator);
-  buffer.set_direction(direction);
-  buffer.set_vmo(std::move(vmo));
-  buffer.set_offset(allocator, memory_ref.offset);
-  buffer.set_size(allocator, memory_ref.size);
+  auto buffer = fuchsia_tee::wire::Buffer::Builder(allocator);
+  buffer.direction(direction);
+  buffer.vmo(std::move(vmo));
+  buffer.offset(memory_ref.offset);
+  buffer.size(memory_ref.size);
 
-  *out_parameter = fuchsia_tee::wire::Parameter::WithBuffer(allocator, std::move(buffer));
+  *out_parameter = fuchsia_tee::wire::Parameter::WithBuffer(allocator, buffer.Build());
   return TEEC_SUCCESS;
 }
 
