@@ -32,7 +32,7 @@ pub use crate::package_archive::PackageArchiveBuilder;
 pub use crate::package_build_manifest::PackageBuildManifest;
 pub use crate::package_builder::{PackageBuilder, ABI_REVISION_FILE_PATH};
 pub use crate::package_directory::{
-    LoadAbiRevisionError, LoadMetaContentsError, OpenRights, PackageDirectory, ReadHashError,
+    LoadAbiRevisionError, LoadMetaContentsError, PackageDirectory, ReadHashError,
 };
 pub use crate::package_manifest::{
     BlobInfo, PackageManifest, PackageManifestBuilder, RelativeTo, SubpackageInfo,

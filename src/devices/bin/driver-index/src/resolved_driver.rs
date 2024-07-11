@@ -7,7 +7,7 @@ use bind::interpreter::decode_bind_rules::DecodedRules;
 use bind::interpreter::match_bind::{match_bind, DeviceProperties, MatchBindData};
 use cm_rust::FidlIntoNative;
 use fidl_fuchsia_pkg_ext::BlobId;
-use fuchsia_pkg::{OpenRights, PackageDirectory};
+use fuchsia_pkg::PackageDirectory;
 use futures::TryFutureExt;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
@@ -160,10 +160,7 @@ pub async fn load_driver(
 
     let bind_path = get_rules_string_value(&component, "bind")
         .ok_or(anyhow!("{}: Missing bind path", component_url))?;
-    let bind = package_dir.open_file(&bind_path, OpenRights::Read).await.with_context(|| {
-        format!("{}: Failed to open bind file '{}'", component_url.as_str(), bind_path)
-    })?;
-    let bind = fuchsia_fs::file::read(&bind).await.with_context(|| {
+    let bind = package_dir.read_file(&bind_path).await.with_context(|| {
         format!("{}: Failed to read bind file '{}'", component_url.as_str(), bind_path)
     })?;
     let bind_rules = DecodedRules::new(bind.clone())
