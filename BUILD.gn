@@ -124,8 +124,9 @@ group("default") {
     # Host tools tests
     "//zircon/tools:tests",
 
-     # Generate ZBIs used to run on target
+    # Generate ZBIs used to run on target
     "//build/images/mistos",
+    "//src/starnix_lite",
   ]
 }
 

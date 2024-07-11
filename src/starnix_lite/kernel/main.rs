@@ -22,8 +22,8 @@ use fuchsia_runtime::swap_utc_clock_handle;
 use futures::prelude::*;
 use mistos_logger::klog;
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
-use starnix_kernel_config::Config;
-use starnix_kernel_runner::{create_container_from_config, Container, ContainerServiceConfig};
+use starnix_lite_kernel_config::Config;
+use starnix_lite_kernel_runner::{create_container_from_config, Container, ContainerServiceConfig};
 use starnix_logging::{log_info, log_warn};
 use {fuchsia_async as fasync, fuchsia_runtime as fruntime, fuchsia_zircon as zx};
 

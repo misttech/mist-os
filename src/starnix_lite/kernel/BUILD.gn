@@ -18,24 +18,21 @@ import("//src/starnix/kernel/starnix.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
 group("kernel") {
-  deps = [ ":starnix_kernel_zbi" ]
+  deps = [ ":starnix_lite_kernel_zbi" ]
 }
 
 group("tests") {
   testonly = true
 
   deps = [
-    ":starnix-tests",
-    ":starnix_kernel_bin-tests",
-    ":starnix_kernel_runner-tests",
-    ":starnix_lifecycle-tests",
-    ":starnix_logging-tests",
-    ":starnix_sync-tests",
+    ":starnix_lite-tests",
+    ":starnix_lite_kernel_bin-tests",
+    ":starnix_lite_kernel_runner-tests",
   ]
 }
 
-rustc_binary("starnix_kernel_bin") {
-  name = "starnix_kernel"
+rustc_binary("starnix_lite_kernel_bin") {
+  name = "starnix_lite_kernel"
   edition = "2021"
   with_unit_tests = true
 
@@ -49,9 +46,9 @@ rustc_binary("starnix_kernel_bin") {
 
   source_root = "main.rs"
   deps = [
-    ":starnix_core",
-    ":starnix_kernel_config",
-    ":starnix_kernel_runner",
+    ":starnix_lite_core",
+    ":starnix_lite_kernel_config",
+    ":starnix_lite_kernel_runner",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
@@ -95,7 +92,7 @@ rustc_binary("starnix_kernel_bin") {
   disable_rustdoc = false
 }
 
-rustc_library("starnix_core") {
+rustc_library("starnix_lite_core") {
   name = "starnix_core"
   edition = "2021"
   version = "0.1.0"
@@ -428,12 +425,12 @@ rustc_library("starnix_core") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
-rustc_library("starnix_kernel_runner") {
-  name = "starnix_kernel_runner"
+rustc_library("starnix_lite_kernel_runner") {
+  name = "starnix_lite_kernel_runner"
   edition = "2021"
   version = "0.1.0"
   with_unit_tests = true
-  source_root = "runner/lib.rs"
+  source_root = "standalone_runner/lib.rs"
 
   # TODO(https://fxbug.dev/42059075): Re-enable starnix in these environments.
   exclude_toolchain_tags = [
@@ -444,14 +441,14 @@ rustc_library("starnix_kernel_runner") {
   configs += [ "//build/config/mistos:mistos_config" ]
 
   sources = [
-    "runner/container.rs",
-    "runner/features.rs",
-    "runner/lib.rs",
+    "standalone_runner/container.rs",
+    "standalone_runner/features.rs",
+    "standalone_runner/lib.rs",
   ]
 
   deps = [
-    ":starnix_core",
-    ":starnix_kernel_config",
+    ":starnix_lite_core",
+    ":starnix_lite_kernel_config",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//src/lib/diagnostics/inspect/contrib/rust",
@@ -472,8 +469,6 @@ rustc_library("starnix_kernel_runner") {
 
   test_deps = [ "//src/lib/fuchsia" ]
 
-  features = [ "starnix_lite" ]
-
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
@@ -481,7 +476,7 @@ static_library("restricted_trampoline") {
   sources = [ "execution/trampoline_${current_cpu}.S" ]
 }
 
-resource("starnix-test-files") {
+resource("starnix_lite-test-files") {
   sources = [
     "data/testfile.txt",
     "data/testfile2.txt",
@@ -492,50 +487,37 @@ resource("starnix-test-files") {
 # Components
 
 # The starnix kernel manifest, used by all containers.
-fuchsia_component_manifest("starnix_kernel_manifest") {
+fuchsia_component_manifest("starnix_lite_kernel_manifest") {
   manifest = "meta/starnix_lite_kernel.cml"
   component_name = "starnix_lite_kernel"
 }
 
 # The starnix kernel configuration library, used by the Rust binary to parse configuration.
-fuchsia_structured_config_rust_lib("starnix_kernel_config") {
-  cm_label = ":starnix_kernel_manifest"
-}
-
-fuchsia_component("starnix_kernel") {
-  cm_label = ":starnix_kernel_manifest"
-  deps = [ ":starnix_kernel_bin" ]
-}
-
-fuchsia_structured_config_values("kernel_config") {
-  cm_label = ":starnix_kernel_manifest"
-  values_source = "//src/starnix/kernel/meta/config.json5"
+fuchsia_structured_config_rust_lib("starnix_lite_kernel_config") {
+  cm_label = ":starnix_lite_kernel_manifest"
 }
 
 # ZBIs
 
-kernel_cmdline("starnix-zbi-cmdline") {
+kernel_cmdline("starnix_lite-zbi-cmdline") {
   args = [
     "userboot.next.root=/",
-    "userboot.next=bin/starnix_kernel",
+    "userboot.next=bin/starnix_lite_kernel",
   ]
 }
 
-zbi("starnix_kernel_zbi") {
+zbi("starnix_lite_kernel_zbi") {
   deps = [ "//zircon/kernel" ]
   deps += [
-    ":kernel_config",
-    ":starnix-zbi-cmdline",
-    ":starnix_kernel",
-    ":starnix_kernel_bin",
-    ":starnix_kernel_manifest",
+    ":starnix_lite-zbi-cmdline",
+    ":starnix_lite_kernel_bin",
     "//build/info/bootfs:minimum_utc_stamp",
     "//src/starnix/containers:default_init",
     "//src/starnix/containers/mistos:container_resources",
     "//src/starnix/examples/hello_starnix:bin",
   ]
 
-  output_name = "starnix_kernel"
+  output_name = "starnix_lite_kernel"
   output_dir = root_out_dir
   output_extension = "zbi"
   output_path =
@@ -556,36 +538,21 @@ zbi("starnix_kernel_zbi") {
   }
 }
 
-mistos_unittest_zbi("starnix-tests") {
+mistos_unittest_zbi("starnix_lite-tests") {
   executable_path = "bin/starnix_core_lib_test"
-  test_target_label = ":starnix_core_test"
+  test_target_label = ":starnix_lite_core_test"
   deps = [
-    ":starnix-test-files",
+    ":starnix_lite-test-files",
     "//src/starnix/examples/hello_starnix:bin",
   ]
 }
 
-mistos_unittest_zbi("starnix_kernel_bin-tests") {
-  executable_path = "bin/starnix_kernel_bin_test"
-  test_target_label = ":starnix_kernel_bin_test"
+mistos_unittest_zbi("starnix_lite_kernel_bin-tests") {
+  executable_path = "bin/starnix_lite_kernel_bin_test"
+  test_target_label = ":starnix_lite_kernel_bin_test"
 }
 
-mistos_unittest_zbi("starnix_kernel_runner-tests") {
-  executable_path = "bin/starnix_kernel_runner_lib_test"
-  test_target_label = ":starnix_kernel_runner_test"
-}
-
-mistos_unittest_zbi("starnix_lifecycle-tests") {
-  executable_path = "bin/starnix_lifecycle_lib_test"
-  test_target_label = "//src/starnix/kernel:starnix_lifecycle_test"
-}
-
-mistos_unittest_zbi("starnix_logging-tests") {
-  executable_path = "bin/starnix_logging_lib_test"
-  test_target_label = "//src/starnix/kernel:starnix_logging_test"
-}
-
-mistos_unittest_zbi("starnix_sync-tests") {
-  executable_path = "bin/starnix_sync_lib_test"
-  test_target_label = "//src/starnix/kernel:starnix_sync_test"
+mistos_unittest_zbi("starnix_lite_kernel_runner-tests") {
+  executable_path = "bin/starnix_lite_kernel_runner_lib_test"
+  test_target_label = ":starnix_lite_kernel_runner_test"
 }
