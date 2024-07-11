@@ -51,6 +51,23 @@ open protocol Controller {
     flexible GetExposedDictionary(resource struct {
         dictionary server_end:fuchsia.component.sandbox.Dictionary;
     }) -> () error Error;
+
+    /// Destroys this component. When this method returns, either:
+    ///
+    /// - Ok was returned, indicating destruction has begun.
+    /// - An error was returned, and destruction will not be attempted.
+    ///
+    /// If Ok was returned, destruction will proceed in the background, but it
+    /// hasn't necessarily completed yet. When it completes, the framework will
+    /// close this [Controller] channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ACCESS_DENIED`: Destruction of this component is not allowed.
+    /// Currently, this can happen if the component is a static child of its
+    /// parent.
+    @available(added=HEAD)
+    flexible Destroy() -> () error Error;
 };
 
 @available(added=14)
@@ -80,7 +97,7 @@ type StartChildArgs = resource table {
 @available(added=14, replaced=18)
 closed protocol ExecutionController {
     /// Initiates a stop action on this component. Once complete, OnStop will be
-    /// called with the stopped payload.
+    /// called with the stopped payload and this channel is closed.
     ///
     /// Note that a component may stop running on its own at any time, so it is
     /// possible for `OnStop` to be received before `Stop` is called.
