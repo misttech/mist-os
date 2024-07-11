@@ -1178,14 +1178,9 @@ mod tests {
             .expect("create_proxy failed");
 
         struct Interface {
-            partition_info: PartitionInfo,
             flush_called: Arc<AtomicBool>,
         }
-        impl block_server::Interface for Interface {
-            fn info(&self) -> &block_server::PartitionInfo {
-                &self.partition_info
-            }
-
+        impl block_server::async_interface::Interface for Interface {
             async fn read(
                 &self,
                 _device_block_offset: u64,
@@ -1229,16 +1224,16 @@ mod tests {
                 remote_block_device.flush().await.expect("flush failed");
             },
             async {
-                let block_server = BlockServer::new(Interface {
-                    partition_info: PartitionInfo {
+                let block_server = BlockServer::new(
+                    PartitionInfo {
                         block_count: 1000,
                         block_size: 512,
                         type_guid: [0; 16],
                         instance_guid: [0; 16],
                         name: "foo".to_string(),
                     },
-                    flush_called: flush_called.clone(),
-                });
+                    Arc::new(Interface { flush_called: flush_called.clone() }),
+                );
                 block_server.handle_requests(stream.cast_stream()).await.unwrap();
             }
         );

@@ -4,17 +4,18 @@
 use anyhow::{anyhow, Error};
 use block_protocol::{BlockFifoRequest, BlockFifoResponse};
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
-use fuchsia_async::{self as fasync, FifoReadable, FifoWritable};
 use futures::stream::FuturesUnordered;
-use futures::{Future, FutureExt as _, StreamExt as _};
+use futures::{Future, StreamExt as _};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use zx::HandleBased;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_partition as fpartition,
     fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_zircon as zx,
 };
+
+pub mod async_interface;
 
 #[derive(Clone)]
 pub struct PartitionInfo {
@@ -25,42 +26,9 @@ pub struct PartitionInfo {
     pub name: String,
 }
 
-pub trait Interface: Send + Sync + 'static {
-    /// Returns information about the partition.
-    fn info(&self) -> &PartitionInfo;
-
-    /// Called for a request to read bytes.
-    fn read(
-        &self,
-        device_block_offset: u64,
-        block_count: u32,
-        vmo: &Arc<zx::Vmo>,
-        vmo_offset: u64, // *bytes* not blocks
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
-
-    /// Called for a request to write bytes.
-    fn write(
-        &self,
-        device_block_offset: u64,
-        length: u32,
-        vmo: &Arc<zx::Vmo>,
-        vmo_offset: u64, // *bytes* not blocks
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
-
-    /// Called to flush the device.
-    fn flush(&self) -> impl Future<Output = Result<(), zx::Status>> + Send;
-
-    /// Called to trim a region.
-    fn trim(
-        &self,
-        device_block_offset: u64,
-        block_count: u32,
-    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
-}
-
 // Multiple Block I/O request may be sent as a group.
 // Notes:
-// - the group is identified by `group_id` in the request
+// - the group is identified by the group id in the request
 // - if using groups, a response will not be sent unless `BlockIoFlag::GROUP_LAST`
 //   flag is set.
 // - when processing a request of a group fails, subsequent requests of that
@@ -77,27 +45,21 @@ struct FifoMessageGroup {
 }
 
 impl FifoMessageGroup {
-    // Initialise a FifoMessageGroup given the request group ID.
-    // `count` is set to 0 as no requests has been processed yet.
     fn new() -> Self {
-        Self { status: zx::Status::OK, count: 0, req_id: None }
+        FifoMessageGroup { status: zx::Status::OK, count: 0, req_id: None }
     }
 }
 
 #[derive(Default)]
-struct FifoMessageGroups(BTreeMap<u16, FifoMessageGroup>);
+struct FifoMessageGroups(Mutex<BTreeMap<u16, FifoMessageGroup>>);
 
 // Keeps track of all the group requests that are currently being processed
 impl FifoMessageGroups {
-    // Returns the current MessageGroup with this group ID
-    fn get(&mut self, group_id: u16) -> &mut FifoMessageGroup {
-        self.0.entry(group_id).or_insert_with(|| FifoMessageGroup::new())
-    }
-
     /// Completes a request and returns a response to be sent if it's the last outstanding request
     /// for this group.
-    fn complete(&mut self, group_id: u16, status: zx::Status) -> Option<BlockFifoResponse> {
-        let Entry::Occupied(mut o) = self.0.entry(group_id) else { unreachable!() };
+    fn complete(&self, group_id: u16, status: zx::Status) -> Option<BlockFifoResponse> {
+        let mut map = self.0.lock().unwrap();
+        let Entry::Occupied(mut o) = map.entry(group_id) else { unreachable!() };
         let group = o.get_mut();
         if group.count == 1 {
             if let Some(reqid) = group.req_id {
@@ -124,20 +86,37 @@ impl FifoMessageGroups {
 }
 
 /// BlockServer is an implementation of fuchsia.hardware.block.partition.Partition.
-pub struct BlockServer<I> {
-    block_size: u32,
-    interface: I,
+pub struct BlockServer<SM> {
+    partition_info: PartitionInfo,
+    session_manager: Arc<SM>,
 }
 
-impl<I: Interface> BlockServer<I> {
-    pub fn new(interface: I) -> Arc<Self> {
-        let block_size = interface.info().block_size;
-        Arc::new(Self { block_size, interface })
+pub trait SessionManager {
+    // This is Arc rather than &self because of https://github.com/rust-lang/rust/issues/42940.
+    fn open_session(
+        self: Arc<Self>,
+        stream: fblock::SessionRequestStream,
+        block_size: u32,
+    ) -> impl Future<Output = Result<(), Error>>;
+}
+
+pub trait IntoSessionManager {
+    type SM: SessionManager;
+
+    fn into_session_manager(self) -> Arc<Self::SM>;
+}
+
+impl<SM: SessionManager> BlockServer<SM> {
+    pub fn new(
+        partition_info: PartitionInfo,
+        session_manager: impl IntoSessionManager<SM = SM>,
+    ) -> Self {
+        Self { partition_info, session_manager: session_manager.into_session_manager() }
     }
 
-    /// Called to process requests for fuchsia.hardware.block.partition/Partition.
+    /// Called to process requests for fuchsia.hardware.block.volume/Volume.
     pub async fn handle_requests(
-        self: &Arc<Self>,
+        &self,
         requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
         let mut requests = requests.fuse();
@@ -146,8 +125,8 @@ impl<I: Interface> BlockServer<I> {
             futures::select! {
                 request = requests.next() => {
                     if let Some(request) = request {
-                        if let Some(new_session) = self.handle_request(request?).await? {
-                            sessions.push(new_session);
+                        if let Some(session) = self.handle_request(request?).await? {
+                            sessions.push(session);
                         }
                     }
                 }
@@ -159,14 +138,14 @@ impl<I: Interface> BlockServer<I> {
 
     /// Processes a partition request.
     async fn handle_request(
-        self: &Arc<Self>,
+        &self,
         request: fvolume::VolumeRequest,
-    ) -> Result<Option<impl Future<Output = ()>>, Error> {
+    ) -> Result<Option<impl Future<Output = Result<(), Error>>>, Error> {
         match request {
             fvolume::VolumeRequest::GetInfo { responder } => {
                 responder.send(Ok(&fblock::BlockInfo {
-                    block_count: self.interface.info().block_count,
-                    block_size: self.interface.info().block_size,
+                    block_count: self.partition_info.block_count,
+                    block_size: self.partition_info.block_size,
                     max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
                     flags: fblock::Flag::empty(),
                 }))?;
@@ -176,12 +155,11 @@ impl<I: Interface> BlockServer<I> {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fvolume::VolumeRequest::OpenSession { session, control_handle: _ } => {
-                let stream = session.into_stream()?;
-                let block_server = self.clone();
-                let mut session = Session::new(block_server)?;
-                return Ok(Some(async move {
-                    let _ = session.run(stream).await;
-                }));
+                return Ok(Some(
+                    self.session_manager
+                        .clone()
+                        .open_session(session.into_stream()?, self.partition_info.block_size),
+                ));
             }
             fvolume::VolumeRequest::ReadBlocks {
                 responder,
@@ -205,16 +183,16 @@ impl<I: Interface> BlockServer<I> {
             }
             fvolume::VolumeRequest::GetTypeGuid { responder } => {
                 let mut guid = fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
-                guid.value.copy_from_slice(&self.interface.info().type_guid);
+                guid.value.copy_from_slice(&self.partition_info.type_guid);
                 responder.send(zx::sys::ZX_OK, Some(&guid))?;
             }
             fvolume::VolumeRequest::GetInstanceGuid { responder } => {
                 let mut guid = fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
-                guid.value.copy_from_slice(&self.interface.info().instance_guid);
+                guid.value.copy_from_slice(&self.partition_info.instance_guid);
                 responder.send(zx::sys::ZX_OK, Some(&guid))?;
             }
             fvolume::VolumeRequest::GetName { responder } => {
-                responder.send(zx::sys::ZX_OK, Some(&self.interface.info().name))?;
+                responder.send(zx::sys::ZX_OK, Some(&self.partition_info.name))?;
             }
             fvolume::VolumeRequest::QuerySlices { responder, .. } => {
                 responder.send(
@@ -238,109 +216,30 @@ impl<I: Interface> BlockServer<I> {
         }
         Ok(None)
     }
-
-    /// Proesses a fifo request.
-    async fn process_fifo_request(
-        &self,
-        op_code: Result<BlockOpcode, zx::Status>,
-        request: &BlockFifoRequest,
-        vmo: Option<Arc<zx::Vmo>>,
-    ) -> Result<(), zx::Status> {
-        match op_code? {
-            BlockOpcode::Read => {
-                self.interface
-                    .read(
-                        request.dev_offset,
-                        request.length,
-                        vmo.as_ref().ok_or(zx::Status::INVALID_ARGS)?,
-                        request
-                            .vmo_offset
-                            .checked_mul(self.block_size as u64)
-                            .ok_or(zx::Status::INVALID_ARGS)?,
-                    )
-                    .await
-            }
-            BlockOpcode::Write => {
-                self.interface
-                    .write(
-                        request.dev_offset,
-                        request.length,
-                        vmo.as_ref().ok_or(zx::Status::INVALID_ARGS)?,
-                        request
-                            .vmo_offset
-                            .checked_mul(self.block_size as u64)
-                            .ok_or(zx::Status::INVALID_ARGS)?,
-                    )
-                    .await
-            }
-            BlockOpcode::Flush => self.interface.flush().await,
-            BlockOpcode::Trim => self.interface.trim(request.dev_offset, request.length).await,
-            BlockOpcode::CloseVmo => {
-                // The caller removed the vmo if present so we just need to check we have a vmo.
-                // This error code is the one that the C++ server used.
-                vmo.ok_or(zx::Status::IO)?;
-                Ok(())
-            }
-        }
-    }
 }
 
-struct Session<I> {
-    block_server: Arc<BlockServer<I>>,
-    fifo: fasync::Fifo<BlockFifoRequest, BlockFifoResponse>,
+struct SessionHelper {
+    block_size: u32,
     peer_fifo: zx::Fifo,
+    vmos: Mutex<BTreeMap<u16, Arc<zx::Vmo>>>,
     message_groups: FifoMessageGroups,
-    vmos: BTreeMap<u16, Arc<zx::Vmo>>,
 }
 
-impl<I: Interface> Session<I> {
-    fn new(block_server: Arc<BlockServer<I>>) -> Result<Self, zx::Status> {
+impl SessionHelper {
+    fn new(block_size: u32) -> Result<(Self, zx::Fifo), zx::Status> {
         let (peer_fifo, fifo) = zx::Fifo::create(16, std::mem::size_of::<BlockFifoRequest>())?;
-        Ok(Self {
-            block_server,
-            fifo: fasync::Fifo::from_fifo(fifo),
-            peer_fifo,
-            message_groups: FifoMessageGroups::default(),
-            vmos: BTreeMap::new(),
-        })
+        Ok((
+            Self {
+                block_size,
+                peer_fifo,
+                vmos: Mutex::default(),
+                message_groups: FifoMessageGroups::default(),
+            },
+            fifo,
+        ))
     }
 
-    async fn run(&mut self, stream: fblock::SessionRequestStream) -> Result<(), Error> {
-        let mut stream = stream.fuse();
-        let mut requests = FuturesUnordered::new();
-        loop {
-            futures::select! {
-                req = stream.next() => {
-                    let Some(req) = req else { return Ok(()) };
-                    self.handle_request(req?)?;
-                }
-                req = self.fifo.read_entry().fuse() => {
-                    if let Some(request) = self.handle_fifo_request(req?) {
-                        requests.push(request);
-                    }
-                }
-                result = requests.select_next_some() => {
-                    let (group_or_request, status) = result;
-                    match group_or_request {
-                        GroupOrRequest::Group(group_id) => {
-                            if let Some(response) = self.message_groups.complete(group_id, status) {
-                                self.fifo.write_entries(&response).await?;
-                            }
-                        }
-                        GroupOrRequest::Request(reqid) => {
-                            self.fifo.write_entries(&BlockFifoResponse {
-                                status: status.into_raw(),
-                                reqid,
-                                ..Default::default()
-                            }).await?;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn handle_request(&mut self, request: fblock::SessionRequest) -> Result<(), Error> {
+    fn handle_request(&self, request: fblock::SessionRequest) -> Result<(), Error> {
         match request {
             fblock::SessionRequest::GetFifo { responder } => {
                 let rights = zx::Rights::TRANSFER
@@ -355,16 +254,17 @@ impl<I: Interface> Session<I> {
                 Ok(())
             }
             fblock::SessionRequest::AttachVmo { vmo, responder } => {
-                if self.vmos.len() == u16::MAX as usize {
+                let mut vmos = self.vmos.lock().unwrap();
+                if vmos.len() == u16::MAX as usize {
                     responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?;
                 } else {
-                    let vmo_id = match self.vmos.last_entry() {
+                    let vmo_id = match vmos.last_entry() {
                         None => 1,
                         Some(o) => {
                             o.key().checked_add(1).unwrap_or_else(|| {
                                 let mut vmo_id = 1;
                                 // Find the first gap...
-                                for (&id, _) in &self.vmos {
+                                for (&id, _) in &*vmos {
                                     if id > vmo_id {
                                         break;
                                     }
@@ -374,7 +274,7 @@ impl<I: Interface> Session<I> {
                             })
                         }
                     };
-                    self.vmos.insert(vmo_id, Arc::new(vmo));
+                    vmos.insert(vmo_id, Arc::new(vmo));
                     responder.send(Ok(&fblock::VmoId { id: vmo_id }))?;
                 }
                 Ok(())
@@ -386,10 +286,7 @@ impl<I: Interface> Session<I> {
         }
     }
 
-    fn handle_fifo_request(
-        &mut self,
-        request: BlockFifoRequest,
-    ) -> Option<impl Future<Output = (GroupOrRequest, zx::Status)>> {
+    fn decode_fifo_request(&self, request: &BlockFifoRequest) -> Option<DecodedRequest> {
         let flags = BlockIoFlag::from_bits_truncate(request.command.flags);
         let is_group = flags.contains(BlockIoFlag::GROUP_ITEM);
         let last_in_group = flags.contains(BlockIoFlag::GROUP_LAST);
@@ -397,7 +294,8 @@ impl<I: Interface> Session<I> {
             BlockOpcode::from_primitive(request.command.opcode).ok_or(zx::Status::INVALID_ARGS);
 
         let group_or_request = if is_group {
-            let group = self.message_groups.get(request.group);
+            let mut groups = self.message_groups.0.lock().unwrap();
+            let group = groups.entry(request.group).or_insert_with(|| FifoMessageGroup::new());
             if group.req_id.is_some() {
                 // We have already received a request tagged as last.
                 if group.status == zx::Status::OK {
@@ -422,25 +320,74 @@ impl<I: Interface> Session<I> {
             GroupOrRequest::Request(request.reqid)
         };
 
+        let mut need_vmo = true;
+        let mut vmo_offset = 0;
         let vmo = match op_code {
-            Ok(BlockOpcode::Read) | Ok(BlockOpcode::Write) => {
-                self.vmos.get(&request.vmoid).cloned()
+            Ok(BlockOpcode::Read) | Ok(BlockOpcode::Write) => (|| {
+                vmo_offset = request.vmo_offset.checked_mul(self.block_size as u64)?;
+                self.vmos.lock().unwrap().get(&request.vmoid).cloned()
+            })(),
+            Ok(BlockOpcode::CloseVmo) => self.vmos.lock().unwrap().remove(&request.vmoid),
+            _ => {
+                need_vmo = false;
+                None
             }
-            Ok(BlockOpcode::CloseVmo) => self.vmos.remove(&request.vmoid),
-            _ => None,
         };
+        if vmo.is_none() && need_vmo {
+            op_code = Err(zx::Status::INVALID_ARGS);
+        }
 
-        let block_server = self.block_server.clone();
-        Some(async move {
-            (
-                group_or_request,
-                block_server.process_fifo_request(op_code, &request, vmo).await.into(),
-            )
-        })
+        let operation = op_code.map(|code| match code {
+            BlockOpcode::Read => Operation::Read {
+                device_block_offset: request.dev_offset,
+                block_count: request.length,
+                vmo_offset,
+            },
+            BlockOpcode::Write => Operation::Write {
+                device_block_offset: request.dev_offset,
+                block_count: request.length,
+                vmo_offset,
+            },
+            BlockOpcode::Flush => Operation::Flush,
+            BlockOpcode::Trim => Operation::Trim {
+                device_block_offset: request.dev_offset,
+                block_count: request.length,
+            },
+            BlockOpcode::CloseVmo => Operation::CloseVmo,
+        });
+        Some(DecodedRequest { group_or_request, operation, vmo })
     }
 }
 
-enum GroupOrRequest {
+struct DecodedRequest {
+    group_or_request: GroupOrRequest,
+    operation: Result<Operation, zx::Status>,
+    vmo: Option<Arc<zx::Vmo>>,
+}
+
+#[repr(C)]
+pub enum Operation {
+    Read {
+        device_block_offset: u64,
+        block_count: u32,
+        vmo_offset: u64,
+    },
+    Write {
+        device_block_offset: u64,
+        block_count: u32,
+        vmo_offset: u64,
+    },
+    Flush,
+    Trim {
+        device_block_offset: u64,
+        block_count: u32,
+    },
+    /// This will never be seen by the C interface.
+    CloseVmo,
+}
+
+#[derive(Clone, Copy)]
+pub enum GroupOrRequest {
     Group(u16),
     Request(u32),
 }
@@ -464,8 +411,8 @@ mod tests {
         fuchsia_zircon as zx,
     };
 
+    #[derive(Default)]
     struct MockInterface {
-        partition_info: PartitionInfo,
         read_hook: Option<
             Box<
                 dyn Fn(u64, u32, &Arc<zx::Vmo>, u64) -> BoxFuture<'static, Result<(), zx::Status>>
@@ -475,17 +422,7 @@ mod tests {
         >,
     }
 
-    impl MockInterface {
-        fn with_info(partition_info: PartitionInfo) -> Self {
-            Self { partition_info, read_hook: None }
-        }
-    }
-
-    impl super::Interface for MockInterface {
-        fn info(&self) -> &PartitionInfo {
-            &self.partition_info
-        }
-
+    impl super::async_interface::Interface for MockInterface {
         async fn read(
             &self,
             device_block_offset: u64,
@@ -543,7 +480,7 @@ mod tests {
         futures::join!(
             async {
                 let block_server =
-                    BlockServer::new(MockInterface::with_info(test_partition_info()));
+                    BlockServer::new(test_partition_info(), Arc::new(MockInterface::default()));
                 block_server.handle_requests(stream).await.unwrap();
             },
             async {
@@ -582,13 +519,16 @@ mod tests {
 
         futures::join!(
             async {
-                let block_server = BlockServer::new(MockInterface {
-                    read_hook: Some(Box::new(move |_, _, vmo, _| {
-                        assert_eq!(vmo.get_koid().unwrap(), koid);
-                        Box::pin(async { Ok(()) })
-                    })),
-                    ..MockInterface::with_info(test_partition_info())
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(MockInterface {
+                        read_hook: Some(Box::new(move |_, _, vmo, _| {
+                            assert_eq!(vmo.get_koid().unwrap(), koid);
+                            Box::pin(async { Ok(()) })
+                        })),
+                        ..MockInterface::default()
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
@@ -677,13 +617,8 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
 
         let mut server = std::pin::pin!(async {
-            let block_server = BlockServer::new(MockInterface::with_info(PartitionInfo {
-                block_count: 1234,
-                block_size: 512,
-                type_guid: [1; 16],
-                instance_guid: [2; 16],
-                name: "foo".to_string(),
-            }));
+            let block_server =
+                BlockServer::new(test_partition_info(), Arc::new(MockInterface::default()));
             block_server.handle_requests(stream).await.unwrap();
         }
         .fuse());
@@ -710,18 +645,14 @@ mod tests {
         );
     }
 
+    #[derive(Default)]
     struct IoMockInterface {
-        partition_info: PartitionInfo,
         counter: AtomicU64,
         do_checks: bool,
         return_errors: bool,
     }
 
-    impl super::Interface for IoMockInterface {
-        fn info(&self) -> &PartitionInfo {
-            &self.partition_info
-        }
-
+    impl super::async_interface::Interface for IoMockInterface {
         async fn read(
             &self,
             device_block_offset: u64,
@@ -794,12 +725,14 @@ mod tests {
 
         futures::join!(
             async {
-                let block_server = BlockServer::new(IoMockInterface {
-                    partition_info: test_partition_info(),
-                    counter: AtomicU64::new(0),
-                    return_errors: false,
-                    do_checks: true,
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(IoMockInterface {
+                        counter: AtomicU64::new(0),
+                        return_errors: false,
+                        do_checks: true,
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
@@ -895,12 +828,14 @@ mod tests {
 
         futures::join!(
             async {
-                let block_server = BlockServer::new(IoMockInterface {
-                    partition_info: test_partition_info(),
-                    counter: AtomicU64::new(0),
-                    return_errors: true,
-                    do_checks: false,
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(IoMockInterface {
+                        counter: AtomicU64::new(0),
+                        return_errors: true,
+                        do_checks: false,
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
@@ -988,12 +923,14 @@ mod tests {
 
         futures::join!(
             async {
-                let block_server = BlockServer::new(IoMockInterface {
-                    partition_info: test_partition_info(),
-                    counter: AtomicU64::new(0),
-                    return_errors: false,
-                    do_checks: false,
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(IoMockInterface {
+                        counter: AtomicU64::new(0),
+                        return_errors: false,
+                        do_checks: false,
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
@@ -1093,7 +1030,7 @@ mod tests {
                         }
                     )
                     .await,
-                    Err(zx::Status::IO)
+                    Err(zx::Status::INVALID_ARGS)
                 );
 
                 std::mem::drop(proxy);
@@ -1111,17 +1048,22 @@ mod tests {
 
         futures::join!(
             async move {
-                let block_server = BlockServer::new(MockInterface {
-                    partition_info: test_partition_info(),
-                    read_hook: Some(Box::new(move |dev_block_offset, _, _, _| {
-                        let (tx, rx) = oneshot::channel();
-                        waiting_readers_clone.lock().unwrap().push((dev_block_offset as u32, tx));
-                        Box::pin(async move {
-                            let _ = rx.await;
-                            Ok(())
-                        })
-                    })),
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(MockInterface {
+                        read_hook: Some(Box::new(move |dev_block_offset, _, _, _| {
+                            let (tx, rx) = oneshot::channel();
+                            waiting_readers_clone
+                                .lock()
+                                .unwrap()
+                                .push((dev_block_offset as u32, tx));
+                            Box::pin(async move {
+                                let _ = rx.await;
+                                Ok(())
+                            })
+                        })),
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
@@ -1205,10 +1147,12 @@ mod tests {
 
         futures::join!(
             async move {
-                let block_server = BlockServer::new(MockInterface {
-                    partition_info: test_partition_info(),
-                    read_hook: Some(Box::new(move |_, _, _, _| Box::pin(async { Ok(()) }))),
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(MockInterface {
+                        read_hook: Some(Box::new(move |_, _, _, _| Box::pin(async { Ok(()) }))),
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
@@ -1271,13 +1215,15 @@ mod tests {
 
         futures::join!(
             async move {
-                let block_server = BlockServer::new(MockInterface {
-                    partition_info: test_partition_info(),
-                    read_hook: Some(Box::new(move |_, _, _, _| {
-                        counter_clone.fetch_add(1, Ordering::Relaxed);
-                        Box::pin(async { Err(zx::Status::BAD_STATE) })
-                    })),
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(MockInterface {
+                        read_hook: Some(Box::new(move |_, _, _, _| {
+                            counter_clone.fetch_add(1, Ordering::Relaxed);
+                            Box::pin(async { Err(zx::Status::BAD_STATE) })
+                        })),
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
@@ -1372,16 +1318,18 @@ mod tests {
         futures::join!(
             async move {
                 let rx = Mutex::new(Some(rx));
-                let block_server = BlockServer::new(MockInterface {
-                    partition_info: test_partition_info(),
-                    read_hook: Some(Box::new(move |_, _, _, _| {
-                        let rx = rx.lock().unwrap().take().unwrap();
-                        Box::pin(async {
-                            let _ = rx.await;
-                            Ok(())
-                        })
-                    })),
-                });
+                let block_server = BlockServer::new(
+                    test_partition_info(),
+                    Arc::new(MockInterface {
+                        read_hook: Some(Box::new(move |_, _, _, _| {
+                            let rx = rx.lock().unwrap().take().unwrap();
+                            Box::pin(async {
+                                let _ = rx.await;
+                                Ok(())
+                            })
+                        })),
+                    }),
+                );
                 block_server.handle_requests(stream).await.unwrap();
             },
             async move {
