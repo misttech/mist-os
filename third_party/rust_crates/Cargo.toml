@@ -570,7 +570,7 @@ rustflags = []
 # pest relies on this being set to find the grammar file
 env_vars = [ "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/handlebars-4.3.5" ]
 
-[gn.package.httparse."1.7.1"]
+[gn.package.httparse."1.8.0"]
 rustflags = ["--cfg=httparse_simd"]
 
 [gn.package.indexmap."1.9.2"]
