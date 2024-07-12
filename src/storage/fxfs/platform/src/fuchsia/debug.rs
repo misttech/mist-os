@@ -10,12 +10,12 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, Status};
 use fxfs::filesystem::FxFilesystem;
 use fxfs::lsm_tree::types::LayerIterator;
+use fxfs::lsm_tree::Query;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
 use fxfs::object_store::{
     AttributeKey, DataObjectHandle, HandleOptions, ObjectKey, ObjectKeyData, ObjectStore,
 };
 use std::collections::BTreeMap;
-use std::ops::Bound;
 use std::sync::{Arc, Mutex, Weak};
 use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult};
@@ -419,7 +419,7 @@ impl Directory for ObjectDirectory {
         let layer_set = store.tree().layer_set();
         let mut merger = layer_set.merger();
         let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::object(object_id)))
+            .query(Query::FullRange(&ObjectKey::object(object_id)))
             .await
             .map_err(map_to_status)?;
         while let Some(data) = iter.get() {

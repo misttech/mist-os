@@ -11,7 +11,7 @@ mod flush;
 pub mod graveyard;
 pub mod journal;
 mod key_manager;
-mod merge;
+pub(crate) mod merge;
 pub mod object_manager;
 pub mod object_record;
 pub mod project_id;
@@ -36,7 +36,7 @@ use crate::filesystem::{
 use crate::log::*;
 use crate::lsm_tree::cache::{NullCache, ObjectCache};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
-use crate::lsm_tree::LSMTree;
+use crate::lsm_tree::{LSMTree, Query};
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::allocator::Allocator;
 use crate::object_store::graveyard::Graveyard;
@@ -60,7 +60,6 @@ use once_cell::sync::OnceCell;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::ops::Bound;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 use storage_device::Device;
@@ -657,6 +656,9 @@ impl ObjectStore {
         root.record_uint("logical_write_ops", self.logical_write_ops.load(Ordering::Relaxed));
 
         root.record(sizes);
+
+        let this = self.clone();
+        root.record_child("lsm_tree", move |node| this.tree().record_inspect_data(node));
     }
 
     pub fn device(&self) -> &Arc<dyn Device> {
@@ -1134,7 +1136,7 @@ impl ObjectStore {
             TrimMode::Tombstone(..) => 0,
             TrimMode::UseSize => {
                 let iter = merger
-                    .seek(Bound::Included(&ObjectKey::attribute(
+                    .query(Query::FullRange(&ObjectKey::attribute(
                         object_id,
                         attribute_id,
                         AttributeKey::Attribute,
@@ -1177,7 +1179,7 @@ impl ObjectStore {
 
         // Loop over the extents and deallocate them.
         let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::from_extent(
+            .query(Query::FullRange(&ObjectKey::from_extent(
                 object_id,
                 attribute_id,
                 ExtentKey::search_key_from_offset(aligned_offset),
@@ -2201,6 +2203,7 @@ mod tests {
     use crate::filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions};
     use crate::fsck::fsck;
     use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+    use crate::lsm_tree::Query;
     use crate::object_handle::{
         ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID,
     };
@@ -2217,7 +2220,6 @@ mod tests {
     use futures::join;
     use fxfs_crypto::{Crypt, WrappedKey, WrappedKeyBytes, WRAPPED_KEY_SIZE};
     use fxfs_insecure_crypto::InsecureCrypt;
-    use std::ops::Bound;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
@@ -2294,7 +2296,7 @@ mod tests {
 
         let layer_set = store.tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
         let mut sequences = [0u64; 3];
         while let Some(ItemRef { key: ObjectKey { object_id, .. }, sequence, .. }) = iter.get() {
             if *object_id == object1.object_id() {
@@ -2648,8 +2650,10 @@ mod tests {
         // There should be no records for the object.
         let layers = root_store.tree.layer_set();
         let mut merger = layers.merger();
-        let iter =
-            merger.seek(Bound::Included(&ObjectKey::object(child_id))).await.expect("seek failed");
+        let iter = merger
+            .query(Query::FullRange(&ObjectKey::object(child_id)))
+            .await
+            .expect("seek failed");
         match iter.get() {
             None => {}
             Some(ItemRef { key: ObjectKey { object_id, .. }, .. }) => {

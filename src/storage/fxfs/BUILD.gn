@@ -69,7 +69,7 @@ fxfs_sources = [
   "src/lsm_tree/bloom_filter.rs",
   "src/lsm_tree/cache.rs",
   "src/lsm_tree/merge.rs",
-  "src/lsm_tree/simple_persistent_layer.rs",
+  "src/lsm_tree/persistent_layer.rs",
   "src/lsm_tree/skip_list_layer.rs",
   "src/lsm_tree/types.rs",
   "src/metrics.rs",

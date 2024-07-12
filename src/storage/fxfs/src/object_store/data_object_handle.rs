@@ -5,6 +5,7 @@
 use crate::errors::FxfsError;
 use crate::log::*;
 use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::lsm_tree::Query;
 use crate::object_handle::{
     ObjectHandle, ObjectProperties, ReadObjectHandle, WriteBytes, WriteObjectHandle,
 };
@@ -34,7 +35,7 @@ use futures::TryStreamExt;
 use fxfs_trace::trace;
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use std::cmp::min;
-use std::ops::{Bound, DerefMut, Range};
+use std::ops::{DerefMut, Range};
 use std::sync::atomic::{self, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
@@ -484,7 +485,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 AttributeKey::Extent(ExtentKey::search_key_from_offset(new_range.start)),
             );
             let mut merger = layer_set.merger();
-            let mut iter = merger.seek(Bound::Included(&offset_key)).await?;
+            let mut iter = merger.query(Query::FullRange(&offset_key)).await?;
 
             loop {
                 match iter.get() {
@@ -715,7 +716,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             AttributeKey::Extent(ExtentKey::search_key_from_offset(start_offset)),
         );
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(Bound::Included(&offset_key)).await?;
+        let mut iter = merger.query(Query::FullRange(&offset_key)).await?;
 
         let mut allocated = None;
         let mut end = start_offset;
@@ -882,7 +883,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             let layer_set = tree.layer_set();
             let mut merger = layer_set.merger();
             let mut iter = merger
-                .seek(Bound::Included(&ObjectKey::attribute(
+                .query(Query::FullRange(&ObjectKey::attribute(
                     self.object_id(),
                     self.attribute_id(),
                     AttributeKey::Extent(ExtentKey::search_key_from_offset(offset)),
@@ -1144,7 +1145,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             let mut merger = layer_set.merger();
             let aligned_old_size = round_down(old_size, block_size);
             let iter = merger
-                .seek(Bound::Included(&ObjectKey::extent(
+                .query(Query::FullRange(&ObjectKey::extent(
                     self.object_id(),
                     self.attribute_id(),
                     aligned_old_size..aligned_old_size + 1,
@@ -1231,7 +1232,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::attribute(
+            .query(Query::FullRange(&ObjectKey::attribute(
                 self.object_id(),
                 self.attribute_id(),
                 AttributeKey::Extent(ExtentKey::search_key_from_offset(file_range.start)),

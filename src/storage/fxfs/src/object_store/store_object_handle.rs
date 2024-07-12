@@ -6,6 +6,7 @@ use crate::checksum::{fletcher64, Checksum, Checksums};
 use crate::errors::FxfsError;
 use crate::log::*;
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+use crate::lsm_tree::Query;
 use crate::object_handle::ObjectHandle;
 use crate::object_store::extent_record::{ExtentKey, ExtentMode, ExtentValue};
 use crate::object_store::object_manager::ObjectManager;
@@ -29,7 +30,7 @@ use fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet};
 use fxfs_trace::trace;
 use std::cmp::min;
 use std::future::Future;
-use std::ops::{Bound, Range};
+use std::ops::Range;
 use std::sync::atomic::{self, AtomicBool, Ordering};
 use std::sync::Arc;
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
@@ -256,7 +257,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             AttributeKey::Extent(key.search_key()),
         );
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(Bound::Included(&lower_bound)).await?;
+        let mut iter = merger.query(Query::FullRange(&lower_bound)).await?;
         let allocator = self.store().allocator();
         let mut deallocated = 0;
         let trace = self.trace();
@@ -704,6 +705,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         if buf.len() == 0 {
             return Ok(());
         }
+        let end_offset = offset + buf.len() as u64;
 
         self.store().logical_read_ops.fetch_add(1, Ordering::Relaxed);
 
@@ -717,10 +719,10 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::extent(
+            .query(Query::LimitedRange(&ObjectKey::extent(
                 self.object_id(),
                 attribute_id,
-                offset..offset + 1,
+                offset..end_offset,
             )))
             .await?;
         let end_align = ((offset + buf.len() as u64) % block_size) as usize;
@@ -844,7 +846,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
         let key = ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute);
-        let mut iter = merger.seek(Bound::Included(&key)).await?;
+        let mut iter = merger.query(Query::FullRange(&key)).await?;
         let (mut buffer, size) = match iter.get() {
             Some(item) if item.key == &key => match item.value {
                 ObjectValue::Attribute { size } => {
@@ -1178,7 +1180,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let mut merger = layer_set.merger();
         // Seek to the first extended attribute key for this object.
         let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::extended_attribute(self.object_id(), Vec::new())))
+            .query(Query::FullRange(&ObjectKey::extended_attribute(self.object_id(), Vec::new())))
             .await?;
         let mut out = Vec::new();
         while let Some(item) = iter.get() {
@@ -1298,7 +1300,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             let layer_set = tree.layer_set();
             let mut merger = layer_set.merger();
             let key = ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute);
-            let mut iter = merger.seek(Bound::Included(&key)).await?;
+            let mut iter = merger.query(Query::FullRange(&key)).await?;
             loop {
                 match iter.get() {
                     // None means the key passed to seek wasn't found. That means the first

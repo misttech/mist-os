@@ -5,6 +5,7 @@
 use crate::fsck::errors::{FsckError, FsckFatal, FsckWarning};
 use crate::fsck::{FragmentationStats, Fsck, FsckResult};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+use crate::lsm_tree::Query;
 use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{self, AllocatorKey, AllocatorValue};
 use crate::object_store::graveyard::Graveyard;
@@ -20,7 +21,7 @@ use anyhow::Error;
 use rustc_hash::FxHashSet as HashSet;
 use std::cell::UnsafeCell;
 use std::collections::btree_map::BTreeMap;
-use std::ops::{Bound, Range};
+use std::ops::Range;
 
 // Information for scanned objects about their allocated attributes.
 #[derive(Debug)]
@@ -795,7 +796,7 @@ async fn scan_extents_and_directory_children<'a>(
     let bs = store.block_size();
     let layer_set = store.tree().layer_set();
     let mut merger = layer_set.merger();
-    let mut iter = merger.seek(Bound::Unbounded).await?;
+    let mut iter = merger.query(Query::FullScan).await?;
     let mut allocated_bytes = 0;
     let mut extent_count = 0;
     let mut previous_object_id = INVALID_OBJECT_ID;
@@ -980,7 +981,7 @@ pub(super) async fn scan_store(
     // Scan the store for objects, attributes, and parent/child relationships.
     let layer_set = store.tree().layer_set();
     let mut merger = layer_set.merger();
-    let mut iter = merger.seek(Bound::Unbounded).await?;
+    let mut iter = merger.query(Query::FullScan).await?;
     let mut last_item: Option<Item<ObjectKey, ObjectValue>> = None;
     while let Some(item) = iter.get() {
         if let Some(last_item) = last_item {

@@ -31,7 +31,7 @@ pub trait SortByU64 {
 ///
 /// For point-based keys, this can be the same as `std::hash::Hash`, but for range-based keys, the
 /// hash can collapse nearby ranges into the same hash value.  Since a range-based key may span
-/// several buckets, `FuzzyHash::partition` must be called to split the key up into each of the
+/// several buckets, `FuzzyHash::fuzzy_hash` must be called to split the key up into each of the
 /// possible values that it overlaps with.
 pub trait FuzzyHash: Hash + Sized {
     type Iter: Iterator<Item = u64>;
@@ -42,6 +42,11 @@ pub trait FuzzyHash: Hash + Sized {
     /// Note that in general only a small number of partitions (e.g. 2) should be checked at once.
     /// Debug assertions will fire if too large of a range is checked.
     fn fuzzy_hash(&self) -> Self::Iter;
+
+    /// Returns whether the type is a range-based key.
+    fn is_range_key(&self) -> bool {
+        false
+    }
 }
 
 impl_fuzzy_hash!(u8);
@@ -255,6 +260,30 @@ pub trait LayerKey: Clone {
     fn next_key(&self) -> Option<Self> {
         None
     }
+    /// Returns the search key for this extent; that is, a key which is <= this key under Ord and
+    /// OrdLowerBound.  Note that this is only used for Query::LimitedRange queries (where
+    /// `Self::partition` returns Some).
+    /// For example, if the tree has extents 50..150 and 150..200 and we wish to read 100..200, we'd
+    /// search for 0..101 which would set the iterator to 50..150.
+    fn search_key(&self) -> Self {
+        unreachable!()
+    }
+}
+
+/// See `Layer::len`.
+pub enum ItemCount {
+    Precise(usize),
+    Estimate(usize),
+}
+
+impl std::ops::Deref for ItemCount {
+    type Target = usize;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Precise(size) => size,
+            Self::Estimate(size) => size,
+        }
+    }
 }
 
 /// Layer is a trait that all layers need to implement (mutable and immutable).
@@ -274,6 +303,20 @@ pub trait Layer<K, V>: Send + Sync {
     /// iterator on the first item in the layer.
     async fn seek(&self, bound: std::ops::Bound<&K>)
         -> Result<BoxedLayerIterator<'_, K, V>, Error>;
+
+    /// Returns the number of items in the layer file, or an estimate if not known.
+    /// Old persistent layer formats did not keep track of how many entries they have, hence the
+    /// estimate.  If this is wrong, bloom filter sizing might be off, but that won't affect
+    /// correctness, and will wash out with future compactions anyways.
+    fn estimated_len(&self) -> ItemCount;
+
+    /// Returns whether the layer *might* contain records relevant to `key`.  Note that this can
+    /// return true even if the layer has no records relevant to `key`, but it will never return
+    /// false if there are such records.  (As such, always returning true is a trivially correct
+    /// implementation.)
+    fn maybe_contains_key(&self, _key: &K) -> bool {
+        true
+    }
 
     /// Locks the layer preventing it from being closed. This will never block i.e. there can be
     /// many locks concurrently.  The lock is purely advisory: seek will still work even if lock has

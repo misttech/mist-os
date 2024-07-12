@@ -5,6 +5,7 @@
 use crate::errors::FxfsError;
 use crate::lsm_tree::merge::{Merger, MergerIterator};
 use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
 use crate::object_store::object_record::{
     ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey, ObjectKeyData,
@@ -18,7 +19,6 @@ use crate::object_store::{
 use anyhow::{anyhow, bail, ensure, Error};
 use fidl_fuchsia_io as fio;
 use std::fmt;
-use std::ops::Bound;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -664,7 +664,7 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<DirectoryIterator<'a, 'b>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let mut iter =
-            merger.seek(Bound::Included(&ObjectKey::child(self.object_id(), from))).await?;
+            merger.query(Query::FullRange(&ObjectKey::child(self.object_id(), from))).await?;
         // Skip deleted entries.
         loop {
             match iter.get() {

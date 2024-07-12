@@ -80,6 +80,7 @@ fn estimate_params(num_items: usize) -> (usize, usize) {
 }
 
 /// A read-only handle to a bloom filter.  To create a bloom filter, use `BloomFilterWriter`.
+/// Note that the bloom filter is *not* versioned; this must be managed by the caller.
 pub struct BloomFilterReader<V> {
     data: BitVec,
     hash_nonces: Vec<u64>,
@@ -170,6 +171,8 @@ impl<V: FuzzyHash> BloomFilterReader<V> {
     }
 }
 
+/// A helper to build a bloom filter in-memory before serializing it.
+/// Note that the bloom filter is *not* versioned; this must be managed by the caller.
 pub struct BloomFilterWriter<V> {
     data: BitVec,
     seed: u64,
@@ -196,6 +199,10 @@ impl<V: FuzzyHash> BloomFilterWriter<V> {
     /// Returns the size the bloom filter will occupy when serialized.
     pub fn serialized_size(&self) -> usize {
         self.data.len() / 8
+    }
+
+    pub fn seed(&self) -> u64 {
+        self.seed
     }
 
     pub fn num_nonces(&self) -> usize {

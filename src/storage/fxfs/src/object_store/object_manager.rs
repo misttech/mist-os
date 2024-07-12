@@ -213,16 +213,13 @@ impl ObjectManager {
             }
         }
 
-        let object_ids = list_volumes(self.volume_directory.get().unwrap()).await?;
+        let object_ids = list_volumes(self.volume_directory.get().unwrap())
+            .await
+            .context("Failed to list volumes")?;
 
         for store_id in object_ids {
             self.open_store(&root_store, store_id).await?;
         }
-
-        ensure!(
-            !self.inner.read().unwrap().stores.iter().any(|(_, store)| store.is_unknown()),
-            FxfsError::Inconsistent
-        );
 
         self.init_metadata_reservation()?;
 
@@ -585,7 +582,12 @@ impl ObjectManager {
         // As we iterate, keep track of the earliest version used by structs in these objects
         let mut earliest_version: Version = LATEST_VERSION;
         for &object_id in object_ids.iter().rev() {
-            let object_earliest_version = self.object(object_id).unwrap().flush().await?;
+            let object_earliest_version = self
+                .object(object_id)
+                .unwrap()
+                .flush()
+                .await
+                .with_context(|| format!("Failed to flush oid {object_id}"))?;
             if object_earliest_version < earliest_version {
                 earliest_version = object_earliest_version;
             }

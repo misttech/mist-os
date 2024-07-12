@@ -9,6 +9,7 @@ use crate::lsm_tree::skip_list_layer::SkipListLayer;
 use crate::lsm_tree::types::{
     BoxedLayerIterator, Item, Key, Layer, LayerIterator, OrdUpperBound, RangeKey, Value,
 };
+use crate::lsm_tree::Query;
 use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{AllocatorKey, AllocatorValue, CoalescingIterator};
 use crate::object_store::journal::super_block::SuperBlockInstance;
@@ -473,7 +474,7 @@ impl<'a> Fsck<'a> {
         let layer_set = allocator.tree().layer_set();
         let mut merger = layer_set.merger();
         let mut stored_allocations = CoalescingIterator::new(
-            allocator.filter(merger.seek(Bound::Unbounded).await?, true).await?,
+            allocator.filter(merger.query(Query::FullScan).await?, true).await?,
         )
         .await
         .expect("filter failed");

@@ -4,12 +4,12 @@
 
 use crate::errors::FxfsError;
 use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::lsm_tree::Query;
 use crate::object_store::transaction::{lock_keys, LockKey, Mutation, Options};
 use crate::object_store::{
     ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue, ProjectProperty,
 };
 use anyhow::{ensure, Error};
-use std::ops::Bound;
 
 impl ObjectStore {
     /// Adds a mutation to set the project limit as an attribute with `bytes` and `nodes` to root
@@ -210,8 +210,9 @@ impl ObjectStore {
         let root_dir_id = self.root_directory_object_id();
         let layer_set = self.tree().layer_set();
         let mut merger = layer_set.merger();
-        let mut iter =
-            merger.seek(Bound::Included(&ObjectKey::project_limit(root_dir_id, start_id))).await?;
+        let mut iter = merger
+            .query(Query::FullRange(&ObjectKey::project_limit(root_dir_id, start_id)))
+            .await?;
         let mut entries = Vec::new();
         let mut prev_entry = 0;
         let mut next_entry = None;
@@ -255,7 +256,7 @@ impl ObjectStore {
         let layer_set = self.tree().layer_set();
         let mut merger = layer_set.merger();
         let mut iter =
-            merger.seek(Bound::Included(&ObjectKey::project_limit(root_id, project_id))).await?;
+            merger.query(Query::FullRange(&ObjectKey::project_limit(root_id, project_id))).await?;
         let mut limit = None;
         let mut usage = None;
         // The limit should be immediately followed by the usage if both exist.

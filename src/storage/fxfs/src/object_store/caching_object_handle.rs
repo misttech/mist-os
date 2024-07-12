@@ -161,6 +161,9 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
                     let aligned_len =
                         std::cmp::min(read_start + CHUNK_SIZE, block_aligned_size(&self.source))
                             - read_start;
+
+                    fxfs_trace::duration!(c"CachingObjectHandle::load", "len" => aligned_len);
+
                     let mut read_buf = self.source.allocate_buffer(aligned_len).await;
                     let amount_read =
                         self.source.read(read_start as u64, read_buf.as_mut()).await?;

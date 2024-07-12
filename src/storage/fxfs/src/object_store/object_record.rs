@@ -200,22 +200,6 @@ impl ObjectKey {
         Self { object_id, data: ObjectKeyData::ExtendedAttribute { name } }
     }
 
-    /// Returns the search key for this extent; that is, a key which is <= this key under Ord and
-    /// OrdLowerBound.
-    /// This would be used when searching for an extent with |find| (when we want to find any
-    /// overlapping extent, which could include extents that start earlier).
-    pub fn search_key(&self) -> Self {
-        if let Self {
-            object_id,
-            data: ObjectKeyData::Attribute(attribute_id, AttributeKey::Extent(e)),
-        } = self
-        {
-            Self::attribute(*object_id, *attribute_id, AttributeKey::Extent(e.search_key()))
-        } else {
-            self.clone()
-        }
-    }
-
     /// Returns the merge key for this key; that is, a key which is <= this key and any
     /// other possibly overlapping key, under Ord. This would be used for the hint in |merge_into|.
     pub fn key_for_merge_into(&self) -> Self {
@@ -289,6 +273,18 @@ impl LayerKey for ObjectKey {
                 Some(key)
             }
             _ => None,
+        }
+    }
+
+    fn search_key(&self) -> Self {
+        if let Self {
+            object_id,
+            data: ObjectKeyData::Attribute(attribute_id, AttributeKey::Extent(e)),
+        } = self
+        {
+            Self::attribute(*object_id, *attribute_id, AttributeKey::Extent(e.search_key()))
+        } else {
+            self.clone()
         }
     }
 }

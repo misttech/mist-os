@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/333401205): Remove allow(dead_code) for bloom filters when used
-#[allow(dead_code)]
 mod bloom_filter;
 pub mod cache;
 pub mod merge;
-pub mod simple_persistent_layer;
+pub mod persistent_layer;
 pub mod skip_list_layer;
 pub mod types;
 
@@ -17,30 +15,32 @@ use crate::object_handle::{ReadObjectHandle, WriteBytes};
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::Error;
 use cache::{ObjectCache, ObjectCacheResult};
-use simple_persistent_layer::SimplePersistentLayerWriter;
+use persistent_layer::{PersistentLayer, PersistentLayerWriter};
 use skip_list_layer::SkipListLayer;
 use std::fmt;
-use std::ops::Bound;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use types::{
     Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter, MergeableKey, OrdLowerBound,
     Value,
 };
 
+pub use merge::Query;
+
 const SKIP_LIST_LAYER_ITEMS: usize = 512;
 
 // For serialization.
-pub use simple_persistent_layer::{LayerInfo, LayerInfoV32};
+pub use persistent_layer::{
+    LayerHeader as PersistentLayerHeader, LayerHeaderV39 as PersistentLayerHeaderV39,
+    LayerInfo as PersistentLayerInfo, LayerInfoV39 as PersistentLayerInfoV39,
+    OldLayerInfo as OldPersistentLayerInfo, OldLayerInfoV32 as OldPersistentLayerInfoV32,
+};
 
 pub async fn layers_from_handles<K: Key, V: Value>(
     handles: impl IntoIterator<Item = impl ReadObjectHandle + 'static>,
 ) -> Result<Vec<Arc<dyn Layer<K, V>>>, Error> {
     let mut layers = Vec::new();
     for handle in handles {
-        layers.push(
-            simple_persistent_layer::SimplePersistentLayer::open(handle).await?
-                as Arc<dyn Layer<K, V>>,
-        );
+        layers.push(PersistentLayer::open(handle).await? as Arc<dyn Layer<K, V>>);
     }
     Ok(layers)
 }
@@ -60,6 +60,16 @@ struct Inner<K, V> {
     mutation_callback: MutationCallback<K, V>,
 }
 
+#[derive(Default)]
+pub(super) struct Counters {
+    num_seeks: usize,
+    // The following two metrics are used to compute the effectiveness of the bloom filters.
+    // `layer_files_total` tracks the number of layer files we might have looked at across all
+    // seeks, and `layer_files_skipped` tracks how many we skipped thanks to the bloom filter.
+    layer_files_total: usize,
+    layer_files_skipped: usize,
+}
+
 /// LSMTree manages a tree of layers to provide a key/value store.  Each layer contains deltas on
 /// the preceding layer.  The top layer is an in-memory mutable layer.  Layers can be compacted to
 /// form a new combined layer.
@@ -67,6 +77,7 @@ pub struct LSMTree<K, V> {
     data: RwLock<Inner<K, V>>,
     merge_fn: merge::MergeFn<K, V>,
     cache: Box<dyn ObjectCache<K, V>>,
+    counters: Arc<Mutex<Counters>>,
 }
 
 #[fxfs_trace::trace]
@@ -81,6 +92,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }),
             merge_fn,
             cache,
+            counters: Arc::new(Mutex::new(Default::default())),
         }
     }
 
@@ -98,6 +110,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }),
             merge_fn,
             cache,
+            counters: Arc::new(Mutex::new(Default::default())),
         })
     }
 
@@ -143,10 +156,12 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     pub async fn compact_with_iterator<W: WriteBytes + Send>(
         &self,
         mut iterator: impl LayerIterator<K, V>,
+        num_items: usize,
         writer: W,
         block_size: u64,
     ) -> Result<(), Error> {
-        let mut writer = SimplePersistentLayerWriter::<W, K, V>::new(writer, block_size).await?;
+        let mut writer =
+            PersistentLayerWriter::<W, K, V>::new(writer, num_items, block_size).await?;
         while let Some(item_ref) = iterator.get() {
             debug!(?item_ref, "compact: writing");
             writer.write(item_ref).await?;
@@ -157,7 +172,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
 
     /// Returns an empty layer-set for this tree.
     pub fn empty_layer_set(&self) -> LayerSet<K, V> {
-        LayerSet { layers: Vec::new(), merge_fn: self.merge_fn }
+        LayerSet { layers: Vec::new(), merge_fn: self.merge_fn, counters: self.counters.clone() }
     }
 
     /// Adds all the layers (including the mutable layer) to `layer_set`.
@@ -189,7 +204,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         for layer in &data.layers {
             layers.push(layer.clone().into());
         }
-        LayerSet { layers, merge_fn: self.merge_fn }
+        LayerSet { layers, merge_fn: self.merge_fn, counters: self.counters.clone() }
     }
 
     /// Inserts an item into the mutable layer.
@@ -256,7 +271,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         let layer_set = self.layer_set();
         let mut merger = layer_set.merger();
 
-        Ok(match merger.seek(Bound::Included(search_key)).await?.get() {
+        Ok(match merger.query(Query::Point(search_key)).await?.get() {
             Some(ItemRef { key, value, sequence }) if key == search_key => {
                 if let Some(token) = token {
                     token.complete(Some(value));
@@ -299,6 +314,32 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     pub fn set_mutable_layer(&self, layer: Arc<SkipListLayer<K, V>>) {
         self.data.write().unwrap().mutable_layer = layer;
     }
+
+    /// Records inspect data for the LSM tree into `node`.  Called lazily when inspect is queried.
+    pub fn record_inspect_data(&self, root: &fuchsia_inspect::Node) {
+        let layer_set = self.layer_set();
+        root.record_child("layers", move |node| {
+            let mut index = 0;
+            for layer in layer_set.layers {
+                node.record_child(format!("{index}"), move |node| {
+                    layer.1.record_inspect_data(node)
+                });
+                index += 1;
+            }
+        });
+        {
+            let counters = self.counters.lock().unwrap();
+            root.record_uint("num_seeks", counters.num_seeks as u64);
+            root.record_uint(
+                "bloom_filter_success_percent",
+                if counters.layer_files_total == 0 {
+                    0
+                } else {
+                    (counters.layer_files_skipped * 100).div_ceil(counters.layer_files_total) as u64
+                },
+            );
+        }
+    }
 }
 
 /// This is an RAII wrapper for a layer which holds a lock on the layer (via the Layer::lock
@@ -339,11 +380,24 @@ impl<K, V> AsRef<dyn Layer<K, V>> for LockedLayer<K, V> {
 pub struct LayerSet<K, V> {
     pub layers: Vec<LockedLayer<K, V>>,
     merge_fn: merge::MergeFn<K, V>,
+    counters: Arc<Mutex<Counters>>,
 }
 
 impl<K: Key + LayerKey + OrdLowerBound, V: Value> LayerSet<K, V> {
+    pub fn sum_len(&self) -> usize {
+        let mut size = 0;
+        for layer in &self.layers {
+            size += *layer.estimated_len()
+        }
+        size
+    }
+
     pub fn merger(&self) -> merge::Merger<'_, K, V> {
-        merge::Merger::new(self.layers.iter().map(|x| x.as_ref()), self.merge_fn)
+        merge::Merger::new(
+            self.layers.iter().map(|x| x.as_ref()),
+            self.merge_fn,
+            self.counters.clone(),
+        )
     }
 }
 
@@ -368,12 +422,12 @@ mod tests {
     use crate::lsm_tree::cache::{
         NullCache, ObjectCache, ObjectCachePlaceholder, ObjectCacheResult,
     };
-    use crate::lsm_tree::layers_from_handles;
     use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
     use crate::lsm_tree::types::{
-        BoxedLayerIterator, FuzzyHash, Item, ItemRef, Key, Layer, LayerIterator, LayerKey,
-        OrdLowerBound, OrdUpperBound, SortByU64, Value,
+        BoxedLayerIterator, FuzzyHash, Item, ItemCount, ItemRef, Key, Layer, LayerIterator,
+        LayerKey, OrdLowerBound, OrdUpperBound, SortByU64, Value,
     };
+    use crate::lsm_tree::{layers_from_handles, Query};
     use crate::object_handle::ObjectHandle;
     use crate::serialized_types::{
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
@@ -387,7 +441,6 @@ mod tests {
     use rand::seq::SliceRandom;
     use rand::thread_rng;
     use std::hash::Hash;
-    use std::ops::Bound;
     use std::sync::{Arc, Mutex};
 
     #[derive(
@@ -441,7 +494,7 @@ mod tests {
         tree.insert(items[1].clone()).expect("insert error");
         let layers = tree.layer_set();
         let mut merger = layers.merger();
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[0].key, &items[0].value));
         iter.advance().await.expect("advance failed");
@@ -471,10 +524,15 @@ mod tests {
         {
             let layer_set = tree.immutable_layer_set();
             let mut merger = layer_set.merger();
-            let iter = merger.seek(Bound::Unbounded).await.expect("create merger");
-            tree.compact_with_iterator(iter, Writer::new(&handle).await, handle.block_size())
-                .await
-                .expect("compact failed");
+            let iter = merger.query(Query::FullScan).await.expect("create merger");
+            tree.compact_with_iterator(
+                iter,
+                items.len(),
+                Writer::new(&handle).await,
+                handle.block_size(),
+            )
+            .await
+            .expect("compact failed");
         }
         tree.set_layers(layers_from_handles([handle]).await.expect("layers_from_handles failed"));
         let handle = FakeObjectHandle::new(object.clone());
@@ -484,7 +542,7 @@ mod tests {
 
         let layers = tree.layer_set();
         let mut merger = layers.merger();
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
         for i in 1..5 {
             let ItemRef { key, value, .. } = iter.get().expect("missing item");
             assert_eq!((key, value), (&TestKey(i..i), &i));
@@ -524,8 +582,8 @@ mod tests {
         {
             let layer_set = tree.immutable_layer_set();
             let mut merger = layer_set.merger();
-            let iter = merger.seek(Bound::Unbounded).await.expect("create merger");
-            tree.compact_with_iterator(iter, Writer::new(&handle).await, handle.block_size())
+            let iter = merger.query(Query::FullScan).await.expect("create merger");
+            tree.compact_with_iterator(iter, 0, Writer::new(&handle).await, handle.block_size())
                 .await
                 .expect("compact failed");
         }
@@ -554,7 +612,7 @@ mod tests {
 
         // Filter out odd keys (which also guarantees we skip the first key which is an edge case).
         let mut iter = merger
-            .seek(Bound::Unbounded)
+            .query(Query::FullScan)
             .await
             .expect("seek failed")
             .filter(|item: ItemRef<'_, TestKey, u64>| item.key.0.start % 2 == 0)
@@ -590,10 +648,10 @@ mod tests {
         }
         let layers = a.layer_set();
         let mut merger = layers.merger();
-        let mut iter_a = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut iter_a = merger.query(Query::FullScan).await.expect("seek failed");
         let layers = b.layer_set();
         let mut merger = layers.merger();
-        let mut iter_b = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut iter_b = merger.query(Query::FullScan).await.expect("seek failed");
 
         for item in items {
             assert_eq!(Some(item.as_item_ref()), iter_a.get());
@@ -775,6 +833,10 @@ mod tests {
 
         fn lock(&self) -> Option<Arc<DropEvent>> {
             self.drop_event.lock().unwrap().clone()
+        }
+
+        fn estimated_len(&self) -> ItemCount {
+            ItemCount::Estimate(0)
         }
 
         async fn close(&self) {
