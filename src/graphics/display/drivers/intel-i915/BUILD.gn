@@ -167,6 +167,7 @@ test("intel-i915-test") {
     "gtt-unittest.cc",
     "hardware-common-unittest.cc",
     "i2c/gmbus-gpio-unittest.cc",
+    "intel-display-driver-test.cc",
     "intel-i915-test.cc",
     "interrupts-unittest.cc",
     "pch-engine-unittest.cc",
