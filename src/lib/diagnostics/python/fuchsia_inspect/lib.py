@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import typing
 import json
+import typing
 from dataclasses import dataclass
 
 
@@ -60,7 +60,7 @@ class Timestamp:
 class InspectMetadata:
     timestamp: Timestamp
     file_name: str | None = None
-    errors: list[InspectMetadataError] | None = None
+    errors: list[str] | None = None
     component_url: str | None = None
 
     @staticmethod
@@ -78,17 +78,10 @@ class InspectMetadata:
         """
         timestamp = Timestamp(int(_extract_or_throw(data, "timestamp")))
 
-        error_list = data.get("errors")
-        if error_list is not None:
-            error_list = [
-                InspectMetadataError(_extract_or_throw(d, "message"))
-                for d in error_list
-            ]
-
         return InspectMetadata(
             timestamp=timestamp,
             file_name=data.get("file_name"),
-            errors=error_list,
+            errors=data.get("errors"),
             component_url=data.get("component_url"),
         )
 

@@ -44,9 +44,7 @@ EXAMPLE_DATA = """
         "component_url": "foo2",
         "timestamp": 181016000000000,
         "errors": [
-          {
-            "message": "Unknown failure"
-          }
+            "Unknown failure"
         ]
     },
     "moniker": "core/example",
@@ -141,9 +139,7 @@ class TestInspect(unittest.TestCase):
         assert processed[0].payload is not None
         self.assertEqual(processed[0].payload["root"]["value"], 100)
         assert processed[2].metadata.errors is not None
-        self.assertEqual(
-            processed[2].metadata.errors[0].message, "Unknown failure"
-        )
+        self.assertEqual(processed[2].metadata.errors[0], "Unknown failure")
 
     def test_failures(self) -> None:
         self.assertRaises(
