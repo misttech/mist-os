@@ -5,6 +5,8 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_LOADER_LOADER_H_
 #define SRC_DEVICES_BIN_DRIVER_LOADER_LOADER_H_
 
+#include <fidl/fuchsia.io/cpp/fidl.h>
+#include <lib/fdio/directory.h>
 #include <lib/ld/remote-dynamic-linker.h>
 #include <lib/ld/remote-load-module.h>
 #include <lib/zircon-internal/default_stack_size.h>
@@ -28,7 +30,7 @@ class Loader {
 
   // Loads the executable |exec| with |vdso| into |process|, and begins the execution on |thread|.
   zx_status_t Start(zx::process process, zx::thread thread, zx::vmar root_vmar, zx::vmo exec,
-                    zx::vmo vdso);
+                    zx::vmo vdso, fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
 
  private:
   using Linker = ld::RemoteDynamicLinker<>;
@@ -82,6 +84,32 @@ class Loader {
   // Use |Create| instead.
   explicit Loader(Diagnostics& diag, zx::vmo stub_ld_vmo)
       : remote_abi_stub_(ld::RemoteAbiStub<>::Create(diag, std::move(stub_ld_vmo), kPageSize)) {}
+
+  // Retrieves the vmo for |libname| from |lib_dir|.
+  zx::result<zx::vmo> GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directory> lib_dir,
+                                const char* libname);
+
+  // Returns a closure that can be passed to |ld::RemoteDynamicLinker::Init|.
+  auto GetDepFunction(Diagnostics& diag, fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
+    return [this, &diag, lib_dir = std::move(lib_dir)](
+               const RemoteModule::Soname& soname) -> Linker::GetDepResult {
+      auto result = GetDepVmo(lib_dir, soname.c_str());
+      if (result.is_ok()) {
+        return RemoteModule::Decoded::Create(diag, std::move(*result), kPageSize);
+
+        // |MissingDependency| or |SystemError| will return true if we should continue
+        // processing even on error, or false if we should abort early.
+      } else if (result.error_value() == ZX_ERR_NOT_FOUND
+                     ? !diag.MissingDependency(soname.str())
+                     : !diag.SystemError("cannot open dependency ", soname.str(), ": ",
+                                         elfldltl::ZirconError{result.error_value()})) {
+        // Tell the linker to abort.
+        return std::nullopt;
+      }
+      // Return an empty pointer. This tells the linker to try to continue even with the error.
+      return RemoteModule::Decoded::Ptr();
+    };
+  }
 
   ld::RemoteAbiStub<>::Ptr remote_abi_stub_;
 

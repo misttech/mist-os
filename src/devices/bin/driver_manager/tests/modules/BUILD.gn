@@ -28,5 +28,33 @@ static_library("entry_point") {
 executable("fake_driver_host") {
   output_name = "fake_driver_host"
   sources = [ "fake_driver_host.cc" ]
-  deps = [ ":entry_point" ]
+  deps = [
+    ":dh-deps-a",
+    ":entry_point",
+  ]
+
+  # The user.basic environment doesn't use toolchain-provided instrumentation
+  # runtimes that wouldn't be compatible.  But it supports variants like ubsan
+  # that require plumbing a custom runtime, which isn't handled for this
+  # experimental test stub binary.
+  exclude_toolchain_tags = [ "custom-runtime" ]
+}
+
+shared_library("dh-deps-a") {
+  sources = [ "dh-deps-a.cc" ]
+  deps = [
+    ":dh-deps-b",
+    ":dh-deps-c",
+    "//zircon/system/public",
+  ]
+}
+
+shared_library("dh-deps-b") {
+  sources = [ "dh-deps-b.cc" ]
+  deps = [ "//zircon/system/public" ]
+}
+
+shared_library("dh-deps-c") {
+  sources = [ "dh-deps-c.cc" ]
+  deps = [ "//zircon/system/public" ]
 }

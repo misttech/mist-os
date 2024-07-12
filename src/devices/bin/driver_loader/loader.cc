@@ -58,7 +58,8 @@ std::unique_ptr<Loader> Loader::Create() {
 }
 
 zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_vmar,
-                          zx::vmo exec_vmo, zx::vmo vdso_vmo) {
+                          zx::vmo exec_vmo, zx::vmo vdso_vmo,
+                          fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
   auto diag = MakeDiagnostics();
 
   Linker linker;
@@ -78,19 +79,10 @@ zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto get_dep = [&diag](const RemoteModule::Soname& soname) -> Linker::GetDepResult {
-    // TODO(https://fxbug.dev/341771498): implement this.
-    RemoteModule::Decoded::Ptr decoded;
-    if (!diag.MissingDependency(soname.str())) {
-      return std::nullopt;
-    }
-    return std::move(decoded);
-  };
-
   auto init_result = linker.Init(diag,
                                  {Linker::Executable(std::move(decoded_executable)),
                                   Linker::Implicit(std::move(decoded_vdso))},
-                                 get_dep);
+                                 GetDepFunction(diag, std::move(lib_dir)));
   if (!init_result) {
     return ZX_ERR_INTERNAL;
   }
@@ -149,6 +141,25 @@ zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_
   }
   started_processes_.push_back(std::move(*process_state));
   return ZX_OK;
+}
+
+zx::result<zx::vmo> Loader::GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directory> lib_dir,
+                                      const char* libname) {
+  auto [client_end, server_end] = fidl::Endpoints<fio::File>::Create();
+  zx_status_t status = fdio_open_at(
+      lib_dir.channel()->get(), libname,
+      static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightExecutable),
+      server_end.TakeChannel().release());
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  fidl::SyncClient file(std::move(client_end));
+  auto result = file->GetBackingMemory(fio::VmoFlags::kRead | fio::VmoFlags::kExecute |
+                                       fio::VmoFlags::kPrivateClone);
+  if (result.is_error()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  return zx::ok(std::move(result->vmo()));
 }
 
 // static
