@@ -57,14 +57,15 @@ typedef struct buffer_allocation {
 class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                    public ddk::IntelGpuCoreProtocol<Controller> {
  public:
-  explicit Controller(zx_device_t* parent);
+  explicit Controller(zx_device_t* parent, inspect::Inspector inspector);
   ~Controller();
 
   // Creates a `Controller` instance and performs short-running initialization
   // of all subcomponents.
   //
   // Long-running initialization is performed in the Start() hook.
-  static zx::result<std::unique_ptr<Controller>> Create(zx_device_t* parent);
+  static zx::result<std::unique_ptr<Controller>> Create(zx_device_t* parent,
+                                                        inspect::Inspector inspector);
 
   // Corresponds to DFv1 `DdkInit()` and DFv2 `Start()`.
   void Start(fdf::StartCompleter completer);

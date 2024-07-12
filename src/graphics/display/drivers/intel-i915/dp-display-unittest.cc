@@ -135,7 +135,7 @@ class TestDdiPhysicalLayer final : public DdiPhysicalLayer {
 class DpDisplayTest : public ::testing::Test {
  protected:
   DpDisplayTest()
-      : controller_(nullptr),
+      : controller_(nullptr, inspect::Inspector{}),
         mmio_buffer_({
             .vaddr = FakeMmioPtr(buffer_),
             .offset = 0,
@@ -170,9 +170,9 @@ class DpDisplayTest : public ::testing::Test {
 
   std::unique_ptr<DpDisplay> MakeDisplay(DdiId ddi_id,
                                          display::DisplayId id = display::DisplayId{1}) {
-    // TODO(https://fxbug.dev/42167004): In normal operation a DpDisplay is not fully constructed until it
-    // receives a call to DisplayDevice::Query, then either DisplayDevice::Init() (for a hotplug or
-    // initially powered-off display) OR DisplayDevice::AttachPipe() and
+    // TODO(https://fxbug.dev/42167004): In normal operation a DpDisplay is not fully constructed
+    // until it receives a call to DisplayDevice::Query, then either DisplayDevice::Init() (for a
+    // hotplug or initially powered-off display) OR DisplayDevice::AttachPipe() and
     // DisplayDevice::LoadACtiveMode() (for a pre-initialized display, e.g. bootloader-configured
     // eDP). For testing we only initialize until the Query() stage. The states of a DpDisplay
     // should become easier to reason about if remove the partially-initialized states.
@@ -252,9 +252,9 @@ TEST_F(DpDisplayTest, LinkRateSelectionViaInit) {
   // DpDisplay::Init() to succeed. Configuring the IGD op region to indicate eDP will cause
   // Controller to assign DPLL0 to the display.
 
-  // TODO(https://fxbug.dev/42164736): It shouldn't be necessary to rely on this logic in Controller to test
-  // DpDisplay. Can DpDisplay be told that it is eDP during construction time instead of querying
-  // Controller for it every time?
+  // TODO(https://fxbug.dev/42164736): It shouldn't be necessary to rely on this logic in Controller
+  // to test DpDisplay. Can DpDisplay be told that it is eDP during construction time instead of
+  // querying Controller for it every time?
   controller()->igd_opregion_for_testing()->SetIsEdpForTesting(DdiId::DDI_A, true);
   auto dpll_status = registers::DisplayPllStatus::Get().ReadFrom(mmio_buffer());
   dpll_status.set_pll0_locked(true).WriteTo(mmio_buffer());

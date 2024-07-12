@@ -2361,7 +2361,8 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-Controller::Controller(zx_device_t* parent) : parent_(parent) {
+Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
+    : parent_(parent), inspector_(std::move(inspector)) {
   mtx_init(&display_lock_, mtx_plain);
   mtx_init(&gtt_lock_, mtx_plain);
   mtx_init(&bar_lock_, mtx_plain);
@@ -2379,9 +2380,11 @@ Controller::~Controller() {
 }
 
 // static
-zx::result<std::unique_ptr<Controller>> Controller::Create(zx_device_t* parent) {
+zx::result<std::unique_ptr<Controller>> Controller::Create(zx_device_t* parent,
+                                                           inspect::Inspector inspector) {
   fbl::AllocChecker alloc_checker;
-  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, parent);
+  auto controller =
+      fbl::make_unique_checked<Controller>(&alloc_checker, parent, std::move(inspector));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);

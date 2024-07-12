@@ -27,7 +27,7 @@ namespace i915 {
 
 class PipeManagerTest : public ::testing::Test {
  public:
-  PipeManagerTest() : controller_(nullptr) {}
+  PipeManagerTest() : controller_(nullptr, inspect::Inspector{}) {}
 
   void SetUp() override {
     mmio_buffer_.emplace(reg_region_.GetMmioBuffer());

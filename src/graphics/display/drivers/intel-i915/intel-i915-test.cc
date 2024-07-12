@@ -37,7 +37,7 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
   FakeSysmemSingleThreadedTest()
       : loop_(&kAsyncLoopConfigAttachToCurrentThread),
         sysmem_(loop_.dispatcher()),
-        display_(nullptr) {}
+        display_(nullptr, inspect::Inspector{}) {}
 
   void SetUp() override {
     auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
@@ -181,7 +181,7 @@ TEST(IntelI915Display, ImportImage) {
   });
 
   // Initialize display controller and sysmem allocator.
-  Controller display(nullptr);
+  Controller display(nullptr, inspect::Inspector{});
   ASSERT_OK(display.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
 
   // Initialize the GTT to the smallest allowed size (which is 2MB with the |gtt_size| bits of the
