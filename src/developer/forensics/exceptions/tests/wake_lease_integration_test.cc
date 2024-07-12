@@ -276,8 +276,14 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   ASSERT_EQ(GetCurrentLevel(kExecutionState), ToUint(ExecutionStateLevel::kActive));
 
   // Drop the AA lease but leave |lease| intact.
+  //
+  // Power Broker won't consider a lease dropped until the power element's power level is set to the
+  // necessary level (here, 0) via the CurrentLevel protocol. For testing simplicity, we'll just
+  // remove the element from the topology by resetting |element_control|.
   aa_element->lease_control.reset();
   ASSERT_FALSE(aa_element->lease_control.is_valid());
+  aa_element->element_control.reset();
+  ASSERT_FALSE(aa_element->element_control.is_valid());
 
   RunLoopUntilIdle();
   ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kWakeHandling));
