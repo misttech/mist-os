@@ -216,6 +216,7 @@ build_api_module("api") {
     ":golden_files",
     ":images",
     ":licenses",
+    ":ninja_subbuilds",
     ":package-repositories",
     ":package_archives",
     ":platform_artifacts",
@@ -772,6 +773,24 @@ build_api_module("images") {
     # which may be specified as data dependencies of select tests.
     ":tests",
   ]
+}
+
+# This describes where to any nested ninja "subbuild" directories, in the file:
+#  "$root_build_dir/ninja_subbuilds.json"
+#
+# See `//build/sdk/idk.gni` for more background on subbuilds.
+#
+# Type: list(scope)
+#
+#   build_dir
+#     Required: The path to the subbuild's build directory, relative to
+#     root_build_dir.
+#     Type: string
+#
+build_api_module("ninja_subbuilds") {
+  testonly = true
+  data_keys = [ "ninja_subbuilds" ]
+  deps = [ "//sdk:final_fuchsia_idk" ] + sdk_archive_labels
 }
 
 # Describes the SDK archives that can be built, in the file:

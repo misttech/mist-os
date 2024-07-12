@@ -97,6 +97,14 @@ template("_subbuild") {
                              "testonly",
                              "visibility",
                            ])
+
+    metadata = {
+      ninja_subbuilds = [
+        {
+          build_dir = rebase_path(_build_dir, root_build_dir)
+        },
+      ]
+    }
   }
 }
 
