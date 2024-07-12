@@ -819,28 +819,15 @@ pub enum WaitFor {
     DeviceOffline,
 }
 
-const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(1000);
 const DOWN_REPOLL_DELAY_MS: u64 = 500;
 
 pub async fn wait_for_device(
     wait_timeout: Option<Duration>,
     env: &EnvironmentContext,
     target_spec: Option<String>,
-    target_collection: &TargetCollectionProxy,
     behavior: WaitFor,
 ) -> Result<(), ffx_command::Error> {
-    if is_discovery_enabled(env).await {
-        wait_for_device_inner(
-            DaemonRcsKnockerImpl { tc_proxy: target_collection },
-            wait_timeout,
-            env,
-            target_spec,
-            behavior,
-        )
-        .await
-    } else {
-        wait_for_device_inner(LocalRcsKnockerImpl, wait_timeout, env, target_spec, behavior).await
-    }
+    wait_for_device_inner(LocalRcsKnockerImpl, wait_timeout, env, target_spec, behavior).await
 }
 
 async fn wait_for_device_inner(
@@ -900,6 +887,8 @@ trait RcsKnocker {
     ) -> impl Future<Output = Result<(), KnockError>>;
 }
 
+struct LocalRcsKnockerImpl;
+
 impl<T: RcsKnocker + ?Sized> RcsKnocker for Box<T> {
     fn knock_rcs(
         &self,
@@ -909,8 +898,6 @@ impl<T: RcsKnocker + ?Sized> RcsKnocker for Box<T> {
         (**self).knock_rcs(target_spec, env)
     }
 }
-
-struct LocalRcsKnockerImpl;
 
 impl RcsKnocker for LocalRcsKnockerImpl {
     async fn knock_rcs(
@@ -927,26 +914,6 @@ impl RcsKnocker for LocalRcsKnockerImpl {
                 tracing::debug!("Knocked target. {msg}");
             },
         )
-    }
-}
-
-struct DaemonRcsKnockerImpl<'a> {
-    tc_proxy: &'a TargetCollectionProxy,
-}
-
-impl<'a> RcsKnocker for DaemonRcsKnockerImpl<'a> {
-    async fn knock_rcs(
-        &self,
-        target_spec: Option<String>,
-        _env: &EnvironmentContext,
-    ) -> Result<(), KnockError> {
-        knock_target_by_name(
-            &target_spec,
-            self.tc_proxy,
-            OPEN_TARGET_TIMEOUT,
-            DEFAULT_RCS_KNOCK_TIMEOUT,
-        )
-        .await
     }
 }
 

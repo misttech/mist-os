@@ -55,6 +55,8 @@ rustc_staticlib("lib") {
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/plugins/target/wait:ffx_wait",
+    "//src/developer/ffx/plugins/target/wait:ffx_wait_args",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/versioning/version-history/rust:version-history",

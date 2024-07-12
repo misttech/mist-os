@@ -26,6 +26,20 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_class()
         self.dut: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
+    def teardown_test(self) -> None:
+        # Until total daemonless functionality is implemented, we must ensure
+        # the daemon is running before test teardown, because Lacewing expects
+        # the daemon to be running for teardown operations. Previously the
+        # daemon was automatically restarted by `ffx target wait`, but this is
+        # now no longer the case because the command does not use the daemon
+        # anymore.
+        # TODO(b/352380489): This non-explicit command relying on daemon
+        # autostart working should be replaced with an explicit background
+        # daemon starting command (currently `ffx daemon start` runs
+        # in the foreground). This also affects honeydew.
+        self.dut.ffx.run(["daemon", "echo"])
+        super().teardown_test()
+
     def test_component_list(self) -> None:
         """Test `ffx component list` output returns as expected."""
         output = self.dut.ffx.run(["component", "list"])
