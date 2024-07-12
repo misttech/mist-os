@@ -7,7 +7,8 @@
 #![allow(clippy::bad_bit_mask)] // TODO(https://fxbug.dev/42080521): stop using bitflags for ResourceKind
 
 use crate::{
-    object_get_info, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Status, Topic,
+    object_get_info_single, object_get_info_vec, ok, AsHandleRef, Handle, HandleBased, HandleRef,
+    ObjectQuery, Status, Topic,
 };
 use bitflags::bitflags;
 use fuchsia_zircon_sys::{self as sys, zx_duration_t, ZX_MAX_NAME_LEN};
@@ -265,49 +266,35 @@ impl Resource {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_RESOURCE topic.
     pub fn info(&self) -> Result<ResourceInfo, Status> {
-        let mut info = ResourceInfo::default();
-        object_get_info::<ResourceInfo>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<ResourceInfo>(self.as_handle_ref())
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_CPU_STATS topic.
     pub fn cpu_stats(&self) -> Result<Vec<PerCpuStats>, Status> {
-        let num_cpu = unsafe { sys::zx_system_get_num_cpus() };
-        let mut info = vec![PerCpuStats::default(); num_cpu as usize];
-        object_get_info::<PerCpuStats>(self.as_handle_ref(), &mut info[..])
-            .map(|(actual, _)| info[..actual].to_vec())
+        object_get_info_vec::<PerCpuStats>(self.as_handle_ref())
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_KMEM_STATS topic.
     pub fn mem_stats(&self) -> Result<MemStats, Status> {
-        let mut info = MemStats::default();
-        object_get_info::<MemStats>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<MemStats>(self.as_handle_ref())
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_KMEM_STATS_EXTENDED topic.
     pub fn mem_stats_extended(&self) -> Result<MemStatsExtended, Status> {
-        let mut info = MemStatsExtended::default();
-        object_get_info::<MemStatsExtended>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<MemStatsExtended>(self.as_handle_ref())
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_KMEM_STATS_COMPRESSION topic.
     pub fn mem_stats_compression(&self) -> Result<MemStatsCompression, Status> {
-        let mut info = MemStatsCompression::default();
-        object_get_info::<MemStatsCompression>(
-            self.as_handle_ref(),
-            std::slice::from_mut(&mut info),
-        )
-        .map(|_| info)
+        object_get_info_single::<MemStatsCompression>(self.as_handle_ref())
     }
 }
 

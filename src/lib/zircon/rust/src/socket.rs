@@ -7,7 +7,7 @@
 #![allow(clippy::bad_bit_mask)] // TODO(https://fxbug.dev/42080521): stop using bitflags for SocketOpts
 
 use crate::{
-    object_get_info, object_get_property, object_set_property, ok, AsHandleRef, Handle,
+    object_get_info_single, object_get_property, object_set_property, ok, AsHandleRef, Handle,
     HandleBased, HandleRef, ObjectQuery, Peered, Property, PropertyQuery, Status, Topic,
 };
 use bitflags::bitflags;
@@ -255,9 +255,7 @@ impl Socket {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_SOCKET topic.
     pub fn info(&self) -> Result<SocketInfo, Status> {
-        let mut info = sys::zx_info_socket_t::default();
-        object_get_info::<SocketInfoQuery>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| SocketInfo::from(info))
+        Ok(SocketInfo::from(object_get_info_single::<SocketInfoQuery>(self.as_handle_ref())?))
     }
 }
 

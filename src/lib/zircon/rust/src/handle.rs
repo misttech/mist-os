@@ -5,10 +5,9 @@
 //! Type-safe bindings for Zircon handles.
 //!
 use crate::{
-    object_get_info, object_get_property, object_set_property, ok, ObjectQuery, Port, Property,
-    PropertyQuery, Rights, Signals, Status, Time, Topic, WaitAsyncOpts,
+    object_get_info_single, object_get_property, object_set_property, ok, ObjectQuery, Port,
+    Property, PropertyQuery, Rights, Signals, Status, Time, Topic, WaitAsyncOpts,
 };
-
 use fuchsia_zircon_sys as sys;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
@@ -289,24 +288,18 @@ pub trait AsHandleRef {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_HANDLE_BASIC topic.
     fn basic_info(&self) -> Result<HandleBasicInfo, Status> {
-        let mut info = sys::zx_info_handle_basic_t::default();
-        object_get_info::<HandleBasicInfoQuery>(
+        Ok(HandleBasicInfo::from(object_get_info_single::<HandleBasicInfoQuery>(
             self.as_handle_ref(),
-            std::slice::from_mut(&mut info),
-        )
-        .map(|_| HandleBasicInfo::from(info))
+        )?))
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_HANDLE_COUNT topic.
     fn count_info(&self) -> Result<HandleCountInfo, Status> {
-        let mut count = sys::zx_info_handle_count_t::default();
-        object_get_info::<HandleCountInfoQuery>(
+        Ok(HandleCountInfo::from(object_get_info_single::<HandleCountInfoQuery>(
             self.as_handle_ref(),
-            std::slice::from_mut(&mut count),
-        )
-        .map(|_| HandleCountInfo::from(count))
+        )?))
     }
 
     /// Returns the koid (kernel object ID) for this handle.

@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon vmar objects.
 
 use crate::{
-    object_get_info, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Status, Topic,
-    Vmo,
+    object_get_info_single, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Status,
+    Topic, Vmo,
 };
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
@@ -153,9 +153,7 @@ impl Vmar {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_VMAR topic.
     pub fn info(&self) -> Result<VmarInfo, Status> {
-        let mut info = VmarInfo::default();
-        object_get_info::<VmarInfo>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        Ok(object_get_info_single::<VmarInfo>(self.as_handle_ref())?)
     }
 }
 

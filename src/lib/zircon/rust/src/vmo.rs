@@ -5,7 +5,7 @@
 //! Type-safe bindings for Zircon vmo objects.
 
 use crate::{
-    object_get_info, object_get_property, object_set_property, ok, AsHandleRef, Bti, Handle,
+    object_get_info_single, object_get_property, object_set_property, ok, AsHandleRef, Bti, Handle,
     HandleBased, HandleRef, Koid, ObjectQuery, Property, PropertyQuery, Resource, Rights, Status,
     Topic,
 };
@@ -312,9 +312,7 @@ impl Vmo {
     /// Wraps the [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_VMO topic.
     pub fn info(&self) -> Result<VmoInfo, Status> {
-        let mut info = sys::zx_info_vmo_t::default();
-        object_get_info::<VmoInfoQuery>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| VmoInfo::from(info))
+        Ok(VmoInfo::from(object_get_info_single::<VmoInfoQuery>(self.as_handle_ref())?))
     }
 
     /// Create a new virtual memory object that clones a range of this one.

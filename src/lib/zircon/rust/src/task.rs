@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{object_get_info, ok, AsHandleRef, Channel, Handle, ObjectQuery, Status, Topic};
+use crate::{object_get_info_single, ok, AsHandleRef, Channel, Handle, ObjectQuery, Status, Topic};
 use bitflags::bitflags;
 use fuchsia_zircon_sys::{self as sys, zx_duration_t};
 
@@ -128,8 +128,6 @@ pub trait Task: AsHandleRef {
     /// Wraps the
     /// [zx_object_get_info]() syscall with `ZX_INFO_TASK_RUNTIME` as the topic.
     fn get_runtime_info(&self) -> Result<TaskRuntimeInfo, Status> {
-        let mut info = TaskRuntimeInfo::default();
-        object_get_info::<TaskRuntimeInfo>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<TaskRuntimeInfo>(self.as_handle_ref())
     }
 }

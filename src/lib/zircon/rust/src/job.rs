@@ -4,14 +4,12 @@
 
 //! Type-safe bindings for Zircon jobs.
 
-use crate::sys::{zx_handle_t, zx_rights_t};
+use crate::sys::{self, zx_handle_t, zx_rights_t};
 use crate::{
-    object_get_info, object_get_info_vec, ok, AsHandleRef, Duration, Handle, HandleBased,
+    object_get_info_single, object_get_info_vec, ok, AsHandleRef, Duration, Handle, HandleBased,
     HandleRef, Koid, ObjectQuery, Process, ProcessOptions, Status, Task, Topic, Vmar,
 };
 use bitflags::bitflags;
-
-use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon job.
 ///
@@ -119,9 +117,7 @@ impl Job {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_JOB topic.
     pub fn info(&self) -> Result<JobInfo, Status> {
-        let mut info = sys::zx_info_job_t::default();
-        object_get_info::<JobInfoQuery>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| JobInfo::from(info))
+        Ok(JobInfo::from(object_get_info_single::<JobInfoQuery>(self.as_handle_ref())?))
     }
 
     /// Wraps the [zx_job_set_policy](//docs/reference/syscalls/job_set_policy.md) syscall.
