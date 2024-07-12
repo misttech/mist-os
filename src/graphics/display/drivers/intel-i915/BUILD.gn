@@ -192,6 +192,7 @@ test("intel-i915-test") {
   ]
   deps = [
     ":common_srcs",
+    "testing:mock-allocator",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
     "//sdk/lib/async-loop-testing/cpp",

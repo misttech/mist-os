@@ -32,13 +32,15 @@
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/intel-i915/intel-display-driver.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
+#include "src/graphics/display/drivers/intel-i915/testing/fake-buffer-collection.h"
+#include "src/graphics/display/drivers/intel-i915/testing/mock-allocator.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace {
+
 constexpr uint32_t kBytesPerRowDivisor = 1024;
-constexpr uint32_t kImageHeight = 32;
 
 // Module-scope global data structure that acts as the data source for the zx_framebuffer_get_info
 // implementation below.
@@ -73,166 +75,18 @@ namespace i915 {
 
 namespace {
 
-// TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
-// testing doubles instead of writing mocks for each display driver test.
-class MockNoCpuBufferCollection
-    : public fidl::testing::WireTestBase<fuchsia_sysmem2::BufferCollection> {
- public:
-  void set_format_modifier(fuchsia_images2::wire::PixelFormatModifier format_modifier) {
-    format_modifier_ = format_modifier;
-  }
-
-  bool set_constraints_called() const { return set_constraints_called_; }
-  void SetConstraints(SetConstraintsRequestView request,
-                      SetConstraintsCompleter::Sync& _completer) override {
-    set_constraints_called_ = true;
-    if (!request->has_constraints()) {
-      return;
-    }
-
-    EXPECT_TRUE(
-        !request->constraints().buffer_memory_constraints().has_inaccessible_domain_supported() ||
-        !request->constraints().buffer_memory_constraints().inaccessible_domain_supported());
-    EXPECT_TRUE(!request->constraints().buffer_memory_constraints().has_cpu_domain_supported() ||
-                !request->constraints().buffer_memory_constraints().cpu_domain_supported());
-    constraints_ = fidl::ToNatural(request->constraints());
-  }
-
-  void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override {
-    completer.Reply(fit::ok());
-  }
-
-  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override {
-    auto info = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_);
-
-    for (size_t i = 0; i < constraints_.image_format_constraints()->size(); i++) {
-      if (constraints_.image_format_constraints()->at(i).pixel_format_modifier() ==
-          format_modifier_) {
-        auto& constraints = constraints_.image_format_constraints()->at(i);
-        constraints.bytes_per_row_divisor(kBytesPerRowDivisor);
-        info.settings(fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena_)
-                          .image_format_constraints(fidl::ToWire(arena_, constraints))
-                          .Build());
-        break;
-      }
-    }
-    zx::vmo vmo;
-    EXPECT_OK(zx::vmo::create(kBytesPerRowDivisor * kImageHeight, 0, &vmo));
-    info.buffers(std::vector{fuchsia_sysmem2::wire::VmoBuffer::Builder(arena_)
-                                 .vmo(std::move(vmo))
-                                 .vmo_usable_start(0)
-                                 .Build()});
-    auto response =
-        fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse::Builder(arena_)
-            .buffer_collection_info(info.Build())
-            .Build();
-    completer.Reply(fit::ok(&response));
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    EXPECT_TRUE(false);
-  }
-
- private:
-  fidl::Arena<fidl::kDefaultArenaInitialCapacity> arena_;
-  bool set_constraints_called_ = false;
-  fuchsia_images2::wire::PixelFormatModifier format_modifier_ =
-      fuchsia_images2::wire::PixelFormatModifier::kLinear;
-  fuchsia_sysmem2::BufferCollectionConstraints constraints_;
-};
-
-class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
- public:
-  explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
-    EXPECT_TRUE(dispatcher_);
-  }
-
-  void BindSharedCollection(BindSharedCollectionRequestView request,
-                            BindSharedCollectionCompleter::Sync& completer) override {
-    const std::vector<fuchsia_images2::wire::PixelFormat> kPixelFormatTypes = {
-        fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
-        fuchsia_images2::wire::PixelFormat::kR8G8B8A8};
-
-    display::DriverBufferCollectionId buffer_collection_id = next_buffer_collection_id_++;
-    active_buffer_collections_[buffer_collection_id] = {
-        .token_client = std::move(request->token()),
-        .mock_buffer_collection = std::make_unique<MockNoCpuBufferCollection>(),
-    };
-    most_recent_buffer_collection_ =
-        active_buffer_collections_.at(buffer_collection_id).mock_buffer_collection.get();
-
-    fidl::BindServer(
-        dispatcher_, std::move(request->buffer_collection_request()),
-        active_buffer_collections_[buffer_collection_id].mock_buffer_collection.get(),
-        [this, buffer_collection_id](MockNoCpuBufferCollection*, fidl::UnbindInfo,
-                                     fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>) {
-          inactive_buffer_collection_tokens_.push_back(
-              std::move(active_buffer_collections_[buffer_collection_id].token_client));
-          active_buffer_collections_.erase(buffer_collection_id);
-        });
-  }
-
-  void SetDebugClientInfo(SetDebugClientInfoRequestView request,
-                          SetDebugClientInfoCompleter::Sync& completer) override {
-    EXPECT_EQ(request->name().get().find("intel-i915"), 0u);
-  }
-
-  // Returns the most recent created BufferCollection server.
-  // This may go out of scope if the caller releases the BufferCollection.
-  MockNoCpuBufferCollection* GetMostRecentBufferCollection() const {
-    return most_recent_buffer_collection_;
-  }
-
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
-  GetActiveBufferCollectionTokenClients() const {
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
-        unowned_token_clients;
-    unowned_token_clients.reserve(active_buffer_collections_.size());
-
-    for (const auto& kv : active_buffer_collections_) {
-      unowned_token_clients.push_back(kv.second.token_client);
-    }
-    return unowned_token_clients;
-  }
-
-  std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
-  GetInactiveBufferCollectionTokenClients() const {
-    std::vector<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
-        unowned_token_clients;
-    unowned_token_clients.reserve(inactive_buffer_collection_tokens_.size());
-
-    for (const auto& token : inactive_buffer_collection_tokens_) {
-      unowned_token_clients.push_back(token);
-    }
-    return unowned_token_clients;
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    EXPECT_TRUE(false);
-  }
-
- private:
-  struct BufferCollection {
-    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token_client;
-    std::unique_ptr<MockNoCpuBufferCollection> mock_buffer_collection;
-  };
-
-  MockNoCpuBufferCollection* most_recent_buffer_collection_ = nullptr;
-  std::unordered_map<display::DriverBufferCollectionId, BufferCollection>
-      active_buffer_collections_;
-  std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
-      inactive_buffer_collection_tokens_;
-
-  display::DriverBufferCollectionId next_buffer_collection_id_ =
-      display::DriverBufferCollectionId(0);
-
-  async_dispatcher_t* dispatcher_ = nullptr;
-};
-
 class IntegrationTest : public ::testing::Test {
  public:
   void SetUp() final {
     SetFramebuffer({});
+
+    sysmem_.SetNewBufferCollectionConfig({
+        .cpu_domain_supported = false,
+        .ram_domain_supported = true,
+        .inaccessible_domain_supported = false,
+        .bytes_per_row_divisor = kBytesPerRowDivisor,
+        .format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear,
+    });
 
     pci_.CreateBar(0u, std::numeric_limits<uint32_t>::max(), /*is_mmio=*/true);
     pci_.AddLegacyInterrupt();
@@ -312,6 +166,14 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
   void SetUp() override {
     auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
     fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &sysmem_);
+
+    sysmem_.SetNewBufferCollectionConfig({
+        .cpu_domain_supported = false,
+        .ram_domain_supported = true,
+        .inaccessible_domain_supported = false,
+        .bytes_per_row_divisor = kBytesPerRowDivisor,
+        .format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear,
+    });
 
     ASSERT_OK(display_.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
     EXPECT_OK(loop_.RunUntilIdle());
@@ -431,6 +293,17 @@ TEST(IntelI915Display, ImportImage) {
   pci::FakePciProtocol fake_pci;
   ddk::Pci pci = fake_pci.SetUpFidlServer(loop);
 
+  fake_sysmem.SetNewBufferCollectionConfig({
+      .cpu_domain_supported = false,
+      .ram_domain_supported = true,
+      .inaccessible_domain_supported = false,
+
+      .width_fallback_px = 32,
+      .height_fallback_px = 32,
+      .bytes_per_row_divisor = kBytesPerRowDivisor,
+      .format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear,
+  });
+
   // Initialize display controller and sysmem allocator.
   Controller display(nullptr);
   ASSERT_OK(display.SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
@@ -527,9 +400,9 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   loop_.RunUntilIdle();
 
   MockAllocator& allocator = sysmem_;
-  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  FakeBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
-  EXPECT_TRUE(collection->set_constraints_called());
+  EXPECT_TRUE(collection->HasConstraints());
 }
 
 TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
@@ -553,9 +426,9 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   loop_.RunUntilIdle();
 
   MockAllocator& allocator = sysmem_;
-  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+  FakeBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
-  EXPECT_FALSE(collection->set_constraints_called());
+  EXPECT_FALSE(collection->HasConstraints());
 }
 
 // Tests that DDK basic DDK lifecycle hooks function as expected.
@@ -660,6 +533,19 @@ TEST_F(IntegrationTest, SysmemImport) {
   IntelDisplayDriver* intel_display_driver = dev->GetDeviceContext<IntelDisplayDriver>();
   Controller* controller = intel_display_driver->controller();
 
+  static constexpr int kImageWidth = 128;
+  static constexpr int kImageHeight = 32;
+  sysmem_.SetNewBufferCollectionConfig({
+      .cpu_domain_supported = false,
+      .ram_domain_supported = true,
+      .inaccessible_domain_supported = false,
+
+      .width_fallback_px = kImageWidth,
+      .height_fallback_px = kImageHeight,
+      .bytes_per_row_divisor = kBytesPerRowDivisor,
+      .format_modifier = fuchsia_images2::wire::PixelFormatModifier::kLinear,
+  });
+
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -676,12 +562,12 @@ TEST_F(IntegrationTest, SysmemImport) {
       &kDisplayUsage, kBanjoBufferCollectionId));
   MockAllocator& allocator = *sysmem();
   driver_runtime_->RunUntil([&] {
-    MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
-    return collection && collection->set_constraints_called();
+    FakeBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+    return collection && collection->HasConstraints();
   });
 
   static constexpr image_metadata_t kDisplayImageMetadata = {
-      .width = 128,
+      .width = kImageWidth,
       .height = kImageHeight,
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
@@ -713,6 +599,19 @@ TEST_F(IntegrationTest, SysmemRotated) {
   IntelDisplayDriver* intel_display_driver = dev->GetDeviceContext<IntelDisplayDriver>();
   Controller* controller = intel_display_driver->controller();
 
+  static constexpr int kImageWidth = 128;
+  static constexpr int kImageHeight = 32;
+  sysmem_.SetNewBufferCollectionConfig({
+      .cpu_domain_supported = false,
+      .ram_domain_supported = true,
+      .inaccessible_domain_supported = false,
+
+      .width_fallback_px = kImageWidth,
+      .height_fallback_px = kImageHeight,
+      .bytes_per_row_divisor = kBytesPerRowDivisor,
+      .format_modifier = fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled,
+  });
+
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
@@ -724,11 +623,10 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
   MockAllocator& allocator = *sysmem();
   driver_runtime_->RunUntil([&] {
-    MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
+    FakeBufferCollection* collection = allocator.GetMostRecentBufferCollection();
     return collection != nullptr;
   });
-  MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
-  collection->set_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled);
+  FakeBufferCollection* collection = allocator.GetMostRecentBufferCollection();
 
   static constexpr image_buffer_usage_t kTiledDisplayUsage = {
       // Must be y or yf tiled so rotation is allowed.
@@ -737,10 +635,10 @@ TEST_F(IntegrationTest, SysmemRotated) {
   EXPECT_OK(controller->DisplayControllerImplSetBufferCollectionConstraints(
       &kTiledDisplayUsage, kBanjoBufferCollectionId));
 
-  driver_runtime_->RunUntil([&] { return collection->set_constraints_called(); });
+  driver_runtime_->RunUntil([&] { return collection->HasConstraints(); });
 
   static constexpr image_metadata_t kTiledImageMetadata = {
-      .width = 128,
+      .width = kImageWidth,
       .height = kImageHeight,
       .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
   };
