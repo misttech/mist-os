@@ -42,7 +42,6 @@ use crate::internal::socket::{
     ReceivedFrame,
 };
 use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
-use crate::DeviceSendFrameError;
 
 /// The MAC address corresponding to the loopback interface.
 const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
@@ -432,8 +431,8 @@ where
             core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_frame);
             Ok(())
         }
-        Err(TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(_))) => {
-            unreachable!("loopback never fails to send a frame")
+        Err(TransmitQueueFrameError::NoQueue(err)) => {
+            unreachable!("loopback never fails to send a frame: {err:?}")
         }
         Err(TransmitQueueFrameError::QueueFull(serializer)) => {
             core_ctx.increment(device_id, |counters: &DeviceCounters| &counters.send_queue_full);

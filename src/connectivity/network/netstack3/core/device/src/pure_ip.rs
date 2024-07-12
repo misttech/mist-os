@@ -9,7 +9,7 @@ use core::convert::Infallible as Never;
 use core::fmt::Debug;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
-use log::warn;
+use log::debug;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Mtu};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
@@ -21,8 +21,7 @@ use netstack3_ip::IpPacketDestination;
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::internal::base::{
-    DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, DeviceSendFrameError,
-    PureIpDeviceCounters,
+    DeviceCounters, DeviceLayerTypes, DeviceReceiveFrameSpec, PureIpDeviceCounters,
 };
 use crate::internal::id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId, DeviceId};
 use crate::internal::queue::tx::{
@@ -286,9 +285,9 @@ where
             core_ctx.increment(device_id, |counters| &counters.send_frame);
             Ok(())
         }
-        Err(TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(()))) => {
+        Err(TransmitQueueFrameError::NoQueue(err)) => {
             core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
-            warn!("device {device_id:?} not ready to send frame.");
+            debug!("device {device_id:?} failed to send frame: {err:?}.");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(serializer)) => {

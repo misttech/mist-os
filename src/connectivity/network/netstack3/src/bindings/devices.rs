@@ -189,7 +189,7 @@ pub(crate) fn spawn_tx_task(
                 netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &device_id,
                     id => ctx.api().transmit_queue::<D>().transmit_queued_frames(id)
                 )
-                .unwrap_or_else(|DeviceSendFrameError::DeviceNotReady(())| {
+                .unwrap_or_else(|DeviceSendFrameError::NoBuffers| {
                     warn!(
                         "TODO(https://fxbug.dev/42057204): Support waiting for TX buffers to be \
                             available, dropping packet for now on device={device_id:?}",

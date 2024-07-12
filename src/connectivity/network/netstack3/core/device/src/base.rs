@@ -240,6 +240,8 @@ pub struct DeviceCounters {
     pub send_ipv6_frame: Counter,
     /// Count of frames that failed to send because there was no Tx queue.
     pub send_dropped_no_queue: Counter,
+    /// Count of frames that were dropped during Tx queue dequeuing.
+    pub send_dropped_dequeue: Counter,
 }
 
 impl DeviceCounters {
@@ -266,6 +268,7 @@ impl Inspectable for DeviceCounters {
             send_queue_full,
             send_serialize_error,
             send_total_frames,
+            send_dropped_dequeue,
         } = self;
         inspector.record_child("Rx", |inspector| {
             inspector.record_counter("TotalFrames", recv_frame);
@@ -281,6 +284,7 @@ impl Inspectable for DeviceCounters {
             inspector.record_counter("NoQueue", send_dropped_no_queue);
             inspector.record_counter("QueueFull", send_queue_full);
             inspector.record_counter("SerializeError", send_serialize_error);
+            inspector.record_counter("DequeueDrop", send_dropped_dequeue);
         });
     }
 }
@@ -433,7 +437,7 @@ pub trait DeviceLayerEventDispatcher:
         &mut self,
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>>;
+    ) -> Result<(), DeviceSendFrameError>;
 
     /// Send an IP packet to an IP device driver.
     ///
@@ -446,14 +450,14 @@ pub trait DeviceLayerEventDispatcher:
         device: &PureIpDeviceId<Self>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>>;
+    ) -> Result<(), DeviceSendFrameError>;
 }
 
 /// An error encountered when sending a frame.
 #[derive(Debug, PartialEq, Eq)]
-pub enum DeviceSendFrameError<T> {
-    /// The device is not ready to send frames.
-    DeviceNotReady(T),
+pub enum DeviceSendFrameError {
+    /// The device doesn't have available buffers to send frames.
+    NoBuffers,
 }
 
 #[cfg(test)]

@@ -639,6 +639,7 @@ async fn inspect_devices(name: &str) {
                         SendIpv6Frame: 0u64,
                         NoQueue: 0u64,
                         QueueFull: 0u64,
+                        DequeueDrop: 0u64,
                         SerializeError: 0u64,
                     },
                     Ethernet: {
@@ -701,6 +702,7 @@ async fn inspect_devices(name: &str) {
                         SendIpv6Frame: diagnostics_assertions::AnyUintProperty,
                         NoQueue: 0u64,
                         QueueFull: 0u64,
+                        DequeueDrop: 0u64,
                         SerializeError: 0u64,
                     },
                     Ethernet: {
@@ -770,6 +772,7 @@ async fn inspect_counters(name: &str) {
                     SendIpv6Frame: 0u64,
                     NoQueue: 0u64,
                     QueueFull: 0u64,
+                    DequeueDrop: 0u64,
                     SerializeError: 0u64,
                 },
                 "Ethernet": {

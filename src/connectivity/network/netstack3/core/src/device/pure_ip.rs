@@ -117,12 +117,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
-    ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let PureIpDeviceTxQueueFrameMetadata { ip_version } = meta;
         DeviceLayerEventDispatcher::send_ip_packet(bindings_ctx, device_id, buf, ip_version)
-            .map_err(|DeviceSendFrameError::DeviceNotReady(buf)| {
-                DeviceSendFrameError::DeviceNotReady((meta, buf))
-            })
     }
 }
 

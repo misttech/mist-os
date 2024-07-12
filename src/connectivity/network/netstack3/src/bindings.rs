@@ -511,7 +511,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         &mut self,
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let EthernetInfo { mac: _, _mac_proxy: _, common_info: _, netdevice, dynamic_info } =
             device.external_state();
         let dynamic_info = dynamic_info.read();
@@ -528,7 +528,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         device: &PureIpDeviceId<Self>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let frame_type = match ip_version {
             IpVersion::V4 => fhardware_network::FrameType::Ipv4,
             IpVersion::V6 => fhardware_network::FrameType::Ipv6,
@@ -549,7 +549,7 @@ fn send_netdevice_frame(
     }: &DynamicNetdeviceInfo,
     frame: Buf<Vec<u8>>,
     frame_type: fhardware_network::FrameType,
-) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+) -> Result<(), DeviceSendFrameError> {
     if *phy_up && *admin_enabled {
         handler
             .send(frame.as_ref(), frame_type)

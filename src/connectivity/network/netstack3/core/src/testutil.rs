@@ -1305,7 +1305,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         &mut self,
         device: &EthernetDeviceId<FakeBindingsCtx>,
         frame: Buf<Vec<u8>>,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let frame_meta = DispatchedFrame::Ethernet(device.downgrade());
         self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, frame.into_inner()));
         Ok(())
@@ -1316,7 +1316,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         device: &PureIpDeviceId<FakeBindingsCtx>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let frame_meta = DispatchedFrame::PureIp(PureIpDeviceAndIpVersion {
             device: device.downgrade(),
             version: ip_version,

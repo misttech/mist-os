@@ -10,7 +10,7 @@ use core::num::NonZeroU32;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 
 use const_unwrap::const_unwrap_option;
-use log::{error, trace};
+use log::{debug, trace};
 use net_types::ethernet::Mac;
 use net_types::ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6, Mtu};
 use net_types::{BroadcastAddress, MulticastAddr, UnicastAddr, Witness};
@@ -48,7 +48,6 @@ use crate::internal::socket::{
     ReceivedFrame,
 };
 use crate::internal::state::{DeviceStateSpec, IpLinkDeviceState};
-use crate::DeviceSendFrameError;
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
@@ -157,9 +156,9 @@ where
             core_ctx.increment(device_id, |counters| &counters.send_frame);
             Ok(())
         }
-        Err(TransmitQueueFrameError::NoQueue(DeviceSendFrameError::DeviceNotReady(()))) => {
+        Err(TransmitQueueFrameError::NoQueue(err)) => {
             core_ctx.increment(device_id, |counters| &counters.send_dropped_no_queue);
-            error!("device {device_id:?} not ready to send frame");
+            debug!("device {device_id:?} failed to send frame: {err:?}.");
             Ok(())
         }
         Err(TransmitQueueFrameError::QueueFull(serializer)) => {
@@ -1284,7 +1283,7 @@ mod tests {
             device_id: &Self::DeviceId,
             (): Self::Meta,
             buf: Self::Buffer,
-        ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+        ) -> Result<(), DeviceSendFrameError> {
             TransmitQueueContext::send_frame(&mut self.inner, bindings_ctx, device_id, (), buf)
         }
     }
@@ -1307,7 +1306,7 @@ mod tests {
             device_id: &Self::DeviceId,
             (): Self::Meta,
             buf: Self::Buffer,
-        ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+        ) -> Result<(), DeviceSendFrameError> {
             self.frames.push(device_id.clone(), buf.as_ref().to_vec());
             Ok(())
         }
