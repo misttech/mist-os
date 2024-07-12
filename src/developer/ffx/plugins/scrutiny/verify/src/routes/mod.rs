@@ -2,76 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
+use cm_rust::CapabilityTypeName;
 use errors::ffx_bail;
-use ffx_scrutiny_verify_args::routes::{default_capability_types, Command};
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
-use scrutiny_plugins::verify::{CapabilityRouteResults, ResultsForCapabilityType};
+use ffx_scrutiny_verify_args::routes::Command;
+use scrutiny_frontend::scrutiny2::Scrutiny;
+use scrutiny_plugins::verify::controller::capability_routing::ResponseLevel;
+use scrutiny_plugins::verify::ResultsForCapabilityType;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-struct Query {
-    capability_types: Vec<String>,
-    response_level: String,
-    product_bundle: PathBuf,
-    component_tree_config_path: Option<PathBuf>,
-    tmp_dir_path: Option<PathBuf>,
-}
-
-impl Query {
-    fn with_temporary_directory(mut self, tmp_dir_path: Option<&PathBuf>) -> Self {
-        self.tmp_dir_path = tmp_dir_path.map(PathBuf::clone);
-        self
-    }
-}
-
-impl From<&Command> for Query {
-    fn from(cmd: &Command) -> Self {
-        // argh(default = "vec![...]") does not work due to failed trait bound:
-        // FromStr on Vec<_>. Apply default when vec is empty.
-        let capability_types = if cmd.capability_type.len() > 0 {
-            cmd.capability_type.clone()
-        } else {
-            default_capability_types()
-        }
-        .into_iter()
-        .map(|capability_type| capability_type.to_string())
-        .collect();
-        Query {
-            capability_types,
-            response_level: cmd.response_level.clone().into(),
-            product_bundle: cmd.product_bundle.clone(),
-            component_tree_config_path: cmd.component_tree_config.clone(),
-            tmp_dir_path: None,
-        }
-    }
-}
-
 pub async fn verify(
     cmd: &Command,
-    tmp_dir: Option<&PathBuf>,
+    _tmp_dir: Option<&PathBuf>,
     recovery: bool,
 ) -> Result<HashSet<PathBuf>> {
-    let query: Query = Query::from(cmd).with_temporary_directory(tmp_dir);
-    let model = if recovery {
-        ModelConfig::from_product_bundle_recovery(&query.product_bundle)
+    let capability_types = if cmd.capability_type.len() > 0 {
+        HashSet::from_iter(cmd.capability_type.iter().cloned())
     } else {
-        ModelConfig::from_product_bundle(&query.product_bundle)
-    }?;
-    let command = CommandBuilder::new("verify.capability_routes")
-        .param("capability_types", query.capability_types.join(" "))
-        .param("response_level", &query.response_level)
-        .build();
-    let mut config = ConfigBuilder::with_model(model).command(command).build();
-    config.runtime.model.component_tree_config_path = query.component_tree_config_path;
-    config.runtime.model.tmp_dir_path = query.tmp_dir_path;
-    config.runtime.logging.silent_mode = true;
+        HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol])
+    };
 
-    let results = launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
-    let mut route_analysis: CapabilityRouteResults = serde_json::from_str(&results)
-        .context(format!("Failed to deserialize verify routes results: {}", results))?;
+    let mut scrutiny = if recovery {
+        Scrutiny::from_product_bundle_recovery(&cmd.product_bundle)
+    } else {
+        Scrutiny::from_product_bundle(&cmd.product_bundle)
+    }?;
+    if let Some(config) = &cmd.component_tree_config {
+        scrutiny.set_component_tree_config_path(config);
+    }
+    let artifacts = scrutiny.collect()?;
+    let mut route_analysis =
+        artifacts.get_capability_route_results(capability_types, &cmd.response_level)?;
 
     // Human-readable messages associated with errors and warnings drawn from `route_analysis`.
     let mut human_readable_errors = vec![];
@@ -146,7 +108,7 @@ pub async fn verify(
             results: Default::default(),
         };
         for ok in entry.results.ok.iter_mut() {
-            let mut context: Vec<String> = if &query.response_level != "verbose" {
+            let mut context: Vec<String> = if cmd.response_level != ResponseLevel::Verbose {
                 // Remove all route segments so they don't show up in JSON snippet.
                 ok.route
                     .drain(..)

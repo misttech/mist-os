@@ -41,7 +41,6 @@ impl UnifiedPlugin {
                 "/static/pkgs" => ExtractStaticPkgsController::default(),
                 "/verify/build" => VerifyBuildController::default(),
                 "/verify/v2_component_model" => V2ComponentModelMappingController::default(),
-                "/verify/capability_routes" => CapabilityRouteController::default(),
                 "/verify/pre_signing" => PreSigningController::default(),
                 "/verify/route_sources" => RouteSourcesController::default(),
                 "/verify/component_resolvers" => ComponentResolversController::default(),

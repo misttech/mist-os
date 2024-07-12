@@ -151,7 +151,7 @@ mod tests {
         V2ComponentModelDataCollector, DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL,
     };
     use crate::verify::controller::capability_routing::{
-        CapabilityRouteController, V2ComponentModelMappingController,
+        CapabilityRouteController, ResponseLevel, V2ComponentModelMappingController,
     };
     use crate::verify::controller::component_resolvers::ComponentResolversController;
     use crate::zbi::Zbi;
@@ -1089,13 +1089,16 @@ mod tests {
     fn test_capability_routing_all_results() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::All;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "all"}),
-        )?;
-
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
         let expected = json!({
           "deps": ["v2_component_tree_dep"],
             "results": [
@@ -1222,12 +1225,16 @@ mod tests {
     fn test_capability_routing_verbose_results() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::Verbose;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "verbose"}),
-        )?;
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
           "deps": ["v2_component_tree_dep"],
@@ -1403,12 +1410,16 @@ mod tests {
     fn test_capability_routing_warn() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::Warn;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "warn"}),
-        )?;
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
             "deps": [
@@ -1532,12 +1543,16 @@ mod tests {
     fn test_capability_routing_errors_only() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::Error;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "error"}),
-        )?;
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
           "deps": ["v2_component_tree_dep"],

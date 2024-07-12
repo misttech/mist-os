@@ -3,17 +3,23 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
+use cm_rust::CapabilityTypeName;
 use fuchsia_url::AbsolutePackageUrl;
 use scrutiny::prelude::{DataCollector, DataModel};
 use scrutiny_config::ModelConfig;
 use scrutiny_plugins::core::collection::{Component, Components, Package, Packages};
 use scrutiny_plugins::core::controller::package_extract::PackageExtractController;
 use scrutiny_plugins::unified_plugin::UnifiedCollector;
+use scrutiny_plugins::verify::controller::capability_routing::{
+    CapabilityRouteController, ResponseLevel,
+};
 use scrutiny_plugins::verify::controller::structured_config::{
     ExtractStructuredConfigController, ExtractStructuredConfigResponse,
 };
+use scrutiny_plugins::verify::CapabilityRouteResults;
 use scrutiny_utils::url::from_pkg_url_parts;
 use serde_json::Value;
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -82,5 +88,13 @@ impl ScrutinyArtifacts {
 
     pub fn extract_structured_config(&self) -> Result<ExtractStructuredConfigResponse> {
         ExtractStructuredConfigController::extract(self.model.clone())
+    }
+
+    pub fn get_capability_route_results(
+        &self,
+        capability_types: HashSet<CapabilityTypeName>,
+        response_level: &ResponseLevel,
+    ) -> Result<CapabilityRouteResults> {
+        CapabilityRouteController::get_results(self.model.clone(), capability_types, response_level)
     }
 }

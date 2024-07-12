@@ -16,6 +16,7 @@ if (is_host) {
       "//src/security/lib/scrutiny/framework",
       "//src/security/lib/scrutiny/plugins",
       "//src/security/lib/scrutiny/utils",
+      "//src/sys/lib/cm_rust",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:simplelog",

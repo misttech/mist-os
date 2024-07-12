@@ -7,7 +7,8 @@ use crate::verify::{
     CapabilityRouteResults, ErrorResult, OkResult, ResultsBySeverity, ResultsForCapabilityType,
     WarningResult,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
+use argh::FromArgValue;
 use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
 use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAnalyzer};
 use cm_fidl_analyzer::route::{CapabilityRouteError, VerifyRouteResult};
@@ -142,17 +143,10 @@ impl DataController for V2ComponentModelMappingController {
 #[derive(Default)]
 pub struct CapabilityRouteController {}
 
-// The expected query format. `capability_types` should be a space-separated list of
-// capability types to verify, and `response_level` should be one of "all", "warn", or
-// "error".
-#[derive(Deserialize, Serialize)]
-pub struct CapabilityRouteRequest {
-    pub capability_types: String,
-    pub response_level: String,
-}
-
 // Configures the amount of information that `CapabilityRouteController` returns.
-enum ResponseLevel {
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[serde(rename = "lowercase")]
+pub enum ResponseLevel {
     // Only return errors.
     Error,
     // Return errors and warnings.
@@ -161,6 +155,18 @@ enum ResponseLevel {
     All,
     // Same as `All`; also include unstable `cm_rust` types.
     Verbose,
+}
+
+impl FromArgValue for ResponseLevel {
+    fn from_arg_value(value: &str) -> Result<Self, String> {
+        match value {
+            "verbose" => Ok(Self::Verbose),
+            "all" => Ok(Self::All),
+            "warn" => Ok(Self::Warn),
+            "error" => Ok(Self::Error),
+            _ => Err(format!("Unsupported response level \"{}\"; possible values are: \"verbose\", \"all\", \"warn\", \"error\".", value)),
+        }
+    }
 }
 
 // A visitor that checks the route for each capability in `model` whose type appears in `capability_types`.
@@ -253,33 +259,11 @@ impl ComponentInstanceVisitor for CapabilityRouteVisitor {
 }
 
 impl CapabilityRouteController {
-    fn parse_request(json_request: Value) -> Result<(HashSet<CapabilityTypeName>, ResponseLevel)> {
-        let request: CapabilityRouteRequest = serde_json::from_value(json_request)?;
-
-        let mut capability_types = HashSet::<CapabilityTypeName>::new();
-        for name in request.capability_types.split(" ") {
-            capability_types.insert(name.parse()?);
-        }
-
-        let response_level = Self::parse_response_level(&request.response_level)?;
-        Ok((capability_types, response_level))
-    }
-
-    fn parse_response_level(level: &str) -> Result<ResponseLevel> {
-        match level {
-            "verbose" => Ok(ResponseLevel::Verbose),
-            "all" => Ok(ResponseLevel::All),
-            "warn" => Ok(ResponseLevel::Warn),
-            "error" => Ok(ResponseLevel::Error),
-            _ => Err(anyhow!("unrecognized response level {}", level)),
-        }
-    }
-}
-
-impl DataController for CapabilityRouteController {
-    fn query(&self, model: Arc<DataModel>, request: Value) -> Result<Value> {
-        let (capability_types, response_level) = Self::parse_request(request)
-            .context("Failed to parse CapabilityRouteController request")?;
+    pub fn get_results(
+        model: Arc<DataModel>,
+        capability_types: HashSet<CapabilityTypeName>,
+        response_level: &ResponseLevel,
+    ) -> Result<CapabilityRouteResults> {
         let component_model_data = Arc::clone(
             &model
                 .get::<V2ComponentModel>()
@@ -293,28 +277,7 @@ impl DataController for CapabilityRouteController {
         walker.walk(&component_model, &mut visitor).context(
             "Failed to walk V2ComponentModel with BreadthFirstModelWalker and CapabilityRouteVisitor",
         )?;
-        let results = visitor.report_results(&response_level);
-        Ok(json!(CapabilityRouteResults { deps, results }))
-    }
-
-    fn description(&self) -> String {
-        "verifies v2 capability routes".to_string()
-    }
-
-    fn usage(&self) -> String {
-        "Verifies routing for each capability that is used by some v2 component.
-         Walks each route from the using component to the final source, checking
-         that each handoff is valid.
-
-         Required parameters:
-         --capability_types: a space-separated list of capability types to verify.
-         --response_level: one of `error` (return errors only); `warn` (return
-                           errors and warnings); `all` (return errors, warnings,
-                           and a list of capabilities with valid routes); or
-                           `verbose` (same as `all`, but with detailed route
-                           information). Note that the format for `verbose`
-                           output is unstable; external tools should not rely on
-                           the output format."
-            .to_string()
+        let results = visitor.report_results(response_level);
+        Ok(CapabilityRouteResults { deps, results })
     }
 }

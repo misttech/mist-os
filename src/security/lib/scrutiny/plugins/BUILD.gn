@@ -161,6 +161,7 @@ if (is_host) {
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//src/sys/pkg/lib/update-package",
       "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:argh",
       "//third_party/rust_crates:base64",
       "//third_party/rust_crates:maplit",
       "//third_party/rust_crates:once_cell",
