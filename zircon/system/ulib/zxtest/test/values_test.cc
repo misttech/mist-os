@@ -40,11 +40,12 @@ void TestValuesIn() {
   // TODO(https://fxbug.dev/42163520): This does not work. We still don't support bools in a vector.
   // auto c3 = std::vector<bool>({false, true});
   // auto p3 = ::zxtest::ValuesIn(c3);
-  // ZX_ASSERT_MSG(p3.size() == c3.size(), "Resulting provider size does not match input
-  // size."); i = 0; for (auto it = c3.begin(); it != c3.end(); ++it, ++i) {
-  //   bool val = *it;
-  //   ZX_ASSERT_MSG(p3[i] == val, "Expected %d, got %d", p3[i], val);
-  // }
+  // ZX_ASSERT_MSG(p3.size() == c3.size(), "Resulting provider size does not match input size.");
+  // i = 0;
+  // for (auto it = c3.begin(); it != c3.end(); ++it, ++i) {
+  //  bool val = *it;
+  //  ZX_ASSERT_MSG(p3[i] == val, "Expected %d, got %d", p3[i], val);
+  //}
 
   auto c4 = cpp20::to_array<bool>({false, true});
   auto p4 = ::zxtest::ValuesIn(c4);
@@ -53,6 +54,19 @@ void TestValuesIn() {
   for (auto it = c4.begin(); it != c4.end(); ++it, ++i) {
     bool val = *it;
     ZX_ASSERT_MSG(p4[i] == val, "Expected %d, got %d", p4[i], val);
+  }
+
+  // Test move-only types
+  std::vector<std::unique_ptr<int>> c5;
+  c5.reserve(c1.size());
+  for (int i : c1) {
+    c5.push_back(std::make_unique<int>(i));
+  }
+  auto p5 = ::zxtest::ValuesIn(std::move(c5));
+  ZX_ASSERT_MSG(p5.size() == c1.size(), "Resulting provider size does not match input size.");
+  i = 0;
+  for (auto it = c1.begin(); it != c1.end(); ++it, ++i) {
+    ZX_ASSERT_MSG(*p5[i] == *it, "Expected %d, got %d", *p5[i], *it);
   }
 }
 

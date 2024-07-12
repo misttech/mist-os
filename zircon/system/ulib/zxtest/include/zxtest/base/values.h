@@ -9,11 +9,11 @@
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
 #include <math.h>
+#include <zircon/assert.h>
 
 #include <optional>
 #include <tuple>
 #include <type_traits>
-#include <vector>
 
 #include <zxtest/base/test.h>
 
@@ -39,9 +39,9 @@ class ValueProvider {
 
   ValueProvider(const ValueProvider&) = delete;
   ValueProvider(ValueProvider&&) noexcept = default;
-  template <typename U, typename std::enable_if_t<
-                            (std::is_convertible_v<U, T> ||
-                             std::is_constructible_v<T, U>)&&!std::is_same_v<U, T>>* = nullptr>
+  template <typename U, typename std::enable_if_t<(std::is_convertible_v<U, T> ||
+                                                   std::is_constructible_v<T, U>) &&
+                                                  !std::is_same_v<U, T>>* = nullptr>
   ValueProvider(ValueProvider<U>&& other)
       : accessor_([cb = std::move(other.accessor_)](size_t index) -> const T& {
           static std::optional<cpp20::remove_cvref_t<T>> tmp;
@@ -154,24 +154,23 @@ auto Combine(::zxtest::internal::ValueProvider<A> a, ::zxtest::internal::ValuePr
 }
 
 // Takes in a container of values and returns a ValueProvider for those values.
-// Supports containers that support ::value_type and iterator.
+// Supports containers that support ::value_type and random-access iterators.
 template <typename C>
-auto ValuesIn(const C& values) {
-  using ParamType = typename C::value_type;
+auto ValuesIn(C&& values) {
+  using ParamType = typename std::remove_reference_t<C>::value_type;
   size_t size = values.size();
   return ::zxtest::internal::ValueProvider<ParamType>(
-      [values = std::move(values)](size_t index) -> const ParamType& {
-        return *(values.begin() + index);
+      [values = std::forward<C>(values)](size_t index) -> const ParamType& {
+        return *(values.cbegin() + index);
       },
       size);
 }
 
 // Takes in values as parameters and returns a ValueProvider for those values.
 template <typename... Args>
-auto Values(Args... args) {
-  using ParamType = typename std::common_type<Args...>::type;
-  auto values = cpp20::to_array<ParamType>({args...});
-  return ValuesIn(values);
+auto Values(Args&&... args) {
+  using ParamType = std::common_type_t<Args...>;
+  return ValuesIn(cpp20::to_array<ParamType>({std::forward<Args>(args)...}));
 }
 
 // Generates a series of values according to the parameters given.
