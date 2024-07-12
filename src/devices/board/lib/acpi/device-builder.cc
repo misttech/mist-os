@@ -8,7 +8,6 @@
 #include <zircon/compiler.h>
 
 #include <bind/fuchsia/acpi/cpp/bind.h>
-#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/hardware/interrupt/cpp/bind.h>
 #include <bind/fuchsia/hardware/spi/cpp/bind.h>
@@ -34,6 +33,43 @@ const std::vector<ddk::BindRule> kSysmemBindRules = {ddk::MakeAcceptBindRule(
 const std::vector<device_bind_prop_t> kSysmemProperties = {ddk::MakeProperty(
     bind_fuchsia_hardware_sysmem::SERVICE, bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
 
+device_bind_prop_t MakeProperty(zx_device_str_prop_t str_prop) {
+  switch (str_prop.property_value.data_type) {
+    case ZX_DEVICE_PROPERTY_VALUE_STRING:
+      return ddk::MakeProperty(str_prop.key, str_prop.property_value.data.str_val);
+    case ZX_DEVICE_PROPERTY_VALUE_BOOL:
+      return ddk::MakeProperty(str_prop.key, str_prop.property_value.data.bool_val);
+    case ZX_DEVICE_PROPERTY_VALUE_INT:
+      return ddk::MakeProperty(str_prop.key, str_prop.property_value.data.int_val);
+    case ZX_DEVICE_PROPERTY_VALUE_ENUM:
+      return ddk::MakeProperty(str_prop.key, str_prop.property_value.data.enum_val);
+    default:
+      ZX_PANIC("Unknown property type: %d", str_prop.property_value.data_type);
+  }
+}
+
+ddk::BindRule MakeAcceptBindRule(zx_device_str_prop_t str_prop) {
+  device_bind_prop_value_t value;
+  switch (str_prop.property_value.data_type) {
+    case ZX_DEVICE_PROPERTY_VALUE_STRING:
+      value = device_bind_prop_str_val(str_prop.property_value.data.str_val);
+      break;
+    case ZX_DEVICE_PROPERTY_VALUE_BOOL:
+      value = device_bind_prop_bool_val(str_prop.property_value.data.bool_val);
+      break;
+    case ZX_DEVICE_PROPERTY_VALUE_INT:
+      value = device_bind_prop_int_val(str_prop.property_value.data.int_val);
+      break;
+    case ZX_DEVICE_PROPERTY_VALUE_ENUM:
+      value = device_bind_prop_enum_val(str_prop.property_value.data.enum_val);
+      break;
+    default:
+      ZX_PANIC("Unknown property type: %d", str_prop.property_value.data_type);
+  }
+  return ddk::BindRule(device_bind_prop_str_key(str_prop.key), DEVICE_BIND_RULE_CONDITION_ACCEPT,
+                       value);
+}
+
 }  // namespace
 
 acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& allocator,
@@ -57,7 +93,7 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
         ACPI_HANDLE bus_parent = nullptr;
         BusType type = BusType::kUnknown;
         DeviceChildEntry entry;
-        uint16_t bus_id_prop;
+        const char* bus_id_prop;
         if (resource_is_spi(res)) {
           type = BusType::kSpi;
           auto result = resource_parse_spi(acpi, handle_, res, allocator, &bus_parent);
@@ -66,9 +102,9 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
             return result.take_error();
           }
           entry = result.value();
-          bus_id_prop = BIND_SPI_BUS_ID;
-          dev_props_.emplace_back(
-              zx_device_prop_t{.id = BIND_SPI_CHIP_SELECT, .value = result.value().cs()});
+          bus_id_prop = bind_fuchsia::SPI_BUS_ID.c_str();
+          str_props_.emplace_back(
+              OwnedStringProp(bind_fuchsia::SPI_CHIP_SELECT.c_str(), result.value().cs()));
         } else if (resource_is_i2c(res)) {
           type = BusType::kI2c;
           auto result = resource_parse_i2c(acpi, handle_, res, allocator, &bus_parent);
@@ -77,9 +113,10 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
             return result.take_error();
           }
           entry = result.value();
-          bus_id_prop = BIND_I2C_BUS_ID;
-          dev_props_.emplace_back(
-              zx_device_prop_t{.id = BIND_I2C_ADDRESS, .value = result.value().address()});
+          bus_id_prop = bind_fuchsia::I2C_BUS_ID.c_str();
+          ;
+          str_props_.emplace_back(
+              OwnedStringProp(bind_fuchsia::I2C_ADDRESS.c_str(), result.value().address()));
         } else if (resource_is_irq(res)) {
           irq_count_++;
         }
@@ -88,7 +125,7 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
           size_t bus_index = callback(bus_parent, type, entry);
           DeviceBuilder* b = manager->LookupDevice(bus_parent);
           buses_.emplace_back(b, bus_index);
-          dev_props_.emplace_back(zx_device_prop_t{.id = bus_id_prop, .value = b->GetBusId()});
+          str_props_.emplace_back(OwnedStringProp(bus_id_prop, b->GetBusId()));
           has_address_ = true;
         }
         return acpi::ok();
@@ -113,10 +150,8 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
       uint32_t bus_id = parent_->GetBusId();
       uint32_t device = (info->Address & (0xffff0000)) >> 16;
       uint32_t func = info->Address & 0x0000ffff;
-      dev_props_.emplace_back(zx_device_prop_t{
-          .id = BIND_PCI_TOPO,
-          .value = BIND_PCI_TOPO_PACK(bus_id, device, func),
-      });
+      str_props_.emplace_back(OwnedStringProp(bind_fuchsia::PCI_TOPO.c_str(),
+                                              BIND_PCI_TOPO_PACK(bus_id, device, func)));
       // Should we buses_.emplace_back() here? The PCI bus driver currently publishes PCI
       // composites, so having a device on a PCI bus that uses other buses resources can't be
       // represented. Such devices don't seem to exist, but if we ever encounter one, it will need
@@ -149,10 +184,8 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
   // If our parent has a bus type, and we have an address on that bus, then we'll expose it in our
   // bind properties.
   if (parent_->GetBusType() != BusType::kUnknown && has_address_) {
-    dev_props_.emplace_back(zx_device_prop_t{
-        .id = BIND_ACPI_BUS_TYPE,
-        .value = parent_->GetBusType(),
-    });
+    str_props_.emplace_back(
+        OwnedStringProp(bind_fuchsia::ACPI_BUS_TYPE.c_str(), parent_->GetBusType()));
   }
   if (result.status_value() == AE_NOT_FOUND) {
     return acpi::ok();
@@ -197,8 +230,7 @@ zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager,
     add_flags |= DEVICE_ADD_NON_BINDABLE;
   }
 
-  auto result = device->AddDevice(name(), cpp20::span(dev_props_),
-                                  cpp20::span(str_props_for_ddkadd), add_flags);
+  auto result = device->AddDevice(name(), cpp20::span(str_props_for_ddkadd), add_flags);
   if (result.is_error()) {
     zxlogf(ERROR, "failed to publish acpi device '%s' (parent=%s): %d", name(), parent_->name(),
            result.status_value());
@@ -294,26 +326,7 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
 
   auto [acpi_bind_rules, acpi_properties] = GetFragmentBindRulesAndPropertiesForSelf();
   for (const auto& str_prop : str_props) {
-    switch (str_prop.property_value.data_type) {
-      case ZX_DEVICE_PROPERTY_VALUE_STRING:
-        acpi_properties.emplace_back(
-            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.str_val));
-        break;
-      case ZX_DEVICE_PROPERTY_VALUE_BOOL:
-        acpi_properties.emplace_back(
-            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.bool_val));
-        break;
-      case ZX_DEVICE_PROPERTY_VALUE_INT:
-        acpi_properties.emplace_back(
-            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.int_val));
-        break;
-      case ZX_DEVICE_PROPERTY_VALUE_ENUM:
-        acpi_properties.emplace_back(
-            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.enum_val));
-        break;
-      default:
-        ZX_PANIC("Unknown property type: %d", str_prop.property_value.data_type);
-    }
+    acpi_properties.emplace_back(MakeProperty(str_prop));
   }
   auto composite_node_spec = ddk::CompositeNodeSpec(acpi_bind_rules, acpi_properties)
                                  .AddParentSpec(kSysmemBindRules, kSysmemProperties);
@@ -435,9 +448,9 @@ DeviceBuilder::GetFragmentBindRulesAndPropertiesForSelf() {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_acpi::BIND_PROTOCOL_DEVICE),
   };
 
-  for (auto& prop : dev_props_) {
-    bind_rules.emplace_back(ddk::MakeAcceptBindRule(static_cast<uint32_t>(prop.id), prop.value));
-    properties.emplace_back(ddk::MakeProperty(static_cast<uint32_t>(prop.id), prop.value));
+  for (auto& prop : str_props_) {
+    bind_rules.emplace_back(MakeAcceptBindRule(prop));
+    properties.emplace_back(MakeProperty(prop));
   }
 
   return {bind_rules, properties};

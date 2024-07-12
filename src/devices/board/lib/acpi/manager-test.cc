@@ -5,7 +5,7 @@
 #include "src/devices/board/lib/acpi/manager.h"
 
 #include <lib/async-loop/testing/cpp/real_loop.h>
-#include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 
 #include <initializer_list>
@@ -13,6 +13,7 @@
 #include <optional>
 
 #include <bind/fuchsia/acpi/cpp/bind.h>
+#include <ddktl/device.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
@@ -26,25 +27,9 @@ namespace {
 
 using acpi::test::Device;
 
-void ExpectProps(acpi::DeviceBuilder* b, const std::vector<zx_device_prop_t>& expected_dev,
-                 const std::vector<zx_device_str_prop_t>& expected_str) {
-  auto dev_props = b->GetDevProps();
-  zxlogf(INFO, "size: %lu", dev_props.size());
-  size_t left = expected_dev.size();
-  for (auto& expected_prop : expected_dev) {
-    for (auto& actual : dev_props) {
-      if (actual.id == expected_prop.id) {
-        zxlogf(INFO, "%s 0x%x 0x%x vs 0x%x 0x%x", b->name(), actual.id, actual.value,
-               expected_prop.id, expected_prop.value);
-        ASSERT_EQ(actual.value, expected_prop.value);
-        left--;
-      }
-    }
-  }
-  ASSERT_EQ(left, 0);
-
+void ExpectProps(acpi::DeviceBuilder* b, const std::vector<zx_device_str_prop_t>& expected_str) {
   auto& str_props = b->GetStrProps();
-  left = expected_str.size();
+  size_t left = expected_str.size();
 
   for (auto& expected_prop : expected_str) {
     for (auto& actual : str_props) {
@@ -178,13 +163,10 @@ TEST_F(AcpiManagerTest, TestDeviceWithHidCid) {
   // Check the properties were generated as expected.
   acpi::DeviceBuilder* builder = manager_.LookupDevice(test);
   ASSERT_NO_FATAL_FAILURE(
-      ExpectProps(builder, {},
-                  {
-                      zx_device_str_prop_t{.key = bind_fuchsia_acpi::HID.c_str(),
-                                           .property_value = str_prop_str_val("GGGG0000")},
-                      zx_device_str_prop_t{.key = bind_fuchsia_acpi::FIRST_CID.c_str(),
-                                           .property_value = str_prop_str_val("AAAA1111")},
-                  }));
+      ExpectProps(builder, {
+                               ddk::MakeStrProperty("fuchsia.acpi.HID", "GGGG0000"),
+                               ddk::MakeStrProperty("fuchsia.acpi.FIRST_CID", "AAAA1111"),
+                           }));
 }
 
 constexpr acpi::Uuid kDevicePropertiesUuid =
@@ -213,11 +195,9 @@ TEST_F(AcpiManagerTest, TestDeviceWithDeviceTreeHid) {
   // Check the properties were generated as expected.
   acpi::DeviceBuilder* builder = manager_.LookupDevice(test);
   ASSERT_NO_FATAL_FAILURE(
-      ExpectProps(builder, {},
-                  {
-                      zx_device_str_prop_t{.key = "fuchsia.acpi.FIRST_CID",
-                                           .property_value = str_prop_str_val("google,cr50")},
-                  }));
+      ExpectProps(builder, {
+                               ddk::MakeStrProperty("fuchsia.acpi.FIRST_CID", "google,cr50"),
+                           }));
 }
 
 TEST_F(AcpiManagerTest, TestDeviceWithDeviceTreeCid) {
@@ -243,11 +223,9 @@ TEST_F(AcpiManagerTest, TestDeviceWithDeviceTreeCid) {
   // Check the properties were generated as expected.
   acpi::DeviceBuilder* builder = manager_.LookupDevice(test);
   ASSERT_NO_FATAL_FAILURE(
-      ExpectProps(builder, {},
-                  {
-                      zx_device_str_prop_t{.key = "fuchsia.acpi.FIRST_CID",
-                                           .property_value = str_prop_str_val("google,cr50")},
-                  }));
+      ExpectProps(builder, {
+                               ddk::MakeStrProperty("fuchsia.acpi.FIRST_CID", "google,cr50"),
+                           }));
 }
 
 TEST_F(AcpiManagerTest, TestSpiDevice) {
@@ -283,14 +261,13 @@ TEST_F(AcpiManagerTest, TestSpiDevice) {
 
   Device* test = acpi_.GetDeviceRoot()->FindByPath("\\_SB_.SPI0.S002");
   acpi::DeviceBuilder* builder = manager_.LookupDevice(test);
-  ASSERT_NO_FATAL_FAILURE(
-      ExpectProps(builder,
-                  {
-                      zx_device_prop_t{.id = BIND_SPI_BUS_ID, .value = 0},
-                      zx_device_prop_t{.id = BIND_SPI_CHIP_SELECT, .value = 2},
-                      zx_device_prop_t{.id = BIND_ACPI_BUS_TYPE, .value = acpi::BusType::kSpi},
-                  },
-                  {}));
+  ASSERT_NO_FATAL_FAILURE(ExpectProps(
+      builder, {
+                   ddk::MakeStrProperty("fuchsia.BIND_SPI_BUS_ID", static_cast<uint32_t>(0)),
+                   ddk::MakeStrProperty("fuchsia.BIND_SPI_CHIP_SELECT", static_cast<uint32_t>(2)),
+                   ddk::MakeStrProperty("fuchsia.BIND_ACPI_BUS_TYPE",
+                                        static_cast<uint32_t>(acpi::BusType::kSpi)),
+               }));
 }
 
 TEST_F(AcpiManagerTest, TestI2cDevice) {
@@ -322,14 +299,13 @@ TEST_F(AcpiManagerTest, TestI2cDevice) {
 
   Device* test = acpi_.GetDeviceRoot()->FindByPath("\\_SB_.I2C0.H084");
   acpi::DeviceBuilder* builder = manager_.LookupDevice(test);
-  ASSERT_NO_FATAL_FAILURE(
-      ExpectProps(builder,
-                  {
-                      zx_device_prop_t{.id = BIND_I2C_BUS_ID, .value = 0},
-                      zx_device_prop_t{.id = BIND_I2C_ADDRESS, .value = 0x84},
-                      zx_device_prop_t{.id = BIND_ACPI_BUS_TYPE, .value = acpi::BusType::kI2c},
-                  },
-                  {}));
+  ASSERT_NO_FATAL_FAILURE(ExpectProps(
+      builder, {
+                   ddk::MakeStrProperty("fuchsia.BIND_I2C_BUS_ID", static_cast<uint32_t>(0)),
+                   ddk::MakeStrProperty("fuchsia.BIND_I2C_ADDRESS", static_cast<uint32_t>(0x84)),
+                   ddk::MakeStrProperty("fuchsia.BIND_ACPI_BUS_TYPE",
+                                        static_cast<uint32_t>(acpi::BusType::kI2c)),
+               }));
 }
 
 TEST_F(AcpiManagerTest, TestMultipleI2cDevice) {
@@ -369,25 +345,23 @@ TEST_F(AcpiManagerTest, TestMultipleI2cDevice) {
 
   Device* test = acpi_.GetDeviceRoot()->FindByPath("\\_SB_.I2C0.H084");
   acpi::DeviceBuilder* builder = manager_.LookupDevice(test);
-  ASSERT_NO_FATAL_FAILURE(
-      ExpectProps(builder,
-                  {
-                      zx_device_prop_t{.id = BIND_I2C_BUS_ID, .value = 0},
-                      zx_device_prop_t{.id = BIND_I2C_ADDRESS, .value = 0x84},
-                      zx_device_prop_t{.id = BIND_ACPI_BUS_TYPE, .value = acpi::BusType::kI2c},
-                  },
-                  {}));
+  ASSERT_NO_FATAL_FAILURE(ExpectProps(
+      builder, {
+                   ddk::MakeStrProperty("fuchsia.BIND_I2C_BUS_ID", static_cast<uint32_t>(0)),
+                   ddk::MakeStrProperty("fuchsia.BIND_I2C_ADDRESS", static_cast<uint32_t>(0x84)),
+                   ddk::MakeStrProperty("fuchsia.BIND_ACPI_BUS_TYPE",
+                                        static_cast<uint32_t>(acpi::BusType::kI2c)),
+               }));
 
   test = acpi_.GetDeviceRoot()->FindByPath("\\_SB_.I2C1.H072");
   builder = manager_.LookupDevice(test);
-  ASSERT_NO_FATAL_FAILURE(
-      ExpectProps(builder,
-                  {
-                      zx_device_prop_t{.id = BIND_I2C_BUS_ID, .value = 1},
-                      zx_device_prop_t{.id = BIND_I2C_ADDRESS, .value = 0x72},
-                      zx_device_prop_t{.id = BIND_ACPI_BUS_TYPE, .value = acpi::BusType::kI2c},
-                  },
-                  {}));
+  ASSERT_NO_FATAL_FAILURE(ExpectProps(
+      builder, {
+                   ddk::MakeStrProperty("fuchsia.BIND_I2C_BUS_ID", static_cast<uint32_t>(1)),
+                   ddk::MakeStrProperty("fuchsia.BIND_I2C_ADDRESS", static_cast<uint32_t>(0x72)),
+                   ddk::MakeStrProperty("fuchsia.BIND_ACPI_BUS_TYPE",
+                                        static_cast<uint32_t>(acpi::BusType::kI2c)),
+               }));
 }
 
 TEST_F(AcpiManagerTest, TestDeviceNotPresentIsIgnored) {

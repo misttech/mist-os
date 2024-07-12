@@ -127,8 +127,8 @@ class Device : public DeviceType,
   zx_device_t** mutable_zxdev() { return &zxdev_; }
 
   // Wrapper around |DdkAdd| which handles setting up FIDL outgoing directory.
-  zx::result<> AddDevice(const char* name, cpp20::span<zx_device_prop_t> props,
-                         cpp20::span<zx_device_str_prop_t> str_props, uint32_t flags);
+  zx::result<> AddDevice(const char* name, cpp20::span<zx_device_str_prop_t> str_props,
+                         uint32_t flags);
 
   zx::result<zx::interrupt> GetInterrupt(size_t index) __TA_EXCLUDES(lock_);
 

@@ -157,9 +157,7 @@ class AcpiDeviceTest : public zxtest::Test, public loop_fixture::RealLoop {
   }
 
   zx_device_t* HandOffToDdk(std::unique_ptr<acpi::Device> device) {
-    EXPECT_OK(device
-                  ->AddDevice("test-acpi-device", cpp20::span<zx_device_prop_t>(),
-                              cpp20::span<zx_device_str_prop_t>(), 0)
+    EXPECT_OK(device->AddDevice("test-acpi-device", cpp20::span<zx_device_str_prop_t>(), 0)
                   .status_value());
 
     // Give mock_ddk ownership of the device.
