@@ -5424,7 +5424,7 @@ To override the set of API levels, see
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:68
+From //build/sdk/config.gni:70
 
 ### override_target_api_level
 
@@ -7596,12 +7596,14 @@ From //sdk/config.gni:7
 
 ### sdk_inside_sub_build
 
-Whether currently building a sub-build (vs. the main build).
-Can be true for any API level, including the default level.
+Whether currently building a sub-build (vs. the main build targeting
+"PLATFORM" and the primary target CPU architecture).
+Prefer using other mechanisms when possible.
+Can be true for any API level, including "PLATFORM", and CPU architecture.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:12
+From //build/sdk/config.gni:14
 
 ### sdk_legacy_unstable_abi_revisions
 
@@ -7614,7 +7616,7 @@ period.
 
 **Current value (from the default):** `true`
 
-From //build/sdk/config.gni:20
+From //build/sdk/config.gni:22
 
 ### sdk_max_simultaneous_sub_builds
 
@@ -7636,7 +7638,7 @@ But also these bad things:
 
 **Current value (from the default):** `5`
 
-From //build/sdk/config.gni:37
+From //build/sdk/config.gni:39
 
 ### sdk_sub_build_max_load_average
 
@@ -7646,7 +7648,7 @@ blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:49
+From //build/sdk/config.gni:51
 
 ### sdk_sub_build_parallelism
 
@@ -7658,7 +7660,7 @@ a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:44
+From //build/sdk/config.gni:46
 
 ### sdk_sub_build_verbose
 
@@ -7666,7 +7668,7 @@ Set to `true` to enable verbose logging during IDK subbuilds.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:52
+From //build/sdk/config.gni:54
 
 ### select_variant
 
