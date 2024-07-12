@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 use core::mem::ManuallyDrop;
 use core::ptr::{addr_of_mut, null_mut, NonNull};
 use core::task::Context;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use fuchsia_zircon::Status;
 
@@ -155,15 +155,14 @@ unsafe impl Send for Dispatcher {}
 unsafe impl Sync for Dispatcher {}
 
 impl Dispatcher {
-    pub fn post_task_sync(&self, p: impl TaskCallback) -> Result<Task, Status> {
+    pub fn post_task_sync(&self, p: impl TaskCallback) -> Result<(), Status> {
         // SAFETY: the fdf dispatcher is valid by construction and can provide an async dispatcher.
         let async_dispatcher = unsafe { fdf_dispatcher_get_async_dispatcher(self.0.as_ptr()) };
         let task_arc = Arc::new(UnsafeCell::new(TaskFunc {
-            task: async_task { handler: Some(Task::call), ..Default::default() },
+            task: async_task { handler: Some(TaskFunc::call), ..Default::default() },
             dispatcher: async_dispatcher,
             func: Box::new(p),
         }));
-        let task = Task(Arc::downgrade(&task_arc));
 
         let task_cell = Arc::into_raw(task_arc);
         // SAFETY: we need a raw mut pointer to give to async_post_task. From
@@ -182,7 +181,7 @@ impl Dispatcher {
             unsafe { Arc::decrement_strong_count(task_cell) }
             Err(Status::from_raw(res))
         } else {
-            Ok(task)
+            Ok(())
         }
     }
 
@@ -295,56 +294,7 @@ struct TaskFunc {
     func: Box<dyn TaskCallback>,
 }
 
-pub struct Task(Weak<UnsafeCell<TaskFunc>>);
-
-impl Task {
-    /// Attempts to cancel the task represented by this object, if it hasn't already
-    /// been cancelled or started running its callback.
-    pub fn cancel(self) -> Result<(), Status> {
-        let Some(task_func) = self.0.upgrade() else {
-            // the task must have already been cancelled or finished.
-            return Err(Status::from_raw(ZX_ERR_NOT_FOUND));
-        };
-        // SAFETY: At this point, there are three components that have access
-        // to the contents of the `TaskFunc`:
-        // - this function, which just upgraded its weak reference to a strong one,
-        // unless the callback has already been called in which case it will have
-        // failed to upgrade above.
-        // - the callback, which will fail to `try_unwrap` its strong reference
-        // because we just upgraded to a second strong reference.
-        // - the driver runtime async executor that is in primary control of the
-        // object and the only writer to the object.
-        //
-        // Here we are essentially recovering the mutable pointer to the `async_task`
-        // struct contained in the `TaskFunc` for the driver runtime to pass it to
-        // `async_cancel_task`. Because of the interlock provided by the Arc
-        // upgrade/try_unwrap dance mentioned above, we know that this is the only
-        // mutable pointer to the object in rust and can pull it out of the
-        // `UnsafeCell`.
-        let task_raw = UnsafeCell::raw_get(&*task_func);
-
-        // SAFETY: since we hold a strong reference to the task struct, we can
-        // assume that it will exist here.
-        let res = unsafe {
-            let task = addr_of_mut!((*task_raw).task);
-            let dispatcher = (*task_raw).dispatcher;
-            async_cancel_task(dispatcher, task)
-        };
-        if res == ZX_OK {
-            // SAFETY: according to the async library's promises, if cancel task
-            // returned ZX_OK, the task was cancelled and the callback will
-            // never be called so we need to let the instance of the Arc
-            // that would have been used by the callback get dropped.
-            unsafe { Arc::decrement_strong_count(task_raw) }
-            Ok(())
-        } else {
-            // SAFETY: if it returned an error, the task has already started
-            // running its callback handler (`Self::call`) and that will dispose
-            // of the reconstituted `Arc`.
-            Err(Status::from_raw(res))
-        }
-    }
-
+impl TaskFunc {
     extern "C" fn call(_dispatcher: *mut async_dispatcher, task: *mut async_task, status: i32) {
         // SAFETY: the async api promises that this function will only be called
         // up to once, so we can reconstitute the `Arc` and let it get dropped.
@@ -541,49 +491,6 @@ pub(crate) mod test {
             inner_rx.recv().unwrap();
         });
         assert_eq!(shutdown_rx.recv().unwrap(), 1);
-    }
-
-    #[test]
-    #[ignore = "currently flakes due to race due to the try_unwrap being too strict"]
-    fn cancel_task_on_dispatcher() {
-        with_raw_dispatcher("testing task", move |dispatcher| {
-            // we want to retry this a bunch because sometimes the task might
-            // fire before we get a chance to cancel it. We will panic out of
-            // this if:
-            // - the task can't be cancelled due to NOT_FOUND, but it doesn't send a message
-            // - the task can't be cancelled for any other reason
-            // - the task was cancelled but did send a message
-            // - we never successfully cancelled the task
-            // we will pass the test when we successfully cancel the task
-            for i in 0..50 {
-                println!("cancel attempt #{i}");
-                let (tx, rx) = mpsc::channel();
-                let task = dispatcher.post_task_sync(move |status| {
-                    tx.send(status).unwrap();
-                })?;
-
-                match task.cancel() {
-                    Err(e) if e == Status::from_raw(ZX_ERR_NOT_FOUND) => {
-                        println!("not the case we were looking for (cancelled too late)");
-                        assert_eq!(rx.recv().unwrap(), Status::from_raw(ZX_OK));
-                    }
-                    Ok(_) => {
-                        // since `tx` should be dropped when the task is
-                        // cancelled, the recv should error with no messages.
-                        rx.recv()
-                            .expect_err("no message should have been sent from the cancelled task");
-                        println!(
-                            "successfully cancelled without receiving a message from the task!"
-                        );
-                        return Ok(());
-                    }
-                    res @ Err(_) => res.unwrap(),
-                }
-            }
-            println!("did not manage to cancel the task in few enough attempts");
-            Err(Status::from_raw(ZX_ERR_TIMED_OUT))
-        })
-        .unwrap()
     }
 
     async fn ping(mut tx: async_mpsc::Sender<u8>, mut rx: async_mpsc::Receiver<u8>) {
