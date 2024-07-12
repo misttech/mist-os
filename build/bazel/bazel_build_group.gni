@@ -1,0 +1,264 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+
+# Build several Bazel targets with a single GN > Bazel boundary
+# transition. This can be considerably faster than building
+# them through separate bazel_build_action() targets, because
+# these must always be serialized. Using a bazel_build_group()
+# allows Bazel to parallelize more work at the same time,
+# and avoids repeating the analysis phase on each call.
+#
+# However, this also means that *all* Bazel targets are re-built
+# it any of a single subtarget's dependency changes.
+#
+# Technically, this creates N+1 targets in the GN graph, where
+# N is the number of items in the `subtargets` list.
+#
+# The first is a bazel_action() target for the group itself
+# that always builds *all* Bazel outputs of *all* subtargets,
+# and copies them to a group-specific location (i.e.
+# $target_out_dir/bazel_build_group_outputs/ instead of
+# $target_out_dir).
+#
+# The remaining N targets are simple copy() or action() targets
+# used to copy a subset of all group outputs to their final
+# location under $target_out_dir.
+#
+# Arguments:
+#    subtargets: (required)
+#      A list of scopes, each one describing the content of a given
+#      Bazel target to build and where to copy its outputs into the
+#      Ninja build directory. Each item in the list follows the
+#      following schema:
+#
+#          bazel_target  (required)
+#              Bazel target label.
+#
+#          gn_target_name  (required)
+#              A GN target name. A copy() or action() target will be created
+#              with this name to copy a subset of the group's outputs to the
+#              Ninja output locations specified in {copy,directory,package}_outputs
+#              lists.
+#
+#          copy_outputs, directory_outputs, package_outputs:
+#              Same meaning as in `bazel_build_action()`, except
+#              that {{BAZEL_TARGET_XXX}} expansions are always
+#              relative to `bazel_target` for the current scope.
+#
+#          deps:
+#              Usual meaning, but all deps for all subtargets are
+#              forwarded to the group target.
+#
+#          metadata, visibility:
+#              Usual meaning, but these values are _not_ forwarded
+#              to the group target.
+#
+#    metadata: (optional)
+#       Metadata that is _only_ applied to the group target itself, not to
+#       its sub-targets.
+#
+#    testonly (optional)
+#       Usual GN meaning, but applies to each subtarget as well as the group.
+#
+#    visibility (optional)
+#       Usual GN meaning. A value provided here applies to the group target
+#       and also to each subtarget that does not have its own visibility definition.
+#
+template("bazel_build_group") {
+  _bazel_targets = []
+  _copy_outputs = []
+  _deps = []
+
+  _build_group_target = target_name
+
+  _group_output_dir = "bazel_build_group_outputs"
+  _copy_outputs = []
+  _directory_outputs = []
+  _package_outputs = []
+
+  foreach(subtarget, invoker.subtargets) {
+    _bazel_targets += [ subtarget.bazel_target ]
+
+    if (defined(subtarget.deps)) {
+      # Add subtarget deps while removing duplicates.
+      _deps += subtarget.deps
+      _deps -= subtarget.deps
+      _deps += subtarget.deps
+    }
+
+    if (defined(subtarget.copy_outputs)) {
+      foreach(output, subtarget.copy_outputs) {
+        _bazel_target = subtarget.bazel_target
+        if (defined(output.bazel_target)) {
+          _bazel_target = output.bazel_target
+        }
+        _copy_outputs += [
+          {
+            bazel_target = _bazel_target
+            bazel = output.bazel
+            ninja = "${_group_output_dir}/${output.ninja}"
+          },
+        ]
+      }
+    }
+
+    if (defined(subtarget.directory_outputs)) {
+      foreach(output, subtarget.directory_outputs) {
+        _bazel_target = subtarget.bazel_target
+        if (defined(output.bazel_target)) {
+          _bazel_target = output.bazel_target
+        }
+        _directory_outputs += [
+          {
+            bazel_target = _bazel_target
+            bazel_dir = output.bazel_dir
+            ninja_dir = "${_group_output_dir}/${output.ninja_dir}"
+            tracked_files = output.tracked_files
+          },
+        ]
+      }
+    }
+
+    if (defined(subtarget.package_outputs)) {
+      foreach(output, subtarget.package_outputs) {
+        _package_outputs += [
+          {
+            package_label = output.package_label
+            if (defined(output.archive)) {
+              archive = "${_group_output_dir}/${output.archive}"
+            }
+            if (defined(output.manifest)) {
+              manifest = "${_group_output_dir}/${output.manifest}"
+            }
+            copy_debug_symbols =
+                defined(output.copy_debug_symbols) && output.copy_debug_symbols
+          },
+        ]
+      }
+    }
+  }
+
+  bazel_action(_build_group_target) {
+    command = "build"
+    bazel_targets = _bazel_targets
+    deps = _deps
+    copy_outputs = _copy_outputs
+    directory_outputs = _directory_outputs
+    package_outputs = _package_outputs
+
+    forward_variables_from(
+        invoker,
+        "*",
+        [
+          # These bazel_action() arguments are forbidden here.
+          "bazel_targets",
+          "bazel_inputs",
+          "command",
+          "copy_outputs",
+          "directory_outputs",
+          "package_outputs",
+
+          # These arguments are handled above.
+          "deps",
+
+          # These arguments are specific to this template, and not
+          # passed to bazel_action().
+          "subtargets",
+        ])
+  }
+
+  # Create subtarget actions
+
+  foreach(subtarget, invoker.subtargets) {
+    _action_args = []
+    _action_outputs = []
+    _action_inputs = []
+
+    _hermetic_deps = true
+
+    if (defined(subtarget.directory_outputs)) {
+      foreach(entry, subtarget.directory_outputs) {
+        _src_dir = "$target_out_dir/${_group_output_dir}/${entry.ninja_dir}"
+        _dst_dir = "$target_out_dir/${entry.ninja_dir}"
+        _action_args += [
+                          "--directory",
+                          rebase_path(_src_dir, root_build_dir),
+                          rebase_path(_dst_dir, root_build_dir),
+                        ] + entry.tracked_files
+
+        _action_outputs += [ "${_dst_dir}" ]
+        foreach(tracked_file, entry.tracked_files) {
+          _action_inputs += [ "${_src_dir}/${tracked_file}" ]
+          _action_outputs += [ "${_dst_dir}/${tracked_file}" ]
+        }
+
+        # This action cannot be hermetic in the presence of directory outputs.
+        # While it would be possible to modify the script to generate an hermetic_inputs_file,
+        # this would only work for unknown inputs (e.g SRC_DIR/file), but not unknown
+        # outputs (e.g. DST_DIR/file).
+        #
+        # TODO(digit): Change bazel_action() to use hermetic_action_ignored_prefixes.
+        _hermetic_deps = false
+      }
+    }
+
+    _files = []
+    if (defined(subtarget.copy_outputs)) {
+      foreach(entry, subtarget.copy_outputs) {
+        _files += [ entry.ninja ]
+      }
+    }
+
+    if (defined(subtarget.package_outputs)) {
+      foreach(entry, subtarget.package_outputs) {
+        if (defined(entry.archive)) {
+          _files += [ entry.archive ]
+        }
+        if (defined(entry.manifest)) {
+          _files += [ entry.manifest ]
+        }
+      }
+    }
+
+    if (_files != []) {
+      _action_args += [ "--files" ]
+      foreach(_file, _files) {
+        _input = "$target_out_dir/${_group_output_dir}/${_file}"
+        _output = "$target_out_dir/${_file}"
+        _action_args += [
+          rebase_path(_input, root_build_dir),
+          rebase_path(_output, root_build_dir),
+        ]
+        _action_inputs += [ _input ]
+        _action_outputs += [ _output ]
+      }
+    }
+
+    action(subtarget.gn_target_name) {
+      deps = [ ":${_build_group_target}" ]
+
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      if (defined(subtarget.visibility)) {
+        visibility += subtarget.visibility
+      }
+      script = "//build/bazel/scripts/copy_bazel_build_group_outputs.py"
+      inputs = _action_inputs
+      outputs = _action_outputs
+      args = _action_args
+      hermetic_deps = _hermetic_deps
+
+      # Disable leak scanner since this action can copy very large product bundle directories
+      # (over 6 GiB) with takes dozens of seconds to verify for no practical benefit.
+      no_output_dir_leaks = false
+
+      forward_variables_from(subtarget, [ "metadata" ])
+    }
+  }
+}
