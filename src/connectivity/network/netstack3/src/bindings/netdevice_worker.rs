@@ -28,9 +28,10 @@ use netstack3_core::ip::{
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
 
+use crate::bindings::util::NeedsDataNotifier;
 use crate::bindings::{
     devices, interfaces_admin, routes, trace_duration, BindingId, BindingsCtx, Ctx, DeviceId,
-    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 /// Like [`DeviceId`], but restricted to netdevice devices.
@@ -414,6 +415,7 @@ impl DeviceHandler {
             PortWireFormat::Ip => format!("ip{}", binding_id),
         });
 
+        let tx_notifier = NeedsDataNotifier::default();
         let static_netdevice_info = devices::StaticNetdeviceInfo {
             handler: PortHandler {
                 id: binding_id,
@@ -422,6 +424,7 @@ impl DeviceHandler {
                 port_class: port_class.clone(),
                 wire_format,
             },
+            tx_notifier: tx_notifier.clone(),
         };
         let port_class = fnet_interfaces_ext::PortClass::try_from(port_class)
             .map_err(Error::InvalidPortClass)?;
@@ -481,9 +484,6 @@ impl DeviceHandler {
         };
 
         let binding_id = core_id.bindings_id().id;
-        let external_state = core_id.external_state();
-        let devices::StaticCommonInfo { tx_notifier, authorization_token: _ } =
-            external_state.static_common_info();
         let task =
             crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
         netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &core_id, device => {

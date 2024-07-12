@@ -205,16 +205,12 @@ pub(crate) fn spawn_tx_task(
 #[derive(Derivative, Debug)]
 pub(crate) struct StaticCommonInfo {
     #[derivative(Debug = "ignore")]
-    pub(crate) tx_notifier: NeedsDataNotifier,
     pub(crate) authorization_token: zx::Event,
 }
 
 impl Default for StaticCommonInfo {
     fn default() -> StaticCommonInfo {
-        StaticCommonInfo {
-            tx_notifier: Default::default(),
-            authorization_token: zx::Event::create(),
-        }
+        StaticCommonInfo { authorization_token: zx::Event::create() }
     }
 }
 
@@ -305,6 +301,7 @@ pub(crate) struct DynamicNetdeviceInfo {
 #[derive(Debug)]
 pub(crate) struct StaticNetdeviceInfo {
     pub(crate) handler: super::netdevice_worker::PortHandler,
+    pub(crate) tx_notifier: NeedsDataNotifier,
 }
 
 impl StaticNetdeviceInfo {

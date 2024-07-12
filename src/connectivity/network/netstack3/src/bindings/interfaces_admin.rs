@@ -677,7 +677,7 @@ async fn dispatch_control_request(
 ///
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
-    let (devices::StaticNetdeviceInfo { handler }, weak_id) = {
+    let (devices::StaticNetdeviceInfo { handler, tx_notifier: _ }, weak_id) = {
         let core_id = ctx
             .bindings_ctx()
             .devices
@@ -1210,8 +1210,7 @@ fn grant_for_interface(ctx: &mut Ctx, id: BindingId) -> GrantForInterfaceAuthori
         .expect("device lifetime should be tied to channel lifetime");
 
     let external_state = core_id.external_state();
-    let StaticCommonInfo { authorization_token, tx_notifier: _ } =
-        external_state.static_common_info();
+    let StaticCommonInfo { authorization_token } = external_state.static_common_info();
 
     GrantForInterfaceAuthorization {
         interface_id: id.get(),

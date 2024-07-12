@@ -711,7 +711,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
             })?;
 
         let external_state = core_id.external_state();
-        let StaticCommonInfo { authorization_token: netstack_token, tx_notifier: _ } =
+        let StaticCommonInfo { authorization_token: netstack_token } =
             external_state.static_common_info();
 
         let netstack_koid = netstack_token
