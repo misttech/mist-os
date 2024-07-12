@@ -326,3 +326,19 @@ class FFX(abc.ABC):
             errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
+
+    @abc.abstractmethod
+    def generate_ffx_cmd(
+        self,
+        cmd: list[str],
+        include_target: bool = True,
+    ) -> list[str]:
+        """Generates the FFX command that need to be run.
+
+        Args:
+            cmd: FFX command.
+            include_target: True to include "-t <target_name>", False otherwise.
+
+        Returns:
+            FFX command to be run as list of string.
+        """
