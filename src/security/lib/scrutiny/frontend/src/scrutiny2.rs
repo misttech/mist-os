@@ -18,27 +18,35 @@ use std::path::Path;
 use std::sync::Arc;
 
 pub struct Scrutiny {
-    model: Arc<DataModel>,
+    model_config: ModelConfig,
 }
 
 impl Scrutiny {
     pub fn from_product_bundle(path: impl AsRef<Path>) -> Result<Self> {
-        let model_config = ModelConfig::from_product_bundle(path)?;
-        Self::from_model_config(model_config)
+        Ok(Self { model_config: ModelConfig::from_product_bundle(path)? })
     }
 
     pub fn from_product_bundle_recovery(path: impl AsRef<Path>) -> Result<Self> {
-        let model_config = ModelConfig::from_product_bundle_recovery(path)?;
-        Self::from_model_config(model_config)
+        Ok(Self { model_config: ModelConfig::from_product_bundle_recovery(path)? })
     }
 
-    fn from_model_config(model_config: ModelConfig) -> Result<Self> {
-        let model = Arc::new(DataModel::new(model_config)?);
+    pub fn set_component_tree_config_path(&mut self, path: impl AsRef<Path>) {
+        self.model_config.component_tree_config_path = Some(path.as_ref().to_path_buf());
+    }
+
+    pub fn collect(self) -> Result<ScrutinyArtifacts> {
+        let model = Arc::new(DataModel::new(self.model_config)?);
         let collector = UnifiedCollector::default();
         collector.collect(model.clone())?;
-        Ok(Self { model })
+        Ok(ScrutinyArtifacts { model })
     }
+}
 
+pub struct ScrutinyArtifacts {
+    model: Arc<DataModel>,
+}
+
+impl ScrutinyArtifacts {
     pub fn get_components(&self) -> Result<Vec<Component>> {
         let mut components = self.model.get::<Components>()?.entries.clone();
         components.sort_by(|a, b| a.url.partial_cmp(&b.url).unwrap());

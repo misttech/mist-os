@@ -18,12 +18,13 @@ fho::embedded_plugin!(ScrutinyPackageTool);
 impl FfxMain for ScrutinyPackageTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let scrutiny = if self.cmd.recovery {
+        let artifacts = if self.cmd.recovery {
             Scrutiny::from_product_bundle_recovery(&self.cmd.product_bundle)
         } else {
             Scrutiny::from_product_bundle(&self.cmd.product_bundle)
-        }?;
-        let package = scrutiny.get_package(self.cmd.url)?;
+        }?
+        .collect()?;
+        let package = artifacts.get_package(self.cmd.url)?;
         let Some(package) = package else {
             fho::return_user_error!("Could not find package");
         };

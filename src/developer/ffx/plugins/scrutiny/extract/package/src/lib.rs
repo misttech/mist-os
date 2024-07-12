@@ -18,12 +18,13 @@ fho::embedded_plugin!(ScrutinyPackageTool);
 impl FfxMain for ScrutinyPackageTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let scrutiny = if self.cmd.recovery {
+        let artifacts = if self.cmd.recovery {
             Scrutiny::from_product_bundle_recovery(&self.cmd.product_bundle)
         } else {
             Scrutiny::from_product_bundle(&self.cmd.product_bundle)
-        }?;
-        let response = scrutiny.extract_package(self.cmd.url, self.cmd.output)?;
+        }?
+        .collect()?;
+        let response = artifacts.extract_package(self.cmd.url, self.cmd.output)?;
         let s = serde_json::to_string_pretty(&response).map_err(|e| fho::Error::User(e.into()))?;
         println!("{}", s);
         Ok(())
