@@ -83,6 +83,13 @@ type PowerElementConfiguration = table {
     2: dependencies vector<PowerDependency>:MAX_DEPENDENCIES;
 };
 
+const MAX_POWER_ELEMENTS uint16 = 32;
+
+/// The configuration for a component's power elements.
+type ComponentPowerConfiguration = struct {
+    power_elements vector<PowerElementConfiguration>:MAX_POWER_ELEMENTS;
+};
+
 // NOTE: This is _not_ a complete list of SAG elements. This enum only lists
 // the elements supported by the power support library. For a complete list
 // of SAG elements, see `fuchsia.power.system.PowerElements`.
