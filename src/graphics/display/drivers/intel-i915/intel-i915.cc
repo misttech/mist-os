@@ -2362,12 +2362,7 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
 }
 
 Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
-    : parent_(parent), inspector_(std::move(inspector)) {
-  mtx_init(&display_lock_, mtx_plain);
-  mtx_init(&gtt_lock_, mtx_plain);
-  mtx_init(&bar_lock_, mtx_plain);
-  mtx_init(&plane_buffers_lock_, mtx_plain);
-}
+    : parent_(parent), inspector_(std::move(inspector)) {}
 
 Controller::~Controller() {
   interrupts_.Destroy();
