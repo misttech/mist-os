@@ -14,16 +14,6 @@
 #include <fbl/macros.h>
 #include <vm/page.h>
 
-// Define this to enable the new `Upgrade` behavior when mapping pages.
-//
-// This allows remapping existing page table entries without first needing
-// to unmap them, which boosts page fault performance.
-// See https://issues.fuchsia.dev/issues/42182886.
-//
-// TODO(https://issues.fuchsia.dev/issues/42182886): Remove this flag which
-// `Upgrade` is the default page fault behavior on all architectures.
-#define ENABLE_PAGE_FAULT_UPGRADE false
-
 // Flags
 const uint ARCH_MMU_FLAG_CACHED = (0u << 0);
 const uint ARCH_MMU_FLAG_UNCACHED = (1u << 0);
@@ -121,8 +111,7 @@ class ArchVmAspaceInterface {
   //  - |Error| - Existing mappings result in a ZX_ERR_ALREADY_EXISTS error.
   //  - |Upgrade| - Upgrade any existing mappings, meaning a read-only mapping
   //                can be converted to read-write, or the mapping can have its
-  //                paddr changed. Only valid if `ENABLE_PAGE_FAULT_UPGRADE` is
-  //                true, otherwise the call to `Map` will assert.
+  //                paddr changed.
   //
   // Skipped pages are still counted in |mapped|. On failure some pages may
   // still be mapped, the number of which will be reported in |mapped|.
