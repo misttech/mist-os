@@ -53,12 +53,14 @@ impl Validation {
 }
 
 impl vfs::directory::entry::DirectoryEntry for Validation {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_dir(self)
+    }
+}
+
+impl vfs::directory::entry::GetEntryInfo for Validation {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 }
 
@@ -229,7 +231,7 @@ mod tests {
     use blobfs_ramdisk::BlobfsRamdisk;
     use futures::prelude::*;
     use std::convert::TryInto as _;
-    use vfs::directory::entry::DirectoryEntry;
+    use vfs::directory::entry::GetEntryInfo;
     use vfs::directory::entry_container::Directory;
     use vfs::node::Node;
 
@@ -351,7 +353,7 @@ mod tests {
         let (_env, validation) = TestEnv::new().await;
 
         assert_eq!(
-            DirectoryEntry::entry_info(validation.as_ref()),
+            GetEntryInfo::entry_info(validation.as_ref()),
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         );
     }

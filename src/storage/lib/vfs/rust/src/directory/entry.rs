@@ -10,7 +10,6 @@ use crate::common::IntoAny;
 use crate::directory::entry_container::Directory;
 use crate::execution_scope::ExecutionScope;
 use crate::file::{self, FileLike};
-use crate::node::IsDirectory;
 use crate::object_request::ObjectRequestSend;
 use crate::path::Path;
 use crate::service::{self, ServiceLike};
@@ -60,16 +59,18 @@ impl fmt::Debug for EntryInfo {
     }
 }
 
+/// Give useful information about the entry, for example, the directory entry type.
+pub trait GetEntryInfo {
+    /// This method is used to populate ReadDirents() output.
+    fn entry_info(&self) -> EntryInfo;
+}
+
 /// Pseudo directories contain items that implement this trait.  Pseudo directories refer to the
 /// items they contain as `Arc<dyn DirectoryEntry>`.
 ///
 /// *NOTE*: This trait only needs to be implemented if you want to add your nodes to a pseudo
-/// directory.  If you don't need to add your nodes to a pseudo directory, consider implementing
-/// node::IsDirectory instead.
-pub trait DirectoryEntry: IntoAny + Sync + Send + 'static {
-    /// This method is used to populate ReadDirents() output.
-    fn entry_info(&self) -> EntryInfo;
-
+/// directory.
+pub trait DirectoryEntry: GetEntryInfo + IntoAny + Sync + Send + 'static {
     /// Opens this entry.
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status>;
 }
@@ -81,12 +82,6 @@ pub trait DirectoryEntryAsync: DirectoryEntry {
         self: Arc<Self>,
         request: OpenRequest<'_>,
     ) -> impl Future<Output = Result<(), Status>> + Send;
-}
-
-impl<T: DirectoryEntry> IsDirectory for T {
-    fn is_directory(&self) -> bool {
-        self.entry_info().type_() == fio::DirentType::Directory
-    }
 }
 
 /// An open request.
@@ -389,11 +384,13 @@ impl<T: DirectoryEntry + ?Sized> SubNode<T> {
     }
 }
 
-impl<T: DirectoryEntry + ?Sized> DirectoryEntry for SubNode<T> {
+impl<T: DirectoryEntry + ?Sized> GetEntryInfo for SubNode<T> {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
     }
+}
 
+impl<T: DirectoryEntry + ?Sized> DirectoryEntry for SubNode<T> {
     fn open_entry(self: Arc<Self>, mut request: OpenRequest<'_>) -> Result<(), Status> {
         request.path = request.path.with_prefix(&self.path);
         self.parent.clone().open_entry(request)
@@ -423,6 +420,7 @@ mod tests {
     use super::{
         DirectoryEntry, DirectoryEntryAsync, EntryInfo, FlagsOrProtocols, OpenRequest, SubNode,
     };
+    use crate::directory::entry::GetEntryInfo;
     use crate::directory::entry_container::Directory;
     use crate::execution_scope::ExecutionScope;
     use crate::file::read_only;
@@ -482,12 +480,17 @@ mod tests {
         where
             for<'a> F: Fn(OpenRequest<'a>) -> Status,
         {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Unknown)
-            }
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
                 request.spawn(self);
                 Ok(())
+            }
+        }
+        impl<F: Send + Sync + 'static> GetEntryInfo for MockNode<F>
+        where
+            for<'a> F: Fn(OpenRequest<'a>) -> Status,
+        {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Unknown)
             }
         }
         impl<F: Send + Sync + 'static> DirectoryEntryAsync for MockNode<F>

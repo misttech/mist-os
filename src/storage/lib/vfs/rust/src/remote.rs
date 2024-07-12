@@ -7,7 +7,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use crate::execution_scope::ExecutionScope;
 use crate::path::Path;
 use crate::{ObjectRequestRef, ToObjectRequest};
@@ -68,11 +68,13 @@ pub trait GetRemoteDir {
     fn get_remote_dir(&self) -> Result<fio::DirectoryProxy, Status>;
 }
 
-impl<T: GetRemoteDir + Send + Sync + 'static> DirectoryEntry for T {
+impl<T: GetRemoteDir + Send + Sync + 'static> GetEntryInfo for T {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
+}
 
+impl<T: GetRemoteDir + Send + Sync + 'static> DirectoryEntry for T {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_remote(self)
     }

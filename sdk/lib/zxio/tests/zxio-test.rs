@@ -12,7 +12,7 @@ use syncio::{
     zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
     OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
 };
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
@@ -262,12 +262,14 @@ async fn test_read_link_error() {
     }
 
     impl DirectoryEntry for ErrorSymlink {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
-        }
-
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
             request.open_remote(self)
+        }
+    }
+
+    impl GetEntryInfo for ErrorSymlink {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
         }
     }
 
@@ -789,12 +791,14 @@ impl AllocateFile {
 }
 
 impl DirectoryEntry for AllocateFile {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_file(self)
+    }
+}
+
+impl GetEntryInfo for AllocateFile {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
     }
 }
 

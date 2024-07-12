@@ -6,6 +6,7 @@ use crate::root_dir::RootDir;
 use fidl::endpoints::ServerEnd;
 use std::sync::Arc;
 use vfs::common::send_on_open_with_error;
+use vfs::directory::entry::EntryInfo;
 use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
@@ -26,7 +27,11 @@ impl<S: crate::NonMetaStorage> MetaSubdir<S> {
     }
 }
 
-impl<S: crate::NonMetaStorage> vfs::node::IsDirectory for MetaSubdir<S> {}
+impl<S: crate::NonMetaStorage> vfs::directory::entry::GetEntryInfo for MetaSubdir<S> {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+    }
+}
 
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaSubdir<S> {
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {

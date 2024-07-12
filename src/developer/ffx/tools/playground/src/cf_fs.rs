@@ -11,7 +11,7 @@ use std::ops::Bound;
 use std::sync::{Arc, Mutex, Weak};
 use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult};
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{Directory, DirectoryWatcher};
 use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
@@ -534,7 +534,9 @@ impl DirectoryEntry for CFDirectory {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_dir(self)
     }
+}
 
+impl GetEntryInfo for CFDirectory {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }

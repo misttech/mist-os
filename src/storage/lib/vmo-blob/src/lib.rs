@@ -7,9 +7,9 @@ use fidl::AsHandleRef;
 use std::sync::{Arc, OnceLock};
 use tracing::error;
 use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::file::{File, FileOptions, GetVmo, SyncMode};
 use vfs::immutable_attributes;
-use vfs::node::IsDirectory;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 /// Mimics the c++ blobfs block size.
@@ -40,9 +40,9 @@ impl GetVmo for VmoBlob {
     }
 }
 
-impl IsDirectory for VmoBlob {
-    fn is_directory(&self) -> bool {
-        false
+impl GetEntryInfo for VmoBlob {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
     }
 }
 

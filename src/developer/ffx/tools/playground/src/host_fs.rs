@@ -13,7 +13,7 @@ use std::os::unix::fs::{DirEntryExt, FileTypeExt, MetadataExt};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use vfs::directory::dirents_sink;
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{Directory, DirectoryWatcher, MutableDirectory};
 use vfs::directory::mutable::connection::MutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
@@ -94,7 +94,9 @@ impl DirectoryEntry for HostFile {
     ) -> std::prelude::v1::Result<(), Status> {
         request.open_file(self)
     }
+}
 
+impl GetEntryInfo for HostFile {
     fn entry_info(&self) -> EntryInfo {
         if let Ok(metadata) = std::fs::metadata(&self.path) {
             EntryInfo::new(metadata.ino(), file_type_to_dirent_type(metadata.file_type()))
@@ -318,7 +320,9 @@ impl DirectoryEntry for HostDirectory {
     ) -> std::prelude::v1::Result<(), Status> {
         request.open_dir(self)
     }
+}
 
+impl GetEntryInfo for HostDirectory {
     fn entry_info(&self) -> EntryInfo {
         if let Ok(metadata) = std::fs::metadata(&self.0) {
             EntryInfo::new(metadata.ino(), file_type_to_dirent_type(metadata.file_type()))
@@ -327,7 +331,6 @@ impl DirectoryEntry for HostDirectory {
         }
     }
 }
-
 impl Node for HostDirectory {
     async fn get_attributes(
         &self,

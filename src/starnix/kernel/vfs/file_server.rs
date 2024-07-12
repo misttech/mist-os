@@ -708,9 +708,11 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
     }
 }
 
-impl vfs::node::IsDirectory for StarnixNodeConnection {
-    fn is_directory(&self) -> bool {
-        self.is_dir()
+impl directory::entry::GetEntryInfo for StarnixNodeConnection {
+    fn entry_info(&self) -> directory::entry::EntryInfo {
+        let dirent_type =
+            if self.is_dir() { fio::DirentType::Directory } else { fio::DirentType::File };
+        directory::entry::EntryInfo::new(0, dirent_type)
     }
 }
 

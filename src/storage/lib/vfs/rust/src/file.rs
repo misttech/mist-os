@@ -338,7 +338,7 @@ pub fn serve(
     object_request: ObjectRequestRef<'_>,
 ) -> Result<(), Status> {
     if protocols.is_node() {
-        let options = protocols.to_node_options(file.is_directory())?;
+        let options = protocols.to_node_options(file.entry_info().type_())?;
         file.open_as_node(scope, options, object_request)
     } else {
         file.open(scope, protocols.to_file_options()?, object_request)

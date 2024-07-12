@@ -245,10 +245,11 @@ mod tests {
 
     mod mocks {
         use crate::directory::dirents_sink;
+        use crate::directory::entry::{EntryInfo, GetEntryInfo};
         use crate::directory::entry_container::{Directory, DirectoryWatcher, MutableDirectory};
         use crate::directory::traversal_position::TraversalPosition;
         use crate::execution_scope::ExecutionScope;
-        use crate::node::{IsDirectory, Node};
+        use crate::node::Node;
         use crate::path::Path;
         use crate::token_registry::{TokenInterface, TokenRegistry};
         use crate::ObjectRequestRef;
@@ -274,6 +275,12 @@ mod tests {
         impl MockDirectory {
             pub(super) fn new() -> Arc<Self> {
                 Arc::new(Self {})
+            }
+        }
+
+        impl GetEntryInfo for MockDirectory {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
             }
         }
 
@@ -360,7 +367,5 @@ mod tests {
                 unimplemented!("Not implemented!");
             }
         }
-
-        impl IsDirectory for MockDirectory {}
     }
 }

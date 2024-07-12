@@ -313,9 +313,10 @@ impl<DirectoryType: MutableDirectory> TokenInterface for MutableConnection<Direc
 mod tests {
     use super::*;
     use crate::directory::dirents_sink;
+    use crate::directory::entry::{EntryInfo, GetEntryInfo};
     use crate::directory::entry_container::{Directory, DirectoryWatcher};
     use crate::directory::traversal_position::TraversalPosition;
-    use crate::node::{IsDirectory, Node};
+    use crate::node::Node;
     use crate::ToObjectRequest;
     use futures::future::BoxFuture;
     use std::any::Any;
@@ -348,6 +349,12 @@ mod tests {
     impl PartialEq for MockDirectory {
         fn eq(&self, other: &Self) -> bool {
             self.id == other.id
+        }
+    }
+
+    impl GetEntryInfo for MockDirectory {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(0, fio::DirentType::Directory)
         }
     }
 
@@ -469,8 +476,6 @@ mod tests {
             Box::pin(ready(result))
         }
     }
-
-    impl IsDirectory for MockDirectory {}
 
     struct Events(Mutex<Vec<MutableDirectoryAction>>);
 

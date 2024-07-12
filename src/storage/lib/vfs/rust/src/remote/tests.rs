@@ -8,7 +8,7 @@ use super::{remote_dir, RemoteLike};
 
 use crate::{assert_close, assert_read, assert_read_dirents, pseudo_directory};
 
-use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use crate::directory::entry_container::Directory;
 use crate::directory::test_utils::{run_client, DirentsSameInodeBuilder};
 use crate::execution_scope::ExecutionScope;
@@ -196,12 +196,13 @@ fn remote_dir_direct_connection_dir_contents() {
 async fn lazy_remote() {
     struct Remote(Mutex<Option<oneshot::Sender<()>>>);
     impl DirectoryEntry for Remote {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Unknown)
-        }
-
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
             request.open_remote(self)
+        }
+    }
+    impl GetEntryInfo for Remote {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Unknown)
         }
     }
     impl RemoteLike for Remote {

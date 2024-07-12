@@ -1086,7 +1086,8 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{IsDirectory, Node};
+    use crate::directory::entry::{EntryInfo, GetEntryInfo};
+    use crate::node::Node;
     use assert_matches::assert_matches;
     use futures::prelude::*;
     use std::sync::Mutex;
@@ -1190,6 +1191,12 @@ mod tests {
                 Status::OK => Ok(()),
                 err => Err(err),
             }
+        }
+    }
+
+    impl GetEntryInfo for MockFile {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(MOCK_FILE_ID, fio::DirentType::File)
         }
     }
 
@@ -1315,12 +1322,6 @@ mod tests {
     impl GetVmo for MockFile {
         fn get_vmo(&self) -> &zx::Vmo {
             &self.vmo
-        }
-    }
-
-    impl IsDirectory for MockFile {
-        fn is_directory(&self) -> bool {
-            false
         }
     }
 

@@ -16,6 +16,7 @@ use std::fmt::Debug;
 use std::io::{Read, Seek, Write};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
+use vfs::directory::entry::EntryInfo;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File as VfsFile, FileIo as VfsFileIo, FileOptions, SyncMode};
 use vfs::{attributes, ObjectRequestRef};
@@ -391,9 +392,9 @@ impl VfsFileIo for FatFile {
     }
 }
 
-impl vfs::node::IsDirectory for FatFile {
-    fn is_directory(&self) -> bool {
-        false
+impl vfs::directory::entry::GetEntryInfo for FatFile {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
     }
 }
 

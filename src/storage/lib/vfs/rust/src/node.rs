@@ -5,6 +5,7 @@
 //! Implementation of a (limited) node connection.
 
 use crate::common::{inherit_rights_for_clone, IntoAny};
+use crate::directory::entry::GetEntryInfo;
 use crate::directory::entry_container::MutableDirectory;
 use crate::execution_scope::ExecutionScope;
 use crate::name::Name;
@@ -31,14 +32,8 @@ pub struct NodeOptions {
     pub rights: fio::Operations,
 }
 
-pub trait IsDirectory {
-    fn is_directory(&self) -> bool {
-        true
-    }
-}
-
 /// All nodes must implement this trait.
-pub trait Node: IsDirectory + IntoAny + Send + Sync + 'static {
+pub trait Node: GetEntryInfo + IntoAny + Send + Sync + 'static {
     /// Returns node attributes (io2).
     fn get_attributes(
         &self,
@@ -131,7 +126,7 @@ impl<N: Node> Connection<N> {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<impl Future<Output = ()>, Status> {
         let node = OpenNode::new(node);
-        let options = options.to_node_options(node.is_directory())?;
+        let options = options.to_node_options(node.entry_info().type_())?;
         let object_request = object_request.take();
         Ok(async move {
             let connection = Connection { scope: scope.clone(), node, options };
@@ -263,7 +258,7 @@ impl<N: Node> Connection<N> {
     fn handle_clone(&mut self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
         flags.to_object_request(server_end).handle(|object_request| {
             let options = inherit_rights_for_clone(fio::OpenFlags::NODE_REFERENCE, flags)?
-                .to_node_options(self.node.is_directory())?;
+                .to_node_options(self.node.entry_info().type_())?;
 
             self.node.will_clone();
 

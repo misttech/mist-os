@@ -308,7 +308,7 @@ pub fn serve(
     object_request: ObjectRequestRef<'_>,
 ) -> Result<(), Status> {
     if protocols.is_node() {
-        let options = protocols.to_node_options(link.is_directory())?;
+        let options = protocols.to_node_options(link.entry_info().type_())?;
         link.open_as_node(scope, options, object_request)
     } else {
         Connection::create(scope.clone(), link, protocols, object_request).map(|x| scope.spawn(x))
@@ -319,8 +319,9 @@ pub fn serve(
 mod tests {
     use super::{Connection, Symlink};
     use crate::common::rights_to_posix_mode_bits;
+    use crate::directory::entry::{EntryInfo, GetEntryInfo};
     use crate::execution_scope::ExecutionScope;
-    use crate::node::{IsDirectory, Node};
+    use crate::node::Node;
     use crate::ToObjectRequest;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
@@ -397,9 +398,9 @@ mod tests {
         }
     }
 
-    impl IsDirectory for TestSymlink {
-        fn is_directory(&self) -> bool {
-            false
+    impl GetEntryInfo for TestSymlink {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
         }
     }
 

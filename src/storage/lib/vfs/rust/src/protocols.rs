@@ -487,11 +487,11 @@ impl ToFileOptions for FileOptions {
 }
 
 pub trait ToNodeOptions {
-    fn to_node_options(&self, is_directory: bool) -> Result<NodeOptions, Status>;
+    fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status>;
 }
 
 impl ToNodeOptions for fio::ConnectionProtocols {
-    fn to_node_options(&self, is_directory: bool) -> Result<NodeOptions, Status> {
+    fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status> {
         let must_be_directory = match self {
             fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols { node: Some(flags), .. }),
@@ -499,7 +499,7 @@ impl ToNodeOptions for fio::ConnectionProtocols {
             }) => flags.contains(fio::NodeProtocolFlags::MUST_BE_DIRECTORY),
             _ => false,
         };
-        if must_be_directory && !is_directory {
+        if must_be_directory && dirent_type != fio::DirentType::Directory {
             Err(Status::NOT_DIR)
         } else {
             Ok(NodeOptions { rights: self.rights().unwrap() & fio::Operations::GET_ATTRIBUTES })
@@ -508,7 +508,7 @@ impl ToNodeOptions for fio::ConnectionProtocols {
 }
 
 impl ToNodeOptions for fio::OpenFlags {
-    fn to_node_options(&self, is_directory: bool) -> Result<NodeOptions, Status> {
+    fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status> {
         // Strictly, we shouldn't allow rights to be specified with NODE_REFERENCE, but there's a
         // CTS pkgdir test that asserts these flags work and fixing that is painful so we preserve
         // old behaviour (which permitted these flags).
@@ -516,7 +516,9 @@ impl ToNodeOptions for fio::OpenFlags {
             fio::OPEN_RIGHTS | fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE;
         if self.intersects(!(fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE | allowed_rights)) {
             Err(Status::INVALID_ARGS)
-        } else if self.contains(fio::OpenFlags::DIRECTORY) && !is_directory {
+        } else if self.contains(fio::OpenFlags::DIRECTORY)
+            && dirent_type != fio::DirentType::Directory
+        {
             Err(Status::NOT_DIR)
         } else {
             Ok(NodeOptions { rights: fio::Operations::GET_ATTRIBUTES })
@@ -525,7 +527,7 @@ impl ToNodeOptions for fio::OpenFlags {
 }
 
 impl ToNodeOptions for NodeOptions {
-    fn to_node_options(&self, _is_directory: bool) -> Result<NodeOptions, Status> {
+    fn to_node_options(&self, _dirent_type: fio::DirentType) -> Result<NodeOptions, Status> {
         Ok(*self)
     }
 }

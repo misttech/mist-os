@@ -37,7 +37,7 @@ use fxfs_macros::ToWeakNode;
 use std::str::FromStr;
 use std::sync::Arc;
 use vfs::directory::dirents_sink::{self, Sink};
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{
     Directory as VfsDirectory, DirectoryWatcher, MutableDirectory,
 };
@@ -414,12 +414,14 @@ impl MutableDirectory for BlobDirectory {
 
 /// Implementation of VFS pseudo-directory for blobs. Forks a task per connection.
 impl DirectoryEntry for BlobDirectory {
-    fn entry_info(&self) -> EntryInfo {
-        self.directory.entry_info()
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_dir(self)
+    }
+}
+
+impl GetEntryInfo for BlobDirectory {
+    fn entry_info(&self) -> EntryInfo {
+        self.directory.entry_info()
     }
 }
 

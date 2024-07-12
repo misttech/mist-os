@@ -7,7 +7,9 @@ use crate::model::routing::{self, RouteRequest};
 use router_error::Explain;
 use std::sync::Arc;
 use tracing::error;
-use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::directory::entry::{
+    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
+};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub struct RouteEntry {
@@ -27,16 +29,17 @@ impl RouteEntry {
 }
 
 impl DirectoryEntry for RouteEntry {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.spawn(self);
         Ok(())
     }
 }
 
+impl GetEntryInfo for RouteEntry {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
+    }
+}
 impl DirectoryEntryAsync for RouteEntry {
     async fn open_entry_async(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         let component = match self.component.upgrade() {

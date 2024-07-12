@@ -31,6 +31,8 @@ use std::collections::BTreeMap;
 use std::iter;
 use std::sync::{Arc, Mutex};
 
+use super::entry::GetEntryInfo;
+
 /// An implementation of a "simple" pseudo directory.  This directory holds a set of entries,
 /// allowing the server to add or remove entries via the
 /// [`crate::directory::helper::DirectlyMutable::add_entry()`] and
@@ -168,11 +170,13 @@ impl Simple {
     }
 }
 
-impl DirectoryEntry for Simple {
+impl GetEntryInfo for Simple {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.inode, fio::DirentType::Directory)
     }
+}
 
+impl DirectoryEntry for Simple {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_dir(self)
     }

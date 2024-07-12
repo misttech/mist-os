@@ -22,7 +22,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
-use vfs::directory::entry::OpenRequest;
+use vfs::directory::entry::{EntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable as _;
 use vfs::directory::immutable::simple::Simple as SimpleImmutableDir;
@@ -538,12 +538,14 @@ impl RemoteLike for DevfsDevice {
 }
 
 impl vfs::directory::entry::DirectoryEntry for DevfsDevice {
-    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
-        vfs::directory::entry::EntryInfo::new(1, fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_remote(self)
+    }
+}
+
+impl vfs::directory::entry::GetEntryInfo for DevfsDevice {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(1, fio::DirentType::Directory)
     }
 }
 

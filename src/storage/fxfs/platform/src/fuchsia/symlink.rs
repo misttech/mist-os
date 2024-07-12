@@ -18,6 +18,7 @@ use fxfs_macros::ToWeakNode;
 use std::sync::Arc;
 use vfs::attributes;
 use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::directory::entry_container::MutableDirectory;
 use vfs::name::Name;
 use vfs::node::Node;
@@ -107,6 +108,12 @@ impl Symlink for FxSymlink {
     }
 }
 
+impl GetEntryInfo for FxSymlink {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(self.object_id(), fio::DirentType::Symlink)
+    }
+}
+
 impl Node for FxSymlink {
     async fn get_attributes(
         &self,
@@ -179,12 +186,6 @@ impl Node for FxSymlink {
             store.object_count(),
             self.handle.owner().id(),
         ))
-    }
-}
-
-impl vfs::node::IsDirectory for FxSymlink {
-    fn is_directory(&self) -> bool {
-        false
     }
 }
 

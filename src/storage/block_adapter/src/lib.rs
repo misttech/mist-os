@@ -13,7 +13,7 @@ use fidl::endpoints::{create_endpoints, ServerEnd};
 use remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use std::sync::Arc;
 use vfs::common::rights_to_posix_mode_bits;
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
@@ -40,12 +40,14 @@ struct BlockFile {
 }
 
 impl DirectoryEntry for BlockFile {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(0, fio::DirentType::File)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_file(self)
+    }
+}
+
+impl GetEntryInfo for BlockFile {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(0, fio::DirentType::File)
     }
 }
 

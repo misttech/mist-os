@@ -21,7 +21,7 @@ use std::hash::{Hash, Hasher};
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 use vfs::directory::dirents_sink::{self, AppendResult, Sink};
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{Directory, DirectoryWatcher, MutableDirectory};
 use vfs::directory::mutable::connection::MutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
@@ -833,12 +833,14 @@ impl MutableDirectory for FatDirectory {
 }
 
 impl DirectoryEntry for FatDirectory {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_dir(self)
+    }
+}
+
+impl GetEntryInfo for FatDirectory {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 }
 

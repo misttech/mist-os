@@ -262,7 +262,9 @@ mod tests {
     use futures::try_join;
     use lazy_static::lazy_static;
     use test_util::Counter;
-    use vfs::directory::entry::{serve_directory, DirectoryEntry, EntryInfo, OpenRequest, SubNode};
+    use vfs::directory::entry::{
+        serve_directory, DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest, SubNode,
+    };
     use vfs::directory::entry_container::Directory as VfsDirectory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
@@ -601,12 +603,13 @@ mod tests {
 
     struct MockDir(Counter);
     impl DirectoryEntry for MockDir {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-        }
-
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
             request.open_remote(self)
+        }
+    }
+    impl GetEntryInfo for MockDir {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         }
     }
     impl RemoteLike for MockDir {
