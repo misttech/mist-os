@@ -93,9 +93,20 @@ class TestDirectory : public fio::testing::Directory_TestBase {
 };
 
 class DriverHostRunnerTest : public gtest::TestLoopFixture {
+  void SetUp() {
+    std::unique_ptr<driver_loader::Loader> loader = driver_loader::Loader::Create();
+    driver_host_runner_ = std::make_unique<driver_manager::DriverHostRunner>(
+        dispatcher(), ConnectToRealm(), std::move(loader));
+  }
+
  protected:
+  // Creates the driver host component, loads the driver host and waits for it to exit.
+  // |driver_host_path| is the local package path to the binary to pass to the driver host runner.
+  void StartDriverHost(std::string_view driver_host_path);
+
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm();
-  void CallComponentStart(driver_manager::DriverHostRunner& driver_host_runner);
+  void CallComponentStart(driver_manager::DriverHostRunner& driver_host_runner,
+                          std::string_view driver_host_path);
 
   // Returns the exit status of the process.
   int64_t WaitForProcessExit(const zx::process& process);
@@ -105,7 +116,46 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
  private:
   driver_runner::TestRealm realm_;
   std::optional<fidl::ServerBinding<fuchsia_component::Realm>> realm_binding_;
+
+  std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner_;
 };
+
+void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path) {
+  constexpr std::string_view kDriverHostName = "driver-host-new-";
+  constexpr std::string_view kCollection = "driver-hosts";
+  constexpr std::string_view kComponentUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
+
+  bool created_component;
+  realm().SetCreateChildHandler(
+      [&](fdecl::CollectionRef collection, fdecl::Child decl, std::vector<fdecl::Offer> offers) {
+        EXPECT_EQ(kDriverHostName, decl.name().value().substr(0, kDriverHostName.size()));
+        EXPECT_EQ(kCollection, collection.name());
+        EXPECT_EQ(kComponentUrl, decl.url());
+        created_component = true;
+      });
+
+  // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
+  // entire thing.
+  bool got_cb = false;
+  auto res = driver_host_runner_->StartDriverHost([&](zx::result<> result) {
+    ASSERT_EQ(ZX_OK, result.status_value());
+    got_cb = true;
+  });
+  ASSERT_EQ(ZX_OK, res.status_value());
+
+  ASSERT_TRUE(RunLoopUntilIdle());
+  ASSERT_TRUE(created_component);
+
+  ASSERT_NO_FATAL_FAILURE(CallComponentStart(*driver_host_runner_, driver_host_path));
+  ASSERT_TRUE(got_cb);
+
+  std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
+      driver_host_runner_->DriverHosts();
+  ASSERT_EQ(1u, driver_hosts.size());
+
+  const zx::process& process = (*driver_hosts.begin())->process();
+  ASSERT_EQ(0, WaitForProcessExit(process));
+}
 
 fidl::ClientEnd<fuchsia_component::Realm> DriverHostRunnerTest::ConnectToRealm() {
   auto realm_endpoints = fidl::Endpoints<fcomponent::Realm>::Create();
@@ -114,8 +164,8 @@ fidl::ClientEnd<fuchsia_component::Realm> DriverHostRunnerTest::ConnectToRealm()
   return std::move(realm_endpoints.client);
 }
 
-void DriverHostRunnerTest::CallComponentStart(
-    driver_manager::DriverHostRunner& driver_host_runner) {
+void DriverHostRunnerTest::CallComponentStart(driver_manager::DriverHostRunner& driver_host_runner,
+                                              std::string_view driver_host_path) {
   async::Loop dir_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   ASSERT_EQ(ZX_OK, dir_loop.StartThread());
 
@@ -135,7 +185,7 @@ void DriverHostRunnerTest::CallComponentStart(
                       .directory(std::move(pkg_endpoints.client))
                       .Build();
 
-  TestFile file("/pkg/bin/driver_host2");
+  TestFile file(driver_host_path);
   fidl::Binding<fio::File> file_binding(&file);
   TestDirectory pkg_directory;
   fidl::Binding<fio::Directory> pkg_binding(&pkg_directory);
@@ -185,46 +235,14 @@ int64_t DriverHostRunnerTest::WaitForProcessExit(const zx::process& process) {
   return result;
 }
 
-TEST_F(DriverHostRunnerTest, Start) {
-  constexpr std::string_view kDriverHostName = "driver-host-new-";
-  constexpr std::string_view kCollection = "driver-hosts";
-  constexpr std::string_view kComponentUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
+TEST_F(DriverHostRunnerTest, StartDriverHost) {
+  constexpr std::string_view kDriverHostPath = "/pkg/bin/driver_host2";
+  StartDriverHost(kDriverHostPath);
+}
 
-  bool created_component;
-  realm().SetCreateChildHandler(
-      [&](fdecl::CollectionRef collection, fdecl::Child decl, std::vector<fdecl::Offer> offers) {
-        EXPECT_EQ(kDriverHostName, decl.name().value().substr(0, kDriverHostName.size()));
-        EXPECT_EQ(kCollection, collection.name());
-        EXPECT_EQ(kComponentUrl, decl.url());
-        created_component = true;
-      });
-
-  // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
-  // entire thing.
-  std::unique_ptr<driver_loader::Loader> loader = driver_loader::Loader::Create();
-  ASSERT_NE(nullptr, loader);
-  driver_manager::DriverHostRunner driver_host_runner(dispatcher(), ConnectToRealm(),
-                                                      std::move(loader));
-
-  bool got_cb = false;
-  auto res = driver_host_runner.StartDriverHost([&](zx::result<> result) {
-    ASSERT_EQ(ZX_OK, result.status_value());
-    got_cb = true;
-  });
-  ASSERT_EQ(ZX_OK, res.status_value());
-
-  ASSERT_TRUE(RunLoopUntilIdle());
-  ASSERT_TRUE(created_component);
-
-  ASSERT_NO_FATAL_FAILURE(CallComponentStart(driver_host_runner));
-  ASSERT_TRUE(got_cb);
-
-  std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
-      driver_host_runner.DriverHosts();
-  ASSERT_EQ(1u, driver_hosts.size());
-
-  const zx::process& process = (*driver_hosts.begin())->process();
-  ASSERT_EQ(0, WaitForProcessExit(process));
+TEST_F(DriverHostRunnerTest, StartFakeDriverHost) {
+  constexpr std::string_view kDriverHostPath = "/pkg/bin/fake_driver_host";
+  StartDriverHost(kDriverHostPath);
 }
 
 }  // namespace

@@ -1,0 +1,32 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/dist/component_manifest_resources.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
+
+user_basic_redirect("modules.basic") {
+  testonly = true
+  public_deps = [ ":modules" ]
+}
+
+group("modules") {
+  testonly = true
+  deps = [ ":fake_driver_host" ]
+}
+
+static_library("entry_point") {
+  public = [ "entry_point.h" ]
+  sources = [ "entry_point.cc" ]
+  public_deps = [
+    "//src/zircon/lib/zircon",
+    "//zircon/system/public",
+  ]
+}
+
+executable("fake_driver_host") {
+  output_name = "fake_driver_host"
+  sources = [ "fake_driver_host.cc" ]
+  deps = [ ":entry_point" ]
+}
