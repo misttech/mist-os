@@ -152,6 +152,7 @@
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.profile.Watcher",
+                "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.recovery.FactoryReset",
                 "fuchsia.sensors.Manager",
