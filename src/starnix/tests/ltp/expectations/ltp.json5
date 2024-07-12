@@ -73,7 +73,6 @@
                 "fdatasync03",
                 "fs_di",
                 "fsetxattr02",
-                "fstatat01",
                 "futimesat01",
                 "getitimer01",
                 "getpriority01",

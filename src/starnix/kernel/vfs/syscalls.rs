@@ -855,11 +855,8 @@ pub fn sys_newfstatat(
     buffer: UserRef<uapi::stat>,
     flags: u32,
 ) -> Result<(), Errno> {
-    if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {
-        track_stub!(TODO("https://fxbug.dev/297370602"), "newfstatat", flags);
-        return error!(ENOSYS);
-    }
-    let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
+    let flags =
+        LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
     let result = name.entry.node.stat(current_task)?;
     current_task.write_object(buffer, &result)?;

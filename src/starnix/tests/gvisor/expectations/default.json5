@@ -815,9 +815,6 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCreds2/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedDifferingCreds/*",
 
-                // stat_test
-                "StatTest.StatIgnoreNoAutomount",
-
                 // statfs_test
                 "FstatfsTest.BlocksFree",
 
