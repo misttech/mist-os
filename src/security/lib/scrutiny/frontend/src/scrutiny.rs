@@ -42,9 +42,7 @@ impl Scrutiny {
 
         // Collect all the data into the model.
         let model = Arc::new(DataModel::new(config.runtime.model.clone())?);
-        if let Some(collector) = &plugin.collector {
-            collector.collect(model.clone())?;
-        }
+        plugin.collector.collect(model.clone())?;
 
         // Register all the functions.
         let dispatcher = Arc::new(RwLock::new(ControllerDispatcher::new(Arc::clone(&model))));

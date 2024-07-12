@@ -13,13 +13,13 @@ use std::sync::Arc;
 /// called.
 #[derive(Clone)]
 pub struct PluginHooks {
-    pub collector: Option<Arc<dyn DataCollector>>,
+    pub collector: Arc<dyn DataCollector>,
     pub controllers: HashMap<String, Arc<dyn DataController>>,
 }
 
 impl PluginHooks {
     pub fn new(
-        collector: Option<Arc<dyn DataCollector>>,
+        collector: Arc<dyn DataCollector>,
         controllers: HashMap<String, Arc<dyn DataController>>,
     ) -> Self {
         Self { collector, controllers }

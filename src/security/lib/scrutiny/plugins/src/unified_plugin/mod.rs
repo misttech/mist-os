@@ -30,7 +30,7 @@ pub struct UnifiedPlugin {}
 impl UnifiedPlugin {
     pub fn with_model() -> PluginHooks {
         PluginHooks::new(
-            Some(Arc::new(UnifiedCollector::default())),
+            Arc::new(UnifiedCollector::default()),
             controllers! {
                 "/devmgr/config" => ExtractAdditionalBootConfigController::default(),
                 "/component" => ComponentGraphController::default(),

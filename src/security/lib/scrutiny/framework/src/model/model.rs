@@ -66,12 +66,6 @@ impl DataModel {
         Ok(())
     }
 
-    pub fn remove<T: DataCollection + Any>(&self) {
-        let type_id = TypeId::of::<T>();
-        let mut collections = self.collections.lock().unwrap();
-        collections.remove(&type_id);
-    }
-
     /// Returns an immutable reference to the ModelConfig which can be
     /// retrieved by `DataControllers` and `DataControllers`.
     pub fn config(&self) -> &ModelConfig {
