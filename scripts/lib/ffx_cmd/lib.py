@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import logging
+import os
 from enum import Enum
 from typing import Callable
 
@@ -12,6 +14,8 @@ from async_utils.command import (
     StderrEvent,
     StdoutEvent,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class FfxOutputFormat(Enum):
@@ -46,6 +50,44 @@ class FfxCmd(fx_cmd.ExecutableCommand):
         if inner is None:
             inner = fx_cmd.FxCmd()
         self._inner: fx_cmd.ExecutableCommand = inner
+
+    @staticmethod
+    def create_test_inner(
+        path_to_ffx: str,
+        *extra_args: str,
+    ) -> fx_cmd.ExecutableCommand:
+        """Create an ExecutableCommand that calls a specific ffx for tests.
+
+        Args:
+            path_to_ffx (str): Path to an ffx binary to execute.
+            extra_args (str): Extra arguments to pass to ffx.
+
+        Returns:
+            ExecutableCommand: Configured wrapper for use as FfxCmd inner.
+        """
+        if not os.path.isfile(path_to_ffx):
+            raise RuntimeError(
+                f"Expected ffx at path {path_to_ffx}, but it is not a file"
+            )
+
+        class TestExecutor(fx_cmd.ExecutableCommand):
+            async def start(self, *args: str) -> AsyncCommand:
+                logger.debug("Processing command line...")
+                index_of_ffx = 0
+                for i, val in enumerate(args):
+                    if val == "ffx":
+                        index_of_ffx = i
+                        break
+                logger.debug(f"Old command line was {args}")
+                command_line = (
+                    [path_to_ffx]
+                    + list(extra_args)
+                    + list(args[index_of_ffx + 1 :])
+                )
+                logger.info(f"Executing ffx for test\n  {command_line}")
+                return await AsyncCommand.create(*command_line)
+
+        return TestExecutor()
 
     def command_line(self, *args: str) -> list[str]:
         """Format a command line with ffx-specific settings.
