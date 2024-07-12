@@ -259,7 +259,7 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/lib/arch",
 
       # "main.h" has #include <lib/mempool/range.h>.
-      "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/kernel/phys/lib/memalloc:range.headers",
     ]
 
     public_configs = [ ":includes" ]
@@ -410,17 +410,13 @@ if (toolchain_environment == "kernel.phys" ||
 
       # allocation.h has #include <lib/memalloc/pool.h>.
       # allocation.h has #include <lib/memalloc/range.h>.
-      "//zircon/kernel/phys/lib/memalloc",
+      "//zircon/kernel/phys/lib/memalloc:headers",
 
       # allocation.h has #include <fbl/alloc_checker.h>.
       "//zircon/system/ulib/fbl",
 
       # allocation.h has #include <lib/fit/result.h>.
       "//zircon/system/ulib/zx",
-
-      # allocation.h has #include <lib/memalloc/range.h>
-      # allocation.h has #include <lib/memalloc/pool.h>
-      "//zircon/kernel/phys/lib/memalloc",
     ]
     public_configs = [ ":includes" ]
   }
