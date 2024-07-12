@@ -146,7 +146,7 @@ group("byteorder") {
 }
 
 group("bytes") {
-  public_deps = [ ":bytes-v1_0_1" ]
+  public_deps = [ ":bytes-v1_6_0" ]
 }
 
 group("camino") {
@@ -2762,15 +2762,15 @@ rust_library("byteorder-v1_4_3") {
   applicable_licenses = [ ":byteorder-v1_4_3.license" ]
 }
 
-license("bytes-v1_0_1.license") {
+license("bytes-v1_6_0.license") {
   public_package_name = "bytes"
-  license_files = [ "//third_party/rust_crates/vendor/bytes-1.0.1/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/bytes-1.6.0/LICENSE" ]
 }
 
-rust_library("bytes-v1_0_1") {
+rust_library("bytes-v1_6_0") {
   crate_name = "bytes"
-  crate_root = "//third_party/rust_crates/vendor/bytes-1.0.1/src/lib.rs"
-  output_name = "bytes-95481d3375f8e2b1"
+  crate_root = "//third_party/rust_crates/vendor/bytes-1.6.0/src/lib.rs"
+  output_name = "bytes-e3ff0f4201df1315"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -2780,15 +2780,15 @@ rust_library("bytes-v1_0_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=95481d3375f8e2b1",
-    "-Cextra-filename=-95481d3375f8e2b1",
+    "-Cmetadata=e3ff0f4201df1315",
+    "-Cextra-filename=-e3ff0f4201df1315",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":bytes-v1_0_1.license" ]
+  applicable_licenses = [ ":bytes-v1_6_0.license" ]
 }
 
 license("camino-v1_1_1.license") {
@@ -3230,7 +3230,7 @@ rust_library("combine-v4_6_2") {
 
   deps = []
   deps += [ ":memchr-v2_7_1" ]
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
 
   rustenv = []
 
@@ -5492,7 +5492,7 @@ rust_library("fuse3-v0_6_1") {
   deps = []
   deps += [ ":async-trait-v0_1_71($host_toolchain)" ]
   deps += [ ":bincode-v1_3_3" ]
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
   deps += [ ":cstr-v0_2_11($host_toolchain)" ]
   deps += [ ":futures-channel-v0_3_19" ]
   deps += [ ":futures-util-v0_3_19" ]
@@ -6568,7 +6568,7 @@ rust_library("http-v0_2_4") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
   deps += [ ":fnv-v1_0_7" ]
   deps += [ ":itoa-v0_4_3" ]
 
@@ -6598,7 +6598,7 @@ rust_library("http-body-v0_4_4") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
   deps += [ ":http-v0_2_4" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
 
@@ -6721,7 +6721,7 @@ rust_library("hyper-v0_14_19") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
   deps += [ ":futures-channel-v0_3_19" ]
   deps += [ ":futures-core-v0_3_19" ]
   deps += [ ":futures-util-v0_3_19" ]
@@ -11154,7 +11154,7 @@ rust_library("prost-v0_11_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
   deps += [ ":prost-derive-v0_11_0($host_toolchain)" ]
 
   rustenv = []
@@ -11187,7 +11187,7 @@ rust_library("prost-build-v0_11_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
   deps += [ ":heck-v0_4_1" ]
   deps += [ ":itertools-v0_10_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
@@ -11261,7 +11261,7 @@ rust_library("prost-types-v0_11_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":bytes-v1_0_1" ]
+  deps += [ ":bytes-v1_6_0" ]
   deps += [ ":prost-v0_11_0" ]
 
   rustenv = []
@@ -15861,7 +15861,7 @@ rust_library("tokio-v1_32_1") {
     deps += [ ":backtrace-v0_3_61" ]
   }
   if (!(current_os == "fuchsia")) {
-    deps += [ ":bytes-v1_0_1" ]
+    deps += [ ":bytes-v1_6_0" ]
     deps += [ ":libc-v0_2_149" ]
     deps += [ ":memchr-v2_7_1" ]
     deps += [ ":mio-v0_8_9" ]
