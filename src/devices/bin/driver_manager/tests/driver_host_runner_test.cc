@@ -97,6 +97,9 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm();
   void CallComponentStart(driver_manager::DriverHostRunner& driver_host_runner);
 
+  // Returns the exit status of the process.
+  int64_t WaitForProcessExit(const zx::process& process);
+
   driver_runner::TestRealm& realm() { return realm_; }
 
  private:
@@ -164,6 +167,24 @@ void DriverHostRunnerTest::CallComponentStart(
   dir_loop.JoinThreads();
 }
 
+int64_t DriverHostRunnerTest::WaitForProcessExit(const zx::process& process) {
+  int64_t result = -1;
+
+  auto wait_for_termination = [&process, &result]() {
+    zx_signals_t signals;
+    ASSERT_EQ(process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), &signals), ZX_OK);
+    ASSERT_TRUE(signals & ZX_PROCESS_TERMINATED);
+    zx_info_process_t info;
+    ASSERT_EQ(process.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr), ZX_OK);
+    ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_STARTED);
+    ASSERT_TRUE(info.flags & ZX_INFO_PROCESS_FLAG_EXITED);
+    result = info.return_code;
+  };
+  wait_for_termination();
+
+  return result;
+}
+
 TEST_F(DriverHostRunnerTest, Start) {
   constexpr std::string_view kDriverHostName = "driver-host-new-";
   constexpr std::string_view kCollection = "driver-hosts";
@@ -187,9 +208,7 @@ TEST_F(DriverHostRunnerTest, Start) {
 
   bool got_cb = false;
   auto res = driver_host_runner.StartDriverHost([&](zx::result<> result) {
-    // TODO(https://fxbug.dev/330775896): this is expected to be an error until
-    // the loader library CL is submitted.
-    ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, result.status_value());
+    ASSERT_EQ(ZX_OK, result.status_value());
     got_cb = true;
   });
   ASSERT_EQ(ZX_OK, res.status_value());
@@ -199,6 +218,13 @@ TEST_F(DriverHostRunnerTest, Start) {
 
   ASSERT_NO_FATAL_FAILURE(CallComponentStart(driver_host_runner));
   ASSERT_TRUE(got_cb);
+
+  std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
+      driver_host_runner.DriverHosts();
+  ASSERT_EQ(1u, driver_hosts.size());
+
+  const zx::process& process = (*driver_hosts.begin())->process();
+  ASSERT_EQ(0, WaitForProcessExit(process));
 }
 
 }  // namespace
