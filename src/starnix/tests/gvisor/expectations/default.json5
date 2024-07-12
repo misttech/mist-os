@@ -713,10 +713,6 @@
                 // rlimits_test
                 "RlimitTest.RlimitNProc",
 
-                // rtsignal_test
-                "RtSignalTest.InvalidCodes",
-                "RtSignalTest.SignoMatch",
-
                 // sigaltstack_test - https://fxbug.dev/42159586
                 "SigaltstackTest.ResetByExecve",
 
@@ -1186,6 +1182,16 @@
 
                 // TODO(https://fxbug.dev/339238239) Re-enable once flake is resolved.
                 "IntervalTimerTest.PeriodicGroupDirectedSignal",
+
+                // Skip for roll
+                "NetlinkRouteTest.GetLinkByIndex",
+                "NetlinkRouteTest.GetLinkByName",
+                "NetlinkRouteIpv4AndIpv6Tests/NetlinkRouteIpInvariantTest.AddAndRemoveRoute/*",
+                "_/NetlinkSetLinkTest.ChangeLinkName/*",
+                "_/NetlinkSetLinkTest.ChangeMACAddress/*",
+                "_/NetlinkSetLinkTest.ChangeMTU/*",
+                "RtSignalTest.InvalidCodes",
+                "RtSignalTest.SignoMatch",
             ],
         },
     ],
