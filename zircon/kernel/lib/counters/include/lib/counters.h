@@ -11,7 +11,9 @@
 
 #include <arch/ops.h>
 #include <kernel/percpu.h>
+#include <ktl/algorithm.h>
 #include <ktl/atomic.h>
+#include <ktl/limits.h>
 
 #include "counter-vmo-abi.h"
 
@@ -20,6 +22,7 @@
 // constructs. It answers questions like:
 //   - after N seconds how many outstanding <x> things are allocated?
 //   - up to this point has <Y> ever happened?
+//   - up to this point what is min(<Z>) or max(<Z>)?
 //
 // Currently the only query interface to the counters is the kcounter command.
 // Issue 'kcounter --help' to learn what it can do.
@@ -31,13 +34,22 @@
 // define multiple counters with the same name.
 //
 //      KCOUNTER(counter_name, "<counter name>");
+//      KCOUNTER_DECLARE(counter_name, "<counter name>", Sum);
+//      KCOUNTER_DECLARE(counter_name, "<counter name>", Min);
+//      KCOUNTER_DECLARE(counter_name, "<counter name>", Max);
 //
-// 2- Counters start at zero. Increment the counter:
+// 2- Counters start at zero, but can be set to other values during startup.
+//
+// Update the counter using sum, min, or max operations:
 //
 //      kcounter_add(counter_name, 1);
+//      kcounter_min(counter_name, 1);
+//      kcounter_max(counter_name, 1);
 //
-// By default with KCOUNTER, the `kcounter` presentation will calculate a
-// sum() across cores rather than summing.
+// By default with KCOUNTER, the `kcounter` presentation will calculate a sum()
+// across cores. The Min and Max presentation types can be specified by using
+// KCOUNTER_DECLARE and will present with a min() or max() across cores,
+// respectively.
 //
 // Naming the counters
 // The naming convention is "subsystem.thing_or_action"
@@ -45,11 +57,26 @@
 //             "exceptions.fpu"
 //             "handles.live"
 //
-// Reading the counter values in code: Don't. The counters are maintained in a
-// per-cpu arena and atomic operations are never used to set their value so they
-// are both imprecise and reflect only the operations on a particular core. That
-// said, if you really need to you can read a counter using either
-// |ValueCurrCpu| or |SumAcrossAllCpus|.
+// The counter update methods use relaxed atomic loads and stores only to avoid
+// formal data races in the C++ memory model, not to ensure atomicity with
+// respect to concurrent updates. Consistency under concurrent updates may
+// require read-modify-write operations on some architectures, which can
+// incur significant code gen complexity and runtime overhead, particularly
+// when preemption/interrupts are not disabled during updates. Since counters
+// are expected to be used in situations where concurrent updates are unlikely,
+// and where performance outweighs absolute accuracy, the operations are not
+// required to be atomic with respect to concurrent updates.
+//
+// The following provides some motivating comparisons of code gen on armv8-a:
+// https://godbolt.org/z/osz68aKq6
+//
+// **NOTE**: Because the accuracy and consistency of the counter values is not
+// guaranteed, care must be taken when reading the counter values in non-
+// diagnostic code. In the appropriate diagnostic use cases, counter values may
+// be read via |ValueCurrCpu|, |SumAcrossAllCpus|, |MinAcrossAllCpus|, or
+// |MaxAcrossAllCpus|. When using these methods, please include comments to make
+// it clear that the values are NOT reliable for production logic or non-
+// diagnostic purposes.
 
 class CounterDesc {
  public:
@@ -116,6 +143,26 @@ class Counter {
     return sum;
   }
 
+  // Return the max of the per-cpu slots for this counter.
+  int64_t MaxAcrossAllCpus() const {
+    int64_t max_value = ktl::numeric_limits<int64_t>::min();
+    percpu::ForEach([&](cpu_num_t cpu_num, percpu* p) {
+      ktl::atomic_ref<int64_t> slot(p->counters[Index()]);
+      max_value = ktl::max(max_value, slot.load(ktl::memory_order_relaxed));
+    });
+    return max_value;
+  }
+
+  // Return the min of the per-cpu slots for this counter.
+  int64_t MinAcrossAllCpus() const {
+    int64_t min_value = ktl::numeric_limits<int64_t>::max();
+    percpu::ForEach([&](cpu_num_t cpu_num, percpu* p) {
+      ktl::atomic_ref<int64_t> slot(p->counters[Index()]);
+      min_value = ktl::min(min_value, slot.load(ktl::memory_order_relaxed));
+    });
+    return min_value;
+  }
+
   // Return the value of the calling cpu's slot for this counter.
   int64_t ValueCurrCpu() const {
     ktl::atomic_ref<int64_t> slot(*Slot());
@@ -131,6 +178,24 @@ class Counter {
   void Add(int64_t delta) const {
     ktl::atomic_ref<int64_t> slot(*Slot());
     slot.store(slot.load(ktl::memory_order_relaxed) + delta, ktl::memory_order_relaxed);
+  }
+
+  void Max(int64_t value) const {
+    ktl::atomic_ref<int64_t> slot(*Slot());
+    const int64_t current = slot.load(ktl::memory_order_relaxed);
+    if (value > current) {
+      slot.store(value, ktl::memory_order_relaxed);
+    }
+  }
+
+  // Note: Since counters are defined in zero-initialized storage, a min counter
+  // must be set to the maximum value using Set() at some time during boot.
+  void Min(int64_t value) const {
+    ktl::atomic_ref<int64_t> slot(*Slot());
+    const int64_t current = slot.load(ktl::memory_order_relaxed);
+    if (value < current) {
+      slot.store(value, ktl::memory_order_relaxed);
+    }
   }
 
  private:
@@ -167,5 +232,7 @@ class Counter {
 #define KCOUNTER(var, name) KCOUNTER_DECLARE(var, name, Sum)
 
 inline void kcounter_add(const Counter& counter, int64_t delta) { counter.Add(delta); }
+inline void kcounter_min(const Counter& counter, int64_t value) { counter.Min(value); }
+inline void kcounter_max(const Counter& counter, int64_t value) { counter.Max(value); }
 
 #endif  // ZIRCON_KERNEL_LIB_COUNTERS_INCLUDE_LIB_COUNTERS_H_
