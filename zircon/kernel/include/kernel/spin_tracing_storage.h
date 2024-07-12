@@ -8,7 +8,9 @@
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_SPIN_TRACING_STORAGE_H_
 
 #include <lib/fxt/interned_string.h>
+#include <lib/fxt/string_ref.h>
 
+#include <kernel/lock_trace_config.h>
 #include <kernel/lockdep.h>
 #include <kernel/spin_tracing_config.h>
 #include <ktl/atomic.h>
@@ -25,8 +27,11 @@ class LockIdGenerator {
   static inline ktl::atomic<uint64_t> generator_{1};
 };
 
-template <LockType kLockType, bool Enabled = false>
-class LockNameStorage {
+template <LockType kLockType, bool Enabled>
+class LockNameStorage;
+
+template <LockType kLockType>
+class LockNameStorage<kLockType, false> {
  public:
   constexpr void SetLockClassId(lockdep::LockClassId lcid) {}
 
@@ -34,6 +39,10 @@ class LockNameStorage {
   constexpr LockNameStorage() = default;
   explicit constexpr LockNameStorage(uint16_t) {}
   constexpr EncodedLockId encoded_lock_id() const { return EncodedLockId::Invalid(); }
+  fxt::StringRef<fxt::RefType::kId> class_name_ref() const {
+    using fxt::operator""_intern;
+    return "[disabled]"_intern;
+  }
 };
 
 template <LockType kLockType>
@@ -74,6 +83,15 @@ class LockNameStorage<kLockType, true> : public LockIdGenerator {
       : encoded_lock_id_{kLockType, CreateId(), class_name_id} {}
 
   EncodedLockId encoded_lock_id() const { return encoded_lock_id_; }
+
+  fxt::StringRef<fxt::RefType::kId> class_name_ref() {
+    const uint16_t id = encoded_lock_id().class_name();
+    if (id == fxt::InternedString::kInvalidId) {
+      using fxt::operator""_intern;
+      return "[invalid]"_intern;
+    }
+    return fxt::StringRef{id};
+  }
 
  private:
   EncodedLockId encoded_lock_id_;

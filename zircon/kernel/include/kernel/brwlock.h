@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <debug.h>
 #include <endian.h>
+#include <lib/fxt/interned_string.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdint.h>
 
@@ -18,6 +19,7 @@
 #include <kernel/lock_validation_guard.h>
 #include <kernel/owned_wait_queue.h>
 #include <kernel/scheduler.h>
+#include <kernel/spin_tracing_storage.h>
 #include <kernel/thread.h>
 #include <kernel/wait.h>
 #include <ktl/atomic.h>
@@ -92,9 +94,14 @@ static_assert(sizeof(BrwLockState<BrwLockEnablePi::No>) == 8,
 // creates an additional restriction that readers must not take any additional
 // locks or otherwise block whilst holding the read lock.
 template <BrwLockEnablePi PI>
-class TA_CAP("mutex") BrwLock {
+class TA_CAP("mutex") BrwLock
+    : public spin_tracing::LockNameStorage<spin_tracing::LockType::kRwLock,
+                                           kSchedulerLockSpinTracingEnabled | kLockTracingEnabled> {
  public:
   BrwLock() = default;
+  explicit BrwLock(const fxt::InternedString& name_stringref)
+      : LockNameStorage(name_stringref.GetId()) {}
+
   ~BrwLock();
 
   void ReadAcquire() TA_ACQ_SHARED() {
@@ -130,7 +137,7 @@ class TA_CAP("mutex") BrwLock {
     uint64_t prev =
         ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockReader, ktl::memory_order_release);
     if (unlikely((prev & kBrwLockReaderMask) == 1 && (prev & kBrwLockWaiterMask) != 0)) {
-      LOCK_TRACE_DURATION("ContendedReadRelease");
+      LOCK_TRACE_DURATION("ContendedReadRelease", ("name", class_name_ref()));
       // there are no readers but still some waiters, becomes our job to wake them up
       ReleaseWakeup();
     }

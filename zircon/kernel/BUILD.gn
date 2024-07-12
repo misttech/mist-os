@@ -368,7 +368,7 @@ if (is_kernel) {
       configs =
           [ "//build/config/zircon/instrumentation:instrumented-stack-size" ]
     } else if (enable_lock_dep_metadata_only ||
-               scheduler_lock_spin_tracing_enabled) {
+               scheduler_lock_spin_tracing_enabled || lock_tracing_enabled) {
       defines += [
         "WITH_LOCK_DEP=1",
         "LOCK_DEP_ENABLED_FEATURE_LEVEL=1",

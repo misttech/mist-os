@@ -46,7 +46,7 @@ struct Bitfield {
 
 }  // namespace internal
 
-enum class LockType { kSpinlock = 0, kMutex = 1 };
+enum class LockType { kSpinlock = 0, kMutex = 1, kChainLock = 2, kRwLock = 3 };
 enum class FinishType {
   kLockAcquired = 0,
   kBlocked = 1,

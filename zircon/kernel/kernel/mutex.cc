@@ -23,6 +23,8 @@
 #include <lib/affine/utils.h>
 #include <lib/arch/intrin.h>
 #include <lib/counters.h>
+#include <lib/fxt/interned_string.h>
+#include <lib/fxt/string_ref.h>
 #include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/ktrace.h>
 #include <lib/zircon-internal/ktrace.h>
@@ -198,7 +200,7 @@ template <bool TimesliceExtensionEnabled>
 __NO_INLINE bool Mutex::AcquireContendedMutex(
     zx_duration_t spin_max_duration, Thread* current_thread,
     TimesliceExtension<TimesliceExtensionEnabled> timeslice_extension) {
-  LOCK_TRACE_DURATION("Mutex::AcquireContended");
+  LOCK_TRACE_DURATION("Mutex::AcquireContended", ("name", class_name_ref()));
 
   // It looks like the mutex is most likely contested (at least, it was when we
   // just checked). Enter the adaptive mutex spin phase, where we spin on the
@@ -467,7 +469,7 @@ inline uintptr_t Mutex::TryRelease(Thread* current_thread) {
 }
 
 __NO_INLINE void Mutex::ReleaseContendedMutex(Thread* current_thread, uintptr_t old_mutex_state) {
-  LOCK_TRACE_DURATION("Mutex::ReleaseContended");
+  LOCK_TRACE_DURATION("Mutex::ReleaseContended", ("name", class_name_ref()));
   OwnedWaitQueue::IWakeRequeueHook& default_hooks = OwnedWaitQueue::default_wake_hooks();
 
   // Lock our OWQ expecting to wake at most 1 thread.
