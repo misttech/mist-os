@@ -47,10 +47,6 @@ impl UnifiedPlugin {
                 "/verify/route_sources" => RouteSourcesController::default(),
                 "/verify/component_resolvers" => ComponentResolversController::default(),
                 "/verify/structured_config" => VerifyStructuredConfigController::default(),
-
-                // This doesn't actually verify anything, but we need the verify model to get
-                // V2ComponentModel, and depending on this plugin in `toolkit` doesn't work.
-                "/verify/structured_config/extract" => ExtractStructuredConfigController::default(),
                 "/zbi/bootfs" => BootFsFilesController::default(),
                 "/zbi/bootfs_packages" => BootFsPackagesController::default(),
                 "/zbi/cmdline" => ZbiCmdlineController::default(),

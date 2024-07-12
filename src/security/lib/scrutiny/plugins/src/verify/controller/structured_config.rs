@@ -17,11 +17,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 /// A controller to extract all of the configuration values in a given build's component topology.
-#[derive(Default)]
 pub struct ExtractStructuredConfigController {}
 
-impl DataController for ExtractStructuredConfigController {
-    fn query(&self, model: Arc<DataModel>, _query: serde_json::Value) -> Result<serde_json::Value> {
+impl ExtractStructuredConfigController {
+    pub fn extract(model: Arc<DataModel>) -> Result<ExtractStructuredConfigResponse> {
         let V2ComponentModel { component_model, deps, .. } =
             &*model.get::<V2ComponentModel>().context("getting component model")?;
         let config_by_url = component_model
@@ -30,7 +29,7 @@ impl DataController for ExtractStructuredConfigController {
 
         let components =
             config_by_url.into_iter().map(|(url, fields)| (url, fields.into())).collect();
-        Ok(serde_json::json!(ExtractStructuredConfigResponse { components, deps: deps.to_owned() }))
+        Ok(ExtractStructuredConfigResponse { components, deps: deps.to_owned() })
     }
 }
 

@@ -11,9 +11,7 @@ ffx_plugin("ffx_scrutiny_structured_config") {
 
   deps = [
     "//src/developer/ffx/lib/fho:lib",
-    "//src/security/lib/scrutiny/config",
     "//src/security/lib/scrutiny/frontend",
-    "//src/security/lib/scrutiny/plugins",
     "//src/security/lib/scrutiny/utils",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:serde_json",
