@@ -565,3 +565,7 @@ pub trait WakeLeaseInterlockOps {
     /// Ignoring the returned Channel means dropping the wake lease.
     fn take_lease(&self) -> Option<zx::Channel>;
 }
+
+pub trait OnWakeOps: Send + Sync {
+    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel);
+}

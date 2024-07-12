@@ -4,6 +4,7 @@
 
 use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags};
+use crate::power::OnWakeOps;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -1756,22 +1757,6 @@ impl FileObject {
     pub fn unregister_epfd(&self, fd: FdNumber) {
         self.epoll_files.lock().remove(&fd);
     }
-
-    /// Called when the underneath `FileOps` is waken up by the power framework.
-    pub fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel) {
-        // Activate associated wake leases in registered epfd.
-        for epfd in self.epoll_files.lock().iter() {
-            if let Ok(file) = current_task.files.get(*epfd) {
-                if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
-                    if let Some(weak_handle) = self.weak_handle.upgrade() {
-                        if let Err(e) = epoll_file.activate_lease(&weak_handle, baton_lease) {
-                            log_error!("Failed to activate wake lease in epoll control file: {e}");
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl Releasable for FileObject {
@@ -1806,6 +1791,24 @@ impl fmt::Debug for FileObject {
             .field("flags", &self.flags)
             .field("ops_ty", &self.ops().type_name())
             .finish()
+    }
+}
+
+impl OnWakeOps for FileReleaser {
+    /// Called when the underneath `FileOps` is waken up by the power framework.
+    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel) {
+        // Activate associated wake leases in registered epfd.
+        for epfd in self.epoll_files.lock().iter() {
+            if let Ok(file) = current_task.files.get(*epfd) {
+                if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
+                    if let Some(weak_handle) = self.weak_handle.upgrade() {
+                        if let Err(e) = epoll_file.activate_lease(&weak_handle, baton_lease) {
+                            log_error!("Failed to activate wake lease in epoll control file: {e}");
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
