@@ -9,7 +9,6 @@ use crate::additional_boot_args::controller::*;
 use crate::core::controller::blob::*;
 use crate::core::controller::component::*;
 use crate::core::controller::package::*;
-use crate::core::controller::package_extract::*;
 use crate::search::controller::components::*;
 use crate::search::controller::packages::*;
 use crate::static_pkgs::controller::*;
@@ -35,7 +34,6 @@ impl UnifiedPlugin {
                 "/component" => ComponentGraphController::default(),
                 "/components" => ComponentsGraphController::default(),
                 "/component/manifest" => ComponentManifestGraphController::default(),
-                "/package/extract" => PackageExtractController::default(),
                 "/packages" => PackagesGraphController::default(),
                 "/packages/urls" => PackageUrlListController::default(),
                 "/blob" => BlobController::default(),

@@ -7,7 +7,9 @@ use fuchsia_url::AbsolutePackageUrl;
 use scrutiny::prelude::{DataCollector, DataModel};
 use scrutiny_config::ModelConfig;
 use scrutiny_plugins::core::collection::{Component, Components, Package, Packages};
+use scrutiny_plugins::core::controller::package_extract::PackageExtractController;
 use scrutiny_plugins::unified_plugin::UnifiedCollector;
+use serde_json::Value;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -47,5 +49,13 @@ impl Scrutiny {
             }
         }
         return Ok(None);
+    }
+
+    pub fn extract_package(
+        &self,
+        url: AbsolutePackageUrl,
+        output: impl AsRef<Path>,
+    ) -> Result<Value> {
+        PackageExtractController::extract(self.model.clone(), url, output)
     }
 }

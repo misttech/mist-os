@@ -2,75 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::core::collection::{Package, Packages};
+use crate::core::collection::Packages;
 use anyhow::{anyhow, Context, Result};
 use fuchsia_archive::Utf8Reader as FarReader;
 use fuchsia_url::AbsolutePackageUrl;
-use scrutiny::model::controller::{DataController, HintDataType};
 use scrutiny::model::model::DataModel;
 use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
-use scrutiny_utils::usage::UsageBuilder;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::value::Value;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-#[derive(Deserialize, Serialize)]
-pub struct PackageExtractRequest {
-    // The input path for the ZBI.
-    pub url: AbsolutePackageUrl,
-    // The output directory for the extracted ZBI.
-    pub output: PathBuf,
-}
-
-impl PackageExtractRequest {
-    fn url_matches_package(&self, pkg: &Package) -> bool {
-        // Unconditionally check package name.
-        if !self.url_matches_pkg_name(pkg) {
-            return false;
-        }
-
-        // Check variant iff request specifies variant.
-        if self.url_has_variant() {
-            if !self.url_matches_pkg_variant(pkg) {
-                return false;
-            }
-        }
-
-        // Check hash iff request specifies hash.
-        if self.url_has_package_hash() {
-            if !self.url_matches_package_hash(pkg) {
-                return false;
-            }
-        }
-
-        // Failed checks returned `false` early.
-        return true;
-    }
-
-    fn url_has_variant(&self) -> bool {
-        self.url.variant().is_some()
-    }
-
-    fn url_has_package_hash(&self) -> bool {
-        self.url.hash().is_some()
-    }
-
-    fn url_matches_pkg_name(&self, pkg: &Package) -> bool {
-        self.url.name() == &pkg.name
-    }
-
-    fn url_matches_pkg_variant(&self, pkg: &Package) -> bool {
-        self.url.variant() == pkg.variant.as_ref()
-    }
-
-    fn url_matches_package_hash(&self, pkg: &Package) -> bool {
-        self.url.hash() == Some(pkg.merkle)
-    }
-}
 
 fn create_dir_all<P: AsRef<Path> + ?Sized>(path: &P) -> Result<()> {
     fs::create_dir_all(path).map_err(|err| {
@@ -96,19 +39,21 @@ where
     })
 }
 
-#[derive(Default)]
 pub struct PackageExtractController {}
 
-impl DataController for PackageExtractController {
-    fn query(&self, model: Arc<DataModel>, query: Value) -> Result<Value> {
+impl PackageExtractController {
+    pub fn extract(
+        model: Arc<DataModel>,
+        url: AbsolutePackageUrl,
+        output: impl AsRef<Path>,
+    ) -> Result<Value> {
+        let output = output.as_ref();
         let mut artifact_reader =
             FileArtifactReader::new(&PathBuf::new(), &model.config().blobs_directory());
-        let request: PackageExtractRequest = serde_json::from_value(query)?;
         let packages = &model.get::<Packages>()?.entries;
         for package in packages.iter() {
-            if request.url_matches_package(package) {
-                let output_path = PathBuf::from(request.output);
-                create_dir_all(&output_path).context("Failed to create output directory")?;
+            if package.matches_url(&url) {
+                create_dir_all(&output).context("Failed to create output directory")?;
 
                 let merkle_string = format!("{}", package.merkle);
                 let blob = artifact_reader
@@ -120,7 +65,7 @@ impl DataController for PackageExtractController {
                 // Extract all the far meta files.
                 for file_name in pkg_files.iter() {
                     let mut data = far.read_file(file_name)?;
-                    let file_path = output_path.join(file_name);
+                    let file_path = output.join(file_name);
                     if let Some(parent_dir) = file_path.as_path().parent() {
                         create_dir_all(parent_dir)
                             .context("Failed to create far meta directory")?;
@@ -138,7 +83,7 @@ impl DataController for PackageExtractController {
                         .open(Path::new(&merkle_string))
                         .context("Failed to read package from blobfs archive(s)")?;
 
-                    let file_path = output_path.join(file_name);
+                    let file_path = output.join(file_name);
                     if let Some(parent_dir) = file_path.as_path().parent() {
                         create_dir_all(parent_dir)
                             .context("Failed to create directory for package contents file")?;
@@ -152,32 +97,6 @@ impl DataController for PackageExtractController {
                 return Ok(json!({"status": "ok"}));
             }
         }
-        Err(anyhow!("Unable to find package with url {}", request.url))
-    }
-
-    fn description(&self) -> String {
-        "Extracts a package from a url to a directory.".to_string()
-    }
-
-    fn usage(&self) -> String {
-        UsageBuilder::new()
-            .name("package.extract - Extracts Fuchsia package to a directory.")
-            .summary("package.extract --url fuchsia-pkg://fuchsia.com/foo --output /tmp/foo")
-            .description(
-                "Extracts package from a given url to some provided file path. \
-                Internally this is resolving the URL and extracting the internal
-                Fuchsia Archive and resolving all the merkle paths.
-                ",
-            )
-            .arg("--url", "Package url that you wish to extract.")
-            .arg("--output", "Path to the output directory")
-            .build()
-    }
-
-    fn hints(&self) -> Vec<(String, HintDataType)> {
-        vec![
-            ("--url".to_string(), HintDataType::NoType),
-            ("--output".to_string(), HintDataType::NoType),
-        ]
+        Err(anyhow!("Unable to find package with url {}", url))
     }
 }
