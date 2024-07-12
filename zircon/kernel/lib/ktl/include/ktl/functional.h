@@ -12,6 +12,7 @@
 namespace ktl {
 
 using cpp20::bind_front;
+using cpp20::invoke;
 
 }  // namespace ktl
 
