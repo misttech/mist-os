@@ -8,6 +8,7 @@ pub mod auth;
 pub mod device_type;
 pub mod elf;
 pub mod errors;
+pub mod file_lease;
 pub mod file_mode;
 pub mod inotify_mask;
 pub mod iptables_flags;

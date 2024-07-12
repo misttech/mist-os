@@ -29,6 +29,7 @@ use starnix_sync::{
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
+use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
@@ -1156,6 +1157,9 @@ pub struct FileObject {
     /// `FileObject` as the control file.
     epoll_files: Mutex<HashSet<FdNumber>>,
 
+    /// See fcntl F_SETLEASE and F_GETLEASE.
+    lease: Mutex<FileLeaseType>,
+
     _file_write_guard: Option<FileWriteGuard>,
 }
 
@@ -1208,6 +1212,7 @@ impl FileObject {
                 flags: Mutex::new(flags - OpenFlags::CREAT),
                 async_owner: Default::default(),
                 epoll_files: Default::default(),
+                lease: Default::default(),
                 _file_write_guard: file_write_guard,
             }
             .into()
@@ -1690,6 +1695,27 @@ impl FileObject {
     /// See fcntl(F_SETOWN)
     pub fn set_async_owner(&self, owner: FileAsyncOwner) {
         *self.async_owner.lock() = owner;
+    }
+
+    /// See fcntl(F_GETLEASE)
+    pub fn get_lease(&self, _current_task: &CurrentTask) -> FileLeaseType {
+        *self.lease.lock()
+    }
+
+    /// See fcntl(F_SETLEASE)
+    pub fn set_lease(
+        &self,
+        _current_task: &CurrentTask,
+        lease: FileLeaseType,
+    ) -> Result<(), Errno> {
+        if !self.node().is_reg() {
+            return error!(EINVAL);
+        }
+        if lease == FileLeaseType::Read && self.can_write() {
+            return error!(EAGAIN);
+        }
+        *self.lease.lock() = lease;
+        Ok(())
     }
 
     /// Wait on the specified events and call the EventHandler when ready

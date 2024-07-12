@@ -55,10 +55,6 @@
                 // Fails due to: "No supported filesystems"
                 "getxattr03",
 
-                // 23 requires F_SETLEASE
-                "fcntl23",
-                "fcntl23_64",
-
                 // 24 requires F_SETLEASE, and does not run on tmpfs.
                 "fcntl24",
                 "fcntl24_64",
