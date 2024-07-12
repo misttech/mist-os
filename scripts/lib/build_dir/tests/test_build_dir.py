@@ -9,14 +9,16 @@ import build_dir
 
 
 class TestBuildDir(unittest.TestCase):
-    @mock.patch.dict("os.environ", {})
+    @mock.patch.dict("os.environ", clear=True)
     def test_missing(self) -> None:
         self.assertRaises(
             build_dir.GetBuildDirectoryError,
             lambda: build_dir.get_build_directory(),
         )
 
-    @mock.patch.dict("os.environ", {"FUCHSIA_BUILD_DIR": "/tmp/out/foo"})
+    @mock.patch.dict(
+        "os.environ", {"FUCHSIA_BUILD_DIR_FROM_FX": "/tmp/out/foo"}
+    )
     def test_present(self) -> None:
         self.assertEqual(
             "/tmp/out/foo", build_dir.get_build_directory().as_posix()

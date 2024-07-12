@@ -91,6 +91,11 @@ fi
 
 export PATH="${newpath}"
 
+# Always populate FUCHSIA_BUILD_DIR_FROM_FX.
+if [[ -z "${FUCHSIA_BUILD_DIR_FROM_FX}" && -f "${FUCHSIA_DIR}/.fx-build-dir" ]]; then
+  export FUCHSIA_BUILD_DIR_FROM_FX=$(cd ${FUCHSIA_DIR} && realpath $(cat .fx-build-dir))
+fi
+
 # Forward the args to the system `env`.
 exec /usr/bin/env -i \
   "FUCHSIA_DIR=${fuchsia_dir}" \

@@ -28,7 +28,7 @@ def get_build_directory() -> pathlib.Path:
             that was not executed by `fx`.
     """
 
-    path = os.getenv("FUCHSIA_BUILD_DIR")
+    path = os.getenv("FUCHSIA_BUILD_DIR_FROM_FX")
     if not path:
         raise GetBuildDirectoryError(
             "Could not determine Fuchsia build directory. Make sure that this script is being executed by `fx` and not directly."
