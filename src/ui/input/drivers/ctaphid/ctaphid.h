@@ -6,7 +6,7 @@
 #define SRC_UI_INPUT_DRIVERS_CTAPHID_CTAPHID_H_
 
 #include <fidl/fuchsia.fido.report/cpp/wire.h>
-#include <fuchsia/hardware/hiddevice/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 
@@ -54,7 +54,7 @@ using pending_response = struct pending_response {
   uint16_t bytes_received = 0;
 
   // The time the last packet of this response was received.
-  std::optional<zx_time_t> last_packet_received_time;
+  std::optional<zx::time> last_packet_received_time;
   // The next expected sequence value of a continuation packet.
   uint8_t next_packet_seq_expected;
 
@@ -67,12 +67,10 @@ class CtapHidDriver;
 using CtapHidDriverDeviceType =
     ddk::Device<CtapHidDriver, ddk::Unbindable,
                 ddk::Messageable<fuchsia_fido_report::SecurityKeyDevice>::Mixin>;
-class CtapHidDriver : public CtapHidDriverDeviceType,
-                      public ddk::EmptyProtocol<ZX_PROTOCOL_CTAP>,
-                      ddk::HidReportListenerProtocol<CtapHidDriver> {
+class CtapHidDriver : public CtapHidDriverDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CTAP> {
  public:
-  CtapHidDriver(zx_device_t* parent, ddk::HidDeviceProtocolClient hiddev)
-      : CtapHidDriverDeviceType(parent), hiddev_(hiddev) {}
+  CtapHidDriver(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_input::Device> input_device)
+      : CtapHidDriverDeviceType(parent), input_device_(std::move(input_device)) {}
 
   ~CtapHidDriver() {
     fbl::AutoLock lock(&lock_);
@@ -83,7 +81,6 @@ class CtapHidDriver : public CtapHidDriverDeviceType,
   }
 
   zx_status_t Start();
-  void Stop();
 
   // DDK Functions.
   zx_status_t Bind();
@@ -93,10 +90,6 @@ class CtapHidDriver : public CtapHidDriverDeviceType,
   // FIDL functions.
   void SendMessage(SendMessageRequestView request, SendMessageCompleter::Sync& completer) override;
   void GetMessage(GetMessageRequestView request, GetMessageCompleter::Sync& completer) override;
-
-  // HidReportListener functions.
-  void HidReportListenerReceiveReport(const uint8_t* report, size_t report_size,
-                                      zx_time_t report_time);
 
  private:
   static constexpr size_t kFidlReportBufferSize = 8192;
@@ -125,7 +118,12 @@ class CtapHidDriver : public CtapHidDriverDeviceType,
                           fuchsia_fido_report::CtapHidCommand command_id, uint16_t payload_len,
                           uint8_t* out, size_t out_size);
 
-  ddk::HidDeviceProtocolClient hiddev_;
+  void HandleReports(
+      fidl::WireUnownedResult<fuchsia_hardware_input::DeviceReportsReader::ReadReports>& result);
+  void HandleReport(cpp20::span<uint8_t> report, zx::time report_time) __TA_REQUIRES(lock_);
+
+  fidl::WireSyncClient<fuchsia_hardware_input::Device> input_device_;
+  fidl::WireClient<fuchsia_hardware_input::DeviceReportsReader> dev_reader_;
 
   fbl::Mutex lock_;
   fidl::Arena<kFidlReportBufferSize> response_allocator_ __TA_GUARDED(lock_);

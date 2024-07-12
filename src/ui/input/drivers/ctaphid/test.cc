@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.fido.report/cpp/wire.h>
+#include <fidl/fuchsia.hardware.input/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/sys/cpp/component_context.h>
 #include <zircon/errors.h>
 
@@ -11,12 +14,14 @@
 #include <zxtest/zxtest.h>
 
 #include "ctaphid.h"
-#include "fidl/fuchsia.fido.report/cpp/markers.h"
 
 namespace ctaphid {
+
+namespace fhidbus = fuchsia_hardware_hidbus;
+namespace finput = fuchsia_hardware_input;
+
 /// Exact report descriptor for a Yubico 5 series security key (note the 0xF1DO near the start).
-#define SKEY_DESC_LEN 34
-const uint8_t skey_desc[SKEY_DESC_LEN] = {
+const uint8_t skey_desc[] = {
     0x06, 0xd0, 0xf1,  // Usage Page ( FIDO_USAGE_PAGE )
     0x09, 0x01,        // Usage ( FIDO_USAGE_CTAPHID )
     0xA1, 0x01,        // Collection ( Application )
@@ -35,81 +40,122 @@ const uint8_t skey_desc[SKEY_DESC_LEN] = {
     0xc0,              // End Collection
 };
 
-class FakeCtapHidDevice : public ddk::HidDeviceProtocol<FakeCtapHidDevice> {
+class FakeCtapHidDevice : public fidl::testing::WireTestBase<finput::Device> {
  public:
-  FakeCtapHidDevice() : proto_({&hid_device_protocol_ops_, this}) {}
+  class DeviceReportsReader : public fidl::WireServer<finput::DeviceReportsReader> {
+   public:
+    explicit DeviceReportsReader(FakeCtapHidDevice* parent, async_dispatcher_t* dispatcher,
+                                 fidl::ServerEnd<finput::DeviceReportsReader> server)
+        : binding_(dispatcher, std::move(server), this,
+                   [parent](fidl::UnbindInfo info) { parent->reader_.reset(); }) {}
 
-  zx_status_t HidDeviceRegisterListener(const hid_report_listener_protocol_t* listener) {
-    listener_ = *listener;
-    return ZX_OK;
-  }
+    ~DeviceReportsReader() override { binding_.Close(ZX_ERR_PEER_CLOSED); }
 
-  void HidDeviceUnregisterListener() { listener_.reset(); }
-
-  zx_status_t HidDeviceGetDescriptor(uint8_t* out_descriptor_list, size_t descriptor_count,
-                                     size_t* out_descriptor_actual) {
-    if (descriptor_count < report_desc_.size()) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
+    void ReadReports(ReadReportsCompleter::Sync& completer) override {
+      ASSERT_FALSE(waiting_read_.has_value());
+      waiting_read_.emplace(completer.ToAsync());
+      wait_for_read_.Signal();
     }
-    memcpy(out_descriptor_list, report_desc_.data(), report_desc_.size());
-    *out_descriptor_actual = report_desc_.size();
-    return ZX_OK;
+
+    void SendReport(std::vector<uint8_t> report, zx::time timestamp) {
+      fidl::Arena arena;
+      std::vector<fhidbus::wire::Report> reports = {
+          fhidbus::wire::Report::Builder(arena)
+              .timestamp(timestamp.get())
+              .buf(fidl::VectorView<uint8_t>::FromExternal(report.data(), report.size()))
+              .Build()};
+      waiting_read_->ReplySuccess(
+          fidl::VectorView<fhidbus::wire::Report>::FromExternal(reports.data(), reports.size()));
+      waiting_read_.reset();
+    }
+
+    libsync::Completion& wait_for_read() { return wait_for_read_; }
+
+   private:
+    fidl::ServerBinding<finput::DeviceReportsReader> binding_;
+    std::optional<ReadReportsCompleter::Async> waiting_read_;
+    libsync::Completion wait_for_read_;
+  };
+
+  static constexpr uint32_t kVendorId = 0xabc;
+  static constexpr uint32_t kProductId = 123;
+  static constexpr uint32_t kVersion = 5;
+
+  explicit FakeCtapHidDevice(fidl::ServerEnd<finput::Device> server)
+      : dispatcher_(async_get_default_dispatcher()),
+        binding_(dispatcher_, std::move(server), this, fidl::kIgnoreBindingClosure) {}
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ASSERT_TRUE(false);
   }
 
-  zx_status_t HidDeviceGetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                                 uint8_t* out_report_list, size_t report_count,
-                                 size_t* out_report_actual) {
+  void Query(QueryCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    completer.ReplySuccess(fhidbus::wire::HidInfo::Builder(arena)
+                               .vendor_id(kVendorId)
+                               .product_id(kProductId)
+                               .version(kVersion)
+                               .Build());
+  }
+
+  void GetDeviceReportsReader(GetDeviceReportsReaderRequestView request,
+                              GetDeviceReportsReaderCompleter::Sync& completer) override {
+    ASSERT_NULL(reader_);
+    reader_ = std::make_unique<DeviceReportsReader>(this, dispatcher_, std::move(request->reader));
+    completer.ReplySuccess();
+  }
+
+  void GetReportDesc(GetReportDescCompleter::Sync& completer) override {
+    completer.Reply(
+        fidl::VectorView<uint8_t>::FromExternal(report_desc_.data(), report_desc_.size()));
+  }
+
+  void GetReport(GetReportRequestView request, GetReportCompleter::Sync& completer) override {
     // If the client is Getting a report with a specific ID, check that it matches
     // our saved report.
-    if ((rpt_id != 0) && (report_.size() > 0)) {
-      if (rpt_id != report_[0]) {
-        return ZX_ERR_WRONG_TYPE;
+    if ((request->id != 0) && (report_.size() > 0)) {
+      if (request->id != report_[0]) {
+        completer.ReplyError(ZX_ERR_WRONG_TYPE);
+        return;
       }
     }
 
-    if (report_count < report_.size()) {
-      return ZX_ERR_BUFFER_TOO_SMALL;
-    }
-    memcpy(out_report_list, report_.data(), report_.size());
-    *out_report_actual = report_.size();
-
-    return ZX_OK;
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(report_.data(), report_.size()));
   }
 
-  void HidDeviceGetHidDeviceInfo(hid_device_info_t* out_info) {
-    out_info->vendor_id = 0xabc;
-    out_info->product_id = 123;
-    out_info->version = 5;
-  }
-
-  zx_status_t HidDeviceSetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                                 const uint8_t* report_list, size_t report_count) {
-    report_ = std::vector<uint8_t>(report_list, report_list + report_count);
+  void SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) override {
+    report_ = std::vector<uint8_t>(request->report.data(),
+                                   request->report.data() + request->report.count());
     n_set_reports_received++;
-    return ZX_OK;
+    completer.ReplySuccess();
   }
 
-  void SetReportDesc(std::vector<uint8_t> report_desc) { report_desc_ = report_desc; }
+  void SetReportDesc(std::vector<uint8_t> report_desc) { report_desc_ = std::move(report_desc); }
 
-  void SendReport(const std::vector<uint8_t>& report, zx_time_t timestamp = ZX_TIME_INFINITE) {
-    if (timestamp == ZX_TIME_INFINITE) {
-      timestamp = zx_clock_get_monotonic();
-    }
-    if (listener_.has_value()) {
-      listener_->ops->receive_report(listener_->ctx, report.data(), report.size(), timestamp);
-    }
+  void SendReport(std::vector<uint8_t> report) {
+    ASSERT_NOT_NULL(reader_);
+    reader_->SendReport(std::move(report), zx::clock::get_monotonic());
   }
 
   void reset_set_reports_counter() { n_set_reports_received = 0; }
   void reset_packets_received_counter() { n_packets_received = 0; }
 
-  std::optional<hid_report_listener_protocol_t> listener_;
-  hid_device_protocol_t proto_;
+  libsync::Completion& wait_for_read() {
+    EXPECT_NOT_NULL(reader_);
+    return reader_->wait_for_read();
+  }
+
+  std::unique_ptr<DeviceReportsReader> reader_;
+  uint32_t n_set_reports_received = 0;
+  uint32_t n_packets_received = 0;
+
+ private:
+  async_dispatcher_t* dispatcher_;
+  fidl::ServerBinding<finput::Device> binding_;
+
   std::vector<uint8_t> report_desc_;
 
   std::vector<uint8_t> report_;
-  uint32_t n_set_reports_received = 0;
-  uint32_t n_packets_received = 0;
 };
 
 class CtapHidDevTest : public zxtest::Test {
@@ -117,26 +163,34 @@ class CtapHidDevTest : public zxtest::Test {
   CtapHidDevTest()
       : loop_(&kAsyncLoopConfigNeverAttachToThread), mock_parent_(MockDevice::FakeRootParent()) {}
   void SetUp() override {
-    hid_client_ = ddk::HidDeviceProtocolClient(&fake_hid_device_.proto_);
-    ctap_driver_device_ = new CtapHidDriver(mock_parent_.get(), hid_client_);
-    // Each test is responsible for calling |ctap_driver_device_->Bind()|.
+    ASSERT_OK(hid_dev_loop_.StartThread("fake-hid-device-thread"));
+    auto [client, server] = fidl::Endpoints<finput::Device>::Create();
+    fake_hid_device_.emplace(std::move(server));
+    ctap_driver_device_ = new CtapHidDriver(mock_parent_.get(), std::move(client));
+
+    fake_hid_device_.SyncCall(&FakeCtapHidDevice::SetReportDesc,
+                              std::vector<uint8_t>(skey_desc, skey_desc + sizeof(skey_desc)));
+    ASSERT_OK(ctap_driver_device_->Bind());
   }
 
  protected:
   static constexpr size_t kFidlReportBufferSize = 8192;
 
-  void SetupSyncClient() {
-    ASSERT_OK(loop_.StartThread("test-loop-thread"));
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> SetupSyncClient() {
+    EXPECT_OK(loop_.StartThread("test-loop-thread"));
     auto endpoints = fidl::Endpoints<fuchsia_fido_report::SecurityKeyDevice>::Create();
     binding_ =
         fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), ctap_driver_device_);
-    sync_client_.Bind(std::move(endpoints.client));
+    return fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice>(
+        std::move(endpoints.client));
   }
 
-  void SetupAsyncClient() {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_fido_report::SecurityKeyDevice>();
-    async_client_.Bind(std::move(endpoints->client), loop_.dispatcher());
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), ctap_driver_device_);
+  fidl::WireClient<fuchsia_fido_report::SecurityKeyDevice> SetupAsyncClient() {
+    auto endpoints = fidl::Endpoints<fuchsia_fido_report::SecurityKeyDevice>::Create();
+    binding_ =
+        fidl::BindServer(loop_.dispatcher(), std::move(endpoints.server), ctap_driver_device_);
+    return fidl::WireClient<fuchsia_fido_report::SecurityKeyDevice>(std::move(endpoints.client),
+                                                                    loop_.dispatcher());
   }
 
   fuchsia_fido_report::wire::Message BuildRequest(fidl::Arena<kFidlReportBufferSize>& allocator,
@@ -152,24 +206,29 @@ class CtapHidDevTest : public zxtest::Test {
     return result;
   }
 
+  void SendReport(std::vector<uint8_t> report) {
+    mock_ddk::GetDriverRuntime()->PerformBlockingWork([this]() {
+      fake_hid_device_.SyncCall(&FakeCtapHidDevice::wait_for_read).Wait();
+      fake_hid_device_.SyncCall(&FakeCtapHidDevice::wait_for_read).Reset();
+    });
+    fake_hid_device_.SyncCall(&FakeCtapHidDevice::SendReport, std::move(report));
+    mock_ddk::GetDriverRuntime()->PerformBlockingWork(
+        [this]() { fake_hid_device_.SyncCall(&FakeCtapHidDevice::wait_for_read).Wait(); });
+  }
+
   async::Loop loop_;
+  async::Loop hid_dev_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
   std::shared_ptr<MockDevice> mock_parent_;
-  FakeCtapHidDevice fake_hid_device_;
-  ddk::HidDeviceProtocolClient hid_client_;
+  async_patterns::TestDispatcherBound<FakeCtapHidDevice> fake_hid_device_{
+      hid_dev_loop_.dispatcher()};
   CtapHidDriver* ctap_driver_device_;
 
   std::optional<fidl::ServerBindingRef<fuchsia_fido_report::SecurityKeyDevice>> binding_;
-  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client_;
-  fidl::WireClient<fuchsia_fido_report::SecurityKeyDevice> async_client_;
 };
 
 TEST_F(CtapHidDevTest, HidLifetimeTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + sizeof(skey_desc));
-  fake_hid_device_.SetReportDesc(desc);
-
-  ASSERT_OK(ctap_driver_device_->Bind());
-  ASSERT_TRUE(fake_hid_device_.listener_);
+  fake_hid_device_.SyncCall([](FakeCtapHidDevice* dev) { ASSERT_TRUE(dev->reader_); });
 
   // make sure the child device is there
   ASSERT_EQ(mock_parent_->child_count(), 1);
@@ -178,15 +237,11 @@ TEST_F(CtapHidDevTest, HidLifetimeTest) {
   child->ReleaseOp();
 
   // Make sure that the CtapHidDriver class has unregistered from the HID device.
-  ASSERT_FALSE(fake_hid_device_.listener_);
+  fake_hid_device_.SyncCall([](FakeCtapHidDevice* dev) { ASSERT_FALSE(dev->reader_); });
 }
 
 TEST_F(CtapHidDevTest, SendMessageWithEmptyPayloadTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   fidl::Arena<kFidlReportBufferSize> allocator;
   std::vector<uint8_t> data_vec{};
@@ -195,20 +250,17 @@ TEST_F(CtapHidDevTest, SendMessageWithEmptyPayloadTest) {
 
   // Send the Command.
   fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-      sync_client_->SendMessage(message_request);
+      sync_client->SendMessage(message_request);
   loop_.RunUntilIdle();
 
   ASSERT_EQ(result.status(), ZX_OK);
   // Check the hid driver received the correct number of packets.
-  ASSERT_EQ(fake_hid_device_.n_set_reports_received, 1);
+  fake_hid_device_.SyncCall(
+      [](FakeCtapHidDevice* dev) { ASSERT_EQ(dev->n_set_reports_received, 1); });
 }
 
 TEST_F(CtapHidDevTest, SendMessageSinglePacketTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   fidl::Arena<kFidlReportBufferSize> allocator;
   std::vector<uint8_t> data_vec{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
@@ -217,20 +269,17 @@ TEST_F(CtapHidDevTest, SendMessageSinglePacketTest) {
 
   // Send the Command.
   fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-      sync_client_->SendMessage(message_request);
+      sync_client->SendMessage(message_request);
   loop_.RunUntilIdle();
 
   ASSERT_EQ(result.status(), ZX_OK);
   // Check the hid driver received the correct number of packets.
-  ASSERT_EQ(fake_hid_device_.n_set_reports_received, 1);
+  fake_hid_device_.SyncCall(
+      [](FakeCtapHidDevice* dev) { ASSERT_EQ(dev->n_set_reports_received, 1); });
 }
 
 TEST_F(CtapHidDevTest, SendMessageMultiPacketTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   fidl::Arena<kFidlReportBufferSize> allocator;
   std::vector<uint8_t> data_vec(1024, 1);
@@ -239,7 +288,7 @@ TEST_F(CtapHidDevTest, SendMessageMultiPacketTest) {
 
   // Send the Command.
   fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-      sync_client_->SendMessage(message_request);
+      sync_client->SendMessage(message_request);
   loop_.RunUntilIdle();
 
   ASSERT_EQ(result.status(), ZX_OK);
@@ -247,15 +296,12 @@ TEST_F(CtapHidDevTest, SendMessageMultiPacketTest) {
   // The number of packets used to send this message should be:
   // ciel((data_size - (ouput_packet_size-7)) / (output_packet_size - 5)) + 1
   // In this case, the output_packet_size is 64 and the data_size is 1024.
-  ASSERT_EQ(fake_hid_device_.n_set_reports_received, 18);
+  fake_hid_device_.SyncCall(
+      [](FakeCtapHidDevice* dev) { ASSERT_EQ(dev->n_set_reports_received, 18); });
 }
 
 TEST_F(CtapHidDevTest, SendMessageChannelAlreadyPendingTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t test_channel = 0x01020304;
 
@@ -268,7 +314,7 @@ TEST_F(CtapHidDevTest, SendMessageChannelAlreadyPendingTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -284,7 +330,7 @@ TEST_F(CtapHidDevTest, SendMessageChannelAlreadyPendingTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_TRUE(result->is_error());
@@ -304,7 +350,7 @@ TEST_F(CtapHidDevTest, SendMessageChannelAlreadyPendingTest) {
         0x00, 0x01,
         // payload
         0x0f};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 
@@ -318,7 +364,7 @@ TEST_F(CtapHidDevTest, SendMessageChannelAlreadyPendingTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_TRUE(result->is_error());
@@ -328,7 +374,7 @@ TEST_F(CtapHidDevTest, SendMessageChannelAlreadyPendingTest) {
   // Get the response to the original command.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
   }
 
@@ -342,20 +388,15 @@ TEST_F(CtapHidDevTest, SendMessageChannelAlreadyPendingTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_FALSE(result->is_error());
-    ;
   }
 }
 
 TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t test_channel = 0x01020304;
   uint8_t test_payload_byte = 0x0f;
@@ -370,7 +411,7 @@ TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -386,7 +427,7 @@ TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_TRUE(result->is_error());
@@ -406,7 +447,7 @@ TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
         0x00, 0x01,
         // payload
         test_payload_byte};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 
@@ -420,7 +461,7 @@ TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_TRUE(result->is_error());
@@ -430,7 +471,7 @@ TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
   // Get the response to the first command, on test_channel.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
   }
 
@@ -444,7 +485,7 @@ TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
 
     ASSERT_FALSE(result->is_error());
@@ -453,11 +494,7 @@ TEST_F(CtapHidDevTest, SendMessageDeviceBusyTest) {
 }
 
 TEST_F(CtapHidDevTest, ReceiveSinglePacketMessageTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t test_channel = 0x01020304;
   auto test_command = fuchsia_fido_report::CtapHidCommand::kInit;
@@ -471,7 +508,7 @@ TEST_F(CtapHidDevTest, ReceiveSinglePacketMessageTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
   }
 
@@ -488,14 +525,14 @@ TEST_F(CtapHidDevTest, ReceiveSinglePacketMessageTest) {
                                 0x00, 0x04,
                                 // payload
                                 0xde, 0xad, 0xbe, 0xef};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 
   // Get and check the Message formed from the packet.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -510,11 +547,7 @@ TEST_F(CtapHidDevTest, ReceiveSinglePacketMessageTest) {
 }
 
 TEST_F(CtapHidDevTest, ReceiveMultiplePacketMessageTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t test_channel = 0x01020304;
   auto test_command = fuchsia_fido_report::CtapHidCommand::kInit;
@@ -539,7 +572,7 @@ TEST_F(CtapHidDevTest, ReceiveMultiplePacketMessageTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
   }
 
@@ -557,7 +590,7 @@ TEST_F(CtapHidDevTest, ReceiveMultiplePacketMessageTest) {
         static_cast<uint8_t>((total_payload_len >> 8) & 0xff),
         static_cast<uint8_t>(total_payload_len & 0xff)};
     init_packet.insert(init_packet.end(), test_init_payload.begin(), test_init_payload.end());
-    fake_hid_device_.SendReport(init_packet);
+    SendReport(init_packet);
     loop_.RunUntilIdle();
     // Cont Payload 1
     std::vector<uint8_t> cont_packet1{// channel id
@@ -568,7 +601,7 @@ TEST_F(CtapHidDevTest, ReceiveMultiplePacketMessageTest) {
                                       // packet sequence number
                                       0x00};
     cont_packet1.insert(cont_packet1.end(), test_cont_payload1.begin(), test_cont_payload1.end());
-    fake_hid_device_.SendReport(cont_packet1);
+    SendReport(cont_packet1);
     loop_.RunUntilIdle();
     // Cont Payload 2
     std::vector<uint8_t> cont_packet2{// channel id
@@ -579,14 +612,14 @@ TEST_F(CtapHidDevTest, ReceiveMultiplePacketMessageTest) {
                                       // packet sequence number
                                       0x01};
     cont_packet2.insert(cont_packet2.end(), test_cont_payload2.begin(), test_cont_payload2.end());
-    fake_hid_device_.SendReport(cont_packet2);
+    SendReport(cont_packet2);
     loop_.RunUntilIdle();
   }
 
   // Get and check the Message formed from the packet.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -599,11 +632,7 @@ TEST_F(CtapHidDevTest, ReceiveMultiplePacketMessageTest) {
 }
 
 TEST_F(CtapHidDevTest, ReceivePacketMissingInitTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t test_channel = 0x01020304;
   auto test_command = fuchsia_fido_report::CtapHidCommand::kInit;
@@ -617,7 +646,7 @@ TEST_F(CtapHidDevTest, ReceivePacketMissingInitTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
   }
 
@@ -632,14 +661,14 @@ TEST_F(CtapHidDevTest, ReceivePacketMissingInitTest) {
                                 0x00,
                                 // payload
                                 0xde, 0xad, 0xbe, 0xef};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 
   // Check the response was set to an incorrect packet sequence error.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -652,11 +681,7 @@ TEST_F(CtapHidDevTest, ReceivePacketMissingInitTest) {
 }
 
 TEST_F(CtapHidDevTest, ReceivePacketMissingContTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t test_channel = 0x01020304;
   auto test_command = fuchsia_fido_report::CtapHidCommand::kInit;
@@ -675,7 +700,7 @@ TEST_F(CtapHidDevTest, ReceivePacketMissingContTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
   }
 
@@ -693,7 +718,7 @@ TEST_F(CtapHidDevTest, ReceivePacketMissingContTest) {
         static_cast<uint8_t>((total_payload_len >> 8) & 0xff),
         static_cast<uint8_t>(total_payload_len & 0xff)};
     init_packet.insert(init_packet.end(), test_init_payload.begin(), test_init_payload.end());
-    fake_hid_device_.SendReport(init_packet);
+    SendReport(init_packet);
     loop_.RunUntilIdle();
   }
 
@@ -707,14 +732,14 @@ TEST_F(CtapHidDevTest, ReceivePacketMissingContTest) {
                                      // packet sequence number
                                      0x00 + 1};
     cont_packet.insert(cont_packet.end(), test_cont_payload.begin(), test_cont_payload.end());
-    fake_hid_device_.SendReport(cont_packet);
+    SendReport(cont_packet);
     loop_.RunUntilIdle();
   }
 
   // Check the response was set to an incorrect packet sequence error.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -726,11 +751,7 @@ TEST_F(CtapHidDevTest, ReceivePacketMissingContTest) {
 }
 
 TEST_F(CtapHidDevTest, GetMessageChannelTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t const test_channel = 0x01020304;
   auto const test_command = fuchsia_fido_report::CtapHidCommand::kMsg;
@@ -744,7 +765,7 @@ TEST_F(CtapHidDevTest, GetMessageChannelTest) {
 
     // Send the Command.
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
   }
 
@@ -761,14 +782,14 @@ TEST_F(CtapHidDevTest, GetMessageChannelTest) {
                                 0x00, 0x01,
                                 // payload
                                 test_payload_byte};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 
   // Make a Request to get a message with a different channel id.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result_1 =
-        sync_client_->GetMessage(0xffffffff);
+        sync_client->GetMessage(0xffffffff);
     loop_.RunUntilIdle();
 
     ASSERT_TRUE(result_1->is_error());
@@ -778,7 +799,7 @@ TEST_F(CtapHidDevTest, GetMessageChannelTest) {
   // Make a Request to get a message with the correct channel id.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result_2 =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
 
     ASSERT_FALSE(result_2->is_error());
@@ -792,11 +813,7 @@ TEST_F(CtapHidDevTest, GetMessageChannelTest) {
 }
 
 TEST_F(CtapHidDevTest, GetMessageKeepAliveTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
-  SetupSyncClient();
+  fidl::WireSyncClient<fuchsia_fido_report::SecurityKeyDevice> sync_client = SetupSyncClient();
 
   uint32_t test_channel = 0x01020304;
   auto test_command = fuchsia_fido_report::CtapHidCommand::kInit;
@@ -809,7 +826,7 @@ TEST_F(CtapHidDevTest, GetMessageKeepAliveTest) {
     auto message_request = BuildRequest(allocator, test_channel, test_command, data_vec);
 
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage> result =
-        sync_client_->SendMessage(message_request);
+        sync_client->SendMessage(message_request);
     loop_.RunUntilIdle();
     ASSERT_EQ(result.status(), ZX_OK);
   }
@@ -828,14 +845,14 @@ TEST_F(CtapHidDevTest, GetMessageKeepAliveTest) {
         0x00, 0x01,
         // payload
         test_payload_byte};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 
   // Make a Request to get a message. This should return the KEEPALIVE message.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -855,14 +872,14 @@ TEST_F(CtapHidDevTest, GetMessageKeepAliveTest) {
                                 0x00, 0x01,
                                 // payload
                                 test_payload_byte};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 
   // Make a Request to get a message again. This should return the final message.
   {
     fidl::WireResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage> result =
-        sync_client_->GetMessage(test_channel);
+        sync_client->GetMessage(test_channel);
     loop_.RunUntilIdle();
 
     ASSERT_EQ(result.status(), ZX_OK);
@@ -871,13 +888,9 @@ TEST_F(CtapHidDevTest, GetMessageKeepAliveTest) {
 }
 
 TEST_F(CtapHidDevTest, HangingGetMessageTest) {
-  std::vector<uint8_t> desc(skey_desc, skey_desc + SKEY_DESC_LEN);
-  fake_hid_device_.SetReportDesc(desc);
-  ASSERT_OK(ctap_driver_device_->Bind());
-
   // Set up an async client to test GetMessage. We'll need to make the fake_hid_device send a packet
   // up to the ctaphid driver after we've sent the GetMessage() request.
-  SetupAsyncClient();
+  fidl::WireClient<fuchsia_fido_report::SecurityKeyDevice> async_client = SetupAsyncClient();
 
   uint32_t test_channel = 0x01020304;
   auto test_command = fuchsia_fido_report::CtapHidCommand::kInit;
@@ -889,7 +902,7 @@ TEST_F(CtapHidDevTest, HangingGetMessageTest) {
     std::vector<uint8_t> data_vec{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     auto message_request = BuildRequest(allocator, test_channel, test_command, data_vec);
 
-    async_client_->SendMessage(message_request)
+    async_client->SendMessage(message_request)
         .ThenExactlyOnce(
             [&](fidl::WireUnownedResult<fuchsia_fido_report::SecurityKeyDevice::SendMessage>&
                     result) {
@@ -900,7 +913,7 @@ TEST_F(CtapHidDevTest, HangingGetMessageTest) {
   }
 
   // Make a Request to get a message. This should hang until a response is sent from the device.
-  async_client_->GetMessage(test_channel)
+  async_client->GetMessage(test_channel)
       .ThenExactlyOnce(
           [&](fidl::WireUnownedResult<fuchsia_fido_report::SecurityKeyDevice::GetMessage>& result) {
             ASSERT_OK(result.status());
@@ -931,7 +944,7 @@ TEST_F(CtapHidDevTest, HangingGetMessageTest) {
                                 0x00, 0x01,
                                 // payload
                                 test_payload_byte};
-    fake_hid_device_.SendReport(packet);
+    SendReport(packet);
     loop_.RunUntilIdle();
   }
 }
