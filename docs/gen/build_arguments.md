@@ -115,12 +115,6 @@ Path to the amlogic decoder firmware file. Overrides the default in the build.
 
 From //src/media/drivers/amlogic_decoder/BUILD.gn:12
 
-### api_compatibility_testing
-
-**Current value (from the default):** `true`
-
-From //build/config/fuchsia/platform_version.gni:39
-
 ### archivist_max_cached_logs_bytes
 
 **Current value (from the default):** `4194304`
@@ -880,7 +874,7 @@ From //build/images/args.gni:35
 
 ### bump_api_level
 
-If true, build for N+1 api level, where N is
+If true, generate golden files for API level N+1, where N is
 platform_version.deprecated_highest_numbered_api_level.
 TODO(https://fxbug.dev/326277078): Update this comment and potentially
 redefine these args when switching the in-development level to "NEXT".
@@ -4077,15 +4071,6 @@ Set to true to include internal fonts in the build.
 
 From //src/fonts/build/font_args.gni:7
 
-### include_next_api_level
-
-If true, generate golden files for next api level. This is used by
-platform-version-roller when the API level is incremented.
-
-**Current value (from the default):** `false`
-
-From //build/config/fuchsia/platform_version.gni:38
-
 ### include_shell_commands_package
 
 Include the shell commands package.  Used as a parameter to
@@ -5418,7 +5403,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:56
+From //build/config/fuchsia/platform_version.gni:51
 
 ### override_idk_target_cpus
 
