@@ -21,8 +21,11 @@ const VERSION_HISTORY_TYPE: &str = "version_history";
 pub struct ApiLevel(u32);
 
 impl ApiLevel {
-    /// The `HEAD` pseudo-API level, representing the bleeding edge of
-    /// development.
+    /// The `NEXT` API level, representing an unstable draft of the next
+    /// numbered stable API level.
+    pub const NEXT: ApiLevel = ApiLevel(4291821568);
+
+    /// The `HEAD` API level, representing the bleeding edge of development.
     pub const HEAD: ApiLevel = ApiLevel(4292870144);
 
     /// The `PLATFORM` pseudo-API level, which is used in platform builds.
@@ -45,6 +48,7 @@ impl ApiLevel {
 impl fmt::Debug for ApiLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
+            ApiLevel::NEXT => write!(f, "ApiLevel::NEXT"),
             ApiLevel::HEAD => write!(f, "ApiLevel::HEAD"),
             ApiLevel::PLATFORM => write!(f, "ApiLevel::PLATFORM"),
             ApiLevel(l) => f.debug_tuple("ApiLevel").field(&l).finish(),
@@ -55,6 +59,7 @@ impl fmt::Debug for ApiLevel {
 impl fmt::Display for ApiLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
+            ApiLevel::NEXT => write!(f, "NEXT"),
             ApiLevel::HEAD => write!(f, "HEAD"),
             ApiLevel::PLATFORM => write!(f, "PLATFORM"),
             ApiLevel(l) => write!(f, "{}", l),
@@ -67,6 +72,7 @@ impl std::str::FromStr for ApiLevel {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "NEXT" => Ok(ApiLevel::NEXT),
             "HEAD" => Ok(ApiLevel::HEAD),
             "PLATFORM" => Ok(ApiLevel::PLATFORM),
             s => Ok(ApiLevel::from_u32(s.parse()?)),
@@ -116,7 +122,7 @@ pub enum AbiRevisionExplanation {
     },
 
     /// This is an unstable ABI revision targeted by components built with the
-    /// SDK. This corresponds to API levels like `HEAD`.
+    /// SDK. This corresponds to API levels like `NEXT` and `HEAD`.
     Unstable {
         /// Prefix of the `integration.git` revision at which the SDK that built
         /// this package was built.
@@ -326,7 +332,11 @@ impl VersionHistory {
     /// something that makes more sense.
     pub fn get_misleading_version_for_ffx(&self) -> Version {
         self.supported_versions()
-            .filter(|v| v.api_level != ApiLevel::HEAD && v.api_level != ApiLevel::PLATFORM)
+            .filter(|v| {
+                v.api_level != ApiLevel::NEXT
+                    && v.api_level != ApiLevel::HEAD
+                    && v.api_level != ApiLevel::PLATFORM
+            })
             .last()
             .unwrap()
     }
@@ -635,14 +645,19 @@ mod tests {
                     }
                 },
                 "special_api_levels": {
+                    "NEXT": {
+                        "as_u32": 4291821568,
+                        "abi_revision": "0xFF0038FA031D0347",
+                        "status": "in-development"
+                    },
                     "HEAD": {
                         "as_u32": 4292870144,
-                        "abi_revision": "0x50cbc6e8a39e1e2c",
+                        "abi_revision": "0xFF0038FA031D0348",
                         "status": "in-development"
                     },
                     "PLATFORM": {
                         "as_u32": 4293918720,
-                        "abi_revision": "0x50cbc6e8a39e1e2c",
+                        "abi_revision": "0xFF01A9328DA0C138",
                         "status": "in-development"
                     }
                 }
@@ -664,13 +679,18 @@ mod tests {
                     status: Status::InDevelopment
                 },
                 Version {
+                    api_level: ApiLevel::NEXT,
+                    abi_revision: 0xFF0038FA031D0347.into(),
+                    status: Status::InDevelopment
+                },
+                Version {
                     api_level: ApiLevel::HEAD,
-                    abi_revision: 0x50CBC6E8A39E1E2C.into(),
+                    abi_revision: 0xFF0038FA031D0348.into(),
                     status: Status::InDevelopment
                 },
                 Version {
                     api_level: ApiLevel::PLATFORM,
-                    abi_revision: 0x50CBC6E8A39E1E2C.into(),
+                    abi_revision: 0xFF01A9328DA0C138.into(),
                     status: Status::InDevelopment
                 },
             ],
@@ -846,6 +866,11 @@ mod tests {
                 status: Status::InDevelopment,
             },
             Version {
+                api_level: ApiLevel::NEXT,
+                abi_revision: AbiRevision::from_u64(0xFF00_1234_abcd_9875),
+                status: Status::InDevelopment,
+            },
+            Version {
                 api_level: ApiLevel::HEAD,
                 abi_revision: AbiRevision::from_u64(0xFF00_1234_abcd_9876),
                 status: Status::InDevelopment,
@@ -861,7 +886,7 @@ mod tests {
     #[test]
     fn test_check_abi_revision() {
         let supported_versions: Vec<Version> =
-            FAKE_VERSION_HISTORY.versions[1..6].iter().cloned().collect();
+            FAKE_VERSION_HISTORY.versions[1..].iter().cloned().collect();
 
         assert_eq!(
             FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0x1234.into()),
@@ -892,7 +917,7 @@ mod tests {
     #[test]
     fn test_pretty_print_abi_error() {
         let supported_versions: Vec<Version> =
-            FAKE_VERSION_HISTORY.versions[1..6].iter().cloned().collect();
+            FAKE_VERSION_HISTORY.versions[1..].iter().cloned().collect();
 
         assert_eq!(
                 AbiRevisionError::Unknown {
@@ -903,6 +928,7 @@ mod tests {
 └── 5 (0x58ea445e942a0005)
 └── 6 (0x58ea445e942a0006)
 └── 7 (0x58ea445e942a0007)
+└── NEXT (0xff001234abcd9875)
 └── HEAD (0xff001234abcd9876)
 └── PLATFORM (0xff011234abcd9876)"
             );
@@ -915,6 +941,7 @@ mod tests {
 └── 5 (0x58ea445e942a0005)
 └── 6 (0x58ea445e942a0006)
 └── 7 (0x58ea445e942a0007)
+└── NEXT (0xff001234abcd9875)
 └── HEAD (0xff001234abcd9876)
 └── PLATFORM (0xff011234abcd9876)"
             );
@@ -923,13 +950,13 @@ mod tests {
     #[test]
     fn test_pretty_print_api_error() {
         let supported: Vec<ApiLevel> =
-            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::PLATFORM];
+            vec![5.into(), 6.into(), 7.into(), ApiLevel::NEXT, ApiLevel::HEAD, ApiLevel::PLATFORM];
 
         assert_eq!(
             ApiLevelError::Unknown { api_level: 42.into(), supported: supported.clone() }
                 .to_string(),
             "Unknown target API level: 42. Is the SDK too old to support it?
-The following API levels are supported: 5, 6, 7, HEAD, PLATFORM",
+The following API levels are supported: 5, 6, 7, NEXT, HEAD, PLATFORM",
         );
         assert_eq!(
             ApiLevelError::Unsupported {
@@ -938,14 +965,14 @@ The following API levels are supported: 5, 6, 7, HEAD, PLATFORM",
             }
             .to_string(),
             "The SDK no longer supports API level 4.
-The following API levels are supported: 5, 6, 7, HEAD, PLATFORM"
+The following API levels are supported: 5, 6, 7, NEXT, HEAD, PLATFORM"
         );
     }
 
     #[test]
     fn test_check_api_level() {
         let supported: Vec<ApiLevel> =
-            vec![5.into(), 6.into(), 7.into(), ApiLevel::HEAD, ApiLevel::PLATFORM];
+            vec![5.into(), 6.into(), 7.into(), ApiLevel::NEXT, ApiLevel::HEAD, ApiLevel::PLATFORM];
 
         assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(42.into()),
@@ -968,6 +995,10 @@ The following API levels are supported: 5, 6, 7, HEAD, PLATFORM"
             Ok(0x58ea445e942a0007.into())
         );
         assert_eq!(
+            FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::NEXT),
+            Ok(0xff001234abcd9875.into())
+        );
+        assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::HEAD),
             Ok(0xff001234abcd9876.into())
         );
@@ -985,7 +1016,11 @@ The following API levels are supported: 5, 6, 7, HEAD, PLATFORM"
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.get_example_supported_version_for_tests(),
-            FAKE_VERSION_HISTORY.versions[5].clone()
+            FAKE_VERSION_HISTORY.versions[FAKE_VERSION_HISTORY.versions.len() - 1].clone()
+        );
+        assert_eq!(
+            FAKE_VERSION_HISTORY.get_example_supported_version_for_tests().api_level,
+            ApiLevel::PLATFORM
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.get_misleading_version_for_ffx(),
