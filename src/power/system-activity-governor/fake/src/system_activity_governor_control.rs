@@ -15,11 +15,13 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::lock::Mutex;
 use futures::prelude::*;
-use power_broker_client::PowerElementContext;
+use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 use tracing::error;
+
 use {
     fidl_fuchsia_power_suspend as fsuspend, fidl_test_sagcontrol as fctrl, fuchsia_async as fasync,
 };
@@ -49,9 +51,9 @@ async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::L
 }
 
 pub struct SystemActivityGovernorControl {
-    application_activity_controller: PowerElementContext,
-    full_wake_handling_controller: PowerElementContext,
-    wake_handling_controller: PowerElementContext,
+    application_activity_controller: Arc<PowerElementContext>,
+    full_wake_handling_controller: Arc<PowerElementContext>,
+    wake_handling_controller: Arc<PowerElementContext>,
 
     hanging_get: RefCell<StateHangingGet>,
 
@@ -72,7 +74,7 @@ impl SystemActivityGovernorControl {
 
         let wh_token =
             sag_power_elements.wake_handling.unwrap().assertive_dependency_token.unwrap();
-        let wake_handling_controller =
+        let wake_handling_controller = Arc::new(
             PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
                 .dependencies(vec![fbroker::LevelDependency {
                     dependency_type: fbroker::DependencyType::Assertive,
@@ -82,11 +84,24 @@ impl SystemActivityGovernorControl {
                 }])
                 .build()
                 .await
-                .unwrap();
+                .unwrap(),
+        );
+        let whc_context = wake_handling_controller.clone();
+        fasync::Task::local(async move {
+            run_power_element(
+                &whc_context.name(),
+                &whc_context.required_level,
+                0,    /* initial_level */
+                None, /* inspect_node */
+                basic_update_fn_factory(&whc_context),
+            )
+            .await;
+        })
+        .detach();
 
         let fwh_token =
             sag_power_elements.full_wake_handling.unwrap().assertive_dependency_token.unwrap();
-        let full_wake_handling_controller =
+        let full_wake_handling_controller = Arc::new(
             PowerElementContext::builder(&topology, "full_wake_controller", &[0, 1])
                 .dependencies(vec![fbroker::LevelDependency {
                     dependency_type: fbroker::DependencyType::Assertive,
@@ -96,11 +111,24 @@ impl SystemActivityGovernorControl {
                 }])
                 .build()
                 .await
-                .unwrap();
+                .unwrap(),
+        );
+        let fwh_context = full_wake_handling_controller.clone();
+        fasync::Task::local(async move {
+            run_power_element(
+                &fwh_context.name(),
+                &fwh_context.required_level,
+                0,    /* initial_level */
+                None, /* inspect_node */
+                basic_update_fn_factory(&fwh_context),
+            )
+            .await;
+        })
+        .detach();
 
         let aa_token =
             sag_power_elements.application_activity.unwrap().assertive_dependency_token.unwrap();
-        let application_activity_controller =
+        let application_activity_controller = Arc::new(
             PowerElementContext::builder(&topology, "application_activity_controller", &[0, 1])
                 .dependencies(vec![fbroker::LevelDependency {
                     dependency_type: fbroker::DependencyType::Assertive,
@@ -110,7 +138,20 @@ impl SystemActivityGovernorControl {
                 }])
                 .build()
                 .await
-                .unwrap();
+                .unwrap(),
+        );
+        let aac_context = application_activity_controller.clone();
+        fasync::Task::local(async move {
+            run_power_element(
+                &aac_context.name(),
+                &aac_context.required_level,
+                0,    /* initial_level */
+                None, /* inspect_node */
+                basic_update_fn_factory(&aac_context),
+            )
+            .await;
+        })
+        .detach();
 
         let boot_complete = Rc::new(Mutex::new(false));
 
@@ -260,9 +301,9 @@ impl SystemActivityGovernorControl {
         .detach();
 
         Rc::new(Self {
-            application_activity_controller,
-            full_wake_handling_controller,
-            wake_handling_controller,
+            application_activity_controller: application_activity_controller.into(),
+            full_wake_handling_controller: full_wake_handling_controller.into(),
+            wake_handling_controller: wake_handling_controller.into(),
             hanging_get: RefCell::new(hanging_get),
             application_activity_lease: RefCell::new(None),
             wake_handling_lease: RefCell::new(None),
@@ -465,7 +506,6 @@ impl SystemActivityGovernorControl {
                         error!(%err, "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
-
                 self.handle_full_partial_wake_handling_changes(
                     required_full_wake_handling_level,
                     required_wake_handling_level,

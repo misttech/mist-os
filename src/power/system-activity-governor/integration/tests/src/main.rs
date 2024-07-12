@@ -11,9 +11,10 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::channel::mpsc;
 use futures::StreamExt;
-use power_broker_client::PowerElementContext;
+use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use realm_proxy_client::RealmProxyClient;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_suspend as fsuspend,
@@ -95,51 +96,79 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     Ok(())
 }
 
-async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
     let aa_token = power_elements.application_activity.unwrap().assertive_dependency_token.unwrap();
 
-    let suspend_controller = PowerElementContext::builder(&topology, "suspend_controller", &[0, 1])
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: 1,
-            requires_token: aa_token,
-            requires_level_by_preference: vec![1],
-        }])
-        .build()
-        .await?;
+    let suspend_controller = Arc::new(
+        PowerElementContext::builder(&topology, "suspend_controller", &[0, 1])
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: 1,
+                requires_token: aa_token,
+                requires_level_by_preference: vec![1],
+            }])
+            .build()
+            .await?,
+    );
+    let sc_context = suspend_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &sc_context.name(),
+            &sc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&sc_context),
+        )
+        .await;
+    })
+    .detach();
 
     Ok(suspend_controller)
 }
 
-async fn create_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+async fn create_wake_topology(realm: &RealmProxyClient) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
     let wh_token = power_elements.wake_handling.unwrap().assertive_dependency_token.unwrap();
 
-    let wake_controller = PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: 1,
-            requires_token: wh_token,
-            requires_level_by_preference: vec![1],
-        }])
-        .build()
-        .await?;
+    let wake_controller = Arc::new(
+        PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: 1,
+                requires_token: wh_token,
+                requires_level_by_preference: vec![1],
+            }])
+            .build()
+            .await?,
+    );
+    let wc_context = wake_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &wc_context.name(),
+            &wc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&wc_context),
+        )
+        .await;
+    })
+    .detach();
 
     Ok(wake_controller)
 }
 
-async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
     let fwh_token = power_elements.full_wake_handling.unwrap().assertive_dependency_token.unwrap();
 
-    let full_wake_controller =
+    let full_wake_controller = Arc::new(
         PowerElementContext::builder(&topology, "full_wake_controller", &[0, 1])
             .dependencies(vec![fbroker::LevelDependency {
                 dependency_type: fbroker::DependencyType::Assertive,
@@ -148,7 +177,20 @@ async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElem
                 requires_level_by_preference: vec![1],
             }])
             .build()
-            .await?;
+            .await?,
+    );
+    let fwc_context = full_wake_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &fwc_context.name(),
+            &fwc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&fwc_context),
+        )
+        .await;
+    })
+    .detach();
 
     Ok(full_wake_controller)
 }
@@ -156,7 +198,7 @@ async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElem
 async fn create_latency_topology(
     realm: &RealmProxyClient,
     expected_latencies: &Vec<i64>,
-) -> Result<PowerElementContext> {
+) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
@@ -167,20 +209,36 @@ async fn create_latency_topology(
 
     let levels = Vec::from_iter(0..expected_latencies.len().try_into().unwrap());
 
-    let erl_controller = PowerElementContext::builder(&topology, "erl_controller", &levels)
-        .dependencies(
-            levels
-                .iter()
-                .map(|level| fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Assertive,
-                    dependent_level: *level,
-                    requires_token: erl_token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-                    requires_level_by_preference: vec![*level],
-                })
-                .collect(),
+    let erl_controller = Arc::new(
+        PowerElementContext::builder(&topology, "erl_controller", &levels)
+            .dependencies(
+                levels
+                    .iter()
+                    .map(|level| fbroker::LevelDependency {
+                        dependency_type: fbroker::DependencyType::Assertive,
+                        dependent_level: *level,
+                        requires_token: erl_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .unwrap(),
+                        requires_level_by_preference: vec![*level],
+                    })
+                    .collect(),
+            )
+            .build()
+            .await?,
+    );
+    let erlc_context = erl_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &erlc_context.name(),
+            &erlc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&erlc_context),
         )
-        .build()
-        .await?;
+        .await;
+    })
+    .detach();
 
     Ok(erl_controller)
 }
