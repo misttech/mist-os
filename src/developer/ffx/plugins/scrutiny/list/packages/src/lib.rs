@@ -4,8 +4,7 @@
 
 use ffx_scrutiny_packages_list_args::ScrutinyPackagesCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::launcher;
+use scrutiny_frontend::scrutiny2::Scrutiny;
 
 #[derive(FfxTool)]
 pub struct ScrutinyPackagesTool {
@@ -19,15 +18,14 @@ fho::embedded_plugin!(ScrutinyPackagesTool);
 impl FfxMain for ScrutinyPackagesTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let command = "packages.urls".to_string();
-        let model = if self.cmd.recovery {
-            ModelConfig::from_product_bundle_recovery(&self.cmd.product_bundle)
+        let scrutiny = if self.cmd.recovery {
+            Scrutiny::from_product_bundle_recovery(&self.cmd.product_bundle)
         } else {
-            ModelConfig::from_product_bundle(&self.cmd.product_bundle)
+            Scrutiny::from_product_bundle(&self.cmd.product_bundle)
         }?;
-        let config = ConfigBuilder::with_model(model).command(command).build();
-        launcher::launch_from_config(config)?;
-
+        let packages = scrutiny.get_package_urls()?;
+        let s = serde_json::to_string_pretty(&packages).map_err(|e| fho::Error::User(e.into()))?;
+        println!("{}", s);
         Ok(())
     }
 }

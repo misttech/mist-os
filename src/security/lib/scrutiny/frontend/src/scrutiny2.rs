@@ -12,6 +12,7 @@ use scrutiny_plugins::unified_plugin::UnifiedCollector;
 use scrutiny_plugins::verify::controller::structured_config::{
     ExtractStructuredConfigController, ExtractStructuredConfigResponse,
 };
+use scrutiny_utils::url::from_pkg_url_parts;
 use serde_json::Value;
 use std::path::Path;
 use std::sync::Arc;
@@ -52,6 +53,15 @@ impl Scrutiny {
             }
         }
         return Ok(None);
+    }
+
+    pub fn get_package_urls(&self) -> Result<Vec<AbsolutePackageUrl>> {
+        let mut packages = self.model.get::<Packages>().unwrap().entries.clone();
+        packages.sort();
+        Ok(packages
+            .into_iter()
+            .map(|package| from_pkg_url_parts(package.name, package.variant, Some(package.merkle)))
+            .collect::<Result<Vec<AbsolutePackageUrl>>>()?)
     }
 
     pub fn extract_package(

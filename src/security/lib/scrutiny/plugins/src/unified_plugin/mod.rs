@@ -35,7 +35,6 @@ impl UnifiedPlugin {
                 "/components" => ComponentsGraphController::default(),
                 "/component/manifest" => ComponentManifestGraphController::default(),
                 "/packages" => PackagesGraphController::default(),
-                "/packages/urls" => PackageUrlListController::default(),
                 "/blob" => BlobController::default(),
                 "/search/components" => ComponentSearchController::default(),
                 "/search/packages" => PackageSearchController::default(),
