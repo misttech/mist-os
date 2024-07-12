@@ -7,6 +7,8 @@
 
 bool SupportsSysmemYuv();
 
+bool SupportsSysmemYv12();
+
 bool SupportsSysmemRenderableLinear();
 
 bool SupportsSysmemLinearNonRgba();
