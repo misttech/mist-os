@@ -2,19 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.blobfs.internal/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/fzl/vmo-mapper.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/fifo.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
+#include <zircon/rights.h>
+#include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <utility>
 
 #include <gtest/gtest.h>
 
 #include "src/storage/blobfs/compression/chunked.h"
+#include "src/storage/blobfs/compression/compressor.h"
 #include "src/storage/blobfs/compression/decompressor_sandbox/decompressor_impl.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
+#include "src/storage/blobfs/compression/seekable_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
 
 namespace blobfs {
@@ -70,11 +88,20 @@ class DecompressorSandboxTest : public ::testing::Test {
     ASSERT_EQ(ZX_OK,
               zx::fifo::create(16, sizeof(wire::DecompressRequest), 0, &fifo_, &remote_fifo));
 
-    zx_status_t status;
-    decompressor_.Create(std::move(remote_fifo), std::move(remote_compressed_vmo),
-                         std::move(remote_decompressed_vmo),
-                         [&status](zx_status_t s) { status = s; });
-    ASSERT_EQ(ZX_OK, status);
+    async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+    loop.StartThread();
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_blobfs_internal::DecompressorCreator>();
+    ASSERT_TRUE(endpoints.is_ok());
+    auto binding =
+        fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &decompressor_);
+    auto result = fidl::WireCall(endpoints->client)
+                      ->Create(std::move(remote_fifo), std::move(remote_compressed_vmo),
+                               std::move(remote_decompressed_vmo));
+    ASSERT_TRUE(result.ok());
+    ASSERT_EQ(ZX_OK, result->status);
+    binding.Unbind();
+    loop.Quit();
+    loop.JoinThreads();
   }
 
   void TearDown() override {

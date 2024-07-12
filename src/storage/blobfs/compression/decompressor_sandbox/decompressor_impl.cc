@@ -9,19 +9,24 @@
 #include "src/storage/blobfs/compression/decompressor_sandbox/decompressor_impl.h"
 
 #include <fidl/fuchsia.blobfs.internal/cpp/wire.h>
-#include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
+#include <lib/zx/fifo.h>
+#include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
 #include <threads.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/threads.h>
 #include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
 #include <safemath/checked_math.h>
 #include <src/lib/chunked-compression/chunked-decompressor.h>
@@ -30,41 +35,49 @@
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
 
+namespace blobfs {
 namespace {
+
 struct FifoInfo {
   zx::fifo fifo;
   fzl::OwnedVmoMapper compressed_mapper;
   fzl::OwnedVmoMapper decompressed_mapper;
 };
-}  // namespace
-
-namespace blobfs {
 
 // This will only decompress a set of complete chunks, if the beginning or end
 // of the range are not chunk aligned this operation will fail.
-zx_status_t DecompressChunkedPartial(const fzl::OwnedVmoMapper& decompressed_mapper,
-                                     const fzl::OwnedVmoMapper& compressed_mapper,
-                                     const fuchsia_blobfs_internal::wire::Range decompressed,
-                                     const fuchsia_blobfs_internal::wire::Range compressed,
-                                     size_t* bytes_decompressed) {
+zx::result<uint64_t> DecompressChunkedPartial(
+    const fzl::OwnedVmoMapper& decompressed_mapper, const fzl::OwnedVmoMapper& compressed_mapper,
+    const fuchsia_blobfs_internal::wire::Range decompressed,
+    const fuchsia_blobfs_internal::wire::Range compressed) {
   const uint8_t* src = static_cast<const uint8_t*>(compressed_mapper.start()) + compressed.offset;
   uint8_t* dst = static_cast<uint8_t*>(decompressed_mapper.start()) + decompressed.offset;
   chunked_compression::ChunkedDecompressor decompressor;
-  return decompressor.DecompressFrame(src, compressed.size, dst, decompressed.size,
-                                      bytes_decompressed);
+  uint64_t bytes_decompressed = 0;
+  if (zx_status_t status = decompressor.DecompressFrame(src, compressed.size, dst,
+                                                        decompressed.size, &bytes_decompressed);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(bytes_decompressed);
 }
 
-zx_status_t DecompressFull(const fzl::OwnedVmoMapper& decompressed_mapper,
-                           const fzl::OwnedVmoMapper& compressed_mapper, size_t decompressed_length,
-                           size_t compressed_length, CompressionAlgorithm algorithm,
-                           size_t* bytes_decompressed) {
+zx::result<uint64_t> DecompressFull(const fzl::OwnedVmoMapper& decompressed_mapper,
+                                    const fzl::OwnedVmoMapper& compressed_mapper,
+                                    size_t decompressed_length, size_t compressed_length,
+                                    CompressionAlgorithm algorithm) {
   std::unique_ptr<Decompressor> decompressor = nullptr;
   if (zx_status_t status = Decompressor::Create(algorithm, &decompressor); status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
-  *bytes_decompressed = decompressed_length;
-  return decompressor->Decompress(decompressed_mapper.start(), bytes_decompressed,
-                                  compressed_mapper.start(), compressed_length);
+  uint64_t bytes_decompressed = decompressed_length;
+  if (zx_status_t status =
+          decompressor->Decompress(decompressed_mapper.start(), &bytes_decompressed,
+                                   compressed_mapper.start(), compressed_length);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(bytes_decompressed);
 }
 
 bool RangeInBounds(const fzl::OwnedVmoMapper& mapper,
@@ -74,54 +87,39 @@ bool RangeInBounds(const fzl::OwnedVmoMapper& mapper,
 }
 
 // The actual handling of a request on the fifo.
-void HandleFifo(const fzl::OwnedVmoMapper& compressed_mapper,
-                const fzl::OwnedVmoMapper& decompressed_mapper,
-                const fuchsia_blobfs_internal::wire::DecompressRequest* request,
-                fuchsia_blobfs_internal::wire::DecompressResponse* response) {
-  TRACE_DURATION("decompressor", "HandleFifo", "length", request->decompressed.size);
+zx::result<uint64_t> HandleFifoRequest(
+    const fzl::OwnedVmoMapper& compressed_mapper, const fzl::OwnedVmoMapper& decompressed_mapper,
+    const fuchsia_blobfs_internal::wire::DecompressRequest& request) {
+  TRACE_DURATION("decompressor", "HandleFifo", "length", request.decompressed.size);
 
-  if (!RangeInBounds(decompressed_mapper, request->decompressed) ||
-      !RangeInBounds(compressed_mapper, request->compressed)) {
+  if (!RangeInBounds(decompressed_mapper, request.decompressed) ||
+      !RangeInBounds(compressed_mapper, request.compressed)) {
     FX_LOGS(ERROR) << "Requested vmo ranges fall outside the mapped vmo.";
-    response->status = ZX_ERR_OUT_OF_RANGE;
-    response->size = 0;
-    return;
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  size_t bytes_decompressed = 0;
-  switch (request->algorithm) {
+  switch (request.algorithm) {
     case fuchsia_blobfs_internal::wire::CompressionAlgorithm::kChunkedPartial:
-      response->status =
-          DecompressChunkedPartial(decompressed_mapper, compressed_mapper, request->decompressed,
-                                   request->compressed, &bytes_decompressed);
-      break;
+      return DecompressChunkedPartial(decompressed_mapper, compressed_mapper, request.decompressed,
+                                      request.compressed);
     case fuchsia_blobfs_internal::wire::CompressionAlgorithm::kLz4:
     case fuchsia_blobfs_internal::wire::CompressionAlgorithm::kZstd:
-    case fuchsia_blobfs_internal::wire::CompressionAlgorithm::kZstdSeekable: {
-      response->status = ZX_ERR_NOT_SUPPORTED;
-      break;
-    }
+    case fuchsia_blobfs_internal::wire::CompressionAlgorithm::kZstdSeekable:
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     case fuchsia_blobfs_internal::wire::CompressionAlgorithm::kChunked:
-      if (request->decompressed.offset != 0 || request->compressed.offset != 0) {
-        bytes_decompressed = 0;
-        response->status = ZX_ERR_NOT_SUPPORTED;
-      } else if (auto algorithm_or = ExternalDecompressorClient::CompressionAlgorithmFidlToLocal(
-                     request->algorithm)) {
-        response->status =
-            DecompressFull(decompressed_mapper, compressed_mapper, request->decompressed.size,
-                           request->compressed.size, *algorithm_or, &bytes_decompressed);
-      } else {
-        // Invalid compression algorithm.
-        bytes_decompressed = 0;
-        response->status = ZX_ERR_NOT_SUPPORTED;
+      if (request.decompressed.offset != 0 || request.compressed.offset != 0) {
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
       }
-      break;
+      if (auto algorithm_or =
+              ExternalDecompressorClient::CompressionAlgorithmFidlToLocal(request.algorithm)) {
+        return DecompressFull(decompressed_mapper, compressed_mapper, request.decompressed.size,
+                              request.compressed.size, *algorithm_or);
+      }
+      // Invalid compression algorithm.
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     case fuchsia_blobfs_internal::wire::CompressionAlgorithm::kUncompressed:
-      response->status = ZX_ERR_NOT_SUPPORTED;
-      break;
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-
-  response->size = bytes_decompressed;
 }
 
 // Watches a fifo for requests to take data from the compressed_vmo and
@@ -144,8 +142,15 @@ void WatchFifo(zx::fifo fifo, fzl::OwnedVmoMapper compressed_mapper,
       break;
     }
 
+    zx::result result = HandleFifoRequest(compressed_mapper, decompressed_mapper, request);
     fuchsia_blobfs_internal::wire::DecompressResponse response;
-    HandleFifo(compressed_mapper, decompressed_mapper, &request, &response);
+    if (result.is_error()) {
+      response.status = result.status_value();
+      response.size = 0;
+    } else {
+      response.status = ZX_OK;
+      response.size = result.value();
+    }
 
     fifo.wait_one(kFifoWriteSignals, zx::time::infinite(), &signal);
     if ((signal & ZX_FIFO_WRITABLE) == 0 ||
@@ -174,34 +179,32 @@ void SetDeadlineProfile(thrd_t& thread) {
   }
 }
 
-void DecompressorImpl::Create(zx::fifo server_end, zx::vmo compressed_vmo, zx::vmo decompressed_vmo,
-                              CreateCallback callback) {
-  FX_LOGS(DEBUG) << "Creating decompressor.";
+zx_status_t CreateFifoThread(zx::fifo server_end, zx::vmo compressed_vmo,
+                             zx::vmo decompressed_vmo) {
   size_t vmo_size;
-  zx_status_t status = decompressed_vmo.get_size(&vmo_size);
-  if (status != ZX_OK) {
+  if (zx_status_t status = decompressed_vmo.get_size(&vmo_size); status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to get `decompressed_vmo` size";
-    return callback(status);
+    return status;
   }
 
   fzl::OwnedVmoMapper decompressed_mapper;
-  status = decompressed_mapper.Map(std::move(decompressed_vmo), vmo_size);
-  if (status != ZX_OK) {
+  if (zx_status_t status = decompressed_mapper.Map(std::move(decompressed_vmo), vmo_size);
+      status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to map `decompressed_vmo`";
-    return callback(status);
+    return status;
   }
 
-  status = compressed_vmo.get_size(&vmo_size);
-  if (status != ZX_OK) {
+  if (zx_status_t status = compressed_vmo.get_size(&vmo_size); status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to get `compressed_vmo` size";
-    return callback(status);
+    return status;
   }
 
   fzl::OwnedVmoMapper compressed_mapper;
-  status = compressed_mapper.Map(std::move(compressed_vmo), vmo_size, ZX_VM_PERM_READ);
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          compressed_mapper.Map(std::move(compressed_vmo), vmo_size, ZX_VM_PERM_READ);
+      status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to map `compressed_vmo`";
-    return callback(status);
+    return status;
   }
 
   thrd_t handler_thread;
@@ -210,12 +213,23 @@ void DecompressorImpl::Create(zx::fifo server_end, zx::vmo compressed_vmo, zx::v
   if (thrd_create_with_name(&handler_thread, WatchFifoWrapper, info.release(),
                             "decompressor-fifo-thread") != thrd_success) {
     FX_LOGS(ERROR) << "Failed to create decompressor FIFO thread!";
-    return callback(ZX_ERR_INTERNAL);
+    return ZX_ERR_INTERNAL;
   }
   SetDeadlineProfile(handler_thread);
 
   thrd_detach(handler_thread);
-  return callback(ZX_OK);
+  return ZX_OK;
+}
+
+}  // namespace
+
+void DecompressorImpl::Create(
+    ::fuchsia_blobfs_internal::wire::DecompressorCreatorCreateRequest* request,
+    CreateCompleter::Sync& completer) {
+  FX_LOGS(DEBUG) << "Creating decompressor.";
+  completer.Reply(CreateFifoThread(std::move(request->server_end),
+                                   std::move(request->compressed_vmo),
+                                   std::move(request->decompressed_vmo)));
 }
 
 }  // namespace blobfs
