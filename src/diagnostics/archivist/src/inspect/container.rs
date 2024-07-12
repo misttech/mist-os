@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::constants;
-use crate::diagnostics::GlobalConnectionStats;
+use crate::diagnostics::{GlobalConnectionStats, TRACE_CATEGORY};
 use crate::identity::ComponentIdentity;
 use crate::inspect::collector::{self as collector, InspectData};
 use diagnostics_data::{self as schema, InspectHandleName};
@@ -244,7 +244,7 @@ impl SnapshotData {
         let trace_id = ftrace::Id::random();
         let _trace_guard = ftrace::async_enter!(
             trace_id,
-            c"app",
+            TRACE_CATEGORY,
             c"SnapshotData::new",
             // An async duration cannot have multiple concurrent child async durations
             // so we include the nonce as metadata to manually determine relationship.
@@ -442,7 +442,7 @@ impl UnpopulatedInspectDataContainer {
         let trace_id = ftrace::Id::random();
         let trace_guard = ftrace::async_enter!(
             trace_id,
-            c"app",
+            TRACE_CATEGORY,
             c"ReaderServer::stream.populate",
             // An async duration cannot have multiple concurrent child async durations
             // so we include the nonce as metadata to manually determine relationship.

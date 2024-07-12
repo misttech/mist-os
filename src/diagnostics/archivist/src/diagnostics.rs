@@ -10,8 +10,11 @@ use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Duration};
 use lazy_static::lazy_static;
 use std::collections::BTreeMap;
+use std::ffi::CStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
+
+pub(crate) static TRACE_CATEGORY: &CStr = c"archivist";
 
 lazy_static! {
     // Exponential histograms for time in microseconds contains power-of-two intervals

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::accessor::PerformanceConfig;
-use crate::diagnostics::BatchIteratorConnectionStats;
+use crate::diagnostics::{BatchIteratorConnectionStats, TRACE_CATEGORY};
 use crate::inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer};
 use diagnostics_data::{self as schema, Data, Inspect, InspectDataBuilder, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
@@ -130,7 +130,7 @@ impl ReaderServer {
                 let trace_id = ftrace::Id::random();
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    c"app",
+                    TRACE_CATEGORY,
                     c"SnapshotData -> NodeHierarchyData",
                     // An async duration cannot have multiple concurrent child async durations
                     // so we include the nonce as metadata to manually determine relationship.
@@ -153,7 +153,7 @@ impl ReaderServer {
                     let trace_id = ftrace::Id::random();
                     let _trace_guard = ftrace::async_enter!(
                         trace_id,
-                        c"app",
+                        TRACE_CATEGORY,
                         c"SnapshotData -> NodeHierarchyData",
                         // An async duration cannot have multiple concurrent child async durations
                         // so we include the nonce as metadata to manually determine relationship.
@@ -177,7 +177,7 @@ impl ReaderServer {
                         let trace_id = ftrace::Id::random();
                         let _trace_guard = ftrace::async_enter!(
                             trace_id,
-                            c"app",
+                            TRACE_CATEGORY,
                             c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
                             // An async duration cannot have multiple concurrent child async durations
                             // so we include the nonce as metadata to manually determine relationship.
@@ -246,7 +246,7 @@ impl ReaderServer {
                     let trace_id = ftrace::Id::random();
                     let _trace_guard = ftrace::async_enter!(
                         trace_id,
-                        c"app",
+                        TRACE_CATEGORY,
                         c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
                         // An async duration cannot have multiple concurrent child async durations
                         // so we include the nonce as metadata to manually determine relationship.

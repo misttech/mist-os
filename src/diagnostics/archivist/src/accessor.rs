@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET;
-use crate::diagnostics::BatchIteratorConnectionStats;
+use crate::diagnostics::{BatchIteratorConnectionStats, TRACE_CATEGORY};
 use crate::error::AccessorError;
 use crate::formatter::{new_batcher, FormattedStream, JsonPacketSerializer, SerializedVmo};
 use crate::inspect::repository::InspectRepository;
@@ -188,7 +188,7 @@ impl ArchiveAccessorServer {
             DataType::Inspect => {
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    c"app",
+                    TRACE_CATEGORY,
                     c"ArchiveAccessorServer::spawn",
                     "data_type" => "Inspect",
                     "trace_id" => u64::from(trace_id)
@@ -245,7 +245,7 @@ impl ArchiveAccessorServer {
             DataType::Logs => {
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    c"app",
+                    TRACE_CATEGORY,
                     c"ArchiveAccessorServer::spawn",
                     "data_type" => "Logs",
                     // An async duration cannot have multiple concurrent child async durations
@@ -589,7 +589,7 @@ where
                 let trace_id = ftrace::Id::random();
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    c"app",
+                    TRACE_CATEGORY,
                     c"BatchIterator::new.serialize",
                     // An async duration cannot have multiple concurrent child async durations
                     // so we include the nonce as metadata to manually determine relationship.
@@ -690,7 +690,7 @@ where
             let trace_id = ftrace::Id::random();
             let _trace_guard = ftrace::async_enter!(
                 trace_id,
-                c"app",
+                TRACE_CATEGORY,
                 c"BatchIterator::run.get_send_batch",
                 // An async duration cannot have multiple concurrent child async durations
                 // so we include the nonce as metadata to manually determine relationship.
