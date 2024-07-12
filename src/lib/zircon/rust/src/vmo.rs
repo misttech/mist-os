@@ -28,6 +28,7 @@ impl_handle_based!(Vmo);
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct VmoInfo {
     pub koid: Koid,
+    pub name: [u8; sys::ZX_MAX_NAME_LEN],
     pub size_bytes: u64,
     pub parent_koid: Koid,
     pub num_children: usize,
@@ -52,6 +53,7 @@ impl From<sys::zx_info_vmo_t> for VmoInfo {
     fn from(info: sys::zx_info_vmo_t) -> VmoInfo {
         VmoInfo {
             koid: Koid::from_raw(info.koid),
+            name: info.name,
             size_bytes: info.size_bytes,
             parent_koid: Koid::from_raw(info.parent_koid),
             num_children: info.num_children,
