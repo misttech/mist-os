@@ -272,81 +272,87 @@ sdk_collection("core") {
   ]
 }
 
-# A "molecule" of SDK atoms exposing the stable and officially supported APIs
-# and ABI of the Fuchsia platform.
-#
-# Due to limitations of the build system at the GN/Bazel boundary, this cannot
-# contain testonly atoms. Libraries and packages for use in tests absolutely
-# belong in the IDK, but unfortunately, before they can be added, the `testonly`
-# attribute must be removed.
-sdk_molecule("fuchsia_idk_atoms") {
-  visibility += [ "//vendor/*" ]
+if (!is_host) {
+  # A "molecule" of SDK atoms exposing the APIs and ABI of the Fuchsia platform.
+  # It is built for each API level supported in the IDK and at "PLATFORM",
+  # though the dependencies are very different in each of those cases.
+  #
+  # Due to limitations of the build system at the GN/Bazel boundary, this cannot
+  # contain testonly atoms. Libraries and packages for use in tests absolutely
+  # belong in the IDK, but unfortunately, before they can be added, the
+  # `testonly` attribute must be removed.
+  sdk_molecule("fuchsia_idk_atoms") {
+    visibility += [ "//vendor/*" ]
 
-  category = "partner"
+    category = "partner"
 
-  if (current_build_target_api_level == "PLATFORM") {
-    deps = [
-      # Do not add to this list. Instead, add new items to
-      # :fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch,
-      # which verifies there are no API level dependencies.
-
-      # There are very limited exceptions that do depend on API level but are
-      # only built at "PLATFORM".
-      ":fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch",
-
-      # Atoms in :fuchsia_idk_atoms_for_each_api_level that currently must
-      # also be built at "PLATFORM" for backwards compatibility with IDK users
-      # that do not yet know about per-API-level prebuilts.
-      #
-      # TODO(https://fxbug.dev/310006516): Remove these once all IDK users are
-      # using the per-API-level artifacts.
-      ":core_cc_prebuilt_libraries",
-      ":core_sysroot",
-    ]
-
-    if (!sdk_inside_sub_build) {
-      deps += [
-        ":fuchsia_idk_atoms_built_only_at_platform_for_one_cpu_arch",
-        ":fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch",
-
-        # IDK atoms that are host tools. They must currently support all
-        # Supported API levels and thus only need to be built once.
-        # TODO(https://fxbug.dev/349889250): Move host tools to
-        # :fuchsia_idk_atoms_at_platform_for_host_cpu_arch_only and/or
-        # :fuchsia_idk_atoms_for_each_api_level as appropriate.
-        ":host_tools",
-
-        # These host tests are (currently) unversioned and only need to be built
-        # once.
-        # TODO(https://fxbug.dev/330373943): Move this once tests are versioned.
-        ":fuchsia_idk_atoms_host_tests",
-      ]
+    if (current_build_target_api_level == "PLATFORM") {
+      deps = [ ":fuchsia_idk_atoms_for_main_platform_build" ]
+    } else {
+      deps = [ ":fuchsia_idk_atoms_for_each_api_level" ]
     }
-  } else {
-    deps = [ ":fuchsia_idk_atoms_for_each_api_level" ]
+
+    # Successfully building at each API level, including PLATFORM, is the test.
+    non_sdk_deps = [ "//zircon/system:availability_test" ]
   }
 
-  # Successfully building the test at each API level is the test.
-  non_sdk_deps = [ "//zircon/system:availability_test" ]
-}
+  # Prebuilt libraries and packages that are built exclusively for the API
+  # levels that SDK users can target (not "PLATFORM").
+  # Note: This target can be built at "PLATFORM" for development purposes.
+  sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
+    category = "partner"
+    deps = [
+      ":core_cc_prebuilt_libraries",
+      ":core_packages",
+      ":core_sysroot",
+    ]
+  }
 
-# Prebuilt libraries and packages that are built exclusively for the API levels
-# that SDK users can target (not "PLATFORM").
-# Note: This target can be built at "PLATFORM" for development purposes.
-sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
-  category = "partner"
-  deps = [
-    ":core_cc_prebuilt_libraries",
-    ":core_packages",
-    ":core_sysroot",
-  ]
-}
-
-if (!is_host) {
   if (current_build_target_api_level == "PLATFORM") {
     # These rules are processed at least once for the primary target CPU,
     # which may not match the host_cpu. They may also be processed for
     # additional CPU architectures when building the final IDK.
+    sdk_molecule("fuchsia_idk_atoms_for_main_platform_build") {
+      category = "partner"
+
+      deps = [
+        # Do not add to this list. Instead, add new items to
+        # :fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch,
+        # which verifies there are no API level dependencies.
+
+        # There are very limited exceptions that do depend on API level but are
+        # only built at "PLATFORM".
+        ":fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch",
+
+        # Atoms in :fuchsia_idk_atoms_for_each_api_level that currently must
+        # also be built at "PLATFORM" for backwards compatibility with IDK users
+        # that do not yet know about per-API-level prebuilts.
+        #
+        # TODO(https://fxbug.dev/310006516): Remove these once all IDK users are
+        # using the per-API-level artifacts.
+        ":core_cc_prebuilt_libraries",
+        ":core_sysroot",
+      ]
+
+      if (!sdk_inside_sub_build) {
+        deps += [
+          ":fuchsia_idk_atoms_built_only_at_platform_for_one_cpu_arch",
+          ":fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch",
+
+          # IDK atoms that are host tools. They must currently support all
+          # Supported API levels and thus only need to be built once.
+          # TODO(https://fxbug.dev/349889250): Move host tools to
+          # :fuchsia_idk_atoms_at_platform_for_host_cpu_arch_only and/or
+          # :fuchsia_idk_atoms_for_each_api_level as appropriate.
+          ":host_tools",
+
+          # These host tests are (currently) unversioned and only need to be
+          # built once.
+          # TODO(https://fxbug.dev/330373943): Move once tests are versioned.
+          ":fuchsia_idk_atoms_host_tests",
+        ]
+      }
+    }
 
     # Do not add dependencies to this target without a really good reason.
     # Most dependencies should be built at every API level (add to
