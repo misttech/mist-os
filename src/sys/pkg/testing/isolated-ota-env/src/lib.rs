@@ -325,7 +325,7 @@ pub struct TestEnv<R> {
 }
 
 impl<R> TestEnv<R> {
-    fn start_omaha(omaha: OmahaState, merkle: Hash) -> Result<UpdateUrlSource, Error> {
+    async fn start_omaha(omaha: OmahaState, merkle: Hash) -> Result<UpdateUrlSource, Error> {
         match omaha {
             OmahaState::Disabled(url) => Ok(match url {
                 Some(url) => UpdateUrlSource::UpdateUrl(url),
@@ -345,6 +345,7 @@ impl<R> TestEnv<R> {
                     .build()
                     .unwrap();
                 let addr = OmahaServer::start(Arc::new(Mutex::new(server)))
+                    .await
                     .context("Starting omaha server")?;
                 let config =
                     OmahaConfig { app_id: "integration-test-appid".to_owned(), server_url: addr };
@@ -357,6 +358,7 @@ impl<R> TestEnv<R> {
     /// Run the update, consuming this |TestEnv| and returning a |TestResult|.
     pub async fn run(self) -> R {
         let update_url_source = TestEnv::<R>::start_omaha(self.omaha, self.update_merkle)
+            .await
             .expect("Starting Omaha server");
 
         let mut service_fs = ServiceFs::new();

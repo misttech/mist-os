@@ -152,7 +152,7 @@ impl OmahaServer {
 
     /// Spawn the server on the current executor, returning the address of the server.
     #[cfg(target_os = "fuchsia")]
-    pub fn start(arc_server: Arc<Mutex<OmahaServer>>) -> Result<String, Error> {
+    pub async fn start(arc_server: Arc<Mutex<OmahaServer>>) -> Result<String, Error> {
         let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0);
 
         let (connections, addr) = {
@@ -520,6 +520,7 @@ mod tests {
                 .build()
                 .unwrap(),
         )))
+        .await
         .context("starting server")?;
 
         let client = fuchsia_hyper::new_client();
@@ -576,6 +577,7 @@ mod tests {
                 .build()
                 .unwrap(),
         )))
+        .await
         .context("starting server")?;
 
         {
@@ -675,6 +677,7 @@ mod tests {
         let server = OmahaServer::start(Arc::new(Mutex::new(
             OmahaServerBuilder::default().responses_by_appid([]).build().unwrap(),
         )))
+        .await
         .context("starting server")?;
 
         let client = fuchsia_hyper::new_client();
@@ -711,6 +714,7 @@ mod tests {
                 .build()
                 .unwrap(),
         )))
+        .await
         .context("starting server")?;
 
         let client = fuchsia_hyper::new_client();
@@ -759,6 +763,7 @@ mod tests {
                 .build()
                 .unwrap(),
         )))
+        .await
         .context("starting server")
         .unwrap();
 
