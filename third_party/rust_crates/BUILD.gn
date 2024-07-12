@@ -688,7 +688,7 @@ group("prost-types") {
 
 if (!(current_os == "fuchsia")) {
   group("pulldown-cmark") {
-    public_deps = [ ":pulldown-cmark-v0_6_0" ]
+    public_deps = [ ":pulldown-cmark-v0_9_3" ]
   }
 }
 
@@ -11315,37 +11315,41 @@ rust_library("publicsuffix-v1_5_4") {
   applicable_licenses = [ ":publicsuffix-v1_5_4.license" ]
 }
 
-license("pulldown-cmark-v0_6_0.license") {
+license("pulldown-cmark-v0_9_3.license") {
   public_package_name = "pulldown_cmark"
-  license_files = [ "//third_party/rust_crates/forks/pulldown-cmark/LICENSE" ]
+  license_files =
+      [ "//third_party/rust_crates/vendor/pulldown-cmark-0.9.3/LICENSE" ]
 }
 
-rust_library("pulldown-cmark-v0_6_0") {
+rust_library("pulldown-cmark-v0_9_3") {
   crate_name = "pulldown_cmark"
-  crate_root = "//third_party/rust_crates/forks/pulldown-cmark/src/lib.rs"
-  output_name = "pulldown_cmark-de13a6fc690a4786"
+  crate_root =
+      "//third_party/rust_crates/vendor/pulldown-cmark-0.9.3/src/lib.rs"
+  output_name = "pulldown_cmark-d552fbe67903af0d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":memchr-v2_7_1" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":getopts-v0_2_18" ]
+  deps += [ ":serde-v1_0_203" ]
   deps += [ ":unicase-v2_7_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=de13a6fc690a4786",
-    "-Cextra-filename=-de13a6fc690a4786",
+    "--edition=2021",
+    "-Cmetadata=d552fbe67903af0d",
+    "-Cextra-filename=-d552fbe67903af0d",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"getopts\"",
+    "--cfg=feature=\"serde\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":pulldown-cmark-v0_6_0.license" ]
+  applicable_licenses = [ ":pulldown-cmark-v0_9_3.license" ]
 }
 
 license("quick-error-v1_2_2.license") {

@@ -6,7 +6,7 @@
 //! checked.
 
 use crate::{parser, DocLine};
-pub use pulldown_cmark::{CowStr, LinkType, Options, Parser, Tag};
+pub use pulldown_cmark::{BrokenLinkCallback, CowStr, LinkType, Options, Parser, Tag};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::Range;
@@ -214,35 +214,39 @@ impl<'a> Element<'a> {
 pub struct DocContext<'a> {
     pub file_name: PathBuf,
     pub line_num: usize,
-    pub(crate) parser: pulldown_cmark::OffsetIter<'a>,
+    pub(crate) parser: pulldown_cmark::OffsetIter<'a, 'a>,
     file_text: &'a str,
     line_index: HashMap<&'a str, usize>,
 }
 
 impl<'a> DocContext<'a> {
-    fn link_callback(reference: &str, normalized: &str) -> Option<(String, String)> {
+    /// Call this from the broken link closure to handle the
+    /// known issues.
+    pub(crate) fn handle_broken_link(
+        link: pulldown_cmark::BrokenLink<'_>,
+        text: &'a str,
+    ) -> Option<(CowStr<'a>, CowStr<'a>)> {
         // TODO(https://fxbug.dev/42069593): Glossary reference links are hard to validate.
-        if !reference.starts_with("glossary.")  &&  
-       // TODO(https://fxbug.dev/42069638): Consider removing [TOC]
-       reference != "TOC" &&
-       // TODO(https://fxbug.dev/42068739): need to check for anchors and classes.
-       !reference.starts_with("#")
+        if !link.reference.starts_with("glossary.")  &&  
+        // TODO(https://fxbug.dev/42069638): Consider removing [TOC]
+        link.reference.as_ref() != "TOC" &&
+        // TODO(https://fxbug.dev/42068739): need to check for anchors and classes.
+        !link.reference.starts_with("#")
         {
-            Some((reference.to_string(), normalized.to_string()))
+            let normalized: &str = &text[link.span.clone()];
+            let reference = link.reference.to_string();
+            Some::<(CowStr<'a>, CowStr<'a>)>((CowStr::Boxed(reference.into()), normalized.into()))
         } else {
             None
         }
     }
 
-    #[cfg(test)]
-    pub fn new(filename: PathBuf, text: &'a str) -> DocContext<'a> {
-        Self::new_with_checks(filename, text)
-    }
-
-    pub fn new_with_checks(filename: PathBuf, text: &'a str) -> DocContext<'a> {
-        let options = Options::empty();
-        let cb: Option<&'a dyn Fn(&str, &str) -> Option<(String, String)>> =
-            Some(&Self::link_callback);
+    pub fn new(
+        filename: PathBuf,
+        text: &'a str,
+        callback: BrokenLinkCallback<'a, 'a>,
+    ) -> DocContext<'a> {
+        let options = Options::ENABLE_FOOTNOTES;
         let mut index = HashMap::new();
         let lines = text.lines();
         let mut line_num = 1;
@@ -253,7 +257,8 @@ impl<'a> DocContext<'a> {
         DocContext {
             file_name: filename,
             line_num: 1,
-            parser: Parser::new_with_broken_link_callback(text, options, cb).into_offset_iter(),
+            parser: Parser::new_with_broken_link_callback(text, options, callback)
+                .into_offset_iter(),
             file_text: text,
             line_index: index,
         }
@@ -302,16 +307,14 @@ mod test {
 
     #[test]
     fn test_get_links() -> Result<()> {
-        let test_data: Vec<(DocContext<'static>, Option<Vec<Element<'static>>>)> = vec![
+        let test_data: Vec<(PathBuf, &str, Option<Vec<Element<'static>>>)> = vec![
         (
-            DocContext::new(
                 PathBuf::from("/docs/README.md"),
                 "This has no links",
-            ),
             None
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 r#"codeblock has no links
 
@@ -319,14 +322,12 @@ mod test {
 This is an example [link](https://somewhere.com)
 ```
 "#,
-            ),
             None
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "This is a line to [something-one-line](/docs/something.md)",
-            ),
             Some(vec![
                 Link(Inline, Borrowed("/docs/something.md"), Borrowed(""),
                  vec![Text(Borrowed("something-one-line"), DocLine { line_num: 1, file_name: "/docs/README.md".into() })],
@@ -334,10 +335,8 @@ This is an example [link](https://somewhere.com)
             ])
         ),
         (
-            DocContext::new(
                 PathBuf::from("/docs/README.md"),
                 "This is a multiline\n\nparagraph. This is a line to [something-two-line](/docs/something.md)",
-            ),
             Some(vec![
                 Link(Inline, Borrowed("/docs/something.md"), Borrowed(""),
                  vec![Text(Borrowed("something-two-line"), DocLine { line_num: 4,file_name: "/docs/README.md".into() })],
@@ -345,14 +344,12 @@ This is an example [link](https://somewhere.com)
             ])
         ),
         (
-            DocContext::new(
                 PathBuf::from("/docs/README.md"),
                 r#"list item
 * one item
 * one with [something](/docs/in-list-item.md)
 
-                "#
-            ),
+                "#,
             Some(vec![
                 Link(Inline, Borrowed("/docs/in-list-item.md"), Borrowed(""),
                 vec![Text(Borrowed("something"), DocLine { line_num: 5, file_name: "/docs/README.md".into() })],
@@ -360,15 +357,14 @@ This is an example [link](https://somewhere.com)
             ])
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 r#"list item
 * one item
 
     In a paragraph one with [something](/docs/in-list-item-pp.md)
 * item two
-                "#
-            ),
+                "#,
             Some(vec![
                 Link(Inline, Borrowed("/docs/in-list-item-pp.md"), Borrowed(""),
                 vec![Text(Borrowed("something"), DocLine { line_num: 6, file_name: "/docs/README.md".into() })],
@@ -377,7 +373,11 @@ This is an example [link](https://somewhere.com)
         ),
         ];
 
-        for (ctx, expected_links) in test_data {
+        for (file, input, expected_links) in test_data {
+            let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+                DocContext::handle_broken_link(broken_link, input)
+            };
+            let ctx = DocContext::new(file, input, Some(callback));
             // Collect all the links from the markdown fragment.
             let elements = ctx.collect::<Vec<Element<'_>>>();
             let actual_links: Vec<&Element<'_>> =

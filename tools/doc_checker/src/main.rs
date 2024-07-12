@@ -310,7 +310,11 @@ pub fn check_markdown<'a>(
 
     for mdfile in files {
         let mdcontent = fs::read_to_string(mdfile).expect("Unable to read file");
-        let doc_context = DocContext::new_with_checks(mdfile.clone(), &mdcontent);
+        let mut callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+            DocContext::handle_broken_link(broken_link, &mdcontent)
+        };
+
+        let doc_context = DocContext::new(mdfile.clone(), &mdcontent, Some(&mut callback));
 
         for element in doc_context {
             for c in &mut *checks {
@@ -402,11 +406,11 @@ mod test {
                 "in-tree link to /docs/missing-image.png could not be found at \"doc_checker_test_data/docs/missing-image.png\""),
             // There are 3 instances of [i] on the same line.
             DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
-                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+                 "Unknown reference link to [i][i]", "making sure you added a matching [i]: YOUR_LINK_HERE below this reference"),
             DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
-                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+            "Unknown reference link to [i][i]", "making sure you added a matching [i]: YOUR_LINK_HERE below this reference"),
             DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
-                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+            "Unknown reference link to [i][i]", "making sure you added a matching [i]: YOUR_LINK_HERE below this reference"),
             DocCheckError::new_error(6, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Invalid link http://{}.com/markdown : invalid uri character"),
             DocCheckError::new_error(10, PathBuf::from("doc_checker_test_data/docs/second.md"),

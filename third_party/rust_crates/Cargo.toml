@@ -298,7 +298,7 @@ notify = { version = "5.1.0", default-features = false, features = ["macos_fseve
 parking_lot = "0.9"
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
-pulldown-cmark = "0.6.0"
+pulldown-cmark = { version = "0.9.3", features = ["serde"] }
 quote = "1.0.35"
 rustfix = "0.6.1"
 rustls-native-certs = "0.5.0"
@@ -384,7 +384,7 @@ nix = { path = "forks/nix" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
-pulldown-cmark = { path = "forks/pulldown-cmark" }
+#pulldown-cmark = { path = "forks/pulldown-cmark" }
 # FIXME(87798): We can unfork to 0.19.1 once we've updated hyper to 0.14.x, and
 # tokio to 1.x.
 rustls = { path = "forks/rustls" }
@@ -699,7 +699,7 @@ rustflags = ["--cfg=u128", "--cfg=use_proc_macro", "--cfg=wrap_proc_macro"]
 [gn.package.proc-macro2."1.0.86"]
 rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 
-[gn.package.pulldown-cmark."0.6.0"]
+[gn.package.pulldown-cmark."0.9.3"]
 # Has build script but no config needed.
 
 # The `build.rs` file in this version of quote checks for rustc versions less

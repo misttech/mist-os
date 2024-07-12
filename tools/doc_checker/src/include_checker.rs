@@ -111,45 +111,49 @@ mod tests {
         let mut checker = IncludeChecker {};
 
         let data = [
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "non-markdown file OK to link to docs [non-source](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/docs/OWNERS)",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "have 2 << but no close",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "have  << but no close\n on the same line>>",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "have a non-markdown file name  <<you name here>>",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "spaces   < <a-file.md> >",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "spaces   <<a-file.md> >",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "spaces   < <a-file.md>>",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "exists <<a-file.md>>",
             ),
-            DocContext::new(
+            (
                 PathBuf::from("/docs/README.md"),
                 "\n```md\nThis is a sample in codeblock to\n<<missing.md>>\n```\n",
             ),
         ];
 
-        for ctx in data {
+        for (file, input) in data {
+            let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+                DocContext::handle_broken_link(broken_link, input)
+            };
+            let ctx = DocContext::new(file, input, Some(callback));
             for ele in ctx {
                 let errors = checker.check(&ele)?;
                 assert!(errors.is_none(), "Expected no errors got {:?}", errors);
@@ -164,7 +168,8 @@ mod tests {
 
         let data = [
             (
-                DocContext::new(PathBuf::from("/docs/README.md"), "does not exist <<missing.md>>"),
+                PathBuf::from("/docs/README.md"),
+                "does not exist <<missing.md>>",
                 vec![DocCheckError::new_error(
                     1,
                     PathBuf::from("/docs/README.md"),
@@ -172,10 +177,8 @@ mod tests {
                 )],
             ),
             (
-                DocContext::new(
-                    PathBuf::from("/docs/README.md"),
-                    " no absolute\" <</docs/README.md>>",
-                ),
+                PathBuf::from("/docs/README.md"),
+                " no absolute\" <</docs/README.md>>",
                 vec![DocCheckError::new_error(
                     1,
                     PathBuf::from("/docs/README.md"),
@@ -184,7 +187,11 @@ mod tests {
             ),
         ];
 
-        for (ctx, expected) in data {
+        for (file, input, expected) in data {
+            let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+                DocContext::handle_broken_link(broken_link, input)
+            };
+            let ctx = DocContext::new(file, input, Some(callback));
             for ele in ctx {
                 let errors = checker.check(&ele)?;
                 let mut expected_iter = expected.iter();

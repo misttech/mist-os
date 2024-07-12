@@ -935,10 +935,13 @@ mod tests {
         let mut checks = register_markdown_checks(&opt)?;
         assert_eq!(checks.len(), 1);
 
-        let ctx = DocContext::new(
-            PathBuf::from("/docs/README.md"),
-            "This is a line to [something](/docs/something.md)",
-        );
+        let file = PathBuf::from("/docs/README.md");
+        let input = "This is a line to [something](/docs/something.md)";
+
+        let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+            DocContext::handle_broken_link(broken_link, input)
+        };
+        let ctx = DocContext::new(file, input, Some(callback));
 
         if let Some(check) = checks.first_mut() {
             for ele in ctx {
@@ -996,19 +999,19 @@ mod tests {
         let mut checks = register_markdown_checks(&opt)?;
         assert_eq!(checks.len(), 1);
 
-        let test_data: Vec<(DocContext<'_>, Option<Vec<DocCheckError>>)> = vec![
+        let test_data: Vec<(PathBuf, &str, Option<Vec<DocCheckError>>)> = vec![
             (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "This is a line to [something](/docs/something.md)",
-            ),
+
             None,
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "invalid image text ![](/docs/something.png)",
-            ),
+
             Some(
                 [DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
                     "Invalid image alt text: \"\", cannot  be one of [\"\"]"),
@@ -1016,70 +1019,74 @@ mod tests {
                    "in-tree link to /docs/something.png could not be found at \"/path/to/fuchsia/docs/something.png\"")].to_vec()),
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "invalid url [oops](https:///nowhere/something.md?xx)",
-            ),
+
             Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
              "Invalid link https:///nowhere/something.md?xx : invalid format")].to_vec())
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "relative path outside root  [oops](/docs/../../illegal.md)",
-            ),
+
             Some([DocCheckError::new_error(1,PathBuf::from("/docs/README.md"),
              "Cannot normalize /docs/../../illegal.md, references parent beyond root.")].to_vec())
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "hl param is not allowed [hl](https://google.com/something?hl=en)",
-            ),
+
             None,
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "invalid project link [garnet](https://fuchsia.googlesource.com/garnet/+/HEAD/src/file.cc)",
-            ),
+
             Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
              "Obsolete or invalid project garnet: https://fuchsia.googlesource.com/garnet/+/HEAD/src/file.cc")].to_vec())
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "A reference link to [`topaz`][flutter-gni]\n\n\
-                [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\""
-            ),
+                [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\"",
+
             Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
             "Obsolete or invalid project topaz: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni")].to_vec())
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "non-master branch link to docs [old doc](https://fuchsia.googlesource.com/fuchsia/+/some-branch/docs/file.md)",
-            ),
+
             Some([DocCheckError::new_error_helpful(1,PathBuf::from("/docs/README.md"),
               "Invalid link to non-main branch: https://fuchsia.googlesource.com/fuchsia/+/some-branch/docs/file.md","filepath: /docs/file.md")].to_vec())
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "non-master branch link to src ok [old source](https://fuchsia.googlesource.com/fuchsia/+/some-branch/tools/file.cc)",
-            ),
+
             None,
         ),
         (
-            DocContext::new(
+
                 PathBuf::from("/docs/README.md"),
                 "non-markdown file OK to link to docs [non-source](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/docs/OWNERS)",
-            ),
+
             None,
         )
         ];
 
-        for (ctx, expected_errors) in test_data {
+        for (file, input, expected_errors) in test_data {
+            let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+                DocContext::handle_broken_link(broken_link, input)
+            };
+            let ctx = DocContext::new(file, input, Some(callback));
             for ele in ctx {
                 let errors = checks[0].check(&ele)?;
                 if let Some(ref expected_list) = expected_errors {
@@ -1149,60 +1156,55 @@ mod tests {
         let mut checks = register_markdown_checks(&opt)?;
         assert_eq!(checks.len(), 1);
 
-        let test_data: Vec<(DocContext<'_>, Option<Vec<DocCheckError>>)> = vec![
-            (
-            DocContext::new_with_checks(
-                PathBuf::from("/docs/README.md"),
-                "This is a line to [something](/docs/something.md)"
-            ),
+        let test_data: Vec<(PathBuf, &str, Option<Vec<DocCheckError>>)> = vec![
+        (
+            PathBuf::from("/docs/README.md"),
+            "This is a line to [something](/docs/something.md)",
             None,
         ),
         (
-            DocContext::new_with_checks(
-                PathBuf::from("/docs/README.md"),
-                "invalid url [oops](https:///nowhere/something.md?xx)"
-            ),
-            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
-             "Invalid link https:///nowhere/something.md?xx : invalid format")].to_vec())
-        ),
-        (
-            DocContext::new_with_checks(
-                PathBuf::from("/docs/README.md"),
-                "A reference link to [`topaz`][flutter-gni]\n\n\
-                [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\""
-            ),
-            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
-            "Obsolete or invalid project topaz: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni")].to_vec())
-        ),
-        (
-        DocContext::new_with_checks(
+
             PathBuf::from("/docs/README.md"),
-            "brackets which are not a link [your name here]"
+            "invalid url [oops](https:///nowhere/something.md?xx)",
+            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
+                "Invalid link https:///nowhere/something.md?xx : invalid format")].to_vec())
         ),
-        Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
-            "unescaped [your name here] not treating this as a shortcut link.",
-            "escape brackets \\[your name here\\] or make a link [your name here](/docs/your name here)")
+        (
+            PathBuf::from("/docs/README.md"),
+            "A reference link to [`topaz`][flutter-gni]\n\n\
+                [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\"",
+            Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
+                "Obsolete or invalid project topaz: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni")].to_vec())
+        ),
+        (
+            PathBuf::from("/docs/README.md"),
+            "brackets which are not a link [your name here]",
+            Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
+                "Unknown reference link to [your name here][your name here]",
+                "making sure you added a matching [your name here]: YOUR_LINK_HERE below this reference")
             ].to_vec()),
         ),
         (
-            DocContext::new_with_checks(
-                PathBuf::from("/docs/README.md"),
-                "missing [text][link-to-text]"),
-                Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
+
+            PathBuf::from("/docs/README.md"),
+            "missing [text][link-to-text]",
+            Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
                 "Unknown reference link to [text][link-to-text]",
                 "making sure you added a matching [link-to-text]: YOUR_LINK_HERE below this reference"
             )].to_vec())
         ),
         (
-            DocContext::new_with_checks(
-                PathBuf::from("/docs/README.md"),
-                r#"pw_toolchain_STATIC_ANALYSIS_SKIP_INCLUDE_PATHS = [".*/third_party/.*"]"#,
-            ),
+            PathBuf::from("/docs/README.md"),
+            r#"pw_toolchain_STATIC_ANALYSIS_SKIP_INCLUDE_PATHS = [".*/third_party/.*"]"#,
             None
         ),
         ];
 
-        for (ctx, expected_errors) in test_data {
+        for (file, input, expected_errors) in test_data {
+            let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+                DocContext::handle_broken_link(broken_link, input)
+            };
+            let ctx = DocContext::new(file, input, Some(callback));
             for ele in ctx {
                 let errors = checks[0].check(&ele)?;
                 if let Some(ref expected_list) = expected_errors {
@@ -1247,15 +1249,17 @@ mod tests {
         let mut checks = register_markdown_checks(&opt)?;
         assert_eq!(checks.len(), 1);
 
-        let test_data: Vec<(DocContext<'_>, Option<Vec<DocCheckError>>)> = vec![
+        let test_data: Vec<(PathBuf, &str, Option<Vec<DocCheckError>>)> = vec![
             (
-            DocContext::new_with_checks(
                 PathBuf::from("/docs/README.md"),
-                "This is a link to fuchsia docs as external url [something](https://fuchsia.dev/fuchsia-src/README.md)"
-            ),
+                "This is a link to fuchsia docs as external url [something](https://fuchsia.dev/fuchsia-src/README.md)",
             None,
         )];
-        for (ctx, expected_errors) in test_data {
+        for (file, input, expected_errors) in test_data {
+            let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+                DocContext::handle_broken_link(broken_link, input)
+            };
+            let ctx = DocContext::new(file, input, Some(callback));
             for ele in ctx {
                 let errors = checks[0].check(&ele)?;
                 if let Some(ref expected_list) = expected_errors {
