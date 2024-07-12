@@ -100,9 +100,6 @@ if (is_host) {
       "//src/devices/bin/driver_tools/tests:*",
       "//src/tests/end_to_end/*",
       "//third_party/antlion/*",
-      "//tools/blackout/blackout-integration:*",
-      "//tools/blackout/blobfs-checkerboard:*",
-      "//tools/blackout/fs-tree:*",
     ]
   }
 

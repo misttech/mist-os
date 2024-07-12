@@ -2,30 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/developer/ffx/build/ffx_plugin.gni")
-
-group("blackout") {
-  testonly = true
-  deps = []
-}
-
-ffx_plugin("ffx_storage_blackout") {
-  version = "0.1.0"
-  edition = "2021"
-
-  args_sources = [ "src/args.rs" ]
-
-  plugin_deps = [ "blackout-host/ffx:ffx_storage_blackout_step" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [ "blackout-host:tests" ]
-}
-
-# the integration group enables the rust test harness version of the power failure tests. this group
-# shouldn't be included in normal test targets - they are intended to be run under specific
-# conditions in CI as opposed to for every change in CQ or being run locally.
+# keep this target around until the fyi builders pointing at it go away.
 group("integration") {
   testonly = true
   deps = []
