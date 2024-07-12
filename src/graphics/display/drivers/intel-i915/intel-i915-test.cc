@@ -33,6 +33,7 @@
 #include "src/graphics/display/drivers/intel-i915/intel-display-driver.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/testing/fake-buffer-collection.h"
+#include "src/graphics/display/drivers/intel-i915/testing/fake-framebuffer.h"
 #include "src/graphics/display/drivers/intel-i915/testing/mock-allocator.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -42,34 +43,7 @@ namespace {
 
 constexpr uint32_t kBytesPerRowDivisor = 1024;
 
-// Module-scope global data structure that acts as the data source for the zx_framebuffer_get_info
-// implementation below.
-struct Framebuffer {
-  zx_status_t status = ZX_OK;
-  uint32_t format = 0u;
-  uint32_t width = 0u;
-  uint32_t height = 0u;
-  uint32_t stride = 0u;
-};
-std::mutex g_lock_;
-Framebuffer g_framebuffer;
-
-void SetFramebuffer(const Framebuffer& buffer) {
-  std::lock_guard guard(g_lock_);
-  g_framebuffer = buffer;
-}
-
 }  // namespace
-
-zx_status_t zx_framebuffer_get_info(zx_handle_t resource, uint32_t* format, uint32_t* width,
-                                    uint32_t* height, uint32_t* stride) {
-  std::lock_guard guard(g_lock_);
-  *format = g_framebuffer.format;
-  *width = g_framebuffer.width;
-  *height = g_framebuffer.height;
-  *stride = g_framebuffer.stride;
-  return g_framebuffer.status;
-}
 
 namespace i915 {
 
@@ -78,7 +52,7 @@ namespace {
 class IntegrationTest : public ::testing::Test {
  public:
   void SetUp() final {
-    SetFramebuffer({});
+    fake_framebuffer::SetFramebuffer({});
 
     sysmem_.SetNewBufferCollectionConfig({
         .cpu_domain_supported = false,
@@ -462,7 +436,7 @@ TEST_F(IntegrationTest, BindAndInit) {
 // Tests that the device can initialize even if bootloader framebuffer information is not available
 // and global GTT allocations start at offset 0.
 TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
-  SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
+  fake_framebuffer::SetFramebuffer({.status = ZX_ERR_INVALID_ARGS});
 
   async_dispatcher_t* current_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
@@ -492,7 +466,7 @@ TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
 TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   constexpr uint32_t kStride = 1920;
   constexpr uint32_t kHeight = 1080;
-  SetFramebuffer({
+  fake_framebuffer::SetFramebuffer({
       .format = ZBI_PIXEL_FORMAT_RGB_888,
       .width = kStride,
       .height = kHeight,
