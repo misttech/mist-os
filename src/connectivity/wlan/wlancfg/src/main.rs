@@ -308,6 +308,7 @@ async fn run_all_futures() -> Result<(), Error> {
     let (roam_service_request_sender, roam_service_request_receiver) =
         mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
     let roam_manager_service_fut = serve_local_roam_manager_requests(
+        cfg.roaming_policy.into(),
         roam_service_request_receiver,
         connection_selection_requester.clone(),
         telemetry_sender.clone(),

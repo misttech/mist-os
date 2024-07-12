@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::client::roaming::lib::ROAMING_CHANNEL_BUFFER_SIZE;
+use crate::client::roaming::lib::{RoamingPolicy, ROAMING_CHANNEL_BUFFER_SIZE};
 use crate::client::roaming::local_roam_manager::{serve_local_roam_manager_requests, RoamManager};
 use crate::client::{connection_selection, scan, serve_provider_requests, types};
 use crate::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
@@ -206,6 +206,7 @@ fn test_setup(
         mpsc::channel(ROAMING_CHANNEL_BUFFER_SIZE);
     let roam_manager_service_fut = Box::pin(
         serve_local_roam_manager_requests(
+            RoamingPolicy::Disabled,
             roam_service_request_receiver,
             connection_selection_requester.clone(),
             telemetry_sender.clone(),
