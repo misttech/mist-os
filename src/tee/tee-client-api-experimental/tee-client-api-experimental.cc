@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.tee/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
 #include <fidl/fuchsia.tee/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -24,6 +25,8 @@
 #include <vector>
 
 #include <tee-client-api/tee_client_api.h>
+
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace {
 
@@ -51,28 +54,15 @@ struct UuidEqualityComparator {
 using UuidToAppContainer =
     std::vector<std::pair<fuchsia_tee::wire::Uuid, fidl::ClientEnd<fuchsia_tee::Application>>>;
 
-constexpr std::string_view kServiceDirectoryPath("/svc/");
+std::string GetApplicationDirectoryPath(const fuchsia_tee::wire::Uuid& app_uuid) {
+  constexpr const char* kPathFormat = "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x";
 
-// Presently only used by clients that need to connect before the service is available / don't need
-// the TEE to be able to use file services.
-constexpr std::string_view kTeeDevClass("/dev/class/tee/");
-
-std::string GetApplicationServicePath(const fuchsia_tee::wire::Uuid& app_uuid) {
-  constexpr std::string_view kApplicationServicePathPrefix = "/svc/fuchsia.tee.Application.";
-  constexpr size_t kUuidNameLength = 36;
-  constexpr const char* kPathFormat = "%s%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x";
-  constexpr size_t kPathLength = kApplicationServicePathPrefix.size() + kUuidNameLength;
-
-  // Reserve an extra spot for the null-terminating character.
-  char path_buf[kPathLength + 1];
-  snprintf(path_buf, kPathLength + 1, kPathFormat, kApplicationServicePathPrefix.data(),
-           app_uuid.time_low, app_uuid.time_mid, app_uuid.time_hi_and_version,
-           app_uuid.clock_seq_and_node[0], app_uuid.clock_seq_and_node[1],
-           app_uuid.clock_seq_and_node[2], app_uuid.clock_seq_and_node[3],
-           app_uuid.clock_seq_and_node[4], app_uuid.clock_seq_and_node[5],
-           app_uuid.clock_seq_and_node[6], app_uuid.clock_seq_and_node[7]);
-
-  return std::string(path_buf, kPathLength);
+  return fxl::StringPrintf(kPathFormat, app_uuid.time_low, app_uuid.time_mid,
+                           app_uuid.time_hi_and_version, app_uuid.clock_seq_and_node[0],
+                           app_uuid.clock_seq_and_node[1], app_uuid.clock_seq_and_node[2],
+                           app_uuid.clock_seq_and_node[3], app_uuid.clock_seq_and_node[4],
+                           app_uuid.clock_seq_and_node[5], app_uuid.clock_seq_and_node[6],
+                           app_uuid.clock_seq_and_node[7]);
 }
 
 constexpr uint32_t GetParamTypeForIndex(uint32_t param_types, size_t index) {
@@ -93,37 +83,6 @@ constexpr bool IsDirectionInput(fuchsia_tee::wire::Direction direction) {
 constexpr bool IsDirectionOutput(fuchsia_tee::wire::Direction direction) {
   return ((direction == fuchsia_tee::wire::Direction::kOutput) ||
           (direction == fuchsia_tee::wire::Direction::kInout));
-}
-
-TEEC_Result CheckGlobalPlatformCompliance(
-    fidl::UnownedClientEnd<fuchsia_hardware_tee::DeviceConnector> maybe_device_connector) {
-  fidl::ClientEnd<fuchsia_tee::DeviceInfo> device_info;
-
-  if (maybe_device_connector.is_valid()) {
-    auto server_end = fidl::CreateEndpoints(&device_info);
-    if (!server_end.is_ok()) {
-      return TEEC_ERROR_COMMUNICATION;
-    }
-    auto result = fidl::WireCall(std::move(maybe_device_connector))
-                      ->ConnectToDeviceInfo(std::move(server_end.value()));
-    if (!result.ok()) {
-      return TEEC_ERROR_NOT_SUPPORTED;
-    }
-  } else {
-    auto result = component::Connect<fuchsia_tee::DeviceInfo>();
-    if (!result.is_ok()) {
-      return TEEC_ERROR_NOT_SUPPORTED;
-    }
-    device_info = std::move(result.value());
-  }
-
-  auto result = fidl::WireCall(device_info)->GetOsInfo();
-  if (!result.ok() || !result.value().info.has_is_global_platform_compliant() ||
-      !result.value().info.is_global_platform_compliant()) {
-    return TEEC_ERROR_NOT_SUPPORTED;
-  }
-
-  return TEEC_SUCCESS;
 }
 
 void ConvertTeecUuidToZxUuid(const TEEC_UUID& teec_uuid, fuchsia_tee::wire::Uuid* out_uuid) {
@@ -645,13 +604,6 @@ TEEC_Result PostprocessOperation(
   return rc;
 }
 
-fidl::UnownedClientEnd<fuchsia_hardware_tee::DeviceConnector> GetDeviceConnectorFromContext(
-    TEEC_Context* context) {
-  ZX_DEBUG_ASSERT(context);
-  return fidl::UnownedClientEnd<fuchsia_hardware_tee::DeviceConnector>(
-      context->imp.device_connector_channel);
-}
-
 fidl::UnownedClientEnd<fuchsia_tee::Application> GetApplicationFromSession(TEEC_Session* session) {
   ZX_DEBUG_ASSERT(session);
   return fidl::UnownedClientEnd<fuchsia_tee::Application>(session->imp.application_channel);
@@ -671,67 +623,17 @@ UuidToAppContainer::iterator FindInUuidToAppContainer(UuidToAppContainer* contai
   });
 }
 
-constexpr bool ShouldUseDeviceConnector(const TEEC_Context* context) {
-  return context->imp.device_connector_channel != ZX_HANDLE_INVALID;
-}
-
-// Connects the client directly to the TEE Driver's DeviceConnector interface.
-//
-// This is a temporary measure to allow clients that come up before component services to still
-// access the TEE. This requires that the client has access to the TEE device class. Additionally,
-// the client's entire context will not have any filesystem support, so if the client opens a
-// session and sends a command to a trusted application that then needs persistent storage to
-// complete, the persistent storage request will be rejected by the driver.
-zx_status_t ConnectToDeviceConnector(
-    const char* tee_device,
-    fidl::ClientEnd<fuchsia_hardware_tee::DeviceConnector>* device_connector) {
-  ZX_DEBUG_ASSERT(tee_device);
-  ZX_DEBUG_ASSERT(device_connector);
-
-  auto device_connector_result =
-      component::Connect<fuchsia_hardware_tee::DeviceConnector>(tee_device);
-  if (!device_connector_result.is_ok()) {
-    return device_connector_result.status_value();
-  }
-
-  *device_connector = std::move(device_connector_result.value());
-  return ZX_OK;
-}
-
-// Opens a connection to a `fuchsia.tee.Application` via a device connector.
-TEEC_Result ConnectApplicationViaDeviceConnector(
-    const fuchsia_tee::wire::Uuid& app_uuid,
-    fidl::UnownedClientEnd<fuchsia_hardware_tee::DeviceConnector> device_connector,
-    fidl::ClientEnd<fuchsia_tee::Application>* out_app) {
-  ZX_DEBUG_ASSERT(device_connector.is_valid());
+// Opens a connection to a `fuchsia.tee.Application` via the directory.
+TEEC_Result ConnectApplicationViaDirectory(const fuchsia_tee::wire::Uuid& app_uuid,
+                                           fidl::ClientEnd<fuchsia_tee::Application>* out_app) {
   ZX_DEBUG_ASSERT(out_app);
 
-  auto app_ends = fidl::CreateEndpoints<fuchsia_tee::Application>();
-  if (!app_ends.is_ok()) {
-    return TEEC_ERROR_COMMUNICATION;
-  }
+  std::string connection_path_base = "/ta/" + GetApplicationDirectoryPath(app_uuid);
 
-  auto result =
-      fidl::WireCall(std::move(device_connector))
-          ->ConnectToApplication(
-              app_uuid, fidl::ClientEnd<::fuchsia_tee_manager::Provider>() /* service_provider */,
-              std::move(app_ends->server));
-  if (!result.ok()) {
-    return TEEC_ERROR_COMMUNICATION;
-  }
+  std::string connection_path =
+      connection_path_base + "/" + fidl::DiscoverableProtocolName<fuchsia_tee::Application>;
 
-  *out_app = std::move(app_ends->client);
-  return TEEC_SUCCESS;
-}
-
-// Opens a connection to a `fuchsia.tee.Application` via the service.
-TEEC_Result ConnectApplicationViaService(const fuchsia_tee::wire::Uuid& app_uuid,
-                                         fidl::ClientEnd<fuchsia_tee::Application>* out_app) {
-  ZX_DEBUG_ASSERT(out_app);
-
-  std::string service_path = GetApplicationServicePath(app_uuid);
-
-  auto application = component::Connect<fuchsia_tee::Application>(service_path.c_str());
+  auto application = component::Connect<fuchsia_tee::Application>(connection_path);
   if (!application.is_ok()) {
     return TEEC_ERROR_COMMUNICATION;
   }
@@ -758,10 +660,9 @@ TEEC_Result ConnectApplication(const fuchsia_tee::wire::Uuid& app_uuid, TEEC_Con
 
   // This is a new connection to this application, so a new connection must be made.
   fidl::ClientEnd<fuchsia_tee::Application> app_owned;
-  TEEC_Result result = ShouldUseDeviceConnector(context)
-                           ? ConnectApplicationViaDeviceConnector(
-                                 app_uuid, GetDeviceConnectorFromContext(context), &app_owned)
-                           : ConnectApplicationViaService(app_uuid, &app_owned);
+
+  TEEC_Result result = ConnectApplicationViaDirectory(app_uuid, &app_owned);
+
   if (result != TEEC_SUCCESS) {
     return result;
   }
@@ -782,31 +683,9 @@ TEEC_Result TEEC_InitializeContext(const char* name, TEEC_Context* context) {
     return TEEC_ERROR_BAD_PARAMETERS;
   }
 
-  // TODO: use `std::string_view::starts_with()` when C++20 is available.
-  auto starts_with = [](std::string_view str, std::string_view prefix) -> bool {
-    // if prefix.size() is larger than str, compare clamps the comparison to the end of str
-    return str.compare(0, prefix.size(), prefix) == 0;
-  };
+  fidl::ClientEnd<fuchsia_hardware_tee::DeviceConnector> device_connector;
 
-  auto name_view = std::string_view(name != nullptr ? name : "");
-  fidl::ClientEnd<fuchsia_hardware_tee::DeviceConnector> maybe_device_connector;
-
-  if (starts_with(name_view, kTeeDevClass)) {
-    if (zx_status_t status = ConnectToDeviceConnector(name, &maybe_device_connector);
-        status != ZX_OK) {
-      return TEEC_ERROR_COMMUNICATION;
-    }
-  } else if (name != nullptr && !starts_with(name_view, kServiceDirectoryPath)) {
-    return TEEC_ERROR_BAD_PARAMETERS;
-  }
-
-  // The device connector is allowed to be invalid in this usage.
-  if (TEEC_Result result = CheckGlobalPlatformCompliance(maybe_device_connector.borrow());
-      result != TEEC_SUCCESS) {
-    return result;
-  }
-
-  context->imp.device_connector_channel = maybe_device_connector.TakeChannel().release();
+  context->imp.device_connector_channel = device_connector.TakeChannel().release();
   context->imp.uuid_to_channel = new UuidToAppContainer();
 
   return TEEC_SUCCESS;
