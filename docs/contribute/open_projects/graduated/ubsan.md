@@ -126,5 +126,5 @@ Reach out for questions or for status updates:
 *   <phosek@google.com>
 *   <mcgrathr@google.com>
 
-[label-ubsan-open]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=label%3Aubsan%20is%3Aopen&can=2
+[label-ubsan-open]: https://issues.fuchsia.dev/issues?q=label%3Aubsan%20is%3Aopen
 [ubsan]: https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
