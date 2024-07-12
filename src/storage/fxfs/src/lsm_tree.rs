@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://fxbug.dev/333401205): Remove allow(dead_code) for bloom filters when used
+#[allow(dead_code)]
+mod bloom_filter;
 pub mod cache;
 pub mod merge;
 pub mod simple_persistent_layer;
@@ -27,7 +30,7 @@ use types::{
 const SKIP_LIST_LAYER_ITEMS: usize = 512;
 
 // For serialization.
-pub use simple_persistent_layer::LayerInfo;
+pub use simple_persistent_layer::{LayerInfo, LayerInfoV32};
 
 pub async fn layers_from_handles<K: Key, V: Value>(
     handles: impl IntoIterator<Item = impl ReadObjectHandle + 'static>,
@@ -368,8 +371,8 @@ mod tests {
     use crate::lsm_tree::layers_from_handles;
     use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
     use crate::lsm_tree::types::{
-        BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, OrdLowerBound,
-        OrdUpperBound, SortByU64, Value,
+        BoxedLayerIterator, FuzzyHash, Item, ItemRef, Key, Layer, LayerIterator, LayerKey,
+        OrdLowerBound, OrdUpperBound, SortByU64, Value,
     };
     use crate::object_handle::ObjectHandle;
     use crate::serialized_types::{
@@ -380,6 +383,7 @@ mod tests {
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
     use fprint::TypeFingerprint;
+    use fxfs_macros::FuzzyHash;
     use rand::seq::SliceRandom;
     use rand::thread_rng;
     use std::hash::Hash;
@@ -392,6 +396,7 @@ mod tests {
         PartialEq,
         Debug,
         Hash,
+        FuzzyHash,
         serde::Serialize,
         serde::Deserialize,
         TypeFingerprint,
@@ -803,13 +808,16 @@ mod tests {
 
 #[cfg(fuzz)]
 mod fuzz {
-    use crate::lsm_tree::types::{Item, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64};
+    use crate::lsm_tree::types::{
+        FuzzyHash, Item, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64,
+    };
     use crate::serialized_types::{
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
     };
     use arbitrary::Arbitrary;
     use fprint::TypeFingerprint;
     use fuzz::fuzz;
+    use fxfs_macros::FuzzyHash;
     use std::hash::Hash;
 
     #[derive(
@@ -817,6 +825,7 @@ mod fuzz {
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,

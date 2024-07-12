@@ -717,7 +717,7 @@ mod tests {
     use super::{MergeResult, Merger};
     use crate::lsm_tree::skip_list_layer::SkipListLayer;
     use crate::lsm_tree::types::{
-        Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
+        FuzzyHash, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
         OrdUpperBound, SortByU64,
     };
     use crate::lsm_tree::Value;
@@ -725,6 +725,7 @@ mod tests {
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
     };
     use fprint::TypeFingerprint;
+    use fxfs_macros::FuzzyHash;
     use rand::Rng;
     use std::hash::Hash;
     use std::ops::{Bound, Range};
@@ -734,6 +735,7 @@ mod tests {
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -1280,6 +1282,7 @@ mod tests {
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -1411,6 +1414,7 @@ mod tests {
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,

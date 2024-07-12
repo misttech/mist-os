@@ -96,8 +96,8 @@ use crate::log::*;
 use crate::lsm_tree::cache::NullCache;
 use crate::lsm_tree::skip_list_layer::SkipListLayer;
 use crate::lsm_tree::types::{
-    Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound, OrdUpperBound,
-    RangeKey, SortByU64,
+    FuzzyHash, Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
+    OrdUpperBound, RangeKey, SortByU64,
 };
 use crate::lsm_tree::{layers_from_handles, LSMTree};
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
@@ -107,7 +107,7 @@ use crate::object_store::transaction::{
 };
 use crate::object_store::{tree, DataObjectHandle, DirectWriter, HandleOptions, ObjectStore};
 use crate::range::RangeExt;
-use crate::round::{round_div, round_down};
+use crate::round::{round_div, round_down, round_up};
 use crate::serialized_types::{
     Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
 };
@@ -119,10 +119,11 @@ use fprint::TypeFingerprint;
 use fuchsia_inspect::{ArrayProperty, HistogramProperty};
 use futures::FutureExt;
 use merge::{filter_marked_for_deletion, filter_tombstones, merge};
+use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher as _};
 use std::marker::PhantomData;
 use std::num::Saturating;
 use std::ops::{Bound, Range};
@@ -304,6 +305,41 @@ pub struct AllocatorKeyV32 {
 impl SortByU64 for AllocatorKey {
     fn get_leading_u64(&self) -> u64 {
         self.device_range.start
+    }
+}
+
+const EXTENT_HASH_BUCKET_SIZE: u64 = 1 * 1024 * 1024;
+
+pub struct AllocatorKeyPartitionIterator {
+    device_range: Range<u64>,
+}
+
+impl Iterator for AllocatorKeyPartitionIterator {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.device_range.start >= self.device_range.end {
+            None
+        } else {
+            let start = self.device_range.start;
+            self.device_range.start = start.saturating_add(EXTENT_HASH_BUCKET_SIZE);
+            let end = std::cmp::min(self.device_range.start, self.device_range.end);
+            let key = AllocatorKey { device_range: start..end };
+            let mut hasher = FxHasher::default();
+            key.hash(&mut hasher);
+            Some(hasher.finish())
+        }
+    }
+}
+
+impl FuzzyHash for AllocatorKey {
+    type Iter = AllocatorKeyPartitionIterator;
+
+    fn fuzzy_hash(&self) -> Self::Iter {
+        AllocatorKeyPartitionIterator {
+            device_range: round_down(self.device_range.start, EXTENT_HASH_BUCKET_SIZE)
+                ..round_up(self.device_range.end, EXTENT_HASH_BUCKET_SIZE).unwrap_or(u64::MAX),
+        }
     }
 }
 

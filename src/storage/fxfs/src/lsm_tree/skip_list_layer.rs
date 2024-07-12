@@ -586,7 +586,7 @@ mod tests {
     use crate::lsm_tree::merge::ItemOp::{Discard, Replace};
     use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
     use crate::lsm_tree::types::{
-        DefaultOrdLowerBound, DefaultOrdUpperBound, Item, ItemRef, Layer, LayerIterator,
+        DefaultOrdLowerBound, DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Layer, LayerIterator,
         LayerIteratorMut, SortByU64,
     };
     use crate::serialized_types::{
@@ -596,7 +596,8 @@ mod tests {
     use fprint::TypeFingerprint;
     use fuchsia_async as fasync;
     use futures::future::join_all;
-    use futures::{join, FutureExt};
+    use futures::{join, FutureExt as _};
+    use fxfs_macros::FuzzyHash;
     use std::hash::Hash;
     use std::ops::Bound;
     use std::time::{Duration, Instant};
@@ -606,6 +607,7 @@ mod tests {
         Eq,
         Debug,
         Hash,
+        FuzzyHash,
         PartialEq,
         PartialOrd,
         Ord,

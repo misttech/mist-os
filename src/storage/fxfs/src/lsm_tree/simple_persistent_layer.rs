@@ -697,7 +697,8 @@ mod tests {
     use super::{block_split, SimplePersistentLayer, SimplePersistentLayerWriter};
     use crate::filesystem::MAX_BLOCK_SIZE;
     use crate::lsm_tree::types::{
-        DefaultOrdUpperBound, Item, ItemRef, Layer, LayerKey, LayerWriter, MergeType, SortByU64,
+        DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Layer, LayerKey, LayerWriter, MergeType,
+        SortByU64,
     };
     use crate::lsm_tree::LayerIterator;
     use crate::object_handle::WriteBytes;
@@ -708,20 +709,11 @@ mod tests {
     use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
     use crate::testing::writer::Writer;
     use fprint::TypeFingerprint;
+    use fxfs_macros::FuzzyHash;
     use std::fmt::Debug;
     use std::hash::Hash;
     use std::ops::{Bound, Range};
     use std::sync::Arc;
-
-    impl DefaultOrdUpperBound for i32 {}
-    impl SortByU64 for i32 {
-        fn get_leading_u64(&self) -> u64 {
-            if self >= &0 {
-                return u64::try_from(*self).unwrap() + u64::try_from(i32::MAX).unwrap() + 1;
-            }
-            u64::try_from(self + i32::MAX + 1).unwrap()
-        }
-    }
 
     impl<W: WriteBytes> Debug for SimplePersistentLayerWriter<W, i32, i32> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -954,6 +946,7 @@ mod tests {
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,

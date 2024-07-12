@@ -5,17 +5,20 @@
 // TODO(https://fxbug.dev/42178223): need validation after deserialization.
 use crate::checksum::Checksums;
 use crate::lsm_tree::types::{
-    Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
+    FuzzyHash, Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey,
+    SortByU64,
 };
 use crate::object_store::extent_record::{
-    ExtentKey, ExtentKeyV32, ExtentValue, ExtentValueV32, ExtentValueV37, ExtentValueV38,
+    ExtentKey, ExtentKeyPartitionIterator, ExtentKeyV32, ExtentValue, ExtentValueV32,
+    ExtentValueV37, ExtentValueV38,
 };
 use crate::serialized_types::{migrate_to_version, Migrate, Versioned};
 use fprint::TypeFingerprint;
 use fxfs_crypto::WrappedKeysV32;
+use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher as _};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// ObjectDescriptor is the set of possible records in the object store.
@@ -304,6 +307,47 @@ impl RangeKey for ObjectKey {
                     && left_key.range.start < right_key.range.end
             }
             (a, b) => a == b,
+        }
+    }
+}
+
+pub enum ObjectKeyFuzzyHashIterator {
+    ExtentKey(/* object_id */ u64, /* attribute_id */ u64, ExtentKeyPartitionIterator),
+    NotExtentKey(/* hash */ Option<u64>),
+}
+
+impl Iterator for ObjectKeyFuzzyHashIterator {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::ExtentKey(oid, attr_id, extent_keys) => extent_keys.next().map(|range| {
+                let mut hasher = FxHasher::default();
+                ObjectKey::extent(*oid, *attr_id, range).hash(&mut hasher);
+                hasher.finish()
+            }),
+            Self::NotExtentKey(hash) => hash.take(),
+        }
+    }
+}
+
+impl FuzzyHash for ObjectKey {
+    type Iter = ObjectKeyFuzzyHashIterator;
+
+    fn fuzzy_hash(&self) -> Self::Iter {
+        match &self.data {
+            ObjectKeyData::Attribute(attr_id, AttributeKey::Extent(extent)) => {
+                ObjectKeyFuzzyHashIterator::ExtentKey(
+                    self.object_id,
+                    *attr_id,
+                    extent.fuzzy_hash_partition(),
+                )
+            }
+            _ => {
+                let mut hasher = FxHasher::default();
+                self.hash(&mut hasher);
+                ObjectKeyFuzzyHashIterator::NotExtentKey(Some(hasher.finish()))
+            }
         }
     }
 }

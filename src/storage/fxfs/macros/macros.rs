@@ -328,3 +328,38 @@ pub fn derive_to_weak_node(input: TokenStream) -> TokenStream {
     }
     .into()
 }
+
+/// Implements a trivial FuzzyHash for non-range-based keys.
+#[proc_macro_derive(FuzzyHash)]
+pub fn derive_fuzzy_hash(input: TokenStream) -> TokenStream {
+    let syn::DeriveInput { ident, .. } = parse_macro_input!(input);
+    TokenStream::from(quote! {
+        impl FuzzyHash for #ident {
+            type Iter = std::iter::Once<u64>;
+
+            fn fuzzy_hash(&self) -> Self::Iter {
+                use std::hash::{Hash as _, Hasher as _};
+                let mut hasher = rustc_hash::FxHasher::default();
+                self.hash(&mut hasher);
+                std::iter::once(hasher.finish())
+            }
+        }
+    })
+}
+
+#[proc_macro]
+pub fn impl_fuzzy_hash(input: TokenStream) -> TokenStream {
+    let ident: syn::Type = parse_macro_input!(input);
+    TokenStream::from(quote! {
+        impl FuzzyHash for #ident {
+            type Iter = std::iter::Once<u64>;
+
+            fn fuzzy_hash(&self) -> Self::Iter {
+                use std::hash::{Hash as _, Hasher as _};
+                let mut hasher = rustc_hash::FxHasher::default();
+                self.hash(&mut hasher);
+                std::iter::once(hasher.finish())
+            }
+        }
+    })
+}
