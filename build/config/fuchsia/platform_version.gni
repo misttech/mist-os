@@ -55,8 +55,3 @@ if (override_idk_buildable_api_levels != false) {
   platform_version.idk_buildable_api_levels = []
   platform_version.idk_buildable_api_levels = override_idk_buildable_api_levels
 }
-
-# Deprecated name for `idk_buildable_api_levels`.
-# TODO(https://fxbug.dev/324062239): Remove after migrating out-of-tree uses.
-platform_version.build_time_supported_api_levels =
-    platform_version.idk_buildable_api_levels
