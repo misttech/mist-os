@@ -40,8 +40,10 @@ pub trait IpDeviceConfigurationHandler<I: IpDeviceIpExt, BC>: DeviceIdContext<An
 pub struct IpDeviceConfigurationUpdate {
     /// A change in IP enabled.
     pub ip_enabled: Option<bool>,
-    /// A change in forwarding enabled.
-    pub forwarding_enabled: Option<bool>,
+    /// A change in unicast forwarding enabled.
+    pub unicast_forwarding_enabled: Option<bool>,
+    /// A change in multicast forwarding enabled.
+    pub multicast_forwarding_enabled: Option<bool>,
     /// A change in Group Messaging Protocol (GMP) enabled.
     pub gmp_enabled: Option<bool>,
 }
@@ -68,8 +70,10 @@ impl AsRef<IpDeviceConfigurationUpdate> for Ipv4DeviceConfigurationUpdate {
 /// Errors observed from updating a device's IP configuration.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum UpdateIpConfigurationError {
-    /// Forwarding is not supported in the target interface.
-    ForwardingNotSupported,
+    /// Unicast Forwarding is not supported in the target interface.
+    UnicastForwardingNotSupported,
+    /// Multicast Forwarding is not supported in the target interface.
+    MulticastForwardingNotSupported,
 }
 
 /// A validated and pending IP device configuration update.
@@ -89,12 +93,19 @@ impl<'a, I: IpDeviceIpExt, D: DeviceIdentifier> PendingIpDeviceConfigurationUpda
         config: I::ConfigurationUpdate,
         device_id: &'a D,
     ) -> Result<Self, UpdateIpConfigurationError> {
-        let IpDeviceConfigurationUpdate { ip_enabled: _, gmp_enabled: _, forwarding_enabled } =
-            config.as_ref();
+        let IpDeviceConfigurationUpdate {
+            ip_enabled: _,
+            gmp_enabled: _,
+            unicast_forwarding_enabled,
+            multicast_forwarding_enabled,
+        } = config.as_ref();
 
         if device_id.is_loopback() {
-            if forwarding_enabled.unwrap_or(false) {
-                return Err(UpdateIpConfigurationError::ForwardingNotSupported);
+            if unicast_forwarding_enabled.unwrap_or(false) {
+                return Err(UpdateIpConfigurationError::UnicastForwardingNotSupported);
+            }
+            if multicast_forwarding_enabled.unwrap_or(false) {
+                return Err(UpdateIpConfigurationError::MulticastForwardingNotSupported);
             }
         }
 
@@ -121,22 +132,33 @@ where
         // NB: Extracted to prevent deep nesting which breaks rustfmt.
         let handle_config_and_flags =
             |config: &mut Ipv4DeviceConfiguration, flags: &mut IpDeviceFlags| {
-                let IpDeviceConfigurationUpdate { ip_enabled, gmp_enabled, forwarding_enabled } =
-                    ip_config;
-                let ip_enabled_updates =
-                    get_prev_next_and_update(&mut flags.ip_enabled, ip_enabled);
-                let gmp_enable_updates =
-                    get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled);
-                let forwarding_enabled_updates = get_prev_next_and_update(
-                    &mut config.ip_config.forwarding_enabled,
-                    forwarding_enabled,
-                );
-                (ip_enabled_updates, gmp_enable_updates, forwarding_enabled_updates)
+                let IpDeviceConfigurationUpdate {
+                    ip_enabled,
+                    gmp_enabled,
+                    unicast_forwarding_enabled,
+                    multicast_forwarding_enabled,
+                } = ip_config;
+                (
+                    get_prev_next_and_update(&mut flags.ip_enabled, ip_enabled),
+                    get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled),
+                    get_prev_next_and_update(
+                        &mut config.ip_config.unicast_forwarding_enabled,
+                        unicast_forwarding_enabled,
+                    ),
+                    get_prev_next_and_update(
+                        &mut config.ip_config.multicast_forwarding_enabled,
+                        multicast_forwarding_enabled,
+                    ),
+                )
             };
 
         self.with_ip_device_configuration_mut(device_id, |mut inner| {
-            let (ip_enabled_updates, gmp_enabled_updates, forwarding_enabled_updates) =
-                inner.with_configuration_and_flags_mut(device_id, handle_config_and_flags);
+            let (
+                ip_enabled_updates,
+                gmp_enabled_updates,
+                unicast_forwarding_enabled_updates,
+                multicast_forwarding_enabled_updates,
+            ) = inner.with_configuration_and_flags_mut(device_id, handle_config_and_flags);
 
             let (config, mut core_ctx) = inner.ip_device_configuration_and_ctx();
             let core_ctx = &mut core_ctx;
@@ -169,9 +191,16 @@ where
                     GmpHandler::gmp_handle_disabled(core_ctx, bindings_ctx, device_id)
                 }
             });
-            let forwarding_enabled = dont_handle_change_and_get_prev(forwarding_enabled_updates);
-            let ip_config =
-                IpDeviceConfigurationUpdate { ip_enabled, gmp_enabled, forwarding_enabled };
+            let unicast_forwarding_enabled =
+                dont_handle_change_and_get_prev(unicast_forwarding_enabled_updates);
+            let multicast_forwarding_enabled =
+                dont_handle_change_and_get_prev(multicast_forwarding_enabled_updates);
+            let ip_config = IpDeviceConfigurationUpdate {
+                ip_enabled,
+                gmp_enabled,
+                unicast_forwarding_enabled,
+                multicast_forwarding_enabled,
+            };
             Ipv4DeviceConfigurationUpdate { ip_config }
         })
     }
@@ -228,10 +257,15 @@ where
                 slaac_config_updates,
                 ip_enabled_updates,
                 gmp_enabled_updates,
-                forwarding_enabled_updates,
+                unicast_forwarding_enabled_updates,
+                multicast_forwarding_enabled_updates,
             ) = inner.with_configuration_and_flags_mut(device_id, |config, flags| {
-                let IpDeviceConfigurationUpdate { ip_enabled, gmp_enabled, forwarding_enabled } =
-                    ip_config;
+                let IpDeviceConfigurationUpdate {
+                    ip_enabled,
+                    gmp_enabled,
+                    unicast_forwarding_enabled,
+                    multicast_forwarding_enabled,
+                } = ip_config;
                 (
                     get_prev_next_and_update(&mut config.dad_transmits, dad_transmits),
                     get_prev_next_and_update(
@@ -242,8 +276,12 @@ where
                     get_prev_next_and_update(&mut flags.ip_enabled, ip_enabled),
                     get_prev_next_and_update(&mut config.ip_config.gmp_enabled, gmp_enabled),
                     get_prev_next_and_update(
-                        &mut config.ip_config.forwarding_enabled,
-                        forwarding_enabled,
+                        &mut config.ip_config.unicast_forwarding_enabled,
+                        unicast_forwarding_enabled,
+                    ),
+                    get_prev_next_and_update(
+                        &mut config.ip_config.multicast_forwarding_enabled,
+                        multicast_forwarding_enabled,
                     ),
                 )
             });
@@ -286,8 +324,8 @@ where
                         GmpHandler::gmp_handle_disabled(core_ctx, bindings_ctx, device_id)
                     }
                 }),
-                forwarding_enabled: handle_change_and_get_prev(
-                    forwarding_enabled_updates,
+                unicast_forwarding_enabled: handle_change_and_get_prev(
+                    unicast_forwarding_enabled_updates,
                     |next| {
                         if next {
                             RsHandler::stop_router_solicitation(core_ctx, bindings_ctx, device_id);
@@ -309,6 +347,9 @@ where
                             RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
                         }
                     },
+                ),
+                multicast_forwarding_enabled: dont_handle_change_and_get_prev(
+                    multicast_forwarding_enabled_updates,
                 ),
             };
             Ipv6DeviceConfigurationUpdate {

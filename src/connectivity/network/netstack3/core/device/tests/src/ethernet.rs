@@ -174,8 +174,8 @@ where
     let device: DeviceId<_> = device_ids[device_builder_id].clone().into();
 
     // Should not be a router (default).
-    assert!(!ctx.test_api().is_forwarding_enabled::<I>(&device));
-    assert!(!ctx.test_api().is_forwarding_enabled::<I::OtherVersion>(&device));
+    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<I>(&device));
+    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<I::OtherVersion>(&device));
 
     // Receiving a packet not destined for the node should only result in a
     // dest unreachable message if routing is enabled.
@@ -183,10 +183,10 @@ where
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
 
     // Set routing and expect packets to be forwarded.
-    ctx.test_api().set_forwarding_enabled::<I>(&device, true);
-    assert!(ctx.test_api().is_forwarding_enabled::<I>(&device));
+    ctx.test_api().set_unicast_forwarding_enabled::<I>(&device, true);
+    assert!(ctx.test_api().is_unicast_forwarding_enabled::<I>(&device));
     // Should not update other Ip routing status.
-    assert!(!ctx.test_api().is_forwarding_enabled::<I::OtherVersion>(&device));
+    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<I::OtherVersion>(&device));
 
     // Should route the packet since routing fully enabled (netstack &
     // device).
@@ -224,9 +224,9 @@ where
     check_icmp::<I>(&frame);
 
     // Attempt to unset router
-    ctx.test_api().set_forwarding_enabled::<I>(&device, false);
-    assert!(!ctx.test_api().is_forwarding_enabled::<I>(&device));
-    assert!(!ctx.test_api().is_forwarding_enabled::<I::OtherVersion>(&device));
+    ctx.test_api().set_unicast_forwarding_enabled::<I>(&device, false);
+    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<I>(&device));
+    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<I::OtherVersion>(&device));
 
     // Should not route packets anymore
     ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf);

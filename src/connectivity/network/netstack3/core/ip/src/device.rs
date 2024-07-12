@@ -897,7 +897,7 @@ impl<
     > IpDeviceHandler<I, BC> for CC
 {
     fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool {
-        is_ip_forwarding_enabled(self, device_id)
+        is_ip_unicast_forwarding_enabled(self, device_id)
     }
 
     fn set_default_hop_limit(&mut self, device_id: &Self::DeviceId, hop_limit: NonZeroU8) {
@@ -1310,7 +1310,7 @@ fn enable_ipv6_device_with_config<
     //    address.
     //
     // If we are operating as a router, we do not solicit routers.
-    if !config.ip_config.forwarding_enabled {
+    if !config.ip_config.unicast_forwarding_enabled {
         RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
     }
 }
@@ -1470,8 +1470,8 @@ pub fn get_ipv6_hop_limit<BT: IpDeviceStateBindingsTypes, CC: IpDeviceStateConte
     core_ctx.with_default_hop_limit(device, Clone::clone)
 }
 
-/// Is IP packet forwarding enabled?
-pub fn is_ip_forwarding_enabled<
+/// Is IP packet unicast forwarding enabled?
+pub fn is_ip_unicast_forwarding_enabled<
     I: IpDeviceIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<I, BC>,
@@ -1480,7 +1480,21 @@ pub fn is_ip_forwarding_enabled<
     device_id: &CC::DeviceId,
 ) -> bool {
     core_ctx.with_ip_device_configuration(device_id, |state, _ctx| {
-        AsRef::<IpDeviceConfiguration>::as_ref(state).forwarding_enabled
+        AsRef::<IpDeviceConfiguration>::as_ref(state).unicast_forwarding_enabled
+    })
+}
+
+/// Is IP packet multicast forwarding enabled?
+pub fn is_ip_multicast_forwarding_enabled<
+    I: IpDeviceIpExt,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
+    CC: IpDeviceConfigurationContext<I, BC>,
+>(
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
+) -> bool {
+    core_ctx.with_ip_device_configuration(device_id, |state, _ctx| {
+        AsRef::<IpDeviceConfiguration>::as_ref(state).multicast_forwarding_enabled
     })
 }
 

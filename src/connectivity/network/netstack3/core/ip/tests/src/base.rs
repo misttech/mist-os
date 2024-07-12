@@ -600,7 +600,9 @@ fn test_ip_reassembly_only_at_destination_host<I: TestIpExt + IpExt>() {
     let fake_config = I::TEST_ADDRS;
     let (mut alice, alice_device_ids) = FakeCtxBuilder::with_addrs(fake_config.swap()).build();
     {
-        alice.test_api().set_forwarding_enabled::<I>(&alice_device_ids[0].clone().into(), true);
+        alice
+            .test_api()
+            .set_unicast_forwarding_enabled::<I>(&alice_device_ids[0].clone().into(), true);
     }
     let (bob, bob_device_ids) = FakeCtxBuilder::with_addrs(fake_config).build();
     let mut net = new_simple_fake_network(
@@ -687,7 +689,7 @@ fn test_ipv6_packet_too_big() {
     let (mut ctx, device_ids) = dispatcher_builder.build();
 
     let device: DeviceId<_> = device_ids[0].clone().into();
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, true);
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, true);
     let frame_dst = FrameDestination::Individual { local: true };
 
     // Construct an IPv6 packet that is too big for our MTU (MTU = 1280;
@@ -1557,8 +1559,8 @@ fn test_receive_ip_packet_action() {
 
     // Receive packet destined to a remote address when forwarding is
     // enabled both globally and on the inbound device.
-    ctx.test_api().set_forwarding_enabled::<Ipv4>(&v4_dev, true);
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&v6_dev, true);
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv4>(&v4_dev, true);
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&v6_dev, true);
     let Ctx { core_ctx, bindings_ctx } = &mut ctx;
     assert_eq!(
         ip::receive_ipv4_packet_action(

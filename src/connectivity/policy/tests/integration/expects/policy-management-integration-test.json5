@@ -40,16 +40,13 @@
                 "test_prefix_provider_already_acquiring_netcfg_advanced_ns3",
                 "test_prefix_provider_full_integration_netcfg_advanced_ns3",
                 "test_prefix_provider_full_integration_netcfg_basic_ns3",
+                "test_forwarding_netcfg_advanced_ns3",
+                "test_forwarding_netcfg_basic_ns3",
             ],
         },
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                // TODO(https://fxbug.dev/323052525): Remove once multicast
-                // forwarding is supported in interface configurations.
-                "test_forwarding_netcfg_advanced_ns3",
-                "test_forwarding_netcfg_basic_ns3",
-
                 // TODO(https://fxbug.dev/331264840): Once Masquerade NAT is
                 // implemented in NS3, add support to netcfg.
                 "test_masquerade_ns3*",

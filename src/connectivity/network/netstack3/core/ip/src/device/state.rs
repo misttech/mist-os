@@ -509,8 +509,8 @@ pub struct IpDeviceConfiguration {
     /// Default: `false`.
     pub gmp_enabled: bool,
 
-    /// A flag indicating whether forwarding of IP packets not destined for this
-    /// device is enabled.
+    /// A flag indicating whether forwarding of unicast IP packets not destined
+    /// for this device is enabled.
     ///
     /// This flag controls whether or not packets can be forwarded from this
     /// device. That is, when a packet arrives at a device it is not destined
@@ -520,7 +520,21 @@ pub struct IpDeviceConfiguration {
     /// ability.
     ///
     /// Default: `false`.
-    pub forwarding_enabled: bool,
+    pub unicast_forwarding_enabled: bool,
+
+    /// A flag indicating whether forwarding of multicast IP packets received on
+    /// this device is enabled.
+    ///
+    /// This flag controls whether or not packets can be forwarded from this
+    /// device. That is, when a multicast packet arrives at this device, the
+    /// multicast routing table will be consulted and the packet will be
+    /// forwarded out of the matching route's corresponding outbound devices
+    /// (regardless of the outbound device's forwarding ability). Enabling
+    /// multicast forwarding does not disrupt local delivery: the packet will
+    /// both be forwarded and delivered locally.
+    ///
+    /// Default: `false`.
+    pub multicast_forwarding_enabled: bool,
 }
 
 /// Configuration common to all IPv4 devices.

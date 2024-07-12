@@ -305,9 +305,14 @@ where
         });
         inspector.record_child("Configuration", |inspector| {
             self.core_ctx().with_ip_device_configuration(device, |config, _core_ctx| {
-                let IpDeviceConfiguration { gmp_enabled, forwarding_enabled } = config.as_ref();
+                let IpDeviceConfiguration {
+                    gmp_enabled,
+                    unicast_forwarding_enabled,
+                    multicast_forwarding_enabled: _,
+                } = config.as_ref();
                 inspector.record_bool("GmpEnabled", *gmp_enabled);
-                inspector.record_bool("ForwardingEnabled", *forwarding_enabled);
+                inspector.record_bool("ForwardingEnabled", *unicast_forwarding_enabled);
+                // TODO(https://fxbug.dev/352570820): Add multicast_forwarding.
             })
         });
     }

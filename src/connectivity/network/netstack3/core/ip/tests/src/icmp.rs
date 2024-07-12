@@ -83,7 +83,7 @@ fn test_receive_ip_packet<
         .build_with_modifications(modify_stack_state_builder);
 
     let device: DeviceId<_> = device_ids[0].clone().into();
-    ctx.test_api().set_forwarding_enabled::<I>(&device, true);
+    ctx.test_api().set_unicast_forwarding_enabled::<I>(&device, true);
     ctx.test_api().receive_ip_packet::<I, _>(
         &device,
         Some(FrameDestination::Individual { local: true }),

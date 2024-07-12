@@ -686,7 +686,7 @@ fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: TestIpExt + IpExt>
     }
 
     net.with_context("remote", |ctx| {
-        ctx.test_api().set_forwarding_enabled::<I>(&remote_device.into(), true);
+        ctx.test_api().set_unicast_forwarding_enabled::<I>(&remote_device.into(), true);
     });
 
     let socket = net.with_context("local", |ctx| {
@@ -731,7 +731,7 @@ fn icmp_error_fragment_offset(fragment_offset: u16) {
         .insert_static_entry(&device_id, FROM_ADDR.get(), Ipv4::TEST_ADDRS.remote_mac.get())
         .expect("add static NUD entry for FROM_ADDR");
 
-    ctx.test_api().set_forwarding_enabled::<Ipv4>(&device_id.clone().into(), true);
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv4>(&device_id.clone().into(), true);
 
     // Receive an IPv4 packet with the per test-case fragment offset value.
     let to = Ipv4::get_other_ip_address(254);

@@ -758,8 +758,11 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
         cb: F,
     ) -> R;
 
-    /// Returns true iff the device has forwarding enabled.
-    fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
+    /// Returns true iff the device has unicast forwarding enabled.
+    fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
+
+    /// Returns true iff the device has multicast forwarding enabled.
+    fn is_device_multicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     /// Returns the MTU of the device.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
@@ -2958,7 +2961,7 @@ fn receive_ip_packet_action_common<
     device_id: &CC::DeviceId,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
     // The packet is not destined locally, so we attempt to forward it.
-    if !core_ctx.is_device_forwarding_enabled(device_id) {
+    if !core_ctx.is_device_unicast_forwarding_enabled(device_id) {
         // Forwarding is disabled; we are operating only as a host.
         //
         // For IPv4, per RFC 1122 Section 3.2.1.3, "A host MUST silently discard

@@ -360,16 +360,20 @@ where
         let _was_enabled: bool = self.set_ip_device_enabled::<Ipv6>(device, true);
     }
 
-    /// Enables or disables IP packet routing on `device`.
+    /// Enables or disables IP packet unicast forwarding on `device`.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub fn set_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>, enabled: bool) {
+    pub fn set_unicast_forwarding_enabled<I: IpExt>(
+        &mut self,
+        device: &DeviceId<BC>,
+        enabled: bool,
+    ) {
         let _config = self
             .core_api()
             .device_ip::<I>()
             .update_configuration(
                 device,
                 IpDeviceConfigurationUpdate {
-                    forwarding_enabled: Some(enabled),
+                    unicast_forwarding_enabled: Some(enabled),
                     ..Default::default()
                 }
                 .into(),
@@ -377,12 +381,12 @@ where
             .unwrap();
     }
 
-    /// Returns whether IP packet routing is enabled on `device`.
+    /// Returns whether IP packet unicast forwarding is enabled on `device`.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub fn is_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
+    pub fn is_unicast_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
         let configuration = self.core_api().device_ip::<I>().get_configuration(device);
-        let IpDeviceConfiguration { forwarding_enabled, .. } = configuration.as_ref();
-        *forwarding_enabled
+        let IpDeviceConfiguration { unicast_forwarding_enabled, .. } = configuration.as_ref();
+        *unicast_forwarding_enabled
     }
 
     /// Adds a loopback device with the IPv4/IPv6 loopback addresses assigned.

@@ -1396,8 +1396,8 @@ fn test_router_solicitation_on_forwarding_enabled_changes() {
     ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
     // Enable routing on device.
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, true);
-    assert!(ctx.test_api().is_forwarding_enabled::<Ipv6>(&device));
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, true);
+    assert!(ctx.test_api().is_unicast_forwarding_enabled::<Ipv6>(&device));
 
     // Should have not sent any new packets, but unset the router
     // solicitation timer.
@@ -1405,8 +1405,8 @@ fn test_router_solicitation_on_forwarding_enabled_changes() {
     assert_empty(ctx.bindings_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
 
     // Unsetting routing should succeed.
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, false);
-    assert!(!ctx.test_api().is_forwarding_enabled::<Ipv6>(&device));
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, false);
+    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<Ipv6>(&device));
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
     ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
@@ -1590,7 +1590,7 @@ fn test_router_stateless_address_autoconfiguration() {
         )
         .into();
     ctx.test_api().enable_device(&device);
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, true);
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, true);
 
     let src_mac = config.remote_mac;
     let src_ip = src_mac.to_ipv6_link_local().addr().get();

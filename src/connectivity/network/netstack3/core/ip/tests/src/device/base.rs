@@ -636,12 +636,13 @@ fn update_ip_device_configuration_err<I: IpExt>() {
                 gmp_enabled: Some(
                     !AsRef::<IpDeviceConfiguration>::as_ref(&original_state).gmp_enabled
                 ),
-                forwarding_enabled: Some(true),
+                unicast_forwarding_enabled: Some(true),
+                multicast_forwarding_enabled: None,
             }
             .into(),
         )
         .unwrap_err(),
-        UpdateIpConfigurationError::ForwardingNotSupported,
+        UpdateIpConfigurationError::UnicastForwardingNotSupported,
     );
     assert_eq!(original_state, api.get_configuration(&loopback_device_id));
 }
@@ -677,7 +678,8 @@ fn update_ipv4_configuration_return() {
             Ipv4DeviceConfigurationUpdate {
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
-                    forwarding_enabled: Some(false),
+                    unicast_forwarding_enabled: Some(false),
+                    multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
                 },
             },
@@ -685,7 +687,8 @@ fn update_ipv4_configuration_return() {
         Ok(Ipv4DeviceConfigurationUpdate {
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: Some(false),
-                forwarding_enabled: Some(false),
+                unicast_forwarding_enabled: Some(false),
+                multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
             },
         }),
@@ -698,7 +701,8 @@ fn update_ipv4_configuration_return() {
             Ipv4DeviceConfigurationUpdate {
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
-                    forwarding_enabled: Some(true),
+                    unicast_forwarding_enabled: Some(true),
+                    multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
                 },
             },
@@ -706,7 +710,8 @@ fn update_ipv4_configuration_return() {
         Ok(Ipv4DeviceConfigurationUpdate {
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: Some(true),
-                forwarding_enabled: Some(false),
+                unicast_forwarding_enabled: Some(false),
+                multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
             },
         }),
@@ -720,7 +725,8 @@ fn update_ipv4_configuration_return() {
             Ipv4DeviceConfigurationUpdate {
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: None,
-                    forwarding_enabled: None,
+                    unicast_forwarding_enabled: None,
+                    multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
                 },
             },
@@ -728,7 +734,8 @@ fn update_ipv4_configuration_return() {
         Ok(Ipv4DeviceConfigurationUpdate {
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: None,
-                forwarding_enabled: None,
+                unicast_forwarding_enabled: None,
+                multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
             },
         }),
@@ -741,7 +748,8 @@ fn update_ipv4_configuration_return() {
             Ipv4DeviceConfigurationUpdate {
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(false),
-                    forwarding_enabled: Some(false),
+                    unicast_forwarding_enabled: Some(false),
+                    multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
                 },
             },
@@ -749,7 +757,8 @@ fn update_ipv4_configuration_return() {
         Ok(Ipv4DeviceConfigurationUpdate {
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: Some(true),
-                forwarding_enabled: Some(true),
+                unicast_forwarding_enabled: Some(true),
+                multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
             },
         }),
@@ -794,7 +803,8 @@ fn update_ipv6_configuration_return() {
                 }),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
-                    forwarding_enabled: Some(false),
+                    unicast_forwarding_enabled: Some(false),
+                    multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
                 },
             },
@@ -805,7 +815,8 @@ fn update_ipv6_configuration_return() {
             slaac_config: Some(SlaacConfiguration::default()),
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: Some(false),
-                forwarding_enabled: Some(false),
+                unicast_forwarding_enabled: Some(false),
+                multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
             },
         }),
@@ -821,7 +832,8 @@ fn update_ipv6_configuration_return() {
                 slaac_config: None,
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
-                    forwarding_enabled: Some(true),
+                    unicast_forwarding_enabled: Some(true),
+                    multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
                 },
             },
@@ -832,7 +844,8 @@ fn update_ipv6_configuration_return() {
             slaac_config: None,
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: Some(true),
-                forwarding_enabled: Some(false),
+                unicast_forwarding_enabled: Some(false),
+                multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
             },
         }),
@@ -849,7 +862,8 @@ fn update_ipv6_configuration_return() {
                 slaac_config: None,
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: None,
-                    forwarding_enabled: None,
+                    unicast_forwarding_enabled: None,
+                    multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
                 },
             },
@@ -860,7 +874,8 @@ fn update_ipv6_configuration_return() {
             slaac_config: None,
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: None,
-                forwarding_enabled: None,
+                unicast_forwarding_enabled: None,
+                multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
             },
         }),
@@ -876,7 +891,8 @@ fn update_ipv6_configuration_return() {
                 slaac_config: Some(SlaacConfiguration::default()),
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(false),
-                    forwarding_enabled: Some(false),
+                    unicast_forwarding_enabled: Some(false),
+                    multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
                 },
             },
@@ -890,7 +906,8 @@ fn update_ipv6_configuration_return() {
             }),
             ip_config: IpDeviceConfigurationUpdate {
                 ip_enabled: Some(true),
-                forwarding_enabled: Some(true),
+                unicast_forwarding_enabled: Some(true),
+                multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
             },
         }),

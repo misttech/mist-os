@@ -1029,7 +1029,8 @@ impl Netstack {
         // Don't need DAD and IGMP/MLD on loopback.
         let ip_config = IpDeviceConfigurationUpdate {
             ip_enabled: Some(true),
-            forwarding_enabled: Some(false),
+            unicast_forwarding_enabled: Some(false),
+            multicast_forwarding_enabled: Some(false),
             gmp_enabled: Some(false),
         };
 

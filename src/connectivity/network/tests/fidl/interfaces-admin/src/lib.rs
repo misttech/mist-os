@@ -2796,7 +2796,7 @@ struct IpForwarding {
 impl IpForwarding {
     // Returns the expected response when calling `get_forwarding` on
     // an interface that was previously configured using the given config.
-    fn expected_next_get_forwarding_response<N: Netstack>(&self) -> IpForwarding {
+    fn expected_next_get_forwarding_response(&self) -> IpForwarding {
         const fn false_if_none(val: Option<bool>) -> Option<bool> {
             // Manual implementation of `Option::and` since it is not yet
             // stable as a const fn.
@@ -2805,25 +2805,11 @@ impl IpForwarding {
                 Some(v) => Some(v),
             }
         }
-        match N::VERSION {
-            // TODO(https://fxbug.dev/323052525): Implement multicast forwarding in Netstack3.
-            NetstackVersion::Netstack3 => IpForwarding {
-                v4: false_if_none(self.v4),
-                v4_multicast: None,
-                v6: false_if_none(self.v6),
-                v6_multicast: None,
-            },
-            NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => IpForwarding {
-                v4: false_if_none(self.v4),
-                v4_multicast: false_if_none(self.v4_multicast),
-                v6: false_if_none(self.v6),
-                v6_multicast: false_if_none(self.v6_multicast),
-            },
-            v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
-            | NetstackVersion::ProdNetstack2
-            | NetstackVersion::ProdNetstack3) => {
-                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
-            }
+        IpForwarding {
+            v4: false_if_none(self.v4),
+            v4_multicast: false_if_none(self.v4_multicast),
+            v6: false_if_none(self.v6),
+            v6_multicast: false_if_none(self.v6_multicast),
         }
     }
 
@@ -2948,7 +2934,7 @@ async fn get_set_forwarding_loopback<N: Netstack>(
         .unwrap();
 
     let expected_get_forwarding_response_when_previously_unset =
-        IpForwarding::default().expected_next_get_forwarding_response::<N>();
+        IpForwarding::default().expected_next_get_forwarding_response();
     // Initially, interfaces have IP forwarding disabled.
     assert_eq!(
         get_ip_forwarding(&loopback_control).await,
@@ -2994,7 +2980,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     let iface2 = realm.join_network(&net, "iface2").await.expect("create iface1");
 
     let expected_get_forwarding_response_when_previously_unset =
-        IpForwarding::default().expected_next_get_forwarding_response::<N>();
+        IpForwarding::default().expected_next_get_forwarding_response();
     // Initially, interfaces have IP forwarding disabled.
     assert_eq!(
         get_ip_forwarding(iface1.control()).await,
@@ -3029,7 +3015,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     )
     .await;
     let expected_get_forwarding_response_after_set =
-        forwarding_config.expected_next_get_forwarding_response::<N>();
+        forwarding_config.expected_next_get_forwarding_response();
     assert_eq!(
         get_ip_forwarding(iface1.control()).await,
         expected_get_forwarding_response_after_set
@@ -3066,7 +3052,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     )
     .await;
     let expected_get_forwarding_response_after_reverse =
-        reversed_forwarding_config.expected_next_get_forwarding_response::<N>();
+        reversed_forwarding_config.expected_next_get_forwarding_response();
     assert_eq!(
         get_ip_forwarding(iface2.control()).await,
         expected_get_forwarding_response_after_reverse,
