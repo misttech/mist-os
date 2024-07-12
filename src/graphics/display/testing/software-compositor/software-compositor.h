@@ -10,7 +10,7 @@
 #include <cstdint>
 
 #include "src/graphics/display/lib/api-types-cpp/alpha-mode.h"
-#include "src/graphics/display/lib/api-types-cpp/frame.h"
+#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
 #include "src/graphics/display/lib/api-types-cpp/transform.h"
 #include "src/graphics/display/testing/software-compositor/pixel.h"
 
@@ -57,26 +57,25 @@ class SoftwareCompositor {
  public:
   // Properties of composition of a layer onto the canvas.
   struct CompositionProperties {
-    // The source frame. Only the `source_image` part of the input image will be
-    // clipped and used.
+    // Only the `image_source` part of the input image will be clipped and used.
     //
     // Equivalent to
-    // - the `src_frame` field in FIDL [`fuchsia.hardware.display/Coordinator/
+    // - the `image_source` field in FIDL [`fuchsia.hardware.display/Coordinator/
     //   SetLayerPrimaryPosition`] method, and
-    // - the `src_frame` field in banjo [`fuchsia.hardware.display.controller/
+    // - the `image_source` field in banjo [`fuchsia.hardware.display.controller/
     //   PrimaryLayer`] struct.
-    ::display::Frame source_frame;
+    ::display::Rectangle image_source;
 
     // The destination (canvas) frame. The clipped input image will be scaled
-    // and painted onto the `canvas_frame` part of the canvas. `canvas_frame`
-    // will be cropped to the extent of the canvas.
+    // and painted onto the `canvas_destination` region of the canvas.
+    // `canvas_destination` will be cropped to the extent of the canvas.
     //
     // Equivalent to
-    // - the `dst_frame` field in FIDL [`fuchsia.hardware.display/Coordinator/
+    // - the `display_destination` field in FIDL [`fuchsia.hardware.display/Coordinator/
     //   SetLayerPrimaryPosition`] method, and
-    // - the `dst_frame` field in banjo [`fuchsia.hardware.display.controller/
+    // - the `display_destination` field in banjo [`fuchsia.hardware.display.controller/
     //   PrimaryLayer`] struct.
-    ::display::Frame canvas_frame;
+    ::display::Rectangle canvas_destination;
 
     // Indicates how image will be transformed (rotated / flipped).
     //

@@ -84,44 +84,44 @@ void SoftwareCompositor::CompositeImage(const InputImage& input_image,
   // Callers must guarantee that the image to draw is not rotated nor flipped.
   ZX_ASSERT(composition_properties.transform == ::display::Transform::kIdentity);
 
-  const ::display::Frame& canvas_frame = composition_properties.canvas_frame;
-  const ::display::Frame& source_frame = composition_properties.source_frame;
+  const ::display::Rectangle& image_source = composition_properties.image_source;
+  const ::display::Rectangle& canvas_destination = composition_properties.canvas_destination;
 
   // TODO(https://fxbug.dev/42075534): Currently this doesn't support clipping of the
   // input image. Callers must guarantee that the source frame starts at (0, 0)
   // and has the same size as the input image.
-  ZX_ASSERT(source_frame.y_pos == 0);
-  ZX_ASSERT(source_frame.x_pos == 0);
-  ZX_ASSERT(source_frame.height == input_image.properties.height);
-  ZX_ASSERT(source_frame.width == input_image.properties.width);
+  ZX_ASSERT(image_source.y() == 0);
+  ZX_ASSERT(image_source.x() == 0);
+  ZX_ASSERT(image_source.height() == input_image.properties.height);
+  ZX_ASSERT(image_source.width() == input_image.properties.width);
 
   // TODO(https://fxbug.dev/42075534): Currently this doesn't support scaling.
   // Callers must guarantee that the destination frame size is the same as the
   // original image size.
-  ZX_ASSERT(canvas_frame.height == input_image.properties.height);
-  ZX_ASSERT(canvas_frame.width == input_image.properties.width);
+  ZX_ASSERT(canvas_destination.height() == input_image.properties.height);
+  ZX_ASSERT(canvas_destination.width() == input_image.properties.width);
 
   // TODO(https://fxbug.dev/42075534): Currently this doesn't support clipping.
   // Callers must guarantee that the destination frame falls within the canvas.
-  ZX_ASSERT(canvas_frame.y_pos + canvas_frame.height <= canvas_.properties.height);
-  ZX_ASSERT(canvas_frame.x_pos + canvas_frame.width <= canvas_.properties.width);
+  ZX_ASSERT(canvas_destination.y() + canvas_destination.height() <= canvas_.properties.height);
+  ZX_ASSERT(canvas_destination.x() + canvas_destination.width() <= canvas_.properties.width);
 
   const int src_bytes_per_pixel = GetBytesPerPixel(input_image.properties.pixel_format);
   const int dst_bytes_per_pixel = GetBytesPerPixel(canvas_.properties.pixel_format);
 
-  for (int row = 0; row < canvas_frame.height; row++) {
-    cpp20::span<const uint8_t> source_row = input_image.buffer.subspan(
-        (row + source_frame.y_pos) * input_image.properties.stride_bytes +
-            source_frame.x_pos * src_bytes_per_pixel,
-        /*count=*/source_frame.width * src_bytes_per_pixel);
+  for (int row = 0; row < canvas_destination.height(); row++) {
+    cpp20::span<const uint8_t> source_row =
+        input_image.buffer.subspan((row + image_source.y()) * input_image.properties.stride_bytes +
+                                       image_source.x() * src_bytes_per_pixel,
+                                   /*count=*/image_source.width() * src_bytes_per_pixel);
     cpp20::span<uint8_t> canvas_row =
-        canvas_.buffer.subspan((row + canvas_frame.y_pos) * canvas_.properties.stride_bytes +
-                                   canvas_frame.x_pos * dst_bytes_per_pixel,
-                               /*count=*/canvas_frame.width * dst_bytes_per_pixel);
+        canvas_.buffer.subspan((row + canvas_destination.y()) * canvas_.properties.stride_bytes +
+                                   canvas_destination.x() * dst_bytes_per_pixel,
+                               /*count=*/canvas_destination.width() * dst_bytes_per_pixel);
 
     auto source_row_it = source_row.begin();
     auto canvas_row_it = canvas_row.begin();
-    for (int column = 0; column < canvas_frame.width; column++) {
+    for (int column = 0; column < canvas_destination.width(); column++) {
       std::tie(canvas_row_it, source_row_it) =
           CopyPixel(canvas_row_it, canvas_.properties.pixel_format, source_row_it,
                     input_image.properties.pixel_format);

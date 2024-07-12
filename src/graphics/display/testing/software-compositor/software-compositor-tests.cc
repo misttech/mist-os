@@ -11,6 +11,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
 #include "src/graphics/display/testing/software-compositor/pixel.h"
 #include "src/graphics/display/testing/software-compositor/software-compositor.h"
 
@@ -184,20 +185,18 @@ TEST(CompositeImageLayers, NoConversionBgra) {
             .image = input_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -257,20 +256,18 @@ TEST(CompositeImageLayers, NoConversionRgba) {
             .image = input_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -330,20 +327,18 @@ TEST(CompositeImageLayers, ConversionRgbaToBgra) {
             .image = input_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -410,20 +405,18 @@ TEST(CompositeImageLayers, SetDestinationFrame) {
             .image = input_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = kImageLeft,
-                            .y_pos = kImageTop,
-                            .width = input_image.properties.width,
-                            .height = input_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = kImageLeft,
+                        .y = kImageTop,
+                        .width = input_image.properties.width,
+                        .height = input_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -508,20 +501,18 @@ TEST(CompositeImageLayers, MultipleLayersNoOverlapRgba) {
             .image = blue_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = blue_image.properties.width,
-                            .height = blue_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = blue_image.properties.width,
-                            .height = blue_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = blue_image.properties.width,
+                        .height = blue_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = blue_image.properties.width,
+                        .height = blue_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -531,20 +522,18 @@ TEST(CompositeImageLayers, MultipleLayersNoOverlapRgba) {
             .image = red_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = red_image.properties.width,
-                            .height = red_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 640,
-                            .y_pos = 0,
-                            .width = red_image.properties.width,
-                            .height = red_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = red_image.properties.width,
+                        .height = red_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 640,
+                        .y = 0,
+                        .width = red_image.properties.width,
+                        .height = red_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -630,20 +619,18 @@ TEST(CompositeImageLayers, MultipleLayersOverlapNoAlphaRgba) {
             .image = blue_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = blue_image.properties.width,
-                            .height = blue_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = blue_image.properties.width,
-                            .height = blue_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = blue_image.properties.width,
+                        .height = blue_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = blue_image.properties.width,
+                        .height = blue_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -652,20 +639,18 @@ TEST(CompositeImageLayers, MultipleLayersOverlapNoAlphaRgba) {
             .image = red_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = red_image.properties.width,
-                            .height = red_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 320,
-                            .y_pos = 0,
-                            .width = red_image.properties.width,
-                            .height = red_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = red_image.properties.width,
+                        .height = red_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 320,
+                        .y = 0,
+                        .width = red_image.properties.width,
+                        .height = red_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -753,20 +738,18 @@ TEST(CompositeImageLayers, MultipleLayersNoAlphaMixedRgbaAndBgra) {
             .image = blue_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = blue_image.properties.width,
-                            .height = blue_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = blue_image.properties.width,
-                            .height = blue_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = blue_image.properties.width,
+                        .height = blue_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = blue_image.properties.width,
+                        .height = blue_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
@@ -775,20 +758,18 @@ TEST(CompositeImageLayers, MultipleLayersNoAlphaMixedRgbaAndBgra) {
             .image = red_image,
             .properties =
                 {
-                    .source_frame =
-                        {
-                            .x_pos = 0,
-                            .y_pos = 0,
-                            .width = red_image.properties.width,
-                            .height = red_image.properties.height,
-                        },
-                    .canvas_frame =
-                        {
-                            .x_pos = 640,
-                            .y_pos = 0,
-                            .width = red_image.properties.width,
-                            .height = red_image.properties.height,
-                        },
+                    .image_source = display::Rectangle({
+                        .x = 0,
+                        .y = 0,
+                        .width = red_image.properties.width,
+                        .height = red_image.properties.height,
+                    }),
+                    .canvas_destination = display::Rectangle({
+                        .x = 640,
+                        .y = 0,
+                        .width = red_image.properties.width,
+                        .height = red_image.properties.height,
+                    }),
                     .transform = ::display::Transform::kIdentity,
                     .alpha_mode = ::display::AlphaMode::kDisable,
                 },
