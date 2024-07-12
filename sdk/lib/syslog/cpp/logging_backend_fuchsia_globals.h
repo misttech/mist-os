@@ -31,12 +31,6 @@ void FuchsiaLogReleaseState();
 // Returns the current log state.
 LogState* FuchsiaLogGetStateLocked();
 
-// Returns the number of dropped logs and resets its count.
-uint32_t FuchsiaLogGetAndResetDropped();
-
-// Increments the dropped log counter.
-void FuchsiaLogAddDropped(uint32_t count);
-
 // Returns the current thread's koid.
 zx_koid_t FuchsiaLogGetCurrentThreadKoid();
 

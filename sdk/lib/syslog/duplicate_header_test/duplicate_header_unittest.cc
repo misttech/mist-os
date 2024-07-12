@@ -48,8 +48,8 @@ TEST(HeaderTest, CompileTimeAsserts) {
   constexpr int fatals[] = {FX_LOG_FATAL, FUCHSIA_LOG_FATAL, fuchsia_logging::LOG_FATAL,
                             static_cast<uint8_t>(fuchsia_diagnostics::Severity::kFatal)};
   static_assert(MultiEquals<int, 4>(fatals));
-  constexpr int nones[] = {FX_LOG_NONE, FUCHSIA_LOG_NONE, fuchsia_logging::LOG_NONE};
-  static_assert(MultiEquals<int, 3>(nones));
+  constexpr int nones[] = {FX_LOG_NONE, FUCHSIA_LOG_NONE};
+  static_assert(MultiEquals<int, 2>(nones));
   constexpr int severity_steps[] = {FX_LOG_SEVERITY_STEP_SIZE, FUCHSIA_LOG_SEVERITY_STEP_SIZE,
                                     fuchsia_logging::LogSeverityStepSize};
   static_assert(MultiEquals<int, 3>(severity_steps));
