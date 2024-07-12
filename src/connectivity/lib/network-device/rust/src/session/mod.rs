@@ -11,7 +11,7 @@ use std::mem::MaybeUninit;
 use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, TryFromIntError};
 use std::ops::Range;
 use std::pin::Pin;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::task::Waker;
 
 use explicit::{PollExt as _, ResultExt as _};
@@ -32,27 +32,23 @@ use buffer::{
 /// A session between network device client and driver.
 #[derive(Clone)]
 pub struct Session {
-    inner: Weak<Inner>,
+    inner: Arc<Inner>,
 }
 
 impl Debug for Session {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.inner.upgrade() {
-            Some(inner) => {
-                let Inner {
-                    name,
-                    pool: _,
-                    proxy: _,
-                    rx: _,
-                    tx: _,
-                    tx_pending: _,
-                    rx_ready: _,
-                    tx_ready: _,
-                } = &*inner;
-                f.debug_struct("Session").field("name", &name).finish_non_exhaustive()
-            }
-            None => f.write_str("Session(closed)"),
-        }
+        let Self { inner } = self;
+        let Inner {
+            name,
+            pool: _,
+            proxy: _,
+            rx: _,
+            tx: _,
+            tx_pending: _,
+            rx_ready: _,
+            tx_ready: _,
+        } = &**inner;
+        f.debug_struct("Session").field("name", &name).finish_non_exhaustive()
     }
 }
 
@@ -64,24 +60,43 @@ impl Session {
         config: Config,
     ) -> Result<(Self, Task)> {
         let inner = Inner::new(device, name, config).await?;
-        Ok((Session { inner: Arc::downgrade(&inner) }, Task { inner }))
+        Ok((Session { inner: Arc::clone(&inner) }, Task { inner }))
     }
 
     /// Sends a [`Buffer`] to the network device in this session.
     pub fn send(&self, buffer: Buffer<Tx>) -> Result<()> {
-        self.inner()?.send(buffer)
+        self.inner.send(buffer)
     }
 
     /// Receives a [`Buffer`] from the network device in this session.
     pub async fn recv(&self) -> Result<Buffer<Rx>> {
-        self.inner()?.recv().await
+        self.inner.recv().await
     }
 
     /// Allocates a [`Buffer`] that may later be queued to the network device.
     ///
     /// The returned buffer will have at least `num_bytes` as size.
     pub async fn alloc_tx_buffer(&self, num_bytes: usize) -> Result<Buffer<Tx>> {
-        self.inner()?.pool.alloc_tx_buffer(num_bytes).await
+        self.inner.pool.alloc_tx_buffer(num_bytes).await
+    }
+
+    /// Waits for at least one TX buffer to be available and returns an iterator
+    /// of buffers with `num_bytes` as capacity.
+    ///
+    /// The returned iterator is guaranteed to yield at least one item (though
+    /// it might be an error if the requested size cannot meet the device
+    /// requirement).
+    ///
+    /// # Note
+    ///
+    /// Given a `Buffer<Tx>` is returned to the pool when it's dropped, the
+    /// returned iterator will seemingly yield infinite items if the yielded
+    /// `Buffer`s are dropped while iterating.
+    pub async fn alloc_tx_buffers(
+        &self,
+        num_bytes: usize,
+    ) -> Result<impl Iterator<Item = Result<Buffer<Tx>>> + '_> {
+        self.inner.pool.alloc_tx_buffers(num_bytes).await
     }
 
     /// Attaches [`Session`] to a port.
@@ -92,7 +107,7 @@ impl Session {
         //
         // The dyn borrow in the signature of `proxy.attach` seems to be the
         // cause of the compiler's confusion.
-        let fut = self.inner()?.proxy.attach(&port.into(), rx_frames);
+        let fut = self.inner.proxy.attach(&port.into(), rx_frames);
         let () = fut.await?.map_err(|raw| Error::Attach(port, zx::Status::from_raw(raw)))?;
         Ok(())
     }
@@ -100,17 +115,12 @@ impl Session {
     /// Detaches a port from the [`Session`].
     pub async fn detach(&self, port: Port) -> Result<()> {
         let () = self
-            .inner()?
+            .inner
             .proxy
             .detach(&port.into())
             .await?
             .map_err(|raw| Error::Detach(port, zx::Status::from_raw(raw)))?;
         Ok(())
-    }
-
-    /// Retrieves [`Inner`] if the task is still alive.
-    fn inner(&self) -> Result<Arc<Inner>> {
-        self.inner.upgrade().ok_or(Error::NoProgress)
     }
 }
 
@@ -224,8 +234,7 @@ impl Inner {
 
 /// The backing task that drives the session.
 ///
-/// A session can make no progress without this task. All ports will be detached
-/// if the task is dropped.
+/// A session will stop making progress if this task is not polled continuously.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Task {
     inner: Arc<Inner>,
