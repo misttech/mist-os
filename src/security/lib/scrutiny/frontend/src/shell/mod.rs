@@ -128,7 +128,6 @@ impl Shell {
         info!(%command);
 
         let mut output = String::new();
-        //#[allow(clippy::if_same_then_else)] // TODO(https://fxbug.dev/42176997)
         if self.plugin(command.clone(), &mut output)? == CommandResponse::Executed {
         } else {
             writeln!(output, "scrutiny: command not found: {}", command)?;

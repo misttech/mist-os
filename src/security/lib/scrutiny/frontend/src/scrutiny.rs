@@ -17,6 +17,7 @@ use std::sync::{Arc, RwLock};
 pub struct Scrutiny {
     #[allow(dead_code)]
     plugin: PluginHooks,
+    #[allow(dead_code)]
     dispatcher: Arc<RwLock<ControllerDispatcher>>,
     shell: Shell,
     config: Config,
@@ -54,12 +55,6 @@ impl Scrutiny {
 
         let shell = Shell::new(Arc::clone(&dispatcher), config.runtime.logging.silent_mode);
         Ok(Self { plugin, dispatcher, shell, config })
-    }
-
-    /// Returns an arc to the dispatcher controller that can be exposed to
-    /// plugins that may wish to use it for managemnet.
-    pub fn dispatcher(&self) -> Arc<RwLock<ControllerDispatcher>> {
-        Arc::clone(&self.dispatcher)
     }
 
     /// Schedules the DataCollectors to run and starts the REST service.

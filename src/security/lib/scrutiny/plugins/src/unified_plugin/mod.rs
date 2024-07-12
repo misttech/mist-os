@@ -14,12 +14,6 @@ use crate::search::controller::components::*;
 use crate::search::controller::package_list::*;
 use crate::search::controller::packages::*;
 use crate::static_pkgs::controller::*;
-use crate::toolkit::controller::blobfs::*;
-use crate::toolkit::controller::far::*;
-use crate::toolkit::controller::fvm::*;
-use crate::toolkit::controller::zbi::*;
-use crate::toolkit::controller::zbi_bootfs::*;
-use crate::toolkit::controller::zbi_cmdline::*;
 use crate::verify::controller::build::*;
 use crate::verify::controller::capability_routing::*;
 use crate::verify::controller::component_resolvers::*;
@@ -34,21 +28,6 @@ use std::sync::Arc;
 pub struct UnifiedPlugin {}
 
 impl UnifiedPlugin {
-    pub fn without_model() -> PluginHooks {
-        PluginHooks::new(
-            None,
-            controllers! {
-                "/tool/blobfs/extract" => BlobFsExtractController::default(),
-                "/tool/far/extract/meta" => FarMetaExtractController::default(),
-                "/tool/fvm/extract" => FvmExtractController::default(),
-                "/tool/zbi/extract" => ZbiExtractController::default(),
-                "/tool/zbi/extract/cmdline" => ZbiExtractCmdlineController::default(),
-                "/tool/zbi/list/bootfs" => ZbiListBootfsController::default(),
-                "/tool/zbi/extract/bootfs/packages" => ZbiExtractBootfsPackageIndex::default(),
-            },
-        )
-    }
-
     pub fn with_model() -> PluginHooks {
         PluginHooks::new(
             Some(Arc::new(UnifiedCollector::default())),

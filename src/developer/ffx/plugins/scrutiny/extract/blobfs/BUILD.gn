@@ -11,9 +11,9 @@ ffx_plugin("ffx_scrutiny_blobfs") {
 
   deps = [
     "//src/developer/ffx/lib/fho:lib",
-    "//src/security/lib/scrutiny/config",
-    "//src/security/lib/scrutiny/frontend",
+    "//src/security/lib/scrutiny/plugins",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:serde_json",
   ]
   non_rust_deps = [ "//src/lib/chunked-compression" ]
 

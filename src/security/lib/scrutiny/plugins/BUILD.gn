@@ -135,6 +135,7 @@ if (is_host) {
       # TODO(https://fxbug.dev/42175368): Shared types should be exposed on a public
       # interface instead of making this visibility exception.
       "//src/developer/ffx/plugins/scrutiny/extract/*",
+      "//src/developer/ffx/plugins/scrutiny/shell/*",
       "//src/developer/ffx/plugins/scrutiny/verify/*",
     ]
 

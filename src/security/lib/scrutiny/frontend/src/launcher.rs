@@ -10,11 +10,7 @@ use scrutiny_plugins::unified_plugin::UnifiedPlugin;
 /// Launches scrutiny from a configuration file. This is intended to be used by binaries that
 /// want to launch custom configurations of the Scrutiny framework with select features enabled.
 pub fn launch_from_config(config: Config) -> Result<String> {
-    // The model may be empty for extract commands.
-    let model_is_empty = config.runtime.model.is_empty();
-    let plugin =
-        if model_is_empty { UnifiedPlugin::without_model() } else { UnifiedPlugin::with_model() };
-    let mut scrutiny = Scrutiny::new(config, plugin)?;
+    let mut scrutiny = Scrutiny::new(config, UnifiedPlugin::with_model())?;
     scrutiny.run()
 }
 

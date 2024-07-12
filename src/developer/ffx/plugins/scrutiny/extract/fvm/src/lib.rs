@@ -4,9 +4,7 @@
 
 use ffx_scrutiny_fvm_args::ScrutinyFvmCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
+use scrutiny_plugins::toolkit::fvm::FvmExtractController;
 
 #[derive(FfxTool)]
 pub struct ScrutinyFvmTool {
@@ -20,16 +18,9 @@ fho::embedded_plugin!(ScrutinyFvmTool);
 impl FfxMain for ScrutinyFvmTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        // An empty model can be used, because we do not need any artifacts other than the fvm in
-        // order to complete the extraction.
-        let model = ModelConfig::empty();
-        let command = CommandBuilder::new("tool.fvm.extract")
-            .param("input", self.cmd.input)
-            .param("output", self.cmd.output)
-            .build();
-        let config = ConfigBuilder::with_model(model).command(command).build();
-        launcher::launch_from_config(config)?;
-
+        let value = FvmExtractController::extract(self.cmd.input, self.cmd.output)?;
+        let s = serde_json::to_string_pretty(&value).map_err(|e| fho::Error::User(e.into()))?;
+        println!("{}", s);
         Ok(())
     }
 }
