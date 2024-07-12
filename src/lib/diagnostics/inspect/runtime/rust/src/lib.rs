@@ -16,6 +16,8 @@ use std::task::{Context, Poll};
 use tracing::error;
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
 
+pub use finspect::EscrowToken;
+
 pub mod service;
 
 /// A setting for the fuchsia.inspect.Tree server that indicates how the server should send
@@ -203,7 +205,7 @@ impl PublishedInspectController {
 
     /// Escrows a frozen copy of the VMO of the associated Inspector replacing the current live
     /// handle in the server.
-    pub async fn escrow_frozen(self, opts: EscrowOptions) -> Option<finspect::EscrowToken> {
+    pub async fn escrow_frozen(self, opts: EscrowOptions) -> Option<EscrowToken> {
         let inspect_sink = match opts.inspect_sink {
             Some(proxy) => proxy,
             None => match client::connect_to_protocol::<finspect::InspectSinkMarker>() {
@@ -222,7 +224,7 @@ impl PublishedInspectController {
         if let Err(err) = inspect_sink.escrow(finspect::InspectSinkEscrowRequest {
             vmo: Some(vmo),
             name: opts.name,
-            token: Some(finspect::EscrowToken { token: ep0 }),
+            token: Some(EscrowToken { token: ep0 }),
             tree: Some(self.tree_koid.raw_koid()),
             ..Default::default()
         }) {
@@ -230,7 +232,7 @@ impl PublishedInspectController {
             return None;
         }
         self.task.await;
-        Some(finspect::EscrowToken { token: ep1 })
+        Some(EscrowToken { token: ep1 })
     }
 }
 
@@ -392,7 +394,7 @@ mod tests {
                     finspect::InspectSinkEscrowRequest {
                         vmo: Some(vmo),
                         name: Some(name),
-                        token: Some(finspect::EscrowToken { token }),
+                        token: Some(EscrowToken { token }),
                         tree: Some(tree),
                         ..
                     },
