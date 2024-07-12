@@ -284,10 +284,8 @@ sdk_molecule("fuchsia_idk_atoms") {
 
   category = "partner"
 
-  deps = [ ":fuchsia_idk_atoms_for_each_api_level_and_platform" ]
-
   if (current_build_target_api_level == "PLATFORM") {
-    deps += [
+    deps = [
       # Do not add to this list. Instead, add new items to
       # :fuchsia_idk_atoms_independent_of_api_level_for_one_cpu_arch,
       # which verifies there are no API level dependencies.
@@ -295,6 +293,15 @@ sdk_molecule("fuchsia_idk_atoms") {
       # There are very limited exceptions that do depend on API level but are
       # only built at "PLATFORM".
       ":fuchsia_idk_atoms_built_only_at_platform_for_each_cpu_arch",
+
+      # Atoms in :fuchsia_idk_atoms_for_each_api_level that currently must
+      # also be built at "PLATFORM" for backwards compatibility with IDK users
+      # that do not yet know about per-API-level prebuilts.
+      #
+      # TODO(https://fxbug.dev/310006516): Remove these once all IDK users are
+      # using the per-API-level artifacts.
+      ":core_cc_prebuilt_libraries",
+      ":core_sysroot",
     ]
 
     if (!sdk_inside_sub_build) {
@@ -316,35 +323,23 @@ sdk_molecule("fuchsia_idk_atoms") {
       ]
     }
   } else {
-    deps += [ ":fuchsia_idk_atoms_for_each_api_level" ]
+    deps = [ ":fuchsia_idk_atoms_for_each_api_level" ]
   }
-}
-
-# Prebuilt libraries (including the sysroot) must be built and included for all
-# API levels they support. They are also built at `PLATFORM` (a.k.a., the
-# API-level-agnostic build, a.k.a., the default platform build), for backwards
-# compatibility with IDK users that don't yet know about per-API-level
-# prebuilts.
-#
-# TODO(https://fxbug.dev/310006516): Move all these into
-# `fuchsia_idk_atoms_for_each_api_level` once all IDK users are using the
-# per-API-level artifacts.
-sdk_molecule("fuchsia_idk_atoms_for_each_api_level_and_platform") {
-  category = "partner"
-  deps = [
-    ":core_cc_prebuilt_libraries",
-    ":core_sysroot",
-  ]
 
   # Successfully building the test at each API level is the test.
   non_sdk_deps = [ "//zircon/system:availability_test" ]
 }
 
 # Prebuilt libraries and packages that are built exclusively for the API levels
-# SDK users can target (not `PLATFORM`).
+# that SDK users can target (not "PLATFORM").
+# Note: This target can be built at "PLATFORM" for development purposes.
 sdk_molecule("fuchsia_idk_atoms_for_each_api_level") {
   category = "partner"
-  deps = [ ":core_packages" ]
+  deps = [
+    ":core_cc_prebuilt_libraries",
+    ":core_packages",
+    ":core_sysroot",
+  ]
 }
 
 if (!is_host) {
@@ -375,7 +370,7 @@ if (!is_host) {
         # each of the subbuilds currently puts the build files at the same path,
         # so all but one of them gets clobbered. Give `loadable_modules` the
         # proper per-API-level treatment and move this to
-        # :fuchsia_idk_atoms_for_each_api_level_and_platform.
+        # :fuchsia_idk_atoms_for_each_api_level.
         ":core_loadable_modules",
       ]
     }
