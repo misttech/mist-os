@@ -58,6 +58,7 @@
       "ms-python.python",
       "ms-python.mypy-type-checker",
       "ms-python.black-formatter",
+      "ms-python.vscode-pylance",
 
       // The GN language server from Microsoft
       "msedge-dev.gnls",
