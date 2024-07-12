@@ -266,7 +266,7 @@ TEST_F(ExprParserTest, AccessorAtEnd) {
   auto result = Parse("base. ");
   ASSERT_FALSE(result);
 
-  EXPECT_EQ("Failed to parse right hand side of \".\".", parser().err().msg());
+  EXPECT_EQ("Expected identifier for right-hand-side of \".\".", parser().err().msg());
 
   EXPECT_EQ(4u, parser().error_token().byte_offset());
   EXPECT_EQ(".", parser().error_token().value());
@@ -304,7 +304,7 @@ TEST_F(ExprParserTest, Arrow) {
   // Arrow with no name.
   result = Parse("base->");
   ASSERT_FALSE(result);
-  EXPECT_EQ("Failed to parse right hand side of \"->\".", parser().err().msg());
+  EXPECT_EQ("Expected identifier for right-hand-side of \"->\".", parser().err().msg());
 }
 
 TEST_F(ExprParserTest, NestedDotArrow) {
