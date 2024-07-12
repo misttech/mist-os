@@ -190,11 +190,20 @@ fpromise::promise<OwnedRequest, void> UsbXhci::UsbHciRequestQueue(OwnedRequest u
   return bridge.consumer.promise().box();
 }
 
-TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id) {
+TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id) {
   usb_xhci::AddressDeviceStruct cmd;
   cmd.set_BSR(0);
   cmd.set_SlotID(slot_id);
-  return SubmitCommand(cmd, command_ring_.AllocateContext());
+  auto slot_context = command_ring_.AllocateContext();
+  if (!slot_context) {
+    zxlogf(ERROR, "No memory.");
+    return fpromise::make_result_promise(
+               fpromise::result<TRB*, zx_status_t>(fpromise::error(ZX_ERR_NO_MEMORY)))
+        .box();
+  }
+  slot_context->port_number = port_id;
+  hw_mb();
+  return SubmitCommand(cmd, std::move(slot_context));
 }
 
 std::optional<usb_speed_t> UsbXhci::GetDeviceSpeed(uint8_t slot) {

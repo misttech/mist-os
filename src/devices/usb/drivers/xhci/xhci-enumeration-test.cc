@@ -205,13 +205,14 @@ TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id,
   return bridge.consumer.promise();
 }
 
-TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id) {
+TRBPromise UsbXhci::AddressDeviceCommand(uint8_t slot_id, uint8_t port_id) {
   fpromise::bridge<TRB*, zx_status_t> bridge;
   auto state = reinterpret_cast<TestState*>(parent_);
   auto context = state->trb_context_allocator_.New();
   FakeTRB* trb = new FakeTRB();
   trb->Op = FakeTRB::Op::AddressDevice;
   trb->slot = slot_id;
+  trb->port = port_id;
   // NOTE: The TRB for the purposes of the test is owned by our test harness.
   // In a real environment, this would be owned by the transfer ring (it would be
   // a TRB that would be inside of a DMA buffer, since it is shared between the

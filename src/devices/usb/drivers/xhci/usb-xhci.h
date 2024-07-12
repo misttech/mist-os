@@ -187,7 +187,7 @@ class UsbXhci : public UsbXhciType,
   TRBPromise AddressDeviceCommand(uint8_t slot_id, uint8_t port_id, std::optional<HubInfo> hub_info,
                                   bool bsr);
 
-  TRBPromise AddressDeviceCommand(uint8_t slot_id);
+  TRBPromise AddressDeviceCommand(uint8_t slot_id, uint8_t port_id);
 
   TRBPromise SetMaxPacketSizeCommand(uint8_t slot_id, uint8_t bMaxPacketSize0);
 

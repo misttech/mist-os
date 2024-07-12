@@ -130,7 +130,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
           return fpromise::make_ok_promise(result);
         }
         // Issue a SET_ADDRESS request to the device
-        return hci->AddressDeviceCommand(*state->slot);
+        return hci->AddressDeviceCommand(*state->slot, port);
       })
       .and_then([=](TRB*& result) -> fpromise::result<void, zx_status_t> {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
