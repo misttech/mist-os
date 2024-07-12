@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 mod collector;
-use collector::UnifiedCollector;
+pub use collector::UnifiedCollector;
 
 use crate::additional_boot_args::controller::*;
 use crate::core::controller::blob::*;
@@ -11,7 +11,6 @@ use crate::core::controller::component::*;
 use crate::core::controller::package::*;
 use crate::core::controller::package_extract::*;
 use crate::search::controller::components::*;
-use crate::search::controller::package_list::*;
 use crate::search::controller::packages::*;
 use crate::static_pkgs::controller::*;
 use crate::verify::controller::build::*;
@@ -35,7 +34,6 @@ impl UnifiedPlugin {
                 "/devmgr/config" => ExtractAdditionalBootConfigController::default(),
                 "/component" => ComponentGraphController::default(),
                 "/components" => ComponentsGraphController::default(),
-                "/components/urls" => ComponentsUrlListController::default(),
                 "/component/manifest" => ComponentManifestGraphController::default(),
                 "/package/extract" => PackageExtractController::default(),
                 "/packages" => PackagesGraphController::default(),
@@ -43,7 +41,6 @@ impl UnifiedPlugin {
                 "/blob" => BlobController::default(),
                 "/search/components" => ComponentSearchController::default(),
                 "/search/packages" => PackageSearchController::default(),
-                "/search/package/list" => PackageListController::default(),
                 "/static/pkgs" => ExtractStaticPkgsController::default(),
                 "/verify/build" => VerifyBuildController::default(),
                 "/verify/v2_component_model" => V2ComponentModelMappingController::default(),

@@ -5,7 +5,7 @@
 use cm_types::Url;
 use core::slice::Iter;
 use fuchsia_merkle::Hash;
-use fuchsia_url::{PackageName, PackageVariant};
+use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant};
 use scrutiny::prelude::DataCollection;
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ord, Ordering, PartialOrd};
@@ -91,6 +91,14 @@ pub struct Package {
     pub contents: HashMap<PathBuf, Hash>,
     /// A mapping from internal package meta paths to meta file contents.
     pub meta: HashMap<PathBuf, Vec<u8>>,
+}
+
+impl Package {
+    pub fn matches_url(&self, url: &AbsolutePackageUrl) -> bool {
+        url.name() == &self.name
+            && (url.variant().is_none() || url.variant() == self.variant.as_ref())
+            && (url.hash().is_none() || url.hash() == Some(self.merkle))
+    }
 }
 
 // Define a zero-copy type that encapsulates "URL part" of `Package` and use it

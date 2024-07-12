@@ -5,4 +5,5 @@
 pub mod command_builder;
 pub mod launcher;
 pub mod scrutiny;
+pub mod scrutiny2;
 mod shell;

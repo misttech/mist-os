@@ -214,7 +214,6 @@ if (is_host) {
       "src/lib.rs",
       "src/search/controller/components.rs",
       "src/search/controller/mod.rs",
-      "src/search/controller/package_list.rs",
       "src/search/controller/packages.rs",
       "src/search/mod.rs",
       "src/static_pkgs/collection.rs",

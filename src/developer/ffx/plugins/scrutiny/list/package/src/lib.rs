@@ -4,9 +4,7 @@
 
 use ffx_scrutiny_package_list_args::ScrutinyPackageCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
+use scrutiny_frontend::scrutiny2::Scrutiny;
 
 #[derive(FfxTool)]
 pub struct ScrutinyPackageTool {
@@ -20,16 +18,18 @@ fho::embedded_plugin!(ScrutinyPackageTool);
 impl FfxMain for ScrutinyPackageTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let url_string = format!("{}", self.cmd.url);
-        let command = CommandBuilder::new("search.package.list").param("url", url_string).build();
-        let model = if self.cmd.recovery {
-            ModelConfig::from_product_bundle_recovery(&self.cmd.product_bundle)
+        let scrutiny = if self.cmd.recovery {
+            Scrutiny::from_product_bundle_recovery(&self.cmd.product_bundle)
         } else {
-            ModelConfig::from_product_bundle(&self.cmd.product_bundle)
+            Scrutiny::from_product_bundle(&self.cmd.product_bundle)
         }?;
-        let config = ConfigBuilder::with_model(model).command(command).build();
-        launcher::launch_from_config(config)?;
-
+        let package = scrutiny.get_package(self.cmd.url)?;
+        let Some(package) = package else {
+            fho::return_user_error!("Could not find package");
+        };
+        let s = serde_json::to_string_pretty(&package.contents)
+            .map_err(|e| fho::Error::User(e.into()))?;
+        println!("{}", s);
         Ok(())
     }
 }

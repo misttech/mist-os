@@ -11,6 +11,7 @@ if (is_host) {
     with_unit_tests = true
     edition = "2021"
     deps = [
+      "//src/lib/fuchsia-url",
       "//src/security/lib/scrutiny/config",
       "//src/security/lib/scrutiny/framework",
       "//src/security/lib/scrutiny/plugins",
@@ -28,6 +29,7 @@ if (is_host) {
       "src/launcher.rs",
       "src/lib.rs",
       "src/scrutiny.rs",
+      "src/scrutiny2.rs",
       "src/shell/args.rs",
       "src/shell/error.rs",
       "src/shell/mod.rs",
