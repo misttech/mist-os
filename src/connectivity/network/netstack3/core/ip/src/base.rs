@@ -6,7 +6,7 @@ use core::cmp::Ordering;
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::marker::PhantomData;
-use core::num::{NonZeroU16, NonZeroU32, NonZeroU8};
+use core::num::{NonZeroU16, NonZeroU8};
 use core::sync::atomic::{self, AtomicU16};
 
 use const_unwrap::const_unwrap_option;
@@ -23,9 +23,9 @@ use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer,
-    Inspectable, Inspector, InstantContext, NestedIntoCoreTimerCtx, NotFoundError, RngContext,
-    SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler,
-    TracingContext, WrapBroadcastMarker,
+    Inspectable, Inspector, InstantContext, IpExt, NestedIntoCoreTimerCtx, NotFoundError,
+    RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
+    TimerHandler, TracingContext, WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -34,7 +34,7 @@ use netstack3_filter::{
 };
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
-use packet_formats::ip::{IpPacket as _, IpPacketBuilder as _, IpProtoExt};
+use packet_formats::ip::{IpPacket as _, IpPacketBuilder as _};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
 use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
@@ -50,7 +50,7 @@ use crate::internal::device::{
 use crate::internal::forwarding::{ForwardingTable, IpForwardingDeviceContext};
 use crate::internal::gmp::GmpQueryHandler;
 use crate::internal::icmp::{
-    IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, Icmpv4Error, Icmpv4ErrorKind,
+    IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, Icmpv4Error, Icmpv4ErrorKind,
     Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
 };
 use crate::internal::ipv6;
@@ -173,34 +173,6 @@ impl From<SendFrameErrorReason> for IpSendFrameErrorReason {
     fn from(value: SendFrameErrorReason) -> Self {
         Self::Device(value)
     }
-}
-
-/// An [`Ip`] extension trait adding functionality specific to the IP layer.
-pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt + BroadcastIpExt + IpProtoExt {
-    /// The type used to specify an IP packet's source address in a call to
-    /// [`IpTransportContext::receive_ip_packet`].
-    ///
-    /// For IPv4, this is `Ipv4Addr`. For IPv6, this is [`Ipv6SourceAddr`].
-    type RecvSrcAddr: Into<Self::Addr> + TryFrom<Self::Addr, Error: Debug> + Copy + Clone;
-    /// The length of an IP header without any IP options.
-    const IP_HEADER_LENGTH: NonZeroU32;
-    /// The maximum payload size an IP payload can have.
-    const IP_MAX_PAYLOAD_LENGTH: NonZeroU32;
-}
-
-impl IpExt for Ipv4 {
-    type RecvSrcAddr = Ipv4Addr;
-    const IP_HEADER_LENGTH: NonZeroU32 =
-        const_unwrap_option(NonZeroU32::new(packet_formats::ipv4::HDR_PREFIX_LEN as u32));
-    const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 =
-        const_unwrap_option(NonZeroU32::new(u16::MAX as u32 - Self::IP_HEADER_LENGTH.get()));
-}
-
-impl IpExt for Ipv6 {
-    type RecvSrcAddr = Ipv6SourceAddr;
-    const IP_HEADER_LENGTH: NonZeroU32 =
-        const_unwrap_option(NonZeroU32::new(packet_formats::ipv6::IPV6_FIXED_HDR_LEN as u32));
-    const IP_MAX_PAYLOAD_LENGTH: NonZeroU32 = const_unwrap_option(NonZeroU32::new(u16::MAX as u32));
 }
 
 /// Informs the transport layer of parameters for transparent local delivery.

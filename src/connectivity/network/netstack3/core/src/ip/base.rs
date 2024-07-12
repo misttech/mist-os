@@ -12,7 +12,9 @@ use log::trace;
 use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use net_types::{MulticastAddr, SpecifiedAddr};
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
+use netstack3_base::{
+    CounterContext, Icmpv4ErrorCode, Icmpv6ErrorCode, TokenBucket, WeakDeviceIdentifier,
+};
 use netstack3_datagram as datagram;
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_icmp_echo::{
@@ -22,8 +24,8 @@ use netstack3_icmp_echo::{
 };
 use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
 use netstack3_ip::icmp::{
-    self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
-    Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
+    self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, InnerIcmpContext,
+    InnerIcmpv4Context, NdpCounters,
 };
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{

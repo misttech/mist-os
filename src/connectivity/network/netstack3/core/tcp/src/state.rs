@@ -17,22 +17,19 @@ use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use log::error;
-use netstack3_base::Instant;
-use netstack3_ip::icmp::IcmpErrorCode;
+use netstack3_base::{
+    Control, IcmpErrorCode, Instant, Mss, Options, Payload, Segment, SendPayload, SeqNum,
+    UnscaledWindowSize, WindowScale, WindowSize,
+};
 use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
 
 use crate::internal::base::{
-    BufferSizes, ConnectionError, Control, KeepAlive, Mss, OptionalBufferSizes, SocketOptions,
-    TcpCountersInner,
+    BufferSizes, ConnectionError, KeepAlive, OptionalBufferSizes, SocketOptions, TcpCountersInner,
 };
-use crate::internal::buffer::{
-    Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload,
-};
+use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::congestion::CongestionControl;
 use crate::internal::rtt::Estimator;
-use crate::internal::segment::{Options, Payload, Segment};
-use crate::internal::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-81):
 /// MSL
@@ -2944,32 +2941,6 @@ mod test {
         }
     }
 
-    impl<P: Payload> Segment<P> {
-        fn data(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, data: P) -> Segment<P> {
-            let (seg, truncated) = Segment::with_data(seq, Some(ack), None, wnd, data);
-            assert_eq!(truncated, 0);
-            seg
-        }
-
-        fn piggybacked_fin(
-            seq: SeqNum,
-            ack: SeqNum,
-            wnd: UnscaledWindowSize,
-            data: P,
-        ) -> Segment<P> {
-            let (seg, truncated) =
-                Segment::with_data(seq, Some(ack), Some(Control::FIN), wnd, data);
-            assert_eq!(truncated, 0);
-            seg
-        }
-    }
-
-    impl Segment<()> {
-        fn fin(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
-            Segment::new(seq, Some(ack), Some(Control::FIN), wnd)
-        }
-    }
-
     impl RingBuffer {
         fn with_data<'a>(cap: usize, data: &'a [u8]) -> Self {
             let mut buffer = RingBuffer::new(cap);
@@ -2977,16 +2948,6 @@ mod test {
             assert_eq!(nwritten, data.len());
             buffer.make_readable(nwritten);
             buffer
-        }
-    }
-
-    impl UnscaledWindowSize {
-        fn from_usize(size: usize) -> Self {
-            UnscaledWindowSize::from(u16::try_from(size).unwrap())
-        }
-
-        fn from_u32(size: u32) -> Self {
-            UnscaledWindowSize::from(u16::try_from(size).unwrap())
         }
     }
 

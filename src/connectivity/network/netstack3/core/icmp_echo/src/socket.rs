@@ -26,9 +26,10 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, CounterContext, DeviceIdContext, Inspector, InspectorDeviceExt,
-    LocalAddressError, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
-    RngContext, SocketError, StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
+    AnyDevice, ContextPair, CounterContext, DeviceIdContext, IcmpIpExt, Inspector,
+    InspectorDeviceExt, LocalAddressError, PortAllocImpl, ReferenceNotifiers,
+    RemoveResourceResultWithContext, RngContext, SocketError, StrongDeviceIdentifier,
+    UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram::{
     self as datagram, DatagramApi, DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSet,
@@ -36,7 +37,7 @@ use netstack3_datagram::{
     DatagramStateContext, ExpectedUnboundError, NonDualStackConverter,
     NonDualStackDatagramSpecBoundStateContext,
 };
-use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpIpExt, IcmpRxCounters};
+use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpRxCounters};
 use netstack3_ip::socket::SocketHopLimits;
 use netstack3_ip::{
     IpTransportContext, MulticastMembershipHandler, ReceiveIpPacketMeta, TransportIpContext,

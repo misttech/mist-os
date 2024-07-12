@@ -17,9 +17,9 @@ use netstack3_base::socket::{
 };
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, ReferenceNotifiers,
-    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, ResourceCounterContext,
-    StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
+    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, IpExt,
+    ReferenceNotifiers, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
+    ResourceCounterContext, StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
@@ -27,7 +27,6 @@ use packet_formats::icmp;
 use packet_formats::ip::IpPacket;
 use zerocopy::ByteSlice;
 
-use crate::internal::base::IpExt;
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;

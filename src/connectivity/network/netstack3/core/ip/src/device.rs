@@ -30,7 +30,7 @@ use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
     AnyDevice, CounterContext, DeferredResourceRemovalContext, DeviceIdContext, EventContext,
     ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext,
-    NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
+    IpExt, NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
     StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
 use netstack3_filter::{IpPacket, ProofOfEgressCheck};
@@ -41,7 +41,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 use zerocopy::ByteSlice;
 
-use crate::internal::base::{IpCounters, IpExt, IpPacketDestination};
+use crate::internal::base::{IpCounters, IpPacketDestination};
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };

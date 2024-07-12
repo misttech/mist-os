@@ -6,7 +6,7 @@
 
 use core::cmp::Ordering;
 use core::convert::Infallible;
-use core::num::{NonZeroU32, NonZeroU8};
+use core::num::NonZeroU8;
 
 use log::error;
 use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu};
@@ -14,7 +14,7 @@ use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    InstantContext, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
+    InstantContext, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
     WeakDeviceIdentifier as _,
 };
 use netstack3_filter::{
@@ -25,7 +25,7 @@ use packet::{BufferMut, PacketConstraints, SerializeError};
 use thiserror::Error;
 
 use crate::internal::base::{
-    FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
+    FilterHandlerProvider, IpCounters, IpDeviceContext, IpLayerIpExt, IpLayerPacketMetadata,
     IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
     SendIpPacketMeta,
 };
@@ -243,26 +243,6 @@ pub enum IpSockCreateAndSendError {
 pub enum SendOneShotIpPacketError<E> {
     CreateAndSendError { err: IpSockCreateAndSendError },
     SerializeError(E),
-}
-
-/// Maximum packet size, that is the maximum IP payload one packet can carry.
-///
-/// More details from https://www.rfc-editor.org/rfc/rfc1122#section-3.3.2.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mms(NonZeroU32);
-
-impl Mms {
-    /// Creates a maximum packet size from an [`Mtu`] value.
-    pub fn from_mtu<I: IpExt>(mtu: Mtu, options_size: u32) -> Option<Self> {
-        NonZeroU32::new(mtu.get().saturating_sub(I::IP_HEADER_LENGTH.get() + options_size))
-            .map(|mms| Self(mms.min(I::IP_MAX_PAYLOAD_LENGTH)))
-    }
-
-    /// Returns the maximum packet size.
-    pub fn get(&self) -> NonZeroU32 {
-        let Self(mms) = *self;
-        mms
-    }
 }
 
 /// Possible errors when retrieving the maximum transport message size.

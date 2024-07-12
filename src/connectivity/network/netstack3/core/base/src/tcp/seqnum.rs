@@ -23,7 +23,7 @@ use explicit::ResultExt as _;
 /// For any sequence number, there are 2**31 numbers after it and 2**31 - 1
 /// numbers before it.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) struct SeqNum(u32);
+pub struct SeqNum(u32);
 
 impl ops::Add<i32> for SeqNum {
     type Output = SeqNum;
@@ -102,7 +102,8 @@ impl From<SeqNum> for u32 {
 }
 
 impl SeqNum {
-    pub(crate) const fn new(x: u32) -> Self {
+    /// Creates a new sequence number.
+    pub const fn new(x: u32) -> Self {
         Self(x)
     }
 }
@@ -111,14 +112,14 @@ impl SeqNum {
     /// A predicate for whether a sequence number is before the other.
     ///
     /// Please refer to [`SeqNum`] for the defined order.
-    pub(crate) fn before(self, other: SeqNum) -> bool {
+    pub fn before(self, other: SeqNum) -> bool {
         self - other < 0
     }
 
     /// A predicate for whether a sequence number is after the other.
     ///
     /// Please refer to [`SeqNum`] for the defined order.
-    pub(crate) fn after(self, other: SeqNum) -> bool {
+    pub fn after(self, other: SeqNum) -> bool {
         self - other > 0
     }
 }
@@ -132,16 +133,22 @@ impl SeqNum {
 ///
 /// [RFC 7323 Section 2.3]: https://tools.ietf.org/html/rfc7323#section-2.3
 #[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
-pub(crate) struct WindowSize(u32);
+pub struct WindowSize(u32);
 
 impl WindowSize {
-    pub(super) const MAX: WindowSize = WindowSize(1 << 30 - 1);
-    pub(super) const ZERO: WindowSize = WindowSize(0);
+    /// The largest possible window size.
+    pub const MAX: WindowSize = WindowSize(1 << 30 - 1);
+    /// The smallest possible window size.
+    pub const ZERO: WindowSize = WindowSize(0);
 
+    /// The Netstack3 default window size.
     // TODO(https://github.com/rust-lang/rust/issues/67441): put this constant
     // in the state module once `Option::unwrap` is stable.
-    pub(super) const DEFAULT: WindowSize = WindowSize(65535);
+    pub const DEFAULT: WindowSize = WindowSize(65535);
 
+    /// Create a new `WindowSize` from the provided `u32`.
+    ///
+    /// If the provided window size is out of range, then `None` is returned.
     pub const fn from_u32(wnd: u32) -> Option<Self> {
         let WindowSize(max) = Self::MAX;
         if wnd > max {
@@ -151,20 +158,28 @@ impl WindowSize {
         }
     }
 
-    pub(super) fn saturating_add(self, rhs: u32) -> Self {
+    /// Add a `u32` to this WindowSize, saturating at [`WindowSize::MAX`].
+    pub fn saturating_add(self, rhs: u32) -> Self {
         Self::from_u32(u32::from(self).saturating_add(rhs)).unwrap_or(Self::MAX)
     }
 
-    pub(super) fn new(wnd: usize) -> Option<Self> {
+    /// Create a new [`WindowSize`], returning `None` if the argument is out of range.
+    pub fn new(wnd: usize) -> Option<Self> {
         u32::try_from(wnd).ok_checked::<TryFromIntError>().and_then(WindowSize::from_u32)
     }
 
-    pub(super) fn checked_sub(self, diff: usize) -> Option<Self> {
+    /// Subtract `diff` from `self`, returning `None` if the result would be negative.
+    pub fn checked_sub(self, diff: usize) -> Option<Self> {
+        // The call to Self::new will never return None.
+        //
+        // If diff is larger than self, the checked_sub will return None. Otherwise the result must
+        // be less than Self::MAX, since the value of self before subtraction must be less than or
+        // equal to Self::MAX.
         usize::from(self).checked_sub(diff).and_then(Self::new)
     }
 
     /// The window scale that needs to be advertised during the handshake.
-    pub(super) fn scale(self) -> WindowScale {
+    pub fn scale(self) -> WindowScale {
         let WindowSize(size) = self;
         let effective_bits = u8::try_from(32 - u32::leading_zeros(size)).unwrap();
         let scale = WindowScale(effective_bits.saturating_sub(16));
@@ -199,19 +214,21 @@ impl From<WindowSize> for usize {
 /// Per RFC 7323 Section 2.2, the restriction is as follows:
 ///   The maximum scale exponent is limited to 14 for a maximum permissible
 ///   receive window size of 1 GiB (2^(14+16)).
-pub(crate) struct WindowScale(u8);
+pub struct WindowScale(u8);
 
 impl WindowScale {
-    pub(super) const MAX: WindowScale = WindowScale(14);
+    /// The largest possible [`WindowScale`].
+    pub const MAX: WindowScale = WindowScale(14);
 
     /// Creates a new `WindowScale`.
     ///
     /// Returns `None` if the input exceeds the maximum possible value.
-    pub(super) fn new(ws: u8) -> Option<Self> {
+    pub fn new(ws: u8) -> Option<Self> {
         (ws <= Self::MAX.get()).then_some(WindowScale(ws))
     }
 
-    pub(super) fn get(&self) -> u8 {
+    /// Returns the inner value.
+    pub fn get(&self) -> u8 {
         let Self(ws) = self;
         *ws
     }
@@ -222,7 +239,7 @@ impl WindowScale {
 ///
 /// For connections with window scaling enabled, the receiver has to scale this
 /// value back to get the real window size advertised by the peer.
-pub(crate) struct UnscaledWindowSize(u16);
+pub struct UnscaledWindowSize(u16);
 
 impl ops::Shl<WindowScale> for UnscaledWindowSize {
     type Output = WindowSize;
@@ -255,6 +272,27 @@ impl From<UnscaledWindowSize> for u16 {
     }
 }
 
+#[cfg(feature = "testutils")]
+mod testutils {
+    use super::*;
+
+    impl UnscaledWindowSize {
+        /// Create a new UnscaledWindowSize.
+        ///
+        /// Panics if `size` is not in range.
+        pub fn from_usize(size: usize) -> Self {
+            UnscaledWindowSize::from(u16::try_from(size).unwrap())
+        }
+
+        /// Create a new UnscaledWindowSize.
+        ///
+        /// Panics if `size` is not in range.
+        pub fn from_u32(size: u32) -> Self {
+            UnscaledWindowSize::from(u16::try_from(size).unwrap())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use proptest::arbitrary::any;
@@ -264,8 +302,8 @@ mod tests {
     use proptest_support::failed_seeds;
     use test_case::test_case;
 
+    use super::super::segment::MAX_PAYLOAD_AND_CONTROL_LEN;
     use super::*;
-    use crate::internal::segment::MAX_PAYLOAD_AND_CONTROL_LEN;
 
     fn arb_seqnum() -> impl Strategy<Value = SeqNum> {
         any::<u32>().prop_map(SeqNum::from)

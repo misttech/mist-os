@@ -17,8 +17,9 @@ use netstack3_base::socket::{
     ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
 };
 use netstack3_base::{
-    trace_duration, BidirectionalConverter as _, CounterContext, CtxPair, EitherDeviceId,
-    NotFoundError, StrongDeviceIdentifier as _, WeakDeviceIdentifier,
+    trace_duration, BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId,
+    Mss, NotFoundError, Segment, SendPayload, SeqNum, StrongDeviceIdentifier as _,
+    WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
@@ -26,21 +27,15 @@ use netstack3_ip::{
     BaseTransportIpContext, IpTransportContext, ReceiveIpPacketMeta, TransportIpContext,
     TransportReceiveError,
 };
-use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
+use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::error::ParseError;
 use packet_formats::ip::{IpExt, IpProto};
 use packet_formats::tcp::{
     TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
     TcpSegmentBuilderWithOptions,
 };
-use thiserror::Error;
 
-use crate::internal::base::{
-    BufferSizes, ConnectionError, Control, Mss, SocketOptions, TcpCounters,
-};
-use crate::internal::buffer::SendPayload;
-use crate::internal::segment::{Options, Segment};
-use crate::internal::seqnum::{SeqNum, UnscaledWindowSize};
+use crate::internal::base::{BufferSizes, ConnectionError, SocketOptions, TcpCounters};
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{
     self, AsThisStack as _, BoundSocketState, Connection, DemuxState, DeviceIpSocketHandler,
@@ -1079,39 +1074,6 @@ where
     result
 }
 
-#[derive(Error, Debug)]
-#[error("multiple mutually exclusive flags are set: syn: {syn}, fin: {fin}, rst: {rst}")]
-pub(crate) struct MalformedFlags {
-    syn: bool,
-    fin: bool,
-    rst: bool,
-}
-
-impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
-    type Error = MalformedFlags;
-
-    fn try_from(from: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
-        if usize::from(from.syn()) + usize::from(from.fin()) + usize::from(from.rst()) > 1 {
-            return Err(MalformedFlags { syn: from.syn(), fin: from.fin(), rst: from.rst() });
-        }
-        let syn = from.syn().then(|| Control::SYN);
-        let fin = from.fin().then(|| Control::FIN);
-        let rst = from.rst().then(|| Control::RST);
-        let control = syn.or(fin).or(rst);
-        let options = Options::from_iter(from.iter_options());
-        let (to, discarded) = Segment::with_data_options(
-            from.seq_num().into(),
-            from.ack_num().map(Into::into),
-            control,
-            UnscaledWindowSize::from(from.window_size()),
-            from.into_body(),
-            options,
-        );
-        debug_assert_eq!(discarded, 0);
-        Ok(to)
-    }
-}
-
 pub(super) fn tcp_serialize_segment<'a, S, I>(
     segment: S,
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
@@ -1151,41 +1113,22 @@ mod test {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::TestIpExt;
+    use netstack3_base::{Options, UnscaledWindowSize};
     use packet::ParseBuffer as _;
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::base::Mss;
 
     const SEQ: SeqNum = SeqNum::new(12345);
     const ACK: SeqNum = SeqNum::new(67890);
-
-    impl Segment<SendPayload<'static>> {
-        const FAKE_DATA: &'static [u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
-        fn with_fake_data(split: bool) -> Self {
-            let (segment, discarded) = Self::with_data(
-                SEQ,
-                Some(ACK),
-                None,
-                UnscaledWindowSize::from(u16::MAX),
-                if split {
-                    let (first, second) = Self::FAKE_DATA.split_at(Self::FAKE_DATA.len() / 2);
-                    SendPayload::Straddle(first, second)
-                } else {
-                    SendPayload::Contiguous(Self::FAKE_DATA)
-                },
-            );
-            assert_eq!(discarded, 0);
-            segment
-        }
-    }
+    const FAKE_DATA: &'static [u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
 
     #[ip_test(I)]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }).into(), &[]; "syn")]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }).into(), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)).into(), &[]; "ack")]
-    #[test_case(Segment::with_fake_data(false), Segment::FAKE_DATA; "contiguous data")]
-    #[test_case(Segment::with_fake_data(true), Segment::FAKE_DATA; "split data")]
+    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, false), FAKE_DATA; "contiguous data")]
+    #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA, true), FAKE_DATA; "split data")]
     fn tcp_serialize_segment<I: TestIpExt>(
         segment: Segment<SendPayload<'_>>,
         expected_body: &[u8],

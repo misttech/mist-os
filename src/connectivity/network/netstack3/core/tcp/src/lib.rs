@@ -18,8 +18,6 @@ mod internal {
     pub(super) mod buffer;
     pub(super) mod congestion;
     pub(super) mod rtt;
-    pub(super) mod segment;
-    pub(super) mod seqnum;
     pub(super) mod socket;
     pub(super) mod state;
     pub(super) mod uninstantiable;
@@ -30,9 +28,8 @@ pub use internal::base::{
     DEFAULT_FIN_WAIT2_TIMEOUT,
 };
 pub use internal::buffer::{
-    Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
+    Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, RingBuffer, SendBuffer,
 };
-pub use internal::segment::Payload;
 pub use internal::socket::accept_queue::ListenerNotifier;
 pub use internal::socket::isn::IsnGenerator;
 pub use internal::socket::{

@@ -114,11 +114,10 @@ pub mod gmp {
 pub mod icmp {
     pub use crate::internal::icmp::{
         send_icmpv4_host_unreachable, send_icmpv6_address_unreachable, send_ndp_packet,
-        EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpErrorCode,
-        IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters, IcmpRxCountersInner, IcmpState,
-        IcmpStateContext, IcmpTxCounters, IcmpTxCountersInner, Icmpv4ErrorCode, Icmpv4StateBuilder,
-        Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters, NdpRxCounters,
-        NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+        EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpIpTransportContext,
+        IcmpRxCounters, IcmpRxCountersInner, IcmpState, IcmpStateContext, IcmpTxCounters,
+        IcmpTxCountersInner, Icmpv4StateBuilder, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
+        NdpRxCounters, NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
     };
 
     /// ICMP test utilities.
@@ -170,7 +169,7 @@ pub mod socket {
     pub use crate::internal::socket::{
         DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
         IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketBindingsContext,
-        IpSocketContext, IpSocketHandler, Mms, MmsError, SendOneShotIpPacketError, SendOptions,
+        IpSocketContext, IpSocketHandler, MmsError, SendOneShotIpPacketError, SendOptions,
         SocketHopLimits,
     };
 
@@ -201,9 +200,9 @@ pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus,
     BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
-    IpDeviceContext, IpDeviceStateContext, IpExt, IpLayerBindingsContext, IpLayerContext,
-    IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
-    IpSendFrameError, IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
+    IpDeviceContext, IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext, IpLayerEvent,
+    IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination, IpSendFrameError,
+    IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
     IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder,
     Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder, MulticastMembershipHandler,
     ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError, SendIpPacketMeta,

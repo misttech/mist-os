@@ -190,12 +190,13 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
+    pub use netstack3_base::{Payload, SendPayload};
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-        OriginalDestinationError, Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
-        SetDeviceError, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
-        TcpBindingsTypes, TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
+        OriginalDestinationError, ReceiveBuffer, RingBuffer, SendBuffer, SetDeviceError,
+        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
+        TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 

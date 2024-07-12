@@ -41,8 +41,8 @@ use netstack3_ip::socket::{
     SendOneShotIpPacketError, SendOptions, SocketHopLimits,
 };
 use netstack3_ip::{
-    self as ip, icmp, BaseTransportIpContext, HopLimits, MulticastMembershipHandler,
-    ResolveRouteError, TransportIpContext,
+    BaseTransportIpContext, HopLimits, MulticastMembershipHandler, ResolveRouteError,
+    TransportIpContext,
 };
 use packet::BufferMut;
 use packet_formats::ip::IpProtoExt;
@@ -124,8 +124,8 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> DerefMut
 }
 
 /// Marker trait for datagram IP extensions.
-pub trait IpExt: ip::IpExt + DualStackIpExt + icmp::IcmpIpExt {}
-impl<I: ip::IpExt + DualStackIpExt + icmp::IcmpIpExt> IpExt for I {}
+pub trait IpExt: netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt {}
+impl<I: netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt> IpExt for I {}
 
 /// A datagram socket's state.
 #[derive(Derivative, GenericOverIp)]
@@ -1038,7 +1038,7 @@ impl<I> DualStackIpExt for I where
 /// useful for implementing dual-stack sockets. The types are intentionally
 /// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
 /// and [`Ipv6`] impls.
-pub trait DualStackBaseIpExt: socket::DualStackIpExt + SocketIpExt + ip::IpExt {
+pub trait DualStackBaseIpExt: socket::DualStackIpExt + SocketIpExt + netstack3_base::IpExt {
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just

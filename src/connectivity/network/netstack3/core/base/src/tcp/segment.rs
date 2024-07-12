@@ -1,4 +1,4 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -10,43 +10,48 @@ use core::ops::Range;
 
 use log::info;
 use packet_formats::tcp::options::TcpOption;
+use packet_formats::tcp::TcpSegment;
+use thiserror::Error;
 
-use crate::internal::base::{Control, Mss};
-use crate::internal::buffer::SendPayload;
-use crate::internal::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
+use super::base::{Control, Mss, SendPayload};
+use super::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 
 /// A TCP segment.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) struct Segment<P: Payload> {
+pub struct Segment<P: Payload> {
     /// The sequence number of the segment.
-    pub(crate) seq: SeqNum,
+    pub seq: SeqNum,
     /// The acknowledge number of the segment. [`None`] if not present.
-    pub(crate) ack: Option<SeqNum>,
+    pub ack: Option<SeqNum>,
     /// The advertised window size.
-    pub(crate) wnd: UnscaledWindowSize,
+    pub wnd: UnscaledWindowSize,
     /// The carried data and its control flag.
-    pub(crate) contents: Contents<P>,
+    pub contents: Contents<P>,
     /// Options carried by this segment.
-    pub(crate) options: Options,
+    pub options: Options,
 }
 
+/// Contains all supported TCP options.
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
-pub(crate) struct Options {
-    pub(crate) mss: Option<Mss>,
-    pub(crate) window_scale: Option<WindowScale>,
+pub struct Options {
+    /// The MSS option (only set on handshake).
+    pub mss: Option<Mss>,
+
+    /// The WS option (only set on handshake).
+    pub window_scale: Option<WindowScale>,
 }
 
 impl Options {
-    pub(crate) fn iter(
-        &self,
-    ) -> impl Iterator<Item = TcpOption<'static>> + core::fmt::Debug + Clone {
+    /// Returns an iterator over the contained options.
+    pub fn iter(&self) -> impl Iterator<Item = TcpOption<'static>> + core::fmt::Debug + Clone {
         self.mss
             .map(|mss| TcpOption::Mss(mss.get().get()))
             .into_iter()
             .chain(self.window_scale.map(|ws| TcpOption::WindowScale(ws.get())))
     }
 
-    pub(crate) fn from_iter<'a>(iter: impl IntoIterator<Item = TcpOption<'a>>) -> Self {
+    /// Creates a new [`Options`] from an iterator of TcpOption.
+    pub fn from_iter<'a>(iter: impl IntoIterator<Item = TcpOption<'a>>) -> Self {
         let mut options = Options::default();
         for option in iter {
             match option {
@@ -78,18 +83,18 @@ impl Options {
 }
 
 /// The maximum length that the sequence number doesn't wrap around.
-pub(super) const MAX_PAYLOAD_AND_CONTROL_LEN: usize = 1 << 31;
+pub const MAX_PAYLOAD_AND_CONTROL_LEN: usize = 1 << 31;
 // The following `as` is sound because it is representable by `u32`.
 const MAX_PAYLOAD_AND_CONTROL_LEN_U32: u32 = MAX_PAYLOAD_AND_CONTROL_LEN as u32;
 
 /// The contents of a TCP segment that takes up some sequence number space.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub(crate) struct Contents<P: Payload> {
+pub struct Contents<P: Payload> {
     /// The control flag of the segment.
-    control: Option<Control>,
+    pub control: Option<Control>,
     /// The data carried by the segment; it is guaranteed that
     /// `data.len() + control_len <= MAX_PAYLOAD_AND_CONTROL_LEN`.
-    data: P,
+    pub data: P,
 }
 
 impl<P: Payload> Contents<P> {
@@ -98,7 +103,7 @@ impl<P: Payload> Contents<P> {
     /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-25):
     ///   SEG.LEN = the number of octets occupied by the data in the segment
     ///   (counting SYN and FIN)
-    pub(super) fn len(&self) -> u32 {
+    pub fn len(&self) -> u32 {
         let Self { data, control } = self;
         // The following unwrap and addition are fine because:
         // - `u32::from(has_control_len)` is 0 or 1.
@@ -107,17 +112,21 @@ impl<P: Payload> Contents<P> {
         u32::try_from(data.len()).unwrap() + u32::from(has_control_len)
     }
 
-    pub(super) fn control(&self) -> Option<Control> {
+    pub fn control(&self) -> Option<Control> {
         self.control
     }
 
-    pub(super) fn data(&self) -> &P {
+    pub fn data(&self) -> &P {
         &self.data
     }
 }
 
 impl<P: Payload> Segment<P> {
-    pub(super) fn with_data_options(
+    /// Creates a new segment with data and options.
+    ///
+    /// Returns the segment along with how many bytes were removed to make sure
+    /// sequence numbers don't wrap around, i.e., `seq.before(seq + seg.len())`.
+    pub fn with_data_options(
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
@@ -152,7 +161,7 @@ impl<P: Payload> Segment<P> {
     ///
     /// Returns the segment along with how many bytes were removed to make sure
     /// sequence numbers don't wrap around, i.e., `seq.before(seq + seg.len())`.
-    pub(super) fn with_data(
+    pub fn with_data(
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
@@ -165,7 +174,7 @@ impl<P: Payload> Segment<P> {
 
 impl<P: Payload> Segment<P> {
     /// Returns the part of the incoming segment within the receive window.
-    pub(super) fn overlap(self, rnxt: SeqNum, rwnd: WindowSize) -> Option<Segment<P>> {
+    pub fn overlap(self, rnxt: SeqNum, rwnd: WindowSize) -> Option<Segment<P>> {
         let Segment { seq, ack, wnd, contents, options } = self;
         let len = contents.len();
         let Contents { control, data } = contents;
@@ -255,7 +264,7 @@ impl<P: Payload> Segment<P> {
 
 impl Segment<()> {
     /// Creates a segment with no data.
-    pub(super) fn new(
+    pub fn new(
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
@@ -264,7 +273,8 @@ impl Segment<()> {
         Self::with_options(seq, ack, control, wnd, Options::default())
     }
 
-    pub(super) fn with_options(
+    /// Creates a new segment with options but no data.
+    pub fn with_options(
         seq: SeqNum,
         ack: Option<SeqNum>,
         control: Option<Control>,
@@ -279,32 +289,27 @@ impl Segment<()> {
     }
 
     /// Creates an ACK segment.
-    pub(super) fn ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
+    pub fn ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
         Segment::new(seq, Some(ack), None, wnd)
     }
 
     /// Creates a SYN segment.
-    pub(super) fn syn(seq: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
+    pub fn syn(seq: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
         Segment::with_options(seq, None, Some(Control::SYN), wnd, options)
     }
 
     /// Creates a SYN-ACK segment.
-    pub(super) fn syn_ack(
-        seq: SeqNum,
-        ack: SeqNum,
-        wnd: UnscaledWindowSize,
-        options: Options,
-    ) -> Self {
+    pub fn syn_ack(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, options: Options) -> Self {
         Segment::with_options(seq, Some(ack), Some(Control::SYN), wnd, options)
     }
 
     /// Creates a RST segment.
-    pub(super) fn rst(seq: SeqNum) -> Self {
+    pub fn rst(seq: SeqNum) -> Self {
         Segment::new(seq, None, Some(Control::RST), UnscaledWindowSize::from(0))
     }
 
     /// Creates a RST-ACK segment.
-    pub(super) fn rst_ack(seq: SeqNum, ack: SeqNum) -> Self {
+    pub fn rst_ack(seq: SeqNum, ack: SeqNum) -> Self {
         Segment::new(seq, Some(ack), Some(Control::RST), UnscaledWindowSize::from(0))
     }
 }
@@ -389,6 +394,39 @@ impl From<Segment<()>> for Segment<&'static [u8]> {
     }
 }
 
+#[derive(Error, Debug)]
+#[error("multiple mutually exclusive flags are set: syn: {syn}, fin: {fin}, rst: {rst}")]
+pub struct MalformedFlags {
+    syn: bool,
+    fin: bool,
+    rst: bool,
+}
+
+impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
+    type Error = MalformedFlags;
+
+    fn try_from(from: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
+        if usize::from(from.syn()) + usize::from(from.fin()) + usize::from(from.rst()) > 1 {
+            return Err(MalformedFlags { syn: from.syn(), fin: from.fin(), rst: from.rst() });
+        }
+        let syn = from.syn().then(|| Control::SYN);
+        let fin = from.fin().then(|| Control::FIN);
+        let rst = from.rst().then(|| Control::RST);
+        let control = syn.or(fin).or(rst);
+        let options = Options::from_iter(from.iter_options());
+        let (to, discarded) = Segment::with_data_options(
+            from.seq_num().into(),
+            from.ack_num().map(Into::into),
+            control,
+            UnscaledWindowSize::from(from.window_size()),
+            from.into_body(),
+            options,
+        );
+        debug_assert_eq!(discarded, 0);
+        Ok(to)
+    }
+}
+
 impl From<Segment<()>> for Segment<SendPayload<'static>> {
     fn from(
         Segment { seq, ack, wnd, contents: Contents { control, data: () }, options }: Segment<()>,
@@ -399,6 +437,61 @@ impl From<Segment<()>> for Segment<SendPayload<'static>> {
             wnd,
             contents: Contents { control, data: SendPayload::Contiguous(&[]) },
             options,
+        }
+    }
+}
+
+#[cfg(feature = "testutils")]
+mod testutils {
+    use super::*;
+
+    impl Segment<SendPayload<'static>> {
+        /// Create a new segment with the given seq, ack, and data. If `split` is true, then the
+        /// data is split in half.
+        pub fn with_fake_data(seq: SeqNum, ack: SeqNum, data: &'static [u8], split: bool) -> Self {
+            let (segment, discarded) = Self::with_data(
+                seq,
+                Some(ack),
+                None,
+                UnscaledWindowSize::from(u16::MAX),
+                if split {
+                    let (first, second) = data.split_at(data.len() / 2);
+                    SendPayload::Straddle(first, second)
+                } else {
+                    SendPayload::Contiguous(data)
+                },
+            );
+            assert_eq!(discarded, 0);
+            segment
+        }
+    }
+
+    impl<P: Payload> Segment<P> {
+        /// Creates a new segment with the provided data.
+        pub fn data(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize, data: P) -> Segment<P> {
+            let (seg, truncated) = Segment::with_data(seq, Some(ack), None, wnd, data);
+            assert_eq!(truncated, 0);
+            seg
+        }
+
+        /// Creates a new FIN segment with the provided data.
+        pub fn piggybacked_fin(
+            seq: SeqNum,
+            ack: SeqNum,
+            wnd: UnscaledWindowSize,
+            data: P,
+        ) -> Segment<P> {
+            let (seg, truncated) =
+                Segment::with_data(seq, Some(ack), Some(Control::FIN), wnd, data);
+            assert_eq!(truncated, 0);
+            seg
+        }
+    }
+
+    impl Segment<()> {
+        /// Creates a new FIN segment.
+        pub fn fin(seq: SeqNum, ack: SeqNum, wnd: UnscaledWindowSize) -> Self {
+            Segment::new(seq, Some(ack), Some(Control::FIN), wnd)
         }
     }
 }

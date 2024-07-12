@@ -26,6 +26,7 @@ mod ip;
 mod port_alloc;
 mod resource_references;
 mod rng;
+mod tcp;
 mod time;
 mod trace;
 mod uninstantiable;
@@ -50,13 +51,19 @@ pub use frame::{
     SendFrameError, SendFrameErrorReason, SendableFrameMeta,
 };
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
-pub use ip::{BroadcastIpExt, WrapBroadcastMarker};
+pub use ip::{
+    BroadcastIpExt, IcmpErrorCode, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt,
+    IpTypesIpExt, Mms, WrapBroadcastMarker,
+};
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, ReferenceNotifiersExt,
     RemoveResourceResult, RemoveResourceResultWithContext,
 };
 pub use rng::RngContext;
+pub use tcp::base::{Control, Mss, SendPayload};
+pub use tcp::segment::{Options, Payload, Segment};
+pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{
     CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,

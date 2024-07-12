@@ -50,30 +50,28 @@ use netstack3_base::socket::{
 use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    AnyDevice, BidirectionalConverter as _, ContextPair, CoreTimerContext, CounterContext, CtxPair,
-    DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError, HandleableTimer,
-    Inspector, InspectorDeviceExt, Instant, InstantBindingsTypes, LocalAddressError,
-    OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
-    RemoveResourceResult, RngContext, StrongDeviceIdentifier as _, TimerBindingsTypes,
-    TimerContext, TracingContext, WeakDeviceIdentifier, ZonedAddressError,
+    AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CounterContext,
+    CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
+    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, Instant, InstantBindingsTypes,
+    IpExt, LocalAddressError, Mss, OwnedOrRefsBidirectionalConverter, PortAllocImpl,
+    ReferenceNotifiersExt as _, RemoveResourceResult, RngContext, Segment, SendPayload, SeqNum,
+    StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
+    WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::Tuple;
-use netstack3_ip::icmp::IcmpErrorCode;
 use netstack3_ip::socket::{
     DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
     IpSockCreationError, IpSocketHandler,
 };
-use netstack3_ip::{self as ip, BaseTransportIpContext, IpExt, TransportIpContext};
+use netstack3_ip::{self as ip, BaseTransportIpContext, TransportIpContext};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
 use crate::internal::base::{
-    BufferSizes, ConnectionError, Control, Mss, OptionalBufferSizes, SocketOptions, TcpCounters,
+    BufferSizes, ConnectionError, OptionalBufferSizes, SocketOptions, TcpCounters,
 };
-use crate::internal::buffer::{IntoBuffers, ReceiveBuffer, SendBuffer, SendPayload};
-use crate::internal::segment::Segment;
-use crate::internal::seqnum::SeqNum;
+use crate::internal::buffer::{IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
@@ -96,7 +94,7 @@ impl<I> DualStackIpExt for I where
 
 /// A dual stack IP extension trait for TCP.
 pub trait DualStackBaseIpExt:
-    netstack3_base::socket::DualStackIpExt + SocketIpExt + ip::IpExt
+    netstack3_base::socket::DualStackIpExt + SocketIpExt + netstack3_base::IpExt
 {
     /// For `Ipv4`, this is [`EitherStack<TcpSocketId<Ipv4, _, _>, TcpSocketId<Ipv6, _, _>>`],
     /// and for `Ipv6` it is just `TcpSocketId<Ipv6>`.
@@ -5234,16 +5232,16 @@ mod tests {
         StepResult, TestIpExt, WithFakeFrameContext, WithFakeTimerContext,
     };
     use netstack3_base::{
-        ContextProvider, Instant as _, InstantContext, LinkDevice, ReferenceNotifiers,
-        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
+        ContextProvider, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _, InstantContext,
+        LinkDevice, Mms, ReferenceNotifiers, StrongDeviceIdentifier, Uninstantiable,
+        UninstantiableWrapper,
     };
     use netstack3_filter::{TransportPacketSerializer, Tuple};
     use netstack3_ip::device::IpDeviceStateIpExt;
-    use netstack3_ip::icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode};
     use netstack3_ip::nud::testutil::FakeLinkResolutionNotifier;
     use netstack3_ip::nud::LinkResolutionContext;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
-    use netstack3_ip::socket::{IpSockSendError, Mms, MmsError, SendOptions};
+    use netstack3_ip::socket::{IpSockSendError, MmsError, SendOptions};
     use netstack3_ip::testutil::DualStackSendIpPacketMeta;
     use netstack3_ip::{
         BaseTransportIpContext, HopLimits, IpTransportContext, ReceiveIpPacketMeta,

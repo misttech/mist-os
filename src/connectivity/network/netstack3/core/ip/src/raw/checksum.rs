@@ -6,14 +6,13 @@
 
 use log::error;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4Addr, Ipv6Addr};
+use netstack3_base::IpExt;
 use packet::{Buf, BufferViewMut, ParsablePacket as _, ParseBuffer as _};
 use packet_formats::icmp::{IcmpParseArgs, Icmpv6Packet, Icmpv6PacketRaw};
 use packet_formats::ip::{IpPacket, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::Ipv4Packet;
 use packet_formats::ipv6::Ipv6Packet;
 use zerocopy::ByteSlice;
-
-use crate::IpExt;
 
 /// Errors that may occur while validating/generating a checksum.
 #[derive(GenericOverIp)]

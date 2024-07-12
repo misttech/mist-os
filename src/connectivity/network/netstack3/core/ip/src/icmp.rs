@@ -5,7 +5,6 @@
 //! The Internet Control Message Protocol (ICMP).
 
 use core::convert::TryInto as _;
-use core::fmt::Debug;
 use core::num::NonZeroU8;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
@@ -21,7 +20,8 @@ use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
-    InstantBindingsTypes, InstantContext, RngContext, TokenBucket,
+    IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext, IpExt,
+    RngContext, TokenBucket,
 };
 use netstack3_filter::{self as filter, TransportPacketSerializer};
 use packet::{
@@ -36,9 +36,9 @@ use packet_formats::icmp::{
     peek_message_type, IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpMessageType,
     IcmpPacket, IcmpPacketBuilder, IcmpPacketRaw, IcmpParseArgs, IcmpTimeExceeded, IcmpUnusedCode,
     Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem, Icmpv4ParameterProblemCode,
-    Icmpv4RedirectCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet,
-    Icmpv6PacketTooBig, Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
-    MessageBody, OriginalPacket,
+    Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig,
+    Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
+    OriginalPacket,
 };
 use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header};
@@ -46,9 +46,9 @@ use packet_formats::ipv6::{ExtHdrParseError, Ipv6Header};
 use zerocopy::ByteSlice;
 
 use crate::internal::base::{
-    self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpPacketDestination,
-    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, ReceiveIpPacketMeta,
-    SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+    AddressStatus, IpDeviceStateContext, IpLayerHandler, IpPacketDestination, IpSendFrameError,
+    IpTransportContext, Ipv6PresentAddressStatus, ReceiveIpPacketMeta, SendIpPacketMeta,
+    TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
@@ -73,62 +73,6 @@ pub const REQUIRED_NDP_IP_PACKET_HOP_LIMIT: u8 = 255;
 ///
 /// Beyond this rate, error messages will be silently dropped.
 pub const DEFAULT_ERRORS_PER_SECOND: u64 = 2 << 16;
-
-/// An ICMPv4 error type and code.
-///
-/// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
-pub enum Icmpv4ErrorCode {
-    DestUnreachable(Icmpv4DestUnreachableCode),
-    Redirect(Icmpv4RedirectCode),
-    TimeExceeded(Icmpv4TimeExceededCode),
-    ParameterProblem(Icmpv4ParameterProblemCode),
-}
-
-impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv4ErrorCode {
-    type Type = I::ErrorCode;
-}
-
-/// An ICMPv6 error type and code.
-///
-/// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
-pub enum Icmpv6ErrorCode {
-    DestUnreachable(Icmpv6DestUnreachableCode),
-    PacketTooBig,
-    TimeExceeded(Icmpv6TimeExceededCode),
-    ParameterProblem(Icmpv6ParameterProblemCode),
-}
-
-impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv6ErrorCode {
-    type Type = I::ErrorCode;
-}
-
-/// An ICMP error of either IPv4 or IPv6.
-#[derive(Debug, Clone, Copy)]
-pub enum IcmpErrorCode {
-    /// ICMPv4 error.
-    V4(Icmpv4ErrorCode),
-    /// ICMPv6 error.
-    V6(Icmpv6ErrorCode),
-}
-
-impl From<Icmpv4ErrorCode> for IcmpErrorCode {
-    fn from(v4_err: Icmpv4ErrorCode) -> Self {
-        IcmpErrorCode::V4(v4_err)
-    }
-}
-
-impl From<Icmpv6ErrorCode> for IcmpErrorCode {
-    fn from(v6_err: Icmpv6ErrorCode) -> Self {
-        IcmpErrorCode::V6(v6_err)
-    }
-}
-
 /// The IP layer's ICMP state.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -346,27 +290,6 @@ impl<BT: IcmpBindingsTypes> AsMut<IcmpState<Ipv6, BT>> for Icmpv6State<BT> {
     fn as_mut(&mut self) -> &mut IcmpState<Ipv6, BT> {
         &mut self.inner
     }
-}
-
-/// An extension trait adding extra ICMP-related functionality to IP versions.
-pub trait IcmpIpExt: packet_formats::ip::IpExt + packet_formats::icmp::IcmpIpExt {
-    /// The type of error code for this version of ICMP - [`Icmpv4ErrorCode`] or
-    /// [`Icmpv6ErrorCode`].
-    type ErrorCode: Debug
-        + Copy
-        + PartialEq
-        + GenericOverIp<Self, Type = Self::ErrorCode>
-        + GenericOverIp<Ipv4, Type = Icmpv4ErrorCode>
-        + GenericOverIp<Ipv6, Type = Icmpv6ErrorCode>
-        + Into<IcmpErrorCode>;
-}
-
-impl IcmpIpExt for Ipv4 {
-    type ErrorCode = Icmpv4ErrorCode;
-}
-
-impl IcmpIpExt for Ipv6 {
-    type ErrorCode = Icmpv6ErrorCode;
 }
 
 /// An extension trait providing ICMP handler properties.
@@ -1772,7 +1695,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     original_dst_ip: SocketIpAddr<I::Addr>,
     get_body_from_src_ip: F,
 ) where
-    I: base::IpExt,
+    I: IpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
@@ -2871,6 +2794,7 @@ mod tests {
     use alloc::vec::Vec;
     use packet_formats::icmp::ndp::options::NdpNonce;
 
+    use core::fmt::Debug;
     use core::time::Duration;
 
     use net_types::ip::Subnet;

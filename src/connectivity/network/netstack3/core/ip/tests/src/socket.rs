@@ -21,13 +21,13 @@ use test_case::test_case;
 
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::testutil::{set_logger_for_test, TestAddrs, TestIpExt};
-use netstack3_base::EitherDeviceId;
+use netstack3_base::{EitherDeviceId, Mms};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
 use netstack3_core::IpExt;
 use netstack3_ip::socket::{
     DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
-    IpSockSendError, IpSocketHandler, Mms, MmsError, SendOptions,
+    IpSockSendError, IpSocketHandler, MmsError, SendOptions,
 };
 use netstack3_ip::{
     self as ip, device, AddableEntryEither, AddableMetric, IpDeviceContext, RawMetric,
@@ -59,7 +59,7 @@ struct NewSocketTestCase {
     expected_result: Result<(), IpSockCreationError>,
 }
 
-trait IpSocketIpExt: TestIpExt + IcmpIpExt + IpExt + ip::IpExt {
+trait IpSocketIpExt: TestIpExt + IcmpIpExt + IpExt + netstack3_base::IpExt {
     fn multicast_addr(host: u8) -> SpecifiedAddr<Self::Addr>;
 }
 
