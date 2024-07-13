@@ -122,14 +122,12 @@ impl ExtendedPstateState {
 }
 
 #[no_mangle]
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 unsafe extern "C" fn restore_extended_pstate(state_addr: usize) {
     let state = state_addr as *mut ExtendedPstateState;
     (&*state).restore()
 }
 
 #[no_mangle]
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 unsafe extern "C" fn save_extended_pstate(state_addr: usize) {
     let state = state_addr as *mut ExtendedPstateState;
     (&mut *state).save()
