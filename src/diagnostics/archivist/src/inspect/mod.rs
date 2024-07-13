@@ -34,6 +34,8 @@ pub struct NodeHierarchyData {
     // Optional DiagnosticsHierarchy of the inspect hierarchy, in case reading fails
     // and we have errors to share with client.
     hierarchy: Option<DiagnosticsHierarchy>,
+    // Whether or not this data comes from an escrowed VMO.
+    escrowed: bool,
 }
 
 impl From<SnapshotData> for NodeHierarchyData {
@@ -45,12 +47,14 @@ impl From<SnapshotData> for NodeHierarchyData {
                     timestamp: data.timestamp,
                     errors: data.errors,
                     hierarchy: Some(node_hierarchy),
+                    escrowed: data.escrowed,
                 },
                 Err(e) => NodeHierarchyData {
                     name: data.name,
                     timestamp: data.timestamp,
                     errors: vec![schema::InspectError { message: format!("{e:?}") }],
                     hierarchy: None,
+                    escrowed: data.escrowed,
                 },
             },
             None => NodeHierarchyData {
@@ -58,6 +62,7 @@ impl From<SnapshotData> for NodeHierarchyData {
                 timestamp: data.timestamp,
                 errors: data.errors,
                 hierarchy: None,
+                escrowed: data.escrowed,
             },
         }
     }
@@ -203,6 +208,7 @@ impl ReaderServer {
                         timestamp: node_hierarchy_data.timestamp,
                         errors: node_hierarchy_data.errors,
                         hierarchy: Some(filtered_hierarchy),
+                        escrowed: node_hierarchy_data.escrowed,
                     },
                 )?
             }
@@ -251,6 +257,7 @@ impl ReaderServer {
                 timestamp: node_hierarchy_data.timestamp,
                 errors: node_hierarchy_data.errors,
                 hierarchy: Some(filtered_hierarchy),
+                escrowed: node_hierarchy_data.escrowed,
             },
         )
     }
@@ -334,7 +341,7 @@ impl ReaderServer {
         if !hierarchy_data.errors.is_empty() {
             builder = builder.with_errors(hierarchy_data.errors);
         }
-        Some(builder.build())
+        Some(builder.escrowed(hierarchy_data.escrowed).build())
     }
 }
 

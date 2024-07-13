@@ -24,10 +24,13 @@ use fuchsia_inspect::{component, Inspector};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt, TryStreamExt};
+use inspect_runtime::{EscrowOptions, PublishedInspectController};
 use inspect_testing::ExampleInspectData;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_archivist_test as fpuppet, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_archivist_test as fpuppet, fidl_fuchsia_inspect as finspect, fuchsia_zircon as zx,
+};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),
@@ -42,12 +45,13 @@ async fn main() -> Result<(), Error> {
     let (interest_send, interest_recv) = unbounded::<InterestChangedEvent>();
     subscribe_to_log_interest_changes(InterestChangedNotifier(interest_send))?;
 
-    let puppet_server = Arc::new(PuppetServer::new(interest_recv));
-
     let mut fs = ServiceFs::new();
 
     let publish_options = inspect_runtime::PublishOptions::default();
-    let _inspect_publish_task = inspect_runtime::publish(component::inspector(), publish_options);
+    let inspect_controller =
+        inspect_runtime::publish(component::inspector(), publish_options).unwrap();
+
+    let puppet_server = Arc::new(PuppetServer::new(interest_recv, inspect_controller));
 
     fs.dir("svc")
         .add_fidl_service(IncomingServices::Puppet)
@@ -96,14 +100,20 @@ struct PuppetServer {
     // Example inspect data, visible only to clients that request it using
     // Puppet/EmitExampleInspectData.
     inspect_data: Mutex<ExampleInspectData>,
+    // The inspect controller that allows to escrow the data.
+    controller: Mutex<Option<PublishedInspectController>>,
 }
 
 impl PuppetServer {
-    fn new(receiver: UnboundedReceiver<InterestChangedEvent>) -> Self {
+    fn new(
+        receiver: UnboundedReceiver<InterestChangedEvent>,
+        controller: PublishedInspectController,
+    ) -> Self {
         Self {
             interest_changed: Mutex::new(receiver),
             interest_waiters: Mutex::new(TaskGroup::new()),
             inspect_data: Mutex::new(ExampleInspectData::default()),
+            controller: Mutex::new(Some(controller)),
         }
     }
 
@@ -122,6 +132,15 @@ impl PuppetServer {
 
     fn set_health_ok(&self) {
         component::health().set_ok();
+    }
+
+    async fn escrow(&self, name: Option<String>) -> finspect::EscrowToken {
+        let controller = self.controller.lock().await.take().unwrap();
+        let mut options = EscrowOptions::default();
+        if let Some(name) = name {
+            options = options.name(name);
+        }
+        controller.escrow_frozen(options).await.unwrap()
     }
 }
 
@@ -183,6 +202,19 @@ async fn handle_inspect_puppet_request(
             server.set_health_ok();
             responder.send().expect("response succeeds")
         }
+        fpuppet::InspectPuppetRequest::EscrowAndExit {
+            payload: fpuppet::InspectPuppetEscrowAndExitRequest { name, .. },
+            responder,
+        } => {
+            let token = server.escrow(name).await;
+            responder
+                .send(fpuppet::InspectPuppetEscrowAndExitResponse {
+                    token: Some(token),
+                    ..Default::default()
+                })
+                .expect("response succeeds");
+            std::process::exit(0);
+        }
         fpuppet::InspectPuppetRequest::_UnknownMethod { .. } => unreachable!(),
     }
     Ok(())
@@ -195,6 +227,19 @@ async fn handle_puppet_request(
     match request {
         fpuppet::PuppetRequest::Crash { message, .. } => {
             panic!("{message}");
+        }
+        fpuppet::PuppetRequest::EscrowAndExit {
+            payload: fpuppet::InspectPuppetEscrowAndExitRequest { name, .. },
+            responder,
+        } => {
+            let token = server.escrow(name).await;
+            responder
+                .send(fpuppet::InspectPuppetEscrowAndExitResponse {
+                    token: Some(token),
+                    ..Default::default()
+                })
+                .expect("response succeeds");
+            std::process::exit(0);
         }
         fpuppet::PuppetRequest::EmitExampleInspectData { responder } => {
             server.emit_example_inspect_data().await;

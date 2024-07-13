@@ -244,17 +244,13 @@ impl InspectRepositoryInner {
         let mut diag_repo_entry_opt = self.diagnostics_containers.get_mut(&identity);
         match diag_repo_entry_opt {
             None => {
-                // An entry with no values implies that the somehow we observed the
-                // creation of a component lower in the topology before observing this
-                // one. If this is the case, just instantiate as though it's our first
-                // time encountering this moniker segment.
                 let mut inspect_container = InspectArtifactsContainer::default();
                 let fut = inspect_container.push_handle(proxy_handle);
                 self.diagnostics_containers.insert(identity, inspect_container);
                 fut
             }
             Some(ref mut artifacts_container) => {
-                // When we escrow a vmo handle and provide an associated tree koid, we wwant to
+                // When we escrow a vmo handle and provide an associated tree koid, we want to
                 // ensure we atomically insert and remove. That's why we provide this optional koid
                 // here and remove it under the same lock as the insertion of the escrowed data.
                 if let Some(koid) = remove_associated {

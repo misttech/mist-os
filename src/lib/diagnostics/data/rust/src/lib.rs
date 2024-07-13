@@ -279,6 +279,12 @@ pub struct InspectMetadata {
 
     /// Monotonic time in nanos.
     pub timestamp: i64,
+
+    /// When set to true, the data was escrowed. Otherwise, the data was fetched live from the
+    /// source component at runtime. When absent, it means the value is false.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default)]
+    pub escrowed: bool,
 }
 
 impl InspectMetadata {
@@ -595,9 +601,15 @@ impl InspectDataBuilder {
                     name: None,
                     component_url: component_url.into(),
                     timestamp,
+                    escrowed: false,
                 },
             },
         }
+    }
+
+    pub fn escrowed(mut self, escrowed: bool) -> Self {
+        self.data.metadata.escrowed = escrowed;
+        self
     }
 
     pub fn with_hierarchy(

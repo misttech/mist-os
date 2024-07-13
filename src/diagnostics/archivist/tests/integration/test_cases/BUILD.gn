@@ -42,6 +42,7 @@ rustc_test("bin") {
 
   sources = [
     "src/assert.rs",
+    "src/inspect/escrow.rs",
     "src/inspect/mod.rs",
     "src/inspect/reader.rs",
     "src/inspect/recursive_glob.rs",

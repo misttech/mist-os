@@ -23,7 +23,7 @@ pub type DataMap = HashMap<Option<InspectHandleName>, InspectData>;
 #[derive(Debug)]
 pub enum InspectData {
     /// A VMO containing data associated with the event.
-    Vmo(Arc<zx::Vmo>),
+    Vmo { data: Arc<zx::Vmo>, escrowed: bool },
 
     /// A file containing data associated with the event.
     ///
@@ -73,7 +73,7 @@ pub async fn populate_data_map(inspect_handles: &[Weak<InspectHandle>]) -> DataM
             InspectHandle::Escrow { vmo, name, .. } => {
                 data_map.insert(
                     name.as_ref().map(|name| InspectHandleName::name(name.clone())),
-                    InspectData::Vmo(Arc::clone(vmo)),
+                    InspectData::Vmo { data: Arc::clone(vmo), escrowed: true },
                 );
             }
         }
@@ -145,7 +145,7 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
         };
 
         let data = match vmo.map_err(zx::Status::from_raw) {
-            Ok(vmo) => InspectData::Vmo(Arc::new(vmo)),
+            Ok(vmo) => InspectData::Vmo { data: Arc::new(vmo), escrowed: false },
             Err(err) => {
                 match err {
                     zx::Status::NOT_SUPPORTED => {}
@@ -296,7 +296,7 @@ mod tests {
                     assert!(extra.is_some());
 
                     match extra.unwrap() {
-                        InspectData::Vmo(vmo) => {
+                        InspectData::Vmo { data: vmo, escrowed: _ } => {
                             let mut buf = [0u8; 5];
                             vmo.read(&mut buf, 0).expect("reading vmo");
                             assert_eq!(content, &buf);

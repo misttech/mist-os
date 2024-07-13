@@ -42,7 +42,7 @@ pub enum InspectHandle {
 }
 
 impl InspectHandle {
-    pub fn is_closed(&self) -> bool {
+    fn is_closed(&self) -> bool {
         match self {
             Self::Directory { proxy } => proxy.as_channel().is_closed(),
             Self::Tree { proxy, .. } => proxy.as_channel().is_closed(),
@@ -50,7 +50,7 @@ impl InspectHandle {
         }
     }
 
-    pub async fn on_closed(&self) -> Result<zx::Signals, zx::Status> {
+    async fn on_closed(&self) -> Result<zx::Signals, zx::Status> {
         match self {
             Self::Tree { proxy, .. } => proxy.on_closed().await,
             Self::Directory { proxy, .. } => proxy.on_closed().await,
@@ -94,10 +94,6 @@ impl InspectHandle {
 
     pub fn directory(proxy: fio::DirectoryProxy) -> Self {
         InspectHandle::Directory { proxy }
-    }
-
-    pub fn is_tree(&self) -> bool {
-        matches!(self, Self::Tree { .. })
     }
 }
 
@@ -152,30 +148,15 @@ impl InspectArtifactsContainer {
             return None;
         }
 
-        // we know there is at least 1
-        let stored = self.inspect_handles.values().next().unwrap();
-        match stored.handle.as_ref() {
-            // there can only be one Directory, semantically
-            InspectHandle::Directory { .. } if self.inspect_handles.len() == 1 => {
-                Some(UnpopulatedInspectDataContainer {
-                    identity: Arc::clone(identity),
-                    inspect_handles: vec![Arc::downgrade(&stored.handle)],
-                    inspect_matcher: matcher,
-                })
-            }
-            InspectHandle::Tree { .. } => Some(UnpopulatedInspectDataContainer {
-                identity: Arc::clone(identity),
-                inspect_matcher: matcher,
-                inspect_handles: self
-                    .inspect_handles
-                    .values()
-                    .filter(|stored| stored.handle.is_tree())
-                    .map(|s| Arc::downgrade(&s.handle))
-                    .collect::<Vec<_>>(),
-            }),
-
-            _ => None,
-        }
+        Some(UnpopulatedInspectDataContainer {
+            identity: Arc::clone(identity),
+            inspect_matcher: matcher,
+            inspect_handles: self
+                .inspect_handles
+                .values()
+                .map(|s| Arc::downgrade(&s.handle))
+                .collect::<Vec<_>>(),
+        })
     }
 
     fn on_closed_task(
@@ -227,6 +208,8 @@ pub struct SnapshotData {
     /// Optional snapshot of the inspect hierarchy, in case reading fails
     /// and we have errors to share with client.
     pub snapshot: Option<ReadSnapshot>,
+    /// Whether or not the data was escrowed.
+    pub escrowed: bool,
 }
 
 impl SnapshotData {
@@ -262,57 +245,77 @@ impl SnapshotData {
                     Duration::from_nanos(lazy_child_timeout.into_nanos() as u64);
                 match SnapshotTree::try_from_with_timeout(&tree, lazy_child_timeout).await {
                     Ok(snapshot_tree) => {
-                        SnapshotData::successful(ReadSnapshot::Tree(snapshot_tree), name)
+                        SnapshotData::successful(ReadSnapshot::Tree(snapshot_tree), name, false)
                     }
                     Err(e) => SnapshotData::failed(
                         schema::InspectError { message: format!("{e:?}") },
                         name,
+                        false,
                     ),
                 }
             }
             InspectData::DeprecatedFidl(inspect_proxy) => {
                 match deprecated_inspect::load_hierarchy(inspect_proxy).await {
                     Ok(hierarchy) => {
-                        SnapshotData::successful(ReadSnapshot::Finished(hierarchy), name)
+                        SnapshotData::successful(ReadSnapshot::Finished(hierarchy), name, false)
                     }
                     Err(e) => SnapshotData::failed(
                         schema::InspectError { message: format!("{e:?}") },
                         name,
+                        false,
                     ),
                 }
             }
-            InspectData::Vmo(vmo) => match Snapshot::try_from(vmo.as_ref()) {
-                Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), name),
-                Err(e) => {
-                    SnapshotData::failed(schema::InspectError { message: format!("{e:?}") }, name)
+            InspectData::Vmo { data: vmo, escrowed } => match Snapshot::try_from(vmo.as_ref()) {
+                Ok(snapshot) => {
+                    SnapshotData::successful(ReadSnapshot::Single(snapshot), name, escrowed)
                 }
+                Err(e) => SnapshotData::failed(
+                    schema::InspectError { message: format!("{e:?}") },
+                    name,
+                    escrowed,
+                ),
             },
             InspectData::File(contents) => match Snapshot::try_from(contents) {
-                Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), name),
-                Err(e) => {
-                    SnapshotData::failed(schema::InspectError { message: format!("{e:?}") }, name)
+                Ok(snapshot) => {
+                    SnapshotData::successful(ReadSnapshot::Single(snapshot), name, false)
                 }
+                Err(e) => SnapshotData::failed(
+                    schema::InspectError { message: format!("{e:?}") },
+                    name,
+                    false,
+                ),
             },
         }
     }
 
     // Constructs packet that timestamps and packages inspect snapshot for exfiltration.
-    fn successful(snapshot: ReadSnapshot, name: Option<InspectHandleName>) -> SnapshotData {
+    fn successful(
+        snapshot: ReadSnapshot,
+        name: Option<InspectHandleName>,
+        escrowed: bool,
+    ) -> SnapshotData {
         SnapshotData {
             name,
             timestamp: fasync::Time::now().into_zx(),
             errors: Vec::new(),
             snapshot: Some(snapshot),
+            escrowed,
         }
     }
 
     // Constructs packet that timestamps and packages inspect snapshot failure for exfiltration.
-    fn failed(error: schema::InspectError, name: Option<InspectHandleName>) -> SnapshotData {
+    fn failed(
+        error: schema::InspectError,
+        name: Option<InspectHandleName>,
+        escrowed: bool,
+    ) -> SnapshotData {
         SnapshotData {
             name,
             timestamp: fasync::Time::now().into_zx(),
             errors: vec![error],
             snapshot: None,
+            escrowed,
         }
     }
 }
@@ -477,6 +480,7 @@ impl UnpopulatedInspectDataContainer {
                         snapshot: SnapshotData::failed(
                             schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },
                             None,
+                            false,
                         ),
                     };
                     Some((

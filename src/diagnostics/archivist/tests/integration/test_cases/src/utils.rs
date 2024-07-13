@@ -27,14 +27,32 @@ pub(crate) async fn snapshot_and_stream_logs(
         .expect("subscribe to logs")
 }
 
-pub(crate) async fn wait_for_component_to_crash(moniker: &str) {
-    let mut event_stream = EventStream::open().await.unwrap();
-    EventMatcher::ok()
-        .stop(Some(ExitStatusMatcher::AnyCrash))
-        .moniker(moniker)
-        .wait::<Stopped>(&mut event_stream)
-        .await
-        .unwrap();
+pub struct StopChecker {
+    event_stream: EventStream,
+}
+
+impl StopChecker {
+    pub async fn new() -> Self {
+        Self { event_stream: EventStream::open().await.unwrap() }
+    }
+
+    pub async fn wait_for_component_to_stop(&mut self, moniker: &str) {
+        EventMatcher::ok()
+            .stop(Some(ExitStatusMatcher::Clean))
+            .moniker(moniker)
+            .wait::<Stopped>(&mut self.event_stream)
+            .await
+            .unwrap();
+    }
+
+    pub async fn wait_for_component_to_crash(&mut self, moniker: &str) {
+        EventMatcher::ok()
+            .stop(Some(ExitStatusMatcher::AnyCrash))
+            .moniker(moniker)
+            .wait::<Stopped>(&mut self.event_stream)
+            .await
+            .unwrap();
+    }
 }
 
 /// Extension methods on LogSettingsProxy.
