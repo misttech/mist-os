@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 
+#include <cinttypes>
+
 #include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
@@ -70,7 +72,7 @@ Peer::LowEnergyData::LowEnergyData(Peer* owner)
       auto_conn_behavior_(AutoConnectBehavior::kAlways),
       features_(std::nullopt,
                 [](const std::optional<hci_spec::LESupportedFeatures> f) {
-                  return f ? bt_lib_cpp_string::StringPrintf("%#.16lx",
+                  return f ? bt_lib_cpp_string::StringPrintf("%#.16" PRIx64,
                                                              f->le_features)
                            : "";
                 }),

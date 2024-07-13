@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/sc_stage_1_passkey.h"
 
+#include <cinttypes>
 #include <optional>
 
 #include <pw_bytes/endian.h>
@@ -97,7 +98,7 @@ void ScStage1Passkey::Run() {
       }
       bt_log(INFO,
              "sm",
-             "SC passkey entry display (passkey: %ld) accepted by user",
+             "SC passkey entry display (passkey: %" PRId64 ") accepted by user",
              passkey);
       responder(passkey_response);
     });

@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_connection.h"
 
+#include <cinttypes>
+
 #include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
@@ -136,8 +138,11 @@ LowEnergyConnection::OnLELongTermKeyRequestEvent(const EventPacket& event) {
   uint16_t ediv = pw::bytes::ConvertOrderFrom(cpp20::endian::little,
                                               params->encrypted_diversifier);
 
-  bt_log(
-      DEBUG, "hci", "LE LTK request - ediv: %#.4x, rand: %#.16lx", ediv, rand);
+  bt_log(DEBUG,
+         "hci",
+         "LE LTK request - ediv: %#.4x, rand: %#.16" PRIx64,
+         ediv,
+         rand);
   if (ltk() && ltk()->rand() == rand && ltk()->ediv() == ediv) {
     cmd = CommandPacket::New(
         hci_spec::kLELongTermKeyRequestReply,

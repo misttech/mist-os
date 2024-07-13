@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco_connection_manager.h"
 
+#include <cinttypes>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/sco_connection.h"
 
@@ -528,7 +530,8 @@ void ScoConnectionManager::SendRejectConnectionCommand(
 void ScoConnectionManager::CancelRequestWithId(ScoRequestId id) {
   // Cancel queued request if id matches.
   if (queued_request_ && queued_request_->id == id) {
-    bt_log(INFO, "gap-sco", "Cancelling queued SCO request (id: %zu)", id);
+    bt_log(
+        INFO, "gap-sco", "Cancelling queued SCO request (id: %" PRIu64 ")", id);
     // Clear queued_request_ before calling callback to prevent calls to
     // CancelRequestWithId() during execution of the callback (e.g. due to
     // destroying the RequestHandle).
@@ -543,7 +546,10 @@ void ScoConnectionManager::CancelRequestWithId(ScoRequestId id) {
   if (in_progress_request_ && in_progress_request_->id == id &&
       !in_progress_request_->initiator &&
       !in_progress_request_->received_request) {
-    bt_log(INFO, "gap-sco", "Cancelling in progress SCO request (id: %zu)", id);
+    bt_log(INFO,
+           "gap-sco",
+           "Cancelling in progress SCO request (id: %" PRIu64 ")",
+           id);
     CompleteRequest(fit::error(HostError::kCanceled));
   }
 }

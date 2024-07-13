@@ -5,6 +5,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/data_element.h"
 
 #include <algorithm>
+#include <cinttypes>
 #include <set>
 #include <vector>
 
@@ -694,10 +695,10 @@ std::string DataElement::ToString() const {
                                              int_value_ ? "true" : "false");
     case Type::kUnsignedInt:
       return bt_lib_cpp_string::StringPrintf(
-          "UnsignedInt:%zu(%lu)", WriteSize() - 1, uint_value_);
+          "UnsignedInt:%zu(%" PRIu64 ")", WriteSize() - 1, uint_value_);
     case Type::kSignedInt:
       return bt_lib_cpp_string::StringPrintf(
-          "SignedInt:%zu(%ld)", WriteSize() - 1, int_value_);
+          "SignedInt:%zu(%" PRId64 ")", WriteSize() - 1, int_value_);
     case Type::kUuid:
       return bt_lib_cpp_string::StringPrintf("UUID(%s)",
                                              uuid_.ToString().c_str());
