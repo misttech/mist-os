@@ -15,7 +15,6 @@ use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
-use lazy_static::lazy_static;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
@@ -206,10 +205,7 @@ impl InspectArtifactsContainer {
     }
 }
 
-lazy_static! {
-    static ref TIMEOUT_MESSAGE: &'static str =
-        "Exceeded per-component time limit for fetching diagnostics data";
-}
+static TIMEOUT_MESSAGE: &str = "Exceeded per-component time limit for fetching diagnostics data";
 
 #[derive(Debug)]
 pub enum ReadSnapshot {
@@ -473,8 +469,7 @@ impl UnpopulatedInspectDataContainer {
             state
                 .iterate(start_time)
                 .on_timeout((timeout - elapsed_time).after_now(), move || {
-                    warn!(identity = ?unpopulated_for_timeout.identity.moniker,
-                            "{}", &*TIMEOUT_MESSAGE);
+                    warn!(identity = ?unpopulated_for_timeout.identity.moniker, "{TIMEOUT_MESSAGE}");
                     global_stats.add_timeout();
                     let result = PopulatedInspectDataContainer {
                         identity: Arc::clone(&unpopulated_for_timeout.identity),
@@ -508,10 +503,10 @@ mod test {
     use fuchsia_inspect::Node;
     use fuchsia_zircon::DurationNum;
     use futures::StreamExt;
+    use once_cell::sync::Lazy;
 
-    lazy_static! {
-        static ref EMPTY_IDENTITY: Arc<ComponentIdentity> = Arc::new(ComponentIdentity::unknown());
-    }
+    static EMPTY_IDENTITY: Lazy<Arc<ComponentIdentity>> =
+        Lazy::new(|| Arc::new(ComponentIdentity::unknown()));
 
     #[fuchsia::test]
     async fn population_times_out() {

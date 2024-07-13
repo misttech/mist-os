@@ -7,7 +7,6 @@ use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
-use lazy_static::lazy_static;
 use selectors::SelectorExt;
 use std::cmp::Ordering;
 use std::fmt::Debug;
@@ -19,9 +18,7 @@ use tracing::trace;
 
 pub type PinStream<I> = Pin<Box<dyn DebugStream<Item = I> + Send + 'static>>;
 
-lazy_static! {
-    static ref MULTIPLEXER_ID: std::sync::atomic::AtomicUsize = AtomicUsize::new(0);
-}
+static MULTIPLEXER_ID: std::sync::atomic::AtomicUsize = AtomicUsize::new(0);
 
 /// A Multiplexer takes multiple possibly-ordered streams and attempts to impose a sensible ordering
 /// over the yielded items without risking starvation. New streams can be added to the multiplexer
