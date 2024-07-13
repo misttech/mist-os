@@ -34,7 +34,7 @@ CML = """{{
 
 FILTERING_ENABLED_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}:filtering_enabled WHERE [s] {value}"
 
-COUNT_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}/config_files/* WHERE [s] Count(s) == {count}"
+COUNT_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}:selector_count WHERE [s] s == {count}"
 
 CONFIG_FILE_SELECTOR = "\"bootstrap/archivist:root/pipelines/{pipeline_name}/config_files/{file_name}\""
 

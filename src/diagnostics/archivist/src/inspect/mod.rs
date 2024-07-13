@@ -118,7 +118,7 @@ impl ReaderServer {
         client_matcher: Option<HierarchyMatcher>,
         moniker: &str,
         parent_trace_id: ftrace::Id,
-    ) -> NodeHierarchyData {
+    ) -> Option<NodeHierarchyData> {
         let filename = snapshot_data.name.clone();
         let node_hierarchy_data = match static_matcher {
             // The only way we have a None value for the PopulatedDataContainer is
@@ -172,128 +172,87 @@ impl ReaderServer {
                     snapshot_data.into()
                 };
 
-                match node_hierarchy_data.hierarchy {
-                    Some(node_hierarchy) => {
-                        let trace_id = ftrace::Id::random();
-                        let _trace_guard = ftrace::async_enter!(
-                            trace_id,
-                            TRACE_CATEGORY,
-                            c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
-                            // An async duration cannot have multiple concurrent child async durations
-                            // so we include the nonce as metadata to manually determine relationship.
-                            "parent_trace_id" => u64::from(parent_trace_id),
-                            "trace_id" => u64::from(trace_id),
-                            "moniker" => moniker,
-                            "filename"  => node_hierarchy_data
-                                    .name
-                                    .as_ref()
-                                    .and_then(InspectHandleName::as_filename)
-                                    .unwrap_or(""),
-                            "name" => node_hierarchy_data
-                                    .name
-                                    .as_ref()
-                                    .and_then(InspectHandleName::as_name)
-                                    .unwrap_or(""),
-                            "selector_type" => "static"
-                        );
-                        match diagnostics_hierarchy::filter_hierarchy(
-                            node_hierarchy,
-                            &static_matcher,
-                        ) {
-                            Some(filtered_hierarchy) => NodeHierarchyData {
-                                name: node_hierarchy_data.name,
-                                timestamp: node_hierarchy_data.timestamp,
-                                errors: node_hierarchy_data.errors,
-                                hierarchy: Some(filtered_hierarchy),
-                            },
-                            None => NodeHierarchyData {
-                                name: node_hierarchy_data.name,
-                                timestamp: node_hierarchy_data.timestamp,
-                                errors: vec![schema::InspectError {
-                                    message: concat!(
-                                        "Inspect hierarchy was fully filtered",
-                                        " by static selectors. No data remaining."
-                                    )
-                                    .to_string(),
-                                }],
-                                hierarchy: None,
-                            },
-                        }
-                    }
-                    None => NodeHierarchyData {
+                let Some(node_hierarchy) = node_hierarchy_data.hierarchy else {
+                    return Some(node_hierarchy_data);
+                };
+                let trace_id = ftrace::Id::random();
+                let _trace_guard = ftrace::async_enter!(
+                    trace_id,
+                    TRACE_CATEGORY,
+                    c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
+                    // An async duration cannot have multiple concurrent child async durations
+                    // so we include the nonce as metadata to manually determine relationship.
+                    "parent_trace_id" => u64::from(parent_trace_id),
+                    "trace_id" => u64::from(trace_id),
+                    "moniker" => moniker,
+                    "filename"  => node_hierarchy_data
+                            .name
+                            .as_ref()
+                            .and_then(InspectHandleName::as_filename)
+                            .unwrap_or(""),
+                    "name" => node_hierarchy_data
+                            .name
+                            .as_ref()
+                            .and_then(InspectHandleName::as_name)
+                            .unwrap_or(""),
+                    "selector_type" => "static"
+                );
+                diagnostics_hierarchy::filter_hierarchy(node_hierarchy, &static_matcher).map(
+                    |filtered_hierarchy| NodeHierarchyData {
                         name: node_hierarchy_data.name,
                         timestamp: node_hierarchy_data.timestamp,
                         errors: node_hierarchy_data.errors,
-                        hierarchy: None,
+                        hierarchy: Some(filtered_hierarchy),
                     },
-                }
+                )?
             }
         };
 
-        match client_matcher {
+        let Some(dynamic_matcher) = client_matcher else {
             // If matcher is present, and there was an HierarchyMatcher,
             // then this means the client provided their own selectors, and a subset of
             // them matched this component. So we need to filter each of the snapshots from
             // this component with the dynamically provided components.
-            Some(dynamic_matcher) => match node_hierarchy_data.hierarchy {
-                None => NodeHierarchyData {
-                    name: node_hierarchy_data.name,
-                    timestamp: node_hierarchy_data.timestamp,
-                    errors: node_hierarchy_data.errors,
-                    hierarchy: None,
-                },
-                Some(node_hierarchy) => {
-                    let trace_id = ftrace::Id::random();
-                    let _trace_guard = ftrace::async_enter!(
-                        trace_id,
-                        TRACE_CATEGORY,
-                        c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
-                        // An async duration cannot have multiple concurrent child async durations
-                        // so we include the nonce as metadata to manually determine relationship.
-                        "parent_trace_id" => u64::from(parent_trace_id),
-                        "trace_id" => u64::from(trace_id),
-                        "moniker" => moniker,
-                        "filename" => {
-                            node_hierarchy_data
-                                .name
-                                .as_ref()
-                                .and_then(InspectHandleName::as_filename)
-                                .unwrap_or("")
-                        },
-                        "name" => {
-                            node_hierarchy_data
-                                .name
-                                .as_ref()
-                                .and_then(InspectHandleName::as_name)
-                                .unwrap_or("")
-                        },
-                        "selector_type" => "client"
-                    );
-                    match diagnostics_hierarchy::filter_hierarchy(node_hierarchy, &dynamic_matcher)
-                    {
-                        Some(filtered_hierarchy) => NodeHierarchyData {
-                            name: node_hierarchy_data.name,
-                            timestamp: node_hierarchy_data.timestamp,
-                            errors: node_hierarchy_data.errors,
-                            hierarchy: Some(filtered_hierarchy),
-                        },
-                        None => NodeHierarchyData {
-                            name: node_hierarchy_data.name,
-                            timestamp: node_hierarchy_data.timestamp,
-                            errors: vec![schema::InspectError {
-                                message: concat!(
-                                    "Inspect hierarchy was fully filtered",
-                                    " by client provided selectors. No data remaining."
-                                )
-                                .to_string(),
-                            }],
-                            hierarchy: None,
-                        },
-                    }
-                }
+            return Some(node_hierarchy_data);
+        };
+        let Some(node_hierarchy) = node_hierarchy_data.hierarchy else {
+            return Some(node_hierarchy_data);
+        };
+
+        let trace_id = ftrace::Id::random();
+        let _trace_guard = ftrace::async_enter!(
+            trace_id,
+            TRACE_CATEGORY,
+            c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
+            // An async duration cannot have multiple concurrent child async durations
+            // so we include the nonce as metadata to manually determine relationship.
+            "parent_trace_id" => u64::from(parent_trace_id),
+            "trace_id" => u64::from(trace_id),
+            "moniker" => moniker,
+            "filename" => {
+                node_hierarchy_data
+                    .name
+                    .as_ref()
+                    .and_then(InspectHandleName::as_filename)
+                    .unwrap_or("")
             },
-            None => node_hierarchy_data,
-        }
+            "name" => {
+                node_hierarchy_data
+                    .name
+                    .as_ref()
+                    .and_then(InspectHandleName::as_name)
+                    .unwrap_or("")
+            },
+            "selector_type" => "client"
+        );
+        diagnostics_hierarchy::filter_hierarchy(node_hierarchy, &dynamic_matcher).map(
+            |filtered_hierarchy| NodeHierarchyData {
+                name: node_hierarchy_data.name,
+                timestamp: node_hierarchy_data.timestamp,
+                errors: node_hierarchy_data.errors,
+                hierarchy: Some(filtered_hierarchy),
+            },
+        )
     }
 
     /// Takes a PopulatedInspectDataContainer and converts all non-error
@@ -360,7 +319,7 @@ impl ReaderServer {
             client_selectors,
             identity.to_string().as_str(),
             parent_trace_id,
-        );
+        )?;
         let mut builder = InspectDataBuilder::new(
             moniker,
             identity.url.clone(),
