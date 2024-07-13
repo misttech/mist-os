@@ -80,7 +80,13 @@ pub struct OtDriver<OT, NI, BI> {
     backbone_if: BI,
 
     /// Task for updating mDNS service for border agent
-    border_agent_service: fuchsia_sync::Mutex<Option<fasync::Task<Result<(), anyhow::Error>>>>,
+    /// Along with a receiver to ensure the task goes to a complete stop
+    border_agent_service_pair: fuchsia_sync::Mutex<
+        Option<(
+            fasync::Task<Result<(), anyhow::Error>>,
+            futures::channel::oneshot::Receiver<usize>,
+        )>,
+    >,
 
     /// The current meshcop TXT records.
     #[allow(clippy::type_complexity)]
@@ -100,7 +106,7 @@ impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
             driver_state_change: AsyncCondition::new(),
             net_if,
             backbone_if,
-            border_agent_service: fuchsia_sync::Mutex::new(None),
+            border_agent_service_pair: fuchsia_sync::Mutex::new(None),
             border_agent_current_txt_entries: std::sync::Arc::new(futures::lock::Mutex::new(
                 vec![],
             )),
