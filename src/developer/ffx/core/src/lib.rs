@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use core_macros::{ffx_command, ffx_plugin};
+pub use core_macros::ffx_command;
 
 use anyhow::Result;
 use async_trait::async_trait;

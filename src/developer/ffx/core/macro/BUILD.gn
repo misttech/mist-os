@@ -13,10 +13,7 @@ if (is_host) {
 
     deps = [
       ":ffx_core_impl",
-
-      # FIXME(https://fxbug.dev/332277415): Please update to syn 2.x.
-      # "//third_party/rust_crates:syn",
-      "//third_party/rust_crates:syn-v1_0_98",
+      "//third_party/rust_crates:syn",
     ]
 
     sources = [ "src/lib.rs" ]
@@ -30,13 +27,9 @@ if (is_host) {
 
     source_root = "src/impl.rs"
     deps = [
-      "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:proc-macro2",
       "//third_party/rust_crates:quote",
-
-      # FIXME(https://fxbug.dev/332277415): Please update to syn 2.x.
-      # "//third_party/rust_crates:syn",
-      "//third_party/rust_crates:syn-v1_0_98",
+      "//third_party/rust_crates:syn",
     ]
 
     sources = [ "src/impl.rs" ]
