@@ -66,7 +66,6 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:core_x64_stable_tests",
   ]
 }
@@ -78,7 +77,10 @@ group_with_no_dir_target_deps("core_x64_unstable_sl4f_tests") {
 
 group_with_no_dir_target_deps("core_x64_unstable_tests") {
   testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_x64_unstable_tests" ]
+  public_deps = [
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "honeydew/tests/functional_tests:core_x64_unstable_tests",
+  ]
 }
 
 group("core_x64_staging_sl4f_tests") {
@@ -106,15 +108,16 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_x64_stable_tests",
   ]
 }
 
 group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_x64_unstable_tests" ]
+  public_deps = [
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "honeydew/tests/functional_tests:workbench_x64_unstable_tests",
+  ]
 }
 
 group("workbench_x64_staging_tests") {
@@ -130,7 +133,6 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_stable_tests",
   ]
 }
@@ -142,6 +144,7 @@ group_with_no_dir_target_deps("core_vim3_unstable_tests") {
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_unstable_tests",
   ]
 }
@@ -159,19 +162,20 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_vim3_stable_tests",
   ]
 }
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:workbench_vim3_unstable_tests" ]
+  public_deps = [
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "honeydew/tests/functional_tests:workbench_vim3_unstable_tests",
+  ]
 }
 
 group("workbench_vim3_staging_tests") {
