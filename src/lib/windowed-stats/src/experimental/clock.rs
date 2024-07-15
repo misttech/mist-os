@@ -56,13 +56,13 @@ impl QuantaExt for Quanta {
 pub type Timestamp = fuchsia_async::Time;
 
 pub trait TimestampExt {
-    fn quantize(self, modulus: Quanta) -> Quanta;
+    /// Calculates the number of quanta between zero and the current timestamp.
+    fn quantize(self) -> Quanta;
 }
 
 impl TimestampExt for Timestamp {
-    /// Quantizes the timestamp by the given modulus.
-    fn quantize(self, modulus: Quanta) -> Quanta {
-        (self - Timestamp::from_nanos(0)).into_quanta() % modulus
+    fn quantize(self) -> Quanta {
+        (self - Timestamp::from_nanos(0)).into_quanta()
     }
 }
 
@@ -99,25 +99,36 @@ impl DurationExt for Duration {
 ///
 /// A `Tick` represents a directed point or relative displacement in time with respect to some
 /// reference time.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Tick {
-    pub timestamp: Timestamp,
-    pub duration: Duration,
+    start: Timestamp,
+    end: Timestamp,
+    last_sample_timestamp: Timestamp,
 }
 
 impl Tick {
-    /// Quantizes the tick by the given modulus into start and end points in time, in that order.
-    pub fn quantize(self, modulus: Quanta) -> (Quanta, Quanta) {
-        let start = self.timestamp.quantize(modulus);
-        let end = (self.timestamp + self.duration).quantize(modulus);
+    /// Quantizes the tick into start and end points in time, in that order.
+    pub fn quantize(self) -> (Quanta, Quanta) {
+        let start = self.start.quantize();
+        let end = self.end.quantize();
         (start, end)
+    }
+
+    /// Return true if the sampling period at the start time of the tick has a sample.
+    /// Otherwise, return false.
+    pub fn start_has_sample(self, max_sampling_period: Quanta) -> bool {
+        let start = self.start.quantize();
+        let sample_time = self.last_sample_timestamp.quantize();
+        (start / max_sampling_period) == (sample_time / max_sampling_period)
     }
 }
 
-/// A monotonic reference point in time that advances when a sample is observed.
-#[derive(Clone, Copy, Debug)]
+/// A monotonic reference point in time that advances when a sample is observed or
+/// an interpolation occurs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ObservationTime {
-    last_sample_timestamp: Timestamp,
+    pub(crate) last_update_timestamp: Timestamp,
+    pub(crate) last_sample_timestamp: Timestamp,
 }
 
 impl ObservationTime {
@@ -131,20 +142,38 @@ impl ObservationTime {
     /// observation time.
     ///
     /// [`Tick`]: crate::experimental::clock::Tick
-    pub fn tick(&mut self, timestamp: Timestamp) -> Result<Tick, MonotonicityError> {
-        if timestamp < self.last_sample_timestamp {
+    pub fn tick(
+        &mut self,
+        timestamp: Timestamp,
+        is_sample: bool,
+    ) -> Result<Tick, MonotonicityError> {
+        if timestamp < self.last_update_timestamp {
             Err(MonotonicityError)
         } else {
-            let duration = timestamp - self.last_sample_timestamp;
-            let timestamp = mem::replace(&mut self.last_sample_timestamp, timestamp);
-            Ok(Tick { timestamp, duration })
+            let new_observation_time = ObservationTime {
+                last_update_timestamp: timestamp,
+                last_sample_timestamp: if is_sample {
+                    timestamp
+                } else {
+                    self.last_sample_timestamp
+                },
+            };
+            let prev = mem::replace(self, new_observation_time);
+            Ok(Tick {
+                start: prev.last_update_timestamp,
+                end: timestamp,
+                last_sample_timestamp: prev.last_sample_timestamp,
+            })
         }
     }
 }
 
 impl Default for ObservationTime {
     fn default() -> Self {
-        ObservationTime { last_sample_timestamp: Timestamp::now() }
+        ObservationTime {
+            last_update_timestamp: Timestamp::now(),
+            last_sample_timestamp: Timestamp::from_nanos(-1),
+        }
     }
 }
 
@@ -158,14 +187,14 @@ pub struct TimedSample<T> {
 }
 
 impl<T> TimedSample<T> {
-    /// Constructs a `Timed` from a sample at the [current time][`Timestamp::now`].
+    /// Constructs a `TimedSample` from a sample at the [current time][`Timestamp::now`].
     ///
     /// [`Timestamp::now`]: crate::experimental::clock::Timestamp::now
     pub fn now(sample: T) -> Self {
         TimedSample { timestamp: Timestamp::now(), sample }
     }
 
-    /// Constructs a `Timed` from a sample at the given point in time.
+    /// Constructs a `TimedSample` from a sample at the given point in time.
     pub fn at(sample: T, timestamp: impl Into<Timestamp>) -> Self {
         TimedSample { timestamp: timestamp.into(), sample }
     }
@@ -189,32 +218,61 @@ mod tests {
     #[test]
     fn quantize() {
         let timestamp = Timestamp::from_nanos(0) + Duration::QUANTUM;
-        assert_eq!(timestamp.quantize(1), 0);
-        assert_eq!(timestamp.quantize(2), 1);
+        assert_eq!(timestamp.quantize(), 1);
 
-        let tick = Tick { timestamp, duration: Duration::from_quanta(3) };
-        assert_eq!(tick.quantize(1), (0, 0));
-        assert_eq!(tick.quantize(3), (1, 1));
+        let tick = Tick {
+            start: timestamp,
+            end: timestamp + Duration::from_quanta(3),
+            last_sample_timestamp: Timestamp::from_nanos(-999),
+        };
+        assert_eq!(tick.quantize(), (1, 4));
+    }
+
+    #[test]
+    fn start_has_sample() {
+        let tick = Tick {
+            start: Timestamp::from_nanos(9_000_000_000),
+            end: Timestamp::from_nanos(12_000_000_000),
+            last_sample_timestamp: Timestamp::from_nanos(8_000_000_000),
+        };
+        assert!(tick.start_has_sample(10));
+
+        let tick = Tick {
+            start: Timestamp::from_nanos(10_000_000_000),
+            end: Timestamp::from_nanos(13_000_000_000),
+            last_sample_timestamp: Timestamp::from_nanos(8_000_000_000),
+        };
+        assert!(!tick.start_has_sample(10));
     }
 
     #[test]
     fn tick() {
-        let timestamp = Timestamp::from_nanos(0);
-        let mut last = ObservationTime { last_sample_timestamp: timestamp };
+        const NEG: Timestamp = Timestamp::from_nanos(-999);
+        const ZERO: Timestamp = Timestamp::from_nanos(0);
+        const MINUTE_ONE: Timestamp = Timestamp::from_nanos(60_000_000_000);
+        const MINUTE_THREE: Timestamp = Timestamp::from_nanos(180_000_000_000);
+        let mut last = ObservationTime { last_update_timestamp: ZERO, last_sample_timestamp: NEG };
 
-        let tick = last.tick(timestamp + Duration::from_minutes(1)).unwrap();
-        assert_eq!(tick, Tick { timestamp, duration: Duration::from_minutes(1) });
+        let tick = last.tick(MINUTE_ONE, true).unwrap();
+        let expected_tick = Tick { start: ZERO, end: MINUTE_ONE, last_sample_timestamp: NEG };
+        let expected_last = ObservationTime {
+            last_update_timestamp: MINUTE_ONE,
+            last_sample_timestamp: MINUTE_ONE,
+        };
+        assert_eq!(tick, expected_tick);
+        assert_eq!(last, expected_last);
 
-        let tick = last.tick(timestamp + Duration::from_minutes(2)).unwrap();
-        assert_eq!(
-            tick,
-            Tick {
-                timestamp: timestamp + Duration::from_minutes(1),
-                duration: Duration::from_minutes(1)
-            },
-        );
+        let tick = last.tick(MINUTE_THREE, false).unwrap();
+        let expected_tick =
+            Tick { start: MINUTE_ONE, end: MINUTE_THREE, last_sample_timestamp: MINUTE_ONE };
+        let expected_last = ObservationTime {
+            last_update_timestamp: MINUTE_THREE,
+            last_sample_timestamp: MINUTE_ONE,
+        };
+        assert_eq!(tick, expected_tick);
+        assert_eq!(last, expected_last);
 
-        let result = last.tick(timestamp + Duration::from_minutes(1));
+        let result = last.tick(MINUTE_ONE, false);
         assert_eq!(result, Err(MonotonicityError));
     }
 

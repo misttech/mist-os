@@ -4,6 +4,8 @@
 
 //! Round-robin multi-resolution time series.
 
+mod interval;
+
 pub mod interpolation;
 pub mod statistic;
 
@@ -17,6 +19,8 @@ use thiserror::Error;
 
 use crate::experimental::clock::MonotonicityError;
 use crate::experimental::series::statistic::OverflowError;
+
+pub use crate::experimental::series::interval::{SamplingInterval, SamplingProfile};
 
 /// Sample folding error.
 ///
