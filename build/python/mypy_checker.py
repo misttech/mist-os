@@ -8,7 +8,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -83,30 +82,34 @@ def run_mypy_on_binary_target(
     Returns:
         The exit code of the Mypy invocation.
     """
-    # Temporary directory to stage the source tree for Mypy checks,
-    # including sources of itself and all the libraries it imports.
-    tmp_dir: str = os.path.join(gen_dir, target_name + "_bin_mypy")
-    os.makedirs(tmp_dir, exist_ok=True)
-
-    # Mapping from the temp dir source file paths to the original source file paths
-    src_map: dict[str, str] = {}
-
-    # Copy over the sources of this target to the tmp directory.
-    ret = package_python_binary.copy_binary_sources(
-        dest_dir=tmp_dir,
-        sources=src_files,
-        data_sources=data_sources,
-        data_package_name=data_package_name,
-        src_map=src_map,
-    )
-    if ret != 0:
-        return ret
-
-    # Copy mypy enabled library sources to the tmp directory.
-    package_python_binary.copy_library_sources(
-        tmp_dir, [info for info in lib_infos if info["mypy_support"]], src_map
-    )
     try:
+        # Temporary directory to stage the source tree for Mypy checks,
+        # including sources of itself and all the libraries it imports.
+        tmp_dir: str = os.path.join(gen_dir, target_name + "_bin_mypy")
+        if os.path.exists(tmp_dir):
+            package_python_binary.remove_dir(tmp_dir)
+        os.makedirs(tmp_dir)
+
+        # Mapping from the temp dir source file paths to the original source file paths
+        src_map: dict[str, str] = {}
+
+        # Copy over the sources of this target to the tmp directory.
+        ret = package_python_binary.copy_binary_sources(
+            dest_dir=tmp_dir,
+            sources=src_files,
+            data_sources=data_sources,
+            data_package_name=data_package_name,
+            src_map=src_map,
+        )
+        if ret != 0:
+            return ret
+
+        # Copy mypy enabled library sources to the tmp directory.
+        package_python_binary.copy_library_sources(
+            tmp_dir,
+            [info for info in lib_infos if info["mypy_support"]],
+            src_map,
+        )
         ret = run_mypy_checks(tmp_dir, src_map)
     finally:
         package_python_binary.remove_dir(tmp_dir)
