@@ -5163,6 +5163,240 @@ zx_status_t brcmf_if_get_iface_histogram_stats(
   return ZX_OK;
 }
 
+static void brcmf_clear_assoc_ies(struct brcmf_cfg80211_info* cfg) {
+  struct brcmf_cfg80211_connect_info* conn_info = cfg_to_conn(cfg);
+
+  free(conn_info->req_ie);
+  conn_info->req_ie = nullptr;
+  conn_info->req_ie_len = 0;
+  free(conn_info->resp_ie);
+  conn_info->resp_ie = nullptr;
+  conn_info->resp_ie_len = 0;
+}
+
+static zx_status_t brcmf_get_assoc_ies(struct brcmf_cfg80211_info* cfg, struct brcmf_if* ifp) {
+  struct brcmf_cfg80211_assoc_ielen_le* assoc_info;
+  struct brcmf_cfg80211_connect_info* conn_info = cfg_to_conn(cfg);
+  uint32_t req_len;
+  uint32_t resp_len;
+  zx_status_t err = ZX_OK;
+  bcme_status_t fw_err = BCME_OK;
+
+  brcmf_clear_assoc_ies(cfg);
+  err = brcmf_fil_iovar_data_get(ifp, "assoc_info", cfg->extra_buf, WL_ASSOC_INFO_MAX, &fw_err);
+  if (err != ZX_OK) {
+    BRCMF_ERR("could not get assoc info: %s, fw err %s", zx_status_get_string(err),
+              brcmf_fil_get_errstr(fw_err));
+    return err;
+  }
+  assoc_info = (struct brcmf_cfg80211_assoc_ielen_le*)cfg->extra_buf;
+  req_len = assoc_info->req_len;
+  resp_len = assoc_info->resp_len;
+  if (req_len) {
+    err =
+        brcmf_fil_iovar_data_get(ifp, "assoc_req_ies", cfg->extra_buf, WL_ASSOC_INFO_MAX, &fw_err);
+    if (err != ZX_OK) {
+      BRCMF_ERR("could not get assoc req: %s, fw err %s", zx_status_get_string(err),
+                brcmf_fil_get_errstr(fw_err));
+      return err;
+    }
+    conn_info->req_ie_len = req_len;
+    conn_info->req_ie = static_cast<decltype(conn_info->req_ie)>(
+        brcmu_alloc_and_copy(cfg->extra_buf, conn_info->req_ie_len));
+    if (conn_info->req_ie == nullptr) {
+      conn_info->req_ie_len = 0;
+    }
+  } else {
+    conn_info->req_ie_len = 0;
+    conn_info->req_ie = nullptr;
+  }
+  if (resp_len) {
+    err =
+        brcmf_fil_iovar_data_get(ifp, "assoc_resp_ies", cfg->extra_buf, WL_ASSOC_INFO_MAX, &fw_err);
+    if (err != ZX_OK) {
+      BRCMF_ERR("could not get assoc resp: %s, fw err %s", zx_status_get_string(err),
+                brcmf_fil_get_errstr(fw_err));
+      return err;
+    }
+    conn_info->resp_ie_len = resp_len;
+    conn_info->resp_ie = static_cast<decltype(conn_info->resp_ie)>(
+        brcmu_alloc_and_copy(cfg->extra_buf, conn_info->resp_ie_len));
+    if (conn_info->resp_ie == nullptr) {
+      conn_info->resp_ie_len = 0;
+    }
+  } else {
+    conn_info->resp_ie_len = 0;
+    conn_info->resp_ie = nullptr;
+  }
+  BRCMF_DBG(CONN, "req len (%d) resp len (%d)", conn_info->req_ie_len, conn_info->resp_ie_len);
+  return err;
+}
+
+static void brcmf_log_conn_status(brcmf_if* ifp, brcmf_connect_status_t connect_status) {
+  BRCMF_DBG(CONN, "connect_status %s", brcmf_get_connect_status_str(connect_status));
+
+  // We track specific failures that are of interest on inspect.
+  switch (connect_status) {
+    case brcmf_connect_status_t::CONNECTED:
+      ifp->drvr->device->GetInspect()->LogConnSuccess();
+      break;
+    case brcmf_connect_status_t::AUTHENTICATION_FAILED:
+      ifp->drvr->device->GetInspect()->LogConnAuthFail();
+      break;
+    case brcmf_connect_status_t::NO_NETWORK:
+      ifp->drvr->device->GetInspect()->LogConnNoNetworkFail();
+      break;
+    default:
+      ifp->drvr->device->GetInspect()->LogConnOtherFail();
+      break;
+  }
+}
+
+// This function issues BRCMF_C_DISASSOC command to firmware for cleaning firmware and AP connection
+// states, firmware will send out deauth or disassoc frame to the AP based on current connection
+// state.
+static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
+  zx_status_t status = ZX_OK;
+  bcme_status_t fw_err = BCME_OK;
+
+  struct brcmf_scb_val_le scbval;
+  memcpy(&scbval.ea, ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
+  scbval.val = static_cast<uint16_t>(fuchsia_wlan_ieee80211::ReasonCode::kStaLeaving);
+  brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
+  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
+  if (status != ZX_OK) {
+    BRCMF_ERR("Failed to issue BRCMF_C_DISASSOC to firmware: %s, fw err %s",
+              zx_status_get_string(status), brcmf_fil_get_errstr(fw_err));
+  }
+  brcmf_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
+  status = brcmf_bss_reset(ifp);
+  return status;
+}
+
+// Sync driver channel to match firmware channel.
+static zx_status_t sync_driver_channel_to_firmware_channel(struct brcmf_if* ifp) {
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  zx_status_t status = ZX_OK;
+  chanspec_t fw_chanspec;
+  uint8_t fw_ctl_chan;
+  status = brcmf_get_ctrl_channel(ifp, &fw_chanspec, &fw_ctl_chan);
+  if (status != ZX_OK) {
+    BRCMF_ERR(
+        "Synchronizing driver channel to firmware channel impossible, channel lookup failed: %d",
+        status);
+    return status;
+  }
+  BRCMF_DBG(CONN, "Setting driver channel to chanspec 0x%x", fw_chanspec);
+  cfg->channel = fw_chanspec;
+  return status;
+}
+
+zx_status_t brcmf_update_bss_info(struct brcmf_if* ifp) {
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  struct brcmf_cfg80211_profile* prof = &ifp->vif->profile;
+  bcme_status_t fw_err = BCME_OK;
+
+  // Firmware returns the BSS info data after a small offset.
+  const size_t kBssInfoOffset = 4;
+  const size_t kBssInfoBufLen = sizeof(brcmf_bss_info_le) + kBssInfoOffset;
+  const auto bss_info_status =
+      brcmf_fil_cmd_data_get(ifp, BRCMF_C_GET_BSS_INFO, cfg->extra_buf, kBssInfoBufLen, &fw_err);
+  if (bss_info_status != ZX_OK) {
+    BRCMF_ERR("Could not get BSS info from firmware: %s, fw err %s",
+              zx_status_get_string(bss_info_status), brcmf_fil_get_errstr(fw_err));
+    return bss_info_status;
+  }
+
+  // Ignore any data before kBssInfoOffset.
+  const auto bss_info_buf = cfg->extra_buf + kBssInfoOffset;
+  auto bss_info = reinterpret_cast<brcmf_bss_info_le*>(bss_info_buf);
+
+  // Copy info into relevant fields.
+  const uint8_t* ie_ptr = reinterpret_cast<uint8_t*>(bss_info) + bss_info->ie_offset;
+  cfg->capability = bss_info->capability;
+  memcpy(ifp->connect_req.selected_bss()->ies().data(), ie_ptr, bss_info->ie_length);
+  brcmf_init_prof(prof);
+  memcpy(&prof->bssid, &bss_info->BSSID, ETH_ALEN);
+  prof->beacon_period = bss_info->beacon_period;
+  return ZX_OK;
+}
+
+static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t connect_status,
+                                       fuchsia_wlan_ieee80211_wire::StatusCode reassoc_result) {
+  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  struct net_device* ndev = ifp->ndev;
+  BRCMF_DBG(TRACE, "Enter");
+
+  if (brcmf_test_and_clear_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
+    cfg->roam_timer->Stop();
+    brcmf_log_conn_status(ifp, connect_status);
+    switch (connect_status) {
+      case brcmf_connect_status_t::CONNECTED: {
+        brcmf_get_assoc_ies(cfg, ifp);
+        brcmf_set_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
+        if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFG)) {
+          // Start the signal report timer
+          cfg->connect_log_cnt = 0;
+          cfg->signal_report_timer->Start(BRCMF_SIGNAL_REPORT_TIMER_DUR_MS);
+          // Indicate the rssi soon after connection
+          cfg80211_signal_ind(ndev);
+        }
+        break;
+      }
+      case brcmf_connect_status_t::REASSOC_REQ_FAILED: {
+        BRCMF_INFO("Reassociation failed, need to reset firmware state.");
+        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
+        }
+        break;
+      }
+      case brcmf_connect_status_t::CONNECTING_TIMEOUT: {
+        BRCMF_INFO("Reassociation failed due to timeout, need to reset firmware state.");
+        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
+        }
+        break;
+      }
+      case brcmf_connect_status_t::ROAM_INTERRUPTED: {
+        BRCMF_INFO("Reassociation failed because roam attempt was interrupted by SME.");
+        // SME has already issued the disconnect, so we just need to reset the interface.
+        const auto err = brcmf_bss_reset(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
+        }
+        break;
+      }
+      default: {
+        BRCMF_WARN("Reassociation failed with connect_status %s, reassoc_result %d",
+                   brcmf_get_connect_status_str(connect_status), static_cast<int>(reassoc_result));
+        BRCMF_INFO("Reassociation failed, need to reset firmware state.");
+        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
+        if (err != ZX_OK) {
+          BRCMF_ERR("Failed to clear firmware connection state.");
+        }
+        break;
+      }
+    }
+    if (!cfg->target_bssid.has_value()) {
+      BRCMF_ERR("Missing target BSSID, cannot notify SME of roam result");
+      return ZX_ERR_INTERNAL;
+    }
+    const auto target_bssid = static_cast<uint8_t*>(cfg->target_bssid->data());
+    brcmf_return_roam_result(ndev, target_bssid, reassoc_result);
+    // If roam failed due to a SME-issued deauth for the target BSS, we have to keep the
+    // target BSSID until the deauth handler cleans it up.
+    if (!brcmf_test_bit(brcmf_disconnect_request_bit_t::DEAUTH_TARGET_BSS,
+                        &cfg->disconnect_request_state)) {
+      cfg->target_bssid.reset();
+    }
+  }
+
+  BRCMF_DBG(TRACE, "Exit");
+  return ZX_OK;
+}
+
 zx_status_t brcmf_if_sae_handshake_resp(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeResp* resp) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
@@ -5447,75 +5681,6 @@ static const char* brcmf_get_client_connect_state_string(brcmf_if* ifp) {
   return "Not connected";
 }
 
-static void brcmf_clear_assoc_ies(struct brcmf_cfg80211_info* cfg) {
-  struct brcmf_cfg80211_connect_info* conn_info = cfg_to_conn(cfg);
-
-  free(conn_info->req_ie);
-  conn_info->req_ie = nullptr;
-  conn_info->req_ie_len = 0;
-  free(conn_info->resp_ie);
-  conn_info->resp_ie = nullptr;
-  conn_info->resp_ie_len = 0;
-}
-
-static zx_status_t brcmf_get_assoc_ies(struct brcmf_cfg80211_info* cfg, struct brcmf_if* ifp) {
-  struct brcmf_cfg80211_assoc_ielen_le* assoc_info;
-  struct brcmf_cfg80211_connect_info* conn_info = cfg_to_conn(cfg);
-  uint32_t req_len;
-  uint32_t resp_len;
-  zx_status_t err = ZX_OK;
-  bcme_status_t fw_err = BCME_OK;
-
-  brcmf_clear_assoc_ies(cfg);
-  err = brcmf_fil_iovar_data_get(ifp, "assoc_info", cfg->extra_buf, WL_ASSOC_INFO_MAX, &fw_err);
-  if (err != ZX_OK) {
-    BRCMF_ERR("could not get assoc info: %s, fw err %s", zx_status_get_string(err),
-              brcmf_fil_get_errstr(fw_err));
-    return err;
-  }
-  assoc_info = (struct brcmf_cfg80211_assoc_ielen_le*)cfg->extra_buf;
-  req_len = assoc_info->req_len;
-  resp_len = assoc_info->resp_len;
-  if (req_len) {
-    err =
-        brcmf_fil_iovar_data_get(ifp, "assoc_req_ies", cfg->extra_buf, WL_ASSOC_INFO_MAX, &fw_err);
-    if (err != ZX_OK) {
-      BRCMF_ERR("could not get assoc req: %s, fw err %s", zx_status_get_string(err),
-                brcmf_fil_get_errstr(fw_err));
-      return err;
-    }
-    conn_info->req_ie_len = req_len;
-    conn_info->req_ie = static_cast<decltype(conn_info->req_ie)>(
-        brcmu_alloc_and_copy(cfg->extra_buf, conn_info->req_ie_len));
-    if (conn_info->req_ie == nullptr) {
-      conn_info->req_ie_len = 0;
-    }
-  } else {
-    conn_info->req_ie_len = 0;
-    conn_info->req_ie = nullptr;
-  }
-  if (resp_len) {
-    err =
-        brcmf_fil_iovar_data_get(ifp, "assoc_resp_ies", cfg->extra_buf, WL_ASSOC_INFO_MAX, &fw_err);
-    if (err != ZX_OK) {
-      BRCMF_ERR("could not get assoc resp: %s, fw err %s", zx_status_get_string(err),
-                brcmf_fil_get_errstr(fw_err));
-      return err;
-    }
-    conn_info->resp_ie_len = resp_len;
-    conn_info->resp_ie = static_cast<decltype(conn_info->resp_ie)>(
-        brcmu_alloc_and_copy(cfg->extra_buf, conn_info->resp_ie_len));
-    if (conn_info->resp_ie == nullptr) {
-      conn_info->resp_ie_len = 0;
-    }
-  } else {
-    conn_info->resp_ie_len = 0;
-    conn_info->resp_ie = nullptr;
-  }
-  BRCMF_DBG(CONN, "req len (%d) resp len (%d)", conn_info->req_ie_len, conn_info->resp_ie_len);
-  return err;
-}
-
 // Notify SME of channel switch
 zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf_event_msg* e,
                                         void* data) {
@@ -5672,47 +5837,6 @@ static zx_status_t brcmf_rx_auth_frame(struct brcmf_if* ifp, const uint32_t data
   return ZX_OK;
 }
 
-static void brcmf_log_conn_status(brcmf_if* ifp, brcmf_connect_status_t connect_status) {
-  BRCMF_DBG(CONN, "connect_status %s", brcmf_get_connect_status_str(connect_status));
-
-  // We track specific failures that are of interest on inspect.
-  switch (connect_status) {
-    case brcmf_connect_status_t::CONNECTED:
-      ifp->drvr->device->GetInspect()->LogConnSuccess();
-      break;
-    case brcmf_connect_status_t::AUTHENTICATION_FAILED:
-      ifp->drvr->device->GetInspect()->LogConnAuthFail();
-      break;
-    case brcmf_connect_status_t::NO_NETWORK:
-      ifp->drvr->device->GetInspect()->LogConnNoNetworkFail();
-      break;
-    default:
-      ifp->drvr->device->GetInspect()->LogConnOtherFail();
-      break;
-  }
-}
-
-// This function issues BRCMF_C_DISASSOC command to firmware for cleaning firmware and AP connection
-// states, firmware will send out deauth or disassoc frame to the AP based on current connection
-// state.
-static zx_status_t brcmf_clear_firmware_connection_state(brcmf_if* ifp) {
-  zx_status_t status = ZX_OK;
-  bcme_status_t fw_err = BCME_OK;
-
-  struct brcmf_scb_val_le scbval;
-  memcpy(&scbval.ea, ifp->connect_req.selected_bss()->bssid().data(), ETH_ALEN);
-  scbval.val = static_cast<uint16_t>(fuchsia_wlan_ieee80211::ReasonCode::kStaLeaving);
-  brcmf_set_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
-  status = brcmf_fil_cmd_data_set(ifp, BRCMF_C_DISASSOC, &scbval, sizeof(scbval), &fw_err);
-  if (status != ZX_OK) {
-    BRCMF_ERR("Failed to issue BRCMF_C_DISASSOC to firmware: %s, fw err %s",
-              zx_status_get_string(status), brcmf_fil_get_errstr(fw_err));
-  }
-  brcmf_clear_bit(brcmf_vif_status_bit_t::DISCONNECTING, &ifp->vif->sme_state);
-  status = brcmf_bss_reset(ifp);
-  return status;
-}
-
 static zx_status_t brcmf_bss_connect_done(brcmf_if* ifp, brcmf_connect_status_t connect_status,
                                           fuchsia_wlan_ieee80211_wire::StatusCode assoc_result) {
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
@@ -5758,82 +5882,6 @@ static zx_status_t brcmf_bss_connect_done(brcmf_if* ifp, brcmf_connect_status_t 
       }
     }
     brcmf_return_assoc_result(ndev, assoc_result);
-  }
-
-  BRCMF_DBG(TRACE, "Exit");
-  return ZX_OK;
-}
-
-static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t connect_status,
-                                       fuchsia_wlan_ieee80211_wire::StatusCode reassoc_result) {
-  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
-  struct net_device* ndev = ifp->ndev;
-  BRCMF_DBG(TRACE, "Enter");
-
-  if (brcmf_test_and_clear_bit(brcmf_vif_status_bit_t::ROAMING, &ifp->vif->sme_state)) {
-    cfg->roam_timer->Stop();
-    brcmf_log_conn_status(ifp, connect_status);
-    switch (connect_status) {
-      case brcmf_connect_status_t::CONNECTED: {
-        brcmf_get_assoc_ies(cfg, ifp);
-        brcmf_set_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
-        if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFG)) {
-          // Start the signal report timer
-          cfg->connect_log_cnt = 0;
-          cfg->signal_report_timer->Start(BRCMF_SIGNAL_REPORT_TIMER_DUR_MS);
-          // Indicate the rssi soon after connection
-          cfg80211_signal_ind(ndev);
-        }
-        break;
-      }
-      case brcmf_connect_status_t::REASSOC_REQ_FAILED: {
-        BRCMF_INFO("Reassociation failed, need to reset firmware state.");
-        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
-        if (err != ZX_OK) {
-          BRCMF_ERR("Failed to clear firmware connection state.");
-        }
-        break;
-      }
-      case brcmf_connect_status_t::CONNECTING_TIMEOUT: {
-        BRCMF_INFO("Reassociation failed due to timeout, need to reset firmware state.");
-        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
-        if (err != ZX_OK) {
-          BRCMF_ERR("Failed to clear firmware connection state.");
-        }
-        break;
-      }
-      case brcmf_connect_status_t::ROAM_INTERRUPTED: {
-        BRCMF_INFO("Reassociation failed because roam attempt was interrupted by SME.");
-        // SME has already issued the disconnect, so we just need to reset the interface.
-        const auto err = brcmf_bss_reset(ifp);
-        if (err != ZX_OK) {
-          BRCMF_ERR("Failed to clear firmware connection state.");
-        }
-        break;
-      }
-      default: {
-        BRCMF_WARN("Reassociation failed with connect_status %s, reassoc_result %d",
-                   brcmf_get_connect_status_str(connect_status), static_cast<int>(reassoc_result));
-        BRCMF_INFO("Reassociation failed, need to reset firmware state.");
-        const zx_status_t err = brcmf_clear_firmware_connection_state(ifp);
-        if (err != ZX_OK) {
-          BRCMF_ERR("Failed to clear firmware connection state.");
-        }
-        break;
-      }
-    }
-    if (!cfg->target_bssid.has_value()) {
-      BRCMF_ERR("Missing target BSSID, cannot notify SME of roam result");
-      return ZX_ERR_INTERNAL;
-    }
-    const auto target_bssid = static_cast<uint8_t*>(cfg->target_bssid->data());
-    brcmf_return_roam_result(ndev, target_bssid, reassoc_result);
-    // If roam failed due to a SME-issued deauth for the target BSS, we have to keep the
-    // target BSSID until the deauth handler cleans it up.
-    if (!brcmf_test_bit(brcmf_disconnect_request_bit_t::DEAUTH_TARGET_BSS,
-                        &cfg->disconnect_request_state)) {
-      cfg->target_bssid.reset();
-    }
   }
 
   BRCMF_DBG(TRACE, "Exit");
@@ -5997,24 +6045,6 @@ static void brcmf_roam_timeout_worker(WorkItem* work) {
   BRCMF_WARN("Roam timeout");
   brcmf_bss_roam_done(ifp, brcmf_connect_status_t::CONNECTING_TIMEOUT,
                       fuchsia_wlan_ieee80211_wire::StatusCode::kRefusedReasonUnspecified);
-}
-
-// Sync driver channel to match firmware channel.
-static zx_status_t sync_driver_channel_to_firmware_channel(struct brcmf_if* ifp) {
-  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
-  zx_status_t status = ZX_OK;
-  chanspec_t fw_chanspec;
-  uint8_t fw_ctl_chan;
-  status = brcmf_get_ctrl_channel(ifp, &fw_chanspec, &fw_ctl_chan);
-  if (status != ZX_OK) {
-    BRCMF_ERR(
-        "Synchronizing driver channel to firmware channel impossible, channel lookup failed: %d",
-        status);
-    return status;
-  }
-  BRCMF_DBG(CONN, "Setting driver channel to chanspec 0x%x", fw_chanspec);
-  cfg->channel = fw_chanspec;
-  return status;
 }
 
 // REASSOC event is currently only supported if roaming-related features are enabled.
@@ -6591,36 +6621,6 @@ static zx_status_t brcmf_notify_roam_prep_status(struct brcmf_if* ifp,
   }
 
   return status;
-}
-
-zx_status_t brcmf_update_bss_info(struct brcmf_if* ifp) {
-  struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
-  struct brcmf_cfg80211_profile* prof = &ifp->vif->profile;
-  bcme_status_t fw_err = BCME_OK;
-
-  // Firmware returns the BSS info data after a small offset.
-  const size_t kBssInfoOffset = 4;
-  const size_t kBssInfoBufLen = sizeof(brcmf_bss_info_le) + kBssInfoOffset;
-  const auto bss_info_status =
-      brcmf_fil_cmd_data_get(ifp, BRCMF_C_GET_BSS_INFO, cfg->extra_buf, kBssInfoBufLen, &fw_err);
-  if (bss_info_status != ZX_OK) {
-    BRCMF_ERR("Could not get BSS info from firmware: %s, fw err %s",
-              zx_status_get_string(bss_info_status), brcmf_fil_get_errstr(fw_err));
-    return bss_info_status;
-  }
-
-  // Ignore any data before kBssInfoOffset.
-  const auto bss_info_buf = cfg->extra_buf + kBssInfoOffset;
-  auto bss_info = reinterpret_cast<brcmf_bss_info_le*>(bss_info_buf);
-
-  // Copy info into relevant fields.
-  const uint8_t* ie_ptr = reinterpret_cast<uint8_t*>(bss_info) + bss_info->ie_offset;
-  cfg->capability = bss_info->capability;
-  memcpy(ifp->connect_req.selected_bss()->ies().data(), ie_ptr, bss_info->ie_length);
-  brcmf_init_prof(prof);
-  memcpy(&prof->bssid, &bss_info->BSSID, ETH_ALEN);
-  prof->beacon_period = bss_info->beacon_period;
-  return ZX_OK;
 }
 
 static zx_status_t brcmf_notify_roaming_status(struct brcmf_if* ifp,
