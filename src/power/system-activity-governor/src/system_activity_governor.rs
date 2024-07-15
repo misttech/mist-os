@@ -25,7 +25,6 @@ use futures::prelude::*;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
-use std::sync::Arc;
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
     fuchsia_async as fasync,
@@ -391,7 +390,7 @@ pub struct SystemActivityGovernor {
     /// The manager used to modify execution_state and trigger suspend.
     execution_state_manager: Rc<ExecutionStateManager>,
     /// The context used to manage the boot_control power element.
-    boot_control: Arc<PowerElementContext>,
+    boot_control: PowerElementContext,
     /// The collection of information about PowerElements managed
     /// by system-activity-governor.
     element_power_level_names: Vec<fbroker::ElementPowerLevelNames>,
@@ -506,34 +505,20 @@ impl SystemActivityGovernor {
             ],
         ));
 
-        let boot_control = Arc::new(
-            PowerElementContext::builder(
-                topology,
-                "boot_control",
-                &[BootControlLevel::Inactive.into(), BootControlLevel::Active.into()],
-            )
-            .dependencies(vec![fbroker::LevelDependency {
-                dependency_type: fbroker::DependencyType::Assertive,
-                dependent_level: BootControlLevel::Active.into(),
-                requires_token: execution_state.assertive_dependency_token(),
-                requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
-            }])
-            .build()
-            .await
-            .expect("PowerElementContext encountered error while building boot_control"),
-        );
-        let bc_context = boot_control.clone();
-        fasync::Task::local(async move {
-            run_power_element(
-                &bc_context.name(),
-                &bc_context.required_level,
-                0,    /* initial_level */
-                None, /* inspect_node */
-                basic_update_fn_factory(&bc_context),
-            )
-            .await;
-        })
-        .detach();
+        let boot_control = PowerElementContext::builder(
+            topology,
+            "boot_control",
+            &[BootControlLevel::Inactive.into(), BootControlLevel::Active.into()],
+        )
+        .dependencies(vec![fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Assertive,
+            dependent_level: BootControlLevel::Active.into(),
+            requires_token: execution_state.assertive_dependency_token(),
+            requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
+        }])
+        .build()
+        .await
+        .expect("PowerElementContext encountered error while building boot_control");
 
         element_power_level_names.push(generate_element_power_level_names(
             "boot_control",
@@ -575,7 +560,7 @@ impl SystemActivityGovernor {
             suspend_stats,
             listeners: RefCell::new(Vec::new()),
             execution_state_manager,
-            boot_control: boot_control.into(),
+            boot_control,
             element_power_level_names,
         }))
     }
@@ -601,7 +586,6 @@ impl SystemActivityGovernor {
             lease_status = boot_control_lease.watch_status(lease_status).await.unwrap();
         }
 
-        tracing::info!("Boot control required. Updating boot_control level to active.");
         let res = self.boot_control.current_level.update(BootControlLevel::Active.into()).await;
         if let Err(error) = res {
             tracing::warn!(?error, "failed to update boot_control level to Active");

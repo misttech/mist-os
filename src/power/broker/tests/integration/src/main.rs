@@ -176,6 +176,7 @@ mod tests {
         // Update P's current level to ON.
         // P's required level should remain ON.
         // C's required level should become ON.
+        // Lease should now be satisfied.
         executor.run_singlethreaded(async {
             parent_current
                 .update(BinaryPowerLevel::On.into_primitive())
@@ -188,21 +189,6 @@ mod tests {
             );
             assert_eq!(
                 child_required_fut.await.unwrap(),
-                Ok(BinaryPowerLevel::On.into_primitive())
-            );
-        });
-        assert!(executor.run_until_stalled(&mut parent_required_fut).is_pending());
-
-        // Update C's current level to ON.
-        // Lease should become satisfied.
-        executor.run_singlethreaded(async {
-            child_current
-                .update(BinaryPowerLevel::On.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-            assert_eq!(
-                child_status.watch_power_level().await.unwrap(),
                 Ok(BinaryPowerLevel::On.into_primitive())
             );
             assert_eq!(
@@ -219,32 +205,20 @@ mod tests {
         executor.run_singlethreaded(async {
             drop(lease);
             assert_eq!(
+                parent_required_fut.await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+            assert_eq!(
                 child_required_fut.await.unwrap(),
                 Ok(BinaryPowerLevel::Off.into_primitive())
             );
         });
-
-        // Update C's current level to OFF.
-        // P's required level should become OFF.
-        executor.run_singlethreaded(async {
-            child_current
-                .update(BinaryPowerLevel::Off.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-            assert_eq!(
-                child_status.watch_power_level().await.unwrap(),
-                Ok(BinaryPowerLevel::Off.into_primitive())
-            );
-            assert_eq!(
-                parent_required_fut.await.unwrap(),
-                Ok(BinaryPowerLevel::Off.into_primitive())
-            );
-        });
         let mut parent_required_fut = parent_required.watch();
-        assert!(executor.run_until_stalled(&mut parent_required_fut).is_pending());
+        let mut child_required_fut = child_required.watch();
 
-        // Update P's current level to OFF.
+        // Update P's current level to OFF
+        // P's required level should remain OFF.
+        // C's required level should remain OFF.
         executor.run_singlethreaded(async {
             parent_current
                 .update(BinaryPowerLevel::Off.into_primitive())
@@ -256,7 +230,8 @@ mod tests {
                 Ok(BinaryPowerLevel::Off.into_primitive())
             );
         });
-        let child_required_fut = child_required.watch();
+        assert!(executor.run_until_stalled(&mut parent_required_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut child_required_fut).is_pending());
 
         // Remove P's element. Status channel should be closed.
         executor.run_singlethreaded(async {
@@ -532,25 +507,7 @@ mod tests {
                 Ok(BinaryPowerLevel::On.into_primitive())
             );
         });
-        let mut element_c_required_fut = element_c_required.watch();
-        assert!(executor.run_until_stalled(&mut element_d_required_fut).is_pending());
-
-        // Update C's current level to ON.
-        // A's required level should remain ON.
-        // B's required level should remain ON.
-        // C's required level should remain ON.
-        // D's required level should remain OFF.
-        // Lease should become satisfied.
-        executor.run_singlethreaded(async {
-            element_c_current
-                .update(BinaryPowerLevel::On.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-        });
-        assert!(executor.run_until_stalled(&mut element_a_required_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut element_b_required_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut element_c_required_fut).is_pending());
+        let element_c_required_fut = element_c_required.watch();
         assert!(executor.run_until_stalled(&mut element_d_required_fut).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(
@@ -559,35 +516,12 @@ mod tests {
             );
         });
 
-        // Drop lease for C.
+        // Drop lease for C with PB.
         // A's required level should remain ON.
-        // B's required level should remain ON.
+        // B's required level should become OFF because C dropped its claim.
         // C's required level should become OFF because the lease was dropped.
         // D's required level should remain OFF.
         drop(lease);
-        assert!(executor.run_until_stalled(&mut element_a_required_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut element_b_required_fut).is_pending());
-        executor.run_singlethreaded(async {
-            assert_eq!(
-                element_c_required_fut.await.unwrap(),
-                Ok(BinaryPowerLevel::Off.into_primitive())
-            );
-        });
-        let mut element_c_required_fut = element_c_required.watch();
-        assert!(executor.run_until_stalled(&mut element_d_required_fut).is_pending());
-
-        // Lower C's current level to OFF.
-        // A's required level should remain ON.
-        // B's required level should become OFF.
-        // C's required level should remain OFF.
-        // D's required level should remain OFF.
-        executor.run_singlethreaded(async {
-            element_c_current
-                .update(BinaryPowerLevel::Off.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-        });
         assert!(executor.run_until_stalled(&mut element_a_required_fut).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(
@@ -596,7 +530,13 @@ mod tests {
             );
         });
         let mut element_b_required_fut = element_b_required.watch();
-        assert!(executor.run_until_stalled(&mut element_c_required_fut).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                element_c_required_fut.await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+        });
+        let mut element_c_required_fut = element_c_required.watch();
         assert!(executor.run_until_stalled(&mut element_d_required_fut).is_pending());
 
         // Lower B's current level to OFF.
@@ -859,6 +799,7 @@ mod tests {
         // P's required level should remain 50.
         // C1's required level should become 5 because P is now at 50.
         // C2's required level should remain 0.
+        // C1's lease @ 5 is now satisfied.
         executor.run_singlethreaded(async {
             parent_current.update(50).await.unwrap().expect("update_current_power_level failed");
         });
@@ -868,20 +809,6 @@ mod tests {
             assert_eq!(child1_req_level_fut.await.unwrap(), Ok(5));
         });
         let mut child1_req_level_fut = child1_required.watch();
-        assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
-
-        // Update C1's current level to 5.
-        // GP's required level should remain 200.
-        // P's required level should remain 50.
-        // C1's required level should remain 5.
-        // C2's required level should remain 0.
-        // C1's lease @ 5 is now satisfied.
-        executor.run_singlethreaded(async {
-            child1_current.update(5).await.unwrap().expect("update_current_power_level failed");
-        });
-        assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(
@@ -898,6 +825,7 @@ mod tests {
         // C1's required level should remain 5.
         // C2's required level should become 3 because its dependencies are already satisfied.
         // C1's lease @ 5 is still satisfied.
+        // C2's lease @ 3 is immediately satisfied.
         let lease_child_2 = executor.run_singlethreaded(async {
             child2_lessor
                 .lease(3)
@@ -919,27 +847,6 @@ mod tests {
                 lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
                 LeaseStatus::Satisfied
             );
-        });
-
-        // Update C2's current level to 3.
-        // GP's required level should remain 200.
-        // P's required level should remain 50.
-        // C1's required level should remain 5.
-        // C2's required level should remain 0.
-        // C1's lease @ 5 is still satisfied.
-        // C2's lease @ 3 is now satisfied.
-        executor.run_singlethreaded(async {
-            child2_current.update(3).await.unwrap().expect("update_current_power_level failed");
-        });
-        assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
-        executor.run_singlethreaded(async {
-            assert_eq!(
-                lease_child_1.watch_status(LeaseStatus::Unknown).await.unwrap(),
-                LeaseStatus::Satisfied
-            );
             assert_eq!(
                 lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
                 LeaseStatus::Satisfied
@@ -947,39 +854,23 @@ mod tests {
         });
 
         // Drop lease for C1.
-        // GP's required level should remain 200.
-        // P's required level should remain 50.
+        // Parent's required level should immediately drop to 30.
+        // Grandparent's required level will remain at 200 for now.
+        // GP's required level should remain 200 because P is still at 50.
+        // P's required level should become 30 because C1 has dropped its claim.
         // C1's required level should become 0 because its lease has been dropped.
         // C2's required level should remain 3.
         // C2's lease @ 3 is still satisfied.
         drop(lease_child_1);
         assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(30));
+        });
+        let mut parent_req_level_fut = parent_required.watch();
         executor.run_singlethreaded(async {
             assert_eq!(child1_req_level_fut.await.unwrap(), Ok(0));
         });
         let mut child1_req_level_fut = child1_required.watch();
-        assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
-        executor.run_singlethreaded(async {
-            assert_eq!(
-                lease_child_2.watch_status(LeaseStatus::Unknown).await.unwrap(),
-                LeaseStatus::Satisfied
-            );
-        });
-
-        // Lower C1's current level to 0.
-        // GP's required level should remain 200.
-        // P's required level should become 30.
-        // C1's required level should remain 0.
-        // C2's required level should remain 3.
-        // C2's lease @ 3 is still satisfied.
-        executor.run_singlethreaded(async {
-            child1_current.update(0).await.unwrap().expect("update_current_power_level failed");
-            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(30));
-        });
-        let mut parent_req_level_fut = parent_required.watch();
-        assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(
@@ -998,7 +889,6 @@ mod tests {
             parent_current.update(30).await.unwrap().expect("update_current_power_level failed");
             assert_eq!(grandparent_req_level_fut.await.unwrap(), Ok(90));
         });
-        let mut grandparent_req_level_fut = grandparent_required.watch();
         assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
@@ -1013,31 +903,21 @@ mod tests {
         // Parent should have required level 0.
         // Grandparent should still have required level 90.
         // GP's required level should remain 90 because P is still at 30.
-        // P's required level should remain 30.
+        // P's required level should become 0 because C2's claim has been dropped.
         // C1's required level should remain 0.
         // C2's required level should become 0 because its lease has been dropped.
         drop(lease_child_2);
+        let mut grandparent_req_level_fut = grandparent_required.watch();
         assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(0));
+        });
+        let mut parent_req_level_fut = parent_required.watch();
         assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(child2_req_level_fut.await.unwrap(), Ok(0));
         });
         let mut child2_req_level_fut = child2_required.watch();
-
-        // Lower C2's current level to 0.
-        // GP's required level should become its minimum level of 10 because P is now at 0.
-        // P's required level should become 0.
-        // C1's required level should remain 0.
-        // C2's required level should remain 0.
-        executor.run_singlethreaded(async {
-            child2_current.update(0).await.unwrap().expect("update_current_power_level failed");
-            assert_eq!(parent_req_level_fut.await.unwrap(), Ok(0));
-        });
-        let mut parent_req_level_fut = parent_required.watch();
-        assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
 
         // Lower Parent's current level to 0.
         // GP's required level should become its minimum level of 10 because P is now at 0.
@@ -1375,7 +1255,7 @@ mod tests {
         // D's required level should become ON.
         // E's required level should remain ON.
         // Lease C should remain pending.
-        // Lease D should remain pending.
+        // Lease D should become satisfied.
         executor.run_singlethreaded(async {
             current_b
                 .update(BinaryPowerLevel::On.into_primitive())
@@ -1398,7 +1278,7 @@ mod tests {
             );
             assert_eq!(
                 lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
-                LeaseStatus::Pending
+                LeaseStatus::Satisfied
             );
         });
 
@@ -1408,7 +1288,7 @@ mod tests {
         // C's required level should become ON because E is now ON.
         // D's required level should remain ON.
         // E's required level should remain ON.
-        // Lease C should remain pending.
+        // Lease C should become satisfied.
         // Lease D should remain pending.
         executor.run_singlethreaded(async {
             current_e
@@ -1422,69 +1302,7 @@ mod tests {
         executor.run_singlethreaded(async {
             assert_eq!(required_c_fut.await.unwrap(), Ok(BinaryPowerLevel::On.into_primitive()));
         });
-        let mut required_c_fut = required_c.watch();
-        assert!(executor.run_until_stalled(&mut required_d_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_e_fut).is_pending());
-        executor.run_singlethreaded(async {
-            assert_eq!(
-                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
-                LeaseStatus::Pending
-            );
-            assert_eq!(
-                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
-                LeaseStatus::Pending
-            );
-        });
-
-        // Update C's current level to ON.
-        // A's required level should remain ON.
-        // B's required level should remain ON.
-        // C's required level should become ON because E is now ON.
-        // D's required level should remain ON.
-        // E's required level should remain ON.
-        // Lease C should become satisfied.
-        // Lease D should remain pending.
-        executor.run_singlethreaded(async {
-            current_c
-                .update(BinaryPowerLevel::On.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-        });
-        assert!(executor.run_until_stalled(&mut required_a_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_b_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_d_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_e_fut).is_pending());
-        executor.run_singlethreaded(async {
-            assert_eq!(
-                lease_c.watch_status(LeaseStatus::Unknown).await.unwrap(),
-                LeaseStatus::Satisfied
-            );
-            assert_eq!(
-                lease_d.watch_status(LeaseStatus::Unknown).await.unwrap(),
-                LeaseStatus::Pending
-            );
-        });
-
-        // Update D's current level to ON.
-        // A's required level should remain ON.
-        // B's required level should remain ON.
-        // C's required level should remain ON.
-        // D's required level should remain ON.
-        // E's required level should remain ON.
-        // Lease C should remain satisfied.
-        // Lease D should become satisfied.
-        executor.run_singlethreaded(async {
-            current_d
-                .update(BinaryPowerLevel::On.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-        });
-        assert!(executor.run_until_stalled(&mut required_a_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_b_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
+        let required_c_fut = required_c.watch();
         assert!(executor.run_until_stalled(&mut required_d_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_e_fut).is_pending());
         executor.run_singlethreaded(async {
@@ -1527,52 +1345,11 @@ mod tests {
 
         // Drop Lease on C.
         // A's required level should remain ON.
-        // B's required level should remain ON.
+        // B's required level should become OFF because C has dropped its claim.
         // C's required level should remain OFF because its lease was dropped.
         // D's required level should remain OFF.
-        // E's required level should remain OFF.
+        // E's required level should become OFF because C has dropped its claim.
         drop(lease_c);
-        assert!(executor.run_until_stalled(&mut required_a_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_b_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_d_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_e_fut).is_pending());
-
-        // Update C's current level to OFF.
-        // A's required level should remain ON.
-        // B's required level should remain ON, D is still ON.
-        // C's required level should remain OFF.
-        // D's required level should remain OFF.
-        // E's required level should become OFF.
-        executor.run_singlethreaded(async {
-            current_c
-                .update(BinaryPowerLevel::Off.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-        });
-        assert!(executor.run_until_stalled(&mut required_a_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_b_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_d_fut).is_pending());
-        executor.run_singlethreaded(async {
-            assert_eq!(required_e_fut.await.unwrap(), Ok(BinaryPowerLevel::Off.into_primitive()));
-        });
-        let mut required_e_fut = required_e.watch();
-
-        // Update D's current level to OFF.
-        // A's required level should remain ON.
-        // B's required level should become OFF.
-        // C's required level should remain OFF.
-        // D's required level should remain OFF.
-        // E's required level should remain OFF.
-        executor.run_singlethreaded(async {
-            current_d
-                .update(BinaryPowerLevel::Off.into_primitive())
-                .await
-                .unwrap()
-                .expect("update_current_power_level failed");
-        });
         assert!(executor.run_until_stalled(&mut required_a_fut).is_pending());
         executor.run_singlethreaded(async {
             assert_eq!(required_b_fut.await.unwrap(), Ok(BinaryPowerLevel::Off.into_primitive()));
@@ -1580,7 +1357,10 @@ mod tests {
         let mut required_b_fut = required_b.watch();
         assert!(executor.run_until_stalled(&mut required_c_fut).is_pending());
         assert!(executor.run_until_stalled(&mut required_d_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut required_e_fut).is_pending());
+        executor.run_singlethreaded(async {
+            assert_eq!(required_e_fut.await.unwrap(), Ok(BinaryPowerLevel::Off.into_primitive()));
+        });
+        let mut required_e_fut = required_e.watch();
 
         // Update B's current level to OFF.
         // A's required level should become OFF.

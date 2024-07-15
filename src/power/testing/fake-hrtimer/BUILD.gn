@@ -17,7 +17,6 @@ source_set("cpp") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
-    "//zircon/system/ulib/async-default",
   ]
 }
 
