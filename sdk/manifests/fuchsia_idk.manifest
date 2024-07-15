@@ -298,7 +298,6 @@ fidl_library://fidl/fuchsia.mem
 fidl_library://fidl/fuchsia.memorypressure
 fidl_library://fidl/fuchsia.metrics
 fidl_library://fidl/fuchsia.migration
-fidl_library://fidl/fuchsia.modular
 fidl_library://fidl/fuchsia.net
 fidl_library://fidl/fuchsia.net.http
 fidl_library://fidl/fuchsia.net.interfaces
@@ -318,8 +317,6 @@ fidl_library://fidl/fuchsia.scheduler
 fidl_library://fidl/fuchsia.session
 fidl_library://fidl/fuchsia.settings
 fidl_library://fidl/fuchsia.settings.policy
-fidl_library://fidl/fuchsia.sys
-fidl_library://fidl/fuchsia.sys.test
 fidl_library://fidl/fuchsia.sysinfo
 fidl_library://fidl/fuchsia.sysmem
 fidl_library://fidl/fuchsia.sysmem2
