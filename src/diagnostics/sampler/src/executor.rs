@@ -218,7 +218,7 @@ impl RebootSnapshotProcessor {
         &mut self,
         hierarchy: DiagnosticsHierarchy<String>,
         diagnostics_filename: &Option<InspectHandleName>,
-        moniker: &String,
+        moniker: &str,
     ) {
         if let Some(project_indexes) = self.moniker_to_projects_map.get(moniker) {
             for index in project_indexes {
@@ -650,7 +650,7 @@ impl ProjectSampler {
         &mut self,
         payload: &DiagnosticsHierarchy,
         diagnostics_filename: &Option<InspectHandleName>,
-        moniker: &String,
+        moniker: &str,
     ) -> Result<(SnapshotOutcome, Vec<EventToLog>), Error> {
         let indexes_opt = &self.moniker_to_selector_map.get(moniker);
         let selector_indexes = match indexes_opt {
@@ -1191,17 +1191,15 @@ fn compute_event_count_diff(
     }
 }
 
-fn process_schema_errors(errors: &Option<Vec<diagnostics_data::InspectError>>, moniker: &String) {
+fn process_schema_errors(errors: &Option<Vec<diagnostics_data::InspectError>>, moniker: &str) {
     match errors {
         Some(errors) => {
             for error in errors {
-                if !error.message.contains("Inspect hierarchy was fully filtered") {
-                    warn!("Moniker: {}, Error: {:?}", moniker, error);
-                }
+                warn!(%moniker, ?error);
             }
         }
         None => {
-            warn!("Moniker: {} encountered null payload and no errors.", moniker);
+            warn!(%moniker, "Encountered null payload and no errors.");
         }
     }
 }

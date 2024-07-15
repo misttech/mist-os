@@ -4,7 +4,7 @@
 
 use async_stream::stream;
 use bitflags::bitflags;
-use diagnostics_data::{DiagnosticsData, Metadata, MetadataError};
+use diagnostics_data::DiagnosticsData;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, BatchIteratorProxy,
     ClientSelectorConfiguration, Format, FormattedContent, PerformanceConfiguration, ReaderError,
@@ -133,7 +133,6 @@ pub trait SerializableValue: private::Sealed {
 
 pub trait CheckResponse: private::Sealed {
     fn has_payload(&self) -> bool;
-    fn was_fully_filtered(&self) -> bool;
 }
 
 // The "sealed trait" pattern.
@@ -150,25 +149,11 @@ impl<D: DiagnosticsData> CheckResponse for Data<D> {
     fn has_payload(&self) -> bool {
         self.payload.is_some()
     }
-
-    fn was_fully_filtered(&self) -> bool {
-        self.metadata
-            .errors()
-            .map(|errors| {
-                errors
-                    .iter()
-                    .filter_map(|error| error.message())
-                    .any(|msg| msg.contains("Inspect hierarchy was fully filtered"))
-            })
-            .unwrap_or(false)
-    }
 }
 
 impl SerializableValue for serde_json::Value {
     const FORMAT_OF_VALUE: Format = Format::Json;
 }
-
-const FULLY_FILTERED_MSG: &str = "Inspect hierarchy was fully filtered";
 
 impl CheckResponse for serde_json::Value {
     fn has_payload(&self) -> bool {
@@ -178,23 +163,6 @@ impl CheckResponse for serde_json::Value {
             }
             _ => false,
         }
-    }
-
-    fn was_fully_filtered(&self) -> bool {
-        self.as_object()
-            .and_then(|obj| obj.get("metadata"))
-            .and_then(|metadata| metadata.as_object())
-            .and_then(|metadata| metadata.get("errors"))
-            .and_then(|errors| errors.as_array())
-            .map(|errors| {
-                errors
-                    .iter()
-                    .filter_map(|error| error.as_object())
-                    .filter_map(|error| error.get("message"))
-                    .filter_map(|msg| msg.as_str())
-                    .any(|message| message.starts_with(FULLY_FILTERED_MSG))
-            })
-            .unwrap_or(false)
     }
 }
 
@@ -212,34 +180,6 @@ impl CheckResponse for serde_cbor::Value {
             _ => false,
         }
     }
-
-    fn was_fully_filtered(&self) -> bool {
-        let this = match self {
-            serde_cbor::Value::Map(m) => m,
-            _ => unreachable!("Only objects are expected"),
-        };
-        let metadata = match this.get(&serde_cbor::Value::Text("metadata".into())) {
-            Some(serde_cbor::Value::Map(m)) => m,
-            _ => unreachable!("All objects have a metadata field"),
-        };
-        let errors = match metadata.get(&serde_cbor::Value::Text("errors".into())) {
-            None => return false, // if no errors, then we can't possibly be fully filtered.
-            Some(serde_cbor::Value::Array(a)) => a,
-            _ => unreachable!("We either get an array or we get nothing"),
-        };
-        errors
-            .iter()
-            .filter_map(|error| match error {
-                serde_cbor::Value::Map(m) => Some(m),
-                _ => None,
-            })
-            .filter_map(|error| error.get(&serde_cbor::Value::Text("message".into())))
-            .filter_map(|msg| match msg {
-                serde_cbor::Value::Text(s) => Some(s),
-                _ => None,
-            })
-            .any(|message| message.starts_with(FULLY_FILTERED_MSG))
-    }
 }
 
 bitflags! {
@@ -248,8 +188,6 @@ bitflags! {
     pub struct RetryConfig: u8 {
         /// ArchiveReader will retry on empty responses.
         const EMPTY = 0b00000001;
-        /// ArchiveReader will retry when the returned hierarchy has been fully filtered.
-        const FULLY_FILTERED = 0x00000010;
     }
 }
 
@@ -264,10 +202,6 @@ impl RetryConfig {
 
     fn on_empty(&self) -> bool {
         self.intersects(Self::EMPTY)
-    }
-
-    fn on_fully_filtered(&self) -> bool {
-        self.intersects(Self::FULLY_FILTERED)
     }
 }
 
@@ -438,12 +372,7 @@ impl ArchiveReader {
                 .collect::<Vec<_>>()
                 .await;
 
-            if (self.retry_config.on_empty() && result.len() < self.minimum_schema_count)
-                || (self.retry_config.on_fully_filtered()
-                    && result
-                        .iter()
-                        .all(|entry| !entry.has_payload() && entry.was_fully_filtered()))
-            {
+            if self.retry_config.on_empty() && result.len() < self.minimum_schema_count {
                 fasync::Timer::new(fasync::Time::after(RETRY_DELAY_MS.millis())).await;
             } else {
                 return Ok(result);
@@ -635,6 +564,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use diagnostics_log::{Publisher, PublisherOptions};
     use fuchsia_component_test::{
@@ -916,19 +846,19 @@ mod tests {
 
         let results = ArchiveReader::new()
             .add_selector(selector)
-            // two schemas, but one is empty
-            .with_minimum_schema_count(2)
+            // Only one schema since empty schemas are filtered out
+            .with_minimum_schema_count(1)
             .snapshot::<Inspect>()
             .await
             .expect("snapshotted");
 
-        let should_be_empty = results
-            .clone()
-            .into_iter()
-            .find(|v| v.metadata.name.as_ref().unwrap().as_name() == Some("tree-1"))
-            .unwrap();
-
-        assert!(should_be_empty.payload.is_none());
+        assert_matches!(
+            results
+                .clone()
+                .into_iter()
+                .find(|v| v.metadata.name.as_ref().unwrap().as_name() == Some("tree-1")),
+            None
+        );
 
         let should_have_data = results
             .into_iter()
