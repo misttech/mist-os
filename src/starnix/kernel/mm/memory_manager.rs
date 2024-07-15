@@ -49,7 +49,7 @@ use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes, NoCell};
 use zx::VmarInfo;
 
-const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
+pub const ZX_VM_SPECIFIC_OVERWRITE: zx::VmarFlags =
     zx::VmarFlags::from_bits_retain(zx::VmarFlagsExtended::SPECIFIC_OVERWRITE.bits());
 
 // We do not create shared processes in unit tests.
