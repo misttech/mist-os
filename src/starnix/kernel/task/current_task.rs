@@ -1184,8 +1184,9 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
-            // TODO: Validate whether we need to use `task_alloc()` with the `init_task` state here.
-            security::task_alloc_for_init(),
+            // If SELinux is enabled then `exec()` of the "init" executable will normally be
+            // configured by policy to transition to the desired init task Security Context.
+            security::task_alloc_for_kernel(),
         )?;
         {
             let mut init_writer = init_task.thread_group.write();
@@ -1252,7 +1253,9 @@ impl CurrentTask {
             },
             Credentials::root(),
             rlimits,
-            security::task_alloc_for_init(),
+            // If SELinux is enabled then `exec()` of the "init" executable will normally be
+            // configured by policy to transition to the desired init task Security Context.
+            security::task_alloc_for_kernel(),
         )
     }
 

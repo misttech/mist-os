@@ -177,7 +177,6 @@ impl SeLoad {
 
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        track_stub!(TODO("https://fxbug.dev/322874969"), "ignoring selinux policy");
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);

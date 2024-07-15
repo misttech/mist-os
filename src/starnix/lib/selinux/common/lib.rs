@@ -287,37 +287,22 @@ class_permission_enum! {
 }
 
 /// Initial Security Identifier (SID) values defined by the SELinux Reference Policy.
-/// The presence and ordering of all values, including ones unused by the implementation,
-/// ensures that the numeric values match those output by userspace policy tooling.
+/// Where the SELinux Reference Policy retains definitions for some deprecated initial SIDs, this
+/// enum omits deprecated entries for clarity.
 #[repr(u64)]
 enum ReferenceInitialSid {
     Kernel = 1,
-    _Security,
-    Unlabeled,
-    _Fs,
-    _File,
-    _FileLabels,
-    _Init,
-    _AnySocket,
-    _Port,
-    _Netif,
-    _Netmsg,
-    _Node,
-    _IgmpPacket,
-    _IcmpSocket,
-    _TcpSocket,
-    _SysctlModprobe,
-    _Sysctl,
-    _SysctlFs,
-    _SysctlKernel,
-    _SysctlNet,
-    _SysctlNetUnix,
-    _SysctlVm,
-    _SysctlDev,
-    _Kmod,
-    _Policy,
-    _ScmpPacket,
-    _Devnull,
+    _Security = 2,
+    Unlabeled = 3,
+    _Fs = 4,
+    _File = 5,
+    _AnySocket = 6,
+    _Port = 7,
+    _Netif = 8,
+    _Netmsg = 9,
+    _Node = 10,
+    _Sysctl = 15,
+    _Devnull = 25,
 
     FirstUnused,
 }

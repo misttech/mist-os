@@ -69,7 +69,7 @@ pub(super) fn check_exec_access(
             log_debug!("entrypoint permission is denied, ignoring.");
         }
         // Check that ptrace permission is allowed if the process is traced.
-        // TODO: Perform this check based on the `Task::ptrace` state.
+        // TODO(b/352535794): Perform this check based on the `Task::ptrace` state.
         if let Some(ptracer_sid) = security_state.ptracer_sid {
             if !security_server.has_permissions(ptracer_sid, new_sid, &[ProcessPermission::Ptrace])
             {
@@ -219,7 +219,7 @@ pub(super) fn ptrace_access_check(
     )
     .and_then(|_| {
         // If tracing is allowed, set the `ptracer_sid` of the tracee with the tracer's SID.
-        // TODO: Remove this, and rely on `Task::ptrace` instead.
+        // TODO(b/352535794): Remove this, and rely on `Task::ptrace` instead.
         tracee_security_state.ptracer_sid = Some(tracer_sid);
         Ok(())
     })
@@ -349,24 +349,20 @@ pub(super) struct TaskState {
 }
 
 impl TaskState {
-    /// Returns initial state for the kernel's root thread group.
+    /// Returns initial state for kernel tasks.
     pub(super) fn for_kernel() -> Self {
-        Self {
-            current_sid: SecurityId::initial(InitialSid::Kernel),
-            previous_sid: SecurityId::initial(InitialSid::Kernel),
-            exec_sid: None,
-            fscreate_sid: None,
-            keycreate_sid: None,
-            sockcreate_sid: None,
-            ptracer_sid: None,
-        }
+        Self::for_initial_sid(InitialSid::Kernel)
     }
 
     /// Returns placeholder state for use when SELinux is not enabled.
     pub(super) fn for_selinux_disabled() -> Self {
+        Self::for_initial_sid(InitialSid::Unlabeled)
+    }
+
+    fn for_initial_sid(initial_sid: InitialSid) -> Self {
         Self {
-            current_sid: SecurityId::initial(InitialSid::Unlabeled),
-            previous_sid: SecurityId::initial(InitialSid::Unlabeled),
+            current_sid: SecurityId::initial(initial_sid),
+            previous_sid: SecurityId::initial(initial_sid),
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
