@@ -46,6 +46,8 @@ TEST_F(PowerLibTest, ElementBuilderFilledOut) {
       fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
   fidl::Endpoints<fuchsia_power_broker::Lessor> lessor =
       fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>().value();
 
   fdf_power::ElementDesc desc = fdf_power::ElementDescBuilder(config, std::move(tokens))
                                     .SetAssertiveToken(active_event.borrow())
@@ -53,9 +55,11 @@ TEST_F(PowerLibTest, ElementBuilderFilledOut) {
                                     .SetCurrentLevel(std::move(current_level.server))
                                     .SetRequiredLevel(std::move(required_level.server))
                                     .SetLessor(std::move(lessor.server))
+                                    .SetElementControl(std::move(element_control.server))
                                     .Build();
 
   ASSERT_TRUE(desc.lessor_server_.is_valid());
+  ASSERT_TRUE(desc.element_control_server_.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.second.is_valid());
 
@@ -65,12 +69,15 @@ TEST_F(PowerLibTest, ElementBuilderFilledOut) {
   ASSERT_EQ(desc.current_level_client_, std::nullopt);
   ASSERT_EQ(desc.required_level_client_, std::nullopt);
   ASSERT_EQ(desc.lessor_client_, std::nullopt);
+  ASSERT_EQ(desc.element_control_client_, std::nullopt);
 
   check_channels_peered(current_level.client.handle()->get(),
                         desc.level_control_servers_.first.handle()->get());
   check_channels_peered(required_level.client.handle()->get(),
                         desc.level_control_servers_.second.handle()->get());
   check_channels_peered(lessor.client.handle()->get(), desc.lessor_server_.handle()->get());
+  check_channels_peered(element_control.client.handle()->get(),
+                        desc.element_control_server_.handle()->get());
 }
 
 TEST_F(PowerLibTest, ElementBuilderMissingCurrentLevel) {
@@ -86,15 +93,19 @@ TEST_F(PowerLibTest, ElementBuilderMissingCurrentLevel) {
       fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
   fidl::Endpoints<fuchsia_power_broker::Lessor> lessor =
       fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>().value();
 
   fdf_power::ElementDesc desc = fdf_power::ElementDescBuilder(config, std::move(tokens))
                                     .SetAssertiveToken(active_event.borrow())
                                     .SetOpportunisticToken(passive_event.borrow())
                                     .SetRequiredLevel(std::move(required_level.server))
                                     .SetLessor(std::move(lessor.server))
+                                    .SetElementControl(std::move(element_control.server))
                                     .Build();
 
   ASSERT_TRUE(desc.lessor_server_.is_valid());
+  ASSERT_TRUE(desc.element_control_server_.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.second.is_valid());
 
@@ -104,12 +115,15 @@ TEST_F(PowerLibTest, ElementBuilderMissingCurrentLevel) {
   ASSERT_TRUE(desc.current_level_client_.has_value());
   ASSERT_EQ(desc.required_level_client_, std::nullopt);
   ASSERT_EQ(desc.lessor_client_, std::nullopt);
+  ASSERT_EQ(desc.element_control_client_, std::nullopt);
 
   check_channels_peered(desc.current_level_client_->handle()->get(),
                         desc.level_control_servers_.first.handle()->get());
   check_channels_peered(required_level.client.handle()->get(),
                         desc.level_control_servers_.second.handle()->get());
   check_channels_peered(lessor.client.handle()->get(), desc.lessor_server_.handle()->get());
+  check_channels_peered(element_control.client.handle()->get(),
+                        desc.element_control_server_.handle()->get());
 }
 
 TEST_F(PowerLibTest, ElementBuilderMin) {
@@ -124,9 +138,11 @@ TEST_F(PowerLibTest, ElementBuilderMin) {
   ASSERT_TRUE(desc.required_level_client_.value().is_valid());
 
   ASSERT_NE(desc.lessor_client_, std::nullopt);
+  ASSERT_NE(desc.element_control_client_, std::nullopt);
   ASSERT_TRUE(desc.required_level_client_.value().is_valid());
 
   ASSERT_TRUE(desc.lessor_server_.is_valid());
+  ASSERT_TRUE(desc.element_control_server_.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers_.second.is_valid());
 
@@ -137,7 +153,8 @@ TEST_F(PowerLibTest, ElementBuilderMin) {
                         desc.level_control_servers_.first.handle()->get());
   check_channels_peered(desc.required_level_client_->handle()->get(),
                         desc.level_control_servers_.second.handle()->get());
-  check_channels_peered(desc.lessor_client_->handle()->get(), desc.lessor_server_.handle()->get());
+  check_channels_peered(desc.element_control_client_->handle()->get(),
+                        desc.element_control_server_.handle()->get());
 }
 
 }  // namespace power_lib_test

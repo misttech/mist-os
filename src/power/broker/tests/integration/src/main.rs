@@ -1559,39 +1559,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn test_element_control_in_element_schema_closes_returned_channel() -> Result<()> {
-        let mut executor = fasync::TestExecutor::new();
-        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
-
-        // Create a topology with only one element:
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-        let (_current, current_server) = create_proxy::<CurrentLevelMarker>()?;
-        let (_required, required_server) = create_proxy::<RequiredLevelMarker>()?;
-        let (_lessor, lessor_server) = create_proxy::<LessorMarker>()?;
-        let (element_control, element_control_server) = create_proxy::<ElementControlMarker>()?;
-        let element_control_from_server = executor.run_singlethreaded(async {
-            topology
-                .add_element(ElementSchema {
-                    element_name: Some("E".into()),
-                    initial_current_level: Some(0),
-                    valid_levels: Some(vec![0, 1, 2]),
-                    level_control_channels: Some(fpb::LevelControlChannels {
-                        current: current_server,
-                        required: required_server,
-                    }),
-                    lessor_channel: Some(lessor_server),
-                    element_control: Some(element_control_server),
-                    ..Default::default()
-                })
-                .await
-                .unwrap()
-                .expect("add_element failed")
-        });
-        assert!(element_control_from_server.into_proxy()?.is_closed());
-        assert!(!element_control.is_closed());
-
-        Ok(())
-    }
 }

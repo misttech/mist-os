@@ -49,8 +49,7 @@ zx::result<> FakeParent::Start() {
         fdf_power::ElementDescBuilder(*power_config, std::move(tokens)).Build();
 
     fidl::ClientEnd<fuchsia_power_broker::Topology> broker = std::move(power_broker_req.value());
-    fit::result<fdf_power::Error, fuchsia_power_broker::TopologyAddElementResponse> add_result =
-        fdf_power::AddElement(broker, description);
+    auto add_result = fdf_power::AddElement(broker, description);
 
     topology_client_ =
         fidl::WireClient<fuchsia_power_broker::Topology>(std::move(broker), dispatcher());
@@ -58,7 +57,6 @@ zx::result<> FakeParent::Start() {
     if (!add_result.is_ok()) {
       return zx::error(ZX_ERR_INTERNAL);
     }
-    element_ctrl_ = std::move(add_result->element_control_channel());
   }
 
   // Add a child

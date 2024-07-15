@@ -61,9 +61,11 @@ impl PowerElement {
         // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
         let power_levels: Vec<u8> = (0..=POWER_ON_LEVEL).collect();
         let (lessor, lessor_server_end) = fidl::endpoints::create_proxy::<fbroker::LessorMarker>()?;
+        let (element_control, element_control_server_end) =
+            fidl::endpoints::create_endpoints::<fbroker::ElementControlMarker>();
         let random_string: String =
             rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
-        let power_element = topology
+        topology
             .add_element(fbroker::ElementSchema {
                 element_name: Some(format!("session-manager-element-{random_string}")),
                 initial_current_level: Some(POWER_ON_LEVEL),
@@ -77,6 +79,7 @@ impl PowerElement {
                     ],
                 }]),
                 lessor_channel: Some(lessor_server_end),
+                element_control: Some(element_control_server_end),
                 ..Default::default()
             })
             .await?
@@ -101,7 +104,7 @@ impl PowerElement {
             .into_client_end()
             .expect("Proxy should be in a valid state to convert into client end");
 
-        Ok(Self { power_element, lease: Some(lease) })
+        Ok(Self { power_element: element_control, lease: Some(lease) })
     }
 
     pub fn take_lease(&mut self) -> Option<ClientEnd<fbroker::LeaseControlMarker>> {

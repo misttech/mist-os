@@ -145,8 +145,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
 
   void AddElement(fuchsia_power_broker::ElementSchema& request,
                   AddElementCompleter::Sync& completer) override {
-    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
-    element_control_server_ = std::move(element_control->server);
+    element_control_server_ = std::move(*request.element_control());
     if (request.lessor_channel()) {
       fidl::BindServer<fuchsia_power_broker::Lessor>(
           fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.lessor_channel()),
@@ -162,11 +161,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
           std::move(request.level_control_channels()->current()), &current_level_);
     }
 
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control->client)},
-    };
-
-    completer.Reply(fit::success(std::move(result)));
+    completer.Reply(fit::success());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,

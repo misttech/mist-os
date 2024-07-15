@@ -423,14 +423,15 @@ fit::result<Error, TokenMap> GetDependencyTokens(
   return zx::ok(std::move(tokens));
 }
 
-fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
+fit::result<Error> AddElement(
     fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
     const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,
-    std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor) {
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control) {
   // Get the power levels we should have
   std::vector<fuchsia_power_broker::PowerLevel> levels = PowerLevelsFromConfig(config);
   if (levels.size() == 0) {
@@ -525,6 +526,9 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
   if (lessor.has_value()) {
     schema.lessor_channel() = std::move(lessor.value());
   }
+  if (element_control.has_value()) {
+    schema.element_control() = std::move(element_control.value());
+  }
 
   // Steal the underlying channel
   fidl::WireSyncClient<fuchsia_power_broker::Topology> pb(
@@ -545,15 +549,16 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
     return fit::error(Error::INVALID_ARGS);
   }
 
-  return fit::success(fidl::ToNatural(std::move(*add_result->value())));
+  return fit::success();
 }
 
-fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
-    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker, ElementDesc& description) {
+fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
+                              ElementDesc& description) {
   return AddElement(
       power_broker, description.element_config_, std::move(description.tokens_),
       description.assertive_token_.borrow(), description.opportunistic_token_.borrow(),
-      std::move(description.level_control_servers_), std::move(description.lessor_server_));
+      std::move(description.level_control_servers_), std::move(description.lessor_server_),
+      std::move(description.element_control_server_));
 }
 
 }  // namespace fdf_power

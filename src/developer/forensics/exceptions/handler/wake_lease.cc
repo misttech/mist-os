@@ -12,6 +12,7 @@
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <tuple>
 #include <utility>
 
 #include "src/developer/forensics/exceptions/constants.h"
@@ -25,7 +26,8 @@ namespace {
 namespace fpb = fuchsia_power_broker;
 namespace fps = fuchsia_power_system;
 
-fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Lessor> server_end,
+fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Lessor> lessor_server,
+                               fidl::ServerEnd<fpb::ElementControl> element_control_server,
                                fpb::LevelControlChannels level_control_channels,
                                const std::string& element_name) {
   fpb::LevelDependency dependency(
@@ -38,7 +40,8 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
   fpb::ElementSchema schema;
   schema.element_name(element_name)
       .initial_current_level(kPowerLevelInactive)
-      .lessor_channel(std::move(server_end))
+      .lessor_channel(std::move(lessor_server))
+      .element_control(std::move(element_control_server))
       .level_control_channels(std::move(level_control_channels))
       .valid_levels(std::vector<uint8_t>({
           kPowerLevelInactive,
@@ -117,6 +120,15 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
           return;
         }
 
+        zx::result<fidl::Endpoints<fpb::ElementControl>> element_control_endpoints =
+            fidl::CreateEndpoints<fpb::ElementControl>();
+        if (element_control_endpoints.is_error()) {
+          FX_LOGS(ERROR) << "Couldn't create FIDL endpoints: "
+                         << element_control_endpoints.status_string();
+          completer.complete_error(Error::kConnectionError);
+          return;
+        }
+
         zx::result<fidl::Endpoints<fpb::CurrentLevel>> current_level_endpoints =
             fidl::CreateEndpoints<fpb::CurrentLevel>();
         if (!current_level_endpoints.is_ok()) {
@@ -142,9 +154,10 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
 
         fpb::ElementSchema schema = BuildSchema(
             std::move(result->execution_state()->opportunistic_dependency_token()).value(),
-            std::move(lessor_endpoints->server), std::move(level_control_endpoints),
-            power_element_name_);
+            std::move(lessor_endpoints->server), std::move(element_control_endpoints->server),
+            std::move(level_control_endpoints), power_element_name_);
 
+        element_control_.Bind(std::move(element_control_endpoints->client), dispatcher_);
         lessor_.Bind(std::move(lessor_endpoints->client), dispatcher_);
         current_level_client_.Bind(std::move(current_level_endpoints->client), dispatcher_);
         required_level_client_.Bind(std::move(required_level_endpoints->client), dispatcher_);
@@ -158,6 +171,7 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
                 FX_LOGS(ERROR) << "Failed to add element to topology: "
                                << result.error_value().FormatDescription();
 
+                std::ignore = element_control_.UnbindMaybeGetEndpoint();
                 std::ignore = lessor_.UnbindMaybeGetEndpoint();
                 std::ignore = current_level_client_.UnbindMaybeGetEndpoint();
                 std::ignore = required_level_client_.UnbindMaybeGetEndpoint();
@@ -165,8 +179,6 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
                 completer.complete_error(Error::kBadValue);
                 return;
               }
-
-              element_control_channel_ = std::move(result.value().element_control_channel());
 
               WatchRequiredLevel();
               completer.complete_ok();

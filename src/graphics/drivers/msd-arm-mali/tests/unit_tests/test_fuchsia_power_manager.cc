@@ -234,11 +234,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control_client_end)},
-    };
-
-    completer.Reply(fit::success(std::move(result)));
+    completer.Reply(fit::success());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,

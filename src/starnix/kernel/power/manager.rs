@@ -143,6 +143,8 @@ impl SuspendResumeManager {
         {
             // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
             let power_levels: Vec<u8> = (0..=STARNIX_POWER_ON_LEVEL).collect();
+            let (element_control, element_control_server_end) =
+                create_sync_proxy::<fbroker::ElementControlMarker>();
             let (lessor, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
             let (current_level, current_level_server_end) =
                 create_sync_proxy::<fbroker::CurrentLevelMarker>();
@@ -152,7 +154,7 @@ impl SuspendResumeManager {
                 current: current_level_server_end,
                 required: required_level_server_end,
             };
-            let element = topology
+            topology
                 .add_element(
                     fbroker::ElementSchema {
                         element_name: Some("starnix-power-mode".into()),
@@ -166,6 +168,7 @@ impl SuspendResumeManager {
                                 fsystem::ApplicationActivityLevel::Active.into_primitive(),
                             ],
                         }]),
+                        element_control: Some(element_control_server_end),
                         lessor_channel: Some(lessor_server_end),
                         level_control_channels: Some(level_control_channels),
                         ..Default::default()
@@ -183,7 +186,7 @@ impl SuspendResumeManager {
 
             self.power_mode
                 .set(PowerElement {
-                    element_proxy: element.into_sync_proxy(),
+                    element_proxy: element_control,
                     lessor_proxy: lessor,
                     level_proxy: Some(current_level),
                 })
@@ -501,7 +504,9 @@ impl WakeLease {
             let power_levels: Vec<u8> =
                 (0..=fbroker::BinaryPowerLevel::On.into_primitive()).collect();
             let (lessor_proxy, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
-            let element_proxy = topology
+            let (element_proxy, element_server_end) =
+                create_sync_proxy::<fbroker::ElementControlMarker>();
+            topology
                 .add_element(
                     fbroker::ElementSchema {
                         element_name: Some(format!("starnix-wake-lock-{}", self.name)),
@@ -518,13 +523,13 @@ impl WakeLease {
                             ],
                         }]),
                         lessor_channel: Some(lessor_server_end),
+                        element_control: Some(element_server_end),
                         ..Default::default()
                     },
                     zx::Time::INFINITE,
                 )
                 .map_err(|e| errno!(EINVAL, format!("PowerBroker::AddElement fidl error ({e:?})")))?
-                .map_err(|e| errno!(EINVAL, format!("PowerBroker::AddElementError ({e:?})")))?
-                .into_sync_proxy();
+                .map_err(|e| errno!(EINVAL, format!("PowerBroker::AddElementError ({e:?})")))?;
             Ok(PowerElement { element_proxy, lessor_proxy, level_proxy: None })
         })
     }

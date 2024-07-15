@@ -54,7 +54,7 @@ class FakeTokenServer : public fidl::WireServer<fuchsia_hardware_power::PowerTok
 class PowerElement {
  public:
   explicit PowerElement(
-      fidl::ServerEnd<fuchsia_power_broker::ElementControl> ec,
+      std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> ec,
       std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
       std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level,
       std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level)
@@ -64,7 +64,7 @@ class PowerElement {
         required_level_(std::move(required_level)) {}
 
  private:
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
+  std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level_;
@@ -89,26 +89,19 @@ class TopologyServer : public fidl::Server<fuchsia_power_broker::Topology> {
     }
 
     // Make channels to return to client
-    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
-
     if (req.level_control_channels().has_value()) {
-      PowerElement element{std::move(element_control->server), std::move(req.lessor_channel()),
+      PowerElement element{std::move(req.element_control()), std::move(req.lessor_channel()),
                            std::move(req.level_control_channels().value().current()),
                            std::move(req.level_control_channels().value().required())};
 
       clients_.emplace_back(std::move(element));
     } else {
-      PowerElement element{std::move(element_control->server), std::move(req.lessor_channel()),
+      PowerElement element{std::move(req.element_control()), std::move(req.lessor_channel()),
                            std::nullopt, std::nullopt};
 
       clients_.emplace_back(std::move(element));
     }
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control->client)},
-    };
-    fit::success<fuchsia_power_broker::TopologyAddElementResponse> success(std::move(result));
-
-    completer.Reply(std::move(success));
+    completer.Reply(fit::success());
   }
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
@@ -197,9 +190,9 @@ TEST_F(PowerLibTest, AddElementNoDep) {
   // Call add element
   fidl::Arena arena;
   zx::event invalid, invalid2;
-  auto call_result =
-      fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config), std::move(tokens),
-                            invalid.borrow(), invalid2.borrow(), std::nullopt, std::nullopt);
+  auto call_result = fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config),
+                                           std::move(tokens), invalid.borrow(), invalid2.borrow(),
+                                           std::nullopt, std::nullopt, std::nullopt);
   ASSERT_TRUE(call_result.is_ok());
   loop.Shutdown();
   loop.JoinThreads();
@@ -293,9 +286,9 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
   // Call add element
   fidl::Arena arena;
   zx::event invalid1, invalid2;
-  auto call_result =
-      fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config), std::move(tokens),
-                            invalid1.borrow(), invalid2.borrow(), std::nullopt, std::nullopt);
+  auto call_result = fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config),
+                                           std::move(tokens), invalid1.borrow(), invalid2.borrow(),
+                                           std::nullopt, std::nullopt, std::nullopt);
 
   ASSERT_TRUE(call_result.is_ok());
 
@@ -423,9 +416,9 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   // Call add element
   fidl::Arena arena;
   zx::event invalid1, invalid2;
-  auto call_result =
-      fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config), std::move(tokens),
-                            invalid1.borrow(), invalid2.borrow(), std::nullopt, std::nullopt);
+  auto call_result = fdf_power::AddElement(endpoints.client, fidl::ToWire(arena, df_config),
+                                           std::move(tokens), invalid1.borrow(), invalid2.borrow(),
+                                           std::nullopt, std::nullopt, std::nullopt);
 
   ASSERT_TRUE(call_result.is_ok());
 

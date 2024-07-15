@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.broker/cpp/markers.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/zx/event.h>
@@ -77,11 +78,13 @@ struct ElementDesc {
             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>
       level_control_servers_;
   fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_server_;
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
 
   // The below are created if the caller did not supply their corresponding server end
   std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_;
   std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_;
   std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_;
 };
 
 /// Given a `PowerElementConfiguration` from driver framework, convert this
@@ -153,9 +156,6 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 /// can pass in tokens to be registered for granting assertive and opportunistic
 /// dependency access on the created element.
 ///
-/// Returns the response from power broker if successful which includes
-/// channels to further control the created power element.
-///
 /// Error
 ///   - Error::DEPENDENCY_NOT_FOUND if there is a dependency specified by
 ///     `config` which is to found in `tokens`.
@@ -163,22 +163,20 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 ///     duplicate a token and therefore assume it must have been invalid, or
 ///     the call to power broker fails for any reason *other* than a closed
 ///     channel.
-fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
+fit::result<Error> AddElement(
     fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
     const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,
-    std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor);
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control);
 
 /// Call `AddElement` on the `power_broker` channel passed in.
 /// This function uses `ElementDescription` passed in to make the proper call
 /// to `fuchsia.power.broker/Topology.AddElement`. See `ElementDescription` for
 /// more information about what fields are inputs to `AddElement`.
-///
-/// Returns the response from power broker if successful which includes
-/// channels to further control the created power element.
 ///
 /// Error
 ///   - Error::DEPENDENCY_NOT_FOUND if there is a dependency specified by
@@ -187,8 +185,8 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
 ///     duplicate a token and therefore assume it must have been invalid, or
 ///     the call to power broker fails for any reason *other* than a closed
 ///     channel.
-fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
-    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker, ElementDesc& description);
+fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
+                              ElementDesc& description);
 }  // namespace fdf_power
 
 #endif  // LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_

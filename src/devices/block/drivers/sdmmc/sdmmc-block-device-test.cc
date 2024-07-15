@@ -228,10 +228,8 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>& required_level_server_end =
         req.level_control_channels().value().required();
     fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
-
-    // Make channels to return to client
-    auto [element_control_client_end, element_control_server_end] =
-        fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
+    fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server_end =
+        req.element_control().value();
 
     // Instantiate (fake) element control implementation.
     auto element_control_impl = std::make_unique<FakeElementControl>();
@@ -299,11 +297,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control_client_end)},
-    };
-
-    completer.Reply(fit::success(std::move(result)));
+    completer.Reply(fit::success());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,

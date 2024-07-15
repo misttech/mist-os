@@ -70,7 +70,7 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
 
     if (config.element().name().get() == kHardwarePowerElementName) {
       hardware_power_element_control_client_end_ =
-          std::move(result.value().element_control_channel());
+          std::move(description.element_control_client_.value());
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       hardware_power_current_level_client_ =

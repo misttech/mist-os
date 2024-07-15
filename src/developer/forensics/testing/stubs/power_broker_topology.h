@@ -112,12 +112,7 @@ class PowerBrokerTopologyDelaysResponse : public PowerBrokerTopologyBase {
   void PopResponse();
 
  private:
-  struct QueuedResponse {
-    AddElementCompleter::Async completer;
-    fuchsia_power_broker::TopologyAddElementResponse response;
-  };
-
-  std::queue<QueuedResponse> queued_responses_;
+  std::queue<AddElementCompleter::Async> queued_completers_;
 };
 
 class PowerBrokerTopologyClosesConnection : public FidlServer<fuchsia_power_broker::Topology> {
