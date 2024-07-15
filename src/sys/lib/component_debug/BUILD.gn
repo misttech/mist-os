@@ -21,7 +21,7 @@ rustc_library("component_debug") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-url",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//src/sys/lib/cm_fidl_validator",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",

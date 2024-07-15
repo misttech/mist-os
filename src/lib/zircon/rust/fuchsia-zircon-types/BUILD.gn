@@ -1,0 +1,36 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_test.gni")
+
+_common_deps = [ "//third_party/rust_crates:zerocopy" ]
+_common_sources = [ "src/lib.rs" ]
+
+rustc_library("fuchsia-zircon-types") {
+  version = "0.1.0"
+  edition = "2021"
+  sources = _common_sources
+  deps = _common_deps
+  features = [ "zerocopy" ]
+}
+
+rustc_test("types-tests") {
+  name = "fuchsia_zircon_types_tests"
+  edition = "2021"
+  sources = _common_sources
+  deps = _common_deps
+  features = [ "zerocopy" ]
+}
+
+fuchsia_unittest_package("fuchsia-zircon-types-tests") {
+  component_name = "fuchsia-zircon-types-tests"
+  deps = [ ":types-tests" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":fuchsia-zircon-types-tests" ]
+}

@@ -74,41 +74,9 @@ rustc_library("fuchsia-cprng") {
 
 # LINT.ThenChange(BUILD.bazel)
 
-rustc_library("fuchsia-zircon-types") {
-  version = "0.1.0"
-  edition = "2021"
-  source_root = "fuchsia-zircon-types/src/lib.rs"
-  deps = [ "//third_party/rust_crates:zerocopy" ]
-  sources = [ "fuchsia-zircon-types/src/lib.rs" ]
-  features = [ "zerocopy" ]
-}
-
-rustc_test("fuchsia-zircon-types-tests") {
-  name = "fuchsia_zircon_types_tests"
-  edition = "2021"
-  source_root = "fuchsia-zircon-types/src/lib.rs"
-  deps = [ "//third_party/rust_crates:zerocopy" ]
-  sources = [ "fuchsia-zircon-types/src/lib.rs" ]
-  features = [ "zerocopy" ]
-}
-
-rustc_library("fuchsia-zircon-status") {
-  version = "0.1.0"
-  edition = "2021"
-  source_root = "fuchsia-zircon-status/src/lib.rs"
-  deps = [ ":fuchsia-zircon-types" ]
-
-  sources = [ "fuchsia-zircon-status/src/lib.rs" ]
-}
-
-rustc_test("fuchsia-zircon-status-tests") {
-  name = "fuchsia_zircon_status_tests"
-  edition = "2021"
-  source_root = "fuchsia-zircon-status/src/lib.rs"
-
-  deps = [ "//src/lib/zircon/rust:fuchsia-zircon-types" ]
-
-  sources = [ "fuchsia-zircon-status/src/lib.rs" ]
+# Left as forwarding target for vendor/ deps.
+group("fuchsia-zircon-status") {
+  public_deps = [ "//src/lib/zircon/rust/fuchsia-zircon-status" ]
 }
 
 # Certain tests written as unit tests of fuchsia-zircon make use of other
@@ -166,11 +134,6 @@ fuchsia_unittest_component("fuchsia-cprng_test-component") {
   deps = [ ":fuchsia-cprng_test" ]
 }
 
-fuchsia_unittest_component("fuchsia-zircon-status-component") {
-  component_name = "fuchsia-zircon-status"
-  deps = [ ":fuchsia-zircon-status-tests" ]
-}
-
 fuchsia_unittest_component("fuchsia-zircon-tests-component") {
   component_name = "fuchsia-zircon-tests"
   manifest = "meta/fuchsia_zircon_tests.cml"
@@ -178,17 +141,10 @@ fuchsia_unittest_component("fuchsia-zircon-tests-component") {
   test_type = "system"
 }
 
-fuchsia_unittest_component("fuchsia-zircon-types-tests-component") {
-  component_name = "fuchsia-zircon-types-tests"
-  deps = [ ":fuchsia-zircon-types-tests" ]
-}
-
 fuchsia_test_package("fuchsia-zircon-tests") {
   test_components = [
     ":fuchsia-cprng_test-component",
-    ":fuchsia-zircon-status-component",
     ":fuchsia-zircon-tests-component",
-    ":fuchsia-zircon-types-tests-component",
   ]
   deps = [
     ":exit_with_code_util",
@@ -206,5 +162,9 @@ fuchsia_test_package("fuchsia-zircon-tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":fuchsia-zircon-tests" ]
+  deps = [
+    ":fuchsia-zircon-tests",
+    "fuchsia-zircon-status:tests",
+    "fuchsia-zircon-types:tests",
+  ]
 }

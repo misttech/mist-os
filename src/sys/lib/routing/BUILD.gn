@@ -36,7 +36,7 @@ rustc_library("routing") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/from-enum",
     "//src/lib/versioning/version-history/rust:version-history",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//src/sys/component_manager/lib/router_error",
     "//src/sys/component_manager/lib/sandbox",
     "//src/sys/lib/cm_config",
