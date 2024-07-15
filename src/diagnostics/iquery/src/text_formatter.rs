@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::{InspectData, InspectHandleName};
+use diagnostics_data::{InspectData, InspectHandleName, InspectMetadata};
 use diagnostics_hierarchy::{
     ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
 };
@@ -27,27 +27,40 @@ pub fn output_schema<W>(w: &mut W, schema: &InspectData) -> fmt::Result
 where
     W: fmt::Write,
 {
-    writeln!(w, "{}:", schema.moniker)?;
+    let InspectData {
+        moniker,
+        metadata: InspectMetadata { errors, name, component_url, timestamp, escrowed },
+        payload,
+        data_source: _,
+        version: _,
+    } = schema;
+
+    writeln!(w, "{moniker}:")?;
     writeln!(w, "  metadata:")?;
-    if let Some(errors) = &schema.metadata.errors {
-        writeln!(w, "    errors = {}", errors.join(", "))?;
+    if let Some(errors) = &errors {
+        let errors = errors.join(", ");
+        writeln!(w, "    errors = {errors}")?;
     }
 
-    if let Some(name) = &schema.metadata.name {
+    if let Some(name) = &name {
         match name {
             InspectHandleName::Filename(f) => {
-                writeln!(w, "    filename = {}", f)?;
+                writeln!(w, "    filename = {f}")?;
             }
             InspectHandleName::Name(n) => {
-                writeln!(w, "    name = {}", n)?;
+                writeln!(w, "    name = {n}")?;
             }
         }
     }
 
-    writeln!(w, "    component_url = {}", schema.metadata.component_url)?;
-    writeln!(w, "    timestamp = {}", schema.metadata.timestamp)?;
+    writeln!(w, "    component_url = {component_url}")?;
+    writeln!(w, "    timestamp = {timestamp}")?;
 
-    match &schema.payload {
+    if *escrowed {
+        writeln!(w, "    escrowed = true")?;
+    }
+
+    match &payload {
         Some(hierarchy) => {
             writeln!(w, "  payload:")?;
             output_hierarchy(w, &hierarchy, 2)
@@ -376,6 +389,7 @@ impl NumberFormat for f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use diagnostics_data::InspectDataBuilder;
     use test_case::test_case;
 
     #[fuchsia::test]
@@ -812,5 +826,20 @@ mod tests {
         bounds: (i64, i64),
     ) {
         assert_eq!(exponential_bucket_bounds(args), bounds);
+    }
+
+    #[fuchsia::test]
+    fn render_escrowed_data() {
+        let data = InspectDataBuilder::new("a/b/c/d", "test-url", 123456i64).escrowed(true).build();
+        let mut buf = String::new();
+        output_schema(&mut buf, &data).unwrap();
+        let expected = r#"a/b/c/d:
+  metadata:
+    component_url = test-url
+    timestamp = 123456
+    escrowed = true
+  payload: null
+"#;
+        assert_eq!(expected, buf);
     }
 }
