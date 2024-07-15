@@ -15,6 +15,7 @@ rustc_library("windowed-stats") {
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia-async",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:thiserror",
   ]
@@ -25,6 +26,8 @@ rustc_library("windowed-stats") {
     "src/aggregations.rs",
     "src/experimental/clock.rs",
     "src/experimental/mod.rs",
+    "src/experimental/series/mod.rs",
+    "src/experimental/series/statistic.rs",
     "src/experimental/vec1.rs",
     "src/lib.rs",
   ]
