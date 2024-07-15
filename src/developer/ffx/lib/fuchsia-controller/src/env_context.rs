@@ -94,7 +94,6 @@ impl EnvContext {
                 version_history::HISTORY.get_misleading_version_for_ffx().api_level,
             ),
             node,
-            None,
             target_spec,
         ));
         Ok(Self { context, injector, lib_ctx })

@@ -17,7 +17,6 @@ if (is_host) {
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/rcs:lib",
-      "//src/developer/ffx/lib/writer:lib",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",

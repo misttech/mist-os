@@ -13,7 +13,6 @@ use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
 use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
 use ffx_metrics::add_ffx_rcs_protocol_event;
 use ffx_target::{get_remote_proxy, open_target_with_fut};
-use ffx_writer::{Format, Writer};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx::{DaemonError, DaemonProxy, TargetInfo, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -88,7 +87,6 @@ impl<T: Proxy + Clone> ProxyState<T> {
 pub struct Injection {
     env_context: EnvironmentContext,
     daemon_check: DaemonVersionCheck,
-    format: Option<Format>,
     target_spec: Option<String>,
     node: Arc<overnet_core::Router>,
     daemon_once: ProxyState<DaemonProxy>,
@@ -108,14 +106,12 @@ impl Injection {
         env_context: EnvironmentContext,
         daemon_check: DaemonVersionCheck,
         node: Arc<overnet_core::Router>,
-        format: Option<Format>,
         target_spec: Option<String>,
     ) -> Self {
         Self {
             env_context,
             daemon_check,
             node,
-            format,
             target_spec,
             daemon_once: Default::default(),
             remote_once: Default::default(),
@@ -127,7 +123,6 @@ impl Injection {
         env_context: EnvironmentContext,
         router_interval: Option<Duration>,
         daemon_check: DaemonVersionCheck,
-        format: Option<Format>,
     ) -> ffx_command_error::Result<Injection> {
         tracing::debug!("Initializing Overnet");
         let node = overnet_core::Router::new(router_interval)
@@ -135,7 +130,7 @@ impl Injection {
         tracing::debug!("Getting target");
         let target_spec = ffx_target::get_target_specifier(&env_context).await?;
         tracing::debug!("Building Injection");
-        Ok(Injection::new(env_context, daemon_check, node, format, target_spec))
+        Ok(Injection::new(env_context, daemon_check, node, target_spec))
     }
 
     #[tracing::instrument]
@@ -292,10 +287,6 @@ impl Injector for Injection {
 
     async fn build_info(&self) -> Result<VersionInfo> {
         Ok::<VersionInfo, anyhow::Error>(ffx_build_version::build_info())
-    }
-
-    async fn writer(&self) -> Result<Writer> {
-        Ok(Writer::new(self.format))
     }
 }
 
@@ -792,7 +783,6 @@ mod test {
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
             local_node,
-            None,
             Some("".into()),
         );
 
