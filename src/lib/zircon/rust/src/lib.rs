@@ -341,7 +341,9 @@ pub(crate) fn object_get_info_vec<Q: ObjectQuery>(
 }
 
 /// Get a property on a zircon object
-pub fn object_get_property<P: PropertyQuery>(handle: HandleRef<'_>) -> Result<P::PropTy, Status> {
+pub(crate) fn object_get_property<P: PropertyQuery>(
+    handle: HandleRef<'_>,
+) -> Result<P::PropTy, Status> {
     // this is safe due to the contract on the P::PropTy type in the ObjectProperty trait.
     let mut out = ::std::mem::MaybeUninit::<P::PropTy>::uninit();
     let status = unsafe {
@@ -356,7 +358,7 @@ pub fn object_get_property<P: PropertyQuery>(handle: HandleRef<'_>) -> Result<P:
 }
 
 /// Set a property on a zircon object
-pub fn object_set_property<P: PropertyQuery>(
+pub(crate) fn object_set_property<P: PropertyQuery>(
     handle: HandleRef<'_>,
     val: &P::PropTy,
 ) -> Result<(), Status> {
@@ -474,14 +476,14 @@ mod tests {
     }
 }
 
-pub fn usize_into_u32(n: usize) -> Result<u32, ()> {
+pub(crate) fn usize_into_u32(n: usize) -> Result<u32, ()> {
     if n > ::std::u32::MAX as usize || n < ::std::u32::MIN as usize {
         return Err(());
     }
     Ok(n as u32)
 }
 
-pub fn size_to_u32_sat(n: usize) -> u32 {
+pub(crate) fn size_to_u32_sat(n: usize) -> u32 {
     if n > ::std::u32::MAX as usize {
         return ::std::u32::MAX;
     }

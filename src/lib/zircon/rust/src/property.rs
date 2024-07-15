@@ -32,7 +32,7 @@ impl Deref for Property {
 /// It must be valid to treat `PropTy` as its corresponding property type and
 /// writing the property type to a `PropTy` must completely initialize it. That
 /// is, `PropTy` must be "transparent" over the property type.
-pub unsafe trait PropertyQuery {
+pub(crate) unsafe trait PropertyQuery {
     /// The raw `Property` value
     const PROPERTY: Property;
     /// The data type of this property
