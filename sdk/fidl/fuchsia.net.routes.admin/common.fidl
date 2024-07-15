@@ -4,7 +4,6 @@
 
 library fuchsia.net.routes.admin;
 
-using fuchsia.net.interfaces.admin;
 using fuchsia.net.routes;
 using zx;
 
@@ -100,11 +99,6 @@ closed protocol BaseRuleSet {
     strict AuthenticateForRouteTable(@generated_name("ProofOfRouteTableAuthorization") resource struct {
         table fuchsia.net.routes.TableId;
         token zx.Handle:<EVENT>;
-    }) -> () error RuleSetError;
-
-    /// Authenticates for an interface that will be used in a selector.
-    strict AuthenticateForInterface(resource struct {
-        credential fuchsia.net.interfaces.admin.ProofOfInterfaceAuthorization;
     }) -> () error RuleSetError;
 
     /// Removes a rule from this rule set.

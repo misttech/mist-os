@@ -276,12 +276,6 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                 let result = self.apply_rule_op(RuleOp::Remove { priority, index }).await;
                 ApplyRuleOpError::respond_result_with(result, responder)
             }
-            RuleSetRequest::AuthenticateForInterface { credential: _, responder } => {
-                // TODO(https://fxbug.dev/345315995): Implement authentication.
-                responder
-                    .send(Err(fnet_routes_admin::RuleSetError::BadAuthentication))
-                    .map(ControlFlow::Continue)
-            }
             RuleSetRequest::AuthenticateForRouteTable { table: _, token: _, responder } => {
                 // TODO(https://fxbug.dev/345315995): Implement authentication.
                 responder

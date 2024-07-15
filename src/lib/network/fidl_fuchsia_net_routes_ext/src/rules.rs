@@ -15,8 +15,8 @@ use futures::{Stream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Subnet};
 use thiserror::Error;
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
 };
 
 use crate::{impl_responder, FidlRouteIpExt, Responder, SliceResponder, WatcherCreationError};
@@ -267,10 +267,6 @@ pub trait FidlRuleAdminIpExt: Ip {
         Payload = Result<(), fnet_routes_admin::RuleSetError>,
         ControlHandle = Self::RuleSetControlHandle,
     >;
-    /// The responder for AuthenticateForInterface requests.
-    type RuleSetAuthenticateForInterfaceResponder: Responder<
-        Payload = Result<(), fnet_routes_admin::RuleSetError>,
-    >;
     /// The responder for AuthenticateForRouteTable requests.
     type RuleSetAuthenticateForRouteTableResponder: Responder<
         Payload = Result<(), fnet_routes_admin::RuleSetError>,
@@ -298,8 +294,6 @@ impl FidlRuleAdminIpExt for Ipv4 {
     type RuleSetRequestStream = fnet_routes_admin::RuleSetV4RequestStream;
     type RuleSetAddRuleResponder = fnet_routes_admin::RuleSetV4AddRuleResponder;
     type RuleSetRemoveRuleResponder = fnet_routes_admin::RuleSetV4RemoveRuleResponder;
-    type RuleSetAuthenticateForInterfaceResponder =
-        fnet_routes_admin::RuleSetV4AuthenticateForInterfaceResponder;
     type RuleSetAuthenticateForRouteTableResponder =
         fnet_routes_admin::RuleSetV4AuthenticateForRouteTableResponder;
     type RuleTableControlHandle = fnet_routes_admin::RuleTableV4ControlHandle;
@@ -325,8 +319,6 @@ impl FidlRuleAdminIpExt for Ipv6 {
     type RuleSetRequestStream = fnet_routes_admin::RuleSetV6RequestStream;
     type RuleSetAddRuleResponder = fnet_routes_admin::RuleSetV6AddRuleResponder;
     type RuleSetRemoveRuleResponder = fnet_routes_admin::RuleSetV6RemoveRuleResponder;
-    type RuleSetAuthenticateForInterfaceResponder =
-        fnet_routes_admin::RuleSetV6AuthenticateForInterfaceResponder;
     type RuleSetAuthenticateForRouteTableResponder =
         fnet_routes_admin::RuleSetV6AuthenticateForRouteTableResponder;
     type RuleTableControlHandle = fnet_routes_admin::RuleTableV6ControlHandle;
@@ -354,10 +346,6 @@ impl_responder!(
     Result<(), fnet_routes_admin::RuleSetError>,
 );
 impl_responder!(
-    fnet_routes_admin::RuleSetV4AuthenticateForInterfaceResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
-);
-impl_responder!(
     fnet_routes_admin::RuleSetV4AuthenticateForRouteTableResponder,
     Result<(), fnet_routes_admin::RuleSetError>,
 );
@@ -367,10 +355,6 @@ impl_responder!(
 );
 impl_responder!(
     fnet_routes_admin::RuleSetV6RemoveRuleResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
-);
-impl_responder!(
-    fnet_routes_admin::RuleSetV6AuthenticateForInterfaceResponder,
     Result<(), fnet_routes_admin::RuleSetError>,
 );
 impl_responder!(
@@ -710,13 +694,6 @@ pub enum RuleSetRequest<I: FidlRuleAdminIpExt> {
         /// The responder for this request.
         responder: I::RuleSetRemoveRuleResponder,
     },
-    /// Authenticates the rule set for managing routes on an interface.
-    AuthenticateForInterface {
-        /// The credential proving authorization for this interface.
-        credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
-        /// The responder for this request.
-        responder: I::RuleSetAuthenticateForInterfaceResponder,
-    },
     /// Authenticates the rule set for managing routes on a route table.
     AuthenticateForRouteTable {
         /// The table id of the table being authenticated for.
@@ -747,10 +724,6 @@ impl From<fnet_routes_admin::RuleSetV4Request> for RuleSetRequest<Ipv4> {
             fnet_routes_admin::RuleSetV4Request::RemoveRule { index, responder } => {
                 RuleSetRequest::RemoveRule { index: RuleIndex(index), responder }
             }
-            fnet_routes_admin::RuleSetV4Request::AuthenticateForInterface {
-                credential,
-                responder,
-            } => RuleSetRequest::AuthenticateForInterface { credential, responder },
             fnet_routes_admin::RuleSetV4Request::AuthenticateForRouteTable {
                 table,
                 token,
@@ -776,10 +749,6 @@ impl From<fnet_routes_admin::RuleSetV6Request> for RuleSetRequest<Ipv6> {
             fnet_routes_admin::RuleSetV6Request::RemoveRule { index, responder } => {
                 RuleSetRequest::RemoveRule { index: RuleIndex(index), responder }
             }
-            fnet_routes_admin::RuleSetV6Request::AuthenticateForInterface {
-                credential,
-                responder,
-            } => RuleSetRequest::AuthenticateForInterface { credential, responder },
             fnet_routes_admin::RuleSetV6Request::AuthenticateForRouteTable {
                 table,
                 token,
