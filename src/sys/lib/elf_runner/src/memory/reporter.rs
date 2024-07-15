@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use attribution::{AttributionServer, AttributionServerHandle};
+use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker, RequestStream};
 use futures::TryStreamExt;
 use std::sync::Arc;

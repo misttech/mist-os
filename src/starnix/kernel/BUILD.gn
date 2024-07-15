@@ -357,7 +357,7 @@ rustc_library("starnix_core") {
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/vulkan",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/performance/memory/attribution",
+    "//src/performance/memory/attribution/server",
     "//src/starnix/lib/ebpf",
     "//src/starnix/lib/extended_pstate:lib",
     "//src/starnix/lib/filter_methods_macro",

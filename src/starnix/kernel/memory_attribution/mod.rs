@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::iter;
 use std::sync::{mpsc, Arc, Weak};
 
-use attribution::{AttributionServer, AttributionServerHandle};
+use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::AsHandleRef;
 use fuchsia_zircon::HandleBased;
 use starnix_sync::Mutex;
@@ -77,7 +77,7 @@ impl MemoryAttributionManager {
     pub fn new_observer(
         &self,
         control_handle: fattribution::ProviderControlHandle,
-    ) -> attribution::Observer {
+    ) -> attribution_server::Observer {
         self.memory_attribution_server.new_observer(control_handle)
     }
 
@@ -93,7 +93,7 @@ impl MemoryAttributionManager {
     ///
     fn run(
         kernel: Weak<Kernel>,
-        publisher: mpsc::Receiver<attribution::Publisher>,
+        publisher: mpsc::Receiver<attribution_server::Publisher>,
         initial_state: mpsc::Receiver<InitialState>,
         waiter: sync::Waiter,
     ) {

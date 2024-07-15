@@ -502,7 +502,7 @@ impl Kernel {
     pub fn new_memory_attribution_observer(
         &self,
         control_handle: fattribution::ProviderControlHandle,
-    ) -> attribution::Observer {
+    ) -> attribution_server::Observer {
         self.memory_attribution_manager.new_observer(control_handle)
     }
 }
