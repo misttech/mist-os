@@ -186,7 +186,7 @@ pub(crate) struct Controller {
     pub core_state_v6: super::conversion::State<Ipv6>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum Event {
     Added(fnet_filter_ext::Resource),
     Removed(fnet_filter_ext::ResourceId),

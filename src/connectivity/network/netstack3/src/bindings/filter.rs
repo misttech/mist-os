@@ -17,7 +17,7 @@ use futures::future::FusedFuture as _;
 use futures::lock::Mutex;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
-use log::{error, warn};
+use log::{debug, error, warn};
 use thiserror::Error;
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
@@ -153,6 +153,8 @@ impl UpdateDispatcherInner {
 
         // Notify all existing watchers of the update, if it was not a no-op.
         if !events.is_empty() {
+            debug!("updated filtering state for {controller_id:?}: {events:?}");
+
             let events = events
                 .into_iter()
                 .map(|event| match event {

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use log::info;
 use net_types::ip::{Ipv4, Ipv6};
 use netstack3_base::{ContextPair, Inspector};
 
@@ -49,12 +48,6 @@ where
     ) -> Result<(), ValidationError<RuleInfo>> {
         let (v4_installed, v4_uninstalled) = ValidRoutines::new(v4)?;
         let (v6_installed, v6_uninstalled) = ValidRoutines::new(v6)?;
-
-        info!(
-            "updating filtering state:\nv4: {:?}\nv6: {:?}",
-            v4_installed.get(),
-            v6_installed.get(),
-        );
 
         self.core_ctx().with_all_filter_state_mut(|v4, v6| {
             v4.installed_routines = v4_installed;
