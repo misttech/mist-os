@@ -14,7 +14,7 @@
 extern "C" {
 
 {{ range . }}
-{{ if not .IsVdsoCall }}
+{{ if not .VdsoCall }}
 {{ $syscallName := LowerCaseWithUnderscores . }}
 {{ $userOutHandles := UserOutHandles . }}
 {{ $lastParamIndex := LastParameterIndex . }}
