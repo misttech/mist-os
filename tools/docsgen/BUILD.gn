@@ -8,6 +8,8 @@ import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 import("//build/sdk/sdk_documentation.gni")
 
+assert(!is_host, "These rules assume a non-host toolchain.")
+
 group("docsgen") {
   testonly = true
   deps = [ ":generated_docs" ]
@@ -112,13 +114,10 @@ compiled_action("invoke_clidoc") {
   tool_output_name = "clidoc"
   depfile = "$target_out_dir/$target_name.d"
   deps = [
-    "//sdk:host_tools",
-    sdk_host_tools_visibility_bridge_label,
-  ]
-
-  deps += [
+    "//sdk:host_tools_for_single_toolchain($host_toolchain)",
     "//src/developer/ffx/frontends/ffx:ffx_bin_unversioned($host_toolchain)",
     "//src/developer/ffx/tools($host_toolchain)",
+    sdk_host_tools_visibility_bridge_label,
 
     # TODO(https://fxbug.dev/42167576) check if triage belongs in sdk docs.
     "//src/diagnostics/triage:triage_bin",

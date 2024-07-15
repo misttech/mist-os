@@ -344,7 +344,7 @@ if (!is_host) {
           # TODO(https://fxbug.dev/349889250): Move host tools to
           # :fuchsia_idk_atoms_at_platform_for_host_cpu_arch_only and/or
           # :fuchsia_idk_atoms_for_each_api_level as appropriate.
-          ":host_tools",
+          ":host_tools_for_configured_host_cpus",
 
           # These host tests are (currently) unversioned and only need to be
           # built once.
@@ -571,99 +571,106 @@ sdk_collection("zircon_sysroot") {
   deps = [ "//zircon/public/sysroot/sdk:sysroot_sdk" ]
 }
 
-# Tools and data used on a 'host' development machine; where host is often
-# Linux or Mac OS.
-sdk_molecule("host_tools") {
-  visibility += [ "//tools/docsgen:invoke_clidoc" ]
+if (is_host) {
+  # Tools and data used on a host development machine (usually Linux or macOS).
+  sdk_molecule("host_tools_for_single_toolchain") {
+    visibility += [ "//tools/docsgen:invoke_clidoc" ]
 
-  category = "partner"
+    category = "partner"
 
-  _host_tools = [
-    "//src/developer/debug/zxdb:zxdb_sdk",
-    "//src/developer/ffx:bin_sdk",
-    "//src/developer/ffx/plugins/agis:sdk",
-    "//src/developer/ffx/plugins/assembly:sdk",
-    "//src/developer/ffx/plugins/audio:sdk",
-    "//src/developer/ffx/plugins/component:sdk",
-    "//src/developer/ffx/plugins/driver:sdk",
-    "//src/developer/ffx/plugins/debug:sdk",
-    "//src/developer/ffx/plugins/fuzz:sdk",
-    "//src/developer/ffx/plugins/emulator:uefi_internal",
-    "//src/developer/ffx/plugins/coverage:sdk",
-    "//src/developer/ffx/plugins/emulator:sdk",
-    "//src/developer/ffx/plugins/inspect:sdk",
-    "//src/developer/ffx/plugins/log:sdk",
-    "//src/developer/ffx/plugins/package:sdk",
-    "//src/developer/ffx/plugins/profile:sdk",
-    "//src/developer/ffx/plugins/product:sdk",
-    "//src/developer/ffx/plugins/process:sdk",
-    "//src/developer/ffx/plugins/repository:sdk",
-    "//src/developer/ffx/plugins/session:sdk",
-    "//src/developer/ffx/plugins/setui:sdk",
-    "//src/developer/ffx/plugins/scrutiny:sdk",
-    "//src/developer/ffx/plugins/test:sdk",
-    "//src/developer/ffx/plugins/trace:sdk",
-    "//src/developer/ffx/tools/starnix:sdk",
-    "//src/developer/ffx/plugins/wlan:sdk",
-    "//src/performance/trace2json:bin_sdk",
-    "//src/storage/bin/fvm:fvm_sdk",
-    "//src/storage/blobfs/tools:blobfs_sdk",
-    "//src/storage/minfs/tools:minfs_sdk",
-    "//src/storage/tools/blobfs-compression:blobfs-compression_sdk",
-    "//src/sys/pkg/bin/far:bin_sdk",
-    "//src/sys/pkg/bin/pm:pm_bin_sdk",
-    "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
-    "//tools/bindc:bindc_sdk",
-    "//tools/bootserver_old:bootserver_sdk",
-    "//tools/cmc:cmc_sdk",
-    "//tools/configc:configc_sdk",
-    "//tools/fidl/fidlc:fidl-format_sdk",
-    "//tools/fidl/fidlc:fidlc_sdk",
-    "//tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk",
-    "//tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk",
-    "//tools/fidl/fidlgen_rust:fidlgen_rust_sdk",
-    "//tools/fidlcat:fidlcat_sdk",
-    "//tools/funnel:funnel_sdk",
-    "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
-    "//tools/net/device-finder:device-finder_sdk",
-    "//tools/sdk-tools/fpublish:fpublish_sdk",
-    "//tools/sdk-tools/fserve:fserve_sdk",
-    "//tools/sdk-tools/fssh:fssh_sdk",
-    "//tools/symbolizer:sdk",
-    "//zircon/tools/merkleroot:merkleroot_sdk",
-    "//zircon/tools/zbi:zbi_sdk",
+    deps = [
+      "//src/developer/debug/zxdb:zxdb_sdk",
+      "//src/developer/ffx:bin_sdk",
+      "//src/developer/ffx/plugins/agis:sdk",
+      "//src/developer/ffx/plugins/assembly:sdk",
+      "//src/developer/ffx/plugins/audio:sdk",
+      "//src/developer/ffx/plugins/component:sdk",
+      "//src/developer/ffx/plugins/coverage:sdk",
+      "//src/developer/ffx/plugins/debug:sdk",
+      "//src/developer/ffx/plugins/driver:sdk",
+      "//src/developer/ffx/plugins/emulator:sdk",
+      "//src/developer/ffx/plugins/emulator:uefi_internal",
+      "//src/developer/ffx/plugins/fuzz:sdk",
+      "//src/developer/ffx/plugins/inspect:sdk",
+      "//src/developer/ffx/plugins/log:sdk",
+      "//src/developer/ffx/plugins/package:sdk",
+      "//src/developer/ffx/plugins/process:sdk",
+      "//src/developer/ffx/plugins/product:sdk",
+      "//src/developer/ffx/plugins/profile:sdk",
+      "//src/developer/ffx/plugins/repository:sdk",
+      "//src/developer/ffx/plugins/scrutiny:sdk",
+      "//src/developer/ffx/plugins/session:sdk",
+      "//src/developer/ffx/plugins/setui:sdk",
+      "//src/developer/ffx/plugins/test:sdk",
+      "//src/developer/ffx/plugins/trace:sdk",
+      "//src/developer/ffx/plugins/wlan:sdk",
+      "//src/developer/ffx/tools/starnix:sdk",
+      "//src/performance/trace2json:bin_sdk",
+      "//src/storage/bin/fvm:fvm_sdk",
+      "//src/storage/blobfs/tools:blobfs_sdk",
+      "//src/storage/minfs/tools:minfs_sdk",
+      "//src/storage/tools/blobfs-compression:blobfs-compression_sdk",
+      "//src/sys/pkg/bin/far:bin_sdk",
+      "//src/sys/pkg/bin/pm:pm_bin_sdk",
+      "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
+      "//tools/bindc:bindc_sdk",
+      "//tools/bootserver_old:bootserver_sdk",
+      "//tools/cmc:cmc_sdk",
+      "//tools/configc:configc_sdk",
+      "//tools/fidl/fidlc:fidl-format_sdk",
+      "//tools/fidl/fidlc:fidlc_sdk",
+      "//tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk",
+      "//tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk",
+      "//tools/fidl/fidlgen_rust:fidlgen_rust_sdk",
+      "//tools/fidlcat:fidlcat_sdk",
+      "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
+      "//tools/funnel:funnel_sdk",
+      "//tools/net/device-finder:device-finder_sdk",
+      "//tools/sdk-tools/fpublish:fpublish_sdk",
+      "//tools/sdk-tools/fserve:fserve_sdk",
+      "//tools/sdk-tools/fssh:fssh_sdk",
+      "//tools/symbolizer:sdk",
+      "//zircon/tools/merkleroot:merkleroot_sdk",
+      "//zircon/tools/zbi:zbi_sdk",
 
-    # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
-    "//src/developer/ffx/plugins/emulator:aemu_internal",
-    "//src/developer/ffx/plugins/emulator:qemu_internal",
-  ]
-
-  _toolchains = []
-  if (host_os == "linux" && sdk_cross_compile_host_tools) {
-    _required_target_cpus = [
-      "x64",
-      "arm64",
+      # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
+      "//src/developer/ffx/plugins/emulator:aemu_internal",
+      "//src/developer/ffx/plugins/emulator:qemu_internal",
     ]
-    _skipped_target_cpus = idk_target_cpus_default - idk_target_cpus
-    assert(
-        _skipped_target_cpus == _skipped_target_cpus + _required_target_cpus -
-                                    _required_target_cpus,
-        "`idk_target_cpus` must include all CPUs for which host tools are being cross-compiled: ${idk_target_cpus} vs. ${_required_target_cpus}")
-    _toolchains += [
-      host_x64_toolchain,
-      host_arm64_toolchain,
-    ]
-  } else {
-    _toolchains = [ host_toolchain ]
   }
+} else {
+  # Contains :host_tools_for_single_toolchain for all host toolchains that this
+  # build is configured to include. Always includes host tools for
+  # `host_toolchain`, and includes host tools for other host toolchains when
+  # `sdk_cross_compile_host_tools` is true.
+  sdk_molecule("host_tools_for_configured_host_cpus") {
+    category = "partner"
 
-  deps = []
-  foreach(toolchain, _toolchains) {
-    foreach(dep, _host_tools) {
-      deps += [ "$dep($toolchain)" ]
+    _toolchains = []
+    if (host_os == "linux" && sdk_cross_compile_host_tools) {
+      _required_target_cpus = [
+        "x64",
+        "arm64",
+      ]
+      _skipped_target_cpus = idk_target_cpus_default - idk_target_cpus
+      assert(
+          _skipped_target_cpus == _skipped_target_cpus + _required_target_cpus -
+                                      _required_target_cpus,
+          "`idk_target_cpus` must include all CPUs for which host tools are being cross-compiled: ${idk_target_cpus} vs. ${_required_target_cpus}")
+      _toolchains += [
+        host_x64_toolchain,
+        host_arm64_toolchain,
+      ]
+    } else {
+      _toolchains = [ host_toolchain ]
+    }
+
+    deps = []
+    foreach(toolchain, _toolchains) {
+      deps += [ ":host_tools_for_single_toolchain($toolchain)" ]
     }
   }
-}
+}  # end if (is_host)
 
 sdk_molecule("core_bindlib") {
   category = "partner"
@@ -1004,7 +1011,7 @@ if (is_host) {
       "//zircon/tools/zbi:zbi_sdk",
     ]
   }
-}
+}  # end if (is_host)
 
 # Host tools necessary to build the IDK. Keep this minimal, so IDK subbuilds can
 # start running as quickly as possible.
