@@ -8,6 +8,7 @@ group("util") {
     ":portable_ui_test",
     ":screenshot_helper",
     ":test_view",
+    ":zxtest_helpers",
   ]
 }
 
@@ -70,4 +71,22 @@ source_set("screenshot_helper") {
     "//third_party/libpng",
     "//zircon/system/ulib/zx",
   ]
+}
+
+source_set("loop_fixture") {
+  testonly = true
+  sources = [
+    "logging_event_loop.cc",
+    "logging_event_loop.h",
+  ]
+  public_deps = [
+    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
+source_set("zxtest_helpers") {
+  testonly = true
+  sources = [ "zxtest_helpers.h" ]
+  public_deps = [ "//zircon/system/ulib/zxtest" ]
 }

@@ -16,9 +16,9 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 #include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
@@ -49,7 +49,7 @@ void CompareColor(utils::Pixel actual, utils::Pixel expected) {
 }
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandPixelTestBase : public LoggingEventLoop, public zxtest::Test {
+class FlatlandPixelTestBase : public ui_testing::LoggingEventLoop, public zxtest::Test {
  public:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the

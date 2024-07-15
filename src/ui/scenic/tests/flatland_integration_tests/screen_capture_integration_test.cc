@@ -25,10 +25,10 @@
 #include "src/ui/scenic/lib/screen_capture/screen_capture.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 #include "zircon/system/ulib/fbl/include/fbl/algorithm.h"
 
 namespace integration_tests {
@@ -53,7 +53,7 @@ using fuchsia::ui::composition::ViewportProperties;
 using fuchsia::ui::views::ViewRef;
 using RealmRoot = component_testing::RealmRoot;
 
-class ScreenCaptureIntegrationTest : public LoggingEventLoop, public ::testing::Test {
+class ScreenCaptureIntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
  public:
   ScreenCaptureIntegrationTest()
       : realm_(ScenicRealmBuilder()

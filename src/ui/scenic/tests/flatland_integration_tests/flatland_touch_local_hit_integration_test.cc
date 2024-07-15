@@ -18,9 +18,9 @@
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 
 // These tests exercise the integration between Flatland and the InputSystem for
 // TouchSourceWithLocalHit. Setup:
@@ -66,7 +66,8 @@ using ViewRef = fuchsia::ui::views::ViewRef;
 
 using RealmRoot = component_testing::RealmRoot;
 
-class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public LoggingEventLoop {
+class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test,
+                                             public ui_testing::LoggingEventLoop {
  protected:
   static constexpr uint32_t kDeviceId = 1111;
   static constexpr uint32_t kPointerId = 2222;

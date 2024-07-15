@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 
 #include <lib/syslog/cpp/macros.h>
 
-namespace integration_tests {
+namespace ui_testing {
 
 namespace {
 /// Returns a string describing the provided source location.
@@ -17,12 +17,6 @@ static std::string ToString(const cpp20::source_location& location) {
   return file + ":" + line + " (" + func + ")";
 }
 }  // namespace
-
-using loop_fixture::RealLoop;
-
-LoggingEventLoop::LoggingEventLoop() {}
-
-LoggingEventLoop::~LoggingEventLoop() {}
 
 bool LoggingEventLoop::RunLoopWithTimeout(zx::duration timeout, cpp20::source_location caller) {
   FX_LOGS(INFO) << "Running until timeout (from " << ToString(caller) << ")";
@@ -47,4 +41,4 @@ void LoggingEventLoop::RunLoopUntilIdle(cpp20::source_location caller) {
   RealLoop::RunLoopUntilIdle();
 }
 
-}  // namespace integration_tests
+}  // namespace ui_testing

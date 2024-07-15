@@ -16,9 +16,9 @@
 
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 
 // These tests exercise the integration between Flatland and the InputSystem, including the
 // View-to-View transform logic between the injection point and the receiver.
@@ -130,7 +130,7 @@ void ExpectEqualPointer(const fuchsia::ui::pointer::MousePointerSample& pointer_
   }
 }
 
-class FlatlandMouseIntegrationTest : public zxtest::Test, public LoggingEventLoop {
+class FlatlandMouseIntegrationTest : public zxtest::Test, public ui_testing::LoggingEventLoop {
  protected:
   static constexpr uint32_t kDeviceId = 1111;
 

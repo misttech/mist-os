@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_SCENIC_TESTS_UTILS_LOGGING_EVENT_LOOP_H_
-#define SRC_UI_SCENIC_TESTS_UTILS_LOGGING_EVENT_LOOP_H_
+#ifndef SRC_UI_TESTING_UTIL_LOGGING_EVENT_LOOP_H_
+#define SRC_UI_TESTING_UTIL_LOGGING_EVENT_LOOP_H_
 
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/source_location.h>
 #include <lib/zx/time.h>
 
-#include <memory>
-
-namespace integration_tests {
+namespace ui_testing {
 
 /// `LoggingEventLoop` provides a subset of the `RealLoop` API, and adds logging.
 /// Feel free to expose more of the `RealLoop` API as needed.
@@ -29,8 +27,8 @@ namespace integration_tests {
 /// class and forward calls to it. But that adds more code without a meaningful benefit.
 class LoggingEventLoop : private loop_fixture::RealLoop {
  public:
-  LoggingEventLoop();
-  ~LoggingEventLoop();
+  LoggingEventLoop() = default;
+  ~LoggingEventLoop() = default;
 
   void RunLoopUntil(fit::function<bool()> condition,
                     cpp20::source_location caller = cpp20::source_location::current());
@@ -45,6 +43,6 @@ class LoggingEventLoop : private loop_fixture::RealLoop {
   void RunLoopUntilIdle(cpp20::source_location caller = cpp20::source_location::current());
 };
 
-}  // namespace integration_tests
+}  // namespace ui_testing
 
-#endif  // SRC_UI_SCENIC_TESTS_UTILS_LOGGING_EVENT_LOOP_H_
+#endif  // SRC_UI_TESTING_UTIL_LOGGING_EVENT_LOOP_H_

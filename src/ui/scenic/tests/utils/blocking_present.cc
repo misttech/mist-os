@@ -8,7 +8,8 @@
 
 namespace integration_tests {
 
-void BlockingPresent(LoggingEventLoop* loop, fuchsia::ui::composition::FlatlandPtr& flatland,
+void BlockingPresent(ui_testing::LoggingEventLoop* loop,
+                     fuchsia::ui::composition::FlatlandPtr& flatland,
                      fuchsia::ui::composition::PresentArgs present_args,
                      cpp20::source_location caller) {
   // Initialize callbacks and callback state.

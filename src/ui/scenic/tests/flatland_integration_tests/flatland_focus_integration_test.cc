@@ -16,9 +16,9 @@
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 
 // This test exercises the focus protocols implemented by Scenic (fuchsia.ui.focus.FocusChain,
 // fuchsia.ui.views.Focuser, fuchsia.ui.views.ViewRefFocused) in the context of the Flatland
@@ -58,7 +58,7 @@ const fuchsia::ui::composition::TransformId kRootTransform{.value = 1};
 }  // namespace
 
 class FlatlandFocusIntegrationTest : public zxtest::Test,
-                                     public LoggingEventLoop,
+                                     public ui_testing::LoggingEventLoop,
                                      public FocusChainListener {
  protected:
   FlatlandFocusIntegrationTest() : focus_chain_listener_(this) {}
