@@ -29,8 +29,6 @@ using fuchsia::ui::composition::FlatlandPtr;
 using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::TransformId;
 
-constexpr auto kBytesPerPixel = 4;
-
 class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
  public:
   CpuRendererIntegrationTest()
@@ -75,7 +73,7 @@ class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public :
 
  protected:
   fuchsia::sysmem2::BufferCollectionInfo SetConstraintsAndAllocateBuffer(
-      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token) {
+      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token, fuchsia::images2::PixelFormat format) {
     fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
     fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
     bind_shared_request.set_token(std::move(token));
@@ -87,7 +85,7 @@ class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public :
     constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
     constraints.set_min_buffer_count(1);
     auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
-    image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+    image_constraints.set_pixel_format(format);
     image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
     image_constraints.set_required_min_size(
         fuchsia::math::SizeU{.width = display_width_, .height = display_height_});
@@ -139,7 +137,7 @@ TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
 
   // Use the local token to allocate a protected buffer. CpuRenderer sets
   // constraint to complete the allocation.
-  SetConstraintsAndAllocateBuffer(std::move(local_token));
+  SetConstraintsAndAllocateBuffer(std::move(local_token), fuchsia::images2::PixelFormat::B8G8R8A8);
 
   // Create the image in the Flatland instance.
   fuchsia::ui::composition::ImageProperties image_properties = {};
@@ -164,7 +162,11 @@ TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
   EXPECT_TRUE(utils::IsEventSignalled(release_fence_copy, ZX_EVENT_SIGNALED));
 }
 
-TEST_F(CpuRendererIntegrationTest, RendersImage) {
+class CpuRendererIntegrationTestWithFormat
+    : public CpuRendererIntegrationTest,
+      public ::testing::WithParamInterface<fuchsia::images2::PixelFormat> {};
+
+TEST_P(CpuRendererIntegrationTestWithFormat, RendersImage) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
   // Send one token to Flatland Allocator.
@@ -180,26 +182,38 @@ TEST_F(CpuRendererIntegrationTest, RendersImage) {
   ASSERT_FALSE(result.is_err());
 
   // Use the local token to allocate a protected buffer.
-  auto info = SetConstraintsAndAllocateBuffer(std::move(local_token));
+  auto info = SetConstraintsAndAllocateBuffer(std::move(local_token), GetParam());
+
+  const uint32_t bytes_per_pixel = GetParam() == fuchsia::images2::PixelFormat::B8G8R8A8 ? 4 : 2;
 
   // Write the pixel values to the VMO.
   const uint32_t num_pixels = display_width_ * display_height_;
 
   const utils::Pixel color = utils::kBlue;
+  std::vector<uint8_t> pixel_data = color.ToFormat(GetParam());
   flatland::MapHostPointer(info.buffers()[0].vmo(), flatland::HostPointerAccessMode::kWriteOnly,
-                           [&num_pixels, &color, &info](uint8_t* vmo_ptr, uint32_t num_bytes) {
-                             ASSERT_EQ(num_bytes, num_pixels * kBytesPerPixel);
+                           [&num_pixels, &color, &pixel_data, &info, bytes_per_pixel](
+                               uint8_t* vmo_ptr, uint32_t num_bytes) {
+                             ASSERT_EQ(num_bytes, num_pixels * bytes_per_pixel);
                              ASSERT_EQ(num_bytes, info.settings().buffer_settings().size_bytes());
 
-                             ASSERT_EQ(info.settings().image_format_constraints().pixel_format(),
-                                       fuchsia::images2::PixelFormat::B8G8R8A8);
-                             for (uint32_t i = 0; i < num_bytes; i += kBytesPerPixel) {
-                               // For BGRA32 pixel format, the first and the third byte in the pixel
-                               // corresponds to the blue and the red channel respectively.
-                               vmo_ptr[i] = color.blue;
-                               vmo_ptr[i + 1] = color.green;
-                               vmo_ptr[i + 2] = color.red;
-                               vmo_ptr[i + 3] = color.alpha;
+                             if (info.settings().image_format_constraints().pixel_format() ==
+                                 fuchsia::images2::PixelFormat::B8G8R8A8) {
+                               for (uint32_t i = 0; i < num_bytes; i += bytes_per_pixel) {
+                                 // For BGRA32 pixel format, the first and the third byte in the
+                                 // pixel corresponds to the blue and the red channel respectively.
+                                 vmo_ptr[i] = color.blue;
+                                 vmo_ptr[i + 1] = color.green;
+                                 vmo_ptr[i + 2] = color.red;
+                                 vmo_ptr[i + 3] = color.alpha;
+                               }
+                             } else {
+                               ASSERT_EQ(info.settings().image_format_constraints().pixel_format(),
+                                         fuchsia::images2::PixelFormat::R5G6B5);
+                               for (uint32_t i = 0; i < num_bytes; i += 2) {
+                                 vmo_ptr[i] = pixel_data[0];
+                                 vmo_ptr[i + 1] = pixel_data[1];
+                               }
                              }
 
                              if (info.settings().buffer_settings().coherency_domain() ==
@@ -229,6 +243,10 @@ TEST_F(CpuRendererIntegrationTest, RendersImage) {
 
   EXPECT_EQ(histogram[color], num_pixels);
 }
+
+INSTANTIATE_TEST_SUITE_P(Formats, CpuRendererIntegrationTestWithFormat,
+                         testing::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
+                                         fuchsia::images2::PixelFormat::R5G6B5));
 
 TEST_F(CpuRendererIntegrationTest, RendersSolidFill) {
   // Create a red solid fill.
