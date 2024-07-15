@@ -37,22 +37,6 @@ fuchsia_product_bundle(
 )
 
 fuchsia_product_bundle(
-    name = "product_bundle_eng.qemu-x64",
-    board_name = "qemu-x64",
-    default_virtual_device = ":workbench_emu",
-    main = ":assembly_eng.qemu-x64",
-    partitions_config = "//build/bazel/assembly/partitions_configurations:qemu-x64",
-    product_bundle_name = "workbench_eng",
-    recovery = "//products/zedboot:qemu-x64",
-    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
-    update_epoch = "1",
-    update_version_file = "//build/info:version",
-    virtual_devices = [
-        ":workbench_emu",
-    ],
-)
-
-fuchsia_product_bundle(
     name = "product_bundle_eng.arm64",
     board_name = "arm64",
     main = ":assembly_eng.arm64",
@@ -79,14 +63,6 @@ fuchsia_product_bundle(
 fuchsia_product(
     name = "assembly_eng.x64",
     board_config = "//boards:x64",
-    legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
-    product_config = ":assembly_config_eng",
-)
-
-fuchsia_product(
-    name = "assembly_eng.qemu-x64",
-    board_config = "//boards:qemu-x64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
@@ -121,11 +97,6 @@ fuchsia_elf_sizes(
 fuchsia_elf_sizes(
     name = "elf_sizes.vim3",
     product = ":assembly_eng.vim3",
-)
-
-fuchsia_elf_sizes(
-    name = "elf_sizes.qemu-x64",
-    product = ":assembly_eng.qemu-x64",
 )
 
 fuchsia_virtual_device(

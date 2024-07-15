@@ -12,11 +12,6 @@ fuchsia_prebuilt_board_configuration(
 )
 
 fuchsia_prebuilt_board_configuration(
-    name = "qemu-x64",
-    directory = "@gn_targets//boards/x64:qemu-x64",
-)
-
-fuchsia_prebuilt_board_configuration(
     name = "arm64",
     directory = "@gn_targets//boards/arm64",
 )

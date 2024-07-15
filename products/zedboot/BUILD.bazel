@@ -65,7 +65,6 @@ fuchsia_product_configuration(
     product_config = "//products/zedboot:zedboot",
 ) for board in [
     "x64",
-    "qemu-x64",
     "arm64",
     "vim3",
     "riscv64",
@@ -81,7 +80,6 @@ fuchsia_product_configuration(
     product_config = "//products/zedboot:zedboot",
 ) for board in [
     "x64",
-    "qemu-x64",
     "arm64",
     "vim3",
     "riscv64",
@@ -96,7 +94,6 @@ fuchsia_product_configuration(
     product_config = "//products/zedboot:zedboot_with_fvm",
 ) for board in [
     "x64",
-    "qemu-x64",
     "arm64",
     "vim3",
     "riscv64",
