@@ -4,7 +4,7 @@
 
 #include "gpio.h"
 
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/wire_types.h>
+#include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -339,8 +339,8 @@ TEST_F(GpioTest, ValidateGpioNameGeneration) {
 }
 
 TEST_F(GpioTest, Init) {
-  namespace fhgpio = fuchsia_hardware_gpio::wire;
-  namespace fhgpioimpl = fuchsia_hardware_gpioimpl::wire;
+  namespace fhgpio = fuchsia_hardware_gpio;
+  namespace fhgpioimpl = fuchsia_hardware_gpioimpl;
 
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
@@ -348,101 +348,28 @@ TEST_F(GpioTest, Init) {
       DECL_GPIO_PIN(3),
   };
 
-  fidl::Arena arena;
+  std::vector<fhgpioimpl::InitStep> steps;
 
-  fhgpioimpl::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fhgpioimpl::InitStep>(arena, 18);
+  steps.push_back({{1, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown)}});
+  steps.push_back({{1, fhgpioimpl::InitCall::WithOutputValue(1)}});
+  steps.push_back({{1, fhgpioimpl::InitCall::WithDriveStrengthUa(4000)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(5)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(2000)}});
+  steps.push_back({{3, fhgpioimpl::InitCall::WithOutputValue(0)}});
+  steps.push_back({{3, fhgpioimpl::InitCall::WithOutputValue(1)}});
+  steps.push_back({{3, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(0)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(1000)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithOutputValue(1)}});
+  steps.push_back({{1, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp)}});
+  steps.push_back({{1, fhgpioimpl::InitCall::WithAltFunction(0)}});
+  steps.push_back({{1, fhgpioimpl::InitCall::WithDriveStrengthUa(4000)}});
+  steps.push_back({{1, fhgpioimpl::InitCall::WithOutputValue(1)}});
+  steps.push_back({{3, fhgpioimpl::InitCall::WithAltFunction(3)}});
+  steps.push_back({{3, fhgpioimpl::InitCall::WithDriveStrengthUa(2000)}});
 
-  metadata.steps[0] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(1)
-                          .call(fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown))
-                          .Build();
-
-  metadata.steps[1] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(1)
-                          .call(fhgpioimpl::InitCall::WithOutputValue(1))
-                          .Build();
-
-  metadata.steps[2] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(1)
-                          .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 4000))
-                          .Build();
-
-  metadata.steps[3] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull))
-                          .Build();
-
-  metadata.steps[4] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithAltFunction(arena, 5))
-                          .Build();
-
-  metadata.steps[5] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 2000))
-                          .Build();
-
-  metadata.steps[6] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(3)
-                          .call(fhgpioimpl::InitCall::WithOutputValue(0))
-                          .Build();
-
-  metadata.steps[7] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(3)
-                          .call(fhgpioimpl::InitCall::WithOutputValue(1))
-                          .Build();
-
-  metadata.steps[8] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(3)
-                          .call(fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp))
-                          .Build();
-
-  metadata.steps[9] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithAltFunction(arena, 0))
-                          .Build();
-
-  metadata.steps[10] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(2)
-                           .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 1000))
-                           .Build();
-
-  metadata.steps[11] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(2)
-                           .call(fhgpioimpl::InitCall::WithOutputValue(1))
-                           .Build();
-
-  metadata.steps[12] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(1)
-                           .call(fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp))
-                           .Build();
-
-  metadata.steps[13] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(1)
-                           .call(fhgpioimpl::InitCall::WithAltFunction(arena, 0))
-                           .Build();
-
-  metadata.steps[14] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(1)
-                           .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 4000))
-                           .Build();
-
-  metadata.steps[15] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(1)
-                           .call(fhgpioimpl::InitCall::WithOutputValue(1))
-                           .Build();
-
-  metadata.steps[16] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(3)
-                           .call(fhgpioimpl::InitCall::WithAltFunction(arena, 3))
-                           .Build();
-
-  metadata.steps[17] = fhgpioimpl::InitStep::Builder(arena)
-                           .index(3)
-                           .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 2000))
-                           .Build();
-
+  fhgpioimpl::InitMetadata metadata{{std::move(steps)}};
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());
 
@@ -478,19 +405,13 @@ TEST_F(GpioTest, Init) {
 }
 
 TEST_F(GpioTest, InitWithoutPins) {
-  namespace fhgpio = fuchsia_hardware_gpio::wire;
-  namespace fhgpioimpl = fuchsia_hardware_gpioimpl::wire;
+  namespace fhgpio = fuchsia_hardware_gpio;
+  namespace fhgpioimpl = fuchsia_hardware_gpioimpl;
 
-  fidl::Arena arena;
+  std::vector<fhgpioimpl::InitStep> steps;
+  steps.push_back({{1, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown)}});
 
-  fhgpioimpl::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fhgpioimpl::InitStep>(arena, 1);
-
-  metadata.steps[0] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(1)
-                          .call(fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown))
-                          .Build();
-
+  fhgpioimpl::InitMetadata metadata{{std::move(steps)}};
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());
 
@@ -512,8 +433,8 @@ TEST_F(GpioTest, InitWithoutPins) {
 }
 
 TEST_F(GpioTest, InitErrorHandling) {
-  namespace fhgpio = fuchsia_hardware_gpio::wire;
-  namespace fhgpioimpl = fuchsia_hardware_gpioimpl::wire;
+  namespace fhgpio = fuchsia_hardware_gpio;
+  namespace fhgpioimpl = fuchsia_hardware_gpioimpl;
 
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
@@ -521,59 +442,25 @@ TEST_F(GpioTest, InitErrorHandling) {
       DECL_GPIO_PIN(3),
   };
 
-  fidl::Arena arena;
+  std::vector<fhgpioimpl::InitStep> steps;
 
-  fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>(arena, 9);
-
-  metadata.steps[0] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(4)
-                          .call(fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown))
-                          .Build();
-
-  metadata.steps[1] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(4)
-                          .call(fhgpioimpl::InitCall::WithOutputValue(1))
-                          .Build();
-
-  metadata.steps[2] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(4)
-                          .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 4000))
-                          .Build();
-
-  metadata.steps[3] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull))
-                          .Build();
-
-  metadata.steps[4] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithAltFunction(arena, 5))
-                          .Build();
-
-  metadata.steps[5] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 2000))
-                          .Build();
+  steps.push_back({{4, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown)}});
+  steps.push_back({{4, fhgpioimpl::InitCall::WithOutputValue(1)}});
+  steps.push_back({{4, fhgpioimpl::InitCall::WithDriveStrengthUa(4000)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(5)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(2000)}});
 
   // Using an index of 11 should cause the fake gpioimpl device to return an error.
-  metadata.steps[6] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(MockGpioImpl::kMaxInitStepPinIndex + 1)
-                          .call(fhgpioimpl::InitCall::WithOutputValue(0))
-                          .Build();
+  steps.push_back(
+      {{MockGpioImpl::kMaxInitStepPinIndex + 1, fhgpioimpl::InitCall::WithOutputValue(0)}});
 
   // Processing should not continue after the above error.
 
-  metadata.steps[7] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithAltFunction(arena, 0))
-                          .Build();
+  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(0)}});
+  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(1000)}});
 
-  metadata.steps[8] = fhgpioimpl::InitStep::Builder(arena)
-                          .index(2)
-                          .call(fhgpioimpl::InitCall::WithDriveStrengthUa(arena, 1000))
-                          .Build();
-
+  fhgpioimpl::InitMetadata metadata{{std::move(steps)}};
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());
 
