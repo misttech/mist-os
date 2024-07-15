@@ -131,7 +131,9 @@ go_library("main") {
   sources = [ "pm.go" ]
 }
 
-group("host_tests") {
-  testonly = true
-  public_deps = test_labels
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    public_deps = test_labels
+  }
 }

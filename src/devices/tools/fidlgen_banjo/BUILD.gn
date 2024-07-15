@@ -92,8 +92,10 @@ rustc_library("lib") {
   ]
 }
 
-sdk_host_tool("fidlgen_banjo_bin_sdk") {
-  category = "partner"
-  output_name = "fidlgen_banjo"
-  deps = [ ":bin" ]
+if (is_host) {
+  sdk_host_tool("fidlgen_banjo_bin_sdk") {
+    category = "partner"
+    output_name = "fidlgen_banjo"
+    deps = [ ":bin" ]
+  }
 }

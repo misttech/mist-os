@@ -28,7 +28,6 @@ group("tools") {
     "//src/storage:tools",
     "//src/sys/pkg/bin/far",
     "//src/sys/pkg/bin/pm",
-    "//src/sys/pkg/bin/pm:host",
     "//src/sys/tools/activity-ctl",
     "//src/sys/tools/log",
     "//src/ui/tools:scenic",
@@ -63,6 +62,7 @@ group("host_tools") {
     "//src/performance/trace2json($host_toolchain)",
     "//src/performance/traceutil($host_toolchain)",
     "//src/sys/pkg/bin/far:host($host_toolchain)",
+    "//src/sys/pkg/bin/pm:host($host_toolchain)",
     "//tools/check-licenses:host($host_toolchain)",
     "//tools/whereiscl:host($host_toolchain)",
   ]

@@ -6,25 +6,27 @@ import("//build/components.gni")
 import("//build/go/go_binary.gni")
 import("//build/host.gni")
 
-test_packages = [
-  "build",
-  "pkg",
-  "pmhttp",
-  "repo",
-]
+if (is_host) {
+  test_packages = [
+    "build",
+    "pkg",
+    "pmhttp",
+    "repo",
+  ]
 
-test_labels = []
-foreach(pkg, test_packages) {
-  pkg_ = string_replace(pkg, "/", "_")
-  name = "pm_${pkg_}_test"
-  test_labels += [ "$pkg:$name" ]
-}
+  test_labels = []
+  foreach(pkg, test_packages) {
+    pkg_ = string_replace(pkg, "/", "_")
+    name = "pm_${pkg_}_test"
+    test_labels += [ "$pkg:$name" ]
+  }
 
-group("host_tests") {
-  testonly = true
-  public_deps = [ "cmd/pm:host_tests" ]
-  foreach(label, test_labels) {
-    public_deps += [ label + "($host_toolchain)" ]
+  group("host_tests") {
+    testonly = true
+    public_deps = [ "cmd/pm:host_tests" ]
+    foreach(label, test_labels) {
+      public_deps += [ label ]
+    }
   }
 }
 
@@ -46,5 +48,5 @@ install_host_tools("host") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":host_tests" ]
+  public_deps = [ ":host_tests($host_toolchain)" ]
 }

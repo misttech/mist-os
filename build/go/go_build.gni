@@ -514,7 +514,7 @@ template("go_build") {
     no_output_dir_leaks = false
   }
 
-  if (define_sdk_target) {
+  if (define_sdk_target && is_host) {
     sdk_host_tool("${target_name}_sdk") {
       forward_variables_from(invoker, "*", [ "deps" ])
       category = invoker.sdk_category

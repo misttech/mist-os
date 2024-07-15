@@ -68,10 +68,12 @@ rustc_binary("cmc") {
   sources = [ "src/main.rs" ]
 }
 
-sdk_host_tool("cmc_sdk") {
-  category = "partner"
-  output_name = "cmc"
-  deps = [ ":cmc" ]
+if (is_host) {
+  sdk_host_tool("cmc_sdk") {
+    category = "partner"
+    output_name = "cmc"
+    deps = [ ":cmc" ]
+  }
 }
 
 rustc_test("cmc_integration_test_bin") {

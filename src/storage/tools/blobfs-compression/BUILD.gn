@@ -46,10 +46,12 @@ executable("blobfs-compression") {
   }
 }
 
-sdk_host_tool("blobfs-compression_sdk") {
-  category = "partner"
-  output_name = "blobfs-compression"
-  deps = [ ":blobfs-compression" ]
+if (is_host) {
+  sdk_host_tool("blobfs-compression_sdk") {
+    category = "partner"
+    output_name = "blobfs-compression"
+    deps = [ ":blobfs-compression" ]
+  }
 }
 
 # This group of tests is run in CQ/CI.

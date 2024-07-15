@@ -17,14 +17,16 @@ executable("bin") {
   ]
 }
 
-sdk_host_tool("bin_sdk") {
-  category = "partner"
-  output_name = "far"
-  deps = [ ":bin" ]
-}
-
-fuchsia_package("far") {
-  deps = [ ":bin" ]
+if (is_host) {
+  sdk_host_tool("bin_sdk") {
+    category = "partner"
+    output_name = "far"
+    deps = [ ":bin" ]
+  }
+} else {
+  fuchsia_package("far") {
+    deps = [ ":bin" ]
+  }
 }
 
 install_host_tools("host") {
