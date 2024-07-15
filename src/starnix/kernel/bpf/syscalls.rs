@@ -58,8 +58,8 @@ fn read_attr<Attr: FromBytes>(
 
     // Verify that the extra is all zeros.
     if attr_size > sizeof_attr {
-        let tail =
-            current_task.read_memory_to_vec(attr_addr + sizeof_attr, attr_size - sizeof_attr)?;
+        let tail_addr = attr_addr.checked_add(sizeof_attr).ok_or_else(|| errno!(EFAULT))?;
+        let tail = current_task.read_memory_to_vec(tail_addr, attr_size - sizeof_attr)?;
         if tail.into_iter().any(|byte| byte != 0) {
             return error!(E2BIG);
         }
