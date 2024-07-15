@@ -161,36 +161,36 @@ zx_status_t Astro::AudioInit() {
   clock_init_steps_.push_back(ClockSetRate(g12a_clk::CLK_HIFI_PLL, 768'000'000));
   clock_init_steps_.push_back(ClockEnable(g12a_clk::CLK_HIFI_PLL));
 
-  auto sleep = [&arena = init_arena_](zx::duration delay) {
-    return fuchsia_hardware_gpioimpl::wire::InitStep::Builder(arena)
-        .call(fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get()))
-        .Build();
+  auto sleep = [](zx::duration delay) {
+    return fuchsia_hardware_gpioimpl::InitStep{{
+        .call = fuchsia_hardware_gpioimpl::InitCall::WithDelay(delay.get()),
+    }};
   };
 
   // TDM pin assignments
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(1), S905D2_GPIOA_1_TDMB_SCLK_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(2), S905D2_GPIOA_2_TDMB_FS_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(3), S905D2_GPIOA_3_TDMB_D0_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(6), S905D2_GPIOA_6_TDMB_DIN3_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(1), S905D2_GPIOA_1_TDMB_SCLK_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(2), S905D2_GPIOA_2_TDMB_FS_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(3), S905D2_GPIOA_3_TDMB_D0_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(6), S905D2_GPIOA_6_TDMB_DIN3_FN));
   constexpr uint64_t ua = 3000;
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOA(1), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOA(2), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOA(3), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOA(1), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOA(2), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOA(3), ua));
 
 #ifdef ENABLE_BT
   // PCM pin assignments.
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(8), S905D2_GPIOX_8_TDMA_DIN1_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(9), S905D2_GPIOX_9_TDMA_D0_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(10), S905D2_GPIOX_10_TDMA_FS_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(11), S905D2_GPIOX_11_TDMA_SCLK_FN));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOX(9), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOX(10), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOX(11), ua));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(8), S905D2_GPIOX_8_TDMA_DIN1_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(9), S905D2_GPIOX_9_TDMA_D0_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(10), S905D2_GPIOX_10_TDMA_FS_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(11), S905D2_GPIOX_11_TDMA_SCLK_FN));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOX(9), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOX(10), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOX(11), ua));
 #endif
 
   // PDM pin assignments
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(7), S905D2_GPIOA_7_PDM_DCLK_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(8), S905D2_GPIOA_8_PDM_DIN0_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(7), S905D2_GPIOA_7_PDM_DCLK_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(8), S905D2_GPIOA_8_PDM_DIN0_FN));
 
   // Hardware Reset of the codec.
   gpio_init_steps_.push_back(GpioConfigOut(S905D2_GPIOA(5), 0));

@@ -107,9 +107,8 @@ static const gpio_pin_t gpio_pins[] = {
 };
 
 zx_status_t Astro::GpioInit() {
-  fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(
-      gpio_init_steps_.data(), gpio_init_steps_.size());
+  fuchsia_hardware_gpioimpl::InitMetadata metadata{{std::move(gpio_init_steps_)}};
+  gpio_init_steps_.clear();
 
   const fit::result encoded_metadata = fidl::Persist(metadata);
   if (!encoded_metadata.is_ok()) {
@@ -153,8 +152,6 @@ zx_status_t Astro::GpioInit() {
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
-
-  gpio_init_steps_.clear();
 
 #ifdef GPIO_TEST
   static const pbus_gpio_t gpio_test_gpios[] = {{
