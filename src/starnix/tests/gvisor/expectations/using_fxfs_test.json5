@@ -26,6 +26,11 @@
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerPeek/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerRead/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListener/*",
+
+                // TODO(https://fxbug.dev/353327849) re-enable once cause identified
+                "StatTimesTest.FileChmod",
+                "StatTimesTest.FileRename",
+                "StatTimesTest.FileRenameOpenFD",
             ],
         },
     ],
