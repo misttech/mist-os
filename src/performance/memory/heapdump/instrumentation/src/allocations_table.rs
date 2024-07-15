@@ -9,9 +9,7 @@ use heapdump_vmo::allocations_table_v1::{AllocationsTableWriter, ResourceKey};
 /// Actual memory for each page will only be committed when we first write to that page.
 const VMO_SIZE: usize = 1 << 31;
 
-// SAFETY: The provided buffer is nul-terminated.
-const VMO_NAME: &std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"heapdump-allocations\0") };
+const VMO_NAME: zx::Name = zx::Name::new_lossy("heapdump-allocations");
 
 /// Tracks live allocations by storing their metadata in a dedicated VMO.
 pub struct AllocationsTable {
@@ -22,7 +20,7 @@ pub struct AllocationsTable {
 impl Default for AllocationsTable {
     fn default() -> AllocationsTable {
         let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("failed to create allocations VMO");
-        vmo.set_name(VMO_NAME).expect("failed to set VMO name");
+        vmo.set_name(&VMO_NAME).expect("failed to set VMO name");
 
         let writer = AllocationsTableWriter::new(&vmo).expect("failed to create writer");
         AllocationsTable { vmo, writer }

@@ -96,10 +96,7 @@ impl Pager {
         if did_create {
             let set_up_vmo = |vmo| -> Result<(), zx::Status> {
                 self.watch_for_zero_children(vmo, inode_num)?;
-                let name_slice = [b"ext4!".as_slice(), name.as_ref()].concat();
-                let name_slice =
-                    &name_slice[..std::cmp::min(name_slice.len(), zx::sys::ZX_MAX_NAME_LEN - 1)];
-                vmo.set_name(&std::ffi::CString::new(name_slice)?)?;
+                vmo.set_name(&zx::Name::new_lossy(&format!("ext4!{}", name)))?;
                 Ok(())
             };
 

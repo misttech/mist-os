@@ -12,9 +12,7 @@ use std::sync::atomic::Ordering::Release;
 /// Actual memory for each page will only be committed when we first write to that page.
 const VMO_SIZE: usize = 1 << 31;
 
-// SAFETY: The provided buffer is nul-terminated.
-const VMO_NAME: &std::ffi::CStr =
-    unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"heapdump-resources\0") };
+const VMO_NAME: zx::Name = zx::Name::new_lossy("heapdump-resources");
 
 /// Stores immutable resources in a dedicated VMO.
 pub struct ResourcesTable {
@@ -25,7 +23,7 @@ pub struct ResourcesTable {
 impl Default for ResourcesTable {
     fn default() -> ResourcesTable {
         let vmo = zx::Vmo::create(VMO_SIZE as u64).expect("failed to create resources VMO");
-        vmo.set_name(VMO_NAME).expect("failed to set VMO name");
+        vmo.set_name(&VMO_NAME).expect("failed to set VMO name");
 
         let writer = ResourcesTableWriter::new(&vmo).expect("failed to create writer");
         ResourcesTable { vmo, writer }
@@ -54,11 +52,7 @@ impl ResourcesTable {
     }
 
     /// Inserts information about a thread.
-    pub fn insert_thread_info(
-        &mut self,
-        koid: zx::Koid,
-        name: &[u8; zx::sys::ZX_MAX_NAME_LEN],
-    ) -> ResourceKey {
+    pub fn insert_thread_info(&mut self, koid: zx::Koid, name: &zx::Name) -> ResourceKey {
         self.writer.insert_thread_info(koid.raw_koid(), name).expect("failed to insert thread info")
     }
 }

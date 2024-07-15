@@ -266,8 +266,8 @@ impl InspectorConfig {
     ) -> Result<(Arc<<Container as BlockContainer>::ShareableData>, Node), Error> {
         let size = Self::adjusted_buffer_size(max_size);
         let (container, vmo) = Container::read_and_write(size).map_err(Error::AllocateVmo)?;
-        let cname = std::ffi::CString::new("InspectHeap").unwrap();
-        vmo.set_name(&cname).map_err(Error::AllocateVmo)?;
+        let name = zx::Name::new("InspectHeap").unwrap();
+        vmo.set_name(&name).map_err(Error::AllocateVmo)?;
         let vmo = Arc::new(vmo);
         let heap = Heap::new(container).map_err(|e| Error::CreateHeap(Box::new(e)))?;
         let state =
@@ -436,7 +436,6 @@ mod tests {
 #[cfg(all(test, target_os = "fuchsia"))]
 mod fuchsia_tests {
     use super::*;
-    use std::ffi::CString;
 
     #[fuchsia::test]
     fn inspector_duplicate_vmo() {
@@ -458,7 +457,7 @@ mod fuchsia_tests {
         assert_eq!(vmo.get_size().unwrap(), 4096);
         let inner = root_node.inner.inner_ref().unwrap();
         assert_eq!(*inner.block_index, 0);
-        assert_eq!(CString::new("InspectHeap").unwrap(), vmo.get_name().expect("Has name"));
+        assert_eq!("InspectHeap", vmo.get_name().expect("Has name"));
     }
 
     #[fuchsia::test]
@@ -499,7 +498,7 @@ mod fuchsia_tests {
         assert_eq!(test_object.max_size().unwrap(), 8192);
 
         assert_eq!(
-            CString::new("InspectHeap").unwrap(),
+            "InspectHeap",
             test_object.storage.as_ref().unwrap().get_name().expect("Has name")
         );
 

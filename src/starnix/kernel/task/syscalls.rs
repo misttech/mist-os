@@ -966,13 +966,13 @@ pub fn sys_prctl(
         PR_SET_NAME => {
             let addr = UserAddress::from(arg2);
             let mut name = current_task.read_memory_to_array::<16>(addr)?;
+            set_zx_name(&fuchsia_runtime::thread_self(), &name);
+
             // The name is truncated to 16 bytes (including the nul)
             name[15] = 0;
             // this will succeed, because we set 0 at end above
             let string_end = name.iter().position(|&c| c == 0).unwrap();
-
             let name_str = CString::new(&mut name[0..string_end]).map_err(|_| errno!(EINVAL))?;
-            set_zx_name(&fuchsia_runtime::thread_self(), name_str.as_bytes());
             current_task.set_command_name(name_str);
             Ok(0.into())
         }

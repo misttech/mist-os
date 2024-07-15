@@ -181,7 +181,7 @@ async fn allocate_image_buffer(
         let name = fuchsia_runtime::process_self().get_name()?;
         let koid = fuchsia_runtime::process_self().get_koid()?;
         allocator.set_debug_client_info(&AllocatorSetDebugClientInfoRequest {
-            name: Some(name.to_str()?.to_string()),
+            name: Some(name.to_string()),
             id: Some(koid.raw_koid()),
             ..Default::default()
         })?;

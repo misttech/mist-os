@@ -45,7 +45,7 @@ impl ResourceKey {
 #[derive(Debug)]
 pub struct ThreadInfo {
     pub koid: zx::sys::zx_koid_t,
-    pub name: [u8; zx::sys::ZX_MAX_NAME_LEN],
+    pub name: zx::Name,
 }
 
 // SAFETY: ThreadInfo only contains memory-mappable types and we never parse the name in it.
@@ -218,7 +218,7 @@ impl ResourcesTableWriter {
     pub fn insert_thread_info(
         &mut self,
         koid: zx::sys::zx_koid_t,
-        name: &[u8; zx::sys::ZX_MAX_NAME_LEN],
+        name: &zx::Name,
     ) -> Result<ResourceKey, crate::Error> {
         let offset = self.allocate(Layout::new::<ThreadInfo>())?;
         *self.storage.get_object_mut(offset as usize).unwrap() = ThreadInfo { koid, name: *name };
@@ -414,14 +414,13 @@ mod tests {
         // Insert a thread info struct with placeholder values (the name must be padded to the
         // expected length).
         const FAKE_KOID: zx::sys::zx_koid_t = 1234;
-        const FAKE_NAME: &[u8; zx::sys::ZX_MAX_NAME_LEN] =
-            b"fake-name\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
-        let resource_key = writer.insert_thread_info(FAKE_KOID, FAKE_NAME).unwrap();
+        const FAKE_NAME: zx::Name = zx::Name::new_lossy("fake-name");
+        let resource_key = writer.insert_thread_info(FAKE_KOID, &FAKE_NAME).unwrap();
 
         // Verify that it can be read back correctly.
         let reader = storage.create_reader();
         let thread_info = reader.get_thread_info(resource_key).unwrap();
         assert_eq!(thread_info.koid, FAKE_KOID);
-        assert_eq!(thread_info.name, *FAKE_NAME);
+        assert_eq!(thread_info.name, FAKE_NAME);
     }
 }

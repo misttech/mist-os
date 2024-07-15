@@ -130,25 +130,25 @@ impl SystemActivityGovernorControl {
             .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
             .collect();
 
-        let es_status = status_endpoints.remove("execution_state".into()).unwrap();
+        let es_status = status_endpoints.remove("execution_state").unwrap();
         let initial_execution_state_level = ExecutionStateLevel::from_primitive(
             es_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
 
-        let aa_status = status_endpoints.remove("application_activity".into()).unwrap();
+        let aa_status = status_endpoints.remove("application_activity").unwrap();
         let initial_application_activity_level = ApplicationActivityLevel::from_primitive(
             aa_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
 
-        let fwh_status = status_endpoints.remove("full_wake_handling".into()).unwrap();
+        let fwh_status = status_endpoints.remove("full_wake_handling").unwrap();
         let initial_full_wake_handling_level = FullWakeHandlingLevel::from_primitive(
             fwh_status.watch_power_level().await.unwrap().unwrap(),
         )
         .unwrap();
 
-        let wh_status = status_endpoints.remove("wake_handling".into()).unwrap();
+        let wh_status = status_endpoints.remove("wake_handling").unwrap();
         let initial_wake_handling_level = WakeHandlingLevel::from_primitive(
             wh_status.watch_power_level().await.unwrap().unwrap(),
         )

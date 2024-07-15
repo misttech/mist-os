@@ -527,7 +527,7 @@ impl ProcessBuilder {
 
         // Allocate the initial thread's stack, map it, and add a handle to the bootstrap message.
         let stack_vmo_name =
-            CString::new(stack_vmo_name).expect("Stack VMO name must not contain interior nul's");
+            zx::Name::new(&stack_vmo_name).expect("Stack VMO name must be less than 31 bytes");
         let stack_info = self.create_stack(stack_size, &stack_vmo_name)?;
 
         // Build and send the primary bootstrap message.
@@ -638,13 +638,13 @@ impl ProcessBuilder {
     fn create_stack(
         &mut self,
         stack_size: usize,
-        vmo_name: &CStr,
+        vmo_name: &zx::Name,
     ) -> Result<StackInfo, ProcessBuilderError> {
         let stack_vmo = zx::Vmo::create(stack_size as u64).map_err(|s| {
             ProcessBuilderError::GenericStatus("Failed to create VMO for initial thread stack", s)
         })?;
         stack_vmo
-            .set_name(&vmo_name)
+            .set_name(vmo_name)
             .map_err(|s| ProcessBuilderError::GenericStatus("Failed to set stack VMO name", s))?;
         let stack_flags = zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
         let stack_base =

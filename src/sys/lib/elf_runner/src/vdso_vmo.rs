@@ -7,9 +7,8 @@ use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
 
-fn take_vdso_vmos() -> Result<HashMap<CString, zx::Vmo>, VdsoError> {
+fn take_vdso_vmos() -> Result<HashMap<zx::Name, zx::Vmo>, VdsoError> {
     let mut vmos = HashMap::new();
     let mut i = 0;
     while let Some(handle) = take_startup_handle(HandleInfo::new(HandleType::VdsoVmo, i)) {
@@ -21,27 +20,27 @@ fn take_vdso_vmos() -> Result<HashMap<CString, zx::Vmo>, VdsoError> {
     Ok(vmos)
 }
 
-pub fn get_vdso_vmo(name: &CStr) -> Result<zx::Vmo, VdsoError> {
+pub fn get_vdso_vmo(name: &zx::Name) -> Result<zx::Vmo, VdsoError> {
     lazy_static! {
-        static ref VMOS: HashMap<CString, zx::Vmo> =
+        static ref VMOS: HashMap<zx::Name, zx::Vmo> =
             take_vdso_vmos().expect("Failed to take vDSO VMOs");
     }
     if let Some(vmo) = VMOS.get(name) {
         vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .map_err(|status| VdsoError::CouldNotDuplicate { name: name.to_owned(), status })
+            .map_err(|status| VdsoError::CouldNotDuplicate { name: *name, status })
     } else {
-        Err(VdsoError::NotFound(name.to_owned()))
+        Err(VdsoError::NotFound(*name))
     }
 }
 
 /// Returns an owned VMO handle to the stable vDSO, duplicated from the handle
 /// provided to this process through its processargs bootstrap message.
 pub fn get_stable_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo(c"vdso/stable")
+    get_vdso_vmo(&zx::Name::new_lossy("vdso/stable"))
 }
 
 /// Returns an owned VMO handle to the next vDSO, duplicated from the handle
 /// provided to this process through its processargs bootstrap message.
 pub fn get_next_vdso_vmo() -> Result<zx::Vmo, VdsoError> {
-    get_vdso_vmo(c"vdso/next")
+    get_vdso_vmo(&zx::Name::new_lossy("vdso/next"))
 }

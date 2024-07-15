@@ -43,7 +43,7 @@ pub struct AllocatorDebugInfo {
 fn default_allocator_name() -> Result<AllocatorDebugInfo, Error> {
     let name = fuchsia_runtime::process_self().get_name()?;
     let koid = fuchsia_runtime::process_self().get_koid()?;
-    Ok(AllocatorDebugInfo { name: name.to_str()?.to_string(), id: koid.raw_koid() })
+    Ok(AllocatorDebugInfo { name: name.to_string(), id: koid.raw_koid() })
 }
 
 fn set_allocator_name(

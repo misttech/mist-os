@@ -252,8 +252,8 @@ impl BuiltinEnvironmentBuilder {
                     .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)?
                     .publish_kernel_vmo(get_stable_vdso_vmo()?)?
                     .publish_kernel_vmo(get_next_vdso_vmo()?)?
-                    .publish_kernel_vmo(get_vdso_vmo(c"vdso/test1")?)?
-                    .publish_kernel_vmo(get_vdso_vmo(c"vdso/test2")?)?
+                    .publish_kernel_vmo(get_vdso_vmo(&zx::Name::new_lossy("vdso/test1"))?)?
+                    .publish_kernel_vmo(get_vdso_vmo(&zx::Name::new_lossy("vdso/test2"))?)?
                     .publish_kernel_vmos(HandleType::KernelFileVmo, 0)?,
                 VmexSource::Namespace => {
                     let mut bootfs_svc = bootfs_svc.ingest_bootfs_vmo_with_namespace_vmex().await?;
@@ -261,8 +261,8 @@ impl BuiltinEnvironmentBuilder {
                     for kernel_vmo in [
                         get_stable_vdso_vmo(),
                         get_next_vdso_vmo(),
-                        get_vdso_vmo(c"vdso/test1"),
-                        get_vdso_vmo(c"vdso/test2"),
+                        get_vdso_vmo(&zx::Name::new_lossy("vdso/test1")),
+                        get_vdso_vmo(&zx::Name::new_lossy("vdso/test2")),
                     ]
                     .into_iter()
                     .filter_map(|v| v.ok())

@@ -69,7 +69,7 @@ fn set_allocator_name(sysmem_client: &fidl_fuchsia_sysmem2::AllocatorProxy) -> R
     let name = fuchsia_runtime::process_self().get_name()?;
     let koid = fuchsia_runtime::process_self().get_koid()?;
     Ok(sysmem_client.set_debug_client_info(&AllocatorSetDebugClientInfoRequest {
-        name: Some(name.to_str()?.to_string()),
+        name: Some(name.to_string()),
         id: Some(koid.raw_koid()),
         ..Default::default()
     })?)

@@ -14,7 +14,6 @@ use futures::{FutureExt, TryStreamExt};
 use mapped_vmo::Mapping;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
-use std::ffi::CString;
 use std::ops::Range;
 
 /// Parameters needed to construct an AudioStream.
@@ -137,9 +136,9 @@ impl PayloadBuffer {
         // 5.14.6.6.3.1 Device Requirements: Stream Parameters
         // "If the device has an intermediate buffer, its size MUST be no less
         // than the specified buffer_bytes value."
-        let cname = CString::new(name)?;
+        let name = zx::Name::new(name)?;
         let vmo = zx::Vmo::create(buffer_bytes as u64).context("failed to allocate VMO")?;
-        vmo.set_name(&cname)?;
+        vmo.set_name(&name)?;
         let flags = zx::VmarFlags::PERM_READ
             | zx::VmarFlags::PERM_WRITE
             | zx::VmarFlags::MAP_RANGE

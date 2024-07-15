@@ -18,12 +18,11 @@ use futures::prelude::*;
 use moniker::ExtendedMoniker;
 use selectors::SelectorExt;
 use std::collections::HashMap;
-use std::ffi::CStr;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
 
-static INSPECT_ESCROW_NAME: &CStr = c"InspectEscrowedVmo";
+static INSPECT_ESCROW_NAME: zx::Name = zx::Name::new_lossy("InspectEscrowedVmo");
 
 pub struct InspectRepository {
     inner: RwLock<InspectRepositoryInner>,
@@ -105,7 +104,7 @@ impl InspectRepository {
         tree: Option<zx::Koid>,
     ) {
         debug!(identity = %component, "Escrow inspect handle.");
-        if let Err(err) = vmo.set_name(INSPECT_ESCROW_NAME) {
+        if let Err(err) = vmo.set_name(&INSPECT_ESCROW_NAME) {
             debug!(%err, "Failed to set escrow vmo name");
         }
         let handle = InspectHandle::escrow(vmo, token, name);
@@ -542,7 +541,7 @@ mod tests {
             repo.fetch_escrow(Arc::clone(&identity), finspect::EscrowToken { token: ep0 }, None);
         assert!(vmo.is_some());
         let vmo = vmo.unwrap();
-        assert_eq!(vmo.get_name().unwrap().as_c_str(), INSPECT_ESCROW_NAME);
+        assert_eq!(vmo.get_name().unwrap(), INSPECT_ESCROW_NAME);
         let inspector_loaded = Inspector::new(InspectorConfig::default().vmo(vmo));
         assert_data_tree!(inspector_loaded, root: {
             foo: 3i64,

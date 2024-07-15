@@ -198,11 +198,7 @@ pub async fn serve_container_controller(
                                                     .get_name()
                                                     .unwrap_or_default();
                                                 results.push(fstarcontainer::VmoReference {
-                                                    process_name: Some(
-                                                        process_name
-                                                            .into_string()
-                                                            .unwrap_or_default(),
-                                                    ),
+                                                    process_name: Some(process_name.to_string()),
                                                     pid: Some(leader.get_pid() as u64),
                                                     fd: Some(fd.raw()),
                                                     koid: Some(koid),

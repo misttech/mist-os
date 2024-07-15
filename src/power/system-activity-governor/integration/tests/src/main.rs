@@ -1853,12 +1853,12 @@ async fn test_element_info_provider() -> Result<()> {
         .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
         .collect();
 
-    let es_status = status_endpoints.get("execution_state".into()).unwrap();
-    let aa_status = status_endpoints.get("application_activity".into()).unwrap();
-    let fwh_status = status_endpoints.get("full_wake_handling".into()).unwrap();
-    let wh_status = status_endpoints.get("wake_handling".into()).unwrap();
-    let bc_status = status_endpoints.get("boot_control".into()).unwrap();
-    let erl_status = status_endpoints.get("execution_resume_latency".into()).unwrap();
+    let es_status = status_endpoints.get("execution_state").unwrap();
+    let aa_status = status_endpoints.get("application_activity").unwrap();
+    let fwh_status = status_endpoints.get("full_wake_handling").unwrap();
+    let wh_status = status_endpoints.get("wake_handling").unwrap();
+    let bc_status = status_endpoints.get("boot_control").unwrap();
+    let erl_status = status_endpoints.get("execution_resume_latency").unwrap();
 
     // First watch should return immediately with default values.
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
@@ -1974,7 +1974,7 @@ async fn test_execution_state_always_starts_at_active_power_level() -> Result<()
         .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
         .collect();
 
-    let es_status = status_endpoints.get("execution_state".into()).unwrap();
+    let es_status = status_endpoints.get("execution_state").unwrap();
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
     Ok(())
 }

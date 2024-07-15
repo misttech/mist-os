@@ -139,11 +139,9 @@ impl MemoryAttributionManager {
 fn get_thread_group_identifier(thread_group: &ThreadGroup) -> String {
     let name = match thread_group.process.is_invalid_handle() {
         // The system task has an invalid Zircon process handle.
-        true => c"[system task]".to_owned(),
-        false => thread_group.process.get_name().unwrap_or_else(|_| c"".to_owned()),
+        true => zx::Name::new_lossy("[system task]"),
+        false => thread_group.process.get_name().unwrap_or_default(),
     };
-    // Names not encoded in UTF-8 will stripped of invalid UTF-8 characters.
-    let name = name.to_string_lossy();
     let id = thread_group.leader;
     let name = format!("{id}: {name}");
     name

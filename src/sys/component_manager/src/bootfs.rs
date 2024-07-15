@@ -242,7 +242,7 @@ impl BootfsSvc {
 
     // Publish a VMO beneath '/boot/kernel'. Used to publish VDSOs and kernel files.
     pub fn publish_kernel_vmo(mut self, vmo: zx::Vmo) -> Result<Self, BootfsError> {
-        let name = vmo.get_name().map_err(BootfsError::VmoName)?.into_string()?;
+        let name = vmo.get_name().map_err(BootfsError::VmoName)?.to_string();
         if name.is_empty() {
             // Skip VMOs without names.
             return Ok(self);

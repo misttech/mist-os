@@ -8,7 +8,6 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::process_self;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, Peered};
 use futures::{try_join, StreamExt, TryFutureExt, TryStreamExt};
-use std::ffi::CString;
 use tracing::warn;
 use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync};
 
@@ -33,7 +32,7 @@ impl Instrumentation {
 
         const NUM_COUNTERS: u64 = 5;
         let module = zx::Vmo::create(NUM_COUNTERS).context("failed to create module VMO")?;
-        let module_name = CString::new("test-module").expect("CString::new failed");
+        let module_name = zx::Name::new("test-module").expect("Name::new failed");
         module.set_name(&module_name).context("failed to set name on module VMO")?;
         module
             .set_content_size(&NUM_COUNTERS)
