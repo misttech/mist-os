@@ -4,15 +4,12 @@
 
 #include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
-#include <fuchsia/ui/test/context/cpp/fidl.h>
-
 namespace ui_conformance_test_base {
 
 void ConformanceTest::SetUp() {
   {
-    fuchsia::ui::test::context::RealmFactorySyncPtr realm_factory;
     context_ = sys::ComponentContext::Create();
-    ASSERT_EQ(context_->svc()->Connect(realm_factory.NewRequest()), ZX_OK);
+    ASSERT_EQ(context_->svc()->Connect(realm_factory_.NewRequest()), ZX_OK);
 
     fuchsia::ui::test::context::RealmFactoryCreateRealmRequest req;
     fuchsia::ui::test::context::RealmFactory_CreateRealm_Result res;
@@ -21,7 +18,7 @@ void ConformanceTest::SetUp() {
     req.set_display_rotation(DisplayRotation());
     req.set_device_pixel_ratio(DevicePixelRatio());
 
-    ASSERT_EQ(realm_factory->CreateRealm(std::move(req), &res), ZX_OK);
+    ASSERT_EQ(realm_factory_->CreateRealm(std::move(req), &res), ZX_OK);
   }
 }
 
