@@ -113,10 +113,10 @@ class Scheduler::PiNodeAdapter<Thread> {
   // bit easier.
   TA_REQ(get_lock()) SchedulerState& scheduler_state() { return thread_.scheduler_state(); }
   TA_REQ(get_lock()) thread_state state() { return thread_.state(); }
-  TA_REQ(get_lock()) zx_koid_t tid() { return thread_.state(); }
   TA_REQ(get_lock()) WaitQueue* blocking_wait_queue() {
     return thread_.wait_queue_state().blocking_wait_queue_;
   }
+  zx_koid_t tid() { return thread_.tid(); }
 
  private:
   Thread& thread_;
