@@ -285,7 +285,7 @@ zx_status_t Nelson::ThermalInit() {
   // function 3 which puts in PWM_D mode.
   gpio_init_steps_.push_back(GpioConfigOut(S905D3_PWM_D_PIN, 0));
 
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_PWM_D_PIN, S905D3_PWM_D_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D3_PWM_D_PIN, S905D3_PWM_D_FN));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('THER');

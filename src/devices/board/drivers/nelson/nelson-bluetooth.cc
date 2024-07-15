@@ -54,10 +54,10 @@ static const std::vector<fpbus::BootMetadata> bt_uart_boot_metadata{
 
 zx_status_t Nelson::BluetoothInit() {
   // set alternate functions to enable Bluetooth UART
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_UART_TX_A, S905D3_UART_TX_A_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_UART_RX_A, S905D3_UART_RX_A_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_UART_CTS_A, S905D3_UART_CTS_A_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D3_UART_RTS_A, S905D3_UART_RTS_A_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D3_UART_TX_A, S905D3_UART_TX_A_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D3_UART_RX_A, S905D3_UART_RX_A_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D3_UART_CTS_A, S905D3_UART_CTS_A_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D3_UART_RTS_A, S905D3_UART_RTS_A_FN));
 
   // Bind UART for Bluetooth HCI
   fdf::Arena arena('BLUE');

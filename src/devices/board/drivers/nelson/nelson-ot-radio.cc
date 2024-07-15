@@ -79,12 +79,12 @@ const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
 namespace nelson {
 
 zx_status_t Nelson::OtRadioInit() {
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_TH_SOC_INT, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_TH_SOC_INT, 0));
   gpio_init_steps_.push_back(
       GpioConfigIn(GPIO_TH_SOC_INT, fuchsia_hardware_gpio::GpioFlags::kNoPull));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_TH_RST_L, 0));  // Reset
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TH_RST_L, 0));  // Reset
   gpio_init_steps_.push_back(GpioConfigOut(GPIO_SOC_TH_RST_L, 1));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_TH_BOOT_MODE_L, 0));  // Boot mode
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TH_BOOT_MODE_L, 0));  // Boot mode
   gpio_init_steps_.push_back(GpioConfigOut(GPIO_SOC_TH_BOOT_MODE_L, 1));
 
   fpbus::Node dev;
