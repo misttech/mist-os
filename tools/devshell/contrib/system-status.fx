@@ -2,11 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
-  testonly = true
-  deps = [ "system-status:tests" ]
-}
-
-group("install") {
-  deps = [ "system-status:install" ]
-}
+#### CATEGORY=Device management
+#### EXECUTABLE=${HOST_TOOLS_DIR}/system-status
+### Get a summary of system status
+## 'fx system-status --help' for instructions.
