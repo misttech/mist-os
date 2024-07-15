@@ -28,6 +28,7 @@ per-file make-integration-patch=thatguy@google.com
 per-file merge-package-config=chaselatta@google.com
 per-file mkinstaller = file: /src/firmware/OWNERS
 per-file mkinstaller-remote = file: /src/firmware/OWNERS
+per-file power-digest=jaeheon@google.com,claridge@google.com,andresoportus@google.com
 per-file             pprof,lib/symbol-index.sh = fdurso@google.com,dthorn@google.com,dangyi@google.com
 per-file             remove-update-source = file: /src/sys/pkg/OWNERS
 per-file refresh-bazel-compdb=chaselatta@google.com,lijiaming@google.com
