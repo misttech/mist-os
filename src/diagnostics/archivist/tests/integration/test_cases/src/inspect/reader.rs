@@ -185,15 +185,14 @@ async fn unified_reader() -> Result<(), Error> {
     .await;
 
     // Then verify that a selector with a correct moniker, but no resolved nodes
-    // produces no data.
+    // produces an error schema.
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:root/non-existent-node:bloop"],
         &UNIFIED_FULL_FILTER_GOLDEN,
-        // we are selecting puppet, so we don't expect archivist own inspect, and the puppet was
-        // entirely filtered so we don't expect it either.
-        ALL_INSPECT_ENTRIES - 2,
+        // we are selecting puppet, so we don't expect archivist own inspect
+        ALL_INSPECT_ENTRIES - 1,
     )
     .await;
 
@@ -243,7 +242,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
-        0,
+        1,
     )
     .await;
 
@@ -336,7 +335,7 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
-        0,
+        1,
     )
     .await;
 
