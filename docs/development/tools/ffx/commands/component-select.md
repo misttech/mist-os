@@ -9,7 +9,7 @@ component topology.
 
 In the special case of a query that uniquely matches a single service, RCS can
 connect to that service and pass a handle to it to the host for FFX to use.
-This is how the [plugin system][ffx-plugins] is able to create FIDL
+This is how the [FHO subtool framework][ffx-plugins] is able to create FIDL
 proxies using the component selector mapping.
 
 To query for services on a target, write a [selector][fidl-selector] to
@@ -67,6 +67,6 @@ equivalent to `core/remote-control:out:*`.
 [component-moniker]: /docs/reference/components/moniker.md
 [component-routing]: /docs/concepts/components/v2/capabilities/README.md#routing-terminology
 [component-topology]: /docs/concepts/components/v2/topology.md
-[ffx-plugins]: /docs/development/tools/ffx/development/plugins.md
+[ffx-plugins]: /docs/development/tools/ffx/development/subtools/getting-started.md
 [fidl-selector]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#Selector
 [selectors]: /docs/reference/diagnostics/selectors.md

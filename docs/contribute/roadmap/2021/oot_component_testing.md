@@ -294,7 +294,7 @@ covered in a [separate roadmap document][oot-system-testing].
 [dash]: /zircon/third_party/uapp/dash/
 [driver-abi-stability]: /docs/contribute/roadmap/2021/stable_driver_runtime.md
 [ffx]: /docs/development/tools/ffx/getting-started.md
-[ffx-plugin]: /docs/development/tools/ffx/development/plugins.md
+[ffx-plugin]: /docs/development/tools/ffx/development/README.md
 [ffx-test]: https://fuchsia.dev/reference/tools/sdk/ffx.md#test
 [fidl]: /docs//concepts/fidl/overview.md
 [fof-velocity]: /docs/contribute/roadmap/2021/flutter_on_fuchsia_velocity.md
