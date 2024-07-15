@@ -92,6 +92,11 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
                                    const std::initializer_list<std::string>& tags);
 #endif
 
+// Get the severity corresponding to the given verbosity. Note that
+// verbosity relative to the default severity and can be thought of
+// as incrementally "more vebose than" the baseline.
+fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
+
 // Do the opposite of |ParseLogSettings()|: Convert |settings| to the
 // command line arguments to pass to a program. The result is empty if
 // |settings| is the default.
