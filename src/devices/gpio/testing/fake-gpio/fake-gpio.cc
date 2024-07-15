@@ -134,6 +134,12 @@ void FakeGpio::SetPolarity(SetPolarityRequestView request, SetPolarityCompleter:
   completer.ReplySuccess();
 }
 
+void FakeGpio::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_ASSERT_MSG(false, "Unknown method ordinal 0x%016lx", metadata.method_ordinal);
+}
+
 uint64_t FakeGpio::GetAltFunction() const {
   const auto& state = std::get<AltFunctionSubState>(state_log_.back().sub_state);
   return state.function;

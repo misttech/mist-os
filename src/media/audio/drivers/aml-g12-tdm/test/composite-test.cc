@@ -232,6 +232,10 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
     completer.Reply(zx::ok());
   }
   void GetName(GetNameCompleter::Sync& completer) override { completer.ReplySuccess("Test"); }
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL();
+  }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);

@@ -107,6 +107,10 @@ class FakeGpio : public fidl::WireServer<Gpio> {
   void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL("Unknown method ordinal 0x%016lx", metadata.method_ordinal);
+  }
 
   mock_function::MockFunction<zx_status_t>& MockGetPin() { return mock_get_pin_; }
   mock_function::MockFunction<zx_status_t>& MockGetName() { return mock_get_name_; }

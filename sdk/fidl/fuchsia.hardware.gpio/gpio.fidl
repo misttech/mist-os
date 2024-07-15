@@ -22,7 +22,7 @@ type GpioPolarity = strict enum : uint32 {
     HIGH = 0x1;
 };
 
-closed protocol Gpio {
+open protocol Gpio {
     /// Get the pin of a GPIO
     strict GetPin() -> (struct {
         pin uint32;

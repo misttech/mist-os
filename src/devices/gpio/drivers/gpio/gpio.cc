@@ -228,6 +228,12 @@ void GpioDevice::SetPolarity(SetPolarityRequestView request,
               }));
 }
 
+void GpioDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown Gpio method ordinal 0x%016lx", metadata.method_ordinal);
+}
+
 zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
                                      const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                                      const std::optional<std::string>& node_name) {

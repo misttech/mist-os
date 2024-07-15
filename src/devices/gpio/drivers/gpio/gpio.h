@@ -57,6 +57,9 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
                       SetAltFunctionCompleter::Sync& completer) override;
   void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override;
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
   std::string pin_name() const {
     char name[20];
     snprintf(name, sizeof(name), "gpio-%u", pin_);
