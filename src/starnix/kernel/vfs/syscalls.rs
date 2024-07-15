@@ -48,6 +48,7 @@ use starnix_uapi::time::{
 };
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::user_buffer::UserBuffer;
+use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
     __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, iocb, itimerspec, off_t,
@@ -364,7 +365,7 @@ fn do_readv(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     offset: Option<off_t>,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -394,7 +395,7 @@ pub fn sys_readv(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
 ) -> Result<usize, Errno> {
     do_readv(locked, current_task, fd, iovec_addr, iovec_count, None, 0)
 }
@@ -404,7 +405,7 @@ pub fn sys_preadv(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     offset: off_t,
 ) -> Result<usize, Errno> {
     do_readv(locked, current_task, fd, iovec_addr, iovec_count, Some(offset), 0)
@@ -415,7 +416,7 @@ pub fn sys_preadv2(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     offset: off_t,
     _unused: SyscallArg, // On 32-bit systems, holds the upper 32 bits of offset.
     flags: u32,
@@ -429,7 +430,7 @@ fn do_writev(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     offset: Option<off_t>,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -469,7 +470,7 @@ pub fn sys_writev(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
 ) -> Result<usize, Errno> {
     do_writev(locked, current_task, fd, iovec_addr, iovec_count, None, 0)
 }
@@ -479,7 +480,7 @@ pub fn sys_pwritev(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     offset: off_t,
 ) -> Result<usize, Errno> {
     do_writev(locked, current_task, fd, iovec_addr, iovec_count, Some(offset), 0)
@@ -490,7 +491,7 @@ pub fn sys_pwritev2(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     offset: off_t,
     _unused: SyscallArg, // On 32-bit systems, holds the upper 32 bits of offset.
     flags: u32,
@@ -2749,7 +2750,7 @@ pub fn sys_vmsplice(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     flags: u32,
 ) -> Result<usize, Errno> {
     splice::vmsplice(locked, current_task, fd, iovec_addr, iovec_count, flags)
@@ -2904,8 +2905,8 @@ fn submit_iocb(
             length: control_block.aio_nbytes as usize,
         }],
         IoOperationType::ReadV | IoOperationType::WriteV => {
-            let count = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
-            current_task.read_iovec(control_block.aio_buf.into(), count)?
+            let count: i32 = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
+            current_task.read_iovec(control_block.aio_buf.into(), count.into())?
         }
     };
 

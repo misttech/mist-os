@@ -33,6 +33,7 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
+use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
     MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE,
@@ -2317,7 +2318,11 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
     ///
     /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
-    fn read_iovec(&self, iovec_addr: UserAddress, iovec_count: i32) -> Result<UserBuffers, Errno> {
+    fn read_iovec(
+        &self,
+        iovec_addr: UserAddress,
+        iovec_count: UserValue<i32>,
+    ) -> Result<UserBuffers, Errno> {
         let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
         if iovec_count > UIO_MAXIOV as usize {
             return error!(EINVAL);

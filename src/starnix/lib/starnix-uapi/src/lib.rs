@@ -29,6 +29,7 @@ pub mod uapi;
 pub mod union;
 pub mod user_address;
 pub mod user_buffer;
+pub mod user_value;
 pub mod vfs;
 
 #[cfg(target_arch = "aarch64")]

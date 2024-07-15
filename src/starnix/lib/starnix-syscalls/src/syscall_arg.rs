@@ -6,6 +6,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::signals::UncheckedSignal;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_value::UserValue;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct SyscallArg(u64);
@@ -38,6 +39,18 @@ impl From<usize> for SyscallArg {
     }
 }
 
+impl From<UserValue<u64>> for SyscallArg {
+    fn from(value: UserValue<u64>) -> Self {
+        Self::from_raw(value.raw())
+    }
+}
+
+impl From<UserValue<usize>> for SyscallArg {
+    fn from(value: UserValue<usize>) -> Self {
+        Self::from_raw(value.raw() as u64)
+    }
+}
+
 impl From<bool> for SyscallArg {
     fn from(value: bool) -> Self {
         Self::from_raw(if value { 1 } else { 0 })
@@ -64,6 +77,11 @@ impl_from_syscall_arg! { for i64: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for u32: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for usize: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for u64: arg => arg.raw() as Self }
+impl_from_syscall_arg! { for UserValue<i32>: arg => Self::from_raw(arg.raw() as i32) }
+impl_from_syscall_arg! { for UserValue<i64>: arg => Self::from_raw(arg.raw() as i64) }
+impl_from_syscall_arg! { for UserValue<u32>: arg => Self::from_raw(arg.raw() as u32) }
+impl_from_syscall_arg! { for UserValue<usize>: arg => Self::from_raw(arg.raw() as usize) }
+impl_from_syscall_arg! { for UserValue<u64>: arg => Self::from_raw(arg.raw() as u64) }
 impl_from_syscall_arg! { for UserAddress: arg => Self::from(arg.raw()) }
 impl_from_syscall_arg! { for UserCString: arg => Self::new(arg.into()) }
 

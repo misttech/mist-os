@@ -13,6 +13,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_buffer::MAX_RW_COUNT;
+use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{errno, error, off_t, uapi};
 use std::sync::Arc;
 
@@ -251,7 +252,7 @@ pub fn vmsplice(
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
-    iovec_count: i32,
+    iovec_count: UserValue<i32>,
     flags: u32,
 ) -> Result<usize, Errno> {
     const KNOWN_FLAGS: u32 =
