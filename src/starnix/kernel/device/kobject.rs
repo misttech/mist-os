@@ -330,7 +330,7 @@ impl FileOps for UEventFile {
             self.device.metadata.device_type.minor(),
             self.device.kobject().name(),
         );
-        data.write(content.get(offset..).ok_or(errno!(EINVAL))?.as_bytes())
+        data.write(content.get(offset..).ok_or_else(|| errno!(EINVAL))?.as_bytes())
     }
 
     fn write(

@@ -119,6 +119,6 @@ impl FileOps for PowerStateFile {
     ) -> Result<usize, Errno> {
         let states = current_task.kernel().suspend_resume_manager.suspend_states();
         let content = states.iter().map(SuspendState::to_str).join(" ") + "\n";
-        data.write(content.get(offset..).ok_or(errno!(EINVAL))?.as_bytes())
+        data.write(content.get(offset..).ok_or_else(|| errno!(EINVAL))?.as_bytes())
     }
 }

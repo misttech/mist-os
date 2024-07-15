@@ -59,7 +59,7 @@ impl Syslog {
     }
 
     fn subscription(&self) -> Result<&Mutex<LogSubscription>, Errno> {
-        self.syscall_subscription.get().ok_or(errno!(ENOENT))
+        self.syscall_subscription.get().ok_or_else(|| errno!(ENOENT))
     }
 }
 

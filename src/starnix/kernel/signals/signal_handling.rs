@@ -346,10 +346,11 @@ pub fn dispatch_signal_handler(
     } else {
         main_stack
     }
-    .ok_or(errno!(EINVAL))?;
+    .ok_or_else(|| errno!(EINVAL))?;
 
-    let stack_pointer =
-        align_stack_pointer(stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or(errno!(EINVAL))?);
+    let stack_pointer = align_stack_pointer(
+        stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or_else(|| errno!(EINVAL))?,
+    );
 
     if let Some(alt_stack) = signal_state.alt_stack {
         if sigaltstack_contains_pointer(&alt_stack, stack_pointer)

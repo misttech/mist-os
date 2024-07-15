@@ -1043,7 +1043,7 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
             let parent_task = pids.get_task(parent.leader);
             security::ptrace_traceme(
                 current_task,
-                parent_task.upgrade().ok_or(errno!(EINVAL))?.as_ref(),
+                parent_task.upgrade().ok_or_else(|| errno!(EINVAL))?.as_ref(),
             )?;
         }
 

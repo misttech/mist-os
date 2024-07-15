@@ -1099,7 +1099,12 @@ impl FsNodeOps for Arc<FuseNode> {
             self.nodeid,
             FuseOperation::Lookup { name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
+        self.fs_node_from_entry(
+            current_task,
+            node,
+            name,
+            response.entry().ok_or_else(|| errno!(EINVAL))?,
+        )
     }
 
     fn mknod(
@@ -1174,7 +1179,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 )?
                 .entry()
                 .copied()
-                .ok_or(errno!(EINVAL))
+                .ok_or_else(|| errno!(EINVAL))
         };
 
         let entry = get_entry()?;
@@ -1201,7 +1206,12 @@ impl FsNodeOps for Arc<FuseNode> {
                 name: name.to_owned(),
             },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
+        self.fs_node_from_entry(
+            current_task,
+            node,
+            name,
+            response.entry().ok_or_else(|| errno!(EINVAL))?,
+        )
     }
 
     fn create_symlink(
@@ -1218,7 +1228,12 @@ impl FsNodeOps for Arc<FuseNode> {
             self.nodeid,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
+        self.fs_node_from_entry(
+            current_task,
+            node,
+            name,
+            response.entry().ok_or_else(|| errno!(EINVAL))?,
+        )
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {

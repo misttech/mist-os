@@ -136,7 +136,7 @@ impl FileOps for RemoteBlockDeviceFile {
                     .backing_memory
                     .read_uninit(buf, offset as u64)
                     .map_err(|status| from_status_like_fdio!(status))?;
-                offset = offset.checked_add(buf.len()).ok_or(errno!(EINVAL))?;
+                offset = offset.checked_add(buf.len()).ok_or_else(|| errno!(EINVAL))?;
             }
             Ok(buf.len())
         })
@@ -157,7 +157,7 @@ impl FileOps for RemoteBlockDeviceFile {
                 .backing_memory
                 .write(&buf[..to_write], offset as u64)
                 .map_err(|status| from_status_like_fdio!(status))?;
-            offset = offset.checked_add(to_write).ok_or(errno!(EINVAL))?;
+            offset = offset.checked_add(to_write).ok_or_else(|| errno!(EINVAL))?;
             Ok(to_write)
         })
     }
@@ -273,7 +273,7 @@ impl RemoteBlockDeviceRegistry {
     }
 
     fn open(&self, minor: u32) -> Result<Arc<RemoteBlockDevice>, Errno> {
-        self.devices.lock().get(&minor).ok_or(errno!(ENODEV)).cloned()
+        self.devices.lock().get(&minor).ok_or_else(|| errno!(ENODEV)).cloned()
     }
 }
 

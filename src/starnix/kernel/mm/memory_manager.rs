@@ -2339,7 +2339,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         let mut index = 0;
         loop {
             // This operation should never overflow: we should fail to read before that.
-            let addr = string.addr().checked_add(index).ok_or(errno!(EFAULT))?;
+            let addr = string.addr().checked_add(index).ok_or_else(|| errno!(EFAULT))?;
             let read = self.read_memory_partial_until_null_byte(
                 addr,
                 &mut buf.spare_capacity_mut()[index..][..chunk_size],

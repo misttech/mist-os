@@ -159,7 +159,8 @@ fn read_c_string_vector(
             }
         })?;
         let cstring = CString::new(string).map_err(|_| errno!(EINVAL))?;
-        vec_size = vec_size.checked_add(cstring.as_bytes_with_nul().len()).ok_or(errno!(E2BIG))?;
+        vec_size =
+            vec_size.checked_add(cstring.as_bytes_with_nul().len()).ok_or_else(|| errno!(E2BIG))?;
         if vec_size > vec_limit {
             return error!(E2BIG);
         }

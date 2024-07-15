@@ -762,7 +762,7 @@ impl LoadavgFile {
 impl DynamicFileSource for LoadavgFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let (runnable_tasks, existing_tasks, last_pid) = {
-            let kernel = self.0.upgrade().ok_or(errno!(EIO))?;
+            let kernel = self.0.upgrade().ok_or_else(|| errno!(EIO))?;
             let pid_table = kernel.pids.read();
 
             let curr_tids = pid_table.task_ids();

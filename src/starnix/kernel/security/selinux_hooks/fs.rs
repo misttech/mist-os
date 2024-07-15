@@ -654,7 +654,7 @@ impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
             .map_err(|_| errno!(ENOENT))?
             .iter()
             .find(|(_permission_id, permission_name)| permission_name == name.as_bytes())
-            .ok_or(errno!(ENOENT))?
+            .ok_or_else(|| errno!(ENOENT))?
             .0;
 
         Ok(node.fs().create_node(

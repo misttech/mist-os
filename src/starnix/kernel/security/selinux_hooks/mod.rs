@@ -279,7 +279,7 @@ pub fn set_procattr(
         ProcAttr::Current => {
             check_permission(ProcessPermission::SetCurrent)?;
             // TODO(b/322849067): Verify the `source` has `dyntransition` permission to the new SID.
-            target.current_sid = sid.ok_or(errno!(EINVAL))?
+            target.current_sid = sid.ok_or_else(|| errno!(EINVAL))?
         }
         ProcAttr::Previous => {
             return error!(EINVAL);

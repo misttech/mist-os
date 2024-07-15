@@ -25,7 +25,7 @@ fn connect_to_hrtimer() -> Result<fhrtimer::DeviceSynchronousProxy, Errno> {
         .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer directory: {e}")))?;
     let entry = dir
         .next()
-        .ok_or(errno!(EINVAL, format!("No entry in the hrtimer directory")))?
+        .ok_or_else(|| errno!(EINVAL, format!("No entry in the hrtimer directory")))?
         .map_err(|e| errno!(EINVAL, format!("Failed to find hrtimer device: {e}")))?;
     let path = entry
         .path()
@@ -96,7 +96,7 @@ impl HrTimerManager {
 
     /// Make sure the proxy to HrTimer device is active.
     fn check_connection(&self) -> Result<&fhrtimer::DeviceSynchronousProxy, Errno> {
-        self.device_proxy.as_ref().ok_or(errno!(EINVAL, "No connection to HrTimer driver"))
+        self.device_proxy.as_ref().ok_or_else(|| errno!(EINVAL, "No connection to HrTimer driver"))
     }
 
     fn resolution_nsecs(&self) -> Result<i64, Errno> {

@@ -39,8 +39,9 @@ impl FsContextState {
     fn set_namespace(&mut self, new_ns: Arc<Namespace>) -> Result<(), Errno> {
         log_trace!("updating namespace");
         let new_root =
-            Namespace::translate_node(self.root.clone(), &new_ns).ok_or(errno!(EINVAL))?;
-        let new_cwd = Namespace::translate_node(self.cwd.clone(), &new_ns).ok_or(errno!(EINVAL))?;
+            Namespace::translate_node(self.root.clone(), &new_ns).ok_or_else(|| errno!(EINVAL))?;
+        let new_cwd =
+            Namespace::translate_node(self.cwd.clone(), &new_ns).ok_or_else(|| errno!(EINVAL))?;
 
         // Only perform a mutation if the rebased nodes both exist in the target namespace.
         self.root = new_root;

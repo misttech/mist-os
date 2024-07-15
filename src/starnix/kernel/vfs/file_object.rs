@@ -221,7 +221,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         trace_duration!(CATEGORY_STARNIX_MM, c"FileOpsDefaultMmap");
         let min_memory_size = (memory_offset as usize)
             .checked_add(round_up_to_system_page_size(length)?)
-            .ok_or(errno!(EINVAL))?;
+            .ok_or_else(|| errno!(EINVAL))?;
         let mut memory = if options.contains(MappingOptions::SHARED) {
             profile_duration!("GetSharedVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetSharedVmo");
