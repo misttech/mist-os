@@ -46,7 +46,7 @@ class FakeGpio : public fidl::WireServer<Gpio> {
   }
   void Read(ReadCompleter::Sync& completer) override {
     mock_read_.Call();
-    completer.ReplySuccess(5);
+    completer.ReplySuccess(true);
   }
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {
     if (request->value != 7) {

@@ -419,7 +419,7 @@ zx::result<bool> OtRadioDevice::IsInterruptAsserted() {
     zxlogf(ERROR, "Failed to read interrupt gpio: %s", zx_status_get_string(result->error_value()));
     return zx::error(result->error_value());
   }
-  return zx::ok(result.value()->value == 0);
+  return zx::ok(!result.value()->value);
 }
 
 zx_status_t OtRadioDevice::DriverUnitTestGetNCPVersion() { return GetNCPVersion(); }

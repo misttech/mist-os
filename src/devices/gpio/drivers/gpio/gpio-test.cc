@@ -192,7 +192,7 @@ TEST_F(GpioTest, TestFidlAll) {
   gpio_client->Read().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Read>& result) {
         ASSERT_OK(result.status());
-        EXPECT_EQ(result->value()->value, 20);
+        EXPECT_TRUE(result->value()->value);
         runtime().Quit();
       });
   runtime().Run();

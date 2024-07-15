@@ -49,9 +49,10 @@ open protocol Gpio {
         function uint64;
     }) -> () error zx.Status;
 
-    /// Reads the current value of a GPIO (0 or 1).
+    /// Reads the current value of a GPIO, returning `true` for a high voltage and `false` for a
+    /// low voltage.
     strict Read() -> (struct {
-        value uint8;
+        value bool;
     }) error zx.Status;
 
     /// Sets the current value of the GPIO (any non-zero value maps to 1).

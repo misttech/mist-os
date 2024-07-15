@@ -103,7 +103,7 @@ void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) 
 
 void FakeGpio::Read(ReadCompleter::Sync& completer) {
   ZX_ASSERT(std::holds_alternative<ReadSubState>(state_log_.back().sub_state));
-  zx::result<uint8_t> response;
+  zx::result<bool> response;
   if (read_callbacks_.empty()) {
     ZX_ASSERT(default_read_response_.has_value());
     response = default_read_response_.value();
@@ -168,11 +168,11 @@ void FakeGpio::PushReadCallback(ReadCallback callback) {
   read_callbacks_.push(std::move(callback));
 }
 
-void FakeGpio::PushReadResponse(zx::result<uint8_t> response) {
+void FakeGpio::PushReadResponse(zx::result<bool> response) {
   read_callbacks_.push([response](FakeGpio& gpio) { return response; });
 }
 
-void FakeGpio::SetDefaultReadResponse(std::optional<zx::result<uint8_t>> response) {
+void FakeGpio::SetDefaultReadResponse(std::optional<zx::result<bool>> response) {
   default_read_response_ = response;
 }
 

@@ -181,7 +181,7 @@ int ButtonsDevice::Thread() {
                   zx_status_get_string(read_result->error_value()));
           return read_result->error_value();
         }
-        if (!!read_result.value()->value != debounce_states_[i].value) {
+        if (read_result.value()->value != debounce_states_[i].value) {
           Notify(i);
         }
         debounce_states_[i].value = read_result.value()->value;
@@ -282,7 +282,7 @@ zx::result<bool> ButtonsDevice::MatrixScan(uint32_t row, uint32_t col, zx_durati
     }
   }
   FDF_LOG(DEBUG, "row %u col %u val %u", row, col, read_result.value()->value);
-  return zx::ok(static_cast<bool>(read_result.value()->value));
+  return zx::ok(read_result.value()->value);
 }
 
 zx::result<ButtonsDevice::ButtonsInputReport> ButtonsDevice::GetInputReportInternal() {
@@ -348,9 +348,9 @@ void ButtonsDevice::GetInputReport(GetInputReportRequestView request,
   completer.ReplySuccess(input_report.Build());
 }
 
-zx::result<uint8_t> ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
+zx::result<bool> ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_port) {
   FDF_LOG(DEBUG, "gpio %u port %lu", idx, int_port);
-  uint8_t current = 0, old;
+  bool current = false, old;
   auto& gpio = gpios_[idx];
 
   fidl::WireResult read_result1 = gpio.client->Read();
@@ -404,7 +404,7 @@ zx::result<uint8_t> ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t in
 zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
   FDF_LOG(DEBUG, "gpio %u port %lu", idx, int_port);
   zx_status_t status;
-  uint8_t current = 0;
+  bool current = false;
   auto& gpio = gpios_[idx];
 
   fidl::WireResult read_result = gpio.client->Read();

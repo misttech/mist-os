@@ -26,7 +26,7 @@ class Vim3DisplayDetect : public fdf::DriverBase {
  private:
   zx::result<> DetectDisplay();
 
-  zx::result<uint8_t> ReadGpio(std::string_view gpio_node_name);
+  zx::result<bool> ReadGpio(std::string_view gpio_node_name);
 
   fidl::SyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::SyncClient<fuchsia_driver_framework::NodeController> controller_;
