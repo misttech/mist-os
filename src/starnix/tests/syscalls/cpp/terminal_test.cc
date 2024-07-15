@@ -458,7 +458,7 @@ TEST_F(Pty, DetectReplicaClosing) {
       SleepNs(10e7);
     }
     SAFE_SYSCALL(kill(child_pid, SIGUSR2));
-    ASSERT_EQ(1, SAFE_SYSCALL(poll(&fds, 1, 10000)));
+    ASSERT_EQ(1, SAFE_SYSCALL(HANDLE_EINTR(poll(&fds, 1, 10000))));
     ASSERT_EQ(fds.revents, POLLHUP);
   });
 }
