@@ -290,7 +290,7 @@ impl Connecting {
                         let msg = format!("Connect terminated; failed to initialized LinkState");
                         error!("{}", msg);
                         state_change_ctx.set_msg(msg);
-                        send_deauthenticate_request(&self.cmd.bss, &context.mlme_sink);
+                        send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
                         let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
                         return Err(Disconnecting {
                             cfg: self.cfg,
@@ -311,7 +311,7 @@ impl Connecting {
                 let msg = format!("Connect request failed: {:?}", other);
                 warn!("{}", msg);
                 state_change_ctx.set_msg(msg);
-                send_deauthenticate_request(&self.cmd.bss, &context.mlme_sink);
+                send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
                 return Err(Disconnecting {
                     cfg: self.cfg,
@@ -383,7 +383,7 @@ impl Connecting {
         let msg = format!("Association request failed due to spurious disassociation; reason code: {:?}, locally_initiated: {:?}",
                           ind.reason_code, ind.locally_initiated);
         warn!("{}", msg);
-        send_deauthenticate_request(&self.cmd.bss, &context.mlme_sink);
+        send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
         let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
         state_change_ctx.set_msg(msg);
         Disconnecting {
@@ -434,7 +434,7 @@ impl Connecting {
                 // failed handshake. Drop to idle.
                 let msg = format!("failed to handle SAE timeout: {:?}", e);
                 error!("{}", msg);
-                send_deauthenticate_request(&self.cmd.bss, &context.mlme_sink);
+                send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
                 state_change_ctx.set_msg(msg);
                 return Err(Disconnecting {
@@ -457,7 +457,7 @@ impl Connecting {
 
     fn disconnect(mut self, context: &mut Context, action: PostDisconnectAction) -> Disconnecting {
         report_connect_finished(&mut self.cmd.connect_txn_sink, ConnectResult::Canceled);
-        send_deauthenticate_request(&self.cmd.bss, &context.mlme_sink);
+        send_deauthenticate_request(&self.cmd.bss.bssid, &context.mlme_sink);
         let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
         Disconnecting { cfg: self.cfg, action, timeout_id }
     }
@@ -494,7 +494,7 @@ impl Associated {
             );
             let _ =
                 state_change_ctx.replace(StateChangeContext::Disconnect { msg, disconnect_source });
-            send_deauthenticate_request(&self.latest_ap_state, &context.mlme_sink);
+            send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
             let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
             Err(Disconnecting { cfg: self.cfg, action: PostDisconnectAction::None, timeout_id })
         } else {
@@ -608,7 +608,7 @@ impl Associated {
         ) {
             Ok(link_state) => link_state,
             Err(failure_reason) => {
-                send_deauthenticate_request(&self.latest_ap_state, &context.mlme_sink);
+                send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
                 report_connect_finished(
                     &mut self.connect_txn_sink,
@@ -710,7 +710,7 @@ impl Associated {
         match self.link_state.handle_timeout(event_id, event, state_change_ctx, context) {
             Ok(link_state) => Ok(Associated { link_state, ..self }),
             Err(failure_reason) => {
-                send_deauthenticate_request(&self.latest_ap_state, &context.mlme_sink);
+                send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
                 report_connect_finished(
                     &mut self.connect_txn_sink,
@@ -724,7 +724,7 @@ impl Associated {
     }
 
     fn disconnect(self, context: &mut Context, action: PostDisconnectAction) -> Disconnecting {
-        send_deauthenticate_request(&self.latest_ap_state, &context.mlme_sink);
+        send_deauthenticate_request(&self.latest_ap_state.bssid, &context.mlme_sink);
         let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
         Disconnecting { cfg: self.cfg, action, timeout_id }
     }
@@ -1316,9 +1316,9 @@ fn connect_cmd_inspect_summary(cmd: &ConnectCommand) -> String {
     )
 }
 
-fn send_deauthenticate_request(current_bss: &BssDescription, mlme_sink: &MlmeSink) {
+fn send_deauthenticate_request(bssid: &Bssid, mlme_sink: &MlmeSink) {
     mlme_sink.send(MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
-        peer_sta_address: current_bss.bssid.to_array(),
+        peer_sta_address: bssid.to_array(),
         reason_code: fidl_ieee80211::ReasonCode::StaLeaving,
     }));
 }
