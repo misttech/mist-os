@@ -10,4 +10,6 @@
 
 mod vec1;
 
+pub mod clock;
+
 pub use crate::experimental::vec1::Vec1;
