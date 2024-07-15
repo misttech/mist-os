@@ -300,13 +300,13 @@ const fpbus::Node thermal_dev_ddr = []() {
 zx_status_t Sherlock::ThermalInit() {
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A53 cluster (Small)
-  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOE(1), kPwmDFn));
+  gpio_init_steps_.push_back(GpioFunction(T931_GPIOE(1), kPwmDFn));
 
   gpio_init_steps_.push_back(GpioConfigOut(T931_GPIOE(1), 0));
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A73 cluster (Big)
-  gpio_init_steps_.push_back(GpioSetAltFunction(T931_GPIOE(2), kPwmDFn));
+  gpio_init_steps_.push_back(GpioFunction(T931_GPIOE(2), kPwmDFn));
 
   gpio_init_steps_.push_back(GpioConfigOut(T931_GPIOE(2), 0));
 

@@ -220,9 +220,8 @@ zx_status_t Sherlock::GpioInit() {
   static_assert(std::size(gpio_pins) + std::size(gpio_c_pins) == GPIO_PIN_COUNT,
                 "Incorrect pin count.");
 
-  fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(
-      gpio_init_steps_.data(), gpio_init_steps_.size());
+  fuchsia_hardware_gpioimpl::InitMetadata metadata{{std::move(gpio_init_steps_)}};
+  gpio_init_steps_.clear();
 
   const fit::result encoded_metadata = fidl::Persist(metadata);
   if (!encoded_metadata.is_ok()) {
@@ -269,8 +268,6 @@ zx_status_t Sherlock::GpioInit() {
       return result->error_value();
     }
   }
-
-  gpio_init_steps_.clear();
 
   // TODO(https://fxbug.dev/42081248): Add the GPIO C device after all init steps have been executed to ensure
   // that there are no simultaneous accesses to these banks.

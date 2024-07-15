@@ -143,11 +143,11 @@ zx_status_t Sherlock::LightInit() {
   light_dev.metadata() = light_metadata;
 
   // Enable the Amber LED so it will be controlled by PWM.
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_AMBER_LED, 3));  // Set as GPIO.
+  gpio_init_steps_.push_back(GpioFunction(GPIO_AMBER_LED, 3));  // Set as GPIO.
   gpio_init_steps_.push_back(GpioConfigOut(GPIO_AMBER_LED, 1));
 
   // Enable the Green LED so it will be controlled by PWM.
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_GREEN_LED, 4));  // Set as PWM.
+  gpio_init_steps_.push_back(GpioFunction(GPIO_GREEN_LED, 4));  // Set as PWM.
   gpio_init_steps_.push_back(GpioConfigOut(GPIO_GREEN_LED, 1));
 
   auto amber_led_gpio_bind_rules = std::vector{
