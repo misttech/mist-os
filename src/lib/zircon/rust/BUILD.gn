@@ -47,7 +47,7 @@ _common_sources = [
   "src/vmo.rs",
 ]
 _common_deps = [
-  ":fuchsia-zircon-status",
+  "//src/lib/zircon/rust/fuchsia-zircon-status",
   "//third_party/rust_crates:bitflags",
   "//third_party/rust_crates:bstr",
   "//third_party/rust_crates:zerocopy",
@@ -75,11 +75,6 @@ rustc_library("fuchsia-cprng") {
 }
 
 # LINT.ThenChange(BUILD.bazel)
-
-# Left as forwarding target for vendor/ deps.
-group("fuchsia-zircon-status") {
-  public_deps = [ "//src/lib/zircon/rust/fuchsia-zircon-status" ]
-}
 
 # Certain tests written as unit tests of fuchsia-zircon make use of other
 # crates which themselves depend on fuchsia-zircon. This causes
