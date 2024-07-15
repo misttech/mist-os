@@ -7,10 +7,6 @@
 
 #include <cstdint>
 
-// REVIEWERS: DO NOT +2 any changes to this header
-// file unless this number is incremented with each change.
-#define FX_LOG_INTREE_API_VERSION (0)
-
 namespace fuchsia_logging {
 
 using LogSeverity = int8_t;
