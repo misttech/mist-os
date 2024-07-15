@@ -6,8 +6,10 @@ use anyhow::{anyhow, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
 use fidl::HandleBased;
 use fuchsia_component::client as fclient;
+use futures::TryStreamExt;
 use rand::Rng;
 use std::future::Future;
+use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
@@ -26,13 +28,10 @@ const KERNEL_COLLECTION: &str = "kernels";
 const CONTAINER_RUNNER_PROTOCOL: &str = "fuchsia.starnix.container.Runner";
 
 pub struct StarnixKernel {
-    /// The realm in which the Starnix kernel is runner.
+    /// The controller used to control the kernel component's lifecycle.
     ///
     /// The kernel runs in a "kernels" collection within that realm.
-    realm: fcomponent::RealmProxy,
-
-    /// The name of the Starnix kernel within that realm.
-    name: String,
+    controller_proxy: fcomponent::ControllerProxy,
 
     /// The directory exposed by the Starnix kernel.
     ///
@@ -43,7 +42,7 @@ pub struct StarnixKernel {
     component_instance: zx::Event,
 
     /// The job the kernel lives under.
-    job: zx::Job,
+    job: Arc<zx::Job>,
 }
 
 impl StarnixKernel {
@@ -111,16 +110,11 @@ impl StarnixKernel {
             anyhow::bail!("expected to find job in ControllerGetJobHandleResponse");
         };
 
-        let kernel = Self { realm, name: kernel_name, exposed_dir, component_instance, job };
+        let kernel = Self { controller_proxy, exposed_dir, component_instance, job: Arc::new(job) };
         let on_stop = async move {
             _ = execution_controller_proxy.into_channel().unwrap().on_closed().await;
         };
         Ok((kernel, on_stop))
-    }
-
-    /// Gets the name of this kernel.
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     /// Gets the opaque token representing the container component.
@@ -129,7 +123,7 @@ impl StarnixKernel {
     }
 
     /// Gets the job the kernel lives under.
-    pub fn job(&self) -> &zx::Job {
+    pub fn job(&self) -> &Arc<zx::Job> {
         &self.job
     }
 
@@ -139,15 +133,19 @@ impl StarnixKernel {
     }
 
     /// Destroys the Starnix kernel that is running the given test.
-    pub async fn destroy(&self) -> Result<(), Error> {
-        self.realm
-            .destroy_child(&fdecl::ChildRef {
-                name: self.name.clone(),
-                collection: Some(KERNEL_COLLECTION.into()),
-            })
+    pub async fn destroy(self) -> Result<(), Error> {
+        self.controller_proxy
+            .destroy()
             .await?
-            .map_err(|e| anyhow::anyhow!("failed to destroy kernel: {:?}", e))?;
-        Ok(())
+            .map_err(|e| anyhow!("kernel component destruction failed: {e:?}"))?;
+        let mut event_stream = self.controller_proxy.take_event_stream();
+        loop {
+            match event_stream.try_next().await {
+                Ok(Some(_)) => continue,
+                Ok(None) => return Ok(()),
+                Err(e) => return Err(e.into()),
+            }
+        }
     }
 }
 
