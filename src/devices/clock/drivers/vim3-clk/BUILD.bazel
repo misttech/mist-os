@@ -45,13 +45,13 @@ fuchsia_cc_driver(
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "@fuchsia_sdk//bind/fuchsia.test:fuchsia.test_cc",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_devfs_cpp",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
-        "@internal_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     ],
 )
 
@@ -100,6 +100,7 @@ fuchsia_cc_test(
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//bind/fuchsia.test:fuchsia.test_cc",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//pkg/async-loop-cpp",
         "@fuchsia_sdk//pkg/async-loop-default",
@@ -109,7 +110,6 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
-        "@internal_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
         "@internal_sdk//pkg/mmio-test-helper",
     ],
 )
