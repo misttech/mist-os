@@ -336,7 +336,8 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_MOTMOT_UART, zbi_dcf
         .set_rx_timeout_enable(true)
         .set_rx_timeout_empty_fifo_enable(false)
         .set_rx_error_status_interrupt_enable(false)
-        .set_rx_level_triggered(true)
+        .set_rx_level_triggered(cfg_.flags & ZBI_KERNEL_DRIVER_IRQ_FLAGS_LEVEL_TRIGGERED ? true
+                                                                                         : false)
         .WriteTo(io.io());
 
     enable_interrupt_callback();
