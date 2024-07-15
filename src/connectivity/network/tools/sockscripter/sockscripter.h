@@ -87,6 +87,10 @@ class SockScripter {
   bool LogIcmp6Filter(char* arg);
   bool LogOriginalDestination(char* arg);
   bool LogOriginalDestination6(char* arg);
+  bool SetTClass(char* arg);
+  bool LogTClass(char* arg);
+  bool SetTos(char* arg);
+  bool LogTos(char* arg);
   bool Bind(char* arg);
   bool Shutdown(char* arg);
   bool Connect(char* arg);

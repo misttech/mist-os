@@ -1204,6 +1204,7 @@ impl Data {
 
 // There's no enum in fuchsia_inspect::format::block which contains only
 // values that are valid for an ArrayType.
+#[allow(dead_code)] // TODO(https://fxbug.dev/351850634)
 #[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 enum ArrayType {
     Int = 4,

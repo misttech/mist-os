@@ -349,7 +349,7 @@ template("_fidl_banjo_rust") {
     if (defined(invoker.public_deps)) {
       foreach(dep, invoker.public_deps) {
         if (dep == "//zircon/vdso/zx") {
-          deps += [ "//src/lib/zircon/rust:fuchsia-zircon-types" ]
+          deps += [ "//src/lib/zircon/rust/fuchsia-zircon-types" ]
         } else {
           _name = get_label_info(dep, "name")
           _dir = get_label_info(dep, "dir")

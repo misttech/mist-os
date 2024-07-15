@@ -21,7 +21,7 @@ if (is_host) {
       source_root = "src/parent_overrides.rs"
       sources = [ source_root ]
       deps = [
-        "//src/developer/ffx/lib/e2e_emu:ffx_e2e_emu",
+        "//src/developer/ffx/lib/e2e_emu",
         "//src/lib/fuchsia",
         "//third_party/rust_crates:futures",
         "//third_party/rust_crates:tracing",

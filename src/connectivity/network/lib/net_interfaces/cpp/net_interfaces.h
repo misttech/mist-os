@@ -45,9 +45,7 @@ class Properties final {
 
   uint64_t id() const { return properties_.id(); }
   const ::std::string& name() const { return properties_.name(); }
-  const fuchsia::net::interfaces::DeviceClass& device_class() const {
-    return properties_.device_class();
-  }
+  const fuchsia::net::interfaces::PortClass& port_class() const { return properties_.port_class(); }
   bool is_loopback() const;
   bool online() const { return properties_.online(); }
   bool has_default_ipv4_route() const { return properties_.has_default_ipv4_route(); }

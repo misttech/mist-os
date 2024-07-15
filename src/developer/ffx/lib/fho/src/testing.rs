@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use ffx_command::{FfxCommandLine, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::{downcast_injector_error, FfxInjectorError, Injector};
-use ffx_writer::Writer;
 use fidl_fuchsia_developer_ffx::{DaemonProxy, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::future::Future;
@@ -53,7 +52,6 @@ impl ToolEnv {
     factory_func!(remote_factory_closure, RemoteControlProxy);
     factory_func!(target_factory_closure, TargetProxy);
     factory_func!(build_info_closure, VersionInfo);
-    factory_func!(writer_closure, Writer);
 
     pub fn is_experiment_closure<F, Fut>(mut self, closure: F) -> Self
     where
@@ -110,7 +108,6 @@ pub struct FakeInjector {
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<TargetProxy>>>>>,
     is_experiment_closure: Box<dyn Fn(&str) -> Pin<Box<dyn Future<Output = bool>>>>,
     build_info_closure: Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<VersionInfo>>>>>,
-    writer_closure: Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<Writer>>>>>,
 }
 
 impl Default for FakeInjector {
@@ -122,7 +119,6 @@ impl Default for FakeInjector {
             target_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             is_experiment_closure: Box::new(|_| Box::pin(async { unimplemented!() })),
             build_info_closure: Box::new(|| Box::pin(async { unimplemented!() })),
-            writer_closure: Box::new(|| Box::pin(async { unimplemented!() })),
         }
     }
 }
@@ -151,10 +147,6 @@ impl Injector for FakeInjector {
 
     async fn build_info(&self) -> anyhow::Result<VersionInfo> {
         (self.build_info_closure)().await
-    }
-
-    async fn writer(&self) -> anyhow::Result<Writer> {
-        (self.writer_closure)().await
     }
 }
 

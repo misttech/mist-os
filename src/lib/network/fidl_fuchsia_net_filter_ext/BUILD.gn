@@ -9,7 +9,6 @@ rustc_library("fidl_fuchsia_net_filter_ext") {
   with_unit_tests = true
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
@@ -17,6 +16,7 @@ rustc_library("fidl_fuchsia_net_filter_ext") {
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",
   ]

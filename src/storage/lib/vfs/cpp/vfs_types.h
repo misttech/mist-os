@@ -309,6 +309,13 @@ fuchsia_io::Rights DownscopeRights(fuchsia_io::Rights rights, VnodeProtocol prot
 zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds supported,
                                             fuchsia_io::NodeProtocolKinds requested);
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+// Determines the protocol to use for serving a connection, based on the |supported| protocols for
+// a node, and those which were requested in |flags|.
+zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::Flags flags,
+                                            fuchsia_io::NodeProtocolKinds supported);
+#endif
+
 // Synthesizes a set of POSIX mode bits using a node's supported protocols and abilities.
 // This implementation mirrors that of |zxio_get_posix_mode|.
 //
@@ -318,6 +325,65 @@ zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds suppor
 uint32_t GetPosixMode(fuchsia_io::NodeProtocolKinds protocols, fuchsia_io::Abilities abilities);
 
 fuchsia_io::NodeProtocolKinds GetProtocols(const fuchsia_io::wire::ConnectionProtocols& protocols);
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+constexpr fuchsia_io::NodeProtocolKinds GetProtocols(fuchsia_io::Flags flags) {
+  using fuchsia_io::Flags;
+  using fuchsia_io::NodeProtocolKinds;
+  // If the caller didn't specify a protocol, allow any.
+  if (!(flags & fuchsia_io::kMaskKnownProtocols)) {
+    return NodeProtocolKinds::kMask;
+  }
+  if (flags & Flags::kProtocolService) {
+    return NodeProtocolKinds::kConnector;
+  }
+  NodeProtocolKinds protocols;
+  if (flags & Flags::kProtocolDirectory) {
+    protocols |= NodeProtocolKinds::kDirectory;
+  }
+  if (flags & Flags::kProtocolFile) {
+    protocols |= NodeProtocolKinds::kFile;
+  }
+  if (flags & Flags::kProtocolSymlink) {
+    protocols |= NodeProtocolKinds::kSymlink;
+  }
+  return protocols;
+}
+
+constexpr fuchsia_io::Rights FlagsToRights(fuchsia_io::Flags flags) {
+  using fuchsia_io::Flags;
+  using fuchsia_io::Rights;
+  Rights rights = {};
+  if (flags & Flags::kPermRead) {
+    rights |= Rights::kReadBytes;
+  }
+  if (flags & Flags::kPermWrite) {
+    rights |= Rights::kWriteBytes;
+  }
+  if (flags & Flags::kPermExecute) {
+    rights |= Rights::kExecute;
+  }
+  if (flags & Flags::kPermSetAttributes) {
+    rights |= Rights::kUpdateAttributes;
+  }
+  if (flags & Flags::kPermEnumerate) {
+    rights |= Rights::kEnumerate;
+  }
+  if (flags & Flags::kPermModify) {
+    rights |= Rights::kModifyDirectory;
+  }
+  if (flags & Flags::kPermConnect) {
+    rights |= Rights::kConnect;
+  }
+  if (flags & Flags::kPermTraverse) {
+    rights |= Rights::kTraverse;
+  }
+  if (flags & Flags::kPermGetAttributes) {
+    rights |= Rights::kGetAttributes;
+  }
+  return rights;
+}
+#endif
 
 // Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
 // an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.
@@ -398,6 +464,18 @@ constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenFlags flags) {
   }
   return CreationMode::kNever;
 }
+
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+constexpr CreationMode CreationModeFromFidl(fuchsia_io::Flags flags) {
+  if (flags & fuchsia_io::Flags::kFlagMustCreate) {
+    return CreationMode::kAlways;
+  }
+  if (flags & fuchsia_io::Flags::kFlagMaybeCreate) {
+    return CreationMode::kAllowExisting;
+  }
+  return CreationMode::kNever;
+}
+#endif
 
 }  // namespace internal
 

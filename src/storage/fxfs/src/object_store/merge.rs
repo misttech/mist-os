@@ -264,11 +264,10 @@ mod tests {
     use crate::checksum::Checksums;
     use crate::lsm_tree::cache::NullCache;
     use crate::lsm_tree::types::{Item, LayerIterator, MergeableKey, Value};
-    use crate::lsm_tree::LSMTree;
+    use crate::lsm_tree::{LSMTree, Query};
     use crate::object_store::extent_record::ExtentValue;
     use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectValue, Timestamp};
     use anyhow::Error;
-    use std::ops::Bound;
 
     async fn test_merge<K: MergeableKey, V: Value + PartialEq>(
         tree: &LSMTree<K, V>,
@@ -285,7 +284,7 @@ mod tests {
         }
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
         for e in expected {
             assert_eq!(iter.get().expect("get failed"), e.as_item_ref());
             iter.advance().await.expect("advance failed");
@@ -314,7 +313,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         iter.advance().await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 512..1024));
@@ -344,7 +343,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
@@ -376,7 +375,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(
             iter.get().unwrap().value,
@@ -417,7 +416,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1024));
         assert_eq!(
             iter.get().unwrap().value,
@@ -461,7 +460,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..2048));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(16384)));
         iter.advance().await?;
@@ -490,7 +489,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -522,7 +521,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
@@ -554,7 +553,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1024));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
@@ -589,7 +588,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..2048));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -627,7 +626,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -665,7 +664,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -694,7 +693,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -722,7 +721,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -755,7 +754,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -788,7 +787,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..1536));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -829,7 +828,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -870,7 +869,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -905,7 +904,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::Extent(ExtentValue::new_raw(0)));
         iter.advance().await?;
@@ -944,7 +943,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..2048));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         iter.advance().await?;
@@ -1070,7 +1069,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await?;
+        let mut iter = merger.query(Query::FullScan).await?;
         assert_eq!(iter.get().unwrap().key, &ObjectKey::extent(object_id, attr_id, 0..512));
         assert_eq!(iter.get().unwrap().value, &ObjectValue::deleted_extent());
         assert_eq!(iter.get().unwrap().sequence, 2u64);
@@ -1117,7 +1116,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        let mut iter = merger.query(Query::FullScan).await.unwrap();
         assert_eq!(iter.get().unwrap().key, &key);
         assert_eq!(
             iter.get().unwrap().value,
@@ -1164,7 +1163,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        let mut iter = merger.query(Query::FullScan).await.unwrap();
         assert_eq!(iter.get().unwrap().key, &key);
         assert_eq!(
             iter.get().unwrap().value,
@@ -1199,7 +1198,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        let iter = merger.query(Query::FullScan).await.unwrap();
         assert!(iter.get().is_none());
     }
 
@@ -1226,7 +1225,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        let mut iter = merger.query(Query::FullScan).await.unwrap();
         assert_eq!(iter.get().unwrap().key, &key);
         assert_eq!(iter.get().unwrap().value, &ObjectValue::BytesAndNodes { bytes: 20, nodes: 40 });
         iter.advance().await.unwrap();
@@ -1258,7 +1257,7 @@ mod tests {
 
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(std::ops::Bound::Unbounded).await.unwrap();
+        let mut iter = merger.query(Query::FullScan).await.unwrap();
         assert_eq!(iter.get().unwrap().key, &key);
         assert_eq!(iter.get().unwrap().value, &ObjectValue::BytesAndNodes { bytes: 2, nodes: 8 });
         iter.advance().await.unwrap();

@@ -52,6 +52,7 @@ use net_declare::fidl_ip_v4;
 use net_declare::net::prefix_length_v4;
 use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tracing::{debug, error, info, trace, warn};
 
 use self::devices::DeviceInfo;
@@ -176,9 +177,11 @@ pub enum InterfaceType {
     Ap,
 }
 
-impl From<fidl_fuchsia_hardware_network::DeviceClass> for InterfaceType {
-    fn from(device_class: fidl_fuchsia_hardware_network::DeviceClass) -> Self {
-        DeviceClass::from(device_class).into()
+impl TryFrom<fidl_fuchsia_hardware_network::PortClass> for InterfaceType {
+    type Error = UnknownPortClassError;
+    fn try_from(port_class: fidl_fuchsia_hardware_network::PortClass) -> Result<Self, Self::Error> {
+        let device_class = DeviceClass::try_from(port_class)?;
+        Ok(device_class.into())
     }
 }
 
@@ -191,6 +194,9 @@ impl From<DeviceClass> for InterfaceType {
             | DeviceClass::Virtual
             | DeviceClass::Ppp
             | DeviceClass::Bridge => InterfaceType::Ethernet,
+            // TODO(https://fxbug.dev/349810498): Add a first party
+            // `InterfaceType` variant for lowpan interfaces.
+            DeviceClass::Lowpan => InterfaceType::Ethernet,
         }
     }
 }
@@ -213,17 +219,29 @@ pub enum DeviceClass {
     Ppp,
     Bridge,
     WlanAp,
+    Lowpan,
 }
 
-impl From<fidl_fuchsia_hardware_network::DeviceClass> for DeviceClass {
-    fn from(device_class: fidl_fuchsia_hardware_network::DeviceClass) -> Self {
-        match device_class {
-            fidl_fuchsia_hardware_network::DeviceClass::Virtual => DeviceClass::Virtual,
-            fidl_fuchsia_hardware_network::DeviceClass::Ethernet => DeviceClass::Ethernet,
-            fidl_fuchsia_hardware_network::DeviceClass::Wlan => DeviceClass::Wlan,
-            fidl_fuchsia_hardware_network::DeviceClass::Ppp => DeviceClass::Ppp,
-            fidl_fuchsia_hardware_network::DeviceClass::Bridge => DeviceClass::Bridge,
-            fidl_fuchsia_hardware_network::DeviceClass::WlanAp => DeviceClass::WlanAp,
+#[derive(Debug, Error)]
+#[error("unknown port class with ordinal: {unknown_ordinal}")]
+pub struct UnknownPortClassError {
+    unknown_ordinal: u16,
+}
+
+impl TryFrom<fidl_fuchsia_hardware_network::PortClass> for DeviceClass {
+    type Error = UnknownPortClassError;
+    fn try_from(port_class: fidl_fuchsia_hardware_network::PortClass) -> Result<Self, Self::Error> {
+        match port_class {
+            fidl_fuchsia_hardware_network::PortClass::Virtual => Ok(DeviceClass::Virtual),
+            fidl_fuchsia_hardware_network::PortClass::Ethernet => Ok(DeviceClass::Ethernet),
+            fidl_fuchsia_hardware_network::PortClass::Wlan => Ok(DeviceClass::Wlan),
+            fidl_fuchsia_hardware_network::PortClass::Ppp => Ok(DeviceClass::Ppp),
+            fidl_fuchsia_hardware_network::PortClass::Bridge => Ok(DeviceClass::Bridge),
+            fidl_fuchsia_hardware_network::PortClass::WlanAp => Ok(DeviceClass::WlanAp),
+            fidl_fuchsia_hardware_network::PortClass::Lowpan => Ok(DeviceClass::Lowpan),
+            fidl_fuchsia_hardware_network::PortClass::__SourceBreaking { unknown_ordinal } => {
+                Err(UnknownPortClassError { unknown_ordinal })
+            }
         }
     }
 }
@@ -242,7 +260,8 @@ impl Default for AllowedDeviceClasses {
             | DeviceClass::Wlan
             | DeviceClass::Ppp
             | DeviceClass::Bridge
-            | DeviceClass::WlanAp => {}
+            | DeviceClass::WlanAp
+            | DeviceClass::Lowpan => {}
         }
         Self(HashSet::from([
             DeviceClass::Virtual,
@@ -251,6 +270,7 @@ impl Default for AllowedDeviceClasses {
             DeviceClass::Ppp,
             DeviceClass::Bridge,
             DeviceClass::WlanAp,
+            DeviceClass::Lowpan,
         ]))
     }
 }
@@ -562,7 +582,7 @@ fn start_dhcpv6_client(
         online,
         name,
         addresses,
-        device_class: _,
+        port_class: _,
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
     }: &fnet_interfaces_ext::Properties,
@@ -1222,16 +1242,7 @@ impl<'a> NetCfg<'a> {
                             .map(
                                 |fnet_interfaces_ext::PropertiesAndState {
                                      state: (),
-                                     properties:
-                                         fnet_interfaces_ext::Properties {
-                                             id: _,
-                                             name,
-                                             device_class: _,
-                                             online: _,
-                                             addresses: _,
-                                             has_default_ipv4_route: _,
-                                             has_default_ipv6_route: _,
-                                         },
+                                     properties: fnet_interfaces_ext::Properties { name, .. },
                                  }| name.as_str(),
                             )
                             .unwrap_or("<removed>");
@@ -2113,7 +2124,7 @@ impl<'a> NetCfg<'a> {
         let device_info =
             device_instance.get_device_info().await.context("error getting device info and MAC")?;
 
-        let DeviceInfo { mac, device_class, topological_path } = &device_info;
+        let DeviceInfo { mac, port_class, topological_path } = &device_info;
 
         let mac = mac.ok_or_else(|| {
             warn!("devices without mac address not supported yet");
@@ -2122,11 +2133,12 @@ impl<'a> NetCfg<'a> {
             )))
         })?;
 
-        let device_info = DeviceInfoRef {
-            device_class: *device_class,
-            mac: &mac,
-            topological_path: &topological_path,
-        };
+        let device_class =
+            DeviceClass::try_from(*port_class).map_err(|e: UnknownPortClassError| {
+                devices::AddDeviceError::Other(errors::Error::NonFatal(anyhow::Error::new(e)))
+            })?;
+        let device_info =
+            DeviceInfoRef { device_class, mac: &mac, topological_path: &topological_path };
 
         let interface_type = device_info.interface_type();
         let metric = match interface_type {
@@ -2136,7 +2148,7 @@ impl<'a> NetCfg<'a> {
         .into();
         let (interface_name, interface_naming_id) = match self
             .interface_naming_config
-            .generate_stable_name(&topological_path, &mac, *device_class)
+            .generate_stable_name(&topological_path, &mac, device_class)
         {
             Ok((name, interface_naming_id)) => (name.to_string(), interface_naming_id),
             Err(interface::NameGenerationError::GenerationError(e)) => {
@@ -2181,10 +2193,9 @@ impl<'a> NetCfg<'a> {
         interface_naming_id: interface::InterfaceNamingIdentifier,
         device_info: &DeviceInfoRef<'_>,
     ) -> Result<(), errors::Error> {
-        let class: DeviceClass = device_info.device_class.into();
         let ForwardedDeviceClasses { ipv4, ipv6 } = &self.forwarded_device_classes;
-        let ipv4_forwarding = ipv4.contains(&class);
-        let ipv6_forwarding = ipv6.contains(&class);
+        let ipv4_forwarding = ipv4.contains(&device_info.device_class);
+        let ipv6_forwarding = ipv6.contains(&device_info.device_class);
         let config: fnet_interfaces_admin::Configuration = control
             .set_configuration(&fnet_interfaces_admin::Configuration {
                 ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
@@ -2244,7 +2255,7 @@ impl<'a> NetCfg<'a> {
                 Entry::Vacant(entry) => entry.insert(InterfaceState::new_wlan_ap(
                     interface_naming_id,
                     control,
-                    class,
+                    device_info.device_class,
                     provisioning_action,
                 )),
             };
@@ -2283,7 +2294,9 @@ impl<'a> NetCfg<'a> {
                     );
                 }
                 Entry::Vacant(entry) => {
-                    let dhcpv6_pd_config = if !self.allowed_upstream_device_classes.contains(&class)
+                    let dhcpv6_pd_config = if !self
+                        .allowed_upstream_device_classes
+                        .contains(&device_info.device_class)
                     {
                         None
                     } else {
@@ -2310,7 +2323,7 @@ impl<'a> NetCfg<'a> {
                         InterfaceState::new_host(
                             interface_naming_id,
                             control,
-                            class,
+                            device_info.device_class,
                             dhcpv6_pd_config,
                             provisioning_action,
                         )
@@ -3053,7 +3066,7 @@ impl<'a> NetCfg<'a> {
                 errors::Error::NonFatal(e) | errors::Error::Fatal(e) => e,
             })?;
 
-        let DeviceInfo { mac, device_class: _, topological_path: _ } = &device_info;
+        let DeviceInfo { mac, port_class: _, topological_path: _ } = &device_info;
         let mac = mac.ok_or_else(|| anyhow!("devices without mac not supported"))?;
 
         Ok(interface::generate_identifier(&mac))
@@ -3292,15 +3305,16 @@ mod tests {
         }
     }
 
-    impl Into<fidl_fuchsia_hardware_network::DeviceClass> for DeviceClass {
-        fn into(self) -> fidl_fuchsia_hardware_network::DeviceClass {
+    impl Into<fidl_fuchsia_hardware_network::PortClass> for DeviceClass {
+        fn into(self) -> fidl_fuchsia_hardware_network::PortClass {
             match self {
-                Self::Virtual => fidl_fuchsia_hardware_network::DeviceClass::Virtual,
-                Self::Ethernet => fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
-                Self::Wlan => fidl_fuchsia_hardware_network::DeviceClass::Wlan,
-                Self::Ppp => fidl_fuchsia_hardware_network::DeviceClass::Ppp,
-                Self::Bridge => fidl_fuchsia_hardware_network::DeviceClass::Bridge,
-                Self::WlanAp => fidl_fuchsia_hardware_network::DeviceClass::WlanAp,
+                Self::Virtual => fidl_fuchsia_hardware_network::PortClass::Virtual,
+                Self::Ethernet => fidl_fuchsia_hardware_network::PortClass::Ethernet,
+                Self::Wlan => fidl_fuchsia_hardware_network::PortClass::Wlan,
+                Self::Ppp => fidl_fuchsia_hardware_network::PortClass::Ppp,
+                Self::Bridge => fidl_fuchsia_hardware_network::PortClass::Bridge,
+                Self::WlanAp => fidl_fuchsia_hardware_network::PortClass::WlanAp,
+                Self::Lowpan => fidl_fuchsia_hardware_network::PortClass::Lowpan,
             }
         }
     }
@@ -3436,12 +3450,8 @@ mod tests {
     ) -> Result<(), anyhow::Error> {
         let event = fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
             id: Some(INTERFACE_ID.get()),
-            name: None,
-            device_class: None,
             online,
             addresses,
-            has_default_ipv4_route: None,
-            has_default_ipv6_route: None,
             ..Default::default()
         });
         netcfg.handle_interface_watcher_event(event, dns_watchers, &mut virtualization::Stub).await
@@ -3555,12 +3565,12 @@ mod tests {
         let mut control_request_stream =
             control_server_end.into_stream().expect("get control request stream");
 
-        let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
+        let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let (new_host_result, ()) = futures::join!(
             InterfaceState::new_host(
                 test_interface_naming_id(),
                 control,
-                device_class.into(),
+                port_class.try_into().unwrap(),
                 None,
                 interface::ProvisioningAction::Local,
             ),
@@ -3581,7 +3591,7 @@ mod tests {
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(INTERFACE_ID.get()),
                     name: Some("testif01".to_string()),
-                    device_class: Some(fnet_interfaces::DeviceClass::Device(device_class)),
+                    port_class: Some(fnet_interfaces::PortClass::Device(port_class)),
                     online: Some(true),
                     addresses: Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR1))),
                     has_default_ipv4_route: Some(false),
@@ -3716,14 +3726,14 @@ mod tests {
         });
 
         // Mock a new WlanAP interface being discovered by NetCfg.
-        let device_class = fidl_fuchsia_hardware_network::DeviceClass::WlanAp;
+        let port_class = fidl_fuchsia_hardware_network::PortClass::WlanAp;
         let (control_client, _control_server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
         let wlan_ap = InterfaceState::new_wlan_ap(
             test_interface_naming_id(),
             control_client,
-            device_class.into(),
+            port_class.try_into().unwrap(),
             interface::ProvisioningAction::Local,
         );
         assert_matches::assert_matches!(
@@ -3740,7 +3750,7 @@ mod tests {
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                         id: Some(INTERFACE_ID.get()),
                         name: Some("testif01".to_string()),
-                        device_class: Some(fnet_interfaces::DeviceClass::Device(device_class)),
+                        port_class: Some(fnet_interfaces::PortClass::Device(port_class)),
                         online: Some(added_online),
                         addresses: Some(Vec::new()),
                         has_default_ipv4_route: Some(false),
@@ -3809,14 +3819,14 @@ mod tests {
         let (control_client, control_server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
-        let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
+        let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let mut control = control_server_end.into_stream().expect("control request stream");
 
         let (new_host_result, ()) = futures::join!(
             InterfaceState::new_host(
                 test_interface_naming_id(),
                 control_client,
-                device_class.into(),
+                port_class.try_into().unwrap(),
                 None,
                 interface::ProvisioningAction::Local,
             ),
@@ -3847,8 +3857,8 @@ mod tests {
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                         id: Some(INTERFACE_ID.get()),
                         name: Some("testif01".to_string()),
-                        device_class: Some(fnet_interfaces::DeviceClass::Device(
-                            fidl_fuchsia_hardware_network::DeviceClass::Virtual,
+                        port_class: Some(fnet_interfaces::PortClass::Device(
+                            fidl_fuchsia_hardware_network::PortClass::Virtual,
                         )),
                         online: Some(added_online),
                         addresses: Some(Vec::new()),
@@ -4112,12 +4122,12 @@ mod tests {
         let (control, control_server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
-        let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
+        let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
 
         let new_host_fut = InterfaceState::new_host(
             test_interface_naming_id(),
             control,
-            device_class.into(),
+            port_class.try_into().unwrap(),
             None,
             interface::ProvisioningAction::Local,
         );
@@ -4138,8 +4148,8 @@ mod tests {
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(INTERFACE_ID.get()),
                     name: Some("testif01".to_string()),
-                    device_class: Some(fnet_interfaces::DeviceClass::Device(
-                        fidl_fuchsia_hardware_network::DeviceClass::Virtual,
+                    port_class: Some(fnet_interfaces::PortClass::Device(
+                        fidl_fuchsia_hardware_network::PortClass::Virtual,
                     )),
                     online: Some(true),
                     addresses: Some(Vec::new()),
@@ -4262,11 +4272,11 @@ mod tests {
         let (control, control_server_end) =
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create endpoints");
-        let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
+        let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let new_host_fut = InterfaceState::new_host(
             test_interface_naming_id(),
             control,
-            device_class.into(),
+            port_class.try_into().unwrap(),
             None,
             interface::ProvisioningAction::Local,
         );
@@ -4287,8 +4297,8 @@ mod tests {
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                         id: Some(INTERFACE_ID.get()),
                         name: Some("testif01".to_string()),
-                        device_class: Some(fnet_interfaces::DeviceClass::Device(
-                            fidl_fuchsia_hardware_network::DeviceClass::Virtual,
+                        port_class: Some(fnet_interfaces::PortClass::Device(
+                            fidl_fuchsia_hardware_network::PortClass::Virtual,
                         )),
                         online: Some(true),
                         addresses: Some(Vec::new()),
@@ -4384,12 +4394,12 @@ mod tests {
                 .expect("create endpoints");
         let mut control_request_stream =
             control_server_end.into_stream().expect("get control request stream");
-        let device_class = fidl_fuchsia_hardware_network::DeviceClass::Virtual;
+        let port_class = fidl_fuchsia_hardware_network::PortClass::Virtual;
         let (new_host_result, ()) = futures::join!(
             InterfaceState::new_host(
                 test_interface_naming_id(),
                 control,
-                device_class.into(),
+                port_class.try_into().unwrap(),
                 None,
                 interface::ProvisioningAction::Local,
             ),
@@ -4409,7 +4419,7 @@ mod tests {
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(INTERFACE_ID.get()),
                     name: Some("testif01".to_string()),
-                    device_class: Some(fnet_interfaces::DeviceClass::Device(device_class)),
+                    port_class: Some(fnet_interfaces::PortClass::Device(port_class)),
                     online: Some(true),
                     addresses: Some(ipv6addrs(Some(LINK_LOCAL_SOCKADDR1))),
                     has_default_ipv4_route: Some(false),
@@ -4760,7 +4770,7 @@ mod tests {
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                         id: Some(id.get()),
                         name: Some(format!("testif{}", id)),
-                        device_class: Some(fnet_interfaces::DeviceClass::Device(
+                        port_class: Some(fnet_interfaces::PortClass::Device(
                             device_class.into(),
                         )),
                         online: Some(true),
@@ -5165,7 +5175,7 @@ mod tests {
                     fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                         id: Some(id.get()),
                         name: Some(format!("testif{}", id)),
-                        device_class: Some(fnet_interfaces::DeviceClass::Device(
+                        port_class: Some(fnet_interfaces::PortClass::Device(
                             device_class.into(),
                         )),
                         online: Some(true),

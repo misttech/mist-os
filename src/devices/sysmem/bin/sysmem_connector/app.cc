@@ -4,6 +4,7 @@
 
 #include "app.h"
 
+#include <fuchsia/feedback/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/sysmem-connector/sysmem-connector.h>
@@ -34,11 +35,23 @@ App::App(async_dispatcher_t* dispatcher)
             << request.channel().get();
         component_context_->svc()->Connect(std::move(request));
       });
-  outgoing_aux_service_directory_ =
-      outgoing_aux_service_directory_parent_.GetOrCreateDirectory("svc");
-
   // Else sysmem_connector won't be able to provide what sysmem expects to be able to rely on.
   ZX_ASSERT(status == ZX_OK);
+
+  status = outgoing_aux_service_directory_parent_.AddPublicService<
+      fuchsia::feedback::ComponentDataRegister>(
+      [this](fidl::InterfaceRequest<fuchsia::feedback::ComponentDataRegister> request) {
+        ZX_DEBUG_ASSERT(component_context_);
+        FX_LOGS(INFO)
+            << "sysmem_connector handling request for ComponentDataRegister -- handle value: "
+            << request.channel().get();
+        component_context_->svc()->Connect(std::move(request));
+      });
+  // Else sysmem_connector won't be able to provide what sysmem expects to be able to rely on.
+  ZX_ASSERT(status == ZX_OK);
+
+  outgoing_aux_service_directory_ =
+      outgoing_aux_service_directory_parent_.GetOrCreateDirectory("svc");
 
   fidl::InterfaceHandle<fuchsia::io::Directory> aux_service_directory;
   status = outgoing_aux_service_directory_->Serve(

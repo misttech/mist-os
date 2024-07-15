@@ -10,7 +10,7 @@ use cm_rust_testing::*;
 use fidl::endpoints::ServerEnd;
 use futures::channel::mpsc;
 use lazy_static::lazy_static;
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
 use vfs::remote::RemoteLike;
 use zx::AsHandleRef;
@@ -122,12 +122,13 @@ async fn open_requests_go_to_the_same_directory_connection() {
     // A directory that notifies via the sender whenever it is opened.
     struct MockDir(mpsc::Sender<()>);
     impl DirectoryEntry for MockDir {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-        }
-
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
             request.open_remote(self)
+        }
+    }
+    impl GetEntryInfo for MockDir {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         }
     }
     impl RemoteLike for MockDir {

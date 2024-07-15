@@ -7,7 +7,6 @@ use crate::device::device_mapper::DeviceMapperRegistry;
 use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::loop_device::LoopDeviceRegistry;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
-use crate::device::sync_fence_registry::SyncFenceRegistry;
 use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
@@ -150,10 +149,6 @@ pub struct Kernel {
     /// When a component is run in that container and also specifies the `framebuffer` feature, the
     /// framebuffer will be served as the view of the component.
     pub framebuffer: Arc<Framebuffer>,
-
-    /// Implementation of fuchsia.starnix.device.SyncFenceRegistry. It is used to hold Linux
-    /// compatible fences for Fuchsia.
-    pub sync_fence_registry: Arc<SyncFenceRegistry>,
 
     /// The binder driver registered for this container, indexed by their device type.
     pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
@@ -343,7 +338,6 @@ impl Kernel {
             remote_block_device_registry: Default::default(),
             bootloader_message_store: OnceCell::new(),
             framebuffer,
-            sync_fence_registry: SyncFenceRegistry::new(),
             binders: Default::default(),
             iptables: OrderedRwLock::new(IpTables::new()),
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
@@ -508,7 +502,7 @@ impl Kernel {
     pub fn new_memory_attribution_observer(
         &self,
         control_handle: fattribution::ProviderControlHandle,
-    ) -> attribution::Observer {
+    ) -> attribution_server::Observer {
         self.memory_attribution_manager.new_observer(control_handle)
     }
 }

@@ -21,8 +21,8 @@ use net_types::ip::{
 use net_types::SpecifiedAddr;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    CoreTimerContext, ExistsError, Inspectable, InspectableValue, Inspector, Instant,
-    InstantBindingsTypes, NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers,
+    BroadcastIpExt, CoreTimerContext, ExistsError, Inspectable, InspectableValue, Inspector,
+    Instant, InstantBindingsTypes, NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers,
     TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::utils::NonZeroDuration;
@@ -38,7 +38,9 @@ use crate::internal::device::{
 use crate::internal::gmp::igmp::{IgmpGroupState, IgmpState, IgmpTimerId};
 use crate::internal::gmp::mld::{MldGroupState, MldTimerId};
 use crate::internal::gmp::{GmpDelayedReportTimerId, GmpState, MulticastGroupSet};
-use crate::internal::types::{IpTypesIpExt, RawMetric};
+use crate::internal::types::RawMetric;
+
+use super::dad::NonceCollection;
 
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
@@ -51,7 +53,7 @@ pub const RETRANS_TIMER_DEFAULT: NonZeroDuration =
 const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
 
 /// An `Ip` extension trait adding IP device state properties.
-pub trait IpDeviceStateIpExt: Ip + IpTypesIpExt {
+pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// The information stored about an IP address assigned to an interface.
     type AssignedAddress<BT: IpDeviceStateBindingsTypes>: AssignedAddress<Self::Addr> + Debug;
     /// The per-group state kept by the Group Messaging Protocol (GMP) used to announce
@@ -507,8 +509,8 @@ pub struct IpDeviceConfiguration {
     /// Default: `false`.
     pub gmp_enabled: bool,
 
-    /// A flag indicating whether forwarding of IP packets not destined for this
-    /// device is enabled.
+    /// A flag indicating whether forwarding of unicast IP packets not destined
+    /// for this device is enabled.
     ///
     /// This flag controls whether or not packets can be forwarded from this
     /// device. That is, when a packet arrives at a device it is not destined
@@ -518,7 +520,21 @@ pub struct IpDeviceConfiguration {
     /// ability.
     ///
     /// Default: `false`.
-    pub forwarding_enabled: bool,
+    pub unicast_forwarding_enabled: bool,
+
+    /// A flag indicating whether forwarding of multicast IP packets received on
+    /// this device is enabled.
+    ///
+    /// This flag controls whether or not packets can be forwarded from this
+    /// device. That is, when a multicast packet arrives at this device, the
+    /// multicast routing table will be consulted and the packet will be
+    /// forwarded out of the matching route's corresponding outbound devices
+    /// (regardless of the outbound device's forwarding ability). Enabling
+    /// multicast forwarding does not disrupt local delivery: the packet will
+    /// both be forwarded and delivered locally.
+    ///
+    /// Default: `false`.
+    pub multicast_forwarding_enabled: bool,
 }
 
 /// Configuration common to all IPv4 devices.
@@ -784,7 +800,15 @@ pub enum Ipv6DadState<BT: DadBindingsTypes> {
     /// When `dad_transmits_remaining` is `None`, then no more DAD messages need
     /// to be sent and DAD may be resolved.
     #[allow(missing_docs)]
-    Tentative { dad_transmits_remaining: Option<NonZeroU16>, timer: BT::Timer },
+    Tentative {
+        dad_transmits_remaining: Option<NonZeroU16>,
+        timer: BT::Timer,
+        nonces: NonceCollection,
+        /// Initialized to false, and exists as a sentinel so that extra
+        /// transmits are added only after the first looped-back probe is
+        /// detected.
+        added_extra_transmits_after_detecting_looped_back_ns: bool,
+    },
 
     /// The address has not yet been initialized.
     Uninitialized,
@@ -1116,6 +1140,8 @@ mod tests {
                 Ipv6DadState::Tentative {
                     dad_transmits_remaining: None,
                     timer: bindings_ctx.new_timer(()),
+                    nonces: Default::default(),
+                    added_extra_transmits_after_detecting_looped_back_ns: false,
                 },
                 Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }),
             ))

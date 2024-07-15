@@ -399,10 +399,10 @@ async fn open_file_with_extra_rights() {
 }
 
 #[fuchsia::test]
-async fn open2_directory_unsupported() {
+async fn open3_not_supported_returns_correct_error() {
     let harness = TestHarness::new().await;
 
-    if harness.config.supports_open2 {
+    if harness.config.supports_open3 {
         return;
     }
 
@@ -410,18 +410,18 @@ async fn open2_directory_unsupported() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
 
-    // fuchsia.io/Directory.Open2
+    // fuchsia.io/Directory.Open3
     assert_matches!(
-        dir_proxy.open2_node::<fio::DirectoryMarker>(".", Default::default()).await,
+        dir_proxy.open3_node::<fio::DirectoryMarker>(".", fio::Flags::empty(), None).await,
         Err(zx::Status::NOT_SUPPORTED)
     );
 }
 
 #[fuchsia::test]
-async fn open2_rights() {
+async fn open3_rights() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -432,26 +432,14 @@ async fn open2_rights() {
     );
     // Should fail to open the file if the rights exceed those allowed by the directory.
     let status = test_dir
-        .open2_node::<fio::NodeMarker>(
-            &TEST_FILE,
-            fio::NodeOptions { rights: Some(fio::Operations::WRITE_BYTES), ..Default::default() },
-        )
+        .open3_node::<fio::NodeMarker>(&TEST_FILE, fio::Flags::PERM_WRITE, None)
         .await
         .expect_err("open should fail if rights exceed those of the parent connection");
     assert_eq!(status, zx::Status::ACCESS_DENIED);
 
-    // Calling open2 with no rights set is the same as calling open2 with empty rights.
+    // Calling open3 with no rights set is the same as calling open3 with empty rights.
     let proxy = test_dir
-        .open2_node::<fio::FileMarker>(
-            &TEST_FILE,
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
+        .open3_node::<fio::FileMarker>(&TEST_FILE, fio::Flags::PROTOCOL_FILE, None)
         .await
         .unwrap();
     assert_eq!(
@@ -461,16 +449,10 @@ async fn open2_rights() {
 
     // Opening with rights that the connection has should succeed.
     let proxy = test_dir
-        .open2_node::<fio::FileMarker>(
+        .open3_node::<fio::FileMarker>(
             &TEST_FILE,
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                rights: Some(fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES),
-                ..Default::default()
-            },
+            fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
+            None,
         )
         .await
         .unwrap();
@@ -487,10 +469,10 @@ async fn open2_rights() {
 }
 
 #[fuchsia::test]
-async fn open2_invalid() {
+async fn open3_invalid() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -500,54 +482,29 @@ async fn open2_invalid() {
     );
 
     // It's an error to specify more than one protocol when trying to create an object.
-    for mode in [vfs::CreationMode::AllowExisting, vfs::CreationMode::Always] {
+    for create_flag in [
+        fio::Flags::FLAG_MAYBE_CREATE,
+        fio::Flags::FLAG_MUST_CREATE,
+        // FLAG_MUST_CREATE takes precedence over FLAG_MAYBE_CREATE.
+        fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::FLAG_MUST_CREATE,
+    ] {
         let status = test_dir
-            .open2_node::<fio::NodeMarker>(
+            .open3_node::<fio::NodeMarker>(
                 "file",
-                fio::NodeOptions {
-                    protocols: Some(fio::NodeProtocols {
-                        file: Some(fio::FileProtocolFlags::default()),
-                        directory: Some(fio::DirectoryProtocolOptions::default()),
-                        ..Default::default()
-                    }),
-                    mode: Some(mode.into()),
-                    ..Default::default()
-                },
+                fio::Flags::PROTOCOL_FILE | fio::Flags::PROTOCOL_DIRECTORY | create_flag,
+                None,
             )
             .await
-            .expect_err("open should fail if multiple protocols are set during object creation");
-        assert_eq!(status, zx::Status::INVALID_ARGS);
-    }
-
-    // It's an error to specify create attributes when opening an object.
-    for mode in [None, Some(vfs::CreationMode::Never.into())] {
-        let status = test_dir
-            .open2_node::<fio::DirectoryMarker>(
-                "file",
-                fio::NodeOptions {
-                    protocols: Some(fio::NodeProtocols {
-                        file: Some(fio::FileProtocolFlags::default()),
-                        ..Default::default()
-                    }),
-                    mode,
-                    create_attributes: Some(fio::MutableNodeAttributes {
-                        creation_time: Some(1),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-            )
-            .await
-            .expect_err("open should fail if setting creation_attributes on an existing object");
+            .expect_err("open should fail if multiple protocols are set with FLAG_*_CREATE");
         assert_eq!(status, zx::Status::INVALID_ARGS);
     }
 }
 
 #[fuchsia::test]
-async fn open2_create_dot_fails_with_already_exists() {
+async fn open3_create_dot_fails_with_already_exists() {
     let harness = TestHarness::new().await;
 
-    if !(harness.config.supports_open2 && harness.config.supports_modify_directory) {
+    if !(harness.config.supports_open3 && harness.config.supports_modify_directory) {
         return;
     }
 
@@ -557,16 +514,10 @@ async fn open2_create_dot_fails_with_already_exists() {
     );
 
     let status = test_dir
-        .open2_node::<fio::DirectoryMarker>(
+        .open3_node::<fio::DirectoryMarker>(
             ".",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::Always.into()),
-                ..Default::default()
-            },
+            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MUST_CREATE,
+            None,
         )
         .await
         .expect_err("open should fail when trying to create the dot path");
@@ -574,10 +525,10 @@ async fn open2_create_dot_fails_with_already_exists() {
 }
 
 #[fuchsia::test]
-async fn open2_open_directory() {
+async fn open3_open_directory() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -588,16 +539,10 @@ async fn open2_open_directory() {
 
     // Should be able to open using the directory protocol.
     let (_, representation) = test_dir
-        .open2_node_get_representation::<fio::DirectoryMarker>(
+        .open3_node_repr::<fio::DirectoryMarker>(
             "dir",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_DIRECTORY,
+            None,
         )
         .await
         .expect("open using directory protocol failed");
@@ -605,44 +550,42 @@ async fn open2_open_directory() {
 
     // Should also be able to open without specifying an exact protocol due to protocol resolution.
     let (_, representation) = test_dir
-        .open2_node_get_representation::<fio::DirectoryMarker>(
-            "dir",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                ..Default::default()
-            },
-        )
+        .open3_node_repr::<fio::DirectoryMarker>("dir", fio::Flags::FLAG_SEND_REPRESENTATION, None)
         .await
         .expect("open using node protocol resolution failed");
     assert_matches!(representation, fio::Representation::Directory(_));
 
-    // Attempting to open the directory as a file should fail.
-    let status = test_dir
-        .open2_node::<fio::NodeMarker>(
+    // Should be able to open the file specifying multiple protocols as long as one matches.
+    let (_, representation) = test_dir
+        .open3_node_repr::<fio::FileMarker>(
             "dir",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION
+                | fio::Flags::PROTOCOL_FILE
+                | fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::PROTOCOL_SYMLINK,
+            None,
+        )
+        .await
+        .expect("failed to open directory with multiple protocols");
+    assert_matches!(representation, fio::Representation::Directory(_));
+
+    // Attempting to open the directory as a file should fail with ZX_ERR_NOT_FILE.
+    let status = test_dir
+        .open3_node::<fio::NodeMarker>(
+            "dir",
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_FILE,
+            None,
         )
         .await
         .expect_err("opening directory as file should fail");
     assert_eq!(status, zx::Status::NOT_FILE);
 
-    // Attempting to open the directory as a symbolic link should also fail.
+    // Attempting to open the directory as a symbolic link should fail with ZX_ERR_WRONG_TYPE.
     let status = test_dir
-        .open2_node::<fio::NodeMarker>(
+        .open3_node::<fio::NodeMarker>(
             "dir",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    symlink: Some(fio::SymlinkProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_SYMLINK,
+            None,
         )
         .await
         .expect_err("opening directory as symlink should fail");
@@ -650,10 +593,10 @@ async fn open2_open_directory() {
 }
 
 #[fuchsia::test]
-async fn open2_open_file() {
+async fn open3_open_file() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -665,16 +608,10 @@ async fn open2_open_file() {
 
     // Should be able to open the file specifying just the file protocol.
     let (_, representation) = test_dir
-        .open2_node_get_representation::<fio::FileMarker>(
+        .open3_node_repr::<fio::FileMarker>(
             "file",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_FILE,
+            None,
         )
         .await
         .expect("failed to open file with file protocol");
@@ -682,47 +619,42 @@ async fn open2_open_file() {
 
     // Should also be able to open without specifying an exact protocol due to protocol resolution.
     let (_, representation) = test_dir
-        .open2_node_get_representation::<fio::FileMarker>(
-            "file",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                ..Default::default()
-            },
-        )
+        .open3_node_repr::<fio::FileMarker>("file", fio::Flags::FLAG_SEND_REPRESENTATION, None)
         .await
         .expect("failed to open file with protocol resolution");
     assert_matches!(representation, fio::Representation::File(_));
 
-    // Attempting to open the file as a directory should fail.
-    let status = test_dir
-        .open2_node_get_representation::<fio::NodeMarker>(
+    // Should be able to open the file specifying multiple protocols as long as one matches.
+    let (_, representation) = test_dir
+        .open3_node_repr::<fio::FileMarker>(
             "file",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION
+                | fio::Flags::PROTOCOL_FILE
+                | fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::PROTOCOL_SYMLINK,
+            None,
+        )
+        .await
+        .expect("failed to open file with multiple protocols");
+    assert_matches!(representation, fio::Representation::File(_));
+
+    // Attempting to open the file as a directory should fail with ZX_ERR_NOT_DIR.
+    let status = test_dir
+        .open3_node_repr::<fio::NodeMarker>(
+            "file",
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_DIRECTORY,
+            None,
         )
         .await
         .expect_err("should fail to open file as directory");
     assert_eq!(status, zx::Status::NOT_DIR);
 
-    // Attempting to open the file as a symbolic link should fail.
-
+    // Attempting to open the file as a symbolic link should fail with ZX_ERR_WRONG_TYPE.
     let status = test_dir
-        .open2_node_get_representation::<fio::NodeMarker>(
+        .open3_node_repr::<fio::NodeMarker>(
             "file",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols {
-                    symlink: Some(fio::SymlinkProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::FLAG_SEND_REPRESENTATION | fio::Flags::PROTOCOL_SYMLINK,
+            None,
         )
         .await
         .expect_err("should fail to open file as symlink");
@@ -730,10 +662,10 @@ async fn open2_open_file() {
 }
 
 #[fuchsia::test]
-async fn open2_file_append() {
+async fn open3_file_append() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 || !harness.config.supports_append {
+    if !harness.config.supports_open3 || !harness.config.supports_append {
         return;
     }
 
@@ -743,16 +675,10 @@ async fn open2_file_append() {
     );
 
     let proxy = test_dir
-        .open2_node::<fio::FileMarker>(
+        .open3_node::<fio::FileMarker>(
             "file",
-            fio::NodeOptions {
-                rights: Some(fio::Operations::WRITE_BYTES | fio::Operations::READ_BYTES),
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::APPEND),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_APPEND,
+            None,
         )
         .await
         .unwrap();
@@ -766,10 +692,10 @@ async fn open2_file_append() {
 }
 
 #[fuchsia::test]
-async fn open2_file_truncate_invalid() {
+async fn open3_file_truncate_invalid() {
     let harness = TestHarness::new().await;
 
-    if !(harness.config.supports_open2 && harness.config.supports_append) {
+    if !(harness.config.supports_open3 && harness.config.supports_append) {
         return;
     }
 
@@ -779,26 +705,17 @@ async fn open2_file_truncate_invalid() {
     );
 
     let status = test_dir
-        .open2_node::<fio::FileMarker>(
-            "file",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::TRUNCATE),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
+        .open3_node::<fio::FileMarker>("file", fio::Flags::FILE_TRUNCATE, None)
         .await
         .expect_err("open with truncate requires rights to write bytes");
     assert_eq!(status, zx::Status::INVALID_ARGS);
 }
 
 #[fuchsia::test]
-async fn open2_file_truncate() {
+async fn open3_file_truncate() {
     let harness = TestHarness::new().await;
 
-    if !(harness.config.supports_open2 && harness.config.supports_append) {
+    if !(harness.config.supports_open3 && harness.config.supports_append) {
         return;
     }
 
@@ -808,16 +725,10 @@ async fn open2_file_truncate() {
     );
 
     let proxy = test_dir
-        .open2_node::<fio::FileMarker>(
+        .open3_node::<fio::FileMarker>(
             "file",
-            fio::NodeOptions {
-                rights: Some(fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES),
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::TRUNCATE),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
+            fio::Flags::PERM_READ | fio::Flags::PERM_WRITE | fio::Flags::FILE_TRUNCATE,
+            None,
         )
         .await
         .unwrap();
@@ -826,25 +737,25 @@ async fn open2_file_truncate() {
 }
 
 #[fuchsia::test]
-async fn open2_directory_get_representation() {
+async fn open3_directory_get_representation() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
     let test_dir = harness.get_directory(root_directory(vec![]), fio::OpenFlags::RIGHT_READABLE);
 
     let (_, representation) = test_dir
-        .open2_node_get_representation::<fio::DirectoryMarker>(
+        .open3_node_repr::<fio::DirectoryMarker>(
             ".",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+            fio::Flags::FLAG_SEND_REPRESENTATION,
+            Some(fio::Options {
                 attributes: Some(
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
                 ),
                 ..Default::default()
-            },
+            }),
         )
         .await
         .unwrap();
@@ -866,33 +777,31 @@ async fn open2_directory_get_representation() {
 }
 
 #[fuchsia::test]
-async fn open2_file_get_representation() {
+async fn open3_file_get_representation() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
     let test_dir = harness
         .get_directory(root_directory(vec![file("file", vec![])]), fio::OpenFlags::RIGHT_READABLE);
 
-    let file_protocols = if harness.config.supports_append {
-        Some(fio::FileProtocolFlags::APPEND)
-    } else {
-        Some(fio::FileProtocolFlags::default())
-    };
-
     let (_, representation) = test_dir
-        .open2_node_get_representation::<fio::FileMarker>(
+        .open3_node_repr::<fio::FileMarker>(
             "file",
-            fio::NodeOptions {
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                protocols: Some(fio::NodeProtocols { file: file_protocols, ..Default::default() }),
+            fio::Flags::FLAG_SEND_REPRESENTATION
+                | if harness.config.supports_append {
+                    fio::Flags::FILE_APPEND
+                } else {
+                    fio::Flags::empty()
+                },
+            Some(fio::Options {
                 attributes: Some(
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
                 ),
                 ..Default::default()
-            },
+            }),
         )
         .await
         .unwrap();
@@ -911,15 +820,15 @@ async fn open2_file_get_representation() {
                     abilities: Some(harness.supported_file_abilities()),
                     ..Default::default()
                 }
-            && is_append == Some(file_protocols == Some(fio::FileProtocolFlags::APPEND))
+            && is_append == Some(harness.config.supports_append)
     );
 }
 
 #[fuchsia::test]
-async fn open2_dir_optional_rights() {
+async fn open3_dir_optional_rights() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -929,37 +838,28 @@ async fn open2_dir_optional_rights() {
     );
 
     let proxy = test_dir
-        .open2_node::<fio::DirectoryMarker>(
+        .open3_node::<fio::DirectoryMarker>(
             ".",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions {
-                        // Optional rights not supported in the parent connection will be removed.
-                        optional_rights: Some(
-                            fio::Operations::WRITE_BYTES | fio::Operations::EXECUTE,
-                        ),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                }),
-                rights: Some(fio::Operations::READ_BYTES),
-                ..Default::default()
-            },
+            fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::PERM_READ
+                | fio::Flags::PERM_INHERIT_WRITE
+                | fio::Flags::PERM_INHERIT_EXECUTE,
+            None,
         )
         .await
         .unwrap();
 
     assert_eq!(
         proxy.get_connection_info().await.expect("get_connection_info failed").rights.unwrap(),
-        fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES,
+        fio::Operations::READ_BYTES | fio::INHERITED_WRITE_PERMISSIONS,
     );
 }
 
 #[fuchsia::test]
-async fn open2_request_attributes_rights_failure() {
+async fn open3_request_attributes_rights_failure() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -969,31 +869,30 @@ async fn open2_request_attributes_rights_failure() {
     );
 
     // Open with no rights.
-    let proxy = test_dir
-        .open2_node::<fio::DirectoryMarker>(
-            ".",
-            fio::NodeOptions { rights: Some(fio::Rights::empty()), ..Default::default() },
-        )
-        .await
-        .unwrap();
+    let proxy =
+        test_dir.open3_node::<fio::DirectoryMarker>(".", fio::Flags::empty(), None).await.unwrap();
 
-    // Now open again and request attributes. It should fail.
-    let options = fio::NodeOptions {
-        attributes: Some(fio::NodeAttributesQuery::PROTOCOLS),
-        flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-        ..Default::default()
-    };
+    // Requesting attributes when re-opening via `proxy` should fail without `PERM_GET_ATTRIBUTES`.
     assert_matches!(
-        proxy.open2_node::<fio::DirectoryMarker>(".", options).await,
+        proxy
+            .open3_node::<fio::DirectoryMarker>(
+                ".",
+                fio::Flags::FLAG_SEND_REPRESENTATION,
+                Some(fio::Options {
+                    attributes: Some(fio::NodeAttributesQuery::PROTOCOLS),
+                    ..Default::default()
+                })
+            )
+            .await,
         Err(zx::Status::ACCESS_DENIED)
     );
 }
 
 #[fuchsia::test]
-async fn open2_open_existing_directory() {
+async fn open3_open_existing_directory() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open2 {
+    if !harness.config.supports_open3 {
         return;
     }
 
@@ -1002,38 +901,25 @@ async fn open2_open_existing_directory() {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    // Should not be able to open non-existing directory entry with open mode `OpenExisting`.
+    // Should not be able to open non-existing directory entry without `FLAG_*_CREATE`.
     let status = test_dir
-        .open2_node::<fio::NodeMarker>(
-            "foo",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::Never.into()),
-                ..Default::default()
-            },
+        .open3_node::<fio::NodeMarker>(
+            "this_path_does_not_exist",
+            fio::Flags::PROTOCOL_DIRECTORY,
+            None,
         )
         .await
         .expect_err("should fail to open non-existing entry when OpenExisting is set");
     assert_eq!(status, zx::Status::NOT_FOUND);
 
-    // Check that calling open with `OpenExisting` is successful with an existing directory.
     test_dir
-        .open2_node::<fio::NodeMarker>(
+        .open3_node::<fio::NodeMarker>(
             "dir",
-            fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::Never.into()),
-                ..Default::default()
-            },
+            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE,
+            None,
         )
         .await
         .expect("failed to open existing entry");
 }
 
-// TODO(https://fxbug.dev/42157659): Add open2 connect tests.
+// TODO(https://fxbug.dev/42157659): Add open3 connect tests.

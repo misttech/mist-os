@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::log::*;
+use crate::lsm_tree;
 use crate::lsm_tree::types::{
     Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerKey, MergeType, OrdLowerBound,
     Value,
@@ -14,6 +15,7 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::fmt::{Debug, Write};
 use std::ops::{Bound, Deref, DerefMut};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ItemOp<K, V> {
@@ -262,12 +264,56 @@ pub struct Merger<'a, K, V> {
 
     // If true, additional logging is enabled.
     trace: bool,
+
+    // Tracks statistics related to the LSM tree.
+    counters: Arc<Mutex<lsm_tree::Counters>>,
 }
 
+/// Query describes the goal of a search in the LSM tree.  The caller specifies this to guide the
+/// merger on which layer files it must consult.
+/// Layers might be skipped during a query for a few reasons:
+///   * Existence filters might allow layer files to be skipped.
+///   * For bounded queries (i.e. any except FullScan), if the search key has
+///     MergeType::OptimizedMerge, we can use that to omit older layers once we find a match.
+#[derive(Debug, Clone)]
+pub enum Query<'a, K: Key + LayerKey + OrdLowerBound> {
+    /// Point queries look for a specific key in the LSM tree.  In this case, the existence filters
+    /// for each layer file can be used to decide if the layer file needs to be consulted.
+    /// Note that it is an error to use `Point` for range-like keys.  Either `LimitedRange` or
+    /// `FullRange` must be used instead.
+    Point(&'a K),
+    /// LimitedRange queries position the iterator to `K::search_key`, and scans forward until the
+    /// first record which does not overlap the provided key.  In this case, the existence filters
+    /// for each layer file can be used, but we have to check for all possible keys in the range we
+    /// wish to search.  Obviously, that means that the range should be, well, limited.  Fuzzy
+    /// hashes permit this for extent-like keys, but these queries are not the right choice for
+    /// things like searching a directory.
+    LimitedRange(&'a K),
+    /// FullRange queries position the iterator to a starting key, and scan forward to the
+    /// first key of a different type.  In this case, the existence filters are not used.
+    FullRange(&'a K),
+    /// FullScan queries are intended to yield every record in the tree.  In this case, the
+    /// existence filters are not used.
+    FullScan,
+}
+
+impl<'a, K: Key + LayerKey + OrdLowerBound> Query<'a, K> {
+    fn needs_layer<V>(&self, layer: &dyn Layer<K, V>) -> bool {
+        match self {
+            Self::Point(key) => layer.maybe_contains_key(key),
+            Self::LimitedRange(key) => layer.maybe_contains_key(key),
+            Self::FullRange(_) => true,
+            Self::FullScan => true,
+        }
+    }
+}
+
+#[fxfs_trace::trace]
 impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
     pub(super) fn new<I: Iterator<Item = &'a dyn Layer<K, V>>>(
         layers: I,
         merge_fn: MergeFn<K, V>,
+        counters: Arc<Mutex<lsm_tree::Counters>>,
     ) -> Merger<'a, K, V> {
         Merger {
             iterators: layers
@@ -276,16 +322,44 @@ impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
                 .collect(),
             merge_fn: merge_fn,
             trace: false,
+            counters,
         }
     }
 
-    /// Seek searches for |bound|.  If |bound| is Bound::Unbounded, the iterator is positioned on
-    /// the first item.  If |bound| is Bound::Included(key), the iterator is positioned on an item
-    /// such that item.key >= key.  In the latter case, a full merge might not occur; only the
-    /// layers that need to be consulted to satisfy the query will occur.
-    pub async fn seek(&mut self, bound: Bound<&K>) -> Result<MergerIterator<'_, 'a, K, V>, Error> {
-        let layer_count = self.iterators.len();
-        let pending_iterators = self.iterators.iter_mut().rev().collect();
+    /// Executes `query`, positioning the iterator to the first matching item.  See `Query` for
+    /// details.
+    #[trace]
+    pub async fn query(
+        &mut self,
+        query: Query<'_, K>,
+    ) -> Result<MergerIterator<'_, 'a, K, V>, Error> {
+        if let Query::Point(key) = query {
+            // NB: It is almost certainly an error to provide a range-like key to a Point query,
+            // hence this debug assertion.  This will most likely result in the wrong result, since
+            // the starting bound would be the original range key and therefore we might miss
+            // records that start earlier but overlap with the key.
+            // For example, if there is a layer which contains 0..100 and 100..200, and we search
+            // for 50..150, we should get both extents, which requires a different starting bound
+            // than 50..150 (particularly it would require the `K::search_key`).
+            debug_assert!(!key.is_range_key())
+        };
+        let len = self.iterators.len();
+        let pending_iterators = {
+            fxfs_trace::duration!(c"Merger::filter_layer_files", "len" => len);
+            self.iterators
+                .iter_mut()
+                .rev()
+                .filter(|l| query.needs_layer(l.layer.clone().unwrap()))
+                .collect::<Vec<&mut MergeLayerIterator<'a, K, V>>>()
+        };
+        let layer_count = pending_iterators.len();
+        {
+            let mut counters = self.counters.lock().unwrap();
+            counters.num_seeks += 1;
+            counters.layer_files_total += len;
+            counters.layer_files_skipped += len - layer_count;
+        }
+        tracing::debug!(?query, "Consulting {}/{} layers", layer_count, len);
         let mut merger_iter = MergerIterator {
             merge_fn: self.merge_fn,
             pending_iterators,
@@ -293,6 +367,16 @@ impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
             item: CurrentItem::None,
             trace: self.trace,
             history: String::new(),
+        };
+        let owned_bound;
+        let bound = match query {
+            Query::Point(key) => Bound::Included(key),
+            Query::LimitedRange(key) => {
+                owned_bound = Bound::Included(key.search_key());
+                owned_bound.as_ref()
+            }
+            Query::FullRange(start) => Bound::Included(start),
+            Query::FullScan => Bound::Unbounded,
         };
         merger_iter.seek(bound).await?;
         Ok(merger_iter)
@@ -714,26 +798,32 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
 #[cfg(test)]
 mod tests {
     use super::ItemOp::{Discard, Keep, Replace};
-    use super::{MergeResult, Merger};
+    use super::{MergeLayerIterator, MergeResult, Merger};
+    use crate::lsm_tree::persistent_layer::{PersistentLayer, PersistentLayerWriter};
     use crate::lsm_tree::skip_list_layer::SkipListLayer;
     use crate::lsm_tree::types::{
-        Item, ItemRef, Key, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
-        OrdUpperBound, SortByU64,
+        FuzzyHash, Item, ItemRef, Key, Layer, LayerIterator, LayerKey, LayerWriter, MergeType,
+        OrdLowerBound, OrdUpperBound, SortByU64,
     };
-    use crate::lsm_tree::Value;
+    use crate::lsm_tree::{self, Query, Value};
+    use crate::object_store::{self, ObjectKey, ObjectValue};
     use crate::serialized_types::{
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
     };
+    use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
+    use crate::testing::writer::Writer;
     use fprint::TypeFingerprint;
+    use fxfs_macros::FuzzyHash;
     use rand::Rng;
     use std::hash::Hash;
     use std::ops::{Bound, Range};
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     #[derive(
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -779,15 +869,28 @@ mod tests {
         layers.iter().map(|x| x.as_ref() as &dyn Layer<K, V>)
     }
 
+    fn dyn_layer_ref_iter<K: Key, V: Value>(
+        layers: &[Arc<dyn Layer<K, V>>],
+    ) -> impl Iterator<Item = &dyn Layer<K, V>> {
+        layers.iter().map(|x| x.as_ref())
+    }
+
+    fn counters() -> Arc<Mutex<lsm_tree::Counters>> {
+        Arc::new(Mutex::new(lsm_tree::Counters::default()))
+    }
+
     #[fuchsia::test]
     async fn test_emit_left() {
         let skip_lists = [SkipListLayer::new(100), SkipListLayer::new(100)];
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::EmitLeft,
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[0].key, &items[0].value));
         iter.advance().await.unwrap();
@@ -803,13 +906,16 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::Other {
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other {
                 emit: Some(Item::new(TestKey(3..3), 3)),
                 left: Discard,
                 right: Discard,
-            });
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+            },
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
 
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&TestKey(3..3), &3));
@@ -823,13 +929,16 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::Other {
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other {
                 emit: None,
                 left: Replace(Item::new(TestKey(3..3), 3)),
                 right: Discard,
-            });
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+            },
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
 
         // The merger should replace the left item and then after discarding the right item, it
         // should emit the replacement.
@@ -845,13 +954,16 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::Other {
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other {
                 emit: None,
                 left: Discard,
                 right: Replace(Item::new(TestKey(3..3), 3)),
-            });
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+            },
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
 
         // The merger should replace the right item and then after discarding the left item, it
         // should emit the replacement.
@@ -867,12 +979,16 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
-            assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
-            assert_eq!((right.key(), right.value()), (&TestKey(2..2), &2));
-            MergeResult::EmitLeft
-        });
-        merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |left, right| {
+                assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
+                assert_eq!((right.key(), right.value()), (&TestKey(2..2), &2));
+                MergeResult::EmitLeft
+            },
+            counters(),
+        );
+        merger.query(Query::FullScan).await.expect("seek failed");
     }
 
     #[fuchsia::test]
@@ -881,14 +997,18 @@ mod tests {
         let item = Item::new(TestKey(1..1), 1);
         skip_lists[0].insert(item.clone()).expect("insert error");
         skip_lists[1].insert(item.clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
-            assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
-            assert_eq!((right.key(), right.value()), (&TestKey(1..1), &1));
-            assert_eq!(left.layer_index, 0);
-            assert_eq!(right.layer_index, 1);
-            MergeResult::EmitLeft
-        });
-        merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |left, right| {
+                assert_eq!((left.key(), left.value()), (&TestKey(1..1), &1));
+                assert_eq!((right.key(), right.value()), (&TestKey(1..1), &1));
+                assert_eq!(left.layer_index, 0);
+                assert_eq!(right.layer_index, 1);
+                MergeResult::EmitLeft
+            },
+            counters(),
+        );
+        merger.query(Query::FullScan).await.expect("seek failed");
     }
 
     #[fuchsia::test]
@@ -897,20 +1017,24 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
-            if left.key() == &TestKey(1..1) {
-                MergeResult::Other {
-                    emit: None,
-                    left: Replace(Item::new(TestKey(3..3), 3)),
-                    right: Keep,
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |left, right| {
+                if left.key() == &TestKey(1..1) {
+                    MergeResult::Other {
+                        emit: None,
+                        left: Replace(Item::new(TestKey(3..3), 3)),
+                        right: Keep,
+                    }
+                } else {
+                    assert_eq!(left.key(), &TestKey(2..2));
+                    assert_eq!(right.key(), &TestKey(3..3));
+                    MergeResult::Other { emit: None, left: Discard, right: Keep }
                 }
-            } else {
-                assert_eq!(left.key(), &TestKey(2..2));
-                assert_eq!(right.key(), &TestKey(3..3));
-                MergeResult::Other { emit: None, left: Discard, right: Keep }
-            }
-        });
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+            },
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
 
         // The merger should first replace left and then it should call the merger again with 2 & 3
         // and end up just keeping 3.
@@ -929,9 +1053,12 @@ mod tests {
                 .insert(Item::new(TestKey(i..i), i))
                 .expect("insert error");
         }
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::EmitLeft,
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
 
         for i in 0..100 {
             let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -947,9 +1074,12 @@ mod tests {
         let items = [Item::new(TestKey(1..10), 1), Item::new(TestKey(2..3), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::EmitLeft,
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
 
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[0].key, &items[0].value));
@@ -1213,10 +1343,12 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(1..1), 2)];
         skip_lists[0].insert(items[0].clone()).expect("insert error");
         skip_lists[1].insert(items[1].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
-            MergeResult::Other { emit: None, left: Discard, right: Keep }
-        });
-        let iter = merger.seek(Bound::Included(&items[0].key)).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other { emit: None, left: Discard, right: Keep },
+            counters(),
+        );
+        let iter = merger.query(Query::FullRange(&items[0].key)).await.expect("seek failed");
 
         // Seek should only search in the first skip list, so no merge should take place, and we'll
         // know if it has because we'll see a different value (2 rather than 1).
@@ -1228,7 +1360,7 @@ mod tests {
     // |start|.
     async fn test_advance<K: Eq + Key + LayerKey + OrdLowerBound>(
         layers: &[&[(K, i64)]],
-        start: Bound<&K>,
+        query: Query<'_, K>,
         expected: &[(K, i64)],
     ) {
         let mut skip_lists = Vec::new();
@@ -1239,9 +1371,12 @@ mod tests {
             }
             skip_lists.push(skip_list);
         }
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
-        let mut iter = merger.seek(start).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::EmitLeft,
+            counters(),
+        );
+        let mut iter = merger.query(query).await.expect("seek failed");
         for (k, v) in expected {
             let ItemRef { key, value, .. } = iter.get().expect("get failed");
             assert_eq!((key, value), (k, v));
@@ -1258,7 +1393,7 @@ mod tests {
                 &[(TestKey(1..2), 1), (TestKey(2..3), 2), (TestKey(4..5), 3)],
                 &[(TestKey(1..2), 4), (TestKey(2..3), 5), (TestKey(3..4), 6)],
             ],
-            Bound::Included(&TestKey(1..2)),
+            Query::FullRange(&TestKey(1..2)),
             &[(TestKey(1..2), 1), (TestKey(2..3), 2), (TestKey(3..4), 6), (TestKey(4..5), 3)],
         )
         .await;
@@ -1270,7 +1405,7 @@ mod tests {
         // but this time, the keys are at the end.
         test_advance(
             &[&[(TestKey(1..2), 1)], &[(TestKey(1..2), 2)]],
-            Bound::Included(&TestKey(1..2)),
+            Query::FullRange(&TestKey(1..2)),
             &[(TestKey(1..2), 1)],
         )
         .await;
@@ -1280,6 +1415,7 @@ mod tests {
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -1343,25 +1479,25 @@ mod tests {
             (TestKeyWithFullMerge(4..5), 3),
         ];
 
-        test_advance(layer_set.as_slice(), Bound::Unbounded, &full_merge_result).await;
+        test_advance(layer_set.as_slice(), Query::FullScan, &full_merge_result).await;
 
         test_advance(
             layer_set.as_slice(),
-            Bound::Included(&TestKeyWithFullMerge(1..2)),
+            Query::FullRange(&TestKeyWithFullMerge(1..2)),
             &full_merge_result,
         )
         .await;
 
         test_advance(
             layer_set.as_slice(),
-            Bound::Included(&TestKeyWithFullMerge(2..3)),
+            Query::FullRange(&TestKeyWithFullMerge(2..3)),
             &full_merge_result[2..],
         )
         .await;
 
         test_advance(
             layer_set.as_slice(),
-            Bound::Included(&TestKeyWithFullMerge(3..4)),
+            Query::FullRange(&TestKeyWithFullMerge(3..4)),
             &full_merge_result[4..],
         )
         .await;
@@ -1384,19 +1520,23 @@ mod tests {
         skip_lists[1].insert(items[1].clone()).expect("insert error");
         skip_lists[2].insert(items[2].clone()).expect("insert error");
         skip_lists[2].insert(items[3].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
-            // Sum matching keys.
-            if left.key() == right.key() {
-                MergeResult::Other {
-                    emit: None,
-                    left: Discard,
-                    right: Replace(Item::new(left.key().clone(), left.value() + right.value())),
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |left, right| {
+                // Sum matching keys.
+                if left.key() == right.key() {
+                    MergeResult::Other {
+                        emit: None,
+                        left: Discard,
+                        right: Replace(Item::new(left.key().clone(), left.value() + right.value())),
+                    }
+                } else {
+                    MergeResult::EmitLeft
                 }
-            } else {
-                MergeResult::EmitLeft
-            }
-        });
-        let mut iter = merger.seek(Bound::Included(&items[0].key)).await.expect("seek failed");
+            },
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullRange(&items[0].key)).await.expect("seek failed");
 
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, *value), (&items[0].key, items[0].value + items[2].value));
@@ -1411,6 +1551,7 @@ mod tests {
         Clone,
         Eq,
         Hash,
+        FuzzyHash,
         PartialEq,
         Debug,
         serde::Serialize,
@@ -1458,7 +1599,7 @@ mod tests {
                     (TestKeyWithDefaultLayerKey(3..4), 6),
                 ],
             ],
-            Bound::Unbounded,
+            Query::FullScan,
             &[
                 (TestKeyWithDefaultLayerKey(1..2), 1),
                 (TestKeyWithDefaultLayerKey(1..2), 4),
@@ -1486,7 +1627,7 @@ mod tests {
                     (TestKeyWithDefaultLayerKey(3..4), 6),
                 ],
             ],
-            Bound::Included(&TestKeyWithDefaultLayerKey(1..2)),
+            Query::FullRange(&TestKeyWithDefaultLayerKey(1..2)),
             &[
                 (TestKeyWithDefaultLayerKey(1..2), 1),
                 (TestKeyWithDefaultLayerKey(1..2), 4),
@@ -1508,9 +1649,12 @@ mod tests {
         ];
         skip_lists[0].insert(items[0].clone()).expect("insert error");
         skip_lists[1].insert(items[1].clone()).expect("insert error");
-        let mut merger =
-            Merger::new(layer_ref_iter(&skip_lists), |_left, _right| MergeResult::EmitLeft);
-        let iter = merger.seek(Bound::Included(&items[1].key)).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::EmitLeft,
+            counters(),
+        );
+        let iter = merger.query(Query::FullRange(&items[1].key)).await.expect("seek failed");
 
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[1].key, &items[1].value));
@@ -1525,10 +1669,12 @@ mod tests {
         ];
         skip_lists[0].insert(items[0].clone()).expect("insert error");
         skip_lists[1].insert(items[1].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
-            MergeResult::Other { emit: None, left: Discard, right: Keep }
-        });
-        let iter = merger.seek(Bound::Included(&items[0].key)).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other { emit: None, left: Discard, right: Keep },
+            counters(),
+        );
+        let iter = merger.query(Query::FullRange(&items[0].key)).await.expect("seek failed");
 
         // Seek should only search in the first skip list, so no merge should take place, and we'll
         // know if it has because we'll see a different value (2 rather than 1).
@@ -1543,10 +1689,12 @@ mod tests {
         skip_lists[0].insert(items[0].clone()).expect("insert error");
         skip_lists[1].insert(items[1].clone()).expect("insert error");
         // Search for a key before 1..1.
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
-            MergeResult::Other { emit: None, left: Discard, right: Keep }
-        });
-        let iter = merger.seek(Bound::Included(&TestKey(0..0))).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other { emit: None, left: Discard, right: Keep },
+            counters(),
+        );
+        let iter = merger.query(Query::FullRange(&TestKey(0..0))).await.expect("seek failed");
 
         // This should find the 2..2 key because of our merge function.
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
@@ -1559,10 +1707,12 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[0].clone()).expect("insert error");
         skip_lists[1].insert(items[1].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
-            MergeResult::Other { emit: None, left: Discard, right: Keep }
-        });
-        let iter = merger.seek(Bound::Included(&TestKey(3..3))).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other { emit: None, left: Discard, right: Keep },
+            counters(),
+        );
+        let iter = merger.query(Query::FullRange(&TestKey(3..3))).await.expect("seek failed");
 
         assert!(iter.get().is_none());
     }
@@ -1573,10 +1723,12 @@ mod tests {
         let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), 2)];
         skip_lists[0].insert(items[1].clone()).expect("insert error");
         skip_lists[1].insert(items[0].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |_left, _right| {
-            MergeResult::Other { emit: None, left: Discard, right: Discard }
-        });
-        let iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |_left, _right| MergeResult::Other { emit: None, left: Discard, right: Discard },
+            counters(),
+        );
+        let iter = merger.query(Query::FullScan).await.expect("seek failed");
         assert!(iter.get().is_none());
     }
 
@@ -1586,18 +1738,22 @@ mod tests {
         let items = [Item::new(TestKey(1..8), 1), Item::new(TestKey(2..10), 2)];
         skip_lists[0].insert(items[0].clone()).expect("insert error");
         skip_lists[1].insert(items[1].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, _right| {
-            if left.key() == &TestKey(1..8) {
-                MergeResult::Other {
-                    emit: None,
-                    left: Replace(Item::new(TestKey(1..2), 1)),
-                    right: Keep,
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |left, _right| {
+                if left.key() == &TestKey(1..8) {
+                    MergeResult::Other {
+                        emit: None,
+                        left: Replace(Item::new(TestKey(1..2), 1)),
+                        right: Keep,
+                    }
+                } else {
+                    MergeResult::EmitLeft
                 }
-            } else {
-                MergeResult::EmitLeft
-            }
-        });
-        let iter = merger.seek(Bound::Included(&TestKey(0..3))).await.expect("seek failed");
+            },
+            counters(),
+        );
+        let iter = merger.query(Query::FullRange(&TestKey(0..3))).await.expect("seek failed");
         let ItemRef { key, value, .. } = iter.get().expect("missing item");
         assert_eq!((key, value), (&items[1].key, &items[1].value));
     }
@@ -1614,27 +1770,34 @@ mod tests {
         skip_lists[0].insert(items[0].clone()).expect("insert error");
         skip_lists[1].insert(items[1].clone()).expect("insert error");
         skip_lists[2].insert(items[2].clone()).expect("insert error");
-        let mut merger = Merger::new(layer_ref_iter(&skip_lists), |left, right| {
-            let result = if left.key().0.end <= right.key().0.start {
-                MergeResult::EmitLeft
-            } else {
-                if left.key() == &TestKey(0..30) && right.key() == &TestKey(10..20) {
-                    MergeResult::Other {
-                        emit: Some(Item::new(TestKey(0..10), 1)),
-                        left: Replace(Item::new(TestKey(10..30), 1)),
-                        right: Keep,
-                    }
+        let mut merger = Merger::new(
+            layer_ref_iter(&skip_lists),
+            |left, right| {
+                let result = if left.key().0.end <= right.key().0.start {
+                    MergeResult::EmitLeft
                 } else {
-                    MergeResult::Other {
-                        emit: None,
-                        left: Keep,
-                        right: Replace(Item::new(TestKey(left.key().0.end..right.key().0.end), 1)),
+                    if left.key() == &TestKey(0..30) && right.key() == &TestKey(10..20) {
+                        MergeResult::Other {
+                            emit: Some(Item::new(TestKey(0..10), 1)),
+                            left: Replace(Item::new(TestKey(10..30), 1)),
+                            right: Keep,
+                        }
+                    } else {
+                        MergeResult::Other {
+                            emit: None,
+                            left: Keep,
+                            right: Replace(Item::new(
+                                TestKey(left.key().0.end..right.key().0.end),
+                                1,
+                            )),
+                        }
                     }
-                }
-            };
-            result
-        });
-        let mut iter = merger.seek(Bound::Included(&TestKey(0..1))).await.expect("seek failed");
+                };
+                result
+            },
+            counters(),
+        );
+        let mut iter = merger.query(Query::FullRange(&TestKey(0..1))).await.expect("seek failed");
         let ItemRef { key, .. } = iter.get().expect("missing item");
         assert_eq!(key, &TestKey(0..10));
         iter.advance().await.expect("advance failed");
@@ -1645,5 +1808,175 @@ mod tests {
         assert_eq!(key, &TestKey(20..30));
         iter.advance().await.expect("advance failed");
         assert_eq!(iter.get(), None);
+    }
+
+    async fn write_layer<K: Key, V: Value>(items: Vec<Item<K, V>>) -> Arc<dyn Layer<K, V>> {
+        let object = Arc::new(FakeObject::new());
+        let write_handle = FakeObjectHandle::new(object.clone());
+        let mut writer =
+            PersistentLayerWriter::<_, K, V>::new(Writer::new(&write_handle).await, 1, 512)
+                .await
+                .expect("PersistentLayerWriter::new failed");
+        for item in items {
+            writer.write(item.as_item_ref()).await.expect("write failed");
+        }
+        writer.flush().await.expect("flush failed");
+        PersistentLayer::open(FakeObjectHandle::new(object))
+            .await
+            .expect("open_persistent_layer failed")
+    }
+
+    fn merge_sum(
+        left: &MergeLayerIterator<'_, i32, i32>,
+        right: &MergeLayerIterator<'_, i32, i32>,
+    ) -> MergeResult<i32, i32> {
+        // Sum matching keys.
+        if left.key() == right.key() {
+            MergeResult::Other {
+                emit: None,
+                left: Discard,
+                right: Replace(Item::new(left.key().clone(), left.value() + right.value())),
+            }
+        } else {
+            MergeResult::EmitLeft
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_bloom_filters_point_query() {
+        let layer_0_items = vec![Item::new(1, 1), Item::new(2, 1)];
+        let layer_1_items = vec![Item::new(2, 1), Item::new(4, 1)];
+        let items = [Item::new(1, 1), Item::new(2, 2), Item::new(4, 1)];
+        let layers: [Arc<dyn Layer<i32, i32>>; 2] =
+            [write_layer(layer_0_items).await, write_layer(layer_1_items).await];
+        let mut merger = Merger::new(dyn_layer_ref_iter(&layers), merge_sum, counters());
+
+        {
+            // Key that exists in layer 0 only
+            let iter = merger.query(Query::Point(&1)).await.expect("seek failed");
+            let ItemRef { key, value, .. } = iter.get().expect("missing item");
+            assert_eq!((key, *value), (&items[0].key, items[0].value));
+        }
+        {
+            // Key that exists in layer 1 and 2
+            let iter = merger.query(Query::Point(&2)).await.expect("seek failed");
+            let ItemRef { key, value, .. } = iter.get().expect("missing item");
+            assert_eq!((key, *value), (&items[1].key, items[1].value));
+        }
+        {
+            // Key that exists in layer 1
+            let iter = merger.query(Query::Point(&4)).await.expect("seek failed");
+            let ItemRef { key, value, .. } = iter.get().expect("missing item");
+            assert_eq!((key, *value), (&items[2].key, items[2].value));
+        }
+        {
+            // Key that doesn't exist at all
+            let iter = merger.query(Query::Point(&400)).await.expect("seek failed");
+            assert!(iter.get().is_none());
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_bloom_filters_limited_range() {
+        // NB: This test uses ObjectKey so that we don't have to reimplement the complex merging
+        // logic for range-like keys.
+        let layer_0_items =
+            vec![Item::new(ObjectKey::extent(0, 0, 0..2048), ObjectValue::extent(0))];
+        let layer_1_items = vec![
+            Item::new(ObjectKey::extent(0, 0, 1024..4096), ObjectValue::extent(32768)),
+            Item::new(ObjectKey::extent(0, 0, 16384..17408), ObjectValue::extent(65536)),
+        ];
+        let items = [
+            Item::new(ObjectKey::extent(0, 0, 0..2048), ObjectValue::extent(0)),
+            Item::new(ObjectKey::extent(0, 0, 2048..4096), ObjectValue::extent(33792)),
+            Item::new(ObjectKey::extent(0, 0, 16384..17408), ObjectValue::extent(65536)),
+        ];
+        let layers: [Arc<dyn Layer<ObjectKey, ObjectValue>>; 2] =
+            [write_layer(layer_0_items).await, write_layer(layer_1_items).await];
+        let mut merger =
+            Merger::new(dyn_layer_ref_iter(&layers), object_store::merge::merge, counters());
+
+        {
+            // Range contains just keys in layer 1
+            let mut iter = merger
+                .query(Query::LimitedRange(&ObjectKey::extent(0, 0, 16384..16386)))
+                .await
+                .expect("seek failed");
+            let ItemRef { key, value, .. } = iter.get().expect("missing item");
+            assert_eq!(key, &items[2].key);
+            assert_eq!(value, &items[2].value);
+            iter.advance().await.expect("advance");
+            assert!(iter.get().is_none());
+        }
+        {
+            // Range contains keys in layer 0 and 1
+            let mut iter = merger
+                .query(Query::LimitedRange(&ObjectKey::extent(0, 0, 0..4096)))
+                .await
+                .expect("seek failed");
+            let ItemRef { key, value, .. } = iter.get().expect("missing item");
+            assert_eq!(key, &items[0].key);
+            assert_eq!(value, &items[0].value);
+            iter.advance().await.expect("advance");
+            let ItemRef { key, value, .. } = iter.get().expect("missing item");
+            assert_eq!(key, &items[1].key);
+            assert_eq!(value, &items[1].value);
+            iter.advance().await.expect("advance");
+        }
+        {
+            // Range contains no keys
+            let mut iter = merger
+                .query(Query::LimitedRange(&ObjectKey::extent(0, 0, 8192..12288)))
+                .await
+                .expect("seek failed");
+            let ItemRef { key, .. } = iter.get().expect("missing item");
+            assert_eq!(key, &items[2].key);
+            iter.advance().await.expect("advance");
+            assert!(iter.get().is_none());
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_bloom_filters_full_range() {
+        let layer_0_items = vec![Item::new(1, 1), Item::new(2, 1)];
+        let layer_1_items = vec![Item::new(2, 1), Item::new(4, 1)];
+        let items = [Item::new(1, 1), Item::new(2, 2), Item::new(4, 1)];
+        let layers: [Arc<dyn Layer<i32, i32>>; 2] =
+            [write_layer(layer_0_items).await, write_layer(layer_1_items).await];
+        let mut merger = Merger::new(dyn_layer_ref_iter(&layers), merge_sum, counters());
+
+        let mut iter = merger.query(Query::FullRange(&0)).await.expect("seek failed");
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[0].key, items[0].value));
+        iter.advance().await.expect("advance");
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[1].key, items[1].value));
+        iter.advance().await.expect("advance");
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[2].key, items[2].value));
+        iter.advance().await.expect("advance");
+        assert!(iter.get().is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_merge_bloom_filters_full_scan() {
+        let layer_0_items = vec![Item::new(1, 1), Item::new(2, 1)];
+        let layer_1_items = vec![Item::new(2, 1), Item::new(4, 1)];
+        let items = [Item::new(1, 1), Item::new(2, 2), Item::new(4, 1)];
+        let layers: [Arc<dyn Layer<i32, i32>>; 2] =
+            [write_layer(layer_0_items).await, write_layer(layer_1_items).await];
+        let mut merger = Merger::new(dyn_layer_ref_iter(&layers), merge_sum, counters());
+
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[0].key, items[0].value));
+        iter.advance().await.expect("advance");
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[1].key, items[1].value));
+        iter.advance().await.expect("advance");
+        let ItemRef { key, value, .. } = iter.get().expect("missing item");
+        assert_eq!((key, *value), (&items[2].key, items[2].value));
+        iter.advance().await.expect("advance");
+        assert!(iter.get().is_none());
     }
 }

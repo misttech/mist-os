@@ -193,6 +193,14 @@ TEST(FcntlLockTest, CheckErrors) {
   ASSERT_EQ(errno, EOVERFLOW);
 
   fl.l_type = F_WRLCK;
+  fl.l_whence = SEEK_END;
+  fl.l_start = std::numeric_limits<decltype(fl.l_len)>::min();
+  fl.l_len = std::numeric_limits<decltype(fl.l_len)>::min();
+
+  ASSERT_EQ(fcntl(fd, F_SETLK, &fl), -1);
+  ASSERT_EQ(errno, EINVAL);
+
+  fl.l_type = F_WRLCK;
   fl.l_whence = SEEK_SET;
   fl.l_start = 0;
   fl.l_len = -1;

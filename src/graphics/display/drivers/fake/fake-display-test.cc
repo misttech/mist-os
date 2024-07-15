@@ -144,7 +144,7 @@ class FakeDisplayRealSysmemTest : public FakeDisplayTest {
     zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> token_endpoints =
         fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
 
-    EXPECT_OK(token_endpoints.status_value());
+    EXPECT_OK(token_endpoints);
     if (!token_endpoints.is_ok()) {
       return token_endpoints.take_error();
     }
@@ -309,17 +309,17 @@ layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& 
                       .alpha_mode = ALPHA_DISABLE,
                       .alpha_layer_val = 1.0,
                       .transform_mode = FRAME_TRANSFORM_IDENTITY,
-                      .src_frame =
+                      .image_source =
                           {
-                              .x_pos = 0,
-                              .y_pos = 0,
+                              .x = 0,
+                              .y = 0,
                               .width = image_metadata.width,
                               .height = image_metadata.height,
                           },
-                      .dest_frame =
+                      .display_destination =
                           {
-                              .x_pos = 0,
-                              .y_pos = 0,
+                              .x = 0,
+                              .y = 0,
                               .width = image_metadata.width,
                               .height = image_metadata.height,
                           },
@@ -361,7 +361,7 @@ void FillImageWithColor(cpp20::span<uint8_t> image_buffer, const std::vector<uin
 
 TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
   zx::result<BufferCollectionAndToken> new_buffer_collection_result = CreateBufferCollection();
-  ASSERT_OK(new_buffer_collection_result.status_value());
+  ASSERT_OK(new_buffer_collection_result);
   auto [collection_client, token] = std::move(new_buffer_collection_result.value());
 
   // Test ImportBufferCollection().
@@ -374,7 +374,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
   // `driver_buffer_collection_id` must be unused.
   zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>> another_token_endpoints =
       fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
-  ASSERT_OK(another_token_endpoints.status_value());
+  ASSERT_OK(another_token_endpoints);
   EXPECT_EQ(display()->DisplayControllerImplImportBufferCollection(
                 kBanjoValidBufferCollectionId, another_token_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
@@ -414,7 +414,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
 
 TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
   zx::result<BufferCollectionAndToken> new_buffer_collection_result = CreateBufferCollection();
-  ASSERT_OK(new_buffer_collection_result.status_value());
+  ASSERT_OK(new_buffer_collection_result);
   auto [collection_client, token] = std::move(new_buffer_collection_result.value());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -504,7 +504,7 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImage) {
 
 TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   zx::result<BufferCollectionAndToken> new_buffer_collection_result = CreateBufferCollection();
-  ASSERT_OK(new_buffer_collection_result.status_value());
+  ASSERT_OK(new_buffer_collection_result);
   auto [collection_client, token] = std::move(new_buffer_collection_result.value());
 
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -574,13 +574,13 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
 TEST_F(FakeDisplayRealSysmemTest, Capture) {
   zx::result<BufferCollectionAndToken> new_capture_buffer_collection_result =
       CreateBufferCollection();
-  ASSERT_OK(new_capture_buffer_collection_result.status_value());
+  ASSERT_OK(new_capture_buffer_collection_result);
   auto [capture_collection_client, capture_token] =
       std::move(new_capture_buffer_collection_result.value());
 
   zx::result<BufferCollectionAndToken> new_framebuffer_buffer_collection_result =
       CreateBufferCollection();
-  ASSERT_OK(new_framebuffer_buffer_collection_result.status_value());
+  ASSERT_OK(new_framebuffer_buffer_collection_result);
   auto [framebuffer_collection_client, framebuffer_token] =
       std::move(new_framebuffer_buffer_collection_result.value());
 

@@ -3,5 +3,4 @@
 // found in the LICENSE file.
 
 pub mod components;
-pub mod package_list;
 pub mod packages;

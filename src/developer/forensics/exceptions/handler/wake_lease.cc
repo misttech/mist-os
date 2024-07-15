@@ -26,6 +26,7 @@ namespace fpb = fuchsia_power_broker;
 namespace fps = fuchsia_power_system;
 
 fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Lessor> server_end,
+                               fpb::LevelControlChannels level_control_channels,
                                const std::string& element_name) {
   fpb::LevelDependency dependency(
       /*dependency_type=*/fpb::DependencyType::kOpportunistic,
@@ -38,6 +39,7 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
   schema.element_name(element_name)
       .initial_current_level(kPowerLevelInactive)
       .lessor_channel(std::move(server_end))
+      .level_control_channels(std::move(level_control_channels))
       .valid_levels(std::vector<uint8_t>({
           kPowerLevelInactive,
           kPowerLevelActive,
@@ -49,32 +51,6 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
   return schema;
 }
 
-fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WaitForLeaseSatisfied(
-    fidl::Client<fpb::LeaseControl> lease_control, fpb::LeaseStatus last_status) {
-  return fidl_fpromise::as_promise(lease_control->WatchStatus(last_status))
-      .then([lease_control = std::move(lease_control)](
-                const fpromise::result<fuchsia_power_broker::LeaseControlWatchStatusResponse,
-                                       fidl::Status>& result) mutable
-            -> fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> {
-        if (result.is_error()) {
-          FX_LOGS(ERROR) << "Failed to watch lease status: " << result.error().FormatDescription();
-
-          // We failed to wait for the lease to become satisfied, but we'll optimistically hold onto
-          // the lease and hope it becomes satisfied in time to prevent a possible system
-          // suspension.
-          return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
-              fpromise::ok(std::move(lease_control)));
-        }
-
-        if (const fpb::LeaseStatus status = result.value().status();
-            status != fpb::LeaseStatus::kSatisfied) {
-          return WaitForLeaseSatisfied(std::move(lease_control), status);
-        }
-        return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
-            fpromise::ok(std::move(lease_control)));
-      });
-}
-
 }  // namespace
 
 WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_element_name,
@@ -84,7 +60,8 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, const std::string& power_el
       power_element_name_(power_element_name),
       add_power_element_called_(false),
       sag_(std::move(sag_client_end), dispatcher_, &sag_event_handler_),
-      topology_(std::move(topology_client_end), dispatcher_, &topology_event_handler_) {}
+      topology_(std::move(topology_client_end), dispatcher_, &topology_event_handler_),
+      required_level_(kPowerLevelInactive) {}
 
 fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::Acquire(
     const zx::duration timeout) {
@@ -132,34 +109,68 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
           return;
         }
 
-        zx::result<fidl::Endpoints<fpb::Lessor>> endpoints = fidl::CreateEndpoints<fpb::Lessor>();
-        if (endpoints.is_error()) {
-          FX_LOGS(ERROR) << "Couldn't create FIDL endpoints: " << endpoints.status_string();
+        zx::result<fidl::Endpoints<fpb::Lessor>> lessor_endpoints =
+            fidl::CreateEndpoints<fpb::Lessor>();
+        if (lessor_endpoints.is_error()) {
+          FX_LOGS(ERROR) << "Couldn't create FIDL endpoints: " << lessor_endpoints.status_string();
           completer.complete_error(Error::kConnectionError);
           return;
         }
 
+        zx::result<fidl::Endpoints<fpb::CurrentLevel>> current_level_endpoints =
+            fidl::CreateEndpoints<fpb::CurrentLevel>();
+        if (!current_level_endpoints.is_ok()) {
+          FX_LOGS(ERROR) << "Couldn't create FIDL endpoints: "
+                         << current_level_endpoints.status_string();
+          completer.complete_error(Error::kConnectionError);
+          return;
+        }
+
+        zx::result<fidl::Endpoints<fpb::RequiredLevel>> required_level_endpoints =
+            fidl::CreateEndpoints<fpb::RequiredLevel>();
+        if (!required_level_endpoints.is_ok()) {
+          FX_LOGS(ERROR) << "Couldn't create FIDL endpoints: "
+                         << required_level_endpoints.status_string();
+          completer.complete_error(Error::kConnectionError);
+          return;
+        }
+
+        fpb::LevelControlChannels level_control_endpoints{{
+            .current = std::move(current_level_endpoints->server),
+            .required = std::move(required_level_endpoints->server),
+        }};
+
         fpb::ElementSchema schema = BuildSchema(
             std::move(result->execution_state()->opportunistic_dependency_token()).value(),
-            std::move(endpoints->server), power_element_name_);
+            std::move(lessor_endpoints->server), std::move(level_control_endpoints),
+            power_element_name_);
+
+        lessor_.Bind(std::move(lessor_endpoints->client), dispatcher_);
+        current_level_client_.Bind(std::move(current_level_endpoints->client), dispatcher_);
+        required_level_client_.Bind(std::move(required_level_endpoints->client), dispatcher_);
 
         // TODO(https://fxbug.dev/341104129): connect to topology here instead of injecting the
         // connection in the constructor. Disconnect once no longer needed.
         topology_->AddElement(std::move(schema))
-            .Then(
-                [this, completer = std::move(completer), client_end = std::move(endpoints->client)](
-                    fidl::Result<fpb::Topology::AddElement>& result) mutable {
-                  if (result.is_error()) {
-                    FX_LOGS(ERROR) << "Failed to add element to topology: "
-                                   << result.error_value().FormatDescription();
-                    completer.complete_error(Error::kBadValue);
-                    return;
-                  }
+            .Then([this, completer = std::move(completer)](
+                      fidl::Result<fpb::Topology::AddElement>& result) mutable {
+              if (result.is_error()) {
+                FX_LOGS(ERROR) << "Failed to add element to topology: "
+                               << result.error_value().FormatDescription();
 
-                  element_control_channel_ = std::move(result.value().element_control_channel());
-                  lessor_ = fidl::Client<fpb::Lessor>(std::move(client_end), dispatcher_);
-                  completer.complete_ok();
-                });
+                std::ignore = lessor_.UnbindMaybeGetEndpoint();
+                std::ignore = current_level_client_.UnbindMaybeGetEndpoint();
+                std::ignore = required_level_client_.UnbindMaybeGetEndpoint();
+
+                completer.complete_error(Error::kBadValue);
+                return;
+              }
+
+              element_control_channel_ = std::move(result.value().element_control_channel());
+
+              WatchRequiredLevel();
+              completer.complete_ok();
+            });
       });
 
   return bridge.consumer.promise_or(fpromise::error(Error::kLogicError))
@@ -187,9 +198,56 @@ fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::DoAcquireLe
               fidl::Client<fpb::LeaseControl> lease_control(
                   std::move(result.lease_control()), dispatcher_, &lease_control_event_handler_);
 
-              return WaitForLeaseSatisfied(std::move(lease_control), fpb::LeaseStatus::kUnknown);
+              return WaitForRequiredLevelActive().then(
+                  [lease_control =
+                       std::move(lease_control)](const fpromise::result<>& result) mutable {
+                    return fpromise::make_result_promise<fidl::Client<fpb::LeaseControl>, Error>(
+                        fpromise::ok(std::move(lease_control)));
+                  });
             });
       });
+}
+
+void WakeLease::WatchRequiredLevel() {
+  required_level_client_->Watch().Then(
+      [this](const fidl::Result<fpb::RequiredLevel::Watch>& result) {
+        if (result.is_error()) {
+          FX_LOGS(ERROR) << "Failed to watch required level: "
+                         << result.error_value().FormatDescription();
+          return;
+        }
+
+        required_level_ = result->required_level();
+
+        current_level_client_->Update(required_level_)
+            .Then([this](const fidl::Result<fpb::CurrentLevel::Update>& result) {
+              if (result.is_error()) {
+                FX_LOGS(ERROR) << "Failed to update current level: "
+                               << result.error_value().FormatDescription();
+                return;
+              }
+
+              // Unblocks all tasks waiting for the required level to become active. Note, promises
+              // will re-block themselves if the power level is not active.
+              for (fpromise::suspended_task& task : waiting_for_required_level_) {
+                task.resume_task();
+              }
+              waiting_for_required_level_.clear();
+
+              WatchRequiredLevel();
+            });
+      });
+}
+
+fpromise::promise<> WakeLease::WaitForRequiredLevelActive() {
+  return fpromise::make_promise([this](fpromise::context& context) -> fpromise::result<> {
+    if (required_level_ == kPowerLevelActive) {
+      return fpromise::ok();
+    }
+
+    waiting_for_required_level_.push_back(context.suspend_task());
+    return fpromise::pending();
+  });
 }
 
 }  // namespace forensics::exceptions::handler

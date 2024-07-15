@@ -30,9 +30,8 @@ use num_derive::FromPrimitive;
 use std::collections::hash_map::{Entry, HashMap};
 use tracing::{debug, error, info};
 use {
-    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 use std::net::IpAddr;
@@ -204,37 +203,6 @@ impl std::fmt::Display for Proto {
         match self {
             Proto::IPv4 => write!(f, "IPv4"),
             Proto::IPv6 => write!(f, "IPv6"),
-        }
-    }
-}
-
-/// `PortType` is the type of port backing the L3 interface.
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum PortType {
-    /// Unknown.
-    Unknown,
-    /// EthernetII or 802.3.
-    Ethernet,
-    /// Wireless LAN based on 802.11.
-    WiFi,
-    /// Switch virtual interface.
-    SVI,
-    /// Loopback.
-    Loopback,
-}
-
-impl From<fnet_interfaces::DeviceClass> for PortType {
-    fn from(device_class: fnet_interfaces::DeviceClass) -> Self {
-        match device_class {
-            fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => PortType::Loopback,
-            fnet_interfaces::DeviceClass::Device(device_class) => match device_class {
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet => PortType::Ethernet,
-                fidl_fuchsia_hardware_network::DeviceClass::Wlan
-                | fidl_fuchsia_hardware_network::DeviceClass::WlanAp => PortType::WiFi,
-                fidl_fuchsia_hardware_network::DeviceClass::Ppp
-                | fidl_fuchsia_hardware_network::DeviceClass::Bridge
-                | fidl_fuchsia_hardware_network::DeviceClass::Virtual => PortType::Unknown,
-            },
         }
     }
 }
@@ -1044,7 +1012,7 @@ impl<Time: TimeProvider> NetworkChecker for Monitor<Time> {
                 &fnet_interfaces_ext::Properties {
                     id,
                     ref name,
-                    device_class: _,
+                    port_class: _,
                     online,
                     addresses: _,
                     has_default_ipv4_route: _,
@@ -1437,7 +1405,10 @@ mod tests {
     use std::pin::pin;
     use std::task::Poll;
     use test_case::test_case;
-    use {fidl_fuchsia_net as fnet, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {
+        fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
+    };
 
     const ETHERNET_INTERFACE_NAME: &str = "eth1";
     const ID1: u64 = 1;
@@ -1503,38 +1474,6 @@ mod tests {
                 "30": "Internet",
             }
         })
-    }
-
-    #[test]
-    fn test_port_type() {
-        assert_eq!(
-            PortType::from(fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {})),
-            PortType::Loopback
-        );
-        assert_eq!(
-            PortType::from(fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet
-            )),
-            PortType::Ethernet
-        );
-        assert_eq!(
-            PortType::from(fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Wlan
-            )),
-            PortType::WiFi
-        );
-        assert_eq!(
-            PortType::from(fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::WlanAp
-            )),
-            PortType::WiFi
-        );
-        assert_eq!(
-            PortType::from(fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Virtual
-            )),
-            PortType::Unknown
-        );
     }
 
     #[test_case(NetworkCheckState::PingGateway, &[std_socket_addr!("1.2.3.0:8080")];
@@ -1739,9 +1678,7 @@ mod tests {
         let properties = &fnet_interfaces_ext::Properties {
             id: interface_id.try_into().expect("should be nonzero"),
             name: name.to_string(),
-            device_class: fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
-            ),
+            port_class: fnet_interfaces_ext::PortClass::Ethernet,
             online: true,
             addresses: Default::default(),
             has_default_ipv4_route: Default::default(),
@@ -2624,9 +2561,7 @@ mod tests {
         let properties = fnet_interfaces_ext::Properties {
             id: ID1.try_into().expect("should be nonzero"),
             name: ETHERNET_INTERFACE_NAME.to_string(),
-            device_class: fnet_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
-            ),
+            port_class: fnet_interfaces_ext::PortClass::Ethernet,
             has_default_ipv4_route: true,
             has_default_ipv6_route: true,
             online: true,
@@ -2684,9 +2619,7 @@ mod tests {
             &fnet_interfaces_ext::Properties {
                 id: ID1.try_into().expect("should be nonzero"),
                 name: NON_ETHERNET_INTERFACE_NAME.to_string(),
-                device_class: fnet_interfaces::DeviceClass::Device(
-                    fidl_fuchsia_hardware_network::DeviceClass::Virtual,
-                ),
+                port_class: fnet_interfaces_ext::PortClass::Virtual,
                 online: false,
                 has_default_ipv4_route: false,
                 has_default_ipv6_route: false,

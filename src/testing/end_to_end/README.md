@@ -85,9 +85,8 @@ NOTE: For infra execution, Mobly config generation is entirely automated by
 Lacewing so nothing is required from test authors (besides picking the correct
 |environments| in the `BUILD.gn` for test targets to run against).
 
-For simplicity, this is an example of a single Fuchsia device testbed.
-
-Multi-device testbeds follows a similar configuration but is out-of-scope of this guide - Please direct to
+Multi-device testbeds follows a similar configuration but is out-of-scope of
+this guide - Please direct to
 [Multi-device setup and execution](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/testing/end_to_end/examples/test_multi_device/README.md)
 
 ### Lacewing test module
@@ -143,7 +142,7 @@ python_mobly_test("my_test_target") {
 }
 ```
 
-### Test execution
+### Local test execution
 
 Once the Lacewing target has been defined, trigger the test to run locally via
 `fx test`:
@@ -176,6 +175,11 @@ override this by supplying `--artifact-output-directory <custom_path>` option
 with `fx test` invocation.
 
 You've just written and run your first Lacewing test!
+
+### Infra test execution
+
+To run a Lacewing test in infra, refer to
+[Lacewing's user guide for infra test execution](https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/tests/end_to_end/#running-an-end_to_end-test-in-infra).
 
 ## Further Reading
 

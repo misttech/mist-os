@@ -621,8 +621,8 @@ PowerStateTransitionResponse Device::TransitionToPowerState(uint8_t requested_st
   return PowerStateTransitionResponse(ZX_OK, current_power_state_);
 }
 
-zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_prop_t> props,
-                               cpp20::span<zx_device_str_prop_t> str_props, uint32_t flags) {
+zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_t> str_props,
+                               uint32_t flags) {
   auto outgoing = PrepareOutgoing();
   if (outgoing.is_error()) {
     zxlogf(ERROR, "failed to add acpi device '%s' - while setting up outgoing: %s", name,
@@ -680,8 +680,6 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_prop_t> p
       .name = "pt",
       .ctx = this,
       .ops = &passthrough_proto,
-      .props = props.data(),
-      .prop_count = static_cast<uint32_t>(props.size()),
       .str_props = str_props.data(),
       .str_prop_count = static_cast<uint32_t>(str_props.size()),
       .proto_id = ZX_PROTOCOL_ACPI,

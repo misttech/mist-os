@@ -50,6 +50,7 @@ zx_library("vm") {
     "vmm.cc",
   ]
   deps = [
+    "//src/lib/zbitl",
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/console",
@@ -93,6 +94,10 @@ zx_library("vm") {
 
     # "pmm_arena.h" has #include <lib/zx/result.h>.
     "//zircon/system/ulib/zx:headers",
+
+    # "pmm.h" has #include <lib/zbi-format/memory.h>
+    # "pmm_node.h" has #include <lib/zbi-format/memory.h>
+    "//sdk/lib/zbi-format",
 
     # <vm/pmm_checker.h> has #include <lib/boot-options/boot-options.h>.
     "//zircon/kernel/lib/boot-options:headers",

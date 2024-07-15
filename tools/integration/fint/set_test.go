@@ -116,9 +116,6 @@ func TestSet(t *testing.T) {
 			t.Errorf("Expected setImpl to set a gn_trace_path in the artifact dir (%q) but got: %q",
 				contextSpec.ArtifactDir, artifacts.GnTracePath)
 		}
-		if !artifacts.UseGoma {
-			t.Errorf("Expected setImpl to set use_goma")
-		}
 		if !artifacts.EnableRbe {
 			t.Errorf("Expected setImpl to set enable_rbe")
 		}

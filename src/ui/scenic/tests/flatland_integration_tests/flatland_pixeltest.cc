@@ -16,9 +16,9 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 #include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
@@ -33,7 +33,6 @@ using component_testing::RealmRoot;
 
 constexpr fuc::TransformId kRootTransform{.value = 1};
 constexpr auto kEpsilon = 1;
-constexpr auto kByterPerPixel = 4;
 
 fuc::ColorRgba GetColorInFloat(utils::Pixel color) {
   return {static_cast<float>(color.red) / 255.f, static_cast<float>(color.green) / 255.f,
@@ -50,7 +49,7 @@ void CompareColor(utils::Pixel actual, utils::Pixel expected) {
 }
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandPixelTestBase : public LoggingEventLoop, public zxtest::Test {
+class FlatlandPixelTestBase : public ui_testing::LoggingEventLoop, public zxtest::Test {
  public:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the
@@ -337,7 +336,14 @@ class ParameterizedSRGBPixelTest : public ParameterizedPixelFormatTest {};
 
 INSTANTIATE_TEST_SUITE_P(RgbPixelFormats, ParameterizedSRGBPixelTest,
                          zxtest::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
-                                        fuchsia::images2::PixelFormat::R8G8B8A8));
+                                        fuchsia::images2::PixelFormat::R8G8B8A8
+// TODO(https://fxbug.dev/351833287): Enable test on X86 once goldfish supports R5G6B5.
+#if defined(__aarch64__)
+                                        ,
+                                        fuchsia::images2::PixelFormat::R5G6B5
+#endif
+
+                                        ));
 
 TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
@@ -354,13 +360,18 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());
 
+  uint32_t bytes_per_pixel = 4;
+  if (GetParam() == fuchsia::images2::PixelFormat::R5G6B5) {
+    bytes_per_pixel = 2;
+  }
+
   // Use the local token to allocate a protected buffer.
   auto info = SetConstraintsAndAllocateBuffer(
       std::move(local_token), GetBufferConstraints(GetParam(), fuchsia::images2::ColorSpace::SRGB));
 
   // Write the pixel values to the VMO.
   const uint32_t num_pixels = display_width_ * display_height_;
-  const uint64_t image_vmo_bytes = num_pixels * kByterPerPixel;
+  const uint64_t image_vmo_bytes = num_pixels * bytes_per_pixel;
   ASSERT_EQ(image_vmo_bytes, info.settings().buffer_settings().size_bytes());
 
   const zx::vmo& image_vmo = info.buffers()[0].vmo();
@@ -371,24 +382,30 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
                                  image_vmo_bytes, reinterpret_cast<uintptr_t*>(&vmo_base));
   EXPECT_EQ(ZX_OK, status);
 
-  const utils::Pixel color = utils::kBlue;
+  utils::Pixel color = utils::kBlue;
   vmo_base += info.buffers()[0].vmo_usable_start();
 
-  for (uint32_t i = 0; i < num_pixels * kByterPerPixel; i += kByterPerPixel) {
-    // For BGRA32 pixel format, the first and the third byte in the pixel corresponds to the blue
-    // and the red channel respectively.
-    if (GetParam() == fuchsia::images2::PixelFormat::B8G8R8A8) {
-      vmo_base[i] = color.blue;
-      vmo_base[i + 2] = color.red;
+  for (uint32_t i = 0; i < num_pixels * bytes_per_pixel; i += bytes_per_pixel) {
+    if (GetParam() == fuchsia::images2::PixelFormat::R5G6B5) {
+      uint16_t color16 = static_cast<uint16_t>(((color.red >> 3) << 11) |
+                                               ((color.green >> 2) << 5) | (color.blue >> 3));
+      *reinterpret_cast<uint16_t*>(&vmo_base[i]) = color16;
+    } else {
+      // For BGRA32 pixel format, the first and the third byte in the pixel corresponds to the blue
+      // and the red channel respectively.
+      if (GetParam() == fuchsia::images2::PixelFormat::B8G8R8A8) {
+        vmo_base[i] = color.blue;
+        vmo_base[i + 2] = color.red;
+      }
+      // For R8G8B8A8 pixel format, the first and the third byte in the pixel corresponds to the red
+      // and the blue channel respectively.
+      if (GetParam() == fuchsia::images2::PixelFormat::R8G8B8A8) {
+        vmo_base[i] = color.red;
+        vmo_base[i + 2] = color.blue;
+      }
+      vmo_base[i + 1] = color.green;
+      vmo_base[i + 3] = color.alpha;
     }
-    // For R8G8B8A8 pixel format, the first and the third byte in the pixel corresponds to the red
-    // and the blue channel respectively.
-    if (GetParam() == fuchsia::images2::PixelFormat::R8G8B8A8) {
-      vmo_base[i] = color.red;
-      vmo_base[i + 2] = color.blue;
-    }
-    vmo_base[i + 1] = color.green;
-    vmo_base[i + 3] = color.alpha;
   }
 
   if (info.settings().buffer_settings().coherency_domain() ==
@@ -411,6 +428,10 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
   auto histogram = screenshot.Histogram();
+
+  if (GetParam() == fuchsia::images2::PixelFormat::R5G6B5) {
+    color.alpha = 0xff;
+  }
 
   EXPECT_EQ(histogram[color], num_pixels);
 }
@@ -588,6 +609,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   auto [pixel_format, orientation, image_flip] = GetParam();
 
   const uint32_t num_pixels = display_width_ * display_height_;
+  constexpr auto kByterPerPixel = 4;
   const uint64_t image_vmo_bytes = num_pixels * kByterPerPixel;
 
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());

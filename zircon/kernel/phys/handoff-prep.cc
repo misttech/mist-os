@@ -143,6 +143,56 @@ void HandoffPrep::FinishVmos() {
   }
 }
 
+void HandoffPrep::SetMemory() {
+  // Normalizes types so that only those that are of interest to the kernel
+  // remain.
+  auto normed_type = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
+    switch (type) {
+      case memalloc::Type::kPeripheral:
+        [[fallthrough]];
+
+      // The allocations that should survive into the hand-off.
+      //
+      // TODO(https://fxbug.dev/42164859): Add more!
+      case memalloc::Type::kReservedLow:
+        return type;
+
+      default:
+        ZX_DEBUG_ASSERT(type != memalloc::Type::kReserved);
+        break;
+    }
+
+    if (memalloc::IsRamType(type)) {
+      return memalloc::Type::kFreeRam;
+    }
+
+    // Anything unknown should be ignored.
+    return ktl::nullopt;
+  };
+
+  auto& pool = Allocation::GetPool();
+
+  // Iterate through once to determine how many normalized ranges there are,
+  // informing our allocation of its storage in the handoff.
+  size_t len = 0;
+  auto count_ranges = [&len](const memalloc::Range& range) {
+    ++len;
+    return true;
+  };
+  pool.NormalizeRanges(count_ranges, normed_type);
+
+  fbl::AllocChecker ac;
+  ktl::span handoff_ranges = New(handoff()->memory, ac, len);
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for memory handoff", len);
+
+  // Now simply record the normalized ranges.
+  auto record_ranges = [it = handoff_ranges.begin()](const memalloc::Range& range) mutable {
+    *it++ = range;
+    return true;
+  };
+  pool.NormalizeRanges(record_ranges, normed_type);
+}
+
 BootOptions& HandoffPrep::SetBootOptions(const BootOptions& boot_options) {
   fbl::AllocChecker ac;
   BootOptions* handoff_options = New(handoff()->boot_options, ac, *gBootOptions);
@@ -240,6 +290,8 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
 
   // Finalize the published VMOs, including the log just published above.
   FinishVmos();
+
+  SetMemory();
 
   // Now that all time samples have been collected, copy gBootTimes into the
   // hand-off.

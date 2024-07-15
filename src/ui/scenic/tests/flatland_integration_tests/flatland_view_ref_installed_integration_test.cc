@@ -20,9 +20,9 @@
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 
 // This test exercises the fuchsia.ui.views.ViewRefInstalled protocol implemented by Scenic
 // in the context of the Flatland compositor interface.
@@ -36,7 +36,8 @@ using RealmRoot = component_testing::RealmRoot;
 using WatchResult = fuv::ViewRefInstalled_Watch_Result;
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public LoggingEventLoop {
+class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test,
+                                                public ui_testing::LoggingEventLoop {
  protected:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the

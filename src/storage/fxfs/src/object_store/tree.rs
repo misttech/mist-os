@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use crate::lsm_tree::types::{LayerIterator, MergeableKey, Value};
-use crate::lsm_tree::{LSMTree, LockedLayer};
+use crate::lsm_tree::{LSMTree, LockedLayer, Query};
 use crate::object_handle::WriteBytes;
 use crate::object_store::journal;
 use anyhow::{Context, Error};
 use std::future::{ready, Future};
-use std::ops::Bound;
 
 pub trait MajorCompactable<K: 'static, V: 'static> {
     /// Returns an iterator that wraps another iterator that is appropriate for major compactions.
@@ -74,13 +73,14 @@ where
 
     {
         let block_size = writer.block_size();
+        let total_len = layer_set.sum_len();
         let mut merger = layer_set.merger();
-        let iter = merger.seek(Bound::Unbounded).await?;
+        let iter = merger.query(Query::FullScan).await?;
         if layers_to_keep.is_empty() {
             let major_iter = LSMTree::<K, V>::major_iter(iter).await?;
-            tree.compact_with_iterator(major_iter, writer, block_size).await
+            tree.compact_with_iterator(major_iter, total_len, writer, block_size).await
         } else {
-            tree.compact_with_iterator(iter, writer, block_size).await
+            tree.compact_with_iterator(iter, total_len, writer, block_size).await
         }
         .context("ObjectStore::flush")?;
     }

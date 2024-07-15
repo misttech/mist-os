@@ -585,7 +585,14 @@ impl file::File for StarnixNodeConnection {
         if flags.contains(fio::VmoFlags::EXECUTE) {
             prot_flags |= ProtectionFlags::EXEC;
         }
-        let vmo = self.file.get_vmo(&*self.task().await?, None, prot_flags)?;
+        let current_task = &*self.task().await?;
+        let memory = self.file.get_memory(
+            self.kernel().unwrap().kthreads.unlocked_for_async().deref_mut(),
+            current_task,
+            None,
+            prot_flags,
+        )?;
+        let vmo = memory.as_vmo().ok_or_else(|| errno!(ENOTSUP))?;
         if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
             let size = vmo.get_size()?;
             vmo.create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, size)
@@ -701,9 +708,11 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
     }
 }
 
-impl vfs::node::IsDirectory for StarnixNodeConnection {
-    fn is_directory(&self) -> bool {
-        self.is_dir()
+impl directory::entry::GetEntryInfo for StarnixNodeConnection {
+    fn entry_info(&self) -> directory::entry::EntryInfo {
+        let dirent_type =
+            if self.is_dir() { fio::DirentType::Directory } else { fio::DirentType::File };
+        directory::entry::EntryInfo::new(0, dirent_type)
     }
 }
 

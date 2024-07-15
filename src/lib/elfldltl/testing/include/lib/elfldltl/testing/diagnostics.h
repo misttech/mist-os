@@ -30,6 +30,32 @@ struct TestingDiagnosticsFlags {
   [[no_unique_address]] UniqueTrueType<2> extra_checking;
 };
 
+// This never does anything, but always instantiates calls (never reached at
+// runtime) to the PrintfDiagnosticsReport and OstreamDiagnosticsReport
+// functions so it tests that the argument types are accepted by those at
+// compile time.
+class ReportTypeCheck {
+ public:
+  template <typename... Args>
+  void operator()(Args&&... args) const {
+    if (do_printf()) {
+      constexpr auto test_printf = [](const char* fmt, ...) { return -1; };
+      PrintfDiagnosticsReport(test_printf)(std::forward<Args>(args)...);
+    } else if (do_ostream()) {
+      std::stringstream os;
+      OstreamDiagnosticsReport(os)(std::forward<Args>(args)...);
+    }
+  }
+
+  // This can guard calls so they can use std::forward twice in the source
+  // without actually forwarding any value twice.
+  static bool guard_call() { return false; }
+
+ private:
+  static bool do_printf() { return false; }
+  static bool do_ostream() { return false; }
+};
+
 struct ReportToString {
   template <typename... Args>
   inline std::string operator()(Args&&... args) const {
@@ -52,6 +78,9 @@ class ExpectNoReport {
     ADD_FAILURE() << location_.file_name() << ":" << location_.line() << ":" << location_.column()
                   << ": in " << location_.function_name() << ": Expected no diagnostics, not: "
                   << ReportToString{}(std::forward<Args>(args)...);
+    if (ReportTypeCheck::guard_call()) {
+      ReportTypeCheck{}(std::forward<Args>(args)...);
+    }
     return true;
   }
 
@@ -87,6 +116,9 @@ class ExpectReport {
 
   template <typename... Ts>
   constexpr bool operator()(Ts&&... args) {
+    if (ReportTypeCheck::guard_call()) {
+      ReportTypeCheck{}(std::forward<Ts>(args)...);
+    }
     constexpr size_t called_argument_count = sizeof...(Ts);
     switch (state_) {
       case State::kMoved:
@@ -278,6 +310,9 @@ class ExpectReportList {
 
   template <typename... Args>
   constexpr bool operator()(Args&&... args) {
+    if (ReportTypeCheck::guard_call()) {
+      ReportTypeCheck{}(std::forward<Args>(args)...);
+    }
     EXPECT_LT(next_, kCount) << location_.file_name() << ":" << location_.line() << ":"
                              << location_.column() << ": in " << location_.function_name()
                              << ": too many errors, next error unexpected...";

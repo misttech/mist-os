@@ -180,7 +180,7 @@ zx_status_t Controller::Init() {
   const uint32_t capabilities = RegRead(kHbaCapabilities);
   const bool use_command_queue = capabilities & AHCI_CAP_NCQ;
   const uint32_t max_command_tag = (capabilities >> 8) & 0x1f;
-  inspect_node_ = inspector_.GetRoot().CreateChild(kDriverName);
+  inspect_node_ = inspector().root().CreateChild(kDriverName);
   inspect_node_.RecordBool("native_command_queuing", use_command_queue);
   inspect_node_.RecordUint("max_command_tag", max_command_tag);
 
@@ -338,14 +338,6 @@ zx::result<> Controller::Start() {
     FDF_LOG(ERROR, "Failed to configure host bus");
     return zx::error(status);
   }
-
-  auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
-  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
-    FDF_LOG(ERROR, "Failed to connect to inspect sink: %s", inspect_sink.status_string());
-    return inspect_sink.take_error();
-  }
-  exposed_inspector_.emplace(inspect::ComponentInspector(
-      dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
 
   auto [controller_client_end, controller_server_end] =
       fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();

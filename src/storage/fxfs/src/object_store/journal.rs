@@ -1716,9 +1716,9 @@ impl Journal {
         if trace {
             info!("J: start compaction");
         }
-        let earliest_version = self.objects.flush().await?;
+        let earliest_version = self.objects.flush().await.context("Failed to flush objects")?;
         self.inner.lock().unwrap().super_block_header.earliest_version = earliest_version;
-        self.write_super_block().await?;
+        self.write_super_block().await.context("Failed to write superblock")?;
         if trace {
             info!("J: end compaction");
         }

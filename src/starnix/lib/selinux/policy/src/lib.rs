@@ -26,6 +26,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::ops::Deref;
+use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
 use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 #[cfg(feature = "selinux_policy_test_api")]
@@ -147,6 +148,14 @@ pub fn parse_policy_by_reference<'a>(
     Ok(Unvalidated(parsed_policy))
 }
 
+/// Information on a Class. This struct is used for sharing Class information outside this crate.
+pub struct ClassInfo<'a> {
+    /// The name of the class.
+    pub class_name: &'a [u8],
+    /// The class identifier.
+    pub class_id: u32,
+}
+
 #[derive(Debug)]
 pub struct Policy<PS: ParseStrategy>(PolicyIndex<PS>);
 
@@ -169,6 +178,56 @@ impl<PS: ParseStrategy> Policy<PS> {
             .iter()
             .map(|boolean| (PS::deref_slice(&boolean.data), PS::deref(&boolean.metadata).active()))
             .collect()
+    }
+
+    /// The set of class names and their respective class identifiers.
+    pub fn classes<'a>(&'a self) -> Vec<ClassInfo<'a>> {
+        self.0
+            .parsed_policy()
+            .classes()
+            .iter()
+            .map(|class| ClassInfo {
+                class_name: class.name_bytes(),
+                class_id: class.id().0.into(),
+            })
+            .collect()
+    }
+
+    /// Returns the set of permissions for the given class, including both the explicitly owned permissions
+    /// and the inherited ones from common symbols. Each permission is a tuple of the permission identifier
+    /// and it's name.
+    pub fn find_class_permissions_by_name(
+        &self,
+        class_name: &str,
+    ) -> Result<Vec<(u32, Vec<u8>)>, ()> {
+        let class = find_class_by_name(self.0.parsed_policy().classes(), class_name).ok_or(())?;
+        let owned_permissions = class.permissions();
+
+        let mut result: Vec<_> = owned_permissions
+            .iter()
+            .map(|permission| (permission.id(), permission.name_bytes().to_vec()))
+            .collect();
+
+        // common_name_bytes() is empty when the class doesn't inherit from a CommonSymbol.
+        if class.common_name_bytes().is_empty() {
+            return Ok(result);
+        }
+
+        let common_symbol_permissions = find_common_symbol_by_name_bytes(
+            self.0.parsed_policy().common_symbols(),
+            class.common_name_bytes(),
+        )
+        .ok_or(())?
+        .permissions();
+
+        result.append(
+            &mut common_symbol_permissions
+                .iter()
+                .map(|permission| (permission.id(), permission.name_bytes().to_vec()))
+                .collect(),
+        );
+
+        Ok(result)
     }
 
     /// Returns the [`SecurityContext`] defined by this policy for the specified

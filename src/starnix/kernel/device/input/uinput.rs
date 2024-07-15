@@ -15,7 +15,9 @@ use starnix_core::fileops_impl_seekless;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{self, default_ioctl, FileObject, FileOps, FsNode, FsString};
+use starnix_core::vfs::{
+    self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+};
 use starnix_logging::log_warn;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -324,6 +326,7 @@ pub fn uinput_running() -> bool {
 
 impl FileOps for UinputDevice {
     fileops_impl_seekless!();
+    fileops_impl_noop_sync!();
 
     fn ioctl(
         &self,

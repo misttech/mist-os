@@ -7,12 +7,11 @@
 #ifndef ZIRCON_KERNEL_PHYS_LIB_MEMALLOC_INCLUDE_LIB_MEMALLOC_RANGE_H_
 #define ZIRCON_KERNEL_PHYS_LIB_MEMALLOC_INCLUDE_LIB_MEMALLOC_RANGE_H_
 
-#include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
 
 #include <algorithm>
-#include <array>
+#include <limits>
 #include <string_view>
 
 namespace memalloc {

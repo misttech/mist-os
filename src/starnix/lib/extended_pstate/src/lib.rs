@@ -121,6 +121,18 @@ impl ExtendedPstateState {
     }
 }
 
+#[no_mangle]
+unsafe extern "C" fn restore_extended_pstate(state_addr: usize) {
+    let state = state_addr as *mut ExtendedPstateState;
+    (&*state).restore()
+}
+
+#[no_mangle]
+unsafe extern "C" fn save_extended_pstate(state_addr: usize) {
+    let state = state_addr as *mut ExtendedPstateState;
+    (&mut *state).save()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -4,10 +4,12 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::mm::MemoryAccessor;
+use crate::mm::memory::MemoryObject;
+use crate::mm::{MemoryAccessor, ProtectionFlags, PAGE_SIZE};
 use crate::task::CurrentTask;
 use dense_map::DenseMap;
 use ebpf::MapSchema;
+use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU32Counter;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};
@@ -30,12 +32,13 @@ use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_STACK, bpf_map_type_BPF_MAP_TYPE_STACK_TRACE,
     bpf_map_type_BPF_MAP_TYPE_STRUCT_OPS, bpf_map_type_BPF_MAP_TYPE_TASK_STORAGE,
     bpf_map_type_BPF_MAP_TYPE_UNSPEC, bpf_map_type_BPF_MAP_TYPE_USER_RINGBUF,
-    bpf_map_type_BPF_MAP_TYPE_XSKMAP, errno, error, BPF_EXIST, BPF_NOEXIST,
+    bpf_map_type_BPF_MAP_TYPE_XSKMAP, errno, error, from_status_like_fdio, BPF_EXIST, BPF_NOEXIST,
 };
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::ops::{Bound, Deref, DerefMut, Range, RangeBounds};
 use std::pin::Pin;
+use std::sync::Arc;
 
 /// Counter for map identifiers.
 static MAP_IDS: AtomicU32Counter = AtomicU32Counter::new(1);
@@ -109,6 +112,7 @@ impl Map {
                 entries[array_range_for_index(self.schema.value_size, index)]
                     .copy_from_slice(&value);
             }
+            MapStore::RingBuffer(_) => return error!(EINVAL),
         }
         Ok(())
     }
@@ -131,6 +135,7 @@ impl Map {
                 //  elements cannot be deleted.
                 return error!(EINVAL);
             }
+            MapStore::RingBuffer(_) => return error!(EINVAL),
         }
         Ok(())
     }
@@ -164,6 +169,7 @@ impl Map {
                 }
                 current_task.write_memory(user_next_key, &next_index.to_ne_bytes())?;
             }
+            MapStore::RingBuffer(_) => return error!(EINVAL),
         }
         Ok(())
     }
@@ -182,6 +188,23 @@ impl Map {
                 }
                 Some(&mut entries[array_range_for_index(schema.value_size, index)])
             }
+            MapStore::RingBuffer(_) => None,
+        }
+    }
+
+    pub fn get_memory<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        let entries = self.entries.lock(locked);
+        match entries.deref() {
+            MapStore::RingBuffer(ringbuf) => ringbuf.get_memory(length, prot),
+            _ => error!(ENODEV),
         }
     }
 }
@@ -194,6 +217,7 @@ type PinnedBuffer = Pin<Box<[u8]>>;
 enum MapStore {
     Array(PinnedBuffer),
     Hash(HashStorage),
+    RingBuffer(RingBufferStorage),
 }
 
 impl MapStore {
@@ -218,7 +242,10 @@ impl MapStore {
             }
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_RINGBUF");
-                Ok(MapStore::Hash(HashStorage::new(&schema)?))
+                if schema.key_size != 0 || schema.value_size != 0 {
+                    return error!(EINVAL);
+                }
+                Ok(MapStore::RingBuffer(RingBufferStorage::new(schema.max_entries as usize)?))
             }
 
             // Unimplemented types
@@ -443,6 +470,62 @@ impl HashStorage {
             }
         }
         Ok(())
+    }
+}
+
+struct RingBufferStorage {
+    // The specific memory object used to map the ring buffer.
+    memory: Arc<MemoryObject>,
+    // The mask corresponding to the size of the ring buffer. This is used to map back the position
+    // in the ringbuffer (that are always growing) to their actual position in the memory object.
+    mask: u32,
+}
+
+impl RingBufferStorage {
+    fn new(size: usize) -> Result<Self, Errno> {
+        let page_size: usize = *PAGE_SIZE as usize;
+        // Size must be a power of 2 and a multiple of PAGE_SIZE
+        if size == 0 || size % page_size != 0 || size & (size - 1) != 0 {
+            return error!(EINVAL);
+        }
+        let mask: u32 = (size - 1).try_into().map_err(|_| errno!(EINVAL))?;
+        // Add the 2 control pages
+        let vmo_size = 2 * page_size + size;
+        let vmo = zx::Vmo::create(vmo_size as u64).map_err(|e| from_status_like_fdio!(e))?;
+        Ok(Self { memory: Arc::new(MemoryObject::RingBuf(vmo)), mask })
+    }
+
+    // The size of the ring buffer.
+    fn size(&self) -> usize {
+        (self.mask + 1) as usize
+    }
+
+    pub fn get_memory(
+        &self,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        // Because of the specific condition needed to map this object, the size must be known.
+        let Some(length) = length else {
+            return error!(EINVAL);
+        };
+        // This cannot be mapped executable.
+        if prot.contains(ProtectionFlags::EXEC) {
+            return error!(EPERM);
+        }
+        // The first page has no restriction on read/write protection, just return the memory.
+        if length <= *PAGE_SIZE as usize {
+            return Ok(self.memory.clone());
+        }
+        // Starting from the second page, this cannot be mapped writable.
+        if prot.contains(ProtectionFlags::WRITE) {
+            return error!(EPERM);
+        }
+        // This cannot be mapped outside of the 2 control pages and the 2 data sections.
+        if length > 2 * (*PAGE_SIZE as usize) + 2 * self.size() {
+            return error!(EINVAL);
+        }
+        Ok(self.memory.clone())
     }
 }
 

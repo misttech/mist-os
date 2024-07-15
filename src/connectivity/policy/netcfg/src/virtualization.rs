@@ -300,14 +300,21 @@ struct Bridge<B: BridgeHandler> {
 impl<B: BridgeHandler> Bridge<B> {
     fn is_device_class_allowed_for_bridge_upstream(
         &self,
-        device_class: fnet_interfaces::DeviceClass,
+        port_class: fnet_interfaces_ext::PortClass,
     ) -> bool {
-        match device_class {
-            fnet_interfaces::DeviceClass::Device(device_class) => {
-                self.allowed_bridge_upstream_device_classes.contains(&device_class.into())
-            }
-            fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => false,
-        }
+        let device_class = match port_class {
+            fnet_interfaces_ext::PortClass::Loopback => None,
+            fnet_interfaces_ext::PortClass::Virtual => Some(DeviceClass::Virtual),
+            fnet_interfaces_ext::PortClass::Ethernet => Some(DeviceClass::Ethernet),
+            fnet_interfaces_ext::PortClass::Wlan => Some(DeviceClass::Wlan),
+            fnet_interfaces_ext::PortClass::WlanAp => Some(DeviceClass::WlanAp),
+            fnet_interfaces_ext::PortClass::Ppp => Some(DeviceClass::Ppp),
+            fnet_interfaces_ext::PortClass::Bridge => Some(DeviceClass::Bridge),
+            fnet_interfaces_ext::PortClass::Lowpan => Some(DeviceClass::Lowpan),
+        };
+        device_class.is_some_and(|device_class| {
+            self.allowed_bridge_upstream_device_classes.contains(&device_class)
+        })
     }
 
     async fn add_guest_to_bridge(&mut self, id: u64) -> Result<(), errors::Error> {
@@ -668,9 +675,9 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
         match update_result {
             fnet_interfaces_ext::UpdateResult::Added { properties, state: _ }
             | fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
-                let fnet_interfaces_ext::Properties { id, online, device_class, .. } = **properties;
+                let fnet_interfaces_ext::Properties { id, online, port_class, .. } = **properties;
                 let allowed_for_bridge_upstream =
-                    bridge.is_device_class_allowed_for_bridge_upstream(device_class);
+                    bridge.is_device_class_allowed_for_bridge_upstream(port_class);
 
                 if online {
                     bridge
@@ -684,10 +691,10 @@ impl<'a, B: BridgeHandler> Handler for Virtualization<'a, B> {
                 current: current_properties,
                 state: _,
             } => {
-                let fnet_interfaces_ext::Properties { id, online, device_class, .. } =
+                let fnet_interfaces_ext::Properties { id, online, port_class, .. } =
                     **current_properties;
                 let allowed_for_bridge_upstream =
-                    bridge.is_device_class_allowed_for_bridge_upstream(device_class);
+                    bridge.is_device_class_allowed_for_bridge_upstream(port_class);
 
                 match (*previously_online, online) {
                     (Some(false), true) => {

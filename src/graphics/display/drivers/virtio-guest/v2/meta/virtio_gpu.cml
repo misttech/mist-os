@@ -9,8 +9,8 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/virtio_gpu.so",
-        bind: "meta/bind/virtio_gpu_bind.bindbc",
+        binary: "driver/virtio_gpu_v2.so",
+        bind: "meta/bind/virtio_gpu_bind_v2.bindbc",
         colocate: "false",
     },
     capabilities: [

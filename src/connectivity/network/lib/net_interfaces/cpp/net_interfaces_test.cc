@@ -29,8 +29,8 @@ fuchsia::net::interfaces::Properties LoopbackProperties(
   fuchsia::net::interfaces::Properties properties;
   properties.set_id(kLoopbackID);
   properties.set_name(kName);
-  properties.set_device_class(
-      fuchsia::net::interfaces::DeviceClass::WithLoopback(fuchsia::net::interfaces::Empty()));
+  properties.set_port_class(
+      fuchsia::net::interfaces::PortClass::WithLoopback(fuchsia::net::interfaces::Empty()));
 
   SetMutableProperties(properties, online, has_default_ipv4_route, has_default_ipv6_route,
                        std::move(addresses));
@@ -43,8 +43,8 @@ fuchsia::net::interfaces::Properties EthernetProperties(
   fuchsia::net::interfaces::Properties properties;
   properties.set_id(kEthernetID);
   properties.set_name(kName);
-  properties.set_device_class(fuchsia::net::interfaces::DeviceClass::WithDevice(
-      fuchsia::hardware::network::DeviceClass::ETHERNET));
+  fuchsia::hardware::network::PortClass ethernet = fuchsia::hardware::network::PortClass::ETHERNET;
+  properties.set_port_class(fuchsia::net::interfaces::PortClass::WithDevice(std::move(ethernet)));
 
   SetMutableProperties(properties, online, has_default_ipv4_route, has_default_ipv6_route,
                        std::move(addresses));
@@ -84,7 +84,7 @@ TEST(Verify, Success) {
   EXPECT_EQ(validated_properties.online(), properties.online());
   EXPECT_EQ(validated_properties.has_default_ipv4_route(), properties.has_default_ipv4_route());
   EXPECT_EQ(validated_properties.has_default_ipv6_route(), properties.has_default_ipv6_route());
-  EXPECT_TRUE(fidl::Equals(validated_properties.device_class(), properties.device_class()));
+  EXPECT_TRUE(fidl::Equals(validated_properties.port_class(), properties.port_class()));
   EXPECT_TRUE(fidl::Equals(validated_properties.addresses(), properties.addresses()));
 }
 

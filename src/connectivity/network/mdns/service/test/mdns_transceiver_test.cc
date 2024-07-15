@@ -207,8 +207,8 @@ class MdnsTransceiverTests : public gtest::TestLoopFixture {
     properties_ = fuchsia::net::interfaces::Properties();
     properties_.set_id(kID);
     properties_.set_name(kName);
-    properties_.set_device_class(fuchsia::net::interfaces::DeviceClass::WithDevice(
-        fuchsia::hardware::network::DeviceClass::WLAN));
+    fuchsia::hardware::network::PortClass wlan = fuchsia::hardware::network::PortClass::WLAN;
+    properties_.set_port_class(fuchsia::net::interfaces::PortClass::WithDevice(std::move(wlan)));
     properties_.set_online(true);
     properties_.set_has_default_ipv4_route(false);
     properties_.set_has_default_ipv6_route(false);
@@ -246,8 +246,8 @@ TEST_F(MdnsTransceiverTests, IgnoreLoopback) {
   EXPECT_EQ(transceiver_.GetInterfaceTransceiver(v6_address1_), nullptr);
   EXPECT_EQ(transceiver_.GetInterfaceTransceiver(v6_address_not_link_local_), nullptr);
 
-  properties_.set_device_class(
-      fuchsia::net::interfaces::DeviceClass::WithLoopback(fuchsia::net::interfaces::Empty()));
+  properties_.set_port_class(
+      fuchsia::net::interfaces::PortClass::WithLoopback(fuchsia::net::interfaces::Empty()));
 
   RunLoopUntilIdle();
 

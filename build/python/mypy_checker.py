@@ -107,7 +107,7 @@ def run_mypy_on_binary_target(
         tmp_dir, [info for info in lib_infos if info["mypy_support"]], src_map
     )
     try:
-        ret = run_mypy_checks(target_name, tmp_dir, src_map)
+        ret = run_mypy_checks(tmp_dir, src_map)
     finally:
         package_python_binary.remove_dir(tmp_dir)
     return ret
@@ -151,14 +151,13 @@ def run_mypy_on_library_target(
     )
 
     try:
-        ret = run_mypy_checks(target_name, str(tmp_dir), src_map)
+        ret = run_mypy_checks(str(tmp_dir), src_map)
     finally:
         package_python_binary.remove_dir(tmp_dir)
     return ret
 
 
 def run_mypy_checks(
-    target_name: str,
     app_dir: str,
     src_map: dict[str, str],
 ) -> int:
@@ -167,7 +166,6 @@ def run_mypy_checks(
     the original file paths.
 
     Args:
-        target_name: The name of the target being built
         app_dir: The path of the directory to run type checking on
         src_map: Mapping from the original source file paths to app dir paths
 
@@ -184,6 +182,9 @@ def run_mypy_checks(
                 "-S",
                 "-m",
                 "mypy",
+                # TODO(https://fxbug.dev/345717802): Disabling cache to temporarily resolve this flake.
+                # see https://github.com/python/mypy/issues/7276 for details on similar issue.
+                "--no-incremental",
                 "--config-file",
                 str(config_path),
                 app_dir,

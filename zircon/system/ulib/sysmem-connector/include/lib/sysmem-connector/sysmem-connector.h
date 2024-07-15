@@ -49,8 +49,8 @@ __EXPORT void sysmem_connector_queue_connection_request_v1(sysmem_connector_t* c
 __EXPORT void sysmem_connector_queue_connection_request_v2(sysmem_connector_t* connector,
                                                            zx_handle_t allocator_request);
 
-// Sysmem needs access to Cobalt.  We provide a service directory to sysmem which has only Cobalt
-// in it.
+// Sysmem needs access to Cobalt and Feedback.  We provide a service directory to sysmem which has
+// only those services.
 __EXPORT void sysmem_connector_queue_service_directory(sysmem_connector_t* connector_param,
                                                        zx_handle_t service_directory_param);
 

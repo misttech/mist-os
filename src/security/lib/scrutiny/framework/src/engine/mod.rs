@@ -4,8 +4,4 @@
 
 #[macro_use]
 pub mod hook;
-#[macro_use]
-pub mod plugin;
 pub mod dispatcher;
-pub mod manager;
-pub mod scheduler;

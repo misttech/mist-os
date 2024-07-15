@@ -55,15 +55,13 @@ template("verify_partitions_configuration") {
                            ])
     visibility = [ ":${invoker.target_name}" ]
     bazel_target = invoker.bazel_partitions_config_target
-    copy_outputs = [
+    directory_outputs = [
       {
-        bazel = "{{BAZEL_TARGET_OUT_PATH}}"
-        ninja = _bazel_partitions_config_dir
+        bazel_dir = "{{BAZEL_TARGET_OUT_PATH}}"
+        ninja_dir = _bazel_partitions_config_dir
+        tracked_files = [ "partitions_config.json" ]
       },
     ]
-    allow_directory_in_outputs = true
-    directory_timestamp_outputs =
-        [ "$_bazel_partitions_config_dir/partitions_config.json" ]
   }
 
   action(target_name) {

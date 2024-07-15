@@ -20,9 +20,9 @@ group("tests") {
 shared_public_deps = [
   "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
   "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
+  "//src/devices/bind/fuchsia:fuchsia_cpp",
   "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
   "//src/devices/lib/iommu",
-  "//src/lib/ddk:ddk-deprecated-binding-headers",
   "//src/lib/ddktl",
   "//third_party/acpica",
 ]

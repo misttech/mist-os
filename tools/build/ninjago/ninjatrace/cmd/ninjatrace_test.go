@@ -34,37 +34,25 @@ func TestJoin(t *testing.T) {
 			name: "join compdb",
 			artifacts: artifacts{
 				steps: []ninjalog.Step{
-					{
-						Out:     "a",
-						CmdHash: ninjalog.MurmurHash64A([]byte("touch a")),
-					},
-					{
-						Out:     "b",
-						CmdHash: ninjalog.MurmurHash64A([]byte("touch b")),
-					},
-					{
-						Out: "c",
-					},
+					{Out: "a"},
+					{Out: "b"},
+					{Out: "c"},
 				},
 				commands: []compdb.Command{
 					{Command: "touch a", Output: "a", Arguments: []string{"a arg"}},
-					{Command: "touch b"},
+					{Command: "touch b", Output: "b"},
 				},
 			},
 			wantSteps: []ninjalog.Step{
 				{
 					Out:     "a",
-					CmdHash: ninjalog.MurmurHash64A([]byte("touch a")),
 					Command: &compdb.Command{Command: "touch a", Output: "a", Arguments: []string{"a arg"}},
 				},
 				{
 					Out:     "b",
-					CmdHash: ninjalog.MurmurHash64A([]byte("touch b")),
-					Command: &compdb.Command{Command: "touch b"},
+					Command: &compdb.Command{Command: "touch b", Output: "b"},
 				},
-				{
-					Out: "c",
-				},
+				{Out: "c"},
 			},
 		},
 		{
@@ -72,9 +60,8 @@ func TestJoin(t *testing.T) {
 			artifacts: artifacts{
 				steps: []ninjalog.Step{
 					{
-						Out:     "1",
-						CmdHash: ninjalog.MurmurHash64A([]byte("touch 1")),
-						End:     time.Second,
+						Out: "1",
+						End: time.Second,
 					},
 					{
 						Out:   "2",
@@ -88,7 +75,7 @@ func TestJoin(t *testing.T) {
 					},
 				},
 				commands: []compdb.Command{
-					{Command: "touch 1"},
+					{Output: "1"},
 				},
 				// 1 ------> 2 (critical path)
 				//    \
@@ -112,8 +99,7 @@ func TestJoin(t *testing.T) {
 				{
 					Out:            "1",
 					End:            time.Second,
-					CmdHash:        ninjalog.MurmurHash64A([]byte("touch 1")),
-					Command:        &compdb.Command{Command: "touch 1"},
+					Command:        &compdb.Command{Output: "1"},
 					OnCriticalPath: true,
 					Drag:           time.Second,
 				},

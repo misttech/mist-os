@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::diagnostics::TRACE_CATEGORY;
 use crate::identity::ComponentIdentity;
 use crate::logs::budget::BudgetHandle;
 use crate::logs::buffer::{ArcList, LazyItem};
@@ -156,7 +157,7 @@ impl LogsArtifactsContainer {
                                 let trace_id = ftrace::Id::random();
                                 let _trace_guard = ftrace::async_enter!(
                                     trace_id,
-                                    c"app",
+                                    TRACE_CATEGORY,
                                     c"LogContainer::cursor.parse_message",
                                     // An async duration cannot have multiple concurrent child async durations
                                     // so we include the nonce as metadata to manually determine relationship.

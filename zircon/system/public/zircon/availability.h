@@ -13,7 +13,6 @@
 //    * Valid levels are defined in availability_levels.inc.
 //    * Support for older retired API levels as parameters may be removed over time.
 //  * `NEXT` - for code to be included in the next stable API level.
-//    * TODO(https://fxbug.dev/326277078): Add support for NEXT as a parameter.
 //  * `HEAD` - for either of the following:
 //    * In-development code that is not ready to be exposed in an SDK
 //    * Code that should only be in Platform builds.
@@ -34,14 +33,28 @@
 #endif  // defined(__Fuchsia__)
 
 // =============================================================================
-// Availability attributes.
+// Availability attribute macros.
 // =============================================================================
 
-// Only apply availability attributes when they are supported and will be used.
-// Clang already handles only applying the attribute to the specified platform,
-// so the __Fuchsia__ condition is at most a minor compile-time optimization
-// when the macros are encountered in non-Fuchsia builds.
-#if defined(__clang__) && defined(__Fuchsia__)
+// Determine whether to implement or stub the macros.
+#if defined(__Fuchsia__)
+#if defined(__clang__)
+// Only Clang supports the underlying availability attributes.
+#define _ZX_AVAILABLE_IMPLEMENTED() 1
+#else
+// Targeting Fuchsia with a compiler other than Clang is risky because Platform Versioning is not
+// fully supported due to the lack of support for the availability attributes. As a result, it is
+// possible to build code that calls APIs that are not available at the target API level. See
+// https://fxbug.dev/327686152.
+#define _ZX_AVAILABLE_IMPLEMENTED() 0
+#endif  // defined(__clang__)
+#else   // defined(__Fuchsia__)
+// While Clang would not apply the attributes when not targeting Fuchsia, this is cleaner and
+// supports other compilers.
+#define _ZX_AVAILABLE_IMPLEMENTED() 0
+#endif  // defined(__Fuchsia__)
+
+#if _ZX_AVAILABLE_IMPLEMENTED()
 
 // When targeting the Fuchsia platform, Clang compares the level(s) specified in
 // the availability attributes below against the target API level, so it is
@@ -105,13 +118,13 @@
                               deprecated = FUCHSIA_API_LEVEL_(level_deprecated),             \
                               obsoleted = FUCHSIA_API_LEVEL_(level_removed), message = msg)))
 
-#else  // defined(__clang__) && defined(__Fuchsia__)
+#else
 
 #define ZX_AVAILABLE_SINCE(level_added)
 #define ZX_DEPRECATED_SINCE(level_added, level_deprecated, msg)
 #define ZX_REMOVED_SINCE(level_added, level_deprecated, level_removed, msg)
 
-#endif  // defined(__clang__) && defined(__Fuchsia__)
+#endif  // _ZX_AVAILABLE_IMPLEMENTED()
 
 // =============================================================================
 // Macros for conditionally compiling code based on the target API level.
@@ -135,7 +148,7 @@
 
 // To avoid mistakenly using a non-existent name or unpublished API level, the levels specified in
 // the following macros are converted to calls to a macro containing the specified API level in its
-// name. If the macro does not exist, the build will fail. See https://fxbug.dev/42084512.
+// name. If the macro does not exist, the build will fail. See https://fxbug.dev/349622444.
 #define FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level) prefix##level##_
 #define FUCHSIA_API_LEVEL_CAT_(prefix, level) FUCHSIA_API_LEVEL_CAT_INDIRECT_(prefix, level)
 #define FUCHSIA_API_LEVEL_(level) FUCHSIA_API_LEVEL_CAT_(FUCHSIA_INTERNAL_LEVEL_, level)()

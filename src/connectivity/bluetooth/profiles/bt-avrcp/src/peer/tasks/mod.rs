@@ -283,7 +283,7 @@ async fn make_connection(peer: Arc<RwLock<RemotePeer>>, conn_type: AVCTPConnecti
             }
         },
         Ok(Err(e)) => {
-            error!("Couldn't connect to peer {peer_id}: {e:?}");
+            error!(?e, %peer_id, "Couldn't connect to peer for {conn_type:?}");
             peer.write().connect_failed(conn_type, false);
         }
     }

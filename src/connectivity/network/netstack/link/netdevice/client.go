@@ -552,7 +552,7 @@ func (p *Port) SetPromiscuousMode(enabled bool) error {
 	return nil
 }
 
-func (p *Port) DeviceClass() network.DeviceClass {
+func (p *Port) PortClass() network.PortClass {
 	return p.portInfo.BaseInfo.PortClass
 }
 
@@ -667,6 +667,10 @@ func (c *Client) NewPort(ctx context.Context, portId network.PortId) (*Port, err
 	}
 	if !(portInfo.HasId() && portInfo.HasBaseInfo() && portInfo.BaseInfo.HasPortClass() && portInfo.BaseInfo.HasRxTypes() && portInfo.BaseInfo.HasTxTypes()) {
 		return nil, fmt.Errorf("incomplete PortInfo: %#v", portInfo)
+	}
+
+	if network.PortClass.IsUnknown(portInfo.BaseInfo.GetPortClass()) {
+		return nil, fmt.Errorf("Unknown PortClass: %d", portInfo.BaseInfo.GetPortClass())
 	}
 
 	rxPortMode, err := selectPortOperatingMode(portInfo.BaseInfo.GetRxTypes())
@@ -935,7 +939,7 @@ func (p *Port) TxStats() *fifo.TxStats {
 	return &p.client.stats.tx
 }
 
-func (p *Port) Class() network.DeviceClass {
+func (p *Port) Class() network.PortClass {
 	return p.portInfo.BaseInfo.PortClass
 }
 

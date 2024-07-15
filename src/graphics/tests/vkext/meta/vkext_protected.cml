@@ -18,12 +18,22 @@
             type: "bool",
             value: true,
         },
+        {
+            config: "fuchsia.gpu.test.SupportSysmemYv12",
+            type: "bool",
+            value: true,
+        },
     ],
     offer: [
         {
             from: "self",
             to: "#test",
             config: "fuchsia.gpu.test.SupportProtectedMemory",
+        },
+        {
+            from: "self",
+            to: "#test",
+            config: "fuchsia.gpu.test.SupportSysmemYv12",
         },
     ],
     expose: [

@@ -71,7 +71,7 @@ class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
     fio_test::Io1Config config;
 
     // Supported options
-    config.supports_open2(true);
+    config.supports_open3(true);
     config.supports_get_token(true);
     config.supports_append(true);
     config.supports_modify_directory(true);

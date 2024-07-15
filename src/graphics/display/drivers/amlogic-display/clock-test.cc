@@ -58,7 +58,7 @@ TEST_F(AmlogicDisplayClockTest, PllTiming_ValidMode) {
     zx::result<HdmiPllConfigForMipiDsi> pll_r =
         Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
                             panel_config->maximum_per_data_lane_bit_per_second());
-    EXPECT_OK(pll_r.status_value());
+    EXPECT_OK(pll_r);
   }
 }
 
@@ -81,7 +81,7 @@ TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv070wsmFitipowerJd9364
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
                           panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
-  EXPECT_OK(pll_config.status_value());
+  EXPECT_OK(pll_config);
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
 }
 
@@ -92,7 +92,7 @@ TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP070acbFitipowerJd9
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
                           panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
-  EXPECT_OK(pll_config.status_value());
+  EXPECT_OK(pll_config);
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
 }
 
@@ -103,7 +103,7 @@ TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, InnoluxP101dezFitipowerJd9
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
                           panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
-  EXPECT_OK(pll_config.status_value());
+  EXPECT_OK(pll_config);
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
 }
 
@@ -114,7 +114,7 @@ TEST_F(PllTimingHdmiPllClockRatioCalculatedCorrectly, BoeTv101wxmFitipowerJd9364
       Clock::GenerateHPLL(panel_config->display_timing.pixel_clock_frequency_hz,
                           panel_config->maximum_per_data_lane_bit_per_second());
   static constexpr int kExpectedHdmiPllClockRatio = 8;
-  EXPECT_OK(pll_config.status_value());
+  EXPECT_OK(pll_config);
   EXPECT_EQ(kExpectedHdmiPllClockRatio, static_cast<int>(pll_config->clock_factor));
 }
 

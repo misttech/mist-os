@@ -117,7 +117,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
-    ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
+    ) -> Result<(), DeviceSendFrameError> {
         // Never handle frames synchronously with the send path - always queue
         // the frame to be received by the loopback device into a queue which
         // a dedicated RX task will kick to handle the queued packet.

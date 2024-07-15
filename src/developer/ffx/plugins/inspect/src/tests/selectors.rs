@@ -88,9 +88,9 @@ async fn test_selectors_with_manifest_that_exists() {
         make_inspects_for_lifecycle(),
     );
     let inspects = vec![
-        make_inspect_with_length(String::from("test/moniker1"), 1, 20),
-        make_inspect_with_length(String::from("test/moniker1"), 3, 10),
-        make_inspect_with_length(String::from("test/moniker1"), 6, 30),
+        make_inspect_with_length("test/moniker1", 1, 20),
+        make_inspect_with_length("test/moniker1", 3, 10),
+        make_inspect_with_length("test/moniker1", 6, 30),
     ];
     let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
@@ -130,7 +130,7 @@ async fn test_selectors_with_selectors() {
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
     );
-    let inspects = vec![make_inspect_with_length(String::from("test/moniker1"), 3, 10)];
+    let inspects = vec![make_inspect_with_length("test/moniker1", 3, 10)];
     let inspect_data = inspect_accessor_data(
         ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
             "test/moniker1:name:hello_3",

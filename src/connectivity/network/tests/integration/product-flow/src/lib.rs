@@ -215,7 +215,7 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
                          has_default_ipv4_route,
                          id: _,
                          name: _,
-                         device_class: _,
+                         port_class: _,
                          online: _,
                          has_default_ipv6_route: _,
                      },

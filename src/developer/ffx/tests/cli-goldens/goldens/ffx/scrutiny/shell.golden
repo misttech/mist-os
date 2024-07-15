@@ -2,7 +2,7 @@
   "name": "shell",
   "description": "Launch the scrutiny shell",
   "examples": [
-    "To start an interactive shell session:\n\n    $ ffx scrutiny shell\n\nTo run commands directly:\n\n    $ ffx scrutiny shell components\n    $ ffx scrutiny shell \"search.packages --files fdio --product-bundle <path>\"\n    "
+    "To start an interactive shell session:\n\n    $ ffx scrutiny shell\n\nTo run commands directly:\n\n    $ ffx scrutiny shell \"tool.blobfs.extract --input <path> --output <path>\"\n    "
   ],
   "flags": [
     {
@@ -12,97 +12,17 @@
       "short": null,
       "description": "display usage information",
       "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "product-bundle"
-        }
-      },
-      "optionality": "optional",
-      "long": "--product-bundle",
-      "short": null,
-      "description": "path to the product bundle",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "script"
-        }
-      },
-      "optionality": "optional",
-      "long": "--script",
-      "short": "s",
-      "description": "run a file as a scrutiny script",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "model"
-        }
-      },
-      "optionality": "optional",
-      "long": "--model",
-      "short": "m",
-      "description": "set a custom path to the data model",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "log"
-        }
-      },
-      "optionality": "optional",
-      "long": "--log",
-      "short": "l",
-      "description": "set a custom path output log",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "port"
-        }
-      },
-      "optionality": "optional",
-      "long": "--port",
-      "short": "p",
-      "description": "set a custom port to run scrutiny on",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "verbosity"
-        }
-      },
-      "optionality": "optional",
-      "long": "--verbosity",
-      "short": "v",
-      "description": "set the verbosity level of logging",
-      "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--recovery",
-      "short": null,
-      "description": "build scrutiny model based on recovery-mode build artifacts",
-      "hidden": false
     }
   ],
   "notes": [
-    "Launches an interactive scrutiny shell where scrutiny specific\ncommands can be run. This will also launch a server on port 127.0.0.1:8080\nby default that provides visual auditing tools.\n\nInside the shell run help for a full list of available commands. If you wish to\nintegrate Scrutiny as part of a wider script check out the --script option."
+    "Runs a command in scrutiny. Deprecated for the more specific scrutiny methods."
   ],
   "commands": [],
   "positionals": [
     {
       "name": "command",
       "description": "",
-      "optionality": "optional",
+      "optionality": "required",
       "hidden": false
     }
   ],

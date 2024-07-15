@@ -44,18 +44,12 @@ pub async fn wait_for_non_loopback_interface_up<
                     fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
                         properties:
                             fidl_fuchsia_net_interfaces_ext::Properties {
-                                name,
-                                device_class,
-                                online,
-                                ..
+                                name, port_class, online, ..
                             },
                         state: _,
                     },
                 )| {
-                    (*device_class
-                        != fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                            fidl_fuchsia_net_interfaces::Empty {},
-                        )
+                    (*port_class != fidl_fuchsia_net_interfaces_ext::PortClass::Loopback
                         && *online
                         && exclude_ids.map_or(true, |ids| !ids.contains(id)))
                     .then(|| (*id, name.clone()))

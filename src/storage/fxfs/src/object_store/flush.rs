@@ -205,7 +205,8 @@ impl ObjectStore {
         parent_store.remove_from_graveyard(&mut end_transaction, new_object_tree_layer_object_id);
 
         transaction.commit().await?;
-        let (layers_to_keep, old_layers) = tree::flush(&self.tree, writer).await?;
+        let (layers_to_keep, old_layers) =
+            tree::flush(&self.tree, writer).await.context("Failed to flush tree")?;
 
         let mut new_layers = layers_from_handles([new_object_tree_layer]).await?;
         new_layers.extend(layers_to_keep.iter().map(|l| (*l).clone()));

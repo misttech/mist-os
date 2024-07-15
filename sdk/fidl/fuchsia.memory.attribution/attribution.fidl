@@ -173,4 +173,8 @@ type Resource = flexible union {
 /// Unique identifier within the scope of an attribution provider, used to
 /// identify a specific principal (Component, part of a Component, etc.)
 /// in attribution updates.
+/// The `0` identifier should be used to point to the source principal itself.
 alias Identifier = uint64;
+
+/// Identifier that refers to the principal that emits the attribution.
+const SELF Identifier = 0;

@@ -60,7 +60,7 @@ instances where this suppression is present in the source tree.
 
 ### Picking a task
 
-Pick any instance where `Wno-conversion` or [bug 58162][fxb58162] are
+Pick any instance where `Wno-conversion` or [bug 42136089][fxb42136089] are
 referenced. Optionally browse
 [`//build/config/BUILD.gn`](/build/config/BUILD.gn) for references to any code
 that you're familiar with.
@@ -326,7 +326,7 @@ and example usage can be seen [here](https://fuchsia.googlesource.com/fuchsia/+/
 Tag the cover bug in your change description as follows:
 
 ```
-Bug: 58162
+Bug: b/42136089
 ```
 
 Remove any references to build targets that you cleaned up in
@@ -358,5 +358,5 @@ Reach out for questions or for status updates:
 *   <mcgrathr@google.com>
 *   <shayba@google.com>
 
-[fxb58162]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=58162
+[fxb42136089]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=42136089
 [wconversion]: https://gcc.gnu.org/wiki/NewWconversion

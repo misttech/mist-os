@@ -174,7 +174,7 @@ mod tests {
     use sandbox::Directory;
     use std::sync::Arc;
     use test_case::test_case;
-    use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+    use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
     use vfs::directory::entry_container::Directory as VfsDirectory;
     use vfs::remote::RemoteLike;
     use vfs::{path, pseudo_directory};
@@ -453,12 +453,13 @@ mod tests {
             rights: fio::OpenFlags,
         }
         impl DirectoryEntry for MockDir {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-            }
-
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
                 request.open_remote(self)
+            }
+        }
+        impl GetEntryInfo for MockDir {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
             }
         }
         impl RemoteLike for MockDir {
@@ -514,12 +515,13 @@ mod tests {
 
         struct MockDir(mpsc::Sender<()>);
         impl DirectoryEntry for MockDir {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-            }
-
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
                 request.open_remote(self)
+            }
+        }
+        impl GetEntryInfo for MockDir {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
             }
         }
         impl RemoteLike for MockDir {

@@ -14,10 +14,12 @@ use crate::vfs::socket::{
     SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
 };
 use crate::vfs::{
-    default_ioctl, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext, Message,
+    default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
+    LookupContext, Message,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
+use starnix_uapi::file_mode::Access;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_buffer::UserBuffer;
@@ -945,6 +947,11 @@ pub fn resolve_unix_socket_address(
                 errno!(ECONNREFUSED)
             }
         })?;
+        name.check_access(
+            current_task,
+            Access::WRITE,
+            CheckAccessReason::InternalPermissionChecks,
+        )?;
         name.entry.node.socket().map(|s| s.clone()).ok_or_else(|| errno!(ECONNREFUSED))
     }
 }

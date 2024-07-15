@@ -78,7 +78,7 @@ func cDeclAttributes(syscall zither.Syscall) string {
 }
 
 func cDeclMacro(syscall zither.Syscall) string {
-	if syscall.Category == zither.SyscallCategoryVdsoCall {
+	if syscall.VdsoCall {
 		return "VDSO_SYSCALL"
 	}
 	if syscall.Category == zither.SyscallCategoryInternal {

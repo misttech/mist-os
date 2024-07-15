@@ -17,7 +17,7 @@ use sandbox::{Capability, DirEntry, Directory};
 use std::sync::Arc;
 use tracing::*;
 use vfs::directory::entry::{
-    serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest,
+    serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };
 use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
@@ -90,16 +90,17 @@ fn use_service(decl: cm_rust::UseServiceDecl, target: &Arc<ComponentInstance>) -
         decl: cm_rust::UseServiceDecl,
     }
     impl DirectoryEntry for Service {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-        }
-
         fn open_entry(self: Arc<Self>, mut request: OpenRequest<'_>) -> Result<(), zx::Status> {
             // Move this request from the namespace scope to the component's scope so that
             // we don't block namespace teardown.
             request.set_scope(self.scope.clone());
             request.spawn(self);
             Ok(())
+        }
+    }
+    impl GetEntryInfo for Service {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         }
     }
     impl DirectoryEntryAsync for Service {
@@ -173,13 +174,15 @@ fn use_directory_or_storage(
     }
 
     impl DirectoryEntry for RouteDirectory {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-        }
-
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
             request.spawn(self);
             Ok(())
+        }
+    }
+
+    impl GetEntryInfo for RouteDirectory {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         }
     }
 
@@ -235,15 +238,17 @@ fn use_event_stream(decl: UseEventStreamDecl, target: &Arc<ComponentInstance>) -
         decl: UseEventStreamDecl,
     }
     impl DirectoryEntry for UseEventStream {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
-        }
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
             if !request.path().is_empty() {
                 return Err(zx::Status::NOT_DIR);
             }
             request.spawn(self);
             Ok(())
+        }
+    }
+    impl GetEntryInfo for UseEventStream {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
         }
     }
     impl DirectoryEntryAsync for UseEventStream {

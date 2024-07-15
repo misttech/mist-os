@@ -3,7 +3,9 @@
 // found in the LICENSE file.cti
 
 use crate::model::actions::StopAction;
-use crate::model::component::{IncomingCapabilities, StartReason, WeakComponentInstance};
+use crate::model::component::{
+    ExtendedInstance, IncomingCapabilities, StartReason, WeakComponentInstance,
+};
 use fidl::endpoints::{ProtocolMarker, RequestStream};
 use futures::prelude::*;
 use tracing::{error, warn};
@@ -86,6 +88,63 @@ pub async fn serve_controller(
                 }
                 .await;
                 responder.send(res)?;
+            }
+            fcomponent::ControllerRequest::Destroy { responder } => {
+                let res = (|| {
+                    let Ok(component) = weak_component_instance.upgrade() else {
+                        return Ok(None);
+                    };
+                    let Ok(ext_parent) = component.parent.upgrade() else {
+                        return Ok(None);
+                    };
+                    let parent;
+                    match ext_parent {
+                        ExtendedInstance::AboveRoot(_) => {
+                            // This is the root component, which can't be destroyed
+                            return Err(fcomponent::Error::AccessDenied);
+                        }
+                        ExtendedInstance::Component(p) => {
+                            parent = p;
+                        }
+                    }
+                    let moniker = component.moniker.clone();
+                    if let None = moniker
+                        .leaf()
+                        .expect("we already checked this is not the root component")
+                        .collection()
+                    {
+                        // Disallow destruction of static children
+                        return Err(fcomponent::Error::AccessDenied);
+                    }
+                    Ok(Some((parent, moniker)))
+                })();
+                let (parent, moniker) = match res {
+                    Ok(Some(v)) => v,
+                    Ok(None) => {
+                        // Already destroyed.
+                        responder.send(Ok(()))?;
+                        continue;
+                    }
+                    Err(e) => {
+                        responder.send(Err(e))?;
+                        continue;
+                    }
+                };
+                // Be sure to return a response before scheduling the subtask. Otherwise it's possible
+                // (even if unlikely) that the subtask completes and cancels this task before the
+                // code to send the response executes.
+                responder.send(Ok(()))?;
+                parent.nonblocking_task_group().spawn(async move {
+                    let child_name =
+                        moniker.leaf().expect("we already checked this is not the root component");
+                    if let Err(err) = parent.remove_dynamic_child(&child_name).await {
+                        warn!(%err, %moniker,
+                                "Controller/Destroy: component destruction unexpectedly failed");
+                    }
+                    // If `res` was Ok, the contract of this method states that we should close
+                    // the channel and not return a response. That should happen because destroying
+                    // this component should cancel this task which owns the channel.
+                });
             }
             fcomponent::ControllerRequest::_UnknownMethod { ordinal, .. } => {
                 warn!(%ordinal, "fuchsia.component/Controller received unknown method");

@@ -247,11 +247,12 @@ mod tests {
     use std::sync::Arc;
     use tempfile::tempdir;
     use vfs::directory::dirents_sink;
+    use vfs::directory::entry::{EntryInfo, GetEntryInfo};
     use vfs::directory::entry_container::{Directory, DirectoryWatcher};
     use vfs::directory::immutable::connection::ImmutableConnection;
     use vfs::directory::traversal_position::TraversalPosition;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::node::{IsDirectory, Node};
+    use vfs::node::Node;
     use vfs::{ObjectRequestRef, ToObjectRequest};
 
     fn one_step<'a, S, OK, ERR>(s: &'a mut S) -> impl Future<Output = OK> + 'a
@@ -355,6 +356,12 @@ mod tests {
         }
     }
 
+    impl GetEntryInfo for MockDirectory {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+        }
+    }
+
     impl Node for MockDirectory {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
             unimplemented!()
@@ -420,8 +427,6 @@ mod tests {
             unimplemented!("Not implemented");
         }
     }
-
-    impl IsDirectory for MockDirectory {}
 
     #[fuchsia::test]
     async fn test_error() {

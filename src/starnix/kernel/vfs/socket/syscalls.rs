@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_increment;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::{CurrentTask, IpTables, Task, WaitCallback, Waiter};
 use crate::vfs::buffers::{
@@ -19,6 +18,7 @@ use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
 use starnix_uapi::errors::{Errno, EEXIST, EINPROGRESS};
 use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::duration_from_timespec;
 use starnix_uapi::user_address::{UserAddress, UserRef};

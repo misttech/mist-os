@@ -124,8 +124,8 @@ impl RecordRange {
         let mut start = origin.checked_add(flock.l_start).ok_or_else(|| errno!(EOVERFLOW))?;
         let mut length = flock.l_len;
         if length < 0 {
-            start += length;
-            length = -length;
+            start = start.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+            length = length.checked_neg().ok_or_else(|| errno!(EINVAL))?;
         }
         if start < 0 {
             return error!(EINVAL);

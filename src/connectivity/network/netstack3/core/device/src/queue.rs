@@ -28,7 +28,7 @@ pub struct ReceiveQueueFullError<T>(pub T);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TransmitQueueFrameError<S> {
-    NoQueue(DeviceSendFrameError<()>),
+    NoQueue(DeviceSendFrameError),
     QueueFull(S),
     SerializeError(ErrorAndSerializer<SerializeError<()>, S>),
 }

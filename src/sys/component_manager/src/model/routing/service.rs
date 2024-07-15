@@ -28,7 +28,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
 use tracing::{error, warn};
-use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::directory::entry::{
+    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
+};
 use vfs::directory::immutable::simple::{
     simple as simple_immutable_dir, Simple as SimpleImmutableDir,
 };
@@ -868,13 +870,15 @@ struct ServiceInstanceDirectoryKey<T: Send + Sync + 'static + fmt::Display> {
 }
 
 impl<T: Send + Sync + 'static> DirectoryEntry for ServiceInstanceDirectoryEntry<T> {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.spawn(self);
         Ok(())
+    }
+}
+
+impl<T: Send + Sync + 'static> GetEntryInfo for ServiceInstanceDirectoryEntry<T> {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 }
 

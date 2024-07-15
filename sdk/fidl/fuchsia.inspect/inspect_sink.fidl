@@ -10,6 +10,9 @@ type EscrowToken = resource struct {
     token zx.Handle:<EVENTPAIR, zx.Rights.WAIT | zx.Rights.INSPECT>;
 };
 
+@available(added=HEAD)
+alias EscrowedVmo = zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ | zx.Rights.SET_PROPERTY>;
+
 @available(added=16)
 const MAX_NAME_LENGTH uint64 = 4096;
 
@@ -30,7 +33,19 @@ open protocol InspectSink {
     /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the
     /// server can use to read Inspect data, including lazy nodes.
     flexible Publish(resource table {
+        /// The Tree that the server will use to fetch Inspect data.
+        ///
+        /// The connection will be closed if this isn't provided.
+        ///
+        /// Required
         1: tree client_end:Tree;
+
+        /// A name to identify this tree from the client perspective. This name
+        /// isn't required to be unique across multiple trees. Multiple trees
+        /// published under the same name are accepted and will not overwrite
+        /// previously published trees.
+        ///
+        /// Optional
         2: name string:MAX_NAME_LENGTH;
     });
 
@@ -58,7 +73,7 @@ open protocol InspectSink {
     flexible Escrow(resource table {
         /// The VMO containing Inspect data that the server will store.
         /// Required
-        1: vmo zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ>;
+        1: vmo EscrowedVmo;
 
         /// The token identifying this VMO and also serving as a controller to
         /// stop storing this VMO in the server.
@@ -116,6 +131,6 @@ open protocol InspectSink {
         /// Optional
         2: tree client_end:Tree;
     }) -> (resource table {
-        1: vmo zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ>;
+        1: vmo EscrowedVmo;
     });
 };

@@ -4,9 +4,9 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
-    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -189,6 +189,7 @@ impl FsNodeOps for Arc<StaticDirectory> {
 
 impl FileOps for StaticDirectory {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,

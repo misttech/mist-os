@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::accessor::PerformanceConfig;
-use crate::diagnostics::BatchIteratorConnectionStats;
+use crate::diagnostics::{BatchIteratorConnectionStats, TRACE_CATEGORY};
 use crate::inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer};
-use diagnostics_data::{self as schema, Data, Inspect, InspectHandleName};
+use diagnostics_data::{self as schema, Data, Inspect, InspectDataBuilder, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl_fuchsia_diagnostics::Selector;
 use fuchsia_inspect::reader::PartialNodeHierarchy;
@@ -34,6 +34,8 @@ pub struct NodeHierarchyData {
     // Optional DiagnosticsHierarchy of the inspect hierarchy, in case reading fails
     // and we have errors to share with client.
     hierarchy: Option<DiagnosticsHierarchy>,
+    // Whether or not this data comes from an escrowed VMO.
+    escrowed: bool,
 }
 
 impl From<SnapshotData> for NodeHierarchyData {
@@ -45,12 +47,14 @@ impl From<SnapshotData> for NodeHierarchyData {
                     timestamp: data.timestamp,
                     errors: data.errors,
                     hierarchy: Some(node_hierarchy),
+                    escrowed: data.escrowed,
                 },
                 Err(e) => NodeHierarchyData {
                     name: data.name,
                     timestamp: data.timestamp,
                     errors: vec![schema::InspectError { message: format!("{e:?}") }],
                     hierarchy: None,
+                    escrowed: data.escrowed,
                 },
             },
             None => NodeHierarchyData {
@@ -58,6 +62,7 @@ impl From<SnapshotData> for NodeHierarchyData {
                 timestamp: data.timestamp,
                 errors: data.errors,
                 hierarchy: None,
+                escrowed: data.escrowed,
             },
         }
     }
@@ -130,7 +135,7 @@ impl ReaderServer {
                 let trace_id = ftrace::Id::random();
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
-                    c"app",
+                    TRACE_CATEGORY,
                     c"SnapshotData -> NodeHierarchyData",
                     // An async duration cannot have multiple concurrent child async durations
                     // so we include the nonce as metadata to manually determine relationship.
@@ -153,7 +158,7 @@ impl ReaderServer {
                     let trace_id = ftrace::Id::random();
                     let _trace_guard = ftrace::async_enter!(
                         trace_id,
-                        c"app",
+                        TRACE_CATEGORY,
                         c"SnapshotData -> NodeHierarchyData",
                         // An async duration cannot have multiple concurrent child async durations
                         // so we include the nonce as metadata to manually determine relationship.
@@ -177,7 +182,7 @@ impl ReaderServer {
                         let trace_id = ftrace::Id::random();
                         let _trace_guard = ftrace::async_enter!(
                             trace_id,
-                            c"app",
+                            TRACE_CATEGORY,
                             c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
                             // An async duration cannot have multiple concurrent child async durations
                             // so we include the nonce as metadata to manually determine relationship.
@@ -204,11 +209,13 @@ impl ReaderServer {
                                 name: node_hierarchy_data.name,
                                 timestamp: node_hierarchy_data.timestamp,
                                 errors: node_hierarchy_data.errors,
+                                escrowed: node_hierarchy_data.escrowed,
                                 hierarchy: Some(filtered_hierarchy),
                             },
                             None => NodeHierarchyData {
                                 name: node_hierarchy_data.name,
                                 timestamp: node_hierarchy_data.timestamp,
+                                escrowed: node_hierarchy_data.escrowed,
                                 errors: vec![schema::InspectError {
                                     message: concat!(
                                         "Inspect hierarchy was fully filtered",
@@ -225,6 +232,7 @@ impl ReaderServer {
                         timestamp: node_hierarchy_data.timestamp,
                         errors: node_hierarchy_data.errors,
                         hierarchy: None,
+                        escrowed: node_hierarchy_data.escrowed,
                     },
                 }
             }
@@ -238,6 +246,7 @@ impl ReaderServer {
             Some(dynamic_matcher) => match node_hierarchy_data.hierarchy {
                 None => NodeHierarchyData {
                     name: node_hierarchy_data.name,
+                    escrowed: node_hierarchy_data.escrowed,
                     timestamp: node_hierarchy_data.timestamp,
                     errors: node_hierarchy_data.errors,
                     hierarchy: None,
@@ -246,7 +255,7 @@ impl ReaderServer {
                     let trace_id = ftrace::Id::random();
                     let _trace_guard = ftrace::async_enter!(
                         trace_id,
-                        c"app",
+                        TRACE_CATEGORY,
                         c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
                         // An async duration cannot have multiple concurrent child async durations
                         // so we include the nonce as metadata to manually determine relationship.
@@ -276,10 +285,12 @@ impl ReaderServer {
                             timestamp: node_hierarchy_data.timestamp,
                             errors: node_hierarchy_data.errors,
                             hierarchy: Some(filtered_hierarchy),
+                            escrowed: node_hierarchy_data.escrowed,
                         },
                         None => NodeHierarchyData {
                             name: node_hierarchy_data.name,
                             timestamp: node_hierarchy_data.timestamp,
+                            escrowed: node_hierarchy_data.escrowed,
                             errors: vec![schema::InspectError {
                                 message: concat!(
                                     "Inspect hierarchy was fully filtered",
@@ -361,14 +372,21 @@ impl ReaderServer {
             identity.to_string().as_str(),
             parent_trace_id,
         );
-        Some(Data::for_inspect(
+        let mut builder = InspectDataBuilder::new(
             moniker,
-            hierarchy_data.hierarchy,
-            hierarchy_data.timestamp.into_nanos(),
             identity.url.clone(),
-            hierarchy_data.name,
-            hierarchy_data.errors,
-        ))
+            hierarchy_data.timestamp.into_nanos(),
+        );
+        if let Some(hierarchy) = hierarchy_data.hierarchy {
+            builder = builder.with_hierarchy(hierarchy);
+        }
+        if let Some(name) = hierarchy_data.name {
+            builder = builder.with_name(name);
+        }
+        if !hierarchy_data.errors.is_empty() {
+            builder = builder.with_errors(hierarchy_data.errors);
+        }
+        Some(builder.escrowed(hierarchy_data.escrowed).build())
     }
 }
 

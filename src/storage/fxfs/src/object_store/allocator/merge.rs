@@ -155,11 +155,11 @@ pub async fn filter_marked_for_deletion(
 mod tests {
     use crate::lsm_tree::cache::NullCache;
     use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
-    use crate::lsm_tree::LSMTree;
+    use crate::lsm_tree::{LSMTree, Query};
     use crate::object_handle::INVALID_OBJECT_ID;
     use crate::object_store::allocator::merge::{filter_tombstones, merge};
     use crate::object_store::allocator::{AllocatorKey, AllocatorValue};
-    use std::ops::{Bound, Range};
+    use std::ops::Range;
 
     // Tests merge logic given (range, delta and object_id) for left, right and expected output.
     async fn test_merge(
@@ -175,7 +175,7 @@ mod tests {
             .expect("insert error");
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = filter_tombstones(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+        let mut iter = filter_tombstones(merger.query(Query::FullScan).await.expect("seek failed"))
             .await
             .expect("filter failed");
         for e in expected {
@@ -351,7 +351,7 @@ mod tests {
         );
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = merger.seek(Bound::Unbounded).await.expect("seek failed");
+        let mut iter = merger.query(Query::FullScan).await.expect("seek failed");
         let ItemRef { key: k, value, .. } = iter.get().expect("get failed");
         assert_eq!((k, value), (&key, &AllocatorValue::Abs { count: 1, owner_object_id: 1 }));
         iter.advance().await.expect("advance failed");
@@ -385,7 +385,7 @@ mod tests {
         .expect("insert error");
         let layer_set = tree.layer_set();
         let mut merger = layer_set.merger();
-        let mut iter = filter_tombstones(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+        let mut iter = filter_tombstones(merger.query(Query::FullScan).await.expect("seek failed"))
             .await
             .expect("filter failed");
         assert_eq!(iter.get().unwrap().key, &AllocatorKey { device_range: 0..25 });

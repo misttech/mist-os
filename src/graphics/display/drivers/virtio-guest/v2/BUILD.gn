@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("virtio_gpu_bind") {
+driver_bind_rules("virtio_gpu_bind_v2") {
   rules = "virtio_gpu.bind"
   tests = "bind_tests.json"
   deps = [
@@ -22,7 +22,7 @@ group("tests") {
   testonly = true
   deps = [
     ":virtio-gpu-test-package",
-    ":virtio_gpu_bind_test",
+    ":virtio_gpu_bind_v2_test",
   ]
 }
 
@@ -49,6 +49,18 @@ source_set("common_srcs") {
     "//src/lib/fxl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sysmem-version",
+  ]
+}
+
+fuchsia_driver("driver") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  output_name = "virtio_gpu_v2"
+  deps = [
+    ":common_srcs",
+    ":virtio_gpu_bind_v2",
   ]
 }
 

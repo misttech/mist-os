@@ -95,25 +95,45 @@ std::vector<HostAddress> MdnsTransceiver::LocalHostAddresses() {
 }
 
 bool MdnsTransceiver::StartInterfaceTransceivers(const net::interfaces::Properties& properties) {
-  // TODO: Fix this when we have a specific interface type for lowpan, until then filter
-  // based on interface name to avoid starting the mdns transceiver on lowpan.
-  if (properties.is_loopback() || (properties.name().find("lowpan") != std::string::npos) ||
-      !properties.online()) {
+  // Don't start the mdns transceiver if the interface is offline.
+  if (!properties.online()) {
     return false;
   }
 
   Media media;
-  switch (properties.device_class().device()) {
-    case fuchsia::hardware::network::DeviceClass::WLAN:
-    case fuchsia::hardware::network::DeviceClass::WLAN_AP:
-      media = Media::kWireless;
+  switch (properties.port_class().Which()) {
+    case fuchsia::net::interfaces::PortClass::Tag::kLoopback:
+      // Don't start the mdns transceiver on the loopback interface.
+      return false;
+    case fuchsia::net::interfaces::PortClass::Tag::kDevice:
+      switch (properties.port_class().device()) {
+        case fuchsia::hardware::network::PortClass::WLAN:
+        case fuchsia::hardware::network::PortClass::WLAN_AP:
+          media = Media::kWireless;
+          break;
+        case fuchsia::hardware::network::PortClass::ETHERNET:
+        case fuchsia::hardware::network::PortClass::PPP:
+        case fuchsia::hardware::network::PortClass::BRIDGE:
+        case fuchsia::hardware::network::PortClass::VIRTUAL:
+          media = Media::kWired;
+          break;
+        case fuchsia::hardware::network::PortClass::LOWPAN:
+          // Don't Start the mdns transceiver on lowpan.
+          return false;
+        default:
+          // Don't start the mdns transceiver on interfaces with an unknown port
+          // class.
+          FX_LOGS(WARNING) << "Not starting MDNS transceiver on interface \"" << properties.name()
+                           << "\" with unknown port class.";
+          return false;
+      }
       break;
-    case fuchsia::hardware::network::DeviceClass::ETHERNET:
-    case fuchsia::hardware::network::DeviceClass::PPP:
-    case fuchsia::hardware::network::DeviceClass::BRIDGE:
-    case fuchsia::hardware::network::DeviceClass::VIRTUAL:
-      media = Media::kWired;
-      break;
+    default:
+      // Don't start the mdns transceiver on interfaces with an unknown port
+      // class.
+      FX_LOGS(WARNING) << "Not starting MDNS transceiver on interface \"" << properties.name()
+                       << "\" with unknown port class.";
+      return false;
   }
 
   std::vector<inet::IpAddress> addresses;

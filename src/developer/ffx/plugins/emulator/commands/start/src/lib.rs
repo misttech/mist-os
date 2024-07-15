@@ -379,11 +379,6 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 return Ok(Some(loaded_product_bundle));
             }
 
-            let engine = self.cmd.engine().await?;
-            if self.cmd.engine.is_none() && engine != "" {
-                self.cmd.engine = Some(engine);
-            }
-
             let gpu = self.cmd.gpu().await?;
             if self.cmd.gpu.is_none() && gpu != "" {
                 self.cmd.gpu = Some(gpu);
@@ -419,6 +414,28 @@ impl<T: EngineOperations> EmuStartTool<T> {
                     }
                 } else {
                     self.cmd.device = Some(loaded_product_bundle.device_refs()?[0].clone());
+                }
+            }
+
+            // At this moment, the android emulator does not support risc-v, so
+            // force using the qemu engine.
+            if (*loaded_product_bundle).get_product_bundle_name().ends_with("riscv64") {
+                self.cmd.engine = match &self.cmd.engine {
+                    Some(engine_name) => {
+                        if engine_name != "qemu" {
+                            return_user_error!("Engine {engine_name} does not support risc-v images. Please use `qemu`.")
+                        } else {
+                            Some(engine_name.into())
+                        }
+                    }
+                    None => Some("qemu".into()),
+                };
+            } else {
+                let engine = self.cmd.engine().await?;
+                if self.cmd.engine.is_none() {
+                    if engine != "" {
+                        self.cmd.engine = Some(engine);
+                    }
                 }
             }
             return Ok(Some(loaded_product_bundle));

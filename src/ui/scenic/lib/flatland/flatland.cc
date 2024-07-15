@@ -114,9 +114,9 @@ std::shared_ptr<Flatland> Flatland::New(
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
         register_mouse_source) {
   // clang-format off
-  return std::shared_ptr<Flatland>(new Flatland(
-      std::move(dispatcher_holder),
-      std::move(request), session_id,
+  auto flatland = std::shared_ptr<Flatland>(new Flatland(
+      dispatcher_holder,
+      session_id,
       std::move(destroy_instance_function),
       std::move(flatland_presenter),
       std::move(link_system),
@@ -127,11 +127,18 @@ std::shared_ptr<Flatland> Flatland::New(
       std::move(register_touch_source),
       std::move(register_mouse_source)));
   // clang-format on
+
+  // Natural FIDL bindings must be created and deleted on the same thread that it handles messages.
+  async::PostTask(
+      dispatcher_holder->dispatcher(),
+      [flatland, request = std::move(request)]() mutable { flatland->Bind(std::move(request)); });
+
+  return flatland;
 }
 
 Flatland::Flatland(
     std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
-    fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request,
+
     scheduling::SessionId session_id, std::function<void()> destroy_instance_function,
     std::shared_ptr<FlatlandPresenter> flatland_presenter, std::shared_ptr<LinkSystem> link_system,
     std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
@@ -146,14 +153,18 @@ Flatland::Flatland(
     fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
         register_mouse_source)
     : dispatcher_holder_(std::move(dispatcher_holder)),
-      binding_(this, std::move(request), dispatcher_holder_->dispatcher()),
       session_id_(session_id),
       destroy_instance_function_(std::move(destroy_instance_function)),
-      peer_closed_waiter_(binding_.channel().get(), ZX_CHANNEL_PEER_CLOSED),
       present2_helper_([this](fuchsia::scenic::scheduling::FramePresentedInfo info) {
-        if (binding_.is_bound()) {
-          binding_.events().OnFramePresented(std::move(info));
-        }
+        // If this callback is invoked, we know that `Present()` must have been called, and
+        // therefore also know that binding must have been completed, because otherwise `Present()`
+        // wouldn't have been called.
+        //
+        // Caveat: in Flatland unit tests, we invoke methods directly on the Flatland object, not
+        // via a FIDL client.  It is conceivable that flakes might arise if the timing relationship
+        // with the scheduler changes.
+        FX_DCHECK(binding_data_);
+        binding_data_->SendOnFramePresented(std::move(info));
       }),
       flatland_presenter_(std::move(flatland_presenter)),
       link_system_(std::move(link_system)),
@@ -168,17 +179,64 @@ Flatland::Flatland(
       register_touch_source_(std::move(register_touch_source)),
       register_mouse_source_(std::move(register_mouse_source)) {
   FX_DCHECK(flatland_presenter_);
-  zx_status_t status = peer_closed_waiter_.Begin(
-      dispatcher(), [this](async_dispatcher_t* dispatcher, async::WaitOnce* wait,
-                           zx_status_t status, const zx_packet_signal_t* signal) {
-        if (!destroy_instance_function_was_invoked_) {
-          destroy_instance_function_was_invoked_ = true;
-          destroy_instance_function_();
-        }
-      });
-  FX_DCHECK(status == ZX_OK);
 
   FLATLAND_VERBOSE_LOG << "Flatland new with ID: " << session_id_;
+}
+
+void Flatland::Bind(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request) {
+  FX_DCHECK(!binding_data_);
+  binding_data_ =
+      std::make_unique<BindingData>(this, dispatcher_holder_->dispatcher(), std::move(request));
+}
+
+Flatland::BindingData::BindingData(
+    Flatland* flatland, async_dispatcher_t* dispatcher,
+    fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request)
+    : binding_(flatland, std::move(request), dispatcher),
+      peer_closed_waiter_(binding_.channel().get(), ZX_CHANNEL_PEER_CLOSED) {
+  zx_status_t status = peer_closed_waiter_.Begin(
+      dispatcher, [flatland](async_dispatcher_t* dispatcher, async::WaitOnce* wait,
+                             zx_status_t status, const zx_packet_signal_t* signal) {
+        if (!flatland->destroy_instance_function_was_invoked_) {
+          flatland->destroy_instance_function_was_invoked_ = true;
+          flatland->destroy_instance_function_();
+        }
+      });
+  FX_DCHECK(status == ZX_OK) << "peer_closed_waiter_.Begin() failed with status: " << status;
+}
+
+void Flatland::BindingData::SendOnFramePresented(
+    fuchsia::scenic::scheduling::FramePresentedInfo info) {
+  if (!binding_.is_bound()) {
+    return;
+  }
+  binding_.events().OnFramePresented(std::move(info));
+}
+
+void Flatland::BindingData::SendOnNextFrameBegin(uint32_t additional_present_credits,
+                                                 FuturePresentationInfos presentation_infos) {
+  if (!binding_.is_bound()) {
+    return;
+  }
+  OnNextFrameBeginValues values;
+  values.set_additional_present_credits(additional_present_credits);
+  values.set_future_presentation_infos(std::move(presentation_infos));
+  binding_.events().OnNextFrameBegin(std::move(values));
+}
+
+void Flatland::BindingData::CloseConnection(FlatlandError error) {
+  // NOTE: there's no need to test the return values of OnError()/Cancel()/Close().  If they fail,
+  // the binding and waiter will be cleaned up anyway because we'll soon be destroyed (since
+  // destroy_instance_function_ has been or will be invoked).
+
+  // Send the error to the client before closing the connection.
+  binding_.events().OnError(error);
+
+  // Cancel the async::Wait before closing the connection, or it will assert on destruction.
+  peer_closed_waiter_.Cancel();
+
+  // Immediately close the FIDL interface to prevent future requests.
+  binding_.Close(ZX_ERR_BAD_STATE);
 }
 
 Flatland::~Flatland() {
@@ -760,8 +818,8 @@ void Flatland::SetClipBoundary(TransformId transform_id,
 
 void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Rect bounds) {
   if (bounds.width <= 0 || bounds.height <= 0) {
-    error_reporter_->ERROR() << "SetClipBoundary failed, width/height must both be positive " << "("
-                             << bounds.width << ", " << bounds.height << ")";
+    error_reporter_->ERROR() << "SetClipBoundary failed, width/height must both be positive "
+                             << "(" << bounds.width << ", " << bounds.height << ")";
     ReportBadOperationError();
     return;
   }
@@ -1644,12 +1702,9 @@ void Flatland::OnNextFrameBegin(uint32_t additional_present_credits,
   // guaranteed that this won't stall clients because the current policy is to always return
   // present tokens upon processing them. If and when a new policy is adopted, we should take care
   // to ensure this guarantee is upheld.
-  if (present_credits_ > 0 && binding_.is_bound()) {
-    OnNextFrameBeginValues values;
-    values.set_additional_present_credits(additional_present_credits);
-    values.set_future_presentation_infos(std::move(presentation_infos));
-
-    binding_.events().OnNextFrameBegin(std::move(values));
+  FX_DCHECK(binding_data_);
+  if (present_credits_ > 0) {
+    binding_data_->SendOnNextFrameBegin(additional_present_credits, std::move(presentation_infos));
   }
 }
 
@@ -1697,20 +1752,10 @@ void Flatland::ReportLinkProtocolError(const std::string& error_log) {
 }
 
 void Flatland::CloseConnection(FlatlandError error) {
-  // NOTE: there's no need to test the return values of OnError()/Cancel()/Close().  If they fail,
-  // the binding and waiter will be cleaned up anyway because we'll soon be destroyed (since
-  // destroy_instance_function_ has been or will be invoked).
+  FX_DCHECK(binding_data_);
+  binding_data_->CloseConnection(error);
 
-  // Send the error to the client before closing the connection.
-  binding_.events().OnError(error);
-
-  // Cancel the async::Wait before closing the connection, or it will assert on destruction.
-  peer_closed_waiter_.Cancel();
-
-  // Immediately close the FIDL interface to prevent future requests.
-  binding_.Close(ZX_ERR_BAD_STATE);
-
-  // Finally, trigger the destruction of this instance.
+  // Trigger the destruction of this instance.
   //
   // NOTE: it would probably be OK to test |destroy_instance_function_was_invoked_| at the top of
   // the function, exiting early if it was already invoked.  But this way makes it obvious that the

@@ -135,6 +135,7 @@ if (is_host) {
       # TODO(https://fxbug.dev/42175368): Shared types should be exposed on a public
       # interface instead of making this visibility exception.
       "//src/developer/ffx/plugins/scrutiny/extract/*",
+      "//src/developer/ffx/plugins/scrutiny/shell/*",
       "//src/developer/ffx/plugins/scrutiny/verify/*",
     ]
 
@@ -160,6 +161,7 @@ if (is_host) {
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//src/sys/pkg/lib/update-package",
       "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:argh",
       "//third_party/rust_crates:base64",
       "//third_party/rust_crates:maplit",
       "//third_party/rust_crates:once_cell",
@@ -186,7 +188,6 @@ if (is_host) {
         "//src/sys/lib/cm_rust/testing",
         "//third_party/rust_crates:assert_matches",
         "//third_party/rust_crates:tempfile",
-        "//third_party/rust_crates:uuid",
         "//tools/lib/cml",
       ]
     }
@@ -211,17 +212,9 @@ if (is_host) {
       "src/core/util/jsons.rs",
       "src/core/util/mod.rs",
       "src/core/util/types.rs",
-      "src/engine/controller/collector.rs",
-      "src/engine/controller/controller.rs",
-      "src/engine/controller/health.rs",
-      "src/engine/controller/mod.rs",
-      "src/engine/controller/model.rs",
-      "src/engine/controller/plugin.rs",
-      "src/engine/mod.rs",
       "src/lib.rs",
       "src/search/controller/components.rs",
       "src/search/controller/mod.rs",
-      "src/search/controller/package_list.rs",
       "src/search/controller/packages.rs",
       "src/search/mod.rs",
       "src/static_pkgs/collection.rs",
@@ -236,6 +229,8 @@ if (is_host) {
       "src/toolkit/controller/zbi_bootfs.rs",
       "src/toolkit/controller/zbi_cmdline.rs",
       "src/toolkit/mod.rs",
+      "src/unified_plugin/collector.rs",
+      "src/unified_plugin/mod.rs",
       "src/verify/collection.rs",
       "src/verify/collector/component_model.rs",
       "src/verify/collector/mod.rs",

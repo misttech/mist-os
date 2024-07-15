@@ -52,8 +52,13 @@ fuchsia_test_package("activity-manager-test") {
   subpackages =
       [ "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack" ]
   test_specs = {
-    # Run all tests in parallel.
-    parallel = 12
+    # Since the activity-manager-test is timer-based, running
+    # some in parallel meaningfully reduces the total running
+    # time of the test suite. This should be taken in balance,
+    # since each simultaneous test runs its own instance of
+    # several UI components (scenic, scene manager, and
+    # others), multiplying impact on memory pressure.
+    parallel = 2
     log_settings = {
       max_severity = "ERROR"
     }

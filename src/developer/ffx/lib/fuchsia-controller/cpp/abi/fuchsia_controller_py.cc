@@ -655,8 +655,13 @@ PyObject *context_target_add(PyObject *self, PyObject *args) {
 
 PyObject *context_target_wait(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  double seconds = 0;
-  if (!PyArg_ParseTuple(args, "Od", &obj, &seconds)) {
+  uint64_t seconds = 0;
+  // The python docs state "K" converts to "unsigned long long" so static assert they're
+  // matching the expected ABI.
+  //
+  // https://docs.python.org/3/c-api/arg.html#numbers
+  static_assert(sizeof(uint64_t) == sizeof(unsigned long long));  // NOLINT
+  if (!PyArg_ParseTuple(args, "OK", &obj, &seconds)) {
     return nullptr;
   }
   auto context = DowncastPyObject<PythonContext>(obj);

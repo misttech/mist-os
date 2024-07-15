@@ -240,12 +240,14 @@ pub enum PathError {
 }
 
 impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir<S> {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_dir(self)
+    }
+}
+
+impl<S: crate::NonMetaStorage> vfs::directory::entry::GetEntryInfo for RootDir<S> {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 }
 
@@ -577,7 +579,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::convert::TryInto as _;
     use std::io::Cursor;
-    use vfs::directory::entry::DirectoryEntry;
+    use vfs::directory::entry::GetEntryInfo;
     use vfs::directory::entry_container::Directory;
     use vfs::node::Node;
 
@@ -845,7 +847,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            DirectoryEntry::entry_info(root_dir.as_ref()),
+            GetEntryInfo::entry_info(root_dir.as_ref()),
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         );
     }

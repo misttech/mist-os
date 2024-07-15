@@ -4,18 +4,34 @@
 
 #include "src/storage/blobfs/blobfs.h"
 
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/sync/completion.h>
+#include <lib/zx/process.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/time.h>
 
-#include <chrono>
-#include <mutex>
-#include <sstream>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <utility>
+#include <vector>
 
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 #include <storage/buffer/vmo_buffer.h>
+#include <storage/operation/operation.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/storage/blobfs/blob.h"
+#include "src/storage/blobfs/blob_layout.h"
+#include "src/storage/blobfs/blobfs_inspect_tree.h"
+#include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/mkfs.h"
@@ -26,7 +42,8 @@
 #include "src/storage/blobfs/transaction.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "src/storage/lib/block_client/cpp/reader.h"
-#include "zircon/time.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 namespace {

@@ -494,7 +494,7 @@ void GuestEthernet::NetworkPortGetInfo(port_base_info_t* out_info) {
   // Advertise we are a virtual port implementing support for TX/RX of raw
   // ethernet frames.
   *out_info = {
-      .port_class = static_cast<uint8_t>(fuchsia_hardware_network::wire::DeviceClass::kVirtual),
+      .port_class = static_cast<uint16_t>(fuchsia_hardware_network::wire::PortClass::kVirtual),
       .rx_types_list = kRxTypes.data(),
       .rx_types_count = kRxTypes.size(),
       .tx_types_list = kTxTypes.data(),

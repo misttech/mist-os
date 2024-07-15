@@ -246,6 +246,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
+    use crate::mm::memory::MemoryObject;
     use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
     use crate::signals::testing::dequeue_signal_for_test;
     use crate::signals::{restore_from_signal_handler, SignalDetail};
@@ -545,9 +546,12 @@ mod tests {
         let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
         let stack_base = current_task
             .mm()
-            .map_vmo(
+            .map_memory(
                 DesiredAddress::Any,
-                Arc::new(zx::Vmo::create(STACK_SIZE as u64).expect("failed to create stack VMO")),
+                MemoryObject::from(
+                    zx::Vmo::create(STACK_SIZE as u64).expect("failed to create stack VMO"),
+                )
+                .into(),
                 0,
                 STACK_SIZE,
                 prot_flags,

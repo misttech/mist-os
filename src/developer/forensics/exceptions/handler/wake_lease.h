@@ -13,6 +13,7 @@
 #include <lib/fpromise/scope.h>
 
 #include <string>
+#include <vector>
 
 #include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/fidl_event_handler.h"
@@ -63,6 +64,10 @@ class WakeLease : public WakeLeaseBase {
 
   fpromise::promise<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error> DoAcquireLease();
 
+  fpromise::promise<> WaitForRequiredLevelActive();
+
+  void WatchRequiredLevel();
+
   async_dispatcher_t* dispatcher_;
   std::string power_element_name_;
   bool add_power_element_called_;
@@ -75,6 +80,11 @@ class WakeLease : public WakeLeaseBase {
   fidl::Client<fuchsia_power_broker::Topology> topology_;
 
   AsyncEventHandlerOpen<fuchsia_power_broker::LeaseControl> lease_control_event_handler_;
+
+  fidl::Client<fuchsia_power_broker::CurrentLevel> current_level_client_;
+  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_client_;
+  uint8_t required_level_;
+  std::vector<fpromise::suspended_task> waiting_for_required_level_;
 
   // Channels that will be valid and must be kept open once the element is added to the topology.
   fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_channel_;

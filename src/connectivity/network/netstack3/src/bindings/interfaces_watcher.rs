@@ -19,8 +19,8 @@ use log::{debug, error, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::IpAddressState;
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as finterfaces_ext,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
+    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fuchsia_zircon as zx,
 };
 
 use crate::bindings::devices::BindingId;
@@ -102,7 +102,7 @@ impl EventQueue {
         // NB: Compiler can't infer the parameter types.
         let state_to_event = |(id, state): (&BindingId, &InterfaceState)| {
             let InterfaceState {
-                properties: InterfaceProperties { name, device_class },
+                properties: InterfaceProperties { name, port_class },
                 addresses,
                 has_default_ipv4_route,
                 has_default_ipv6_route,
@@ -112,13 +112,13 @@ impl EventQueue {
                 finterfaces_ext::Properties {
                     id: *id,
                     name: name.clone(),
-                    device_class: device_class.clone(),
                     online: *online,
                     addresses: Worker::collect_addresses(addresses),
                     has_default_ipv4_route: *has_default_ipv4_route,
                     has_default_ipv6_route: *has_default_ipv6_route,
+                    port_class: *port_class,
                 }
-                .into(),
+                .into_fidl_backwards_compatible(),
             );
             filter_addresses(&mut event, include_non_assigned_addresses);
             event
@@ -270,7 +270,7 @@ pub(crate) struct AddressPropertiesUpdate {
 #[cfg_attr(test, derive(Clone, Eq, PartialEq))]
 pub(crate) struct InterfaceProperties {
     pub(crate) name: String,
-    pub(crate) device_class: finterfaces::DeviceClass,
+    pub(crate) port_class: finterfaces_ext::PortClass,
 }
 
 /// Cached interface state by the worker.
@@ -587,17 +587,14 @@ impl Worker {
         event: InterfaceEvent,
     ) -> Result<Option<(finterfaces::Event, ChangedAddressProperties)>, WorkerError> {
         match event {
-            InterfaceEvent::Added {
-                id,
-                properties: InterfaceProperties { name, device_class },
-            } => {
+            InterfaceEvent::Added { id, properties: InterfaceProperties { name, port_class } } => {
                 let online = false;
                 let has_default_ipv4_route = false;
                 let has_default_ipv6_route = false;
                 match state.insert(
                     id,
                     InterfaceState {
-                        properties: InterfaceProperties { name: name.clone(), device_class },
+                        properties: InterfaceProperties { name: name.clone(), port_class },
                         online,
                         addresses: HashMap::new(),
                         has_default_ipv4_route,
@@ -610,13 +607,13 @@ impl Worker {
                             finterfaces_ext::Properties {
                                 id,
                                 name,
-                                device_class,
+                                port_class,
                                 online,
                                 addresses: Vec::new(),
                                 has_default_ipv4_route,
                                 has_default_ipv6_route,
                             }
-                            .into(),
+                            .into_fidl_backwards_compatible(),
                         ),
                         ChangedAddressProperties::InterestNotApplicable,
                     ))),
@@ -903,13 +900,58 @@ impl WorkerInterfaceSink {
     }
 }
 
+/// A helper to convert to the backing FIDL type, while maintaining
+/// backwards compatibility of removed fields.
+trait IntoFidlBackwardsCompatible<F> {
+    fn into_fidl_backwards_compatible(self) -> F;
+}
+
+// TODO(https://fxbug.dev/42157740): Remove this implementation.
+impl IntoFidlBackwardsCompatible<finterfaces::Properties> for finterfaces_ext::Properties {
+    fn into_fidl_backwards_compatible(self) -> finterfaces::Properties {
+        // `device_class` has been replaced by `port_class`.
+        let device_class = match &self.port_class {
+            finterfaces_ext::PortClass::Loopback => {
+                finterfaces::DeviceClass::Loopback(finterfaces::Empty)
+            }
+            finterfaces_ext::PortClass::Virtual => {
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual)
+            }
+            finterfaces_ext::PortClass::Ethernet => {
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet)
+            }
+            finterfaces_ext::PortClass::Wlan => {
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Wlan)
+            }
+            finterfaces_ext::PortClass::WlanAp => {
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::WlanAp)
+            }
+            finterfaces_ext::PortClass::Ppp => {
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ppp)
+            }
+            finterfaces_ext::PortClass::Bridge => {
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Bridge)
+            }
+            // NB: `Lowpan` doesn't have a corresponding `DeviceClass` variant.
+            // Claim it's a virtual device for backwards compatibility.
+            finterfaces_ext::PortClass::Lowpan => {
+                finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Virtual)
+            }
+        };
+
+        finterfaces::Properties {
+            device_class: Some(device_class),
+            ..finterfaces::Properties::from(self)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::bindings::util::TryIntoCore as _;
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
-    use fidl_fuchsia_hardware_network as fhardware_network;
     use fixture::fixture;
     use futures::Stream;
     use itertools::Itertools as _;
@@ -965,13 +1007,11 @@ mod tests {
 
     const IFACE1_ID: BindingId = const_unwrap_option(NonZeroU64::new(111));
     const IFACE1_NAME: &str = "iface1";
-    const IFACE1_CLASS: finterfaces::DeviceClass =
-        finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet);
+    const IFACE1_TYPE: finterfaces_ext::PortClass = finterfaces_ext::PortClass::Ethernet;
 
     const IFACE2_ID: BindingId = const_unwrap_option(NonZeroU64::new(222));
     const IFACE2_NAME: &str = "iface2";
-    const IFACE2_CLASS: finterfaces::DeviceClass =
-        finterfaces::DeviceClass::Loopback(finterfaces::Empty {});
+    const IFACE2_TYPE: finterfaces_ext::PortClass = finterfaces_ext::PortClass::Loopback;
 
     /// Tests full integration between [`Worker`] and [`Watcher`]s through basic
     /// state updates.
@@ -987,7 +1027,7 @@ mod tests {
         let producer = interface_sink
             .add_interface(
                 IFACE1_ID,
-                InterfaceProperties { name: IFACE1_NAME.to_string(), device_class: IFACE1_CLASS },
+                InterfaceProperties { name: IFACE1_NAME.to_string(), port_class: IFACE1_TYPE },
             )
             .expect("add interface");
 
@@ -998,12 +1038,12 @@ mod tests {
                     id: IFACE1_ID,
                     addresses: Vec::new(),
                     online: false,
-                    device_class: IFACE1_CLASS,
+                    port_class: IFACE1_TYPE,
                     has_default_ipv4_route: false,
                     has_default_ipv6_route: false,
                     name: IFACE1_NAME.to_string(),
                 }
-                .into()
+                .into_fidl_backwards_compatible()
             ))
         );
 
@@ -1081,7 +1121,7 @@ mod tests {
                 finterfaces_ext::Properties {
                     id: IFACE1_ID,
                     name: IFACE1_NAME.to_string(),
-                    device_class: IFACE1_CLASS,
+                    port_class: IFACE1_TYPE,
                     online: true,
                     addresses: vec![finterfaces_ext::Address {
                         addr: addr1.into_fidl(),
@@ -1092,7 +1132,7 @@ mod tests {
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: false,
                 }
-                .into()
+                .into_fidl_backwards_compatible()
             ))
         );
         assert_eq!(new_watcher.next().await, Some(finterfaces::Event::Idle(finterfaces::Empty {})));
@@ -1110,12 +1150,12 @@ mod tests {
         let producer1 = interface_sink
             .add_interface(
                 IFACE1_ID,
-                InterfaceProperties { name: IFACE1_NAME.to_string(), device_class: IFACE1_CLASS },
+                InterfaceProperties { name: IFACE1_NAME.to_string(), port_class: IFACE1_TYPE },
             )
             .expect(" add interface");
         let _producer2 = interface_sink.add_interface(
             IFACE2_ID,
-            InterfaceProperties { name: IFACE2_NAME.to_string(), device_class: IFACE2_CLASS },
+            InterfaceProperties { name: IFACE2_NAME.to_string(), port_class: IFACE2_TYPE },
         );
         assert_matches!(
             watcher.next().await,
@@ -1153,7 +1193,7 @@ mod tests {
             InterfaceState {
                 properties: InterfaceProperties {
                     name: IFACE1_NAME.to_string(),
-                    device_class: IFACE1_CLASS,
+                    port_class: IFACE1_TYPE,
                 },
                 online: false,
                 addresses: Default::default(),
@@ -1178,13 +1218,13 @@ mod tests {
                     finterfaces_ext::Properties {
                         id,
                         name: initial_state.properties.name.clone(),
-                        device_class: initial_state.properties.device_class.clone(),
+                        port_class: initial_state.properties.port_class.clone(),
                         online: false,
                         addresses: Vec::new(),
                         has_default_ipv4_route: false,
                         has_default_ipv6_route: false,
                     }
-                    .into()
+                    .into_fidl_backwards_compatible()
                 ),
                 ChangedAddressProperties::InterestNotApplicable
             )))
@@ -1736,10 +1776,7 @@ mod tests {
                 let producer = interface_sink
                     .add_interface(
                         i,
-                        InterfaceProperties {
-                            name: format!("if{}", i),
-                            device_class: IFACE1_CLASS,
-                        },
+                        InterfaceProperties { name: format!("if{}", i), port_class: IFACE1_TYPE },
                     )
                     .expect("failed to add interface");
                 (producer, i)
@@ -1790,7 +1827,7 @@ mod tests {
             let _: InterfaceEventProducer = interface_sink
                 .add_interface(
                     BindingId::new(i).unwrap(),
-                    InterfaceProperties { name: format!("if{}", i), device_class: IFACE1_CLASS },
+                    InterfaceProperties { name: format!("if{}", i), port_class: IFACE1_TYPE },
                 )
                 .expect("failed to add interface");
         }
@@ -1842,10 +1879,7 @@ mod tests {
             let producer = interface_sink
                 .add_interface(
                     IFACE1_ID,
-                    InterfaceProperties {
-                        name: IFACE1_NAME.to_string(),
-                        device_class: IFACE1_CLASS,
-                    },
+                    InterfaceProperties { name: IFACE1_NAME.to_string(), port_class: IFACE1_TYPE },
                 )
                 .expect("failed to add interface");
             assert_matches!(

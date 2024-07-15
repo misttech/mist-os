@@ -54,6 +54,8 @@ static_library("f2fs") {
     "vnode_cache.h",
     "writeback.cc",
     "writeback.h",
+    "xattr.cc",
+    "xattr.h",
   ]
 
   public = [

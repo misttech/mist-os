@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
 
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
+#include <fuchsia/math/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 namespace {
@@ -16,20 +18,20 @@ using fhd_Transform = fuchsia::hardware::display::types::Transform;
 namespace flatland {
 
 DisplaySrcDstFrames DisplaySrcDstFrames::New(ImageRect rectangle, allocation::ImageMetadata image) {
-  fuchsia::hardware::display::types::Frame src_frame = {
-      .x_pos = static_cast<uint32_t>(rectangle.texel_uvs[0].x),
-      .y_pos = static_cast<uint32_t>(rectangle.texel_uvs[0].y),
+  fuchsia::math::RectU image_source = {
+      .x = static_cast<uint32_t>(rectangle.texel_uvs[0].x),
+      .y = static_cast<uint32_t>(rectangle.texel_uvs[0].y),
       .width = static_cast<uint32_t>(rectangle.texel_uvs[2].x - rectangle.texel_uvs[0].x),
       .height = static_cast<uint32_t>(rectangle.texel_uvs[2].y - rectangle.texel_uvs[0].y),
   };
 
-  fuchsia::hardware::display::types::Frame dst_frame = {
-      .x_pos = static_cast<uint32_t>(rectangle.origin.x),
-      .y_pos = static_cast<uint32_t>(rectangle.origin.y),
+  fuchsia::math::RectU display_destination = {
+      .x = static_cast<uint32_t>(rectangle.origin.x),
+      .y = static_cast<uint32_t>(rectangle.origin.y),
       .width = static_cast<uint32_t>(rectangle.extent.x),
       .height = static_cast<uint32_t>(rectangle.extent.y),
   };
-  return {.src = src_frame, .dst = dst_frame};
+  return {.src = image_source, .dst = display_destination};
 }
 
 fuchsia::hardware::display::types::Transform GetDisplayTransformFromOrientationAndFlip(

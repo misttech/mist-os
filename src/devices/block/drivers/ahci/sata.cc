@@ -183,7 +183,7 @@ zx_status_t SataDevice::Init() {
   di.max_cmd = max_cmd;
   controller_->SetDevInfo(port_, &di);
 
-  controller_->inspector().emplace(std::move(inspect_device));
+  controller_->inspect().emplace(std::move(inspect_device));
   return ZX_OK;
 }
 

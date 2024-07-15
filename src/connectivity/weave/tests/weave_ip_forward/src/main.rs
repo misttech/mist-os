@@ -43,7 +43,7 @@ fn get_interface_id(
                      fnet_interfaces_ext::Properties {
                          id,
                          name,
-                         device_class: _,
+                         port_class: _,
                          online: _,
                          addresses: _,
                          has_default_ipv4_route: _,

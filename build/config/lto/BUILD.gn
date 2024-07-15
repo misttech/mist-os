@@ -4,6 +4,7 @@
 
 import("//build/config/lto/config.gni")
 import("//build/config/riscv64/riscv64.gni")
+import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
 
 config("fat-lto-objects") {
@@ -40,17 +41,31 @@ config("no-fat-lto-objects") {
   }
 }
 
-config("lto-clang") {
-  cflags = [ "-flto" ]
-
-  configs = [ ":fat-lto-objects" ]
+config("lto-workarounds") {
+  # TODO(https://fxbug.dev/42079915): LLD lets --no-pie trump the code generation
+  # switches, since we default to PIC, specify that to LTO links outside of x86_32 and EFI.
+  if (toolchain_environment != "kernel.phys32" &&
+      toolchain_environment != "kernel.efi") {
+    ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
+  }
 
   # TODO(https://fxbug.dev/42086180): The workarounds below are required to
   # avoid code generation bugs during LTO. They can be removed once LTO
   # properly handles riscv target features
   if (current_cpu == "riscv64") {
-    configs += [ "//build/config/riscv64:lto-workarounds" ]
+    configs = [ "//build/config/riscv64:lto-workarounds" ]
   }
+
+  visibility = [ ":*" ]
+}
+
+config("lto-clang") {
+  cflags = [ "-flto" ]
+
+  configs = [
+    ":fat-lto-objects",
+    ":lto-workarounds",
+  ]
 
   if (!(is_fuchsia || is_mistos) || is_kernel) {
     configs += [ ":lto-whole-program-devirtualization" ]
@@ -101,12 +116,7 @@ config("lto-rust") {
     "-Zsplit-lto-unit",
   ]
 
-  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
-  # avoid code generation bugs during LTO. They can be removed once LTO
-  # properly handles riscv target features
-  if (current_cpu == "riscv64") {
-    configs = [ "//build/config/riscv64:lto-workarounds" ]
-  }
+  configs = [ ":lto-workarounds" ]
 }
 
 # This can be appended with:
@@ -136,14 +146,10 @@ variant("lto") {
 config("thinlto-clang") {
   cflags = [ "-flto=thin" ]
   ldflags = cflags
-  configs = [ ":fat-lto-objects" ]
-
-  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
-  # avoid code generation bugs during LTO. They can be removed once LTO
-  # properly handles riscv target features
-  if (current_cpu == "riscv64") {
-    configs += [ "//build/config/riscv64:lto-workarounds" ]
-  }
+  configs = [
+    ":fat-lto-objects",
+    ":lto-workarounds",
+  ]
 
   # These switches have the same meaning but different spellings for
   # lld-link vs ld.lld.
@@ -195,12 +201,7 @@ config("thinlto-rust") {
 
   rustflags += [ "${rust_linkarg}${_cache_dir}${thinlto_cache_dir}" ]
 
-  # TODO(https://fxbug.dev/42086180): The workarounds below are required to
-  # avoid code generation bugs during LTO. They can be removed once LTO
-  # properly handles riscv target features
-  if (current_cpu == "riscv64") {
-    configs = [ "//build/config/riscv64:lto-workarounds" ]
-  }
+  configs = [ ":lto-workarounds" ]
 }
 
 variant("thinlto") {

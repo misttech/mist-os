@@ -25,6 +25,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use storage_device::buffer;
 use vfs::common::rights_to_posix_mode_bits;
+use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::directory::entry_container::MutableDirectory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{File, FileOptions, GetVmo, StreamIoConnection, SyncMode};
@@ -258,9 +259,9 @@ impl FxNode for FxFile {
     }
 }
 
-impl vfs::node::IsDirectory for FxFile {
-    fn is_directory(&self) -> bool {
-        false
+impl GetEntryInfo for FxFile {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(self.object_id(), fio::DirentType::File)
     }
 }
 

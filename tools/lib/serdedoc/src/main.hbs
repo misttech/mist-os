@@ -10,7 +10,7 @@
 {{#each data_types }}
 <tr>
     <td><a href="{{~ @root.url_path ~}}{{~ rust_type ~}}">{{~ rust_type ~}}</a></td>
-    <td>{{description}}</td>
+    <td>{{md_escaped description}}</td>
 </tr>
 {{/each }}
 </tbody>

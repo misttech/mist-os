@@ -58,6 +58,16 @@ struct DriverEpitaph {
     path: String,
 }
 
+#[derive(Deserialize, Debug)]
+// Dead code is used here so the names
+// of the fields can be used by Deserialize
+// even though there is no reading of the fields.
+#[allow(dead_code)]
+struct AllDrivers {
+    drivers_areas: Vec<String>,
+    drivers_documentation: Vec<Value>,
+}
+
 #[derive(Deserialize, PartialEq, Debug)]
 struct EngCouncil {
     members: Vec<String>,
@@ -201,6 +211,7 @@ pub(crate) struct YamlChecker {
     project: String,
     check_external_links: bool,
     allow_fuchsia_src_links: bool,
+    reference_docs_root: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -216,6 +227,7 @@ impl DocYamlCheck for YamlChecker {
     ) -> Result<Option<Vec<DocCheckError>>> {
         if let Some(yaml_name) = filename.file_name() {
             let result = match yaml_name.to_str() {
+                Some("_all_drivers_doc.yaml") => check_all_drivers_doc(filename, yaml_value),
                 Some("_areas.yaml") => check_areas(filename, yaml_value),
                 Some("_deprecated-docs.yaml") => check_deprecated_docs(filename, yaml_value),
                 Some("_drivers_areas.yaml") => check_drivers_areas(filename, yaml_value),
@@ -281,6 +293,28 @@ impl DocYamlCheck for YamlChecker {
                 if let Some(path_list) = toc.get_paths() {
                     for p in path_list {
                         if is_external_path(&p) {
+                            if let Some(reference_root) = &self.reference_docs_root {
+                                if p.starts_with("/reference") {
+                                    let rel_path =
+                                        p.strip_prefix("/reference/").unwrap_or(p.as_str());
+                                    let mut file_path = reference_root.join(rel_path);
+                                    if path_helper::is_dir(&file_path) {
+                                        file_path.push("README.md");
+                                    }
+
+                                    if markdown_file_set.take(&file_path).is_none()
+                                        && !visited.contains_key(&file_path)
+                                    {
+                                        errors.push(DocCheckError::new_error(
+                                            0,
+                                            yaml_doc.clone(),
+                                            &format!("Reference to missing file: {}", p),
+                                        ));
+                                    } else {
+                                        visited.insert(file_path, current_yaml.clone());
+                                    }
+                                }
+                            }
                             if self.check_external_links {
                                 if p.starts_with("/reference") {
                                     external_links.push(LinkReference {
@@ -356,6 +390,34 @@ impl DocYamlCheck for YamlChecker {
                             included_file: f,
                         }),
                     );
+                    // if checking reference docs, add them as well
+                    if let Some(reference_root) = &self.reference_docs_root {
+                        let ref_additional_paths = includes
+                            .iter()
+                            //Only process /reference.
+                            .filter(|p| p.starts_with("/reference"))
+                            .map(|p| {
+                                reference_root
+                                    .join(p.strip_prefix("/reference/").unwrap_or(p.as_str()))
+                            })
+                            .filter(|p| {
+                                if p == &current_yaml.included_file {
+                                    errors.push(DocCheckError::new_error(
+                                        0,
+                                        p.clone(),
+                                        &format!("YAML files cannot include themselves {p:?}"),
+                                    ));
+                                    false
+                                } else {
+                                    true
+                                }
+                            });
+                        let more_paths: Vec<PathBuf> = ref_additional_paths.collect();
+                        toc_stack.extend(more_paths.into_iter().map(|f| IncludedYaml {
+                            container: yaml_doc.clone(),
+                            included_file: f,
+                        }));
+                    }
                 }
             } else if !visited.contains_key(&current_yaml.included_file) {
                 errors.push(DocCheckError::new_error(
@@ -513,6 +575,18 @@ fn check_areas(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>
 fn check_deprecated_docs(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let result = serde_yaml::from_value::<Deprecations>(yaml_value.clone());
     //TODO(https://fxbug.dev/42064923): Add a check that the to: doc exists.
+    match result {
+        Ok(_) => None,
+        Err(e) => Some(vec![DocCheckError::new_error(
+            1,
+            filename.to_path_buf(),
+            &format!("invalid structure {}", e),
+        )]),
+    }
+}
+fn check_all_drivers_doc(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
+    let result = serde_yaml::from_value::<AllDrivers>(yaml_value.clone());
+    //TODO(https://fxbug.dev/349902231): Add a check that the to: doc exists.
     match result {
         Ok(_) => None,
         Err(e) => Some(vec![DocCheckError::new_error(
@@ -698,6 +772,7 @@ pub fn register_yaml_checks(opt: &DocCheckerArgs) -> Result<Vec<Box<dyn DocYamlC
         project: opt.project.clone(),
         check_external_links: !opt.local_links_only,
         allow_fuchsia_src_links: opt.allow_fuchsia_src_links,
+        reference_docs_root: opt.reference_docs_root.clone(),
     };
 
     Ok(vec![Box::new(checker)])

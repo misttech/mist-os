@@ -4,7 +4,8 @@
 
 #include "input-report.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fidl/epitaph.h>
 #include <lib/fit/defer.h>
 #include <lib/hid-parser/parser.h>
@@ -15,14 +16,14 @@
 #include <threads.h>
 #include <zircon/status.h>
 
-#include <array>
-
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 
 #include "src/ui/input/lib/hid-input-report/device.h"
 
 namespace hid_input_report_dev {
+
+namespace fhidbus = fuchsia_hardware_hidbus;
+namespace finput = fuchsia_hardware_input;
 
 zx::result<hid_input_report::DeviceType> InputReport::InputReportDeviceTypeToHid(
     const fuchsia_input_report::wire::DeviceType type) {
@@ -42,13 +43,7 @@ zx::result<hid_input_report::DeviceType> InputReport::InputReportDeviceTypeToHid
   }
 }
 
-zx_status_t InputReport::Stop() {
-  hiddev_.UnregisterListener();
-  return ZX_OK;
-}
-
 void InputReport::RemoveReaderFromList(InputReportsReader* reader) {
-  fbl::AutoLock lock(&readers_lock_);
   for (auto iter = readers_list_.begin(); iter != readers_list_.end(); ++iter) {
     if (iter->get() == reader) {
       readers_list_.erase(iter);
@@ -57,9 +52,29 @@ void InputReport::RemoveReaderFromList(InputReportsReader* reader) {
   }
 }
 
-void InputReport::HidReportListenerReceiveReport(const uint8_t* report, size_t report_size,
-                                                 zx_time_t report_time) {
-  fbl::AutoLock lock(&readers_lock_);
+void InputReport::HandleReports(
+    fidl::WireUnownedResult<finput::DeviceReportsReader::ReadReports>& result) {
+  if (!result.ok()) {
+    return;
+  }
+  if (result->is_error()) {
+    return;
+  }
+
+  zx::time time = zx::clock::get_monotonic();
+  for (const fuchsia_hardware_hidbus::wire::Report& report : result->value()->reports) {
+    if (!report.has_buf()) {
+      FDF_LOG(ERROR, "Report does not have data!");
+      continue;
+    }
+    HandleReport(cpp20::span<uint8_t>(report.buf().data(), report.buf().count()),
+                 report.has_timestamp() ? zx::time(report.timestamp()) : time);
+  }
+
+  dev_reader_->ReadReports().Then(fit::bind_member<&InputReport::HandleReports>(this));
+}
+
+void InputReport::HandleReport(cpp20::span<const uint8_t> report, zx::time report_time) {
   for (auto& device : devices_) {
     // A Device may not have input reports at all: for example, a
     // TouchConfiguration Device takes only feature reports but no input
@@ -90,11 +105,11 @@ void InputReport::HidReportListenerReceiveReport(const uint8_t* report, size_t r
     }
 
     for (auto& reader : readers_list_) {
-      reader->ReceiveReport(report, report_size, report_time, device.get());
+      reader->ReceiveReport(report, report_time, device.get());
     }
   }
 
-  const zx::duration latency = zx::clock::get_monotonic() - zx::time(report_time);
+  const zx::duration latency = zx::clock::get_monotonic() - report_time;
 
   total_latency_ += latency;
   total_report_count_.Set(++report_count_);
@@ -106,7 +121,7 @@ void InputReport::HidReportListenerReceiveReport(const uint8_t* report, size_t r
   }
 
   latency_histogram_usecs_.Insert(latency.to_usecs());
-  last_event_timestamp_.Set(report_time);
+  last_event_timestamp_.Set(report_time.get());
 }
 
 bool InputReport::ParseHidInputReportDescriptor(const hid::ReportDescriptor* report_desc) {
@@ -129,15 +144,14 @@ void InputReport::SendInitialConsumerControlReport(InputReportsReader* reader) {
         continue;
       }
 
-      std::array<uint8_t, HID_MAX_REPORT_LEN> report_data;
-      size_t report_size = 0;
-      zx_status_t status = hiddev_.GetReport(HID_REPORT_TYPE_INPUT, *device->InputReportId(),
-                                             report_data.data(), report_data.size(), &report_size);
-      if (status != ZX_OK) {
+      fidl::WireResult result =
+          input_device_->GetReport(fhidbus::ReportType::kInput, *device->InputReportId());
+      if (!result.ok() || result->is_error()) {
         continue;
       }
-      reader->ReceiveReport(report_data.data(), report_size, zx_clock_get_monotonic(),
-                            device.get());
+      reader->ReceiveReport(
+          cpp20::span(result.value()->report.data(), result.value()->report.count()),
+          zx::clock::get_monotonic(), device.get());
     }
   }
 }
@@ -173,10 +187,8 @@ std::string InputReport::GetDeviceTypesString() const {
 
 void InputReport::GetInputReportsReader(GetInputReportsReaderRequestView request,
                                         GetInputReportsReaderCompleter::Sync& completer) {
-  fbl::AutoLock lock(&readers_lock_);
-
-  auto reader = InputReportsReader::Create(this, next_reader_id_++, loop_->dispatcher(),
-                                           std::move(request->reader));
+  std::unique_ptr<InputReportsReader> reader =
+      std::make_unique<InputReportsReader>(this, next_reader_id_++, std::move(request->reader));
   if (!reader) {
     return;
   }
@@ -192,15 +204,34 @@ void InputReport::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   fidl::Arena<kFidlDescriptorBufferSize> descriptor_allocator;
   fuchsia_input_report::wire::DeviceDescriptor descriptor(descriptor_allocator);
 
-  hid_device_info_t info;
-  hiddev_.GetHidDeviceInfo(&info);
-
   fidl::Arena<kFidlDescriptorBufferSize> descriptor_info_allocator;
   fuchsia_input_report::wire::DeviceInformation fidl_info(descriptor_info_allocator);
-  fidl_info.set_vendor_id(info.vendor_id);
-  fidl_info.set_product_id(info.product_id);
-  fidl_info.set_version(info.version);
-  fidl_info.set_polling_rate(descriptor_info_allocator, info.polling_rate);
+  {
+    fidl::WireResult result = input_device_->Query();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "GetDescriptor: FIDL failed to Query: %s\n",
+              result.FormatDescription().c_str());
+      completer.Close(result.status());
+      return;
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "GetDescriptor: Failed to Query: %d\n", result->error_value());
+      completer.Close(result->error_value());
+      return;
+    }
+    if (result.value()->info.has_vendor_id()) {
+      fidl_info.set_vendor_id(result.value()->info.vendor_id());
+    }
+    if (result.value()->info.has_product_id()) {
+      fidl_info.set_product_id(result.value()->info.product_id());
+    }
+    if (result.value()->info.has_version()) {
+      fidl_info.set_version(result.value()->info.version());
+    }
+    if (result.value()->info.has_polling_rate()) {
+      fidl_info.set_polling_rate(descriptor_allocator, result.value()->info.polling_rate());
+    }
+  }
   descriptor.set_device_information(descriptor_allocator, fidl_info);
 
   if (sensor_count_) {
@@ -216,16 +247,18 @@ void InputReport::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   }
 
   completer.Reply(descriptor);
-  fidl::Status result = completer.result_of_reply();
-  if (result.status() != ZX_OK) {
-    zxlogf(ERROR, "GetDescriptor: Failed to send descriptor: %s\n",
-           result.FormatDescription().c_str());
+  {
+    fidl::Status result = completer.result_of_reply();
+    if (result.status() != ZX_OK) {
+      FDF_LOG(ERROR, "GetDescriptor: Failed to send descriptor: %s\n",
+              result.FormatDescription().c_str());
+    }
   }
 }
 
 void InputReport::SendOutputReport(SendOutputReportRequestView request,
                                    SendOutputReportCompleter::Sync& completer) {
-  uint8_t hid_report[HID_MAX_DESC_LEN];
+  uint8_t hid_report[fhidbus::wire::kMaxReportLen];
   size_t size;
   hid_input_report::ParseResult result = hid_input_report::ParseResult::kNotImplemented;
   for (auto& device : devices_) {
@@ -244,9 +277,11 @@ void InputReport::SendOutputReport(SendOutputReportRequestView request,
     return;
   }
 
-  zx_status_t status = hiddev_.SetReport(HID_REPORT_TYPE_OUTPUT, hid_report[0], hid_report, size);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
+  fidl::WireResult status =
+      input_device_->SetReport(fhidbus::ReportType::kOutput, hid_report[0],
+                               fidl::VectorView<uint8_t>::FromExternal(hid_report, size));
+  if (!status.ok()) {
+    completer.ReplyError(status.status());
     return;
   }
   completer.ReplySuccess();
@@ -261,20 +296,26 @@ void InputReport::GetFeatureReport(GetFeatureReportCompleter::Sync& completer) {
       continue;
     }
 
-    std::array<uint8_t, HID_MAX_REPORT_LEN> report_data;
-    size_t report_size = 0;
-    auto status = hiddev_.GetReport(HID_REPORT_TYPE_FEATURE, *device->FeatureReportId(),
-                                    report_data.data(), report_data.size(), &report_size);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "GetReport failed %d", status);
-      completer.ReplyError(status);
+    fidl::WireResult feature_report_result =
+        input_device_->GetReport(fhidbus::ReportType::kFeature, *device->FeatureReportId());
+    if (!feature_report_result.ok()) {
+      FDF_LOG(ERROR, "FIDL GetReport failed %s", feature_report_result.FormatDescription().c_str());
+      completer.ReplyError(feature_report_result.status());
       return;
     }
+    if (feature_report_result->is_error()) {
+      FDF_LOG(ERROR, "GetReport failed %s",
+              zx_status_get_string(feature_report_result->error_value()));
+      completer.ReplyError(feature_report_result->error_value());
+      return;
+    }
+    const fidl::VectorView<uint8_t>& feature_report = feature_report_result.value()->report;
 
-    auto result = device->ParseFeatureReport(report_data.data(), report_size, allocator, report);
+    auto result = device->ParseFeatureReport(feature_report.data(), feature_report.count(),
+                                             allocator, report);
     if (result != hid_input_report::ParseResult::kOk &&
         result != hid_input_report::ParseResult::kNotImplemented) {
-      zxlogf(ERROR, "ParseFeatureReport failed with %u", static_cast<unsigned int>(result));
+      FDF_LOG(ERROR, "ParseFeatureReport failed with %u", static_cast<unsigned int>(result));
       completer.ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -283,7 +324,7 @@ void InputReport::GetFeatureReport(GetFeatureReportCompleter::Sync& completer) {
   completer.ReplySuccess(std::move(report));
   fidl::Status result = completer.result_of_reply();
   if (result.status() != ZX_OK) {
-    zxlogf(ERROR, "Failed to get feature report: %s\n", result.FormatDescription().c_str());
+    FDF_LOG(ERROR, "Failed to get feature report: %s\n", result.FormatDescription().c_str());
   }
 }
 
@@ -295,7 +336,7 @@ void InputReport::SetFeatureReport(SetFeatureReportRequestView request,
       continue;
     }
 
-    uint8_t hid_report[HID_MAX_DESC_LEN];
+    uint8_t hid_report[fhidbus::wire::kMaxReportLen];
     size_t size;
     auto result = device->SetFeatureReport(&request->report, hid_report, sizeof(hid_report), &size);
     if (result == hid_input_report::ParseResult::kNotImplemented ||
@@ -303,15 +344,16 @@ void InputReport::SetFeatureReport(SetFeatureReportRequestView request,
       continue;
     }
     if (result != hid_input_report::ParseResult::kOk) {
-      zxlogf(ERROR, "SetFeatureReport failed with %u", static_cast<unsigned int>(result));
+      FDF_LOG(ERROR, "SetFeatureReport failed with %u", static_cast<unsigned int>(result));
       completer.ReplyError(ZX_ERR_INTERNAL);
       return;
     }
-    zx_status_t status =
-        hiddev_.SetReport(HID_REPORT_TYPE_FEATURE, *device->FeatureReportId(), hid_report, size);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "SetReport failed with %u", status);
-      completer.ReplyError(status);
+    fidl::WireResult set_report_result =
+        input_device_->SetReport(fhidbus::ReportType::kFeature, *device->FeatureReportId(),
+                                 fidl::VectorView<uint8_t>::FromExternal(hid_report, size));
+    if (set_report_result.ok()) {
+      FDF_LOG(ERROR, "SetReport failed with %s", set_report_result.FormatDescription().c_str());
+      completer.ReplyError(set_report_result.status());
       return;
     }
     found = true;
@@ -324,7 +366,7 @@ void InputReport::SetFeatureReport(SetFeatureReportRequestView request,
   completer.ReplySuccess();
   fidl::Status result = completer.result_of_reply();
   if (result.status() != ZX_OK) {
-    zxlogf(ERROR, "Failed to set feature report: %s\n", result.FormatDescription().c_str());
+    FDF_LOG(ERROR, "Failed to set feature report: %s\n", result.FormatDescription().c_str());
   }
 }
 
@@ -353,18 +395,19 @@ void InputReport::GetInputReport(GetInputReportRequestView request,
       return;
     }
 
-    std::array<uint8_t, HID_MAX_REPORT_LEN> report_data;
-    size_t report_size = 0;
-    zx_status_t status = hiddev_.GetReport(HID_REPORT_TYPE_INPUT, *device->InputReportId(),
-                                           report_data.data(), report_data.size(), &report_size);
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
+    auto result = input_device_->GetReport(fhidbus::ReportType::kInput, *device->InputReportId());
+    if (!result.ok()) {
+      completer.ReplyError(result.status());
+      return;
+    }
+    if (result->is_error()) {
+      completer.ReplyError(result->error_value());
       return;
     }
 
-    if (device->ParseInputReport(report_data.data(), report_size, allocator, report) !=
-        hid_input_report::ParseResult::kOk) {
-      zxlogf(ERROR, "GetInputReport: Device failed to parse report correctly");
+    if (device->ParseInputReport(result.value()->report.data(), result.value()->report.count(),
+                                 allocator, report) != hid_input_report::ParseResult::kOk) {
+      FDF_LOG(ERROR, "GetInputReport: Device failed to parse report correctly");
       completer.ReplyError(ZX_ERR_INTERNAL);
       return;
     }
@@ -382,24 +425,23 @@ void InputReport::GetInputReport(GetInputReportRequestView request,
 }
 
 zx_status_t InputReport::Start() {
-  uint8_t report_desc[HID_MAX_DESC_LEN];
-  size_t report_desc_size;
-  zx_status_t status = hiddev_.GetDescriptor(report_desc, HID_MAX_DESC_LEN, &report_desc_size);
-  if (status != ZX_OK) {
-    return status;
+  auto result = input_device_->GetReportDesc();
+  if (!result.ok()) {
+    return result.status();
   }
 
   hid::DeviceDescriptor* dev_desc = nullptr;
-  auto parse_res = hid::ParseReportDescriptor(report_desc, report_desc_size, &dev_desc);
+  hid::ParseResult parse_res =
+      hid::ParseReportDescriptor(result->desc.data(), result->desc.count(), &dev_desc);
   if (parse_res != hid::ParseResult::kParseOk) {
-    zxlogf(ERROR, "hid-parser: parsing report descriptor failed with error %d", int(parse_res));
+    FDF_LOG(ERROR, "hid-parser: parsing report descriptor failed with error %d", int(parse_res));
     return ZX_ERR_INTERNAL;
   }
   auto free_desc = fit::defer([dev_desc]() { hid::FreeDeviceDescriptor(dev_desc); });
 
   auto count = dev_desc->rep_count;
   if (count == 0) {
-    zxlogf(ERROR, "No report descriptors found ");
+    FDF_LOG(ERROR, "No report descriptors found ");
     return ZX_ERR_INTERNAL;
   }
 
@@ -413,26 +455,21 @@ zx_status_t InputReport::Start() {
 
   // If we never parsed a single device correctly then fail.
   if (devices_.size() == 0) {
-    zxlogf(ERROR, "Can't process HID report descriptor for, all parsing attempts failed.");
+    FDF_LOG(ERROR, "Can't process HID report descriptor for, all parsing attempts failed.");
     return ZX_ERR_INTERNAL;
   }
 
-  // Start the async loop for the Readers.
-  {
-    fbl::AutoLock lock(&readers_lock_);
-    loop_.emplace(&kAsyncLoopConfigNoAttachToCurrentThread);
-    status = loop_->StartThread("hid-input-report-reader-loop");
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-
   // Register to listen to HID reports.
-  status = hiddev_.RegisterListener(this, &hid_report_listener_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to register for HID reports: %s", zx_status_get_string(status));
-    return status;
+  auto [client, server] = fidl::Endpoints<finput::DeviceReportsReader>::Create();
+  fidl::WireResult get_device_reports_reader_result =
+      input_device_->GetDeviceReportsReader(std::move(server));
+  if (!get_device_reports_reader_result.ok()) {
+    FDF_LOG(ERROR, "Failed to get device reports reader: %s",
+            get_device_reports_reader_result.FormatDescription().c_str());
+    return get_device_reports_reader_result.status();
   }
+  dev_reader_.Bind(std::move(client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  dev_reader_->ReadReports().Then(fit::bind_member<&InputReport::HandleReports>(this));
 
   const std::string device_types = GetDeviceTypesString();
 
@@ -447,14 +484,6 @@ zx_status_t InputReport::Start() {
   last_event_timestamp_ = root_.CreateUint("last_event_timestamp", 0);
 
   return ZX_OK;
-}
-
-zx_status_t InputReport::WaitForNextReader(zx::duration timeout) {
-  zx_status_t status = sync_completion_wait(&next_reader_wait_, timeout.get());
-  if (status == ZX_OK) {
-    sync_completion_reset(&next_reader_wait_);
-  }
-  return status;
 }
 
 }  // namespace hid_input_report_dev

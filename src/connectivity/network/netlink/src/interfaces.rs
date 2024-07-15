@@ -20,8 +20,8 @@ use fidl_fuchsia_net_interfaces_ext::admin::{
 };
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
 use {
-    fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_root as fnet_root,
 };
 
 use derivative::Derivative;
@@ -31,8 +31,8 @@ use futures::StreamExt as _;
 use linux_uapi::{
     net_device_flags_IFF_LOOPBACK, net_device_flags_IFF_LOWER_UP, net_device_flags_IFF_RUNNING,
     net_device_flags_IFF_UP, rtnetlink_groups_RTNLGRP_IPV4_IFADDR,
-    rtnetlink_groups_RTNLGRP_IPV6_IFADDR, rtnetlink_groups_RTNLGRP_LINK, ARPHRD_ETHER,
-    ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID,
+    rtnetlink_groups_RTNLGRP_IPV6_IFADDR, rtnetlink_groups_RTNLGRP_LINK, ARPHRD_6LOWPAN,
+    ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID,
 };
 use net_types::ip::{AddrSubnetEither, IpVersion};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
@@ -470,9 +470,9 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         addresses,
                         id: _,
                         name: _,
-                        device_class: _,
                         has_default_ipv4_route: _,
                         has_default_ipv6_route: _,
+                        port_class: _,
                         ..
                     },
                 current:
@@ -480,7 +480,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         id,
                         addresses: _,
                         name: _,
-                        device_class: _,
+                        port_class: _,
                         online: _,
                         has_default_ipv4_route: _,
                         has_default_ipv6_route: _,
@@ -1086,20 +1086,19 @@ pub(crate) enum NetlinkLinkMessageConversionError {
     InvalidInterfaceId(u64),
 }
 
-fn device_class_to_link_type(device_class: fnet_interfaces::DeviceClass) -> u16 {
-    match device_class {
-        fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => ARPHRD_LOOPBACK,
-        fnet_interfaces::DeviceClass::Device(device_class) => match device_class {
-            fhwnet::DeviceClass::Ethernet
-            | fhwnet::DeviceClass::Bridge
-            | fhwnet::DeviceClass::Wlan
-            | fhwnet::DeviceClass::WlanAp => ARPHRD_ETHER,
-            fhwnet::DeviceClass::Ppp => ARPHRD_PPP,
-            // NB: Virtual devices on fuchsia are overloaded. This may be a
-            // tun/tap/no-op interface. Return `ARPHRD_VOID` since we have
-            // insufficient information to precisely classify the link_type.
-            fhwnet::DeviceClass::Virtual => ARPHRD_VOID,
-        },
+fn port_class_to_link_type(port_class: fnet_interfaces_ext::PortClass) -> u16 {
+    match port_class {
+        fnet_interfaces_ext::PortClass::Loopback => ARPHRD_LOOPBACK,
+        fnet_interfaces_ext::PortClass::Ethernet
+        | fnet_interfaces_ext::PortClass::Bridge
+        | fnet_interfaces_ext::PortClass::Wlan
+        | fnet_interfaces_ext::PortClass::WlanAp => ARPHRD_ETHER,
+        fnet_interfaces_ext::PortClass::Ppp => ARPHRD_PPP,
+        // NB: Virtual devices on fuchsia are overloaded. This may be a
+        // tun/tap/no-op interface. Return `ARPHRD_VOID` since we have
+        // insufficient information to precisely classify the link_type.
+        fnet_interfaces_ext::PortClass::Virtual => ARPHRD_VOID,
+        fnet_interfaces_ext::PortClass::Lowpan => ARPHRD_6LOWPAN,
     }
     .try_into()
     .expect("potential values will fit into the u16 range")
@@ -1140,7 +1139,7 @@ fn interface_properties_to_link_message(
     fnet_interfaces_ext::Properties {
         id,
         name,
-        device_class,
+        port_class,
         online,
         addresses: _,
         has_default_ipv4_route: _,
@@ -1162,7 +1161,7 @@ fn interface_properties_to_link_message(
     };
     link_header.index = id;
 
-    let link_layer_type = device_class_to_link_type(*device_class);
+    let link_layer_type = port_class_to_link_type(*port_class);
     link_header.link_layer_type = LinkLayerType::from(link_layer_type);
 
     let mut flags = 0;
@@ -1275,7 +1274,7 @@ fn interface_properties_to_address_messages(
         id,
         name,
         addresses,
-        device_class: _,
+        port_class: _,
         online: _,
         has_default_ipv4_route: _,
         has_default_ipv6_route: _,
@@ -1390,18 +1389,16 @@ pub(crate) mod testutil {
     pub(crate) const PPP_INTERFACE_ID: u64 = 4;
     pub(crate) const PPP_NAME: &str = "ppp";
 
-    pub(crate) const BRIDGE: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Bridge);
-    pub(crate) const ETHERNET: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ethernet);
-    pub(crate) const WLAN: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Wlan);
-    pub(crate) const WLAN_AP: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::WlanAp);
-    pub(crate) const PPP: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Device(fhwnet::DeviceClass::Ppp);
-    pub(crate) const LOOPBACK: fnet_interfaces::DeviceClass =
-        fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {});
+    pub(crate) const BRIDGE: fnet_interfaces_ext::PortClass =
+        fnet_interfaces_ext::PortClass::Bridge;
+    pub(crate) const ETHERNET: fnet_interfaces_ext::PortClass =
+        fnet_interfaces_ext::PortClass::Ethernet;
+    pub(crate) const WLAN: fnet_interfaces_ext::PortClass = fnet_interfaces_ext::PortClass::Wlan;
+    pub(crate) const WLAN_AP: fnet_interfaces_ext::PortClass =
+        fnet_interfaces_ext::PortClass::WlanAp;
+    pub(crate) const PPP: fnet_interfaces_ext::PortClass = fnet_interfaces_ext::PortClass::Ppp;
+    pub(crate) const LOOPBACK: fnet_interfaces_ext::PortClass =
+        fnet_interfaces_ext::PortClass::Loopback;
     pub(crate) const TEST_V4_ADDR: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
     pub(crate) const TEST_V6_ADDR: fnet::Subnet = fidl_subnet!("2001:db8::1/32");
 
@@ -1690,14 +1687,14 @@ mod tests {
     fn create_interface(
         id: u64,
         name: String,
-        device_class: fnet_interfaces::DeviceClass,
+        port_class: fnet_interfaces_ext::PortClass,
         online: bool,
         addresses: Vec<fnet_interfaces_ext::Address>,
     ) -> fnet_interfaces_ext::Properties {
         fnet_interfaces_ext::Properties {
             id: NonZeroU64::new(id).unwrap(),
             name,
-            device_class,
+            port_class,
             online,
             addresses,
             has_default_ipv4_route: false,
@@ -1708,7 +1705,7 @@ mod tests {
     fn create_interface_with_addresses(
         id: u64,
         name: String,
-        device_class: fnet_interfaces::DeviceClass,
+        port_class: fnet_interfaces_ext::PortClass,
         online: bool,
     ) -> fnet_interfaces_ext::Properties {
         let addresses = vec![
@@ -1723,7 +1720,7 @@ mod tests {
                 assignment_state: AddressAssignmentState::Assigned,
             },
         ];
-        create_interface(id, name, device_class, online, addresses)
+        create_interface(id, name, port_class, online, addresses)
     }
 
     fn create_default_address_messages(
@@ -1747,12 +1744,12 @@ mod tests {
     fn get_fake_interface(
         id: u64,
         name: &'static str,
-        device_class: fnet_interfaces::DeviceClass,
+        port_class: fnet_interfaces_ext::PortClass,
     ) -> fnet_interfaces_ext::Properties {
         fnet_interfaces_ext::Properties {
             id: id.try_into().unwrap(),
             name: name.to_string(),
-            device_class,
+            port_class,
             online: true,
             addresses: Vec::new(),
             has_default_ipv4_route: false,
@@ -1773,7 +1770,7 @@ mod tests {
         let map_fn = |fnet_interfaces_ext::Properties {
                           id,
                           name,
-                          device_class,
+                          port_class,
                           online,
                           addresses,
                           has_default_ipv4_route,
@@ -1782,7 +1779,7 @@ mod tests {
             fnet_interfaces::Properties {
                 id: Some(id.get()),
                 name: Some(name),
-                device_class: Some(device_class),
+                port_class: Some(port_class.into()),
                 online: Some(online),
                 addresses: Some(
                     addresses
@@ -1949,7 +1946,7 @@ mod tests {
     #[test_case(BRIDGE, false, 0, ARPHRD_ETHER)]
     #[test_case(BRIDGE, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
     fn test_interface_conversion(
-        device_class: fnet_interfaces::DeviceClass,
+        port_class: fnet_interfaces_ext::PortClass,
         online: bool,
         flags: u32,
         expected_link_type: u32,
@@ -1959,7 +1956,7 @@ mod tests {
         let expected_link_type = expected_link_type as u16;
         let interface_name = LO_NAME.to_string();
         let interface =
-            create_interface(LO_INTERFACE_ID, interface_name.clone(), device_class, online, vec![]);
+            create_interface(LO_INTERFACE_ID, interface_name.clone(), port_class, online, vec![]);
         let actual: NetlinkLinkMessage =
             interface_properties_to_link_message(&interface, &LO_MAC.map(|a| a.octets.to_vec()))
                 .unwrap();
@@ -2074,7 +2071,7 @@ mod tests {
                 fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
                     id: Some(LO_INTERFACE_ID),
                     name: Some(LO_NAME.to_string()),
-                    device_class: Some(LOOPBACK),
+                    port_class: Some(LOOPBACK.into()),
                     online: Some(false),
                     addresses: Some(vec![test_addr_with_assignment_state(
                         TEST_V4_ADDR,
@@ -2087,7 +2084,7 @@ mod tests {
                 fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
                     id: Some(ETH_INTERFACE_ID),
                     name: Some(ETH_NAME.to_string()),
-                    device_class: Some(ETHERNET),
+                    port_class: Some(ETHERNET.into()),
                     online: Some(false),
                     addresses: Some(vec![
                         test_addr_with_assignment_state(
@@ -2106,7 +2103,7 @@ mod tests {
                 fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
                     id: Some(PPP_INTERFACE_ID),
                     name: Some(PPP_NAME.to_string()),
-                    device_class: Some(PPP),
+                    port_class: Some(PPP.into()),
                     online: Some(false),
                     addresses: Some(vec![
                         test_addr_with_assignment_state(
@@ -2149,7 +2146,7 @@ mod tests {
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(WLAN_INTERFACE_ID),
                     name: Some(WLAN_NAME.to_string()),
-                    device_class: Some(WLAN),
+                    port_class: Some(WLAN.into()),
                     online: Some(false),
                     addresses: Some(vec![
                         test_addr_with_assignment_state(
@@ -2434,7 +2431,7 @@ mod tests {
                 fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
                     id: Some(LO_INTERFACE_ID),
                     name: Some(LO_NAME.to_string()),
-                    device_class: Some(LOOPBACK),
+                    port_class: Some(LOOPBACK.into()),
                     online: Some(true),
                     addresses: Some(vec![test_addr(TEST_V6_ADDR), test_addr(TEST_V4_ADDR)]),
                     has_default_ipv4_route: Some(false),
@@ -2444,7 +2441,7 @@ mod tests {
                 fnet_interfaces::Event::Existing(fnet_interfaces::Properties {
                     id: Some(ETH_INTERFACE_ID),
                     name: Some(ETH_NAME.to_string()),
-                    device_class: Some(ETHERNET),
+                    port_class: Some(ETHERNET.into()),
                     online: Some(false),
                     addresses: Some(vec![test_addr(TEST_V4_ADDR), test_addr(TEST_V6_ADDR)]),
                     has_default_ipv4_route: Some(false),

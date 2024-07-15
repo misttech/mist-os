@@ -366,7 +366,7 @@ impl RemotePeer {
     /// Reset control channel.
     fn reset_control_connection(&mut self, attempt_reconnection: bool) {
         info!(
-            "Disconnecting control connection peer {}, will {}attempt to reconnect",
+            "Resetting control connection peer {}, will {}attempt to reconnect",
             self.peer_id,
             if attempt_reconnection { "" } else { "not " }
         );
@@ -383,7 +383,7 @@ impl RemotePeer {
     /// Reset browse channel.
     fn reset_browse_connection(&mut self, attempt_reconnection: bool) {
         info!(
-            "Disconnecting browse connection peer {}, will {}attempt to reconnect",
+            "Resetting browse connection peer {}, will {}attempt to reconnect",
             self.peer_id,
             if attempt_reconnection { "" } else { "not " }
         );

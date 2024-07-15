@@ -5,6 +5,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/recombiner.h"
 
 #include <gtest/gtest.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/pdu.h"
@@ -46,8 +47,10 @@ hci::ACLDataPacketPtr FirstFragment(
 
   // L2CAP Header
   auto* header = packet->mutable_view()->mutable_payload<BasicHeader>();
-  header->length = htole16(header_payload_size);
-  header->channel_id = htole16(kTestChannelId);
+  header->length =
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, header_payload_size);
+  header->channel_id =
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, kTestChannelId);
 
   // L2CAP payload
   packet->mutable_view()->mutable_payload_data().Write(BufferView(payload),

@@ -457,7 +457,7 @@ impl ResolvedInstanceState {
         );
 
         let (component_sandbox, child_inputs) = build_component_sandbox(
-            &component.moniker,
+            &component,
             child_outgoing_dictionary_routers,
             &decl,
             component_input,
@@ -840,7 +840,7 @@ impl ResolvedInstanceState {
             self.get_child_component_output_dictionary_routers();
         if !dynamic_offers.is_empty() {
             extend_dict_with_offers(
-                &component.moniker,
+                &component,
                 &child_component_output_dictionary_routers,
                 &self.sandbox.component_input,
                 &dynamic_offers,

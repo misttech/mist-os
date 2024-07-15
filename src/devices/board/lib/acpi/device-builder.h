@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
-#include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/zx/result.h>
@@ -15,6 +15,7 @@
 
 #include <string>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <ddktl/composite-node-spec.h>
 
 #include "src/devices/board/lib/acpi/acpi.h"
@@ -29,6 +30,11 @@ struct OwnedStringProp : zx_device_str_prop_t {
   OwnedStringProp(const char* key, const char* value) : value_(value) {
     this->key = key;
     property_value = str_prop_str_val(value_.data());
+  }
+
+  OwnedStringProp(const char* key, uint32_t value) {
+    this->key = key;
+    property_value = str_prop_int_val(value);
   }
 
   OwnedStringProp(OwnedStringProp& other) : zx_device_str_prop_t(other), value_(other.value_) {
@@ -93,10 +99,7 @@ class DeviceBuilder {
         parent_(parent),
         state_(state),
         device_id_(device_id) {
-    dev_props_.emplace_back(zx_device_prop_t{
-        .id = BIND_ACPI_ID,
-        .value = device_id_,
-    });
+    str_props_.emplace_back(OwnedStringProp(bind_fuchsia::ACPI_ID.c_str(), device_id_));
   }
 
   static DeviceBuilder MakeRootDevice(ACPI_HANDLE handle, zx_device_t* acpi_root) {
@@ -148,7 +151,6 @@ class DeviceBuilder {
   bool HasBusId() { return bus_id_.has_value(); }
 
   // For unit test use only.
-  std::vector<zx_device_prop_t>& GetDevProps() { return dev_props_; }
   std::vector<OwnedStringProp>& GetStrProps() { return str_props_; }
 
   uint32_t device_id() const { return device_id_; }
@@ -190,7 +192,6 @@ class DeviceBuilder {
 
   DeviceChildData bus_children_;
   std::vector<OwnedStringProp> str_props_;
-  std::vector<zx_device_prop_t> dev_props_;
 
   // Resources this device uses. "Buses" is a fairly loosely used term here and could
   // refer to things like GPIOs as well.

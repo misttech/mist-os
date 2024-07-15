@@ -4,48 +4,25 @@
 
 //! The Transmission Control Protocol (TCP).
 
-use core::num::{NonZeroU16, NonZeroU8};
+use core::num::NonZeroU8;
 use core::time::Duration;
 
 use const_unwrap::const_unwrap_option;
-use net_types::ip::{GenericOverIp, Ip, IpMarked, IpVersion};
-use netstack3_base::{Counter, WeakDeviceIdentifier};
-use netstack3_ip::icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode};
-use netstack3_ip::socket::Mms;
-use netstack3_ip::IpExt;
+use net_types::ip::{GenericOverIp, Ip, IpMarked};
+use netstack3_base::{
+    Counter, IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, UnscaledWindowSize,
+    WeakDeviceIdentifier, WindowSize,
+};
 use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
-use crate::internal::seqnum::{UnscaledWindowSize, WindowSize};
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
 use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
 
 /// Default lifetime for a orphaned connection in FIN_WAIT2.
 pub const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
-
-/// Control flags that can alter the state of a TCP control block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Control {
-    /// Corresponds to the SYN bit in a TCP segment.
-    SYN,
-    /// Corresponds to the FIN bit in a TCP segment.
-    FIN,
-    /// Corresponds to the RST bit in a TCP segment.
-    RST,
-}
-
-impl Control {
-    /// Returns whether the control flag consumes one byte from the sequence
-    /// number space.
-    pub(crate) fn has_sequence_no(self) -> bool {
-        match self {
-            Control::SYN | Control::FIN => true,
-            Control::RST => false,
-        }
-    }
-}
 
 /// Errors surfaced to the user.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -176,45 +153,6 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes> TcpState<
             sockets: Sockets::new(),
             counters: Default::default(),
         }
-    }
-}
-
-const TCP_HEADER_LEN: u32 = packet_formats::tcp::HDR_PREFIX_LEN as u32;
-
-/// Maximum segment size, that is the maximum TCP payload one segment can carry.
-#[derive(Clone, Copy, PartialEq, Eq, Debug, PartialOrd, Ord)]
-pub(crate) struct Mss(pub(crate) NonZeroU16);
-
-impl Mss {
-    /// Creates MSS from the maximum message size of the IP layer.
-    pub(crate) fn from_mms<I: IpExt>(mms: Mms) -> Option<Self> {
-        NonZeroU16::new(
-            u16::try_from(mms.get().get().saturating_sub(TCP_HEADER_LEN)).unwrap_or(u16::MAX),
-        )
-        .map(Self)
-    }
-
-    pub(crate) const fn default<I: Ip>() -> Self {
-        // Per RFC 9293 Section 3.7.1:
-        //  If an MSS Option is not received at connection setup, TCP
-        //  implementations MUST assume a default send MSS of 536 (576 - 40) for
-        //  IPv4 or 1220 (1280 - 60) for IPv6 (MUST-15).
-        match I::VERSION {
-            IpVersion::V4 => Mss(const_unwrap_option(NonZeroU16::new(536))),
-            IpVersion::V6 => Mss(const_unwrap_option(NonZeroU16::new(1220))),
-        }
-    }
-
-    /// Gets the numeric value of the MSS.
-    pub(crate) const fn get(&self) -> NonZeroU16 {
-        let Self(mss) = *self;
-        mss
-    }
-}
-
-impl From<Mss> for u32 {
-    fn from(Mss(mss): Mss) -> Self {
-        u32::from(mss.get())
     }
 }
 
@@ -422,7 +360,7 @@ pub struct TcpCountersInner {
 
 #[cfg(test)]
 pub(crate) mod testutil {
-    use super::Mss;
+    use netstack3_base::Mss;
     /// Per RFC 879 section 1 (https://tools.ietf.org/html/rfc879#section-1):
     ///
     /// THE TCP MAXIMUM SEGMENT SIZE IS THE IP MAXIMUM DATAGRAM SIZE MINUS

@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod dynamic_writer;
 mod machine_writer;
 mod simple_writer;
 mod test_buffer;
 mod tool_io;
 mod verified_machine_writer;
 
-pub use dynamic_writer::*;
 pub use machine_writer::*;
 pub use simple_writer::*;
 pub use test_buffer::*;

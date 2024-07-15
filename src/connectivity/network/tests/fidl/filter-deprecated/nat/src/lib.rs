@@ -258,16 +258,7 @@ pub async fn setup_masquerade_nat_network<'a>(
         let router_ep2_name = match &router_ep2_interface_state {
             fnet_interfaces_ext::InterfaceState::Known(
                 fnet_interfaces_ext::PropertiesAndState {
-                    properties:
-                        fnet_interfaces_ext::Properties {
-                            id,
-                            name,
-                            device_class: _,
-                            online: _,
-                            addresses: _,
-                            has_default_ipv4_route: _,
-                            has_default_ipv6_route: _,
-                        },
+                    properties: fnet_interfaces_ext::Properties { id, name, .. },
                     state: _,
                 },
             ) => {

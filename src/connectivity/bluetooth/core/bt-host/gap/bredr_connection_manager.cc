@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
 
+#include <pw_bytes/endian.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/expiring_set.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspectable.h"
@@ -1475,7 +1477,8 @@ BrEdrConnectionManager::OnUserConfirmationRequest(
     }
   };
   conn_pair->second->pairing_state_manager().OnUserConfirmationRequest(
-      le32toh(params.numeric_value), std::move(confirm_cb));
+      pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.numeric_value),
+      std::move(confirm_cb));
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
 
@@ -1530,7 +1533,7 @@ BrEdrConnectionManager::OnUserPasskeyNotification(
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
   conn_pair->second->pairing_state_manager().OnUserPasskeyNotification(
-      le32toh(params.numeric_value));
+      pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.numeric_value));
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
 

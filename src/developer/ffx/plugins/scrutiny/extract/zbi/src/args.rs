@@ -4,6 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
+use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -18,7 +19,7 @@ use ffx_core::ffx_command;
 )]
 pub struct ScrutinyZbiCommand {
     #[argh(positional)]
-    pub input: String,
+    pub input: PathBuf,
     #[argh(positional)]
-    pub output: String,
+    pub output: PathBuf,
 }

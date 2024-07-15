@@ -53,9 +53,7 @@ async fn interfaces_watcher_after_invalid_state_request<N: Netstack>(name: &str)
                 properties: fidl_fuchsia_net_interfaces_ext::Properties {
                     id: const_unwrap_option(NonZeroU64::new(1)),
                     name: "lo".to_owned(),
-                    device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                        fidl_fuchsia_net_interfaces::Empty,
-                    ),
+                    port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Loopback,
                     online: true,
                     addresses: vec![
                         fidl_fuchsia_net_interfaces_ext::Address {

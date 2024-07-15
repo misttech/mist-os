@@ -7,6 +7,10 @@
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
+use crate::mm::MemoryAccessorExt;
+use crate::signals::RunState;
+use crate::task::{CurrentTask, WaiterRef};
+use crate::vfs::{default_ioctl, FileObject, FileOps};
 use fidl::endpoints::Proxy as _;
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::{Locked, Mutex, Unlocked};
@@ -19,11 +23,6 @@ use {
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
     fuchsia_async as fasync, fuchsia_zircon as zx,
 };
-
-use crate::mm::MemoryAccessorExt;
-use crate::signals::RunState;
-use crate::task::{CurrentTask, WaiterRef};
-use crate::vfs::{default_ioctl, FileObject, FileOps};
 
 #[derive(Debug, Clone, Copy)]
 enum DevKind {
@@ -331,6 +330,7 @@ struct DevTunInner {
 
 impl FileOps for DevTun {
     crate::fileops_impl_nonseekable!();
+    crate::fileops_impl_noop_sync!();
 
     fn write(
         &self,

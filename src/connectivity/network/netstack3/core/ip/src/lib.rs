@@ -72,14 +72,15 @@ pub mod device {
     pub use crate::internal::device::{
         add_ip_addr_subnet_with_config, clear_ipv4_device_state, clear_ipv6_device_state,
         del_ip_addr_inner, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
-        is_ip_forwarding_enabled, join_ip_multicast, join_ip_multicast_with_config,
-        leave_ip_multicast, leave_ip_multicast_with_config, receive_igmp_packet,
-        AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext,
-        IpAddressState, IpDeviceAddr, IpDeviceAddressContext, IpDeviceAddressIdContext,
-        IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
-        IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId, Ipv4DeviceTimerId,
-        Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext, Ipv6DeviceHandler,
-        Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner, WithIpv6DeviceConfigurationMutInner,
+        is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled, join_ip_multicast,
+        join_ip_multicast_with_config, leave_ip_multicast, leave_ip_multicast_with_config,
+        receive_igmp_packet, AddressRemovedReason, DelIpAddr, IpAddressId, IpAddressIdSpec,
+        IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddressContext,
+        IpDeviceAddressIdContext, IpDeviceBindingsContext, IpDeviceConfigurationContext,
+        IpDeviceEvent, IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, IpDeviceTimerId,
+        Ipv4DeviceTimerId, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        Ipv6DeviceHandler, Ipv6DeviceTimerId, WithIpDeviceConfigurationMutInner,
+        WithIpv6DeviceConfigurationMutInner,
     };
 
     /// IP device test utilities.
@@ -113,11 +114,10 @@ pub mod gmp {
 pub mod icmp {
     pub use crate::internal::icmp::{
         send_icmpv4_host_unreachable, send_icmpv6_address_unreachable, send_ndp_packet,
-        EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpErrorCode,
-        IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters, IcmpRxCountersInner, IcmpState,
-        IcmpStateContext, IcmpTxCounters, IcmpTxCountersInner, Icmpv4ErrorCode, Icmpv4StateBuilder,
-        Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters, NdpRxCounters,
-        NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
+        EchoTransportContextMarker, IcmpBindingsContext, IcmpBindingsTypes, IcmpIpTransportContext,
+        IcmpRxCounters, IcmpRxCountersInner, IcmpState, IcmpStateContext, IcmpTxCounters,
+        IcmpTxCountersInner, Icmpv4StateBuilder, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
+        NdpRxCounters, NdpTxCounters, REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
     };
 
     /// ICMP test utilities.
@@ -169,7 +169,7 @@ pub mod socket {
     pub use crate::internal::socket::{
         DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
         IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketBindingsContext,
-        IpSocketContext, IpSocketHandler, Mms, MmsError, SendOneShotIpPacketError, SendOptions,
+        IpSocketContext, IpSocketHandler, MmsError, SendOneShotIpPacketError, SendOptions,
         SocketHopLimits,
     };
 
@@ -200,14 +200,14 @@ pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus,
     BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
-    IpDeviceContext, IpDeviceStateContext, IpExt, IpLayerBindingsContext, IpLayerContext,
-    IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
-    IpSendFrameError, IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
+    IpDeviceContext, IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext, IpLayerEvent,
+    IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination, IpSendFrameError,
+    IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
     IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder,
     Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder, MulticastMembershipHandler,
-    ReceivePacketAction, ResolveRouteError, SendIpPacketMeta, TransparentLocalDelivery,
-    TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
-    IPV6_DEFAULT_SUBNET,
+    ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError, SendIpPacketMeta,
+    TransparentLocalDelivery, TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS,
+    DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
 pub use internal::forwarding::{
     request_context_add_route, request_context_del_routes, AddRouteError, ForwardingTable,
@@ -217,7 +217,7 @@ pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,
-    IpTypesIpExt, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
+    Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
 };
 
 /// IP layer test utilities.

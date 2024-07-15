@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 mod futex_table;
+pub mod memory;
 mod memory_manager;
 pub mod syscalls;
 mod vmex_resource;
-pub mod vmo;
+mod vmsplice;
 
 pub use futex_table::*;
 pub use memory_manager::*;
 pub use vmex_resource::VMEX_RESOURCE;
+pub use vmsplice::*;

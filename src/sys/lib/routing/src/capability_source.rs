@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::dict_ext::DictExt;
 use crate::component_instance::{
     ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
 };
@@ -11,17 +12,21 @@ use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
     EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
     ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-    ExposeServiceDecl, ExposeSource, NameMapping, OfferConfigurationDecl, OfferDecl,
-    OfferDictionaryDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
-    OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
-    ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl, StorageDecl, UseDecl,
-    UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
+    ExposeServiceDecl, ExposeSource, FidlIntoNative, NameMapping, NativeIntoFidl,
+    OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl,
+    OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
+    OfferSource, OfferStorageDecl, ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl,
+    ServiceDecl, StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl,
+    UseSource, UseStorageDecl,
 };
 use cm_types::{Name, Path};
 use derivative::Derivative;
+use fidl::{persist, unpersist};
+use fidl_fuchsia_component_decl as fdecl;
 use from_enum::FromEnum;
 use futures::future::BoxFuture;
 use moniker::ChildName;
+use sandbox::{Capability, Data, Dict};
 use std::fmt;
 use std::sync::Weak;
 use thiserror::Error;
@@ -212,6 +217,212 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                 Self::Void { capability, .. } => capability.to_string(),
             }
         )
+    }
+}
+
+const AGGREGATE_CAPABILITY_KEY_STR: &'static str = "aggregate_capability_key";
+const BUILTIN_STR: &'static str = "builtin";
+const CAPABILITY_SOURCE_KEY_STR: &'static str = "capability_source_key";
+const CAPABILITY_STR: &'static str = "capability";
+const COMPONENT_CAPABILITY_KEY_STR: &'static str = "component_capability_key";
+const COMPONENT_STR: &'static str = "component";
+const CONFIG_STR: &'static str = "config";
+const DEBUG_STR: &'static str = "debug";
+const DICTIONARY_STR: &'static str = "dictionary";
+const DIRECTORY_STR: &'static str = "directory";
+const ENVIRONMENT_CAPABILITY_VARIANT_STR: &'static str = "environment_capability_variant";
+const ENVIRONMENT_STR: &'static str = "environment";
+const EVENT_STREAM_STR: &'static str = "event_stream";
+const EXPOSE_STR: &'static str = "expose";
+const FRAMEWORK_STR: &'static str = "framework";
+const INTERNAL_CAPABILITY_KEY_STR: &'static str = "internal_capability_key";
+const NAMESPACE_STR: &'static str = "namespace";
+const OFFER_STR: &'static str = "offer";
+const PROTOCOL_STR: &'static str = "protocol";
+const RESOLVER_STR: &'static str = "resolver";
+const RUNNER_STR: &'static str = "runner";
+const SERVICE_STR: &'static str = "service";
+const SOURCE_NAME_STR: &'static str = "source_name";
+const SOURCE_STR: &'static str = "source";
+const STORAGE_STR: &'static str = "storage";
+const USE_STR: &'static str = "use";
+const VALUE_STR: &'static str = "value";
+const VOID_STR: &'static str = "void";
+
+impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for Dict {
+    type Error = fidl::Error;
+
+    fn try_from(capability_source: CapabilitySource<C>) -> Result<Self, Self::Error> {
+        fn insert_key(dict: &Dict, key: &str) {
+            dict.insert_capability(
+                &Name::new(CAPABILITY_SOURCE_KEY_STR).unwrap(),
+                Data::String(key.to_string()).into(),
+            )
+            .unwrap();
+        }
+        fn insert_capability_dict(
+            dict: &Dict,
+            try_into_dict: impl TryInto<Dict, Error = fidl::Error>,
+        ) -> Result<(), fidl::Error> {
+            dict.insert_capability(
+                &Name::new(CAPABILITY_STR).unwrap(),
+                Capability::Dictionary(try_into_dict.try_into()?),
+            )
+            .unwrap();
+            Ok(())
+        }
+        fn insert_component_token<C: ComponentInstanceInterface + 'static>(
+            dict: &Dict,
+            component: WeakComponentInstanceInterface<C>,
+        ) {
+            dict.insert_capability(
+                &Name::new(COMPONENT_STR).unwrap(),
+                Capability::Instance(component.clone().into()),
+            )
+            .unwrap();
+        }
+        fn insert_top_instance_token<C: ComponentInstanceInterface + 'static>(
+            dict: &Dict,
+            top_instance: Weak<C::TopInstance>,
+        ) {
+            dict.insert_capability(
+                &Name::new(COMPONENT_STR).unwrap(),
+                Capability::Instance(
+                    WeakExtendedInstanceInterface::<C>::AboveRoot(top_instance).into(),
+                ),
+            )
+            .unwrap();
+        }
+
+        let output = Dict::new();
+        match capability_source {
+            CapabilitySource::Component { capability, component } => {
+                insert_key(&output, COMPONENT_STR);
+                insert_capability_dict(&output, capability)?;
+                insert_component_token(&output, component);
+            }
+            CapabilitySource::Framework { capability, component } => {
+                insert_key(&output, FRAMEWORK_STR);
+                insert_capability_dict(&output, capability)?;
+                insert_component_token(&output, component);
+            }
+            CapabilitySource::Builtin { capability, top_instance } => {
+                insert_key(&output, BUILTIN_STR);
+                insert_capability_dict(&output, capability)?;
+                insert_top_instance_token::<C>(&output, top_instance);
+            }
+            CapabilitySource::Namespace { capability, top_instance } => {
+                insert_key(&output, NAMESPACE_STR);
+                insert_capability_dict(&output, capability)?;
+                insert_top_instance_token::<C>(&output, top_instance);
+            }
+            CapabilitySource::Capability { source_capability, component } => {
+                insert_key(&output, CAPABILITY_STR);
+                insert_capability_dict(&output, source_capability)?;
+                insert_component_token(&output, component);
+            }
+            CapabilitySource::Environment { capability, component } => {
+                insert_key(&output, ENVIRONMENT_STR);
+                insert_capability_dict(&output, capability)?;
+                insert_component_token(&output, component);
+            }
+            CapabilitySource::Void { capability, component } => {
+                insert_key(&output, VOID_STR);
+                insert_capability_dict(&output, capability)?;
+                insert_component_token(&output, component);
+            }
+            // The following two are only relevant for service capabilities, which are currently
+            // unsupported in the bedrock layer of routing.
+            CapabilitySource::AnonymizedAggregate { .. } => unimplemented!(),
+            CapabilitySource::FilteredAggregate { .. } => unimplemented!(),
+        }
+        Ok(output)
+    }
+}
+
+impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource<C> {
+    type Error = fidl::Error;
+
+    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
+        fn get_capability_dict(dict: &Dict) -> Result<Dict, fidl::Error> {
+            let data = dict
+                .get(&Name::new(CAPABILITY_STR).unwrap())
+                .map_err(|_| fidl::Error::InvalidEnumValue)?;
+            let Some(Capability::Dictionary(capability_dict)) = data else {
+                return Err(fidl::Error::InvalidEnumValue);
+            };
+            Ok(capability_dict)
+        }
+        fn get_weak_component<C: ComponentInstanceInterface + 'static>(
+            dict: &Dict,
+        ) -> Result<WeakComponentInstanceInterface<C>, fidl::Error> {
+            let component = dict
+                .get(&Name::new(COMPONENT_STR).unwrap())
+                .map_err(|_| fidl::Error::InvalidEnumValue)?;
+            let Some(Capability::Instance(weak_instance_token)) = component else {
+                return Err(fidl::Error::InvalidEnumValue);
+            };
+            Ok(weak_instance_token
+                .clone()
+                .try_into()
+                .expect("unexpected type in weak component token"))
+        }
+        fn get_top_instance<C: ComponentInstanceInterface + 'static>(
+            dict: &Dict,
+        ) -> Result<Weak<C::TopInstance>, fidl::Error> {
+            let component = dict
+                .get(&Name::new(COMPONENT_STR).unwrap())
+                .map_err(|_| fidl::Error::InvalidEnumValue)?;
+            let Some(Capability::Instance(weak_instance_token)) = component else {
+                return Err(fidl::Error::InvalidEnumValue);
+            };
+            let weak_extended: WeakExtendedInstanceInterface<C> = weak_instance_token
+                .clone()
+                .try_into()
+                .expect("unexpected type in weak component token");
+            match weak_extended {
+                WeakExtendedInstanceInterface::Component(_) => Err(fidl::Error::InvalidEnumValue),
+                WeakExtendedInstanceInterface::AboveRoot(top_instance) => Ok(top_instance),
+            }
+        }
+
+        let key = dict
+            .get(&Name::new(CAPABILITY_SOURCE_KEY_STR).unwrap())
+            .map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let Some(Capability::Data(Data::String(key))) = key else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        Ok(match key.as_str() {
+            COMPONENT_STR => CapabilitySource::Component {
+                capability: get_capability_dict(&dict)?.try_into()?,
+                component: get_weak_component(&dict)?,
+            },
+            FRAMEWORK_STR => CapabilitySource::Framework {
+                capability: get_capability_dict(&dict)?.try_into()?,
+                component: get_weak_component(&dict)?,
+            },
+            BUILTIN_STR => CapabilitySource::Builtin {
+                capability: get_capability_dict(&dict)?.try_into()?,
+                top_instance: get_top_instance::<C>(&dict)?,
+            },
+            NAMESPACE_STR => CapabilitySource::Namespace {
+                capability: get_capability_dict(&dict)?.try_into()?,
+                top_instance: get_top_instance::<C>(&dict)?,
+            },
+            CAPABILITY_STR => CapabilitySource::Capability {
+                source_capability: get_capability_dict(&dict)?.try_into()?,
+                component: get_weak_component(&dict)?,
+            },
+            ENVIRONMENT_STR => CapabilitySource::Environment {
+                capability: get_capability_dict(&dict)?.try_into()?,
+                component: get_weak_component(&dict)?,
+            },
+            VOID_STR => CapabilitySource::Void {
+                capability: get_capability_dict(&dict)?.try_into()?,
+                component: get_weak_component(&dict)?,
+            },
+            _ => return Err(fidl::Error::InvalidEnumValue),
+        })
     }
 }
 
@@ -466,6 +677,69 @@ impl From<cm_rust::ConfigurationDecl> for InternalCapability {
     }
 }
 
+impl TryFrom<InternalCapability> for Dict {
+    type Error = fidl::Error;
+
+    fn try_from(capability: InternalCapability) -> Result<Self, Self::Error> {
+        let (key, value) = match capability {
+            InternalCapability::Service(name) => (SERVICE_STR, name),
+            InternalCapability::Protocol(name) => (PROTOCOL_STR, name),
+            InternalCapability::Directory(name) => (DIRECTORY_STR, name),
+            InternalCapability::Runner(name) => (RUNNER_STR, name),
+            InternalCapability::Config(name) => (CONFIG_STR, name),
+            InternalCapability::EventStream(name) => (EVENT_STREAM_STR, name),
+            InternalCapability::Resolver(name) => (RESOLVER_STR, name),
+            InternalCapability::Storage(name) => (STORAGE_STR, name),
+            InternalCapability::Dictionary(name) => (DICTIONARY_STR, name),
+        };
+        let output = Dict::new();
+        output
+            .insert_capability(
+                &Name::new(INTERNAL_CAPABILITY_KEY_STR).unwrap(),
+                Data::String(key.to_string()).into(),
+            )
+            .unwrap();
+        output
+            .insert_capability(
+                &Name::new(VALUE_STR).unwrap(),
+                Data::String(value.as_str().to_string()).into(),
+            )
+            .unwrap();
+        Ok(output)
+    }
+}
+
+impl TryFrom<Dict> for InternalCapability {
+    type Error = fidl::Error;
+
+    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
+        let key = dict
+            .get(&Name::new(INTERNAL_CAPABILITY_KEY_STR).unwrap())
+            .map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let value =
+            dict.get(&Name::new(VALUE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let Some(Capability::Data(Data::String(key))) = key else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        let Some(Capability::Data(Data::String(value))) = value else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        let name = Name::new(value).unwrap();
+        Ok(match key.as_str() {
+            SERVICE_STR => InternalCapability::Service(name),
+            PROTOCOL_STR => InternalCapability::Protocol(name),
+            DIRECTORY_STR => InternalCapability::Directory(name),
+            RUNNER_STR => InternalCapability::Runner(name),
+            CONFIG_STR => InternalCapability::Config(name),
+            EVENT_STREAM_STR => InternalCapability::EventStream(name),
+            RESOLVER_STR => InternalCapability::Resolver(name),
+            STORAGE_STR => InternalCapability::Storage(name),
+            DICTIONARY_STR => InternalCapability::Dictionary(name),
+            _ => panic!("unknown internal capability variant"),
+        })
+    }
+}
+
 /// A capability being routed from a component.
 #[derive(FromEnum, Clone, Debug, PartialEq, Eq)]
 pub enum ComponentCapability {
@@ -648,6 +922,126 @@ impl fmt::Display for ComponentCapability {
     }
 }
 
+impl TryFrom<ComponentCapability> for Dict {
+    type Error = fidl::Error;
+
+    fn try_from(capability: ComponentCapability) -> Result<Self, Self::Error> {
+        let (key, value) = match capability {
+            ComponentCapability::Use(decl) => {
+                (USE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Environment(env_cap) => {
+                (ENVIRONMENT_STR, Capability::Dictionary(env_cap.try_into()?))
+            }
+            ComponentCapability::Expose(decl) => {
+                (EXPOSE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Offer(decl) => {
+                (OFFER_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Protocol(decl) => {
+                (PROTOCOL_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Directory(decl) => {
+                (DIRECTORY_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Storage(decl) => {
+                (STORAGE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Runner(decl) => {
+                (RUNNER_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Resolver(decl) => {
+                (RESOLVER_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Service(decl) => {
+                (SERVICE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::EventStream(decl) => {
+                (EVENT_STREAM_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Dictionary(decl) => {
+                (DICTIONARY_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+            ComponentCapability::Config(decl) => {
+                (CONFIG_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
+            }
+        };
+        let output = Dict::new();
+        output
+            .insert_capability(
+                &Name::new(COMPONENT_CAPABILITY_KEY_STR).unwrap(),
+                Data::String(key.to_string()).into(),
+            )
+            .unwrap();
+        output.insert_capability(&Name::new(VALUE_STR).unwrap(), value).unwrap();
+        Ok(output)
+    }
+}
+
+impl TryFrom<Dict> for ComponentCapability {
+    type Error = fidl::Error;
+
+    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
+        let key = dict
+            .get(&Name::new(COMPONENT_CAPABILITY_KEY_STR).unwrap())
+            .map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let value =
+            dict.get(&Name::new(VALUE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let Some(Capability::Data(Data::String(key))) = key else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        if let Some(Capability::Dictionary(dict)) = value {
+            if key.as_str() != ENVIRONMENT_STR {
+                return Err(fidl::Error::InvalidEnumValue);
+            }
+            return Ok(ComponentCapability::Environment(dict.try_into()?));
+        }
+        let Some(Capability::Data(Data::Bytes(value))) = value else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        Ok(match key.as_str() {
+            USE_STR => {
+                ComponentCapability::Use(unpersist::<fdecl::Use>(&value)?.fidl_into_native())
+            }
+            EXPOSE_STR => {
+                ComponentCapability::Expose(unpersist::<fdecl::Expose>(&value)?.fidl_into_native())
+            }
+            OFFER_STR => {
+                ComponentCapability::Offer(unpersist::<fdecl::Offer>(&value)?.fidl_into_native())
+            }
+            PROTOCOL_STR => ComponentCapability::Protocol(
+                unpersist::<fdecl::Protocol>(&value)?.fidl_into_native(),
+            ),
+            DIRECTORY_STR => ComponentCapability::Directory(
+                unpersist::<fdecl::Directory>(&value)?.fidl_into_native(),
+            ),
+            STORAGE_STR => ComponentCapability::Storage(
+                unpersist::<fdecl::Storage>(&value)?.fidl_into_native(),
+            ),
+            RUNNER_STR => {
+                ComponentCapability::Runner(unpersist::<fdecl::Runner>(&value)?.fidl_into_native())
+            }
+            RESOLVER_STR => ComponentCapability::Resolver(
+                unpersist::<fdecl::Resolver>(&value)?.fidl_into_native(),
+            ),
+            SERVICE_STR => ComponentCapability::Service(
+                unpersist::<fdecl::Service>(&value)?.fidl_into_native(),
+            ),
+            EVENT_STREAM_STR => ComponentCapability::EventStream(
+                unpersist::<fdecl::EventStream>(&value)?.fidl_into_native(),
+            ),
+            DICTIONARY_STR => ComponentCapability::Dictionary(
+                unpersist::<fdecl::Dictionary>(&value)?.fidl_into_native(),
+            ),
+            CONFIG_STR => ComponentCapability::Config(
+                unpersist::<fdecl::Configuration>(&value)?.fidl_into_native(),
+            ),
+            _ => panic!("unknown component capability variant"),
+        })
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EnvironmentCapability {
     Runner { source_name: Name, source: RegistrationSource },
@@ -662,6 +1056,77 @@ impl EnvironmentCapability {
             | Self::Resolver { source, .. }
             | Self::Debug { source, .. } => &source,
         }
+    }
+}
+
+impl TryFrom<EnvironmentCapability> for Dict {
+    type Error = fidl::Error;
+
+    fn try_from(capability: EnvironmentCapability) -> Result<Self, Self::Error> {
+        let (variant, source_name, source) = match capability {
+            EnvironmentCapability::Runner { source_name, source } => {
+                (RUNNER_STR, source_name, source)
+            }
+            EnvironmentCapability::Resolver { source_name, source } => {
+                (RESOLVER_STR, source_name, source)
+            }
+            EnvironmentCapability::Debug { source_name, source } => {
+                (DEBUG_STR, source_name, source)
+            }
+        };
+        let output = Dict::new();
+        output
+            .insert_capability(
+                &Name::new(ENVIRONMENT_CAPABILITY_VARIANT_STR).unwrap(),
+                Data::String(variant.to_string()).into(),
+            )
+            .unwrap();
+        output
+            .insert_capability(
+                &Name::new(SOURCE_NAME_STR).unwrap(),
+                Data::String(source_name.as_str().to_string()).into(),
+            )
+            .unwrap();
+        output
+            .insert_capability(
+                &Name::new(SOURCE_STR).unwrap(),
+                Data::Bytes(persist(&source.native_into_fidl())?).into(),
+            )
+            .unwrap();
+        Ok(output)
+    }
+}
+
+impl TryFrom<Dict> for EnvironmentCapability {
+    type Error = fidl::Error;
+
+    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
+        let variant = dict
+            .get(&Name::new(ENVIRONMENT_CAPABILITY_VARIANT_STR).unwrap())
+            .map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let source_name = dict
+            .get(&Name::new(SOURCE_NAME_STR).unwrap())
+            .map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let source =
+            dict.get(&Name::new(SOURCE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
+
+        let Some(Capability::Data(Data::String(variant))) = variant else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        let Some(Capability::Data(Data::String(source_name))) = source_name else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        let Some(Capability::Data(Data::Bytes(source))) = source else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        let source_name = Name::new(source_name).map_err(|_e| fidl::Error::InvalidEnumValue)?;
+        let source: RegistrationSource = unpersist::<fdecl::Ref>(&source)?.fidl_into_native();
+        Ok(match variant.as_str() {
+            RUNNER_STR => EnvironmentCapability::Runner { source_name, source },
+            RESOLVER_STR => EnvironmentCapability::Resolver { source_name, source },
+            DEBUG_STR => EnvironmentCapability::Debug { source_name, source },
+            _ => panic!("unknown environment capability variant"),
+        })
     }
 }
 
@@ -704,6 +1169,53 @@ impl From<ServiceDecl> for AggregateCapability {
     }
 }
 
+impl TryFrom<AggregateCapability> for Dict {
+    type Error = fidl::Error;
+
+    fn try_from(capability: AggregateCapability) -> Result<Self, Self::Error> {
+        let (key, value) = match capability {
+            AggregateCapability::Service(name) => (SERVICE_STR, name),
+        };
+        let output = Dict::new();
+        output
+            .insert_capability(
+                &Name::new(AGGREGATE_CAPABILITY_KEY_STR).unwrap(),
+                Data::String(key.to_string()).into(),
+            )
+            .unwrap();
+        output
+            .insert_capability(
+                &Name::new(VALUE_STR).unwrap(),
+                Data::String(value.as_str().to_string()).into(),
+            )
+            .unwrap();
+        Ok(output)
+    }
+}
+
+impl TryFrom<Dict> for AggregateCapability {
+    type Error = fidl::Error;
+
+    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
+        let key = dict
+            .get(&Name::new(AGGREGATE_CAPABILITY_KEY_STR).unwrap())
+            .map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let value =
+            dict.get(&Name::new(VALUE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
+        let Some(Capability::Data(Data::String(key))) = key else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        let Some(Capability::Data(Data::String(value))) = value else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        let name = Name::new(value).unwrap();
+        Ok(match key.as_str() {
+            SERVICE_STR => AggregateCapability::Service(name),
+            _ => panic!("unknown aggregate capability variant"),
+        })
+    }
+}
+
 /// The list of declarations for capabilities from component manager's namespace.
 pub type NamespaceCapabilities = Vec<CapabilityDecl>;
 
@@ -714,7 +1226,6 @@ pub type BuiltinCapabilities = Vec<CapabilityDecl>;
 mod tests {
     use super::*;
     use cm_rust::StorageDirectorySource;
-    use fidl_fuchsia_component_decl as fdecl;
 
     #[test]
     fn capability_type_name() {

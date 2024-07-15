@@ -14,11 +14,14 @@ use cm_config::RuntimeConfig;
 use cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl};
 use cm_types::{Name, Url};
 use config_encoder::ConfigFields;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_process as fprocess;
+use lazy_static::lazy_static;
 use moniker::{ChildName, Moniker};
 use routing::bedrock::program_output_dict::build_program_output_dictionary;
 use routing::bedrock::sandbox_construction::{build_component_sandbox, ComponentSandbox};
 use routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
-use routing::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
+use routing::capability_source::{BuiltinCapabilities, InternalCapability, NamespaceCapabilities};
 use routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
     TopInstanceInterface, WeakExtendedInstanceInterface,
@@ -27,9 +30,15 @@ use routing::environment::RunnerRegistry;
 use routing::error::ComponentInstanceError;
 use routing::policy::GlobalPolicyChecker;
 use routing::resolving::{ComponentAddress, ComponentResolutionContext};
-use sandbox::Dict;
+use sandbox::{Capability, Dict, Router};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+
+lazy_static! {
+    static ref BUILTIN_CAPABILITIES: Vec<InternalCapability> = vec![InternalCapability::Protocol(
+        Name::new(fprocess::LauncherMarker::PROTOCOL_NAME).unwrap()
+    ),];
+}
 
 /// A representation of a v2 component instance.
 #[derive(Debug)]
@@ -70,8 +79,32 @@ impl ComponentInstanceForAnalyzer {
         let parent = WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
             top_instance,
         ));
-        let input = Default::default();
-        Self::new_internal(moniker, decl, config, url, parent, policy, id_index, environment, input)
+        let root_component_input = ComponentInput::default();
+        for builtin in BUILTIN_CAPABILITIES.iter() {
+            root_component_input
+                .insert_capability(
+                    builtin.source_name(),
+                    Router::new_ok(Capability::Dictionary(
+                        builtin
+                            .clone()
+                            .try_into()
+                            .expect("failed to convert internal capability source to dict"),
+                    ))
+                    .into(),
+                )
+                .expect("failedto insert builtin capability into dictionary");
+        }
+        Self::new_internal(
+            moniker,
+            decl,
+            config,
+            url,
+            parent,
+            policy,
+            id_index,
+            environment,
+            Default::default(),
+        )
     }
 
     // Creates a new non-root component instance as a child of `parent`.
@@ -152,15 +185,15 @@ impl ComponentInstanceForAnalyzer {
             &new_outgoing_dir_router,
         );
         let (sandbox, child_inputs) = build_component_sandbox(
-            &moniker,
+            &self_,
             children_component_output_dictionary_routers,
             &decl,
             input,
             &Dict::new(), // progam_input_dict_additions
             program_output_dict,
             program_output_router(&self_),
-            build_framework_dictionary(),
-            build_capability_sourced_capabilities_dictionary(&decl),
+            build_framework_dictionary(&self_),
+            build_capability_sourced_capabilities_dictionary(&self_, &decl),
             declared_dictionaries,
         );
         self_.sandbox.append(&sandbox);

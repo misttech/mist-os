@@ -5,6 +5,7 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_SPEC_LMP_FEATURE_SET_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_SPEC_LMP_FEATURE_SET_H_
 
+#include <cinttypes>
 #include <cstdint>
 #include <string>
 
@@ -57,7 +58,7 @@ class LMPFeatureSet {
     for (size_t i = 0; i <= last_page_number_; i++)
       if (HasPage(i))
         str += bt_lib_cpp_string::StringPrintf(
-            "[P%zu: 0x%016lx]", i, features_[i]);
+            "[P%zu: 0x%016" PRIx64 "]", i, features_[i]);
     return str;
   }
 

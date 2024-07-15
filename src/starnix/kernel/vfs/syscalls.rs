@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fs::fuchsia::TimerFile;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor, PAGE_SIZE};
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter,
 };
@@ -23,16 +23,18 @@ use crate::vfs::{
     XattrOp,
 };
 use fuchsia_zircon as zx;
+use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
-    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, PTRACE_MODE_ATTACH_REALCREDS,
+    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_LEASE, CAP_SYS_ADMIN, PTRACE_MODE_ATTACH_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
+use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
@@ -54,15 +56,16 @@ use starnix_uapi::{
     CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
     CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
     EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, F_ADD_SEALS, F_DUPFD,
-    F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK,
-    F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD, F_SETFL, F_SETLK,
-    F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, MFD_ALLOW_SEALING,
-    MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT,
-    O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT,
-    POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED,
-    POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL,
-    POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME,
-    TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
+    F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS,
+    F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
+    F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK,
+    IOCB_FLAG_RESFD, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT,
+    NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR,
+    POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM,
+    POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
+    POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
+    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX,
+    XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -297,6 +300,21 @@ pub fn sys_fcntl(
             let file = current_task.files.get(fd)?;
             let state = file.name.entry.node.write_guard_state.lock();
             Ok(state.get_seals()?.into())
+        }
+        F_SETLEASE => {
+            let file = current_task.files.get(fd)?;
+
+            let creds = current_task.creds();
+            if !creds.has_capability(CAP_LEASE) && creds.fsuid != file.node().info().uid {
+                return error!(EPERM);
+            }
+            let lease = FileLeaseType::from_bits(arg as u32)?;
+            file.set_lease(current_task, lease)?;
+            Ok(SUCCESS)
+        }
+        F_GETLEASE => {
+            let file = current_task.files.get(fd)?;
+            Ok(file.get_lease(current_task).into())
         }
         _ => {
             let file = current_task.files.get(fd)?;
@@ -837,11 +855,8 @@ pub fn sys_newfstatat(
     buffer: UserRef<uapi::stat>,
     flags: u32,
 ) -> Result<(), Errno> {
-    if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {
-        track_stub!(TODO("https://fxbug.dev/297370602"), "newfstatat", flags);
-        return error!(ENOSYS);
-    }
-    let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
+    let flags =
+        LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
     let result = name.entry.node.stat(current_task)?;
     current_task.write_object(buffer, &result)?;
@@ -2860,10 +2875,47 @@ fn submit_iocb(
     let opcode = control_block.aio_lio_opcode as u32;
     let offset = control_block.aio_offset as usize;
     let flags = control_block.aio_flags;
-    let buffer = UserBuffer {
-        address: control_block.aio_buf.into(),
-        length: control_block.aio_nbytes as usize,
+
+    let op_type = match opcode {
+        starnix_uapi::IOCB_CMD_PREAD => IoOperationType::Read,
+        starnix_uapi::IOCB_CMD_PREADV => IoOperationType::ReadV,
+        starnix_uapi::IOCB_CMD_PWRITE => IoOperationType::Write,
+        starnix_uapi::IOCB_CMD_PWRITEV => IoOperationType::WriteV,
+        _ => {
+            track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
+            return error!(ENOSYS);
+        }
     };
+    match op_type {
+        IoOperationType::Read | IoOperationType::ReadV => {
+            if !file.can_read() {
+                return error!(EBADF);
+            }
+        }
+        IoOperationType::Write | IoOperationType::WriteV => {
+            if !file.can_write() {
+                return error!(EBADF);
+            }
+        }
+    }
+    let mut buffers = match op_type {
+        IoOperationType::Read | IoOperationType::Write => smallvec![UserBuffer {
+            address: control_block.aio_buf.into(),
+            length: control_block.aio_nbytes as usize,
+        }],
+        IoOperationType::ReadV | IoOperationType::WriteV => {
+            let count = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
+            current_task.read_iovec(control_block.aio_buf.into(), count)?
+        }
+    };
+
+    // Validate the user buffers and offset synchronously.
+    let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
+        current_task.maximum_valid_address(),
+        &mut buffers,
+    )?;
+    checked_add_offset_and_length(offset, buffer_length)?;
+
     let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
         let eventfd = current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
         if eventfd.downcast_file::<EventFdFileObject>().is_none() {
@@ -2874,32 +2926,13 @@ fn submit_iocb(
         None
     };
 
-    let op_type = match opcode {
-        starnix_uapi::IOCB_CMD_PREAD => {
-            if !file.can_read() {
-                return error!(EBADF);
-            }
-            IoOperationType::Read
-        }
-        starnix_uapi::IOCB_CMD_PWRITE => {
-            if !file.can_write() {
-                return error!(EBADF);
-            }
-            IoOperationType::Write
-        }
-        _ => {
-            track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
-            return error!(ENOSYS);
-        }
-    };
-
     let mut ctx = ctx.lock();
     ctx.queue_op(
         current_task,
         IoOperation {
             op_type,
             file: Arc::downgrade(&file),
-            buffer,
+            buffers,
             offset,
             id,
             iocb_addr,

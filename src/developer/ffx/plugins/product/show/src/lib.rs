@@ -6,21 +6,34 @@
 //! images and packages, and can be used to emulate, flash, or update a product.
 
 use anyhow::{bail, Context, Result};
-use ffx_core::ffx_plugin;
+
 use ffx_product_show_args::ShowCommand;
+use fho::{FfxMain, FfxTool, SimpleWriter, ToolIO as _};
 use sdk_metadata::{ProductBundle, ProductBundleV2, VirtualDevice, VirtualDeviceManifest};
 use serde_json::to_string_pretty;
-use std::io::{stderr, stdin, stdout};
+use std::io::{stdin, stdout};
 use structured_ui::{Notice, Presentation, TableRows};
 
 /// `ffx product show` sub-command.
-#[ffx_plugin()]
-pub async fn pb_show(cmd: ShowCommand) -> Result<()> {
-    let mut input = stdin();
-    let mut output = stdout();
-    let mut err_out = stderr();
-    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    pb_show_impl(&ui, &cmd).await
+#[derive(FfxTool)]
+pub struct ProductCreateTool {
+    #[command]
+    pub cmd: ShowCommand,
+}
+
+fho::embedded_plugin!(ProductCreateTool);
+
+/// Create a product bundle.
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ProductCreateTool {
+    type Writer = SimpleWriter;
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        let mut input = stdin();
+        let mut output = stdout();
+        let mut err_out = writer.stderr();
+        let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+        pb_show_impl(&ui, &self.cmd).await.map_err(Into::into)
+    }
 }
 
 async fn pb_show_impl<I>(ui: &I, cmd: &ShowCommand) -> Result<()>

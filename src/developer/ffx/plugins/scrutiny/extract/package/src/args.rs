@@ -4,6 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
+use fuchsia_url::AbsolutePackageUrl;
 use std::path::PathBuf;
 
 #[ffx_command()]
@@ -26,7 +27,7 @@ pub struct ScrutinyPackageCommand {
     pub product_bundle: PathBuf,
     /// the package url.
     #[argh(option)]
-    pub url: String,
+    pub url: AbsolutePackageUrl,
     /// the location to write the output artifacts.
     #[argh(option)]
     pub output: String,

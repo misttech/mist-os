@@ -18,7 +18,7 @@ use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use derivative::Derivative;
 use either::Either;
 use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6};
-use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr};
+use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_base::socket::{
     self, BoundSocketMap, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
     DualStackListenerIpAddr, DualStackLocalIp, DualStackRemoteIp, EitherStack, InsertError,
@@ -41,8 +41,8 @@ use netstack3_ip::socket::{
     SendOneShotIpPacketError, SendOptions, SocketHopLimits,
 };
 use netstack3_ip::{
-    self as ip, icmp, BaseTransportIpContext, HopLimits, MulticastMembershipHandler,
-    ResolveRouteError, TransportIpContext,
+    BaseTransportIpContext, HopLimits, MulticastMembershipHandler, ResolveRouteError,
+    TransportIpContext,
 };
 use packet::BufferMut;
 use packet_formats::ip::IpProtoExt;
@@ -124,8 +124,8 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> DerefMut
 }
 
 /// Marker trait for datagram IP extensions.
-pub trait IpExt: ip::IpExt + DualStackIpExt + icmp::IcmpIpExt {}
-impl<I: ip::IpExt + DualStackIpExt + icmp::IcmpIpExt> IpExt for I {}
+pub trait IpExt: netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt {}
+impl<I: netstack3_base::IpExt + DualStackIpExt + netstack3_base::IcmpIpExt> IpExt for I {}
 
 /// A datagram socket's state.
 #[derive(Derivative, GenericOverIp)]
@@ -200,6 +200,21 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> SocketState<I, D,
             };
             node.record_local_socket_addr::<N, _, _, _>(local);
             node.record_remote_socket_addr::<N, _, _, _>(remote);
+
+            let IpOptions {
+                multicast_memberships: MulticastMemberships(multicast_memberships),
+                socket_options: _,
+                other_stack: _,
+                transparent: _,
+            } = self.as_ref();
+            node.record_child("MulticastGroupMemberships", |node| {
+                for (index, (multicast_addr, device)) in multicast_memberships.iter().enumerate() {
+                    node.record_debug_child(index, |node| {
+                        node.record_ip_addr("MulticastGroup", multicast_addr.get());
+                        N::record_device(node, "Device", device);
+                    })
+                }
+            });
         });
     }
 
@@ -547,6 +562,9 @@ pub struct DatagramSocketOptions<I: IpExt, D: WeakDeviceIdentifier> {
     /// IP_MULTICAST_LOOP flag). Enabled by default.
     #[derivative(Default(value = "true"))]
     pub multicast_loop: bool,
+
+    /// Set to `Some` when the socket can be used to send broadcast packets.
+    pub allow_broadcast: Option<I::BroadcastMarker>,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions<I, D> {
@@ -556,6 +574,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions
 
     fn multicast_loop(&self) -> bool {
         self.multicast_loop
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        self.allow_broadcast
     }
 }
 
@@ -1016,7 +1038,7 @@ impl<I> DualStackIpExt for I where
 /// useful for implementing dual-stack sockets. The types are intentionally
 /// asymmetric - `DualStackIpExt::Xxx` has a different shape for the [`Ipv4`]
 /// and [`Ipv6`] impls.
-pub trait DualStackBaseIpExt: socket::DualStackIpExt + SocketIpExt + ip::IpExt {
+pub trait DualStackBaseIpExt: socket::DualStackIpExt + SocketIpExt + netstack3_base::IpExt {
     /// The type of socket that can receive an IP packet.
     ///
     /// For `Ipv4`, this is [`EitherIpSocket<S>`], and for `Ipv6` it is just
@@ -2158,6 +2180,7 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
     device: &Option<CC::WeakDeviceId>,
     core_ctx: &mut CC,
     identifier: LI,
+    transparent: bool,
 ) -> Result<
     (Option<SocketIpAddr<I::Addr>>, Option<EitherDeviceId<CC::DeviceId, CC::WeakDeviceId>>, LI),
     LocalAddressError,
@@ -2171,8 +2194,8 @@ fn try_pick_bound_address<I: IpExt, CC: TransportIpContext<I, BC>, BC, LI>(
 
             // Binding to multicast addresses is allowed regardless.
             // Other addresses can only be bound to if they are assigned
-            // to the device.
-            if !addr.addr().is_multicast() {
+            // to the device, or if the socket is transparent.
+            if !addr.addr().is_multicast() && !transparent {
                 BaseTransportIpContext::<I, _>::with_devices_with_assigned_addr(
                     core_ctx,
                     addr.into(),
@@ -2310,6 +2333,7 @@ fn listen_inner<
         local_id: Option<<S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
         id: <S::SocketMapSpec<I, CC::WeakDeviceId> as SocketMapStateSpec>::ListenerId,
         sharing: S::SharingState,
+        transparent: bool,
     ) -> Result<
         ListenerAddr<
             ListenerIpAddr<I::Addr, <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier>,
@@ -2328,7 +2352,7 @@ fn listen_inner<
         }
         .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
         let (addr, device, identifier) =
-            try_pick_bound_address::<I, _, _, _>(addr, device, core_ctx, identifier)?;
+            try_pick_bound_address::<I, _, _, _>(addr, device, core_ctx, identifier, transparent)?;
         let weak_device = device.map(|d| d.as_weak().into_owned());
 
         BoundStateHandler::<_, S, _>::try_insert_listener(
@@ -2363,6 +2387,7 @@ fn listen_inner<
                         local_id,
                         id,
                         sharing.clone(),
+                        ip_options.transparent(),
                     )
                 })
                 .map(|ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }| {
@@ -2390,6 +2415,7 @@ fn listen_inner<
                         local_id,
                         id,
                         sharing.clone(),
+                        ip_options.transparent(),
                     )
                 })
                 .map(|ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device }| {
@@ -2424,8 +2450,13 @@ fn listen_inner<
                         ),
                     }
                     .ok_or(LocalAddressError::FailedToAllocateLocalPort)?;
-                    let (_addr, device, identifier) =
-                        try_pick_bound_address::<I, _, _, _>(None, device, core_ctx, identifier)?;
+                    let (_addr, device, identifier) = try_pick_bound_address::<I, _, _, _>(
+                        None,
+                        device,
+                        core_ctx,
+                        identifier,
+                        ip_options.transparent(),
+                    )?;
                     let weak_device = device.map(|d| d.as_weak().into_owned());
 
                     BoundStateHandler::<_, S, _>::try_insert_listener(
@@ -2579,6 +2610,7 @@ fn connect_inner<
         local_ip.map(SocketIpAddr::into),
         remote_ip,
         S::ip_proto::<WireI>(),
+        ip_options.transparent(),
     )?;
 
     let local_port = match local_port {
@@ -3328,6 +3360,7 @@ struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakDeviceI
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: &'a Option<D>,
     socket_options: &'a DatagramSocketOptions<I, D>,
+    transparent: bool,
 }
 
 fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC, B: BufferMut>(
@@ -3340,6 +3373,7 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
         remote_id,
         device,
         socket_options,
+        transparent,
     }: SendOneshotParameters<'_, I, S, CC::WeakDeviceId>,
     body: B,
 ) -> Result<(), SendToError<S::SerializeError>> {
@@ -3371,6 +3405,7 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
                 )
             },
             None,
+            transparent,
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => SendToError::CreateAndSend(err),
@@ -3471,7 +3506,7 @@ fn set_bound_device_single_stack<
         }
         SetBoundDeviceParameters::Connected(ConnState {
             socket,
-            ip_options: _,
+            ip_options,
             addr,
             shutdown: _,
             clear_device_on_disconnect,
@@ -3486,6 +3521,7 @@ fn set_bound_device_single_stack<
                     Some(local_ip.clone()),
                     remote_ip.clone(),
                     socket.proto(),
+                    ip_options.transparent(),
                 )
                 .map_err(|_: IpSockCreationError| {
                     SocketError::Remote(RemoteAddressError::NoRoute)
@@ -4212,6 +4248,7 @@ where
                                         remote_id: remote_identifier,
                                         device,
                                         socket_options: &ip_options.socket_options,
+                                        transparent: ip_options.transparent,
                                     },
                                     core_ctx,
                                 )),
@@ -4240,6 +4277,7 @@ where
                                         remote_id: remote_identifier,
                                         device,
                                         socket_options: &ip_options.socket_options,
+                                        transparent: ip_options.transparent,
                                     },
                                     core_ctx,
                                 )),
@@ -4273,6 +4311,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: &ip_options.socket_options,
+                                    transparent: ip_options.transparent,
                                 },
                                 core_ctx,
                             )),
@@ -4290,6 +4329,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: &ip_options.socket_options,
+                                    transparent: ip_options.transparent,
                                 },
                                 core_ctx,
                             )),
@@ -4310,6 +4350,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: ds.to_other_socket_options(ip_options),
+                                    transparent: ip_options.transparent,
                                 },
                                 ds,
                             )),
@@ -4327,6 +4368,7 @@ where
                                     remote_id: remote_identifier,
                                     device,
                                     socket_options: ds.to_other_socket_options(ip_options),
+                                    transparent: ip_options.transparent,
                                 },
                                 ds,
                             )),
@@ -4370,6 +4412,7 @@ where
                                             remote_id: remote_identifier,
                                             device,
                                             socket_options: &ip_options.socket_options,
+                                            transparent: ip_options.transparent,
                                         },
                                         core_ctx,
                                     )),
@@ -4401,6 +4444,7 @@ where
                                             remote_id: remote_identifier,
                                             device,
                                             socket_options: ds.to_other_socket_options(ip_options),
+                                            transparent: ip_options.transparent,
                                         },
                                         ds,
                                     )),
@@ -4810,6 +4854,38 @@ where
         })
     }
 
+    /// Calls the callback with mutable access to [`DatagramSocketOptionsI, D>`]
+    /// and [`S::OtherStackIpOptions<I, D>`].
+    pub fn with_both_stacks_ip_options_mut<R>(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+        cb: impl FnOnce(
+            &mut DatagramSocketOptions<I, DatagramApiWeakDeviceId<C>>,
+            &mut S::OtherStackIpOptions<I, DatagramApiWeakDeviceId<C>>,
+        ) -> R,
+    ) -> R {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            let options = state.get_options_mut(core_ctx);
+            cb(&mut options.socket_options, &mut options.other_stack)
+        })
+    }
+
+    /// Calls the callback with access to [`DatagramSocketOptionsI, D>`] and
+    /// [`S::OtherStackIpOptions<I, D>`].
+    pub fn with_both_stacks_ip_options<R>(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+        cb: impl FnOnce(
+            &DatagramSocketOptions<I, DatagramApiWeakDeviceId<C>>,
+            &S::OtherStackIpOptions<I, DatagramApiWeakDeviceId<C>>,
+        ) -> R,
+    ) -> R {
+        self.core_ctx().with_socket_state(id, |core_ctx, state| {
+            let (options, _device) = state.get_options_device(core_ctx);
+            cb(&options.socket_options, &options.other_stack)
+        })
+    }
+
     /// Updates the socket's sharing state to the result of `f`.
     ///
     /// `f` is given mutable access to the sharing state and is called under the
@@ -4864,7 +4940,29 @@ where
         })
     }
 
-    /// Sets the multicast interface for outgoing multicast interface.
+    /// Sets the broadcast option.
+    pub fn set_broadcast(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+        value: Option<I::BroadcastMarker>,
+    ) {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            state.get_options_mut(core_ctx).socket_options.allow_broadcast = value;
+        })
+    }
+
+    /// Returns the broadcast option.
+    pub fn get_broadcast(
+        &mut self,
+        id: &DatagramApiSocketId<I, C, S>,
+    ) -> Option<I::BroadcastMarker> {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            let (options, _device) = state.get_options_device(core_ctx);
+            options.socket_options.allow_broadcast
+        })
+    }
+
+    /// Sets the multicast interface for outgoing multicast packets.
     pub fn set_multicast_interface(
         &mut self,
         id: &DatagramApiSocketId<I, C, S>,
@@ -5939,6 +6037,46 @@ mod test {
         api.set_ip_transparent(&unbound, false);
 
         assert!(!api.get_ip_transparent(&unbound));
+    }
+
+    #[ip_test(I)]
+    fn transparent_bind_connect_non_local_src_addr<I: DatagramIpExt<FakeDeviceId>>() {
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::<I, _>::new_with_ip_socket_ctx(
+            FakeDualStackIpSocketCtx::new([FakeDeviceConfig {
+                device: FakeDeviceId,
+                local_ips: vec![],
+                remote_ips: vec![I::TEST_ADDRS.remote_ip],
+            }]),
+        ));
+        let mut api = ctx.datagram_api::<I>();
+        let socket = api.create(());
+        api.set_ip_transparent(&socket, true);
+
+        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
+        const REMOTE_PORT: u16 = 1234;
+
+        // Binding to `local_ip` should succeed even though it is not assigned
+        // to an interface because the socket is transparent.
+        api.listen(&socket, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(LOCAL_PORT))
+            .expect("listen should succeed");
+
+        // Connecting to a valid remote should also succeed even though the
+        // local address of the IP socket is not actually local.
+        api.connect(
+            &socket,
+            Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
+            REMOTE_PORT,
+            Default::default(),
+        )
+        .expect("connect should succeed");
+
+        api.send_to(
+            &socket,
+            Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)),
+            REMOTE_PORT,
+            Buf::new(Vec::new(), ..),
+        )
+        .expect("send_to should succeed");
     }
 
     #[derive(Eq, PartialEq)]

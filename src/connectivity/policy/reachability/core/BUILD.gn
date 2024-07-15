@@ -14,10 +14,8 @@ rustc_library("lib") {
 
   deps = [
     ":network_policy_metrics_registry_rustlib",
-    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
-    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
     "//src/connectivity/lib/fidl_fuchsia_net_neighbor_ext",
@@ -51,6 +49,7 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
     "//src/connectivity/lib/net-declare",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",

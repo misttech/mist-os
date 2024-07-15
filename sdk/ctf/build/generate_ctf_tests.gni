@@ -328,44 +328,79 @@ template("generate_pkgdir-tests") {
 
 template("generate_simulate-scan-wlan-hw-sim-tests") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    test_specs = {
-      log_settings = {
-        max_severity = "ERROR"
-      }
+  _disabled_versions = [
+    "15",
+    "16",
+    "17",
+    "18",
+  ]
+  if (defined(invoker.api_level) &&
+      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
+      _disabled_versions) {
+    not_needed([ "test_info" ])
+    group(target_name) {
     }
-    subpackages = [
-      test_info.target_label,
-      "//src/connectivity/wlan/tests/helpers/realm-factory",
-      "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
-    ]
-    test_component = "//src/connectivity/wlan/testing/hw-sim/test/simulate_scan:simulate-scan-test-root-component"
-    test_component_name = "test-root.cm"
+  } else {
+    fuchsia_package_with_test(target_name) {
+      test_specs = {
+        log_settings = {
+          max_severity = "ERROR"
+        }
+      }
+      subpackages = [
+        test_info.target_label,
+        "//src/connectivity/wlan/tests/helpers/realm-factory",
+        "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
+      ]
+      test_component = "//src/connectivity/wlan/testing/hw-sim/test/simulate_scan:simulate-scan-test-root-component"
+      test_component_name = "test-root.cm"
+    }
   }
 }
 
 template("generate_basic-driver-test") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    test_component =
-        "//src/devices/tests/ctf/basic_driver:basic-driver-test-root"
-    test_component_name = "basic-driver-test-root.cm"
-    subpackages = [
-      test_info.target_label,
-      "//src/devices/testing/realm-factory",
-    ]
+  _disabled_versions = [
+    "17",
+    "18",
+  ]
+  if (defined(invoker.api_level) &&
+      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
+      _disabled_versions) {
+    not_needed([ "test_info" ])
+    group(target_name) {
+    }
+  } else {
+    fuchsia_package_with_test(target_name) {
+      test_component =
+          "//src/devices/tests/ctf/basic_driver:basic-driver-test-root"
+      test_component_name = "basic-driver-test-root.cm"
+      subpackages = [
+        test_info.target_label,
+        "//src/devices/testing/realm-factory",
+      ]
+    }
   }
 }
 
 template("generate_nodegroup_test") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    test_component = "//src/devices/tests/v2/node_group:nodegroup_test_root"
-    test_component_name = "nodegroup_test_root.cm"
-    subpackages = [
-      test_info.target_label,
-      "//src/devices/testing/realm-factory",
-    ]
+  _disabled_versions = [ "18" ]
+  if (defined(invoker.api_level) &&
+      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
+      _disabled_versions) {
+    not_needed([ "test_info" ])
+    group(target_name) {
+    }
+  } else {
+    fuchsia_package_with_test(target_name) {
+      test_component = "//src/devices/tests/v2/node_group:nodegroup_test_root"
+      test_component_name = "nodegroup_test_root.cm"
+      subpackages = [
+        test_info.target_label,
+        "//src/devices/testing/realm-factory",
+      ]
+    }
   }
 }
 

@@ -192,8 +192,20 @@ struct arithmetic_ops_helper<T*> {
   static constexpr size_t modifier = sizeof(T);
 };
 
+// difference_t is only defined for pointers, integral types and floating types.
+template <typename T, typename = void>
+struct atomic_difference_type {};
+
 template <typename T>
-using difference_t = typename arithmetic_ops_helper<T>::operand_type;
+struct atomic_difference_type<T, std::enable_if_t<std::is_pointer_v<T>>> {
+  using difference_type = std::ptrdiff_t;
+};
+
+template <typename T>
+struct atomic_difference_type<
+    T, std::enable_if_t<std::is_integral_v<T> || std::is_floating_point_v<T>>> {
+  using difference_type = T;
+};
 
 // Arithmetic operations.
 //

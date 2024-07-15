@@ -4,7 +4,10 @@
 
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps};
+use crate::vfs::{
+    default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject,
+    FileOps,
+};
 use starnix_logging::log_info;
 use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
@@ -21,6 +24,7 @@ impl SyslogFile {
 
 impl FileOps for SyslogFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

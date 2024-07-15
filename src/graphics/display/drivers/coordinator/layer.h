@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -102,8 +103,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
 
   void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageMetadata image_metadata);
   void SetPrimaryPosition(fuchsia_hardware_display_types::wire::Transform transform,
-                          fuchsia_hardware_display_types::wire::Frame src_frame,
-                          fuchsia_hardware_display_types::wire::Frame dest_frame);
+                          fuchsia_math::wire::RectU image_source,
+                          fuchsia_math::wire::RectU display_destination);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
   void SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
                       ::fidl::VectorView<uint8_t> color_bytes);

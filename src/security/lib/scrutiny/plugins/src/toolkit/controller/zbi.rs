@@ -3,15 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use scrutiny::model::controller::{DataController, HintDataType};
-use scrutiny::model::model::*;
 use scrutiny_utils::blobfs::*;
 use scrutiny_utils::bootfs::*;
 use scrutiny_utils::fs::tempdir;
 use scrutiny_utils::fvm::*;
-use scrutiny_utils::usage::*;
 use scrutiny_utils::zbi::*;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::value::Value;
 use std::collections::HashMap;
@@ -22,31 +18,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::info;
 
-#[derive(Deserialize, Serialize)]
-pub struct ZbiExtractRequest {
-    // The input path for the ZBI.
-    pub input: String,
-    // The output directory for the extracted ZBI.
-    pub output: String,
-}
-
-#[derive(Default)]
 pub struct ZbiExtractController {}
 
-impl DataController for ZbiExtractController {
-    fn query(&self, model: Arc<DataModel>, query: Value) -> Result<Value> {
-        let tmp_root_dir_path = model.config().tmp_dir_path();
-
-        let request: ZbiExtractRequest = serde_json::from_value(query)?;
-        let mut zbi_file = File::open(request.input)?;
-        let output_path = PathBuf::from(request.output);
+impl ZbiExtractController {
+    pub fn extract(input: PathBuf, output: PathBuf) -> Result<Value> {
+        let mut zbi_file = File::open(input)?;
         let mut zbi_buffer = Vec::new();
         zbi_file.read_to_end(&mut zbi_buffer)?;
         let mut reader = ZbiReader::new(zbi_buffer);
         let zbi_sections = reader.parse()?;
 
-        fs::create_dir_all(&output_path)?;
-        let mut sections_dir = output_path.clone();
+        fs::create_dir_all(&output)?;
+        let mut sections_dir = output.clone();
         sections_dir.push("sections");
         fs::create_dir_all(&sections_dir)?;
         let mut section_count = HashMap::new();
@@ -66,7 +49,7 @@ impl DataController for ZbiExtractController {
 
             // Expand bootfs into its own folder as well.
             if section.section_type == ZbiType::StorageBootfs {
-                let mut bootfs_dir = output_path.clone();
+                let mut bootfs_dir = output.clone();
                 bootfs_dir.push("bootfs");
                 fs::create_dir_all(bootfs_dir.clone())?;
                 let mut bootfs_reader = BootfsReader::new(section.buffer.clone());
@@ -85,7 +68,7 @@ impl DataController for ZbiExtractController {
                 let mut fvm_reader = FvmReader::new(section.buffer.clone());
                 if let Ok(fvm_partitions) = fvm_reader.parse() {
                     info!(total = fvm_partitions.len(), "Extracting Partitions in StorageRamdisk");
-                    let mut fvm_dir = output_path.clone();
+                    let mut fvm_dir = output.clone();
                     fvm_dir.push("fvm");
                     fs::create_dir_all(fvm_dir.clone())?;
 
@@ -111,7 +94,7 @@ impl DataController for ZbiExtractController {
                             let blobfs_dir = fvm_dir.join("blobfs");
                             fs::create_dir_all(&blobfs_dir)?;
 
-                            let tmp_dir = tempdir(tmp_root_dir_path.as_ref()).context(
+                            let tmp_dir = tempdir::<PathBuf>(None).context(
                                 "Failed to create temporary directory for zbi extract controller",
                             )?;
                             let mut reader = BlobFsReaderBuilder::new()
@@ -139,30 +122,5 @@ impl DataController for ZbiExtractController {
         }
 
         Ok(json!({"status": "ok"}))
-    }
-
-    fn description(&self) -> String {
-        "Extracts a ZBI and outputs all the file contents.".to_string()
-    }
-
-    fn usage(&self) -> String {
-        UsageBuilder::new()
-            .name("tool.zbi.extract - Extracts Zircon Boot Images")
-            .summary("tool.zbi.extract --input foo.zbi --output /foo/bar")
-            .description(
-                "Extracts zircon boot images into their sections \
-            some recognized sections like bootfs are further parsed out into \
-            directories.",
-            )
-            .arg("--input", "Path to the input zbi file")
-            .arg("--output", "Path to the output directory")
-            .build()
-    }
-
-    fn hints(&self) -> Vec<(String, HintDataType)> {
-        vec![
-            ("--input".to_string(), HintDataType::NoType),
-            ("--output".to_string(), HintDataType::NoType),
-        ]
     }
 }

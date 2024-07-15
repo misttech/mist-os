@@ -112,11 +112,11 @@ void GetPostTransformWidth(const layer_t& layer, uint32_t* width, uint32_t* heig
       primary->transform_mode == FRAME_TRANSFORM_ROT_180 ||
       primary->transform_mode == FRAME_TRANSFORM_REFLECT_X ||
       primary->transform_mode == FRAME_TRANSFORM_REFLECT_Y) {
-    *width = primary->src_frame.width;
-    *height = primary->src_frame.height;
+    *width = primary->image_source.width;
+    *height = primary->image_source.height;
   } else {
-    *width = primary->src_frame.height;
-    *height = primary->src_frame.width;
+    *width = primary->image_source.height;
+    *height = primary->image_source.width;
   }
 }
 
@@ -1167,10 +1167,10 @@ bool Controller::CalculateMinimumAllocations(
 
         if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY ||
             primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
-          plane_source_width = primary->src_frame.width;
+          plane_source_width = primary->image_source.width;
           min_scan_lines = 8;
         } else {
-          plane_source_width = primary->src_frame.height;
+          plane_source_width = primary->image_source.height;
           min_scan_lines = 32 / bytes_per_pixel;
         }
         min_allocs[pipe_id][plane_num] = static_cast<uint16_t>(
@@ -1324,10 +1324,10 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t> banj
       } else if (layer->type == LAYER_TYPE_PRIMARY) {
         const primary_layer_t* primary = &layer->cfg.primary;
 
-        uint32_t scaled_width =
-            primary->src_frame.width * primary->src_frame.width / primary->dest_frame.width;
-        uint32_t scaled_height =
-            primary->src_frame.height * primary->src_frame.height / primary->dest_frame.height;
+        uint32_t scaled_width = primary->image_source.width * primary->image_source.width /
+                                primary->display_destination.width;
+        uint32_t scaled_height = primary->image_source.height * primary->image_source.height /
+                                 primary->display_destination.height;
 
         // TODO(https://fxbug.dev/42076788): Currently we assume only RGBA/BGRA formats
         // are supported and hardcode the bytes-per-pixel value to avoid pixel
@@ -1533,8 +1533,8 @@ bool Controller::CheckDisplayLimits(
       uint32_t src_width, src_height;
       GetPostTransformWidth(banjo_display_config.layer_list[i], &src_width, &src_height);
 
-      double downscale = std::max(1.0, 1.0 * src_height / primary->dest_frame.height) *
-                         std::max(1.0, 1.0 * src_width / primary->dest_frame.width);
+      double downscale = std::max(1.0, 1.0 * src_height / primary->display_destination.height) *
+                         std::max(1.0, 1.0 * src_width / primary->display_destination.width);
       double plane_ratio = 1.0 / downscale;
       min_plane_ratio = std::min(plane_ratio, min_plane_ratio);
     }
@@ -1550,7 +1550,8 @@ bool Controller::CheckDisplayLimits(
         uint32_t src_width, src_height;
         GetPostTransformWidth(banjo_display_config.layer_list[j], &src_width, &src_height);
 
-        if (src_height > primary->dest_frame.height || src_width > primary->dest_frame.width) {
+        if (src_height > primary->display_destination.height ||
+            src_width > primary->display_destination.width) {
           current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
       }
@@ -1674,18 +1675,19 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
             merge_all = true;
           }
 
-          if (primary->dest_frame.width != src_width || primary->dest_frame.height != src_height) {
+          if (primary->display_destination.width != src_width ||
+              primary->display_destination.height != src_height) {
             float ratio = registers::PipeScalerControlSkylake::k7x5MaxRatio;
             uint32_t max_width = static_cast<uint32_t>(static_cast<float>(src_width) * ratio);
             uint32_t max_height = static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
             uint32_t scalers_needed = 1;
             // The 7x5 scaler (i.e. 2 scaler resources) is required if the src width is
             // >2048 and the required vertical scaling is greater than 1.99.
-            if (primary->src_frame.width > 2048) {
+            if (primary->image_source.width > 2048) {
               float ratio = registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
               uint32_t max_dynamic_height =
                   static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
-              if (max_dynamic_height < primary->dest_frame.height) {
+              if (max_dynamic_height < primary->display_destination.height) {
                 scalers_needed = 2;
               }
             }
@@ -1700,7 +1702,8 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
                 src_width > registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
                 src_width < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
                 src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
-                max_width < primary->dest_frame.width || max_height < primary->dest_frame.height) {
+                max_width < primary->display_destination.width ||
+                max_height < primary->display_destination.height) {
               current_display_client_composition_opcodes[j] |=
                   CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
             } else {
@@ -2358,12 +2361,8 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-Controller::Controller(zx_device_t* parent) : parent_(parent) {
-  mtx_init(&display_lock_, mtx_plain);
-  mtx_init(&gtt_lock_, mtx_plain);
-  mtx_init(&bar_lock_, mtx_plain);
-  mtx_init(&plane_buffers_lock_, mtx_plain);
-}
+Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
+    : parent_(parent), inspector_(std::move(inspector)) {}
 
 Controller::~Controller() {
   interrupts_.Destroy();
@@ -2376,9 +2375,11 @@ Controller::~Controller() {
 }
 
 // static
-zx::result<std::unique_ptr<Controller>> Controller::Create(zx_device_t* parent) {
+zx::result<std::unique_ptr<Controller>> Controller::Create(zx_device_t* parent,
+                                                           inspect::Inspector inspector) {
   fbl::AllocChecker alloc_checker;
-  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, parent);
+  auto controller =
+      fbl::make_unique_checked<Controller>(&alloc_checker, parent, std::move(inspector));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);

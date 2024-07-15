@@ -16,8 +16,8 @@ use fidl_fuchsia_diagnostics::{LogInterestSelector, Selector, Severity, StreamMo
 use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::prelude::*;
-use lazy_static::lazy_static;
 use moniker::Moniker;
+use once_cell::sync::Lazy;
 use selectors::SelectorExt;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -25,10 +25,9 @@ use std::sync::Arc;
 use tracing::{debug, error};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
-lazy_static! {
-    pub static ref INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0);
-    pub static ref OUR_MONIKER: Moniker = Moniker::parse_str("bootstrap/archivist").unwrap();
-}
+static INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0);
+static ARCHIVIST_MONIKER: Lazy<Moniker> =
+    Lazy::new(|| Moniker::parse_str("bootstrap/archivist").unwrap());
 
 /// LogsRepository holds all diagnostics data and is a singleton wrapped by multiple
 /// [`pipeline::Pipeline`]s in a given Archivist instance.
@@ -282,7 +281,9 @@ impl LogsRepositoryState {
             let lowest_selector = selectors
                 .iter()
                 .filter(|selector| {
-                    OUR_MONIKER.matches_component_selector(&selector.selector).unwrap_or(false)
+                    ARCHIVIST_MONIKER
+                        .matches_component_selector(&selector.selector)
+                        .unwrap_or(false)
                 })
                 .min_by_key(|selector| selector.interest.min_severity.unwrap_or(Severity::Info));
             if let Some(selector) = lowest_selector {

@@ -5,13 +5,13 @@
 use fuchsia_zircon as zx;
 
 use crate::arch::registers::RegisterState;
-use crate::mm::vmo::round_up_to_increment;
 use crate::signals::{SignalInfo, SignalState};
 use crate::task::{CurrentTask, Task};
 use extended_pstate::riscv64::{RiscvVectorCsrs, NUM_V_REGISTERS, VLEN};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
 use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{self as uapi, error, sigaction, sigaltstack, sigcontext, siginfo_t, ucontext};
 
@@ -207,7 +207,7 @@ pub fn restore_registers(
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
-    round_up_to_increment(pointer as usize, 16).expect("Failed to round up stack pointer") as u64
+    round_up_to_increment(pointer, 16).expect("Failed to round up stack pointer")
 }
 
 pub fn update_register_state_for_restart(registers: &mut RegisterState, err: ErrnoCode) {

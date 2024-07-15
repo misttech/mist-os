@@ -25,9 +25,9 @@ const tag = "filter"
 
 type cachedNicInfo struct {
 	nicid tcpip.NICID
-	// deviceClass caches the NIC's device class, if it has one. Only interfaces
+	// deviceClass caches the NIC's port class, if it has one. Only interfaces
 	// backed by netdevice have a defined class.
-	deviceClass *network.DeviceClass
+	PortClass *network.PortClass
 }
 
 type enabledNicsCache struct {
@@ -64,24 +64,24 @@ func (c *enabledNicsCache) remove(name string) {
 	c.mu.Unlock()
 }
 
-// nicDeviceClass returns the cached device class for nic named name, if the
-// provided nic has enabled filtering on it _and_ it has a device class.
-func (d *enabledNicsCache) nicDeviceClass(name string) *network.DeviceClass {
+// nicPortClass returns the cached port class for nic named name, if the
+// provided nic has enabled filtering on it _and_ it has a port class.
+func (d *enabledNicsCache) nicPortClass(name string) *network.PortClass {
 	d.mu.RLock()
-	var deviceClass *network.DeviceClass
+	var PortClass *network.PortClass
 	cached, ok := d.mu.enabledNics[name]
 	if ok {
-		deviceClass = cached.deviceClass
+		PortClass = cached.PortClass
 	}
 	d.mu.RUnlock()
-	return deviceClass
+	return PortClass
 }
 
 // NicInfoProvider provides nic information for caching in the filtering engine.
 type NicInfoProvider interface {
-	// GetNicInfo returns the NIC name and device class (if available).
+	// GetNicInfo returns the NIC name and port class (if available).
 	// If nicid doesn't exist, GetNicInfo returns "", nil.
-	GetNicInfo(nicid tcpip.NICID) (string, *network.DeviceClass)
+	GetNicInfo(nicid tcpip.NICID) (string, *network.PortClass)
 }
 
 type Filter struct {
@@ -136,14 +136,14 @@ func New(s *stack.Stack, nicInfoProvider NicInfoProvider) *Filter {
 }
 
 func (f *Filter) enableInterface(id tcpip.NICID) filter.FilterEnableInterfaceResult {
-	name, deviceClass := f.nicInfoProvider.GetNicInfo(id)
+	name, PortClass := f.nicInfoProvider.GetNicInfo(id)
 	if name == "" {
 		return filter.FilterEnableInterfaceResultWithErr(filter.EnableDisableInterfaceErrorNotFound)
 	}
 
 	f.enabledNics.add(name, cachedNicInfo{
-		nicid:       id,
-		deviceClass: deviceClass,
+		nicid:     id,
+		PortClass: PortClass,
 	})
 	return filter.FilterEnableInterfaceResultWithResponse(filter.FilterEnableInterfaceResponse{})
 }

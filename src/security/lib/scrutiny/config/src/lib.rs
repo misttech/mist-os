@@ -14,12 +14,11 @@ pub struct ConfigBuilder {
     model: ModelConfig,
     command: Option<String>,
     script_path: Option<String>,
-    plugins: Option<Vec<String>>,
 }
 
 impl ConfigBuilder {
     pub fn with_model(model: ModelConfig) -> Self {
-        ConfigBuilder { model, command: None, script_path: None, plugins: None }
+        ConfigBuilder { model, command: None, script_path: None }
     }
 
     pub fn command(&mut self, command: String) -> &mut Self {
@@ -32,24 +31,14 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn plugins<S: ToString>(&mut self, plugins: Vec<S>) -> &mut Self {
-        self.plugins = Some(plugins.iter().map(|s| s.to_string()).collect());
-        self
-    }
-
     pub fn build(&self) -> Config {
-        let &Self { model, command, script_path, plugins } = &self;
-        let plugin = if let Some(plugins) = plugins {
-            PluginConfig { plugins: plugins.clone() }
-        } else {
-            PluginConfig::default()
-        };
+        let &Self { model, command, script_path } = &self;
         Config {
             launch: LaunchConfig { command: command.clone(), script_path: script_path.clone() },
             runtime: RuntimeConfig {
                 logging: LoggingConfig::default(),
                 model: model.clone(),
-                plugin,
+                plugin: PluginConfig::default(),
             },
         }
     }
@@ -285,18 +274,7 @@ pub struct PluginConfig {
 
 impl PluginConfig {
     pub fn default() -> PluginConfig {
-        PluginConfig {
-            plugins: vec![
-                "ZbiPlugin".to_string(),
-                "AdditionalBootConfigPlugin".to_string(),
-                "StaticPkgsPlugin".to_string(),
-                "CorePlugin".to_string(),
-                "SearchPlugin".to_string(),
-                "EnginePlugin".to_string(),
-                "ToolkitPlugin".to_string(),
-                "VerifyPlugin".to_string(),
-            ],
-        }
+        PluginConfig { plugins: vec!["UnifiedPlugin".to_string()] }
     }
     // TODO(benwright) - Make this a smaller set once API usages are cleaned up.
     pub fn minimal() -> PluginConfig {

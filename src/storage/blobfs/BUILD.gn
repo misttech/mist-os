@@ -160,7 +160,7 @@ static_library("blobfs") {
     ]
     public_deps += [
       ":fuchsia.blobfs.internal_cpp",
-      ":fuchsia.blobfs.internal_hlcpp",
+      ":fuchsia.blobfs.internal_cpp",
       "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
       "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
@@ -217,7 +217,6 @@ static_library("blobfs") {
 fidl("fuchsia.blobfs.internal") {
   sources = [ "compression/decompressor_sandbox/decompressor.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-  enable_hlcpp = true
 }
 
 source_set("decompressor_impl") {
@@ -232,18 +231,14 @@ source_set("decompressor_impl") {
   ]
   deps = [
     ":blobfs",
-    ":fuchsia.blobfs.internal_hlcpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fidl/cpp:cpp",
+    ":fuchsia.blobfs.internal_cpp",
     "//sdk/lib/scheduler/cpp",
-    "//sdk/lib/sys/cpp:cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/chunked-compression",
-    "//src/lib/digest",
-    "//src/storage/lib/vfs/cpp/journal",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
 
@@ -252,16 +247,12 @@ executable("decompressor") {
   sources = [ "compression/decompressor_sandbox/main.cc" ]
   deps = [
     ":decompressor_impl",
-    ":fuchsia.blobfs.internal_hlcpp",
-    "//sdk/lib/fidl/cpp:cpp",
-    "//sdk/lib/sys/cpp:cpp",
+    ":fuchsia.blobfs.internal_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/fidl/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/digest",
-    "//src/storage/lib/vfs/cpp/journal",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/zx",
   ]

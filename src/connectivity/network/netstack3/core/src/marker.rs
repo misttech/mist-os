@@ -38,7 +38,7 @@ use crate::TimerId;
 pub trait IpExt:
     IpLayerIpExt
     + IpDeviceIpExt
-    + ip::icmp::IcmpIpExt
+    + netstack3_base::IcmpIpExt
     + ip::device::IpDeviceIpExt
     + tcp::DualStackIpExt
     + datagram::DualStackIpExt
@@ -48,7 +48,7 @@ pub trait IpExt:
 impl<O> IpExt for O where
     O: ip::IpLayerIpExt
         + IpDeviceIpExt
-        + ip::icmp::IcmpIpExt
+        + netstack3_base::IcmpIpExt
         + ip::device::IpDeviceIpExt
         + tcp::DualStackIpExt
         + datagram::DualStackIpExt

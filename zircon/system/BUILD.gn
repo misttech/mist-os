@@ -13,7 +13,9 @@ import("//build/config/fuchsia/target_api_level.gni")
 static_library("availability_test") {
   visibility = [ "//sdk/*" ]
 
-  if (current_build_target_api_level != "PLATFORM") {
+  # `current_build_target_api_level` may be a string or integer. The following only
+  # applies to integers.
+  if (current_build_target_api_level != "$current_build_target_api_level") {
     # Define values used by the test.
 
     # Due to the way the macros are defined, only literals can be specified.

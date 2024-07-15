@@ -13,15 +13,14 @@
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #endif
 #include <atomic>
-#include <functional>
 #include <limits>
 #include <sstream>
-#include <vector>
 
 namespace syslog_runtime {
 
 struct LogBuffer;
 
+namespace internal {
 // A null-safe wrapper around cpp17::optional<cpp17::string_view>
 //
 // This class is used to represent a string that may be nullptr. It is used
@@ -30,7 +29,6 @@ struct LogBuffer;
 //
 // This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
 // NOLINT is used as implicit conversions are intentional here.
-// This is deprecated. Please use applicable Builder classes instead.
 class NullSafeStringView final {
  public:
   //  Constructs a NullSafeStringView from a cpp17::string_view.
@@ -69,18 +67,7 @@ class NullSafeStringView final {
  private:
   cpp17::optional<cpp17::string_view> string_view_;
 };
-
-template <typename... Args>
-constexpr size_t ArgsSize(Args... args) {
-  return sizeof...(args);
-}
-
-template <typename... Args>
-struct Tuplet final {
-  std::tuple<Args...> tuple;
-  size_t size;
-  constexpr Tuplet(std::tuple<Args...> tuple, size_t size) : tuple(tuple), size(size) {}
-};
+}  // namespace internal
 
 template <typename Key, typename Value>
 struct KeyValue final {

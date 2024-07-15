@@ -11,6 +11,7 @@ if (is_host) {
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//src/lib/diagnostics/python/fuchsia_inspect",
     ]
     transport = "fuchsia-controller"
     environments = [

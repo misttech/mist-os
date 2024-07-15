@@ -569,6 +569,7 @@ impl IntoErrno for IpSockSendError {
         match self {
             IpSockSendError::Mtu | IpSockSendError::IllegalLoopbackAddress => Errno::Einval,
             IpSockSendError::Unroutable(e) => e.into_errno(),
+            IpSockSendError::BroadcastNotAllowed => Errno::Eacces,
         }
     }
 }
@@ -583,6 +584,7 @@ impl IntoErrno for udp::SendToError {
             // `IpSockSendError` which maps to EINVAL instead.
             Self::Send(IpSockSendError::Mtu) => Errno::Emsgsize,
             Self::Send(IpSockSendError::IllegalLoopbackAddress) => Errno::Einval,
+            Self::Send(IpSockSendError::BroadcastNotAllowed) => Errno::Eacces,
             Self::Send(IpSockSendError::Unroutable(err)) => err.into_errno(),
             Self::RemotePortUnset => Errno::Einval,
             Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,

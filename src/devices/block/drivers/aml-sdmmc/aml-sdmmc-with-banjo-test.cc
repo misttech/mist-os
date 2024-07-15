@@ -250,31 +250,6 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
   zx::event wake_handling_assertive_;
 };
 
-class FakeElementControl : public fidl::Server<fuchsia_power_broker::ElementControl> {
- public:
-  void OpenStatusChannel(OpenStatusChannelRequest& req,
-                         OpenStatusChannelCompleter::Sync& completer) override {}
-
-  void RegisterDependencyToken(RegisterDependencyTokenRequest& req,
-                               RegisterDependencyTokenCompleter::Sync& completer) override {
-    EXPECT_TRUE(req.token().is_valid());
-    EXPECT_EQ(req.dependency_type(), fuchsia_power_broker::DependencyType::kAssertive);
-    dep_token_registered_ = true;
-    completer.Reply(fit::success());
-  }
-
-  void UnregisterDependencyToken(UnregisterDependencyTokenRequest& req,
-                                 UnregisterDependencyTokenCompleter::Sync& completer) override {}
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementControl> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  bool dep_token_registered() const { return dep_token_registered_; }
-
- private:
-  bool dep_token_registered_ = false;
-};
-
 class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
   void AddSideEffect(fit::function<void()> side_effect) { side_effect_ = std::move(side_effect); }
@@ -320,17 +295,16 @@ class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLeve
 
 class PowerElement {
  public:
-  explicit PowerElement(
-      fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control,
-      fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
-      fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
-      fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
+  explicit PowerElement(fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control,
+                        fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor,
+                        fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level,
+                        fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level)
       : element_control_(std::move(element_control)),
         lessor_(std::move(lessor)),
         current_level_(std::move(current_level)),
         required_level_(std::move(required_level)) {}
 
-  fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_;
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_;
   fidl::ServerBindingRef<fuchsia_power_broker::Lessor> lessor_;
   fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_;
   fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_;
@@ -356,22 +330,6 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     // Make channels to return to client
     auto [element_control_client_end, element_control_server_end] =
         fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
-
-    // Instantiate (fake) element control implementation.
-    auto element_control_impl = std::make_unique<FakeElementControl>();
-    if (req.element_name() == AmlSdmmc::kHardwarePowerElementName) {
-      hardware_power_element_control_ = element_control_impl.get();
-    } else if (req.element_name() == AmlSdmmc::kSystemWakeOnRequestPowerElementName) {
-      wake_on_request_element_control_ = element_control_impl.get();
-    } else {
-      ZX_ASSERT_MSG(0, "Unexpected power element.");
-    }
-    fidl::ServerBindingRef<fuchsia_power_broker::ElementControl> element_control_binding =
-        fidl::BindServer<fuchsia_power_broker::ElementControl>(
-            fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-            std::move(element_control_server_end), std::move(element_control_impl),
-            [](FakeElementControl* impl, fidl::UnbindInfo info,
-               fidl::ServerEnd<fuchsia_power_broker::ElementControl> server_end) mutable {});
 
     // Instantiate (fake) lessor implementation.
     auto lessor_impl = std::make_unique<FakeLessor>();
@@ -419,7 +377,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
           [&]() { hardware_power_required_level_->required_level_ = AmlSdmmc::kPowerLevelOn; });
     }
 
-    servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
+    servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
     fuchsia_power_broker::TopologyAddElementResponse result{
@@ -432,11 +390,9 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
-  FakeElementControl* hardware_power_element_control_ = nullptr;
   FakeLessor* hardware_power_lessor_ = nullptr;
   FakeCurrentLevel* hardware_power_current_level_ = nullptr;
   FakeRequiredLevel* hardware_power_required_level_ = nullptr;
-  FakeElementControl* wake_on_request_element_control_ = nullptr;
   FakeLessor* wake_on_request_lessor_ = nullptr;
   FakeCurrentLevel* wake_on_request_current_level_ = nullptr;
   FakeRequiredLevel* wake_on_request_required_level_ = nullptr;
@@ -2563,10 +2519,6 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerTokenProvider) {
 
   ASSERT_OK(dut_->Init({}));
 
-  EXPECT_FALSE(incoming_.SyncCall([](IncomingNamespace* incoming) {
-    return incoming->power_broker.hardware_power_element_control_->dep_token_registered();
-  }));
-
   auto client_end =
       component::ConnectAtMember<fuchsia_hardware_power::PowerTokenService::TokenProvider>(
           CreateDriverSvcClient(), component::kDefaultInstance);
@@ -2580,10 +2532,6 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerTokenProvider) {
     EXPECT_TRUE(get_token.value()->handle.is_valid());
     EXPECT_EQ(get_token.value()->name.get(), AmlSdmmc::kHardwarePowerElementName);
   });
-
-  EXPECT_TRUE(incoming_.SyncCall([](IncomingNamespace* incoming) {
-    return incoming->power_broker.hardware_power_element_control_->dep_token_registered();
-  }));
 }
 
 }  // namespace aml_sdmmc

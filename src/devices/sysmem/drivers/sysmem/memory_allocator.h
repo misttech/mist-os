@@ -17,6 +17,7 @@
 
 #include "protected_ranges.h"
 
+class SnapshotAnnotationRegister;
 class SysmemMetrics;
 
 namespace sysmem_driver {
@@ -32,6 +33,7 @@ class MemoryAllocator {
     virtual zx_status_t CreatePhysicalVmo(uint64_t base, uint64_t size, zx::vmo* vmo_out) = 0;
     // Should be called after every delete that makes the allocator empty.
     virtual void CheckForUnbind() {}
+    virtual SnapshotAnnotationRegister& snapshot_annotation_register() = 0;
     virtual SysmemMetrics& metrics() = 0;
     virtual protected_ranges::ProtectedRangesCoreControl& protected_ranges_core_control(
         const fuchsia_sysmem2::Heap& heap) {

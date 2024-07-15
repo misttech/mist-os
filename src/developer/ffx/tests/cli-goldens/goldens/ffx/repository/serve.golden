@@ -126,6 +126,14 @@
       "short": null,
       "description": "if true, will not register repositories to device. Default is `false`.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--refresh-metadata",
+      "short": null,
+      "description": "refresh repository metadata during startup. Note that this is not necessary if package-tool runs in the background taking care of it, e.g. as part of `fx serve`. Default is `false`.",
+      "hidden": false
     }
   ],
   "notes": [],

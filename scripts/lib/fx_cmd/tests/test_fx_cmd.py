@@ -21,7 +21,9 @@ real_subprocess_exec = asyncio.create_subprocess_exec
 
 
 class TestFxCmd(unittest.TestCase):
-    @mock.patch.dict("os.environ", {"FUCHSIA_BUILD_DIR": "/tmp/fuchsia/global"})
+    @mock.patch.dict(
+        "os.environ", {"FUCHSIA_BUILD_DIR_FROM_FX": "/tmp/fuchsia/global"}
+    )
     def test_command_line(self) -> None:
         """command line respects build directory specification"""
         cmd = fx_cmd.FxCmd()

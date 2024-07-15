@@ -792,6 +792,7 @@ impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/351850359)
 pub(crate) struct UninstantiableFuture<O>(Never, std::marker::PhantomData<O>);
 
 impl<O: std::marker::Unpin> futures::Future for UninstantiableFuture<O> {

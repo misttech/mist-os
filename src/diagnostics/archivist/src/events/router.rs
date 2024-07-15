@@ -380,18 +380,15 @@ mod tests {
     use fuchsia_sync::Mutex;
     use fuchsia_zircon::AsHandleRef;
     use futures::FutureExt;
-    use lazy_static::lazy_static;
     use moniker::ExtendedMoniker;
+    use once_cell::sync::Lazy;
     use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const TEST_URL: &str = "NO-OP URL";
     const FAKE_TIMESTAMP: i64 = 5;
-    lazy_static! {
-        static ref IDENTITY: Arc<ComponentIdentity> = Arc::new(ComponentIdentity::new(
-            ExtendedMoniker::parse_str("./a/b").unwrap(),
-            TEST_URL
-        ));
-    }
+    static IDENTITY: Lazy<Arc<ComponentIdentity>> = Lazy::new(|| {
+        Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str("./a/b").unwrap(), TEST_URL))
+    });
 
     #[derive(Default)]
     struct TestEventProducer {

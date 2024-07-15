@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::vfs::{
-    fileops_impl_dataless, fileops_impl_nonseekable, CurrentTask, FileOps, FsNode, FsNodeOps,
-    SimpleFileNode,
+    fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, CurrentTask, FileOps,
+    FsNode, FsNodeOps, SimpleFileNode,
 };
 use starnix_logging::BugRef;
 use starnix_sync::{DeviceOpen, Locked};
@@ -31,6 +31,7 @@ impl StubEmptyFile {
 impl FileOps for StubEmptyFile {
     fileops_impl_dataless!();
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 }
 
 #[track_caller]

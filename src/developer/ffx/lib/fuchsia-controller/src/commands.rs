@@ -18,7 +18,6 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
-use std::time::Duration;
 use {fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_types};
 
 type Responder<T> = mpsc::SyncSender<T>;
@@ -142,7 +141,7 @@ pub(crate) enum LibraryCommand {
     },
     TargetWait {
         env: Arc<EnvContext>,
-        timeout: f64,
+        timeout: u64,
         responder: Responder<zx_status::Status>,
     },
 }
@@ -453,39 +452,14 @@ impl LibraryCommand {
                 };
                 responder.send(res).unwrap();
             }
-            Self::TargetWait { env, timeout: timeout_float, responder } => {
-                let tc = match env.target_collection_proxy_factory().await {
-                    Ok(tc) => tc,
-                    Err(e) => {
-                        env.write_err(e);
-                        responder.send(zx_status::Status::INTERNAL).unwrap();
-                        return;
-                    }
+            Self::TargetWait { env, timeout, responder } => {
+                let cmd = ffx_wait_args::WaitOptions { timeout, down: false };
+                let tool = ffx_wait::WaitOperation {
+                    cmd,
+                    env: env.context.clone(),
+                    waiter: ffx_wait::DeviceWaiterImpl,
                 };
-                // This target spec is the same one used in the target proxy factory -- we re-grab it
-                // just for the error message.
-                let target_spec = match ffx_target::get_target_specifier(&env.context).await {
-                    Ok(t) => t,
-                    Err(e) => {
-                        env.write_err(e);
-                        responder.send(zx_status::Status::INTERNAL).unwrap();
-                        return;
-                    }
-                };
-                let duration = if timeout_float > 0.0 {
-                    Some(Duration::from_secs_f64(timeout_float))
-                } else {
-                    None
-                };
-                match ffx_target::wait_for_device(
-                    duration,
-                    &env.context,
-                    target_spec,
-                    &tc,
-                    ffx_target::WaitFor::DeviceOnline,
-                )
-                .await
-                {
+                match tool.wait_impl().await {
                     Ok(()) => {
                         responder.send(zx_status::Status::OK).unwrap();
                     }

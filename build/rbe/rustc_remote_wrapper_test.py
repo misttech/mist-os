@@ -335,16 +335,22 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
             with contextlib.ExitStack() as stack:
                 for m in mocks:
                     stack.enter_context(m)
-                prepare_status = r.prepare()
+                with mock.patch.object(
+                    rustc_remote_wrapper, "_remove_files"
+                ) as mock_remove:
+                    prepare_status = r.prepare()
 
             self.assertEqual(prepare_status, 0)  # success
 
             # Expect there was a temporary response file written next to the
             # original one, also inside the temporary dir.
             # It should be marked for cleanup.
-            self.assertTrue(
-                any(str(f).startswith(str(rsp)) for f in r._cleanup_files)
-            )
+            mock_remove.assert_called_once()
+            args, _ = mock_remove.call_args_list[0]
+            self.assertEqual(len(args), 1)
+            # args[0] is the list of files to cleanup
+            self.assertGreater(len(args[0]), 0)
+            self.assertTrue(any(str(f).startswith(str(rsp)) for f in args[0]))
 
         a = r.remote_action
         remote_inputs = set(a.inputs_relative_to_working_dir)

@@ -18,10 +18,10 @@ from fuchsia_controller_py import ZxStatus
 from mobly import base_test
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
-TIMEOUTS: dict[str, float] = {
+TIMEOUTS: dict[str, int] = {
     "OFFLINE": 120,
     "ONLINE": 180,
-    "SLEEP": 0.5,
+    "SLEEP": 1,
 }
 
 
@@ -77,7 +77,7 @@ class FuchsiaDevice(object):
         if ctx_config["discovery.mdns.enabled"] == "false":
             self.ctx.target_add(self.target, True)
 
-    async def wait_offline(self, timeout: float = TIMEOUTS["OFFLINE"]) -> None:
+    async def wait_offline(self, timeout: int = TIMEOUTS["OFFLINE"]) -> None:
         """Waits for the Fuchsia device to be offline.
 
         Args:
@@ -117,7 +117,7 @@ class FuchsiaDevice(object):
             f"Target '{self.target}' is now offline after {time.time() - start_time} seconds"
         )
 
-    async def wait_online(self, timeout: float = TIMEOUTS["ONLINE"]) -> None:
+    async def wait_online(self, timeout: int = TIMEOUTS["ONLINE"]) -> None:
         """Waits for the Fuchsia device to come online.
 
         A device is considered online when it is connected to the remote control proxy in the ffx

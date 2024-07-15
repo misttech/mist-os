@@ -899,3 +899,76 @@ func TestAllOutputs(t *testing.T) {
 		})
 	}
 }
+
+func TestPopulate(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		steps    []Step
+		commands []compdb.Command
+		want     []Step
+	}{
+		{
+			name: "match on main output",
+			steps: []Step{
+				{Out: "foo"},
+				{Out: "bar"},
+			},
+			commands: []compdb.Command{
+				{Output: "bar"},
+				{Output: "foo"},
+			},
+			want: []Step{
+				{Out: "foo", Command: &compdb.Command{Output: "foo"}},
+				{Out: "bar", Command: &compdb.Command{Output: "bar"}},
+			},
+		},
+		{
+			name: "match on other outputs",
+			steps: []Step{
+				{Out: "foo", Outs: []string{"baz"}},
+				{Out: "bar"},
+			},
+			commands: []compdb.Command{
+				{Output: "bar"},
+				{Output: "baz"},
+			},
+			want: []Step{
+				{Out: "foo", Outs: []string{"baz"}, Command: &compdb.Command{Output: "baz"}},
+				{Out: "bar", Command: &compdb.Command{Output: "bar"}},
+			},
+		},
+		{
+			name: "no match in commands",
+			steps: []Step{
+				{Out: "foo"},
+				{Out: "bar"},
+			},
+			commands: []compdb.Command{
+				{Output: "bar"},
+			},
+			want: []Step{
+				{Out: "foo"},
+				{Out: "bar", Command: &compdb.Command{Output: "bar"}},
+			},
+		},
+		{
+			name: "discard commands with no outputs",
+			steps: []Step{
+				{Out: "foo"},
+			},
+			commands: []compdb.Command{
+				{Output: "foo"},
+			},
+			want: []Step{
+				{Out: "foo", Command: &compdb.Command{Output: "foo"}},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Populate(tc.steps, tc.commands)
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Errorf("Populate(%#v, %#v) got:\n%#v, want:\n%#v", tc.steps, tc.commands, got, tc.want)
+			}
+		})
+	}
+}

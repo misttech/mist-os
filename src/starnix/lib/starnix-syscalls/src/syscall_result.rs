@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::seal_flags::SealFlags;
@@ -45,6 +46,12 @@ impl From<OpenFlags> for SyscallResult {
 impl From<Signal> for SyscallResult {
     fn from(value: Signal) -> Self {
         SyscallResult(value.number() as u64)
+    }
+}
+
+impl From<FileLeaseType> for SyscallResult {
+    fn from(value: FileLeaseType) -> Self {
+        SyscallResult(value.bits() as u64)
     }
 }
 

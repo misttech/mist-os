@@ -862,7 +862,6 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::vmo::round_up_to_system_page_size;
     use crate::mm::PAGE_SIZE;
     use crate::signals::send_standard_signal;
     use crate::signals::testing::dequeue_signal_for_test;
@@ -870,6 +869,7 @@ mod tests {
     use crate::testing::*;
     use starnix_uapi::auth::Credentials;
     use starnix_uapi::errors::ERESTARTSYS;
+    use starnix_uapi::math::round_up_to_system_page_size;
     use starnix_uapi::signals::{
         SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
         SIGUSR1,

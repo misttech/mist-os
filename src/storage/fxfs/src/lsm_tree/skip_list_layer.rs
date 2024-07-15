@@ -9,8 +9,8 @@ use crate::drop_event::DropEvent;
 use crate::log::*;
 use crate::lsm_tree::merge::{self, MergeFn};
 use crate::lsm_tree::types::{
-    BoxedLayerIterator, Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, OrdLowerBound,
-    OrdUpperBound, Value,
+    BoxedLayerIterator, Item, ItemCount, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut,
+    OrdLowerBound, OrdUpperBound, Value,
 };
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::{bail, Error};
@@ -255,6 +255,10 @@ impl<K: Key, V: Value> Layer<K, V> for SkipListLayer<K, V> {
         self.close_event.lock().unwrap().clone()
     }
 
+    fn estimated_len(&self) -> ItemCount {
+        ItemCount::Precise(self.inner.lock().unwrap().item_count)
+    }
+
     async fn close(&self) {
         let listener =
             self.close_event.lock().unwrap().take().expect("close already called").listen();
@@ -265,6 +269,11 @@ impl<K: Key, V: Value> Layer<K, V> for SkipListLayer<K, V> {
         // The SkipListLayer is stored in RAM and written to disk as a SimplePersistentLayer
         // Hence, the SkipListLayer is always at the latest version
         return LATEST_VERSION;
+    }
+
+    fn record_inspect_data(self: Arc<Self>, node: &fuchsia_inspect::Node) {
+        node.record_bool("persistent", false);
+        node.record_uint("num_items", self.inner.lock().unwrap().item_count as u64);
     }
 }
 
@@ -582,11 +591,12 @@ impl<K: Key, V: Value> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, K, V>
 
 #[cfg(test)]
 mod tests {
-    use super::{SkipListLayer, SkipListLayerIter, SkipListLayerIterMut};
+    use super::{SkipListLayer, SkipListLayerIterMut};
     use crate::lsm_tree::merge::ItemOp::{Discard, Replace};
     use crate::lsm_tree::merge::{MergeLayerIterator, MergeResult};
+    use crate::lsm_tree::skip_list_layer::SkipListLayerIter;
     use crate::lsm_tree::types::{
-        DefaultOrdLowerBound, DefaultOrdUpperBound, Item, ItemRef, Layer, LayerIterator,
+        DefaultOrdLowerBound, DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Layer, LayerIterator,
         LayerIteratorMut, SortByU64,
     };
     use crate::serialized_types::{
@@ -596,7 +606,8 @@ mod tests {
     use fprint::TypeFingerprint;
     use fuchsia_async as fasync;
     use futures::future::join_all;
-    use futures::{join, FutureExt};
+    use futures::{join, FutureExt as _};
+    use fxfs_macros::FuzzyHash;
     use std::hash::Hash;
     use std::ops::Bound;
     use std::time::{Duration, Instant};
@@ -606,6 +617,7 @@ mod tests {
         Eq,
         Debug,
         Hash,
+        FuzzyHash,
         PartialEq,
         PartialOrd,
         Ord,

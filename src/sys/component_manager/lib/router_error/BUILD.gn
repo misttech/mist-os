@@ -10,7 +10,7 @@ rustc_library("router_error") {
 
   deps = [
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//third_party/rust_crates:thiserror",
   ]
 

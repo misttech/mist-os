@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/bredr_signaling_channel.h"
 
+#include <pw_bytes/endian.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 
 namespace bt::l2cap::internal {
@@ -51,7 +53,8 @@ void BrEdrSignalingChannel::DecodeRxUnit(ByteBufferPtr sdu,
     const auto header_data = sdu->view(sdu_offset, sizeof(CommandHeader));
     SignalingPacket packet(&header_data);
 
-    uint16_t expected_payload_length = le16toh(packet.header().length);
+    uint16_t expected_payload_length = pw::bytes::ConvertOrderFrom(
+        cpp20::endian::little, packet.header().length);
     size_t remaining_sdu_length =
         sdu->size() - sdu_offset - sizeof(CommandHeader);
     if (remaining_sdu_length < expected_payload_length) {

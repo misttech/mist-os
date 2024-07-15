@@ -623,13 +623,11 @@ void FileCache::EvictCleanPages() {
   while (current != page_tree_.end()) {
     auto raw_page = current.CopyPointer();
     ++current;
-    if (!raw_page->IsActive()) {
+    if (!raw_page->IsActive() && !raw_page->IsDirty()) {
       ZX_DEBUG_ASSERT(!raw_page->IsLocked());
       ZX_DEBUG_ASSERT(!raw_page->IsWriteback());
-      if (!raw_page->IsDirty()) {
-        fbl::RefPtr<Page> evicted = fbl::ImportFromRawPtr(raw_page);
-        EvictUnsafe(raw_page);
-      }
+      fbl::RefPtr<Page> evicted = fbl::ImportFromRawPtr(raw_page);
+      EvictUnsafe(raw_page);
     }
   }
 }

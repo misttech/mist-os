@@ -10,16 +10,16 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, Status};
 use fxfs::filesystem::FxFilesystem;
 use fxfs::lsm_tree::types::LayerIterator;
+use fxfs::lsm_tree::Query;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
 use fxfs::object_store::{
     AttributeKey, DataObjectHandle, HandleOptions, ObjectKey, ObjectKeyData, ObjectStore,
 };
 use std::collections::BTreeMap;
-use std::ops::Bound;
 use std::sync::{Arc, Mutex, Weak};
 use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult};
-use vfs::directory::entry::{DirectoryEntry, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::traversal_position::TraversalPosition;
@@ -61,12 +61,14 @@ impl InternalFile {
 }
 
 impl DirectoryEntry for InternalFile {
-    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
-        vfs::directory::entry::EntryInfo::new(self.object_id, fio::DirentType::File)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_file(self)
+    }
+}
+
+impl GetEntryInfo for InternalFile {
+    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
+        vfs::directory::entry::EntryInfo::new(self.object_id, fio::DirentType::File)
     }
 }
 
@@ -291,12 +293,14 @@ pub struct ObjectDirectory {
 }
 
 impl DirectoryEntry for ObjectDirectory {
-    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
-        vfs::directory::entry::EntryInfo::new(self.store_object_id, fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_dir(self)
+    }
+}
+
+impl GetEntryInfo for ObjectDirectory {
+    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
+        vfs::directory::entry::EntryInfo::new(self.store_object_id, fio::DirentType::Directory)
     }
 }
 
@@ -419,7 +423,7 @@ impl Directory for ObjectDirectory {
         let layer_set = store.tree().layer_set();
         let mut merger = layer_set.merger();
         let mut iter = merger
-            .seek(Bound::Included(&ObjectKey::object(object_id)))
+            .query(Query::FullRange(&ObjectKey::object(object_id)))
             .await
             .map_err(map_to_status)?;
         while let Some(data) = iter.get() {

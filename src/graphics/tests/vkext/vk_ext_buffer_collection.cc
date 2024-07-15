@@ -24,6 +24,7 @@
 
 #include "vulkan/vulkan_enums.hpp"
 #include "vulkan/vulkan_handles.hpp"
+#include "vulkan/vulkan_structs.hpp"
 #include <vulkan/vulkan.hpp>
 
 namespace {
@@ -1972,6 +1973,303 @@ TEST_F(VulkanExtensionTest, LinearNonPackedStride) {
       }
     }
     ctx_->device()->unmapMemory(*memory);
+  }
+}
+
+// Test that Yv12 data is assigned to the expected planes.
+TEST_F(VulkanExtensionTest, YV12Copy) {
+  ASSERT_TRUE(Initialize());
+
+  if (!SupportsSysmemYv12())
+    GTEST_SKIP();
+  auto [vulkan_token, sysmem_token] = MakeSharedCollection<2>();
+
+  constexpr bool kLinear = true;
+  std::array<vk::SysmemColorSpaceFUCHSIA, 1> color_spaces;
+  color_spaces[0].colorSpace = static_cast<uint32_t>(fuchsia::sysmem::ColorSpaceType::REC709);
+  vk::ImageFormatConstraintsInfoFUCHSIA format_constraints =
+      GetDefaultYuvImageFormatConstraintsInfo();
+  format_constraints.imageCreateInfo = GetDefaultImageCreateInfo(
+      false, VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, kDefaultWidth, kDefaultHeight, kLinear);
+  format_constraints.imageCreateInfo.setUsage(vk::ImageUsageFlagBits::eTransferSrc);
+  format_constraints.pColorSpaces = color_spaces.data();
+  format_constraints.colorSpaceCount = color_spaces.size();
+  format_constraints.sysmemPixelFormat =
+      static_cast<uint64_t>(fuchsia::sysmem::PixelFormatType::YV12);
+
+  UniqueBufferCollection collection =
+      CreateVkBufferCollectionForImage(std::move(vulkan_token), format_constraints);
+
+  fuchsia::sysmem2::BufferCollectionConstraints constraints;
+  constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_READ);
+  auto &bmc = *constraints.mutable_buffer_memory_constraints();
+  bmc.set_cpu_domain_supported(true);
+  bmc.set_ram_domain_supported(true);
+  auto sysmem_collection =
+      AllocateSysmemCollection(std::move(constraints), std::move(sysmem_token));
+
+  vk::UniqueImage yv12_image;
+  vk::UniqueDeviceMemory yv12_memory;
+
+  format_constraints.imageCreateInfo.setInitialLayout(vk::ImageLayout::ePreinitialized);
+  ASSERT_TRUE(InitializeDirectImage(*collection, format_constraints.imageCreateInfo));
+
+  std::optional<uint32_t> init_img_memory_result = InitializeDirectImageMemory(*collection);
+  ASSERT_TRUE(init_img_memory_result);
+
+  yv12_image = std::move(vk_image_);
+  yv12_memory = std::move(vk_device_memory_);
+
+  uint32_t uv_width = fbl::round_up(kDefaultWidth, 2u) / 2u;
+  uint32_t uv_height = fbl::round_up(kDefaultHeight, 2u) / 2u;
+  constexpr uint8_t kYPlaneFill = 127;
+  constexpr uint8_t kUPlaneFill = 0;
+  constexpr uint8_t kVPlaneFill = 255;
+
+  vk::BufferCollectionPropertiesFUCHSIA yv_properties;
+  EXPECT_EQ(vk::Result::eSuccess, ctx_->device()->getBufferCollectionPropertiesFUCHSIA(
+                                      *collection, &yv_properties, loader_));
+
+  uint32_t u_plane;
+  EXPECT_EQ(vk::ComponentSwizzle::eIdentity, yv_properties.samplerYcbcrConversionComponents.g);
+
+  // For VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM, G is plane 0, B is plane 1, and R is plane 2.
+  switch (yv_properties.samplerYcbcrConversionComponents.b) {
+    case vk::ComponentSwizzle::eIdentity:
+    case vk::ComponentSwizzle::eB:
+      u_plane = 1;
+      break;
+    case vk::ComponentSwizzle::eR:
+      u_plane = 2;
+      break;
+    default:
+      ASSERT_FALSE(true) << " component "
+                         << static_cast<uint32_t>(yv_properties.samplerYcbcrConversionComponents.b);
+  }
+  {
+    auto map_result = vulkan_context().device()->mapMemory(*yv12_memory, 0, VK_WHOLE_SIZE, {});
+    ASSERT_EQ(vk::Result::eSuccess, map_result.result);
+    size_t bytes_per_row = fbl::round_up(
+        std::max(static_cast<size_t>(kDefaultWidth),
+                 static_cast<size_t>(
+                     sysmem_collection.settings().image_format_constraints().min_bytes_per_row())),
+        sysmem_collection.settings().image_format_constraints().bytes_per_row_divisor());
+
+    auto y_plane_ptr = reinterpret_cast<uint8_t *>(map_result.value);
+    size_t uv_bytes_per_row = fbl::round_up(bytes_per_row, 2u) / 2;
+    uint8_t *v_plane_ptr = y_plane_ptr + bytes_per_row * kDefaultHeight;
+    uint8_t *u_plane_ptr = v_plane_ptr + uv_bytes_per_row * uv_height;
+    for (size_t y = 0; y < kDefaultHeight; y++) {
+      memset(y_plane_ptr + bytes_per_row * y, kYPlaneFill, kDefaultWidth);
+    }
+    for (size_t y = 0; y < kDefaultHeight / 2; y++) {
+      memset(u_plane_ptr + uv_bytes_per_row * y, kUPlaneFill, uv_width);
+      memset(v_plane_ptr + uv_bytes_per_row * y, kVPlaneFill, uv_width);
+    }
+
+    vk::SubresourceLayout layouts[3];
+    layouts[1] = vulkan_context().device()->getImageSubresourceLayout(
+        *yv12_image, vk::ImageSubresource().setAspectMask(vk::ImageAspectFlagBits::ePlane1));
+    layouts[2] = vulkan_context().device()->getImageSubresourceLayout(
+        *yv12_image, vk::ImageSubresource().setAspectMask(vk::ImageAspectFlagBits::ePlane2));
+    EXPECT_EQ(layouts[u_plane].offset, static_cast<uintptr_t>(u_plane_ptr - y_plane_ptr));
+    EXPECT_EQ(layouts[3 - u_plane].offset, static_cast<uintptr_t>(v_plane_ptr - y_plane_ptr));
+
+    ASSERT_EQ(
+        vk::Result::eSuccess,
+        vulkan_context().device()->flushMappedMemoryRanges(
+            vk::MappedMemoryRange().setMemory(*yv12_memory).setOffset(0).setSize(VK_WHOLE_SIZE)));
+  }
+
+  constexpr uint32_t kPlaneCount = 3;
+  vk::UniqueImage plane_image[kPlaneCount];
+  vk::UniqueDeviceMemory plane_memory[kPlaneCount];
+  uint32_t plane_widths[kPlaneCount];
+  uint32_t plane_heights[kPlaneCount];
+  for (size_t i = 0; i < kPlaneCount; i++) {
+    uint32_t width = (i == 0) ? kDefaultWidth : uv_width;
+    uint32_t height = (i == 0) ? kDefaultHeight : uv_height;
+    plane_widths[i] = width;
+    plane_heights[i] = height;
+    vk::ImageCreateInfo create_info =
+        GetDefaultImageCreateInfo(false, VK_FORMAT_R8_UNORM, width, height, kLinear);
+    auto result = vulkan_context().device()->createImageUnique(create_info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    plane_image[i] = std::move(result.value);
+
+    auto requirements = vulkan_context().device()->getImageMemoryRequirements(*plane_image[i]);
+
+    uint32_t memory_type = 0xffffffff;
+
+    auto memory_properties = vulkan_context().physical_device().getMemoryProperties();
+    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i) {
+      if (!(requirements.memoryTypeBits & (1 << i)))
+        continue;
+      if (!(memory_properties.memoryTypes[i].propertyFlags &
+            vk::MemoryPropertyFlagBits::eHostVisible)) {
+        continue;
+      }
+      memory_type = i;
+      break;
+    }
+
+    auto memory_result =
+        vulkan_context().device()->allocateMemoryUnique(vk::MemoryAllocateInfo()
+                                                            .setMemoryTypeIndex(memory_type)
+                                                            .setAllocationSize(requirements.size));
+    ASSERT_EQ(vk::Result::eSuccess, memory_result.result);
+    plane_memory[i] = std::move(memory_result.value);
+
+    ASSERT_EQ(vk::Result::eSuccess,
+              vulkan_context().device()->bindImageMemory(*plane_image[i], *plane_memory[i], 0));
+  }
+
+  vk::UniqueCommandPool command_pool;
+  {
+    auto info =
+        vk::CommandPoolCreateInfo().setQueueFamilyIndex(vulkan_context().queue_family_index());
+    auto result = vulkan_context().device()->createCommandPoolUnique(info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    command_pool = std::move(result.value);
+  }
+
+  std::vector<vk::UniqueCommandBuffer> command_buffers;
+  {
+    auto info = vk::CommandBufferAllocateInfo()
+                    .setCommandPool(command_pool.get())
+                    .setLevel(vk::CommandBufferLevel::ePrimary)
+                    .setCommandBufferCount(1);
+    auto result = vulkan_context().device()->allocateCommandBuffersUnique(info);
+    ASSERT_EQ(vk::Result::eSuccess, result.result);
+    command_buffers = std::move(result.value);
+  }
+
+  {
+    auto info = vk::CommandBufferBeginInfo();
+    EXPECT_EQ(vk::Result::eSuccess, command_buffers[0]->begin(&info));
+  }
+
+  {
+    auto range = vk::ImageSubresourceRange()
+                     .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                     .setLevelCount(1)
+                     .setLayerCount(1);
+    auto barrier = vk::ImageMemoryBarrier()
+                       .setImage(yv12_image.get())
+                       .setSrcAccessMask(vk::AccessFlagBits::eHostWrite)
+                       .setDstAccessMask(vk::AccessFlagBits::eTransferRead)
+                       .setOldLayout(vk::ImageLayout::ePreinitialized)
+                       .setNewLayout(vk::ImageLayout::eTransferSrcOptimal)
+                       .setSubresourceRange(range);
+    command_buffers[0]->pipelineBarrier(
+        vk::PipelineStageFlagBits::eHost,     /* srcStageMask */
+        vk::PipelineStageFlagBits::eTransfer, /* dstStageMask */
+        {}, 0 /* memoryBarrierCount */, nullptr /* pMemoryBarriers */,
+        0 /* bufferMemoryBarrierCount */, nullptr /* pBufferMemoryBarriers */,
+        1 /* imageMemoryBarrierCount */, &barrier);
+  }
+  {
+    auto range = vk::ImageSubresourceRange()
+                     .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                     .setLevelCount(1)
+                     .setLayerCount(1);
+    std::vector<vk::ImageMemoryBarrier> barriers;
+    for (auto &image : plane_image) {
+      barriers.push_back(vk::ImageMemoryBarrier()
+                             .setImage(*image)
+                             .setSrcAccessMask({})
+                             .setDstAccessMask(vk::AccessFlagBits::eTransferWrite)
+                             .setOldLayout(vk::ImageLayout::eUndefined)
+                             .setNewLayout(vk::ImageLayout::eGeneral)
+                             .setSubresourceRange(range));
+    }
+
+    command_buffers[0]->pipelineBarrier(vk::PipelineStageFlagBits::eHost,
+                                        vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, barriers);
+  }
+
+  for (size_t i = 0; i < kPlaneCount; i++) {
+    std::vector<vk::ImageAspectFlags> src_planes = {vk::ImageAspectFlagBits::ePlane0,
+                                                    vk::ImageAspectFlagBits::ePlane1,
+                                                    vk::ImageAspectFlagBits::ePlane2};
+    command_buffers[0]->copyImage(
+        *yv12_image, vk::ImageLayout::eTransferSrcOptimal, *plane_image[i],
+        vk::ImageLayout::eGeneral,
+        vk::ImageCopy()
+            .setSrcSubresource(
+                vk::ImageSubresourceLayers().setAspectMask(src_planes[i]).setLayerCount(1))
+            .setDstSubresource(vk::ImageSubresourceLayers()
+                                   .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                                   .setLayerCount(1))
+            .setExtent(
+                vk::Extent3D().setDepth(1).setWidth(plane_widths[i]).setHeight(plane_heights[i])));
+  }
+  {
+    auto range = vk::ImageSubresourceRange()
+                     .setAspectMask(vk::ImageAspectFlagBits::eColor)
+                     .setLevelCount(1)
+                     .setLayerCount(1);
+    std::vector<vk::ImageMemoryBarrier> barriers;
+    for (auto &image : plane_image) {
+      barriers.push_back(vk::ImageMemoryBarrier()
+                             .setImage(*image)
+                             .setSrcAccessMask(vk::AccessFlagBits::eTransferWrite)
+                             .setDstAccessMask(vk::AccessFlagBits::eHostRead)
+                             .setOldLayout(vk::ImageLayout::eGeneral)
+                             .setNewLayout(vk::ImageLayout::eGeneral)
+                             .setSubresourceRange(range));
+    }
+
+    command_buffers[0]->pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                        vk::PipelineStageFlagBits::eHost, {}, {}, {}, barriers);
+  }
+  EXPECT_EQ(vk::Result::eSuccess, command_buffers[0]->end());
+  {
+    auto command_buffer_temp = command_buffers[0].get();
+    auto info = vk::SubmitInfo().setCommandBufferCount(1).setPCommandBuffers(&command_buffer_temp);
+    EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().submit(1, &info, vk::Fence()));
+  }
+  EXPECT_EQ(vk::Result::eSuccess, vulkan_context().queue().waitIdle());
+
+  for (uint32_t i = 0; i < kPlaneCount; i++) {
+    auto map_result = vulkan_context().device()->mapMemory(*plane_memory[i], 0, VK_WHOLE_SIZE, {});
+    EXPECT_EQ(vk::Result::eSuccess, map_result.result);
+    auto ptr = reinterpret_cast<uint8_t *>(map_result.value);
+    ASSERT_EQ(vk::Result::eSuccess, vulkan_context().device()->invalidateMappedMemoryRanges(
+                                        vk::MappedMemoryRange()
+                                            .setMemory(*plane_memory[i])
+                                            .setOffset(0)
+                                            .setSize(VK_WHOLE_SIZE)));
+    auto layout = vulkan_context().device()->getImageSubresourceLayout(
+        *plane_image[i], vk::ImageSubresource(vk::ImageAspectFlagBits::eColor, 0, 0));
+    size_t width = plane_widths[i];
+    size_t height = plane_heights[i];
+
+    uint32_t error_count = 0;
+    bool skip = false;
+    constexpr uint32_t kMaxErrors = 10;
+    uint8_t expected_value;
+    if (i == 0) {
+      expected_value = kYPlaneFill;
+    } else if (i == u_plane) {
+      expected_value = kUPlaneFill;
+    } else {
+      expected_value = kVPlaneFill;
+    }
+
+    for (size_t y = 0; y < height && !skip; y++) {
+      for (size_t x = 0; x < width && !skip; x++) {
+        uint8_t *pixel = ptr + layout.offset + y * layout.rowPitch + x;
+        if (*pixel != expected_value) {
+          EXPECT_EQ(*pixel, expected_value) << " plane " << i << " x " << x << " y " << y;
+          error_count++;
+          if (error_count > kMaxErrors) {
+            printf("Skipping reporting remaining errors\n");
+            skip = true;
+          }
+        }
+      }
+    }
   }
 }
 

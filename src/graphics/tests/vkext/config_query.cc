@@ -29,6 +29,11 @@ bool SupportsSysmemYuv() {
   return c.support_sysmem_yuv();
 }
 
+bool SupportsSysmemYv12() {
+  auto& c = GetConfig();
+  return c.support_sysmem_yv12();
+}
+
 bool SupportsSysmemRenderableLinear() { return GetConfig().support_sysmem_renderable_linear(); }
 
 bool SupportsSysmemLinearNonRgba() { return GetConfig().support_sysmem_linear_nonrgba(); }

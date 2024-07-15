@@ -2,22 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_core::ffx_plugin;
 use ffx_scrutiny_packages_list_args::ScrutinyPackagesCommand;
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::launcher;
+use fho::{FfxMain, FfxTool, Result, SimpleWriter};
+use scrutiny_frontend::scrutiny2::Scrutiny;
 
-#[ffx_plugin()]
-pub async fn scrutiny_package(cmd: ScrutinyPackagesCommand) -> Result<()> {
-    let command = "packages.urls".to_string();
-    let model = if cmd.recovery {
-        ModelConfig::from_product_bundle_recovery(&cmd.product_bundle)
-    } else {
-        ModelConfig::from_product_bundle(&cmd.product_bundle)
-    }?;
-    let config = ConfigBuilder::with_model(model).command(command).build();
-    launcher::launch_from_config(config)?;
+#[derive(FfxTool)]
+pub struct ScrutinyPackagesTool {
+    #[command]
+    pub cmd: ScrutinyPackagesCommand,
+}
 
-    Ok(())
+fho::embedded_plugin!(ScrutinyPackagesTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ScrutinyPackagesTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let artifacts = if self.cmd.recovery {
+            Scrutiny::from_product_bundle_recovery(&self.cmd.product_bundle)
+        } else {
+            Scrutiny::from_product_bundle(&self.cmd.product_bundle)
+        }?
+        .collect()?;
+        let packages = artifacts.get_package_urls()?;
+        let s = serde_json::to_string_pretty(&packages).map_err(|e| fho::Error::User(e.into()))?;
+        println!("{}", s);
+        Ok(())
+    }
 }

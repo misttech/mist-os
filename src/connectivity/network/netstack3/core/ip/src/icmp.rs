@@ -5,7 +5,6 @@
 //! The Internet Control Message Protocol (ICMP).
 
 use core::convert::TryInto as _;
-use core::fmt::Debug;
 use core::num::NonZeroU8;
 
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
@@ -21,7 +20,8 @@ use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
-    InstantBindingsTypes, InstantContext, RngContext, TokenBucket,
+    IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, InstantBindingsTypes, InstantContext, IpExt,
+    RngContext, TokenBucket,
 };
 use netstack3_filter::{self as filter, TransportPacketSerializer};
 use packet::{
@@ -36,9 +36,9 @@ use packet_formats::icmp::{
     peek_message_type, IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpMessageType,
     IcmpPacket, IcmpPacketBuilder, IcmpPacketRaw, IcmpParseArgs, IcmpTimeExceeded, IcmpUnusedCode,
     Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv4ParameterProblem, Icmpv4ParameterProblemCode,
-    Icmpv4RedirectCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet,
-    Icmpv6PacketTooBig, Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
-    MessageBody, OriginalPacket,
+    Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode, Icmpv6Packet, Icmpv6PacketTooBig,
+    Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
+    OriginalPacket,
 };
 use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header};
@@ -46,9 +46,9 @@ use packet_formats::ipv6::{ExtHdrParseError, Ipv6Header};
 use zerocopy::ByteSlice;
 
 use crate::internal::base::{
-    self, AddressStatus, IpDeviceStateContext, IpExt, IpLayerHandler, IpPacketDestination,
-    IpSendFrameError, IpTransportContext, Ipv6PresentAddressStatus, SendIpPacketMeta,
-    TransparentLocalDelivery, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+    AddressStatus, IpDeviceStateContext, IpLayerHandler, IpPacketDestination, IpSendFrameError,
+    IpTransportContext, Ipv6PresentAddressStatus, ReceiveIpPacketMeta, SendIpPacketMeta,
+    TransportReceiveError, IPV6_DEFAULT_SUBNET,
 };
 use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
@@ -73,62 +73,6 @@ pub const REQUIRED_NDP_IP_PACKET_HOP_LIMIT: u8 = 255;
 ///
 /// Beyond this rate, error messages will be silently dropped.
 pub const DEFAULT_ERRORS_PER_SECOND: u64 = 2 << 16;
-
-/// An ICMPv4 error type and code.
-///
-/// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
-pub enum Icmpv4ErrorCode {
-    DestUnreachable(Icmpv4DestUnreachableCode),
-    Redirect(Icmpv4RedirectCode),
-    TimeExceeded(Icmpv4TimeExceededCode),
-    ParameterProblem(Icmpv4ParameterProblemCode),
-}
-
-impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv4ErrorCode {
-    type Type = I::ErrorCode;
-}
-
-/// An ICMPv6 error type and code.
-///
-/// Each enum variant corresponds to a particular error type, and contains the
-/// possible codes for that error type.
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
-pub enum Icmpv6ErrorCode {
-    DestUnreachable(Icmpv6DestUnreachableCode),
-    PacketTooBig,
-    TimeExceeded(Icmpv6TimeExceededCode),
-    ParameterProblem(Icmpv6ParameterProblemCode),
-}
-
-impl<I: IcmpIpExt> GenericOverIp<I> for Icmpv6ErrorCode {
-    type Type = I::ErrorCode;
-}
-
-/// An ICMP error of either IPv4 or IPv6.
-#[derive(Debug, Clone, Copy)]
-pub enum IcmpErrorCode {
-    /// ICMPv4 error.
-    V4(Icmpv4ErrorCode),
-    /// ICMPv6 error.
-    V6(Icmpv6ErrorCode),
-}
-
-impl From<Icmpv4ErrorCode> for IcmpErrorCode {
-    fn from(v4_err: Icmpv4ErrorCode) -> Self {
-        IcmpErrorCode::V4(v4_err)
-    }
-}
-
-impl From<Icmpv6ErrorCode> for IcmpErrorCode {
-    fn from(v6_err: Icmpv6ErrorCode) -> Self {
-        IcmpErrorCode::V6(v6_err)
-    }
-}
-
 /// The IP layer's ICMP state.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
@@ -346,27 +290,6 @@ impl<BT: IcmpBindingsTypes> AsMut<IcmpState<Ipv6, BT>> for Icmpv6State<BT> {
     fn as_mut(&mut self) -> &mut IcmpState<Ipv6, BT> {
         &mut self.inner
     }
-}
-
-/// An extension trait adding extra ICMP-related functionality to IP versions.
-pub trait IcmpIpExt: packet_formats::ip::IpExt + packet_formats::icmp::IcmpIpExt {
-    /// The type of error code for this version of ICMP - [`Icmpv4ErrorCode`] or
-    /// [`Icmpv6ErrorCode`].
-    type ErrorCode: Debug
-        + Copy
-        + PartialEq
-        + GenericOverIp<Self, Type = Self::ErrorCode>
-        + GenericOverIp<Ipv4, Type = Icmpv4ErrorCode>
-        + GenericOverIp<Ipv6, Type = Icmpv6ErrorCode>
-        + Into<IcmpErrorCode>;
-}
-
-impl IcmpIpExt for Ipv4 {
-    type ErrorCode = Icmpv4ErrorCode;
-}
-
-impl IcmpIpExt for Ipv6 {
-    type ErrorCode = Icmpv6ErrorCode;
 }
 
 /// An extension trait providing ICMP handler properties.
@@ -830,8 +753,9 @@ impl<
         src_ip: Ipv4Addr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         mut buffer: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
+        meta: ReceiveIpPacketMeta<Ipv4>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        let ReceiveIpPacketMeta { broadcast: _, transport_override } = &meta;
         if let Some(delivery) = transport_override {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
@@ -882,8 +806,8 @@ impl<
             Icmpv4Packet::EchoReply(echo_reply) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.echo_reply);
                 trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received an EchoReply message");
-                let meta = echo_reply.parse_metadata();
-                buffer.undo_parse(meta);
+                let parse_metadata = echo_reply.parse_metadata();
+                buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
                             as IpTransportContext<Ipv4, BC, CC>>::receive_ip_packet(
                         core_ctx,
@@ -892,7 +816,7 @@ impl<
                         src_ip,
                         dst_ip,
                         buffer,
-                        None,
+                        meta,
                 );
             }
             Icmpv4Packet::TimestampRequest(timestamp_request) => {
@@ -1216,11 +1140,12 @@ fn receive_ndp_packet<
                     //       which this message is sent or (if Duplicate Address
                     //       Detection is in progress [ADDRCONF]) the
                     //       unspecified address.
-                    match Ipv6DeviceHandler::remove_duplicate_tentative_address(
+                    match Ipv6DeviceHandler::handle_received_dad_neighbor_solicitation(
                         core_ctx,
                         bindings_ctx,
                         &device_id,
                         target_address,
+                        p.body().iter().find_map(|option| option.nonce()),
                     ) {
                         IpAddressState::Assigned => {
                             // Address is assigned to us to we let the
@@ -1265,15 +1190,7 @@ fn receive_ndp_packet<
                         }
                     }
 
-                    let link_addr = p.body().iter().find_map(|o| match o {
-                        NdpOption::SourceLinkLayerAddress(a) => Some(a),
-                        NdpOption::TargetLinkLayerAddress(_)
-                        | NdpOption::PrefixInformation(_)
-                        | NdpOption::RedirectedHeader { .. }
-                        | NdpOption::RecursiveDnsServer(_)
-                        | NdpOption::RouteInformation(_)
-                        | NdpOption::Mtu(_) => None,
-                    });
+                    let link_addr = p.body().iter().find_map(|o| o.source_link_layer_address());
 
                     if let Some(link_addr) = link_addr {
                         NudIpHandler::handle_neighbor_probe(
@@ -1324,7 +1241,7 @@ fn receive_ndp_packet<
 
             core_ctx.increment(|counters| &counters.rx.neighbor_advertisement);
 
-            match Ipv6DeviceHandler::remove_duplicate_tentative_address(
+            match Ipv6DeviceHandler::handle_received_neighbor_advertisement(
                 core_ctx,
                 bindings_ctx,
                 &device_id,
@@ -1365,15 +1282,7 @@ fn receive_ndp_packet<
                 }
             }
 
-            let link_addr = p.body().iter().find_map(|o| match o {
-                NdpOption::TargetLinkLayerAddress(a) => Some(a),
-                NdpOption::SourceLinkLayerAddress(_)
-                | NdpOption::PrefixInformation(_)
-                | NdpOption::RedirectedHeader { .. }
-                | NdpOption::RecursiveDnsServer(_)
-                | NdpOption::RouteInformation(_)
-                | NdpOption::Mtu(_) => None,
-            });
+            let link_addr = p.body().iter().find_map(|o| o.target_link_layer_address());
             let link_addr = match link_addr {
                 Some(a) => a,
                 None => {
@@ -1462,7 +1371,8 @@ fn receive_ndp_packet<
                 match option {
                     NdpOption::TargetLinkLayerAddress(_)
                     | NdpOption::RedirectedHeader { .. }
-                    | NdpOption::RecursiveDnsServer(_) => {}
+                    | NdpOption::RecursiveDnsServer(_)
+                    | NdpOption::Nonce(_) => {}
                     NdpOption::SourceLinkLayerAddress(addr) => {
                         debug!("processing SourceLinkLayerAddress option in RA: {:?}", addr);
                         // As per RFC 4861 section 6.3.4,
@@ -1629,8 +1539,9 @@ impl<
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         mut buffer: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
+        meta: ReceiveIpPacketMeta<Ipv6>,
     ) -> Result<(), (B, TransportReceiveError)> {
+        let ReceiveIpPacketMeta { broadcast: _, transport_override } = &meta;
         if let Some(delivery) = transport_override {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
@@ -1690,8 +1601,8 @@ impl<
             Icmpv6Packet::EchoReply(echo_reply) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv6>| &counters.echo_reply);
                 trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message");
-                let meta = echo_reply.parse_metadata();
-                buffer.undo_parse(meta);
+                let parse_metadata = echo_reply.parse_metadata();
+                buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
                             as IpTransportContext<Ipv6, BC, CC>>::receive_ip_packet(
                         core_ctx,
@@ -1700,7 +1611,7 @@ impl<
                         src_ip,
                         dst_ip,
                         buffer,
-                        None,
+                        meta
                 );
             }
             Icmpv6Packet::Ndp(packet) => {
@@ -1784,7 +1695,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     original_dst_ip: SocketIpAddr<I::Addr>,
     get_body_from_src_ip: F,
 ) where
-    I: base::IpExt,
+    I: IpExt,
     CC: IpSocketHandler<I, BC> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
@@ -1802,6 +1713,7 @@ fn send_icmp_reply<I, BC, CC, S, F>(
             &DefaultSendOptions,
             |src_ip| get_body_from_src_ip(src_ip.into()),
             None,
+            false, /* transparent */
         )
         .unwrap_or_else(|err| {
             debug!("failed to send ICMP reply: {}", err);
@@ -2621,7 +2533,8 @@ fn send_icmpv4_error_message<
                     message,
                 ))
             },
-            None
+            None,
+            false, /* transparent */
         )
     );
 }
@@ -2681,6 +2594,7 @@ fn send_icmpv6_error_message<
                     .encapsulate(icmp_builder)
             },
             Some(Ipv6::MINIMUM_LINK_MTU.get()),
+            false, /* transparent */
         )
     );
 }
@@ -2878,7 +2792,9 @@ pub(crate) mod testutil {
 mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
+    use packet_formats::icmp::ndp::options::NdpNonce;
 
+    use core::fmt::Debug;
     use core::time::Duration;
 
     use net_types::ip::Subnet;
@@ -3006,7 +2922,7 @@ mod tests {
             _src_ip: I::RecvSrcAddr,
             _dst_ip: SpecifiedAddr<I::Addr>,
             _buffer: B,
-            _transport_override: Option<TransparentLocalDelivery<I>>,
+            _meta: ReceiveIpPacketMeta<I>,
         ) -> Result<(), (B, TransportReceiveError)> {
             unimplemented!()
         }
@@ -3308,8 +3224,16 @@ mod tests {
             local_ip: Option<SocketIpAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
+            transparent: bool,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.ip_socket_ctx.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            self.ip_socket_ctx.new_ip_socket(
+                bindings_ctx,
+                device,
+                local_ip,
+                remote_ip,
+                proto,
+                transparent,
+            )
         }
 
         fn send_ip_packet<S, O>(
@@ -3381,7 +3305,17 @@ mod tests {
             unimplemented!()
         }
 
-        fn remove_duplicate_tentative_address(
+        fn handle_received_dad_neighbor_solicitation(
+            &mut self,
+            _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
+            _device_id: &Self::DeviceId,
+            _addr: UnicastAddr<Ipv6Addr>,
+            _nonce: Option<NdpNonce<&'_ [u8]>>,
+        ) -> IpAddressState {
+            unimplemented!()
+        }
+
+        fn handle_received_neighbor_advertisement(
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device_id: &Self::DeviceId,
@@ -3534,7 +3468,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
-                None,
+                ReceiveIpPacketMeta::default(),
             )
             .unwrap();
             f(&ctx);
@@ -3778,7 +3712,7 @@ mod tests {
                     ))
                     .serialize_vec_outer()
                     .unwrap(),
-                None,
+                ReceiveIpPacketMeta::default(),
             )
             .unwrap();
             f(&ctx);

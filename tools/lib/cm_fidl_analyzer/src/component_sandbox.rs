@@ -3,18 +3,18 @@
 // found in the LICENSE file.
 
 use crate::component_instance::ComponentInstanceForAnalyzer;
-use ::routing::component_instance::{
-    ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
-};
+use ::routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use ::routing::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use ::routing::error::RoutingError;
 use ::routing::DictExt;
 use async_trait::async_trait;
 use cm_rust::ComponentDecl;
 use cm_types::RelativePath;
 use fidl::endpoints::DiscoverableProtocolMarker;
+use futures::{future, FutureExt};
 use moniker::ChildName;
 use router_error::RouterError;
-use sandbox::{Capability, Data, Dict, Request, Routable, Router, WeakInstanceToken};
+use sandbox::{Capability, Data, Dict, Request, Routable, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
 use {
@@ -22,7 +22,23 @@ use {
     fidl_fuchsia_sys2 as fsys,
 };
 
-pub fn build_framework_dictionary() -> Dict {
+fn new_debug_only_router(source: CapabilitySource<ComponentInstanceForAnalyzer>) -> Router {
+    let cap = Capability::Dictionary(
+        source.try_into().expect("failed to convert capability source to dictionary"),
+    );
+    Router::new(move |request: Request| {
+        if !request.debug {
+            future::ready(Err(RouterError::NotFound(Arc::new(
+                RoutingError::NonDebugRoutesUnsupported,
+            ))))
+            .boxed()
+        } else {
+            future::ready(Ok(cap.try_clone().unwrap())).boxed()
+        }
+    })
+}
+
+pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>) -> Dict {
     let framework_dict = Dict::new();
     for protocol_name in &[
         fcomponent::BinderMarker::PROTOCOL_NAME,
@@ -34,26 +50,36 @@ pub fn build_framework_dictionary() -> Dict {
         fsys::RealmQueryMarker::PROTOCOL_NAME,
         fsys::RouteValidatorMarker::PROTOCOL_NAME,
     ] {
+        let name = cm_types::Name::new(*protocol_name).unwrap();
         framework_dict
             .insert_capability(
-                &cm_types::Name::new(*protocol_name).unwrap(),
-                // Note: a future commit will add a capability source of "program" and use it here.
-                Router::new_ok(Data::String("TODO".to_string())).into(),
+                &name,
+                new_debug_only_router(CapabilitySource::Framework {
+                    capability: InternalCapability::Protocol(name.clone()),
+                    component: WeakComponentInstanceInterface::new(component),
+                })
+                .into(),
             )
             .expect("failed to insert framework capability into dictionary");
     }
     framework_dict
 }
 
-pub fn build_capability_sourced_capabilities_dictionary(decl: &cm_rust::ComponentDecl) -> Dict {
+pub fn build_capability_sourced_capabilities_dictionary(
+    component: &Arc<ComponentInstanceForAnalyzer>,
+    decl: &cm_rust::ComponentDecl,
+) -> Dict {
     let output = Dict::new();
     for capability in &decl.capabilities {
         if let cm_rust::CapabilityDecl::Storage(storage_decl) = capability {
             output
                 .insert_capability(
                     &storage_decl.name,
-                    // Note: a future commit will replace this with CapabilitySource::Capability
-                    Router::new_ok(Data::String("TODO".to_string())).into(),
+                    new_debug_only_router(CapabilitySource::Capability {
+                        source_capability: ComponentCapability::Storage(storage_decl.clone()),
+                        component: WeakComponentInstanceInterface::new(component),
+                    })
+                    .into(),
                 )
                 .expect("failed to insert capability backed capability into dictionary");
         }
@@ -71,14 +97,12 @@ pub fn new_program_router(
 pub fn new_outgoing_dir_router(
     component: &Arc<ComponentInstanceForAnalyzer>,
     _decl: &cm_rust::ComponentDecl,
-    _capability: &cm_rust::CapabilityDecl,
+    capability: &cm_rust::CapabilityDecl,
 ) -> Router {
-    let weak_component_token = WeakInstanceToken {
-        inner: Arc::new(WeakExtendedInstanceInterface::Component(
-            WeakComponentInstanceInterface::new(component),
-        )),
-    };
-    Router::new_ok(weak_component_token)
+    new_debug_only_router(CapabilitySource::Component {
+        capability: ComponentCapability::from(capability.clone()),
+        component: WeakComponentInstanceInterface::new(component),
+    })
 }
 
 pub(crate) fn program_output_router(component: &Arc<ComponentInstanceForAnalyzer>) -> Router {

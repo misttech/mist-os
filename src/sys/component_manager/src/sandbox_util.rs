@@ -25,7 +25,9 @@ use sandbox::{
 use std::fmt::Debug;
 use std::sync::Arc;
 use tracing::warn;
-use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::directory::entry::{
+    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
+};
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -256,10 +258,6 @@ impl<T: Routable + 'static> RoutableExt for T {
                 struct OnReadable(ExecutionScope, Arc<dyn DirectoryEntry>);
 
                 impl DirectoryEntry for OnReadable {
-                    fn entry_info(&self) -> EntryInfo {
-                        self.1.entry_info()
-                    }
-
                     fn open_entry(
                         self: Arc<Self>,
                         mut request: OpenRequest<'_>,
@@ -271,6 +269,12 @@ impl<T: Routable + 'static> RoutableExt for T {
                         } else {
                             self.1.clone().open_entry(request)
                         }
+                    }
+                }
+
+                impl GetEntryInfo for OnReadable {
+                    fn entry_info(&self) -> EntryInfo {
+                        self.1.entry_info()
                     }
                 }
 

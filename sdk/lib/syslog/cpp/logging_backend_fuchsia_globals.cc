@@ -8,15 +8,13 @@
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
 
-#include <atomic>
 #include <mutex>
 
 #define EXPORT __attribute__((visibility("default")))
 
 namespace {
 
-std::atomic<uint32_t> dropped_count = std::atomic<uint32_t>(0);
-syslog_runtime::LogState* state = nullptr;
+syslog_runtime::internal::LogState* state = nullptr;
 std::mutex state_lock;
 // This thread's koid.
 // Initialized on first use.
@@ -43,23 +41,13 @@ zx_koid_t FuchsiaLogGetCurrentThreadKoid() {
 }
 
 EXPORT
-void FuchsiaLogSetStateLocked(syslog_runtime::LogState* new_state) { state = new_state; }
+void FuchsiaLogSetStateLocked(syslog_runtime::internal::LogState* new_state) { state = new_state; }
 
 EXPORT void FuchsiaLogAcquireState() __TA_NO_THREAD_SAFETY_ANALYSIS { state_lock.lock(); }
 
 EXPORT void FuchsiaLogReleaseState() __TA_NO_THREAD_SAFETY_ANALYSIS { state_lock.unlock(); }
 
 EXPORT
-syslog_runtime::LogState* FuchsiaLogGetStateLocked() { return state; }
-
-EXPORT
-uint32_t FuchsiaLogGetAndResetDropped() {
-  return dropped_count.exchange(0, std::memory_order_relaxed);
-}
-
-EXPORT
-void FuchsiaLogAddDropped(uint32_t count) {
-  dropped_count.fetch_add(count, std::memory_order_relaxed);
-}
+syslog_runtime::internal::LogState* FuchsiaLogGetStateLocked() { return state; }
 
 }  // extern "C"

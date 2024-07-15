@@ -24,19 +24,12 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         .param("policy_path", policy_path.clone())
         .param("golden_files_dir", golden_files_dir.clone())
         .build();
-    let plugins = vec![
-        "ZbiPlugin".to_string(),
-        "AdditionalBootConfigPlugin".to_string(),
-        "CorePlugin".to_string(),
-        "StaticPkgsPlugin".to_string(),
-        "VerifyPlugin".to_string(),
-    ];
     let model = if recovery {
         ModelConfig::from_product_bundle_recovery(&cmd.product_bundle.clone())
     } else {
         ModelConfig::from_product_bundle(&cmd.product_bundle.clone())
     }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+    let mut config = ConfigBuilder::with_model(model).command(command).build();
     config.runtime.logging.silent_mode = true;
 
     let scrutiny_output =

@@ -40,14 +40,14 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     // test harness should be the exact same as the current SDK VFS one.
 
     // Supported options:
-    config.supports_open2(true);
+    config.supports_open3(true);
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
 
-    // TODO(https://fxbug.dev/324112857): Support append when adding Open2.
+    // TODO(https://fxbug.dev/324112857): Support append when finalizing Open3 support.
 
     completer.Reply(std::move(config));
   }

@@ -5,11 +5,6 @@ can run. These can be either compiled directly into `ffx` and/or build as separa
 commands that can be found in the build output directory or the SDK, and they
 will then be invoked using the [FHO tool interface](/docs/development/tools/ffx/architecture/fho.md).
 
-This document describes how to get started writing a new subtool for `ffx`.
-If you already have a plugin that was written before the new interface and want
-to migrate it to the new subtool interface, you can find more information on that
-in the [migrating doc](migrating.md).
-
 Note: The tool produced by this document will only be runnable as an external subtool.
 The `ffx` maintainers will generally not be accepting new top level tools as being integrated into
 the `ffx` binary unless there's a very strong reason for it, in which case please
@@ -41,10 +36,8 @@ may require discussion with the tools team to decide on the best place.
 ## What files
 
 Once you've decided where your tool is going to go, create the source
-files. Unlike the legacy plugin system, subtools aren't required to be broken out
-into three separate rust libraries. Still, best practices are to have your
-tool's code broken out into a library that implements things and a `main.rs` that
-simply calls into that library.
+files. Best practices is to have your
+tool's code broken out into a library that implements things and a `main.rs` that simply calls into that library.
 
 The following file set would be a normal starting point:
 
@@ -123,6 +116,44 @@ experimental status and exits early if it's not enabled. When writing a new
 subcommand, it should have this declaration on it to discourage people from relying
 on it before it's ready for wider use.
 
+## FIDL protocols {#fidl-proxy}
+
+FFX subtools can communicate with a target device using FIDL protocols through
+[Overnet][overnet]. To access FIDL protocols from your subtool:
+
+1. Add the FIDL Rust bindings as a dependency to the subtool's `BUILD.gn` file.
+    The following example adds bindings for the `fuchsia.device` FIDL library:
+
+    ```gn
+      deps = [
+        "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
+      ]
+    ```
+
+1. Import the necessary bindings into your subtool implementation. The following
+    example imports `NameProviderProxy` from `fuchsia.device`:
+
+    Note: The struct `NameProviderProxy` is generated as part of the rust
+     bindings to the FIDL `fuchsia.device`,
+     [`NameProviderProxy`](/sdk/fidl/fuchsia.device/name-provider.fidl)
+
+    ```rust
+    use fidl_fuchsia_device::NameProviderProxy;
+    ```
+
+1.  Declare a member field of the tool structure. Since FIDL proxies implement
+  the `TryFromEnv` trait, the FHO framework will create and initialize the field
+  for you.
+
+    ```rust
+    #[derive(FfxTool)]
+    pub struct EchoTool {
+      #[command]
+      cmd: EchoCommand,
+      name_proxy: NameProviderProxy,
+    }
+    ```
+
 #### The `FfxMain` implementation
 
 ```rust
@@ -131,23 +162,42 @@ on it before it's ready for wider use.
 
 Here you can implement the actual tool logic. You can specify a type for the
 [`Writer`](writers.md) associated trait and that type will (through `TryFromEnv`) be
-initialized for you based on the context `ffx` is run in. Most new plugins should
+initialized for you based on the context `ffx` is run in. Most new subtools should
 use the `MachineWriter<>` type, specifying a less generic type than the example
 `String` above, but what makes sense will vary by tool. In the future, it may
 be required that all new tools implement a machine interface.
 
 Also, the result type of this function defaults to using the fho `Error` type,
 which can be used to differentiate between errors that are due to user
-interaction and errors that are unexpected. This maps to the way the legacy
-plugin interface discriminated between normal `anyhow` errors and errors
-produced by `ffx_error` or `ffx_bail`. More information on that can be found
+interaction and errors that are unexpected. More information on that can be found
 in the [errors](errors.md) document.
 
-#### Tests
+#### Unit tests {#unit-tests}
 
-A common patten for testing subtools is to create a fake proxy for a FIDL protocol. This allows
-you to return the full variety of results from calling the proxy without actually having to deal
-with the complexity of an integration test.
+If you want to unit test your subtool, just follow the standard method for
+testing [rust code][rust-testing] on a host. The `ffx_plugin()` GN template
+generates a `<target_name>_lib_test` library target for unit tests when the
+`with_unit_tests` parameter is set to `true`.
+
+If your `lib.rs` contains tests, they can be invoked using `fx test`:
+
+```posix-terminal
+fx test ffx_example_lib_test
+```
+
+If fx test doesn't find your test, check that the product configuration includes
+ your test. You can include all the ffx tests with this command:
+
+```posix-terminal {:.devsite-disable-click-to-copy}
+fx set ... --with=//src/developer/ffx:tests
+```
+
+#### Using fake FIDL proxy in tests
+
+A common patten for testing subtools is to create a fake proxy for a FIDL
+ protocol. This allows you to return the full variety of results from calling
+ the proxy without actually having to deal with the complexity of an integration
+ test.
 
 ```rust
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/tools/echo/src/lib.rs" region_tag="fake_proxy" %}
@@ -265,16 +315,17 @@ sdk_molecule("host_tools") {
 ]
 ```
 
-### UX review
+### UX and SDK review
 
-Fuchsia currently does not have a formal “UX Review” for subtools before adding them to
-the SDK and IDK. This documentation will be updated once design criteria gets published.
-
+Subtools are required to follow the
+[CLI Guidelines](/docs/development/api/cli.md).
 <!-- Reference links -->
 
-[ffx-target-update]: /src/developer/ffx/plugins/target/update/src/lib.rs
-[promoting-an-api-to-partner-internal]: /docs/contribute/sdk#promoting_an_api_to_the_partner_internal_category
-[sdk-gn-file]: /sdk/BUILD.gn
 [ArgsInfo]: https://github.com/google/argh/blob/e901d3a1cc285db9740e0e68a1e4225234377015/argh/src/lib.rs#L338
+[ffx-target-update]: /src/developer/ffx/plugins/target/update/src/lib.rs
 [golden-file-test]: /src/developer/ffx/tests/cli-goldens/README.md
 [MachineWriter]: /docs/development/tools/ffx/development/subtools/writers.md
+[overnet]: /src/connectivity/overnet/
+[promoting-an-api-to-partner-internal]: /docs/contribute/sdk#promoting_an_api_to_the_partner_internal_category
+[sdk-gn-file]: /sdk/BUILD.gn
+[rust-testing]: /docs/development/languages/rust/testing.md

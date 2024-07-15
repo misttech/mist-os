@@ -30,7 +30,7 @@
 //
 class TA_CAP("mutex") Mutex
     : public spin_tracing::LockNameStorage<spin_tracing::LockType::kMutex,
-                                           kSchedulerLockSpinTracingEnabled> {
+                                           kSchedulerLockSpinTracingEnabled | kLockTracingEnabled> {
  public:
   constexpr Mutex() = default;
   explicit Mutex(const fxt::InternedString& name_stringref)

@@ -18,6 +18,10 @@
     capabilities: [
         { service: "fuchsia.hardware.hidbus.Service" },
     ],
+    use: [
+        { service: "fuchsia.hardware.usb.UsbService" },
+        { service: "fuchsia.hardware.usb.endpoint.Endpoint" },
+    ],
     expose: [
         {
             service: "fuchsia.hardware.hidbus.Service",

@@ -12,6 +12,7 @@ rustc_library("cm_fidl_analyzer") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-url",
@@ -28,13 +29,14 @@ rustc_library("cm_fidl_analyzer") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:url",
 
     # Depend on fuchsia_zircon_status crate instead of fuchsia_zircon so that this builds for host.
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust/fuchsia-zircon-status",
   ]
   test_deps = [
     "//src/lib/fuchsia",

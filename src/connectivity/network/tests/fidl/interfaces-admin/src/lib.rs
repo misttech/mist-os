@@ -328,16 +328,7 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
         event_stream,
         &mut if_state,
         |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-             properties:
-                 fidl_fuchsia_net_interfaces_ext::Properties {
-                     addresses,
-                     online: _,
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fidl_fuchsia_net_interfaces_ext::Properties { addresses, .. },
              state: (),
          }| {
             addresses.iter().find_map(
@@ -361,15 +352,7 @@ async fn add_address_errors<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
-    let fidl_fuchsia_net_interfaces_ext::Properties {
-        id: loopback_id,
-        addresses,
-        name: _,
-        device_class: _,
-        online: _,
-        has_default_ipv4_route: _,
-        has_default_ipv6_route: _,
-    } = realm
+    let fidl_fuchsia_net_interfaces_ext::Properties { id: loopback_id, addresses, .. } = realm
         .loopback_properties()
         .await
         .expect("failed to get loopback properties")
@@ -462,15 +445,7 @@ async fn add_ipv4_mapped_ipv6_address<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
-    let fidl_fuchsia_net_interfaces_ext::Properties {
-        id: loopback_id,
-        addresses: _,
-        name: _,
-        device_class: _,
-        online: _,
-        has_default_ipv4_route: _,
-        has_default_ipv6_route: _,
-    } = realm
+    let fidl_fuchsia_net_interfaces_ext::Properties { id: loopback_id, .. } = realm
         .loopback_properties()
         .await
         .expect("failed to get loopback properties")
@@ -716,6 +691,72 @@ async fn add_address_removal<N: Netstack>(
                 fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::User
             )
         );
+    }
+}
+
+// Races address and interface removal and verifies that the end state is as
+// expected. Guards against regression for ASP race in Netstack3.
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn race_address_and_interface_removal<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("new sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = realm
+        .install_endpoint(device, InterfaceConfig::default())
+        .await
+        .expect("install interface");
+    let iface_id = interface.id();
+
+    let address_state_provider = interfaces::add_address_wait_assigned(
+        interface.control(),
+        fidl_subnet!("192.0.2.1/24"),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+    )
+    .await
+    .expect("add address failed unexpectedly");
+
+    let interfaces_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+
+    let watcher = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interfaces_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("create event stream")
+    .map(|r| r.expect("watcher error"))
+    .fuse();
+    let mut watcher = pin!(watcher);
+
+    let _existing = fidl_fuchsia_net_interfaces_ext::existing(
+        watcher.by_ref().map(Result::<_, fidl::Error>::Ok),
+        HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new(),
+    )
+    .await
+    .expect("existing");
+
+    // Drop both the interface and state provider, poll on the watcher until we
+    // see the interface removed.
+    core::mem::drop((interface, address_state_provider));
+    loop {
+        let event = watcher.next().await.expect("watcher closed");
+        match event {
+            e @ fnet_interfaces::Event::Existing(_)
+            | e @ fnet_interfaces::Event::Idle(_)
+            | e @ fnet_interfaces::Event::Added(_) => panic!("unexpected event {e:?}"),
+            fnet_interfaces::Event::Removed(id) => {
+                assert_eq!(id, iface_id);
+                break;
+            }
+            fnet_interfaces::Event::Changed(fnet_interfaces::Properties { id, .. }) => {
+                // We may see interface changed events depending on how the race
+                // plays out, the only thing we can assert on is that it relates
+                // to the interface we're racing.
+                assert_eq!(id, Some(iface_id));
+            }
+        }
     }
 }
 
@@ -1087,16 +1128,7 @@ async fn add_address_and_remove<N: Netstack>(
         .expect("event stream from state"),
         &mut fnet_interfaces_ext::InterfaceState::Unknown(id),
         |fnet_interfaces_ext::PropertiesAndState {
-             properties:
-                 fnet_interfaces_ext::Properties {
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     online: _,
-                     addresses,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fnet_interfaces_ext::Properties { addresses, .. },
              state: (),
          }| {
             addresses
@@ -1302,16 +1334,7 @@ async fn remove_slaac_address<N: Netstack>(name: &str) {
         &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
         |fnet_interfaces_ext::PropertiesAndState {
              state: (),
-             properties:
-                 fnet_interfaces_ext::Properties {
-                     id: _,
-                     name: _,
-                     device_class: _,
-                     online: _,
-                     addresses,
-                     has_default_ipv4_route: _,
-                     has_default_ipv6_route: _,
-                 },
+             properties: fnet_interfaces_ext::Properties { addresses, .. },
          }| {
             addresses.iter().find_map(
                 |&fnet_interfaces_ext::Address {
@@ -1402,9 +1425,7 @@ async fn device_control_create_interface<N: Netstack>(name: &str) {
         fidl_fuchsia_net_interfaces_ext::Properties {
             id: iface_id.try_into().expect("should be nonzero"),
             name: IF_NAME.to_string(),
-            device_class: fidl_fuchsia_net_interfaces::DeviceClass::Device(
-                fidl_fuchsia_hardware_network::DeviceClass::Virtual
-            ),
+            port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Virtual,
             online: false,
             // We haven't enabled the interface, it mustn't have any addresses assigned
             // to it yet.
@@ -2775,7 +2796,7 @@ struct IpForwarding {
 impl IpForwarding {
     // Returns the expected response when calling `get_forwarding` on
     // an interface that was previously configured using the given config.
-    fn expected_next_get_forwarding_response<N: Netstack>(&self) -> IpForwarding {
+    fn expected_next_get_forwarding_response(&self) -> IpForwarding {
         const fn false_if_none(val: Option<bool>) -> Option<bool> {
             // Manual implementation of `Option::and` since it is not yet
             // stable as a const fn.
@@ -2784,25 +2805,11 @@ impl IpForwarding {
                 Some(v) => Some(v),
             }
         }
-        match N::VERSION {
-            // TODO(https://fxbug.dev/323052525): Implement multicast forwarding in Netstack3.
-            NetstackVersion::Netstack3 => IpForwarding {
-                v4: false_if_none(self.v4),
-                v4_multicast: None,
-                v6: false_if_none(self.v6),
-                v6_multicast: None,
-            },
-            NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => IpForwarding {
-                v4: false_if_none(self.v4),
-                v4_multicast: false_if_none(self.v4_multicast),
-                v6: false_if_none(self.v6),
-                v6_multicast: false_if_none(self.v6_multicast),
-            },
-            v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
-            | NetstackVersion::ProdNetstack2
-            | NetstackVersion::ProdNetstack3) => {
-                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
-            }
+        IpForwarding {
+            v4: false_if_none(self.v4),
+            v4_multicast: false_if_none(self.v4_multicast),
+            v6: false_if_none(self.v6),
+            v6_multicast: false_if_none(self.v6_multicast),
         }
     }
 
@@ -2921,18 +2928,13 @@ async fn get_set_forwarding_loopback<N: Netstack>(
             realm.loopback_properties().await,
             Ok(Some(fnet_interfaces_ext::Properties {
                 id,
-                name: _,
-                device_class: _,
-                online: _,
-                addresses: _,
-                has_default_ipv4_route: _,
-                has_default_ipv6_route: _,
+                ..
             })) => id.get()
         ))
         .unwrap();
 
     let expected_get_forwarding_response_when_previously_unset =
-        IpForwarding::default().expected_next_get_forwarding_response::<N>();
+        IpForwarding::default().expected_next_get_forwarding_response();
     // Initially, interfaces have IP forwarding disabled.
     assert_eq!(
         get_ip_forwarding(&loopback_control).await,
@@ -2978,7 +2980,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     let iface2 = realm.join_network(&net, "iface2").await.expect("create iface1");
 
     let expected_get_forwarding_response_when_previously_unset =
-        IpForwarding::default().expected_next_get_forwarding_response::<N>();
+        IpForwarding::default().expected_next_get_forwarding_response();
     // Initially, interfaces have IP forwarding disabled.
     assert_eq!(
         get_ip_forwarding(iface1.control()).await,
@@ -3013,7 +3015,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     )
     .await;
     let expected_get_forwarding_response_after_set =
-        forwarding_config.expected_next_get_forwarding_response::<N>();
+        forwarding_config.expected_next_get_forwarding_response();
     assert_eq!(
         get_ip_forwarding(iface1.control()).await,
         expected_get_forwarding_response_after_set
@@ -3050,7 +3052,7 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     )
     .await;
     let expected_get_forwarding_response_after_reverse =
-        reversed_forwarding_config.expected_next_get_forwarding_response::<N>();
+        reversed_forwarding_config.expected_next_get_forwarding_response();
     assert_eq!(
         get_ip_forwarding(iface2.control()).await,
         expected_get_forwarding_response_after_reverse,

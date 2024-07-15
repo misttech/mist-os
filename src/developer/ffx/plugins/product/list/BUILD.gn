@@ -15,13 +15,12 @@ ffx_plugin("ffx_product_list") {
 
   deps = [
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
-    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/gcs",
     "//src/lib/structured_ui",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:omaha_client",
@@ -33,7 +32,7 @@ ffx_plugin("ffx_product_list") {
   ]
 
   test_deps = [
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/testing/temp_test_env",
   ]
 }

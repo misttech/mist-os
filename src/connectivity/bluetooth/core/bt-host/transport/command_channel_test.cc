@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/command_channel.h"
 
+#include <pw_bytes/endian.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
@@ -13,8 +15,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_packets.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
-#include <pw_bluetooth/hci_commands.emb.h>
 #include <pw_bluetooth/hci_android.emb.h>
+#include <pw_bluetooth/hci_commands.emb.h>
 
 namespace bt::hci {
 namespace {
@@ -105,9 +107,11 @@ TEST_F(CommandChannelTest, SingleRequestResponse) {
                       .payload<hci_spec::CommandCompleteEventParams>()
                       .num_hci_command_packets);
         EXPECT_EQ(hci_spec::kReset,
-                  le16toh(event.view()
-                              .payload<hci_spec::CommandCompleteEventParams>()
-                              .command_opcode));
+                  pw::bytes::ConvertOrderFrom(
+                      cpp20::endian::little,
+                      event.view()
+                          .payload<hci_spec::CommandCompleteEventParams>()
+                          .command_opcode));
         EXPECT_EQ(pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE,
                   event.return_params<hci_spec::SimpleReturnParams>()->status);
       });
@@ -123,29 +127,18 @@ TEST_F(CommandChannelTest, SingleRequestResponse) {
 }
 
 TEST_F(CommandChannelTest, SingleAsynchronousRequest) {
-  // Set up expectations:
-  // clang-format off
-  // HCI_Inquiry (general, unlimited, 1s)
- StaticByteBuffer req(
-      LowerBits(hci_spec::kInquiry), UpperBits(hci_spec::kInquiry),  // HCI_Inquiry opcode
-      0x05,                                      // parameter_total_size
-      0x33, 0x8B, 0x9E,                          // General Inquiry
-      0x01,                                      // 1.28s
-      0x00                                       // Unlimited responses
-      );
-  // HCI_CommandStatus
-  auto rsp0 = StaticByteBuffer(
-       hci_spec::kCommandStatusEventCode,
-      0x04,  // parameter_total_size (4 byte payload)
-      pw::bluetooth::emboss::StatusCode::SUCCESS, 0x01, // status, num_hci_command_packets (1 can be sent)
-      LowerBits(hci_spec::kInquiry), UpperBits(hci_spec::kInquiry)  // HCI_Inquiry opcode
-      );
-  // HCI_InquiryComplete
-  auto rsp1 = StaticByteBuffer(
-      hci_spec::kInquiryCompleteEventCode,
-      0x01,  // parameter_total_size (1 byte payload)
-      pw::bluetooth::emboss::StatusCode::SUCCESS);
-  // clang-format on
+  // Set up expectations: HCI_Inquiry (general, unlimited, 1s)
+  const auto req = testing::InquiryCommandPacket(0x01);
+  // HCI_Command_Status
+  auto rsp0 =
+      testing::CommandStatusPacket(hci_spec::kInquiry,
+                                   pw::bluetooth::emboss::StatusCode::SUCCESS,
+                                   /*num_packets=*/1);
+  // HCI_Inquiry_Complete
+  auto rsp1 = StaticByteBuffer(hci_spec::kInquiryCompleteEventCode,
+                               0x01,  // parameter_total_size (1 byte payload)
+                               pw::bluetooth::emboss::StatusCode::SUCCESS);
+
   EXPECT_CMD_PACKET_OUT(test_device(), req, &rsp0, &rsp1);
 
   // Send HCI_Inquiry
@@ -211,7 +204,8 @@ TEST_F(CommandChannelTest, SingleRequestWithStatusResponse) {
                   .num_hci_command_packets);
     EXPECT_EQ(
         hci_spec::kReset,
-        le16toh(
+        pw::bytes::ConvertOrderFrom(
+            cpp20::endian::little,
             event.params<hci_spec::CommandStatusEventParams>().command_opcode));
   };
 
@@ -276,8 +270,10 @@ TEST_F(CommandChannelTest, OneSentUntilStatus) {
       expected_opcode = hci_spec::kInquiryCancel;
     }
     EXPECT_EQ(expected_opcode,
-              le16toh(event.params<hci_spec::CommandCompleteEventParams>()
-                          .command_opcode));
+              pw::bytes::ConvertOrderFrom(
+                  cpp20::endian::little,
+                  event.params<hci_spec::CommandCompleteEventParams>()
+                      .command_opcode));
     cb_event_count++;
   };
 
@@ -353,7 +349,8 @@ TEST_F(CommandChannelTest, QueuedCommands) {
   auto cb = [&reset_count, &cancel_count](CommandChannel::TransactionId id,
                                           const EventPacket& event) {
     EXPECT_EQ(hci_spec::kCommandCompleteEventCode, event.event_code());
-    auto opcode = le16toh(
+    uint16_t opcode = pw::bytes::ConvertOrderFrom(
+        cpp20::endian::little,
         event.params<hci_spec::CommandCompleteEventParams>().command_opcode);
     if (opcode == hci_spec::kReset) {
       reset_count++;
@@ -1281,18 +1278,13 @@ TEST_F(CommandChannelTest,
        AsyncEventHandlersAndLeMetaEventHandlersDoNotInterfere) {
   // Set up expectations for the asynchronous command and its corresponding
   // command status event.
-  // clang-format off
-  auto cmd = StaticByteBuffer(
-      LowerBits(hci_spec::kInquiry), UpperBits(hci_spec::kInquiry),  // HCI_Inquiry opcode
-      0x00                                       // parameter_total_size
-  );
-  auto cmd_status = StaticByteBuffer(
-       hci_spec::kCommandStatusEventCode,
-      0x04,  // parameter_total_size (4 byte payload)
-      pw::bluetooth::emboss::StatusCode::SUCCESS, 0x01, // status, num_hci_command_packets (1 can be sent)
-      LowerBits(hci_spec::kInquiry), UpperBits(hci_spec::kInquiry)  // HCI_Inquiry opcode
-  );
-  // clang-format on
+  auto cmd =
+      StaticByteBuffer(LowerBits(hci_spec::kInquiry),
+                       UpperBits(hci_spec::kInquiry),  // HCI_Inquiry opcode
+                       0x00                            // parameter_total_size
+      );
+  auto cmd_status = testing::InquiryCommandResponse(
+      pw::bluetooth::emboss::StatusCode::SUCCESS);
 
   EXPECT_CMD_PACKET_OUT(test_device(), cmd, &cmd_status);
 

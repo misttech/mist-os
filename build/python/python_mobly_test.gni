@@ -149,6 +149,9 @@ import("//build/testing/host_test_data.gni")
 #  timeout_secs (optional)
 #    [int] The infra timeout in seconds for the test.
 #
+#   isolated (optional)
+#     [bool] Whether the test needs to be run in isolation to other tests.
+#
 #   environments
 #    Optional: what environments this test should target. Only applies to host
 #    host tests. See //build/testing/test_spec.gni for more details.
@@ -403,6 +406,7 @@ template("python_mobly_test") {
   host_test(_test_name) {
     forward_variables_from(invoker,
                            [
+                             "isolated",
                              "visibility",
                              "timeout_secs",
                            ])
@@ -549,6 +553,7 @@ template("python_mobly_test") {
     host_test("${_test_name}.hermetic") {
       forward_variables_from(invoker,
                              [
+                               "isolated",
                                "visibility",
                                "timeout_secs",
                              ])

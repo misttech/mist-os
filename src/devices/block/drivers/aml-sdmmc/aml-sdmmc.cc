@@ -368,6 +368,7 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
               std::move(description.current_level_client_.value()));
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client_.value()), dispatcher());
+      hardware_power_assertive_token_ = std::move(description.assertive_token_);
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
       wake_on_request_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
@@ -405,42 +406,11 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
 }
 
 void AmlSdmmc::GetToken(GetTokenCompleter::Sync& completer) {
-  zx::event token;
-  zx_status_t status = zx::event::create(0, &token);
-  if (status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to create token.");
-    completer.Reply(fit::error(status));
-    return;
-  }
-
   zx::event dupe;
-  status = token.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
+  zx_status_t status = hardware_power_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe);
   if (status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to duplicate token.");
     completer.Reply(fit::error(status));
-    return;
-  }
-
-  const fidl::WireResult result = hardware_power_element_control_client_->RegisterDependencyToken(
-      std::move(token), fuchsia_power_broker::DependencyType::kAssertive);
-  if (!result.ok()) {
-    FDF_LOGL(ERROR, logger(), "Call to RegisterDependencyToken failed: %s", result.status_string());
-    completer.Reply(fit::error(result.status()));
-    return;
-  }
-  if (result->is_error()) {
-    switch (result->error_value()) {
-      case fuchsia_power_broker::RegisterDependencyTokenError::kAlreadyInUse:
-        FDF_LOGL(ERROR, logger(), "RegisterDependencyToken returned already in use error.");
-        break;
-      case fuchsia_power_broker::RegisterDependencyTokenError::kInternal:
-        FDF_LOGL(ERROR, logger(), "RegisterDependencyToken returned internal error.");
-        break;
-      default:
-        FDF_LOGL(ERROR, logger(), "RegisterDependencyToken returned unknown error.");
-        break;
-    }
-    completer.Reply(fit::error(ZX_ERR_INTERNAL));
     return;
   }
 

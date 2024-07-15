@@ -108,12 +108,14 @@ fuchsia_package("vkcopy_test_child_package") {
   ]
 }
 
-sdk_fuchsia_package("vkcopy-test-sdk") {
-  distribution_name = "vkcopy-test"
-  category = "partner"
-  package_label = ":vkcopy_test_child_package"
-  api_level_added = 19
-  expected_files_exact = [ "meta/vkcopy-test-child.cm" ]
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("vkcopy-test-sdk") {
+    distribution_name = "vkcopy-test"
+    category = "partner"
+    package_label = ":vkcopy_test_child_package"
+    api_level_added = 19
+    expected_files_exact = [ "meta/vkcopy-test-child.cm" ]
+  }
 }
 
 fuchsia_test_component("vkcopy_cmp") {

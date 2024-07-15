@@ -20,6 +20,7 @@
 #include <fcntl.h>
 
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -80,6 +81,7 @@
 #include "src/storage/f2fs/dir_entry_cache.h"
 #include "src/storage/f2fs/inspect.h"
 #include "src/storage/f2fs/memory_watcher.h"
+#include "src/storage/f2fs/xattr.h"
 // clang-format on
 
 namespace f2fs {

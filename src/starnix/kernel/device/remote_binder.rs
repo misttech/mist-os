@@ -3,10 +3,14 @@
 // found in the LICENSE file.
 
 use crate::device::{BinderDriver, DeviceOps, RemoteBinderConnection};
+use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use crate::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString, NamespaceNode};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+    NamespaceNode,
+};
 use anyhow::{Context, Error};
 use derivative::Derivative;
 use fidl::endpoints::{ClientEnd, ControlHandle, RequestStream, ServerEnd};
@@ -94,6 +98,7 @@ impl RemoteBinderFileOps {
 
 impl FileOps for RemoteBinderFileOps {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn query_events(
         &self,
@@ -118,13 +123,14 @@ impl FileOps for RemoteBinderFileOps {
         self.0.ioctl(locked, current_task, request, arg)
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         _prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         error!(EOPNOTSUPP)
     }
 
@@ -134,7 +140,7 @@ impl FileOps for RemoteBinderFileOps {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _addr: DesiredAddress,
-        _vmo_offset: u64,
+        _memory_offset: u64,
         _length: usize,
         _prot_flags: ProtectionFlags,
         _mapping_options: MappingOptions,
@@ -606,7 +612,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let deadline = payload.deadline.map(zx::Time::from_nanos);
                         kernel
                             .shared_futexes
-                            .external_wait(vmo, offset, value, mask)
+                            .external_wait(vmo.into(), offset, value, mask)
                             .map(|receiver| (deadline, receiver))
                     })();
                     let result = match deadline_and_receiver {
@@ -635,7 +641,12 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         let offset = payload.offset.ok_or_else(|| errno!(EINVAL))?;
                         let count = payload.count.ok_or_else(|| errno!(EINVAL))?;
                         let mask = payload.mask.unwrap_or(u32::MAX);
-                        kernel.shared_futexes.external_wake(vmo, offset, count as usize, mask)
+                        kernel.shared_futexes.external_wake(
+                            vmo.into(),
+                            offset,
+                            count as usize,
+                            mask,
+                        )
                     })();
                     let result = result
                         .map(|count| fbinder::WakeResponse {

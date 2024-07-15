@@ -119,6 +119,7 @@ pub mod ip {
     }
 
     // Re-exported types.
+    pub use netstack3_base::WrapBroadcastMarker;
     pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
         IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
@@ -151,9 +152,10 @@ pub mod neighbor {
 /// Types and utilities for dealing with routes.
 pub mod routes {
     // Re-exported types.
+    pub use netstack3_base::WrapBroadcastMarker;
     pub use netstack3_ip::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither,
-        Generation, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
+        Generation, Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
     };
 }
 
@@ -188,12 +190,13 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
+    pub use netstack3_base::{Payload, SendPayload};
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-        OriginalDestinationError, Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
-        SetDeviceError, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
-        TcpBindingsTypes, TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
+        OriginalDestinationError, ReceiveBuffer, RingBuffer, SendBuffer, SetDeviceError,
+        SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
+        TcpSocketId, UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 

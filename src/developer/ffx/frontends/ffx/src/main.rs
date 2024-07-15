@@ -251,15 +251,13 @@ fn find_info_from_cmd(args: &[&str], all_info: &CliArgsInfo) -> Option<CliArgsIn
 }
 
 async fn run_legacy_subcommand(
-    app: FfxCommandLine,
+    _app: FfxCommandLine,
     context: EnvironmentContext,
     subcommand: FfxBuiltIn,
 ) -> Result<()> {
     let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
     tracing::debug!("initializing overnet");
-    let injector =
-        Injection::initialize_overnet(context, None, daemon_version_string, app.global.machine)
-            .await?;
+    let injector = Injection::initialize_overnet(context, None, daemon_version_string).await?;
     tracing::debug!("Overnet initialized, creating injector");
     let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
     ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await
@@ -275,6 +273,7 @@ async fn main() {
 mod test {
     use super::*;
     use ffx_command::{FlagInfo, FlagKind, PositionalInfo, SubCommandInfo};
+    use ffx_core as _;
 
     #[fuchsia::test]
     async fn test_try_runner_from_name() {

@@ -201,6 +201,7 @@ impl ZxioErrorCode {
 pub enum ControlMessage {
     IpTos(u8),
     IpTtl(u8),
+    IpRecvOrigDstAddr([u8; size_of::<zxio::sockaddr_in>()]),
     Ipv6Tclass(u8),
     Ipv6HopLimit(u8),
     Ipv6PacketInfo { iface: u32, local_addr: [u8; size_of::<zxio::in6_addr>()] },
@@ -224,6 +225,7 @@ impl ControlMessage {
         match self {
             ControlMessage::IpTos(_) => 1,
             ControlMessage::IpTtl(_) => size_of::<c_int>(),
+            ControlMessage::IpRecvOrigDstAddr(addr) => size_of_val(&addr),
             ControlMessage::Ipv6Tclass(_) => size_of::<c_int>(),
             ControlMessage::Ipv6HopLimit(_) => size_of::<c_int>(),
             ControlMessage::Ipv6PacketInfo { .. } => size_of::<zxio::in6_pktinfo>(),
@@ -243,6 +245,10 @@ impl ControlMessage {
             ControlMessage::IpTtl(v) => {
                 (*v as c_int).write_to_prefix(data).unwrap();
                 (size_of::<c_int>(), zxio::SOL_IP, zxio::IP_TTL)
+            }
+            ControlMessage::IpRecvOrigDstAddr(v) => {
+                v.write_to_prefix(data).unwrap();
+                (size_of_val(&v), zxio::SOL_IP, zxio::IP_RECVORIGDSTADDR)
             }
             ControlMessage::Ipv6Tclass(v) => {
                 (*v as c_int).write_to_prefix(data).unwrap();
@@ -319,6 +325,9 @@ fn parse_control_messages(data: &[u8]) -> Vec<ControlMessage> {
             (zxio::SOL_IP, zxio::IP_TTL) => {
                 ControlMessage::IpTtl(c_int::read_from_prefix(msg_data).unwrap() as u8)
             }
+            (zxio::SOL_IP, zxio::IP_RECVORIGDSTADDR) => ControlMessage::IpRecvOrigDstAddr(
+                <[u8; size_of::<zxio::sockaddr_in>()]>::read_from_prefix(msg_data).unwrap(),
+            ),
             (zxio::SOL_IPV6, zxio::IPV6_TCLASS) => {
                 ControlMessage::Ipv6Tclass(c_int::read_from_prefix(msg_data).unwrap() as u8)
             }

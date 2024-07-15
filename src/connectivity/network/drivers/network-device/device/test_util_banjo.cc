@@ -46,7 +46,7 @@ zx_status_t RxBuffer::WriteData(cpp20::span<const uint8_t> data, const VmoProvid
 
 FakeNetworkPortImpl::FakeNetworkPortImpl()
     : port_info_({
-          .port_class = static_cast<uint8_t>(netdev::wire::DeviceClass::kEthernet),
+          .port_class = static_cast<uint16_t>(netdev::wire::PortClass::kEthernet),
           .rx_types_list = rx_types_.data(),
           .rx_types_count = 1,
           .tx_types_list = tx_types_.data(),

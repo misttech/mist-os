@@ -192,7 +192,10 @@ const struct Command {
      &SockScripter::LogOriginalDestination},
     {"log-original-destination6", nullptr, "log SOL_IPV6: SO_ORIGINAL_DST option value",
      &SockScripter::LogOriginalDestination6},
-
+    {"set-tclass", "<tclass>", "set IPV6_TCLASS option", &SockScripter::SetTClass},
+    {"log-tclass", nullptr, "log IPV6_TCLASS option value", &SockScripter::LogTClass},
+    {"set-tos", "<tos>", "set IP_TOS option", &SockScripter::SetTos},
+    {"log-tos", nullptr, "log IP_TOS option value", &SockScripter::LogTos},
     {"join4", "<mcast-ip>-<local-intf-Addr>",
      "join IPv4 mcast group (IP_ADD_MEMBERSHIP) on local interface", &SockScripter::Join4},
     {"drop4", "<mcast-ip>-<local-intf-Addr>",
@@ -890,6 +893,36 @@ bool SockScripter::LogIcmp6Filter(char* arg) {
   }
 
   LOG(INFO) << "IPPROTO_IPV6: ICMP6_FILTER - " << IcmpFilterString(filter);
+  return true;
+}
+
+bool SockScripter::SetTClass(char* arg) {
+  int value;
+  if (!str2int(arg, &value) || value < 0) {
+    LOG(ERROR) << "Error: Invalid IPV6_TCLASS value='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IPV6, IPV6_TCLASS, value)
+  return true;
+}
+
+bool SockScripter::LogTClass(char* arg) {
+  LOG_SOCK_OPT_VAL(IPPROTO_IPV6, IPV6_TCLASS, int);
+  return true;
+}
+
+bool SockScripter::SetTos(char* arg) {
+  int value;
+  if (!str2int(arg, &value) || value < 0) {
+    LOG(ERROR) << "Error: Invalid IP_TOS value='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IP, IP_TOS, value)
+  return true;
+}
+
+bool SockScripter::LogTos(char* arg) {
+  LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_TOS, int);
   return true;
 }
 

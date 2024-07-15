@@ -5,6 +5,7 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_COMMON_IDENTIFIER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_COMMON_IDENTIFIER_H_
 
+#include <cinttypes>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -23,7 +24,7 @@ struct IdentifierTraits {
 template <>
 struct IdentifierTraits<uint64_t> {
   static std::string ToString(uint64_t value) {
-    return bt_lib_cpp_string::StringPrintf("%.16lx", value);
+    return bt_lib_cpp_string::StringPrintf("%.16" PRIx64, value);
   }
 };
 

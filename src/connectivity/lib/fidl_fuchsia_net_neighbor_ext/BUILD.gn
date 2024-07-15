@@ -13,7 +13,7 @@ rustc_library("fidl_fuchsia_net_neighbor_ext") {
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
     "//src/lib/fidl_table_validation",
     "//src/lib/network/fidl_fuchsia_net_ext",
-    "//src/lib/zircon/rust:fuchsia-zircon-types",
+    "//src/lib/zircon/rust/fuchsia-zircon-types",
   ]
 
   sources = [ "src/lib.rs" ]

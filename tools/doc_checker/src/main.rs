@@ -106,6 +106,14 @@ pub struct DocCheckerArgs {
     /// to /docs.
     #[argh(switch)]
     pub allow_fuchsia_src_links: bool,
+
+    /// path to reference docs. Links to the main docs folder.
+    #[argh(option)]
+    pub reference_docs_root: Option<PathBuf>,
+
+    /// do not check links between docs,
+    #[argh(switch)]
+    pub skip_link_check: bool,
 }
 
 #[fuchsia::main]
@@ -116,6 +124,13 @@ async fn main() -> Result<()> {
     // the root directory existing and being a normalized path.
     opt.root =
         opt.root.canonicalize().context(format!("invalid root dir for source: {:?} ", opt.root))?;
+    if let Some(reference_root) = opt.reference_docs_root {
+        opt.reference_docs_root = Some(
+            reference_root
+                .canonicalize()
+                .context("could not get canonical reference root for {reference_root:?}")?,
+        );
+    }
 
     if let Some(mut errors) = do_main(&opt).await? {
         // Output the result
@@ -173,11 +188,11 @@ async fn do_main(opt: &DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
 
     // Find all the markdown in the docs folder.
     let pattern = format!("{}/**/*.md", docs_dir.to_string_lossy());
-    let markdown_files: Vec<PathBuf> = glob(&pattern)?
+    let mut markdown_files: Vec<PathBuf> = glob(&pattern)?
         // Keep only non-error results, mapping to Option<PathBuf>
         .filter_map(|p| p.ok())
         // Keep paths with file names, mapped to str&
-        // and rop the hidden files that macs sometime make.
+        // and drop the hidden files that macs sometime make.
         .filter_map(|p| {
             if let Some(name) = p.file_name()?.to_str() {
                 if !name.starts_with("._") {
@@ -193,8 +208,32 @@ async fn do_main(opt: &DocCheckerArgs) -> Result<Option<Vec<DocCheckError>>> {
 
     // Find all the .yaml files.
     let yaml_pattern = format!("{}/**/*.yaml", docs_dir.to_string_lossy());
-    let yaml_files: Vec<PathBuf> = glob(&yaml_pattern)?.filter_map(|p| p.ok()).collect();
+    let mut yaml_files: Vec<PathBuf> = glob(&yaml_pattern)?.filter_map(|p| p.ok()).collect();
 
+    if let Some(reference_root) = &opt.reference_docs_root {
+        eprintln!("Also checking reference docs in {reference_root:?}.");
+        let pattern = format!("{}/**/*.md", reference_root.to_string_lossy());
+        let reference_markdown = glob(&pattern)?
+            // Keep only non-error results, mapping to Option<PathBuf>
+            .filter_map(|p| p.ok())
+            // Keep paths with file names, mapped to str&
+            // and rop the hidden files that macs sometime make.
+            .filter_map(|p| {
+                if let Some(name) = p.file_name()?.to_str() {
+                    if !name.starts_with("._") {
+                        Some(p)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            });
+        markdown_files.extend(reference_markdown);
+
+        let yaml_pattern = format!("{}/**/*.yaml", reference_root.to_string_lossy());
+        yaml_files.extend(glob(&yaml_pattern)?.filter_map(|p| p.ok()));
+    }
     eprintln!(
         "Checking {} markdown files and {} yaml files",
         markdown_files.len(),
@@ -271,7 +310,11 @@ pub fn check_markdown<'a>(
 
     for mdfile in files {
         let mdcontent = fs::read_to_string(mdfile).expect("Unable to read file");
-        let doc_context = DocContext::new_with_checks(mdfile.clone(), &mdcontent);
+        let mut callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+            DocContext::handle_broken_link(broken_link, &mdcontent)
+        };
+
+        let doc_context = DocContext::new(mdfile.clone(), &mdcontent, Some(&mut callback));
 
         for element in doc_context {
             for c in &mut *checks {
@@ -333,6 +376,8 @@ mod test {
             local_links_only: true,
             json: false,
             allow_fuchsia_src_links: false,
+            reference_docs_root: None,
+            skip_link_check: false,
         };
 
         // Set the current directory to the executable dir so the relative test paths WAI.
@@ -361,11 +406,11 @@ mod test {
                 "in-tree link to /docs/missing-image.png could not be found at \"doc_checker_test_data/docs/missing-image.png\""),
             // There are 3 instances of [i] on the same line.
             DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
-                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+                 "Unknown reference link to [i][i]", "making sure you added a matching [i]: YOUR_LINK_HERE below this reference"),
             DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
-                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+            "Unknown reference link to [i][i]", "making sure you added a matching [i]: YOUR_LINK_HERE below this reference"),
             DocCheckError::new_error_helpful(17, PathBuf::from("doc_checker_test_data/docs/path.md"),
-                 "unescaped [i] not treating this as a shortcut link.", "escape brackets \\[i\\] or make a link [i](/docs/i)"),
+            "Unknown reference link to [i][i]", "making sure you added a matching [i]: YOUR_LINK_HERE below this reference"),
             DocCheckError::new_error(6, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Invalid link http://{}.com/markdown : invalid uri character"),
             DocCheckError::new_error(10, PathBuf::from("doc_checker_test_data/docs/second.md"),

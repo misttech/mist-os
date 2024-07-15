@@ -83,13 +83,8 @@ where
     })
 }
 
-/// Return `TaskState` for specific kinds of kernel task.
-// Ideally we'd have a single `task_alloc()` that updates a target `Task` based on optional `CurrentTask`, PID, etc.
+/// Return the default initial `TaskState` for kernel tasks.
 pub fn task_alloc_for_kernel() -> TaskState {
-    TaskState(selinux_hooks::TaskState::for_kernel())
-}
-pub fn task_alloc_for_init() -> TaskState {
-    // TODO(b/350975345): Return value based on the "init" initial SID.
     TaskState(selinux_hooks::TaskState::for_kernel())
 }
 
@@ -311,7 +306,7 @@ pub fn task_prlimit(
 }
 
 /// Clears the `ptrace_sid` for `tracee_task`.
-// TODO: Fix ptrace checks to rely on `Task::ptrace` state, and remove this.
+// TODO(b/352535794): Fix ptrace checks to rely on `Task::ptrace` state, and remove this.
 pub fn clear_ptracer_sid(tracee_task: &Task) {
     run_if_selinux(tracee_task, |_| {
         let mut task_state = tracee_task.write();
@@ -697,7 +692,7 @@ mod tests {
 
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
-        let initial_state = selinux_hooks::TaskState::for_kernel();
+        let initial_state = task.read().security_state.0.clone();
         let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
         let elf_state = ResolvedElfState(elf_sid);
         assert_ne!(elf_sid, initial_state.current_sid);

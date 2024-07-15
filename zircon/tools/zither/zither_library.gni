@@ -521,7 +521,7 @@ if (support_rust) {
     if (invoker.backend == "rust_syscall") {
       crate_name = "fuchsia-zircon-sys"
       crate_root = "${_output_dir}/${output_namespace}/src/definitions.rs"
-      crate_deps = [ "//src/lib/zircon/rust:fuchsia-zircon-types" ]
+      crate_deps = [ "//src/lib/zircon/rust/fuchsia-zircon-types" ]
       not_needed([ "source_names" ])
     } else {
       foreach(name, source_names) {

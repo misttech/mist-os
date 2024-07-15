@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_increment;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    default_ioctl, fileops_impl_nonseekable, fs_args, inotify, Anon, BytesFile, BytesFileOps,
-    DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr, FsString,
-    WdNumber,
+    default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, inotify, Anon,
+    BytesFile, BytesFileOps, DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser,
+    FsNodeOps, FsStr, FsString, WdNumber,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -18,6 +17,7 @@ use starnix_uapi::auth::CAP_SYS_ADMIN;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
@@ -193,6 +193,7 @@ impl InotifyFileObject {
 
 impl FileOps for InotifyFileObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

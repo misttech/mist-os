@@ -154,6 +154,7 @@
         },
         {
             protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.feedback.DataProvider",
             ],

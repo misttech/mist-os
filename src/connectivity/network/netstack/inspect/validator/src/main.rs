@@ -148,7 +148,7 @@ async fn run_service(mut incoming: validate::InspectPuppetRequestStream) {
                     .await
                     .expect("puppet did not respond");
 
-                running_inspect_servers.add(
+                running_inspect_servers.spawn(
                     inspect_runtime::publish(
                         &Inspector::new(
                             InspectorConfig::default().vmo(

@@ -13,7 +13,7 @@
 #include <lib/fidl/cpp/wire/internal/arrow.h>
 #include <lib/fidl/cpp/wire/internal/transport.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
-// IWYU pragma: begin_exports
+// IWYU pragma: end_exports
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl/cpp/wire/sync_call.h>

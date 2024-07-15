@@ -36,6 +36,7 @@
         {
             protocol: [
                 "fuchsia.accessibility.semantics.SemanticsManager",
+                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.fonts.Provider",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.logger.LogSink",

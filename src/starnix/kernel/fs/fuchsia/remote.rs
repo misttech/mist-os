@@ -4,6 +4,7 @@
 
 use crate::device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
+use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
@@ -11,14 +12,15 @@ use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
 use crate::vfs::{
     default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
-    fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink, Anon, AppendLockGuard,
-    CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
-    DEFAULT_BYTES_PER_BLOCK,
+    fileops_impl_noop_sync, fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_symlink,
+    Anon, AppendLockGuard, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode,
+    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
+    SymlinkTarget, ValueOrSize, XattrOp, DEFAULT_BYTES_PER_BLOCK,
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
+use fuchsia_zircon::{HandleBased, Status};
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
@@ -1386,6 +1388,17 @@ impl FileOps for RemoteDirectoryObject {
         Ok(())
     }
 
+    fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
+        self.zxio.sync().map_err(|status| match status {
+            Status::NO_RESOURCES | Status::NO_MEMORY | Status::NO_SPACE => errno!(ENOSPC),
+            Status::INVALID_ARGS | Status::NOT_FILE => errno!(EINVAL),
+            Status::BAD_HANDLE => errno!(EBADFD),
+            Status::NOT_SUPPORTED => errno!(ENOTSUP),
+            Status::INTERRUPTED_RETRY => errno!(EINTR),
+            _ => errno!(EIO),
+        })
+    }
+
     fn to_handle(
         &self,
         _locked: &mut Locked<'_, FileOpsToHandle>,
@@ -1406,22 +1419,22 @@ pub struct RemoteFileObject {
     zxio: Arc<Zxio>,
 
     /// Cached read-only VMO handle.
-    read_only_vmo: OnceCell<Arc<zx::Vmo>>,
+    read_only_memory: OnceCell<Arc<MemoryObject>>,
 
     /// Cached read/exec VMO handle.
-    read_exec_vmo: OnceCell<Arc<zx::Vmo>>,
+    read_exec_memory: OnceCell<Arc<MemoryObject>>,
 }
 
 impl RemoteFileObject {
     fn new(zxio: impl Into<Arc<Zxio>>) -> RemoteFileObject {
         RemoteFileObject {
             zxio: zxio.into(),
-            read_only_vmo: Default::default(),
-            read_exec_vmo: Default::default(),
+            read_only_memory: Default::default(),
+            read_exec_memory: Default::default(),
         }
     }
 
-    fn fetch_remote_vmo(&self, prot: ProtectionFlags) -> Result<Arc<zx::Vmo>, Errno> {
+    fn fetch_remote_memory(&self, prot: ProtectionFlags) -> Result<Arc<MemoryObject>, Errno> {
         let without_exec = self
             .zxio
             .vmo_get(prot.to_vmar_flags() - zx::VmarFlags::PERM_EXECUTE)
@@ -1431,7 +1444,7 @@ impl RemoteFileObject {
         } else {
             without_exec
         };
-        Ok(Arc::new(all_flags))
+        Ok(Arc::new(MemoryObject::from(all_flags)))
     }
 }
 
@@ -1460,25 +1473,26 @@ impl FileOps for RemoteFileObject {
         zxio_write_at(&self.zxio, current_task, offset, data)
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         trace_duration!(CATEGORY_STARNIX_MM, c"RemoteFileGetVmo");
-        let vmo_cache = if prot == (ProtectionFlags::READ | ProtectionFlags::EXEC) {
-            Some(&self.read_exec_vmo)
+        let memory_cache = if prot == (ProtectionFlags::READ | ProtectionFlags::EXEC) {
+            Some(&self.read_exec_memory)
         } else if prot == ProtectionFlags::READ {
-            Some(&self.read_only_vmo)
+            Some(&self.read_only_memory)
         } else {
             None
         };
 
-        vmo_cache
-            .map(|c| c.get_or_try_init(|| self.fetch_remote_vmo(prot)).cloned())
-            .unwrap_or_else(|| self.fetch_remote_vmo(prot))
+        memory_cache
+            .map(|c| c.get_or_try_init(|| self.fetch_remote_memory(prot)).cloned())
+            .unwrap_or_else(|| self.fetch_remote_memory(prot))
     }
 
     fn to_handle(
@@ -1495,6 +1509,17 @@ impl FileOps for RemoteFileObject {
             .map_err(|status| from_status_like_fdio!(status))
     }
 
+    fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
+        self.zxio.sync().map_err(|status| match status {
+            Status::NO_RESOURCES | Status::NO_MEMORY | Status::NO_SPACE => errno!(ENOSPC),
+            Status::INVALID_ARGS | Status::NOT_FILE => errno!(EINVAL),
+            Status::BAD_HANDLE => errno!(EBADFD),
+            Status::NOT_SUPPORTED => errno!(ENOTSUP),
+            Status::INTERRUPTED_RETRY => errno!(EINTR),
+            _ => errno!(EIO),
+        })
+    }
+
     fn ioctl(
         &self,
         locked: &mut Locked<'_, Unlocked>,
@@ -1509,8 +1534,19 @@ impl FileOps for RemoteFileObject {
             || (request as u8 == SYNC_IOC_MERGE)
         {
             let mut sync_points: Vec<SyncPoint> = vec![];
-            let vmo = self.get_vmo(file, current_task, Some(8), ProtectionFlags::READ)?;
-            sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });
+            let memory = self.get_memory(
+                &mut locked.cast_locked::<FileOpsCore>(),
+                file,
+                current_task,
+                Some(8),
+                ProtectionFlags::READ,
+            )?;
+            let vmo = memory
+                .as_vmo()
+                .ok_or_else(|| errno!(ENOTSUP))?
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .map_err(impossible_error)?;
+            sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: Arc::new(vmo) });
             let sync_file_name: &[u8; 32] = b"hwc semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
             let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
             return sync_file.ioctl(locked, file, current_task, request, arg);
@@ -1535,6 +1571,7 @@ impl RemotePipeObject {
 
 impl FileOps for RemotePipeObject {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,

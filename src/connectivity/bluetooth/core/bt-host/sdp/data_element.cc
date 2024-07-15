@@ -4,11 +4,12 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/data_element.h"
 
-#include <endian.h>
-
 #include <algorithm>
+#include <cinttypes>
 #include <set>
 #include <vector>
+
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
@@ -66,12 +67,14 @@ size_t WriteLength(MutableByteBuffer* buf, size_t length) {
   }
 
   if (length <= std::numeric_limits<uint16_t>::max()) {
-    buf->WriteObj(htobe16(static_cast<uint16_t>(length)));
+    buf->WriteObj(pw::bytes::ConvertOrderTo(cpp20::endian::big,
+                                            static_cast<uint16_t>(length)));
     return sizeof(uint16_t);
   }
 
   if (length <= std::numeric_limits<uint32_t>::max()) {
-    buf->WriteObj(htobe32(static_cast<uint32_t>(length)));
+    buf->WriteObj(pw::bytes::ConvertOrderTo(cpp20::endian::big,
+                                            static_cast<uint32_t>(length)));
     return sizeof(uint32_t);
   }
 
@@ -411,7 +414,8 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (cursor.size() < sizeof(uint16_t)) {
         return 0;
       }
-      data_bytes = be16toh(cursor.To<uint16_t>());
+      data_bytes = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               cursor.To<uint16_t>());
       bytes_read += sizeof(uint16_t);
       break;
     }
@@ -419,7 +423,8 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (cursor.size() < sizeof(uint32_t)) {
         return 0;
       }
-      data_bytes = be32toh(cursor.To<uint32_t>());
+      data_bytes = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                               cursor.To<uint32_t>());
       bytes_read += sizeof(uint32_t);
       break;
     }
@@ -448,11 +453,14 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (size_desc == Size::kOneByte) {
         elem->Set(cursor.To<uint8_t>());
       } else if (size_desc == Size::kTwoBytes) {
-        elem->Set(be16toh(cursor.To<uint16_t>()));
+        elem->Set(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                              cursor.To<uint16_t>()));
       } else if (size_desc == Size::kFourBytes) {
-        elem->Set(be32toh(cursor.To<uint32_t>()));
+        elem->Set(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                              cursor.To<uint32_t>()));
       } else if (size_desc == Size::kEightBytes) {
-        elem->Set(be64toh(cursor.To<uint64_t>()));
+        elem->Set(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                              cursor.To<uint64_t>()));
       } else {
         // TODO(https://fxbug.dev/42078670): support 128-bit uints
         // Invalid size.
@@ -464,11 +472,14 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (size_desc == Size::kOneByte) {
         elem->Set(cursor.To<int8_t>());
       } else if (size_desc == Size::kTwoBytes) {
-        elem->Set(be16toh(cursor.To<int16_t>()));
+        elem->Set(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                              cursor.To<int16_t>()));
       } else if (size_desc == Size::kFourBytes) {
-        elem->Set(be32toh(cursor.To<int32_t>()));
+        elem->Set(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                              cursor.To<int32_t>()));
       } else if (size_desc == Size::kEightBytes) {
-        elem->Set(be64toh(cursor.To<int64_t>()));
+        elem->Set(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                              cursor.To<int64_t>()));
       } else {
         // TODO(https://fxbug.dev/42078670): support 128-bit uints
         // Invalid size.
@@ -478,9 +489,11 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
     }
     case Type::kUuid: {
       if (size_desc == Size::kTwoBytes) {
-        elem->Set(UUID(be16toh(cursor.To<uint16_t>())));
+        elem->Set(UUID(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                                   cursor.To<uint16_t>())));
       } else if (size_desc == Size::kFourBytes) {
-        elem->Set(UUID(be32toh(cursor.To<uint32_t>())));
+        elem->Set(UUID(pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                                   cursor.To<uint32_t>())));
       } else if (size_desc == Size::kSixteenBytes) {
         StaticByteBuffer<16> uuid_bytes;
         // UUID expects these to be in little-endian order.
@@ -594,13 +607,16 @@ size_t DataElement::Write(MutableByteBuffer* buffer) const {
         cursor.Write(reinterpret_cast<uint8_t*>(&val), sizeof(val));
         pos += sizeof(val);
       } else if (size_ == Size::kTwoBytes) {
-        cursor.WriteObj(htobe16(static_cast<uint16_t>(uint_value_)));
+        cursor.WriteObj(pw::bytes::ConvertOrderTo(
+            cpp20::endian::big, static_cast<uint16_t>(uint_value_)));
         pos += sizeof(uint16_t);
       } else if (size_ == Size::kFourBytes) {
-        cursor.WriteObj(htobe32(static_cast<uint32_t>(uint_value_)));
+        cursor.WriteObj(pw::bytes::ConvertOrderTo(
+            cpp20::endian::big, static_cast<uint32_t>(uint_value_)));
         pos += sizeof(uint32_t);
       } else if (size_ == Size::kEightBytes) {
-        uint64_t val = htobe64(uint_value_);
+        uint64_t val =
+            pw::bytes::ConvertOrderTo(cpp20::endian::big, uint_value_);
         cursor.Write(reinterpret_cast<uint8_t*>(&val), sizeof(val));
         pos += sizeof(val);
       }
@@ -612,13 +628,16 @@ size_t DataElement::Write(MutableByteBuffer* buffer) const {
         cursor.Write(reinterpret_cast<uint8_t*>(&val), sizeof(val));
         pos += sizeof(val);
       } else if (size_ == Size::kTwoBytes) {
-        cursor.WriteObj(htobe16(static_cast<int16_t>(int_value_)));
+        cursor.WriteObj(pw::bytes::ConvertOrderTo(
+            cpp20::endian::big, static_cast<int16_t>(int_value_)));
         pos += sizeof(uint16_t);
       } else if (size_ == Size::kFourBytes) {
-        cursor.WriteObj(htobe32(static_cast<int32_t>(int_value_)));
+        cursor.WriteObj(pw::bytes::ConvertOrderTo(
+            cpp20::endian::big, static_cast<int32_t>(int_value_)));
         pos += sizeof(uint32_t);
       } else if (size_ == Size::kEightBytes) {
-        int64_t val = htobe64(static_cast<int64_t>(int_value_));
+        int64_t val = pw::bytes::ConvertOrderTo(
+            cpp20::endian::big, static_cast<int64_t>(int_value_));
         cursor.Write(reinterpret_cast<uint8_t*>(&val), sizeof(val));
         pos += sizeof(val);
       }
@@ -676,10 +695,10 @@ std::string DataElement::ToString() const {
                                              int_value_ ? "true" : "false");
     case Type::kUnsignedInt:
       return bt_lib_cpp_string::StringPrintf(
-          "UnsignedInt:%zu(%lu)", WriteSize() - 1, uint_value_);
+          "UnsignedInt:%zu(%" PRIu64 ")", WriteSize() - 1, uint_value_);
     case Type::kSignedInt:
       return bt_lib_cpp_string::StringPrintf(
-          "SignedInt:%zu(%ld)", WriteSize() - 1, int_value_);
+          "SignedInt:%zu(%" PRId64 ")", WriteSize() - 1, int_value_);
     case Type::kUuid:
       return bt_lib_cpp_string::StringPrintf("UUID(%s)",
                                              uuid_.ToString().c_str());

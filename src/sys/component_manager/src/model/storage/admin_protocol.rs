@@ -996,6 +996,12 @@ mod tests {
         }
     }
 
+    impl vfs::directory::entry::GetEntryInfo for FakeDir {
+        fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
+            vfs::directory::entry::EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
+        }
+    }
+
     impl vfs::node::Node for FakeDir {
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
             Err(zx::Status::INTERNAL)
@@ -1072,8 +1078,6 @@ mod tests {
             panic!("not implemented!");
         }
     }
-
-    impl vfs::node::IsDirectory for FakeDir {}
 
     #[fuchsia::test]
     async fn test_get_storage_utilization() {

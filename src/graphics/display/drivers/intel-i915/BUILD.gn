@@ -167,6 +167,7 @@ test("intel-i915-test") {
     "gtt-unittest.cc",
     "hardware-common-unittest.cc",
     "i2c/gmbus-gpio-unittest.cc",
+    "intel-display-driver-test.cc",
     "intel-i915-test.cc",
     "interrupts-unittest.cc",
     "pch-engine-unittest.cc",
@@ -192,6 +193,8 @@ test("intel-i915-test") {
   ]
   deps = [
     ":common_srcs",
+    "testing:fake-framebuffer",
+    "testing:mock-allocator",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
     "//sdk/lib/async-loop-testing/cpp",
@@ -220,6 +223,7 @@ group("tests") {
   deps = [
     ":intel-i915-bind_test",
     ":intel-i915-test-package",
+    "testing:tests",
   ]
 }
 

@@ -173,6 +173,11 @@ def update_golden(args):
     if c is None:
         return None
 
+    # Ensure the directory exists before copying.
+    golden_directory = os.path.dirname(args.golden)
+    if not os.path.exists(golden_directory):
+        os.makedirs(os.path.abspath(golden_directory))
+
     result = subprocess.run(c.split())
     try:
         result.check_returncode()

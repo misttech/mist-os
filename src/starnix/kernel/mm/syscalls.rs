@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-use starnix_sync::{LockEqualOrBefore, Locked, Unlocked};
-
 use crate::execution::notify_debugger_of_module_list;
 use crate::mm::{
     DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
@@ -14,8 +11,9 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::FdNumber;
 use fuchsia_inspect_contrib::profile_duration;
+use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
-use starnix_sync::FileOpsCore;
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::SyscallArg;
 use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::errors::{Errno, EINTR};
@@ -126,7 +124,7 @@ where
         (addr, true, false) => DesiredAddress::FixedOverwrite(addr),
     };
 
-    let vmo_offset = if flags & MAP_ANONYMOUS != 0 { 0 } else { offset };
+    let memory_offset = if flags & MAP_ANONYMOUS != 0 { 0 } else { offset };
 
     let mut options = MappingOptions::empty();
     if flags & MAP_SHARED != 0 {
@@ -159,7 +157,7 @@ where
             locked,
             current_task,
             addr,
-            vmo_offset,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -287,7 +285,8 @@ pub fn sys_process_vm_readv(
         let mut input = UserBuffersInputBuffer::unified_new(current_task, remote_iov)?;
         output.write_buffer(&mut input)
     } else {
-        let mut input = UserBuffersInputBuffer::<Task>::vmo_new(remote_task.deref(), remote_iov)?;
+        let mut input =
+            UserBuffersInputBuffer::<Task>::syscall_new(remote_task.deref(), remote_iov)?;
         output.write_buffer(&mut input)
     }
 }
@@ -338,7 +337,8 @@ pub fn sys_process_vm_writev(
         let mut output = UserBuffersOutputBuffer::unified_new(current_task, remote_iov)?;
         output.write_buffer(&mut input)
     } else {
-        let mut output = UserBuffersOutputBuffer::<Task>::vmo_new(remote_task.deref(), remote_iov)?;
+        let mut output =
+            UserBuffersOutputBuffer::<Task>::syscall_new(remote_task.deref(), remote_iov)?;
         output.write_buffer(&mut input)
     }
 }
@@ -570,9 +570,8 @@ pub fn sys_mincore(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
+    use crate::mm::memory::MemoryObject;
     use crate::testing::*;
     use starnix_uapi::errors::EEXIST;
     use starnix_uapi::{MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ};
@@ -1088,18 +1087,18 @@ mod tests {
 
     /// Clobbers the middle of an existing mapping with mremap to a fixed location.
     #[::fuchsia::test]
-    async fn test_mremap_clobber_vmo_mapping() {
+    async fn test_mremap_clobber_memory_mapping() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let dst_vmo = Arc::new(zx::Vmo::create(2 * *PAGE_SIZE).unwrap());
-        dst_vmo.write(&['x' as u8].repeat(*PAGE_SIZE as usize), 0).unwrap();
-        dst_vmo.write(&['y' as u8].repeat(*PAGE_SIZE as usize), *PAGE_SIZE).unwrap();
+        let dst_memory = MemoryObject::from(zx::Vmo::create(2 * *PAGE_SIZE).unwrap());
+        dst_memory.write(&['x' as u8].repeat(*PAGE_SIZE as usize), 0).unwrap();
+        dst_memory.write(&['y' as u8].repeat(*PAGE_SIZE as usize), *PAGE_SIZE).unwrap();
 
         let dst_addr = current_task
             .mm()
-            .map_vmo(
+            .map_memory(
                 DesiredAddress::Any,
-                dst_vmo,
+                dst_memory.into(),
                 0,
                 2 * (*PAGE_SIZE as usize),
                 ProtectionFlags::READ,

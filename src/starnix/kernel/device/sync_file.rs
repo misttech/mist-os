@@ -9,7 +9,9 @@ use crate::task::{
     WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
+};
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
@@ -22,7 +24,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    c_char, error, sync_fence_info, sync_file_info, sync_merge_data, SYNC_IOC_MAGIC,
+    c_char, errno, error, sync_fence_info, sync_file_info, sync_merge_data, SYNC_IOC_MAGIC,
 };
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -107,6 +109,7 @@ impl SyncFile {
 
 impl FileOps for SyncFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn to_handle(
         &self,
@@ -124,7 +127,7 @@ impl FileOps for SyncFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -163,10 +166,23 @@ impl FileOps for SyncFile {
                         }
                     }
                 } else if let Some(file2) = file2.downcast_file::<RemoteFileObject>() {
-                    let vmo = file2.get_vmo(file, current_task, None, ProtectionFlags::READ)?;
-                    let koid = vmo.get_koid().unwrap();
+                    let memory = file2.get_memory(
+                        &mut locked.cast_locked::<FileOpsCore>(),
+                        file,
+                        current_task,
+                        None,
+                        ProtectionFlags::READ,
+                    )?;
+                    let koid = memory.get_koid();
+                    let vmo = memory
+                        .as_vmo()
+                        .ok_or_else(|| errno!(EINVAL))?
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .map_err(impossible_error)?;
                     if set.insert(koid) {
-                        fence.sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });
+                        fence
+                            .sync_points
+                            .push(SyncPoint { timeline: Timeline::Hwc, handle: Arc::new(vmo) });
                     }
                 } else {
                     return error!(EINVAL);

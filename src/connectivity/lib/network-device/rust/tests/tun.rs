@@ -8,7 +8,7 @@ use fidl::endpoints;
 use fuchsia_component::client::connect_to_protocol;
 use futures::future::{Future, FutureExt as _};
 use futures::stream::TryStreamExt as _;
-use netdevice_client::{Client, Error, Port, Session};
+use netdevice_client::{Client, Port, Session};
 use std::convert::TryInto as _;
 use std::io::{Read as _, Write as _};
 use {
@@ -192,37 +192,6 @@ async fn test_echo_pair() {
             .await;
         })
         .await;
-}
-
-#[test]
-fn test_session_task_dropped() {
-    let mut executor = fasync::TestExecutor::new();
-    let session = executor.run_singlethreaded(async {
-        let (tun, _tun_port, port) = create_tun_device_and_port().await;
-        let client = create_netdev_client(&tun);
-        let (session, _task) = client
-            .primary_session("test_session_task_dropped", SESSION_BUFFER_LEN)
-            .await
-            .expect("failed to create session");
-        let () = session
-            .attach(port, &[netdev::FrameType::Ethernet])
-            .await
-            .expect("failed to attach session");
-        session
-    });
-    executor.run_singlethreaded(async move {
-        assert_matches!(
-            session
-                .alloc_tx_buffer(DATA_LEN)
-                .await
-                .expect_err("alloc_tx_buffer should fail after the session is detached"),
-            Error::NoProgress
-        );
-        assert_matches!(
-            session.recv().await.expect_err("recv should fail after the session is detached"),
-            Error::NoProgress
-        );
-    })
 }
 
 #[fasync::run_singlethreaded(test)]

@@ -36,7 +36,7 @@ rustc_binary("realm_builder_server_bin") {
     "//src/lib/fuchsia-fs",
     "//src/lib/versioning/version-history/rust:version-history",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/cm_fidl_validator",
     "//src/sys/lib/cm_rust",
@@ -88,10 +88,12 @@ fuchsia_package("pkg") {
   deps = [ ":realm_builder_server_component" ]
 }
 
-sdk_fuchsia_package("realm_builder_server_sdk") {
-  distribution_name = "realm_builder_server"
-  package_label = ":pkg"
-  category = "partner"
-  expected_files_exact = [ "meta/realm_builder_server.cm" ]
-  api_level_added = 18
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("realm_builder_server_sdk") {
+    distribution_name = "realm_builder_server"
+    package_label = ":pkg"
+    category = "partner"
+    expected_files_exact = [ "meta/realm_builder_server.cm" ]
+    api_level_added = 18
+  }
 }

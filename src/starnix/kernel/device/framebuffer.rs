@@ -6,9 +6,10 @@ use super::framebuffer_server::{init_viewport_scene, start_presentation_loop, Fr
 use crate::device::kobject::DeviceMetadata;
 use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::sysfs::DeviceDirectory;
+use crate::mm::memory::MemoryObject;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, Kernel};
-use crate::vfs::{fileops_impl_vmo, FileObject, FileOps, FsNode};
+use crate::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
 use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_logging::{impossible_error, log_info, log_warn};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked};
@@ -36,8 +37,8 @@ pub struct AspectRatio {
 }
 
 pub struct Framebuffer {
-    vmo: Arc<zx::Vmo>,
-    vmo_len: u32,
+    memory: Arc<MemoryObject>,
+    memory_len: u32,
     pub info: RwLock<fb_var_screeninfo>,
     server: Option<Arc<FramebufferServer>>,
     pub view_identity: Mutex<Option<fuiviews::ViewIdentityOnCreation>>,
@@ -77,32 +78,34 @@ impl Framebuffer {
 
         if let Ok(server) = FramebufferServer::new(width, height) {
             let server = Arc::new(server);
-            let vmo = Arc::new(server.get_vmo()?);
-            let vmo_len = vmo.info().map_err(|_| errno!(EINVAL))?.size_bytes as u32;
+            let memory = Arc::new(server.get_memory()?);
+            let memory_len = memory.info()?.size_bytes as u32;
             // Fill the buffer with white pixels as a placeholder.
             if let Err(err) =
-                vmo.write(&vec![0xff, 0x00, 0xff, 0xff].repeat((vmo_len / 4) as usize), 0)
+                memory.write(&vec![0xff, 0x00, 0xff, 0xff].repeat((memory_len / 4) as usize), 0)
             {
                 log_warn!("could not write initial framebuffer: {:?}", err);
             }
 
             Ok(Arc::new(Self {
-                vmo,
-                vmo_len,
+                memory,
+                memory_len,
                 server: Some(server),
                 info: RwLock::new(info),
                 view_identity: Default::default(),
                 view_bound_protocols: Default::default(),
             }))
         } else {
-            let vmo_len = info.xres * info.yres * (info.bits_per_pixel / 8);
-            let vmo = Arc::new(zx::Vmo::create(vmo_len as u64).map_err(|s| match s {
-                zx::Status::NO_MEMORY => errno!(ENOMEM),
-                _ => impossible_error(s),
-            })?);
+            let memory_len = info.xres * info.yres * (info.bits_per_pixel / 8);
+            let memory = Arc::new(MemoryObject::from(zx::Vmo::create(memory_len as u64).map_err(
+                |s| match s {
+                    zx::Status::NO_MEMORY => errno!(ENOMEM),
+                    _ => impossible_error(s),
+                },
+            )?));
             Ok(Arc::new(Self {
-                vmo,
-                vmo_len,
+                memory,
+                memory_len,
                 server: None,
                 info: RwLock::new(info),
                 view_identity: Default::default(),
@@ -171,8 +174,8 @@ impl DeviceOps for Arc<Framebuffer> {
             return error!(ENODEV);
         }
         node.update_info(|info| {
-            info.size = self.vmo_len as usize;
-            info.blocks = self.vmo.get_size().map_err(impossible_error)? as usize / info.blksize;
+            info.size = self.memory_len as usize;
+            info.blocks = self.memory.get_size() as usize / info.blksize;
             Ok(())
         })?;
         Ok(Box::new(Arc::clone(self)))
@@ -180,7 +183,8 @@ impl DeviceOps for Arc<Framebuffer> {
 }
 
 impl FileOps for Framebuffer {
-    fileops_impl_vmo!(self, &self.vmo);
+    fileops_impl_memory!(self, &self.memory);
+    fileops_impl_noop_sync!();
 
     fn ioctl(
         &self,
@@ -197,7 +201,7 @@ impl FileOps for Framebuffer {
                 let finfo = fb_fix_screeninfo {
                     id: zerocopy::FromBytes::read_from(&b"Starnix\0\0\0\0\0\0\0\0\0"[..]).unwrap(),
                     smem_start: 0,
-                    smem_len: self.vmo_len,
+                    smem_len: self.memory_len,
                     type_: FB_TYPE_PACKED_PIXELS,
                     visual: FB_VISUAL_TRUECOLOR,
                     line_length: info.bits_per_pixel / 8 * info.xres,

@@ -121,16 +121,7 @@ mod tests {
 
         let get_maps = || {
             let process = fuchsia_runtime::process_self();
-            let (returned, remaining) = process.info_maps(&mut [] as &mut [zx::ProcessMapsInfo])?;
-            assert_eq!(returned, 0);
-            // Add some extra since our Vec allocation will itself create an additional mapping.
-            let count = remaining + 10;
-            let mut info = Vec::with_capacity(count);
-            info.resize(count, zx::ProcessMapsInfo::default());
-            let (returned, remaining) = process.info_maps(info.as_mut_slice())?;
-            assert_eq!(remaining, 0);
-            info.resize(returned, zx::ProcessMapsInfo::default());
-            Result::<_, zx::Status>::Ok(info)
+            process.info_maps_vec()
         };
 
         {

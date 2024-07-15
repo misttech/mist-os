@@ -3,40 +3,24 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use scrutiny::model::controller::{DataController, HintDataType};
-use scrutiny::model::model::*;
 use scrutiny_utils::fvm::*;
-use scrutiny_utils::usage::*;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::value::Value;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::PathBuf;
-use std::sync::Arc;
 
-#[derive(Deserialize, Serialize)]
-pub struct FvmExtractRequest {
-    // The input path for the FVM to extract.
-    pub input: String,
-    // The output directory for the extracted FVM.
-    pub output: String,
-}
-
-#[derive(Default)]
 pub struct FvmExtractController {}
 
-impl DataController for FvmExtractController {
-    fn query(&self, _model: Arc<DataModel>, query: Value) -> Result<Value> {
-        let request: FvmExtractRequest = serde_json::from_value(query)?;
-        let mut fvm_file = File::open(request.input)?;
-        let output_path = PathBuf::from(request.output);
+impl FvmExtractController {
+    pub fn extract(input: PathBuf, output: PathBuf) -> Result<Value> {
+        let mut fvm_file = File::open(input)?;
         let mut fvm_buffer = Vec::new();
         fvm_file.read_to_end(&mut fvm_buffer)?;
         let mut reader = FvmReader::new(fvm_buffer);
         let fvm_partitions = reader.parse()?;
 
-        fs::create_dir_all(&output_path)?;
+        fs::create_dir_all(&output)?;
         let mut minfs_count = 0;
         let mut blobfs_count = 0;
         for partition in fvm_partitions {
@@ -56,7 +40,7 @@ impl DataController for FvmExtractController {
                     }
                 }
             };
-            let mut path = output_path.clone();
+            let mut path = output.clone();
             path.push(partition_name);
             let mut file = File::create(path)?;
             file.write_all(&partition.buffer)?;
@@ -67,30 +51,5 @@ impl DataController for FvmExtractController {
         }
 
         Ok(json!({"status": "ok"}))
-    }
-
-    fn description(&self) -> String {
-        "Extracts FVM (.blk) values from an input file to a directory.".to_string()
-    }
-
-    fn usage(&self) -> String {
-        UsageBuilder::new()
-            .name("tool.fvm.extract - Extracts a fvm (.blk) to a directory.")
-            .summary("tool.fvm.extract --input foo.blk --output /tmp/foo")
-            .description(
-                "Extracts a FVM (.blk) into a series of volumes. \
-            This tool will simply extract the volumes as large files and will \
-            not attempt to interpret the internal file system within the volume.",
-            )
-            .arg("--input", "Path to the input fvm to extract.")
-            .arg("--output", "Path to the output directory")
-            .build()
-    }
-
-    fn hints(&self) -> Vec<(String, HintDataType)> {
-        vec![
-            ("--input".to_string(), HintDataType::NoType),
-            ("--output".to_string(), HintDataType::NoType),
-        ]
     }
 }

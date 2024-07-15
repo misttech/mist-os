@@ -2,31 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod collection;
-mod collector;
-mod controller;
+pub mod collection;
+pub mod collector;
+pub mod controller;
 
 pub use collection::Zbi;
-
-use collector::ZbiCollector;
-use controller::{
-    BootFsFilesController, BootFsPackagesController, ZbiCmdlineController, ZbiSectionsController,
-};
-use scrutiny::prelude::*;
-use std::sync::Arc;
-
-plugin!(
-    ZbiPlugin,
-    PluginHooks::new(
-        collectors! {
-            "ZbiCollector" => ZbiCollector::default(),
-        },
-        controllers! {
-            "/zbi/bootfs" => BootFsFilesController::default(),
-            "/zbi/bootfs_packages" => BootFsPackagesController::default(),
-            "/zbi/cmdline" => ZbiCmdlineController::default(),
-            "/zbi/sections" => ZbiSectionsController::default(),
-        }
-    ),
-    vec![]
-);

@@ -32,8 +32,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     } else {
         ModelConfig::from_product_bundle(cmd.product_bundle.clone())
     }?;
-    let plugins = vec!["ZbiPlugin".to_string()];
-    let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+    let mut config = ConfigBuilder::with_model(model).command(command).build();
     config.runtime.logging.silent_mode = true;
 
     let scrutiny_output =

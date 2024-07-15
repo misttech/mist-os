@@ -121,7 +121,7 @@ impl ScopeRef {
     }
 
     #[inline(always)]
-    pub(super) fn executor(&self) -> &Arc<Executor> {
+    pub(crate) fn executor(&self) -> &Arc<Executor> {
         &self.inner.executor
     }
 
@@ -305,6 +305,7 @@ mod tests {
     use super::*;
     use crate::TestExecutor;
     use std::pin::pin;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     #[test]
     fn spawn_works_on_root_scope() {
@@ -379,5 +380,23 @@ mod tests {
         assert_eq!(Some(1), task.cancel());
         assert_eq!(executor.run_until_stalled(&mut std::future::pending::<()>()), Poll::Pending);
         assert_eq!(scope.lock().all_tasks.len(), 0);
+    }
+
+    #[test]
+    fn can_spawn_from_non_executor_thread() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().clone();
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let _ = std::thread::spawn(move || {
+            scope
+                .spawn(async move {
+                    done_clone.store(true, Ordering::Relaxed);
+                })
+                .detach()
+        })
+        .join();
+        let _ = executor.run_until_stalled(&mut std::future::pending::<()>());
+        assert!(done.load(Ordering::Relaxed));
     }
 }

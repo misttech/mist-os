@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
@@ -25,8 +26,8 @@ typedef struct custom_layer {
 
   bool done;
 
-  fuchsia_hardware_display_types::wire::Frame src;
-  fuchsia_hardware_display_types::wire::Frame dest;
+  fuchsia_math::wire::RectU src;
+  fuchsia_math::wire::RectU dest;
 
   image_import_t import_info[2];
 } custom_layer_t;
@@ -117,18 +118,18 @@ class PrimaryLayer : public VirtualLayer {
     image_width_ = width;
     image_height_ = height;
 
-    src_frame_.width = width;
-    src_frame_.height = height;
-    dest_frame_.width = width;
-    dest_frame_.height = height;
+    image_source_.width = width;
+    image_source_.height = height;
+    display_destination_.width = width;
+    display_destination_.height = height;
   }
-  void SetSrcFrame(uint32_t width, uint32_t height) {
-    src_frame_.width = width;
-    src_frame_.height = height;
+  void SetImageSource(uint32_t width, uint32_t height) {
+    image_source_.width = width;
+    image_source_.height = height;
   }
-  void SetDestFrame(uint32_t width, uint32_t height) {
-    dest_frame_.width = width;
-    dest_frame_.height = height;
+  void SetDisplayDestination(uint32_t width, uint32_t height) {
+    display_destination_.width = width;
+    display_destination_.height = height;
   }
   void SetLayerFlipping(bool flip) { layer_flipping_ = flip; }
   void SetPanSrc(bool pan) { pan_src_ = pan; }
@@ -177,8 +178,8 @@ class PrimaryLayer : public VirtualLayer {
   uint32_t fgcolor_;
   uint32_t bgcolor_;
 
-  fuchsia_hardware_display_types::wire::Frame src_frame_ = {};
-  fuchsia_hardware_display_types::wire::Frame dest_frame_ = {};
+  fuchsia_math::wire::RectU image_source_ = {};
+  fuchsia_math::wire::RectU display_destination_ = {};
   typedef fuchsia_hardware_display_types::wire::Transform Transform;
   Transform rotation_ = Transform::kIdentity;
   bool layer_flipping_ = false;

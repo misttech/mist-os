@@ -31,7 +31,7 @@ namespace {
 using namespace ::nl::Weave;
 using namespace ::nl::Weave::Profiles::WeaveTunnel;
 
-using fuchsia::hardware::network::DeviceClass;
+using fuchsia::hardware::network::PortClass;
 using Internal::ServiceTunnelAgent;
 using nl::Weave::WeaveInspector;
 
@@ -304,9 +304,9 @@ void ConnectivityManagerDelegateImpl::OnInterfaceEvent(fuchsia::net::interfaces:
     // interface that matches is correct), allow the wlan and thread interfaces to be specified via
     // config.
 
-    if (wlan_interface_id_ == 0 && properties.has_device_class() &&
-        properties.device_class().is_device() &&
-        properties.device_class().device() == DeviceClass::WLAN) {
+    if (wlan_interface_id_ == 0 && properties.has_port_class() &&
+        properties.port_class().is_device() &&
+        properties.port_class().device() == PortClass::WLAN) {
       wlan_interface_id_ = properties.id();
       wlan_interface_name_ = properties.name();
       FX_LOGS(INFO) << "Identifying interface \"" << properties.name()

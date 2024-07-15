@@ -44,9 +44,6 @@ NEW_API_LEVEL = 2
 # when freezing an API level.
 NEW_SUPPORTED_API_LEVELS = OLD_SUPPORTED_API_LEVELS
 
-FAKE_SRC_FILE_CONTENT = "{ test }"
-EXPECTED_DST_FILE_CONTENT = "{ test }"
-
 
 class TestUpdatePlatformVersionMethods(unittest.TestCase):
     def setUp(self) -> None:
@@ -63,32 +60,6 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         )
         with open(self.fake_fidl_compability_doc_file, "w") as f:
             f.write(FAKE_FIDL_COMPATIBILITY_DOC_FILE_CONTENT)
-
-        self.test_src_dir = tempfile.mkdtemp()
-        self.fake_src_file = os.path.join(
-            self.test_src_dir, "fuchsia_src.test.json"
-        )
-        with open(self.fake_src_file, "w") as f:
-            f.write(FAKE_SRC_FILE_CONTENT)
-
-        self.test_dst_dir = tempfile.mkdtemp()
-        self.fake_dst_file = os.path.join(
-            self.test_dst_dir, "fuchsia_dst.test.json"
-        )
-
-        self.test_dir = tempfile.mkdtemp()
-        self.fake_golden_file = os.path.join(
-            self.test_dir, "compatibility_testing_goldens.json"
-        )
-
-        content = [
-            {
-                "dst": self.fake_dst_file,
-                "src": self.fake_src_file,
-            },
-        ]
-        with open(self.fake_golden_file, "w") as f:
-            json.dump(content, f)
 
     def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)
@@ -191,14 +162,6 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         self.assertIn(
             f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines
         )
-
-    def test_move_compatibility_test_goldens(self) -> None:
-        self.assertTrue(
-            update_platform_version.copy_compatibility_test_goldens(
-                self.test_dir, NEW_API_LEVEL
-            )
-        )
-        self.assertTrue(filecmp.cmp(self.fake_src_file, self.fake_dst_file))
 
 
 if __name__ == "__main__":

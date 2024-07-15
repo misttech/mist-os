@@ -6,15 +6,18 @@
 #define SRC_STORAGE_BLOBFS_COMPRESSION_EXTERNAL_DECOMPRESSOR_H_
 
 #include <fidl/fuchsia.blobfs.internal/cpp/wire.h>
-#include <fuchsia/blobfs/internal/cpp/fidl.h>
-#include <lib/zx/channel.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <memory>
 #include <optional>
 
-#include "src/storage/blobfs/compression/seekable_decompressor.h"
+#include <fbl/macros.h>
+
 #include "src/storage/blobfs/compression_settings.h"
 
 namespace blobfs {
@@ -27,8 +30,9 @@ class DecompressorCreatorConnector {
  public:
   virtual ~DecompressorCreatorConnector() = default;
 
-  // Passes the `remote_channel` to some DecompressorCreator handler.
-  virtual zx_status_t ConnectToDecompressorCreator(zx::channel remote_channel) = 0;
+  // Passes the `server_end` to some DecompressorCreator handler.
+  virtual zx_status_t ConnectToDecompressorCreator(
+      fidl::ServerEnd<fuchsia_blobfs_internal::DecompressorCreator> server_end) = 0;
 
   // Default (singleton) implementation that calls `fdio_service_connect()`. Thread-safe.
   static DecompressorCreatorConnector& DefaultServiceConnector();
@@ -86,7 +90,7 @@ class ExternalDecompressorClient {
   zx::vmo compressed_vmo_;
 
   // Fidl connection to the DecompressorCreator.
-  fuchsia::blobfs::internal::DecompressorCreatorSyncPtr decompressor_creator_;
+  fidl::ClientEnd<fuchsia_blobfs_internal::DecompressorCreator> decompressor_creator_;
 
   // For completing connections to the DecompressorCreator.
   DecompressorCreatorConnector* connector_;

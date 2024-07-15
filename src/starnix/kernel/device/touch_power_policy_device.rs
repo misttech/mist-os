@@ -7,7 +7,9 @@ use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::sysfs::DeviceDirectory;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
+};
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, WriteOps};
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
@@ -105,6 +107,7 @@ impl TouchPowerPolicyFile {
 
 impl FileOps for TouchPowerPolicyFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,

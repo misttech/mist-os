@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
 
@@ -69,7 +70,7 @@ class PlatformDevice : public PlatformDeviceType,
   // Creates a new PlatformDevice instance.
   // *flags* contains zero or more PDEV_ADD_* flags from the platform bus protocol.
   static zx_status_t Create(fuchsia_hardware_platform_bus::Node node, zx_device_t* parent,
-                            PlatformBus* bus, Type type,
+                            PlatformBus* bus, Type type, inspect::ComponentInspector& inspector,
                             std::unique_ptr<platform_bus::PlatformDevice>* out);
 
   inline uint32_t vid() const { return vid_; }
@@ -119,10 +120,12 @@ class PlatformDevice : public PlatformDeviceType,
  private:
   // *flags* contains zero or more PDEV_ADD_* flags from the platform bus protocol.
   explicit PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type,
-                          fuchsia_hardware_platform_bus::Node node);
+                          inspect::Node inspect_node, fuchsia_hardware_platform_bus::Node node);
   zx_status_t Init();
 
   zx_status_t CreateInterruptFragments();
+
+  fpromise::promise<inspect::Inspector> InspectNodeCallback() const;
 
   PlatformBus* bus_;
   char name_[ZX_DEVICE_NAME_MAX + 1];
@@ -138,6 +141,14 @@ class PlatformDevice : public PlatformDeviceType,
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bus_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> device_bindings_;
   std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_;
+
+  // Contains the vectors used when creating interrupts. `interrupt_vectors_`
+  // must be above `inspector_`. This is to ensure that `interrupt_vectors_` is
+  // not destructed before `inspector_` is destructed. When `inspector_`
+  // destructs, it executes a callback that references `interrupt_vectors_`.
+  std::vector<unsigned int> interrupt_vectors_;
+
+  inspect::Node inspect_node_;
 };
 
 }  // namespace platform_bus

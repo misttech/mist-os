@@ -121,6 +121,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type SetReusePortError: IntoErrno;
     type ShutdownError: IntoErrno;
     type SetIpTransparentError: IntoErrno;
+    type SetBroadcastError: IntoErrno;
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
     type RemoteIdentifier: From<u16> + Into<u16> + Send;
     type SocketInfo: IntoFidl<LocalAddress<I, WeakDeviceId<BindingsCtx>, Self::LocalIdentifier>>
@@ -264,6 +265,14 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         ip_version: IpVersion,
     ) -> Result<bool, Self::MulticastLoopError>;
 
+    fn set_broadcast(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        value: bool,
+    ) -> Result<(), Self::SetBroadcastError>;
+
+    fn get_broadcast(ctx: &mut Ctx, id: &Self::SocketId) -> bool;
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -326,6 +335,7 @@ where
     type SetReuseAddrError = ExpectedUnboundError;
     type SetReusePortError = ExpectedUnboundError;
     type SetIpTransparentError = Never;
+    type SetBroadcastError = Never;
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = udp::UdpRemotePort;
     type SocketInfo = SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
@@ -533,6 +543,18 @@ where
         ctx.api().udp().get_multicast_loop(id, ip_version)
     }
 
+    fn set_broadcast(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        value: bool,
+    ) -> Result<(), Self::SetBroadcastError> {
+        Ok(ctx.api().udp().set_broadcast(id, value))
+    }
+
+    fn get_broadcast(ctx: &mut Ctx, id: &Self::SocketId) -> bool {
+        ctx.api().udp().get_broadcast(id)
+    }
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -619,6 +641,7 @@ where
     type SetMulticastMembershipError = NotSupportedError;
     type MulticastInterfaceError = NotSupportedError;
     type MulticastLoopError = NotSupportedError;
+    type SetBroadcastError = NotSupportedError;
     type SetReuseAddrError = NotSupportedError;
     type SetReusePortError = NotSupportedError;
     type SetIpTransparentError = NotSupportedError;
@@ -872,6 +895,18 @@ where
         Err(NotSupportedError)
     }
 
+    fn set_broadcast(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _value: bool,
+    ) -> Result<(), Self::SetBroadcastError> {
+        Err(NotSupportedError)
+    }
+
+    fn get_broadcast(_ctx: &mut Ctx, _id: &Self::SocketId) -> bool {
+        false
+    }
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -917,6 +952,9 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
                 IpSockSendError::IllegalLoopbackAddress,
             )) => fposix::Errno::Einval,
+            core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
+                IpSockSendError::BroadcastNotAllowed,
+            )) => fposix::Errno::Eacces,
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
                 IpSockSendError::Unroutable(err),
             )) => err.into_errno(),
@@ -1365,17 +1403,12 @@ where
                     .unwrap_or_log("failed to respond")
             }
             Request::SetBroadcast { value, responder } => {
-                // We allow a no-op since the core does not yet support limiting
-                // broadcast packets. Until we implement this, we leave this as a
-                // no-op so that applications needing to send broadcast packets may
-                // make progress.
-                //
-                // TODO(https://fxbug.dev/42077065): Actually implement SO_BROADCAST.
-                let response = if value { Ok(()) } else { Err(fposix::Errno::Eopnotsupp) };
-                responder.send(response).unwrap_or_log("failed to respond");
+                let result = self.set_broadcast(value).map_err(IntoErrno::into_errno);
+                maybe_log_error!("set_broadcast", &result);
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetBroadcast { responder } => {
-                respond_not_supported!("syncudp::GetBroadcast", responder)
+                responder.send(Ok(self.get_broadcast())).unwrap_or_log("failed to respond");
             }
             Request::SetKeepAlive { value: _, responder } => {
                 respond_not_supported!("syncudp::SetKeepAlive", responder)
@@ -2190,6 +2223,16 @@ where
     fn get_ip_transparent(self) -> bool {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_ip_transparent(ctx, id)
+    }
+
+    fn set_broadcast(self, value: bool) -> Result<(), T::SetBroadcastError> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::set_broadcast(ctx, id, value)
+    }
+
+    fn get_broadcast(self) -> bool {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_broadcast(ctx, id)
     }
 
     fn get_timestamp_option(self) -> Result<fposix_socket::TimestampOption, fposix::Errno> {

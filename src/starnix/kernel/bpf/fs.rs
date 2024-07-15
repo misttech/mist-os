@@ -8,13 +8,15 @@
 use crate::bpf::map::Map;
 use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
+use crate::mm::memory::MemoryObject;
+use crate::mm::ProtectionFlags;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode,
-    FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryDirectoryFile,
-    MemoryXattrStorage, NamespaceNode, XattrOp,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir,
+    fs_node_impl_xattr_delegate, CacheMode, FdNumber, FileObject, FileOps, FileSystem,
+    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
@@ -82,6 +84,7 @@ impl From<BpfTypeFormat> for BpfHandle {
 
 impl FileOps for BpfHandle {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
     fn read(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
@@ -103,6 +106,19 @@ impl FileOps for BpfHandle {
     ) -> Result<usize, Errno> {
         track_stub!(TODO("https://fxbug.dev/322873841"), "bpf handle write");
         error!(EINVAL)
+    }
+    fn get_memory(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        match self {
+            Self::Map(map) => map.get_memory(locked, length, prot),
+            _ => error!(ENODEV),
+        }
     }
 }
 

@@ -115,12 +115,6 @@ Path to the amlogic decoder firmware file. Overrides the default in the build.
 
 From //src/media/drivers/amlogic_decoder/BUILD.gn:12
 
-### api_compatibility_testing
-
-**Current value (from the default):** `true`
-
-From //build/config/fuchsia/platform_version.gni:39
-
 ### archivist_max_cached_logs_bytes
 
 **Current value (from the default):** `4194304`
@@ -331,9 +325,9 @@ binaries for all API levels, or a subset of them. Possible values are:
       contains artifacts built at "PLATFORM".
 
   true: To build for all API levels listed in
-      platform_version.build_time_supported_api_levels, which defaults to
+      platform_version.idk_buildable_api_levels, which defaults to
       all Supported API levels plus the current in-development API level,
-      unless `override_build_time_supported_api_levels` is also set.
+      unless `override_idk_buildable_api_levels` is also set.
       See //build/config/fuchsia/platform_versions.gni.
 
 
@@ -880,7 +874,7 @@ From //build/images/args.gni:35
 
 ### bump_api_level
 
-If true, build for N+1 api level, where N is
+If true, generate golden files for API level N+1, where N is
 platform_version.deprecated_highest_numbered_api_level.
 TODO(https://fxbug.dev/326277078): Update this comment and potentially
 redefine these args when switching the in-development level to "NEXT".
@@ -4077,15 +4071,6 @@ Set to true to include internal fonts in the build.
 
 From //src/fonts/build/font_args.gni:7
 
-### include_next_api_level
-
-If true, generate golden files for next api level. This is used by
-platform-version-roller when the API level is incremented.
-
-**Current value (from the default):** `false`
-
-From //build/config/fuchsia/platform_version.gni:38
-
 ### include_shell_commands_package
 
 Include the shell commands package.  Used as a parameter to
@@ -5398,7 +5383,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 From //build/config/BUILDCONFIG.gn:30
 
-### override_build_time_supported_api_levels
+### override_idk_buildable_api_levels
 
 Overrides the set of API levels for which this build will provide build-time
 support in the IDK/SDK. The default (`false`) set is all `supported` and
@@ -5418,7 +5403,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:56
+From //build/config/fuchsia/platform_version.gni:51
 
 ### override_idk_target_cpus
 
@@ -5435,11 +5420,11 @@ Note: The in-tree Bazel SDK ignores this variable and the variable it
 overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
 
 To override the set of API levels, see
-`override_build_time_supported_api_levels`.
+`override_idk_buildable_api_levels`.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:68
+From //build/sdk/config.gni:70
 
 ### override_target_api_level
 
@@ -7483,7 +7468,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"FwJNmCIbbweuTE2kC-y8jly7X2dsTnn6ubfEuGFdsuwC"`
+**Current value (from the default):** `"TDzgN1kRRXjyDbYULfxtDph_5Ac5A7g_9mKTNg3eNIAC"`
 
 From //build/rust/config.gni:38
 
@@ -7611,12 +7596,14 @@ From //sdk/config.gni:7
 
 ### sdk_inside_sub_build
 
-Whether currently building a sub-build (vs. the main build).
-Can be true for any API level, including the default level.
+Whether currently building a sub-build (vs. the main build targeting
+"PLATFORM" and the primary target CPU architecture).
+Prefer using other mechanisms when possible.
+Can be true for any API level, including "PLATFORM", and CPU architecture.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:12
+From //build/sdk/config.gni:14
 
 ### sdk_legacy_unstable_abi_revisions
 
@@ -7629,7 +7616,7 @@ period.
 
 **Current value (from the default):** `true`
 
-From //build/sdk/config.gni:20
+From //build/sdk/config.gni:22
 
 ### sdk_max_simultaneous_sub_builds
 
@@ -7651,7 +7638,7 @@ But also these bad things:
 
 **Current value (from the default):** `5`
 
-From //build/sdk/config.gni:37
+From //build/sdk/config.gni:39
 
 ### sdk_sub_build_max_load_average
 
@@ -7661,7 +7648,7 @@ blank, the subbuild script will make a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:49
+From //build/sdk/config.gni:51
 
 ### sdk_sub_build_parallelism
 
@@ -7673,7 +7660,7 @@ a guess.
 
 **Current value (from the default):** `""`
 
-From //build/sdk/config.gni:44
+From //build/sdk/config.gni:46
 
 ### sdk_sub_build_verbose
 
@@ -7681,7 +7668,7 @@ Set to `true` to enable verbose logging during IDK subbuilds.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:52
+From //build/sdk/config.gni:54
 
 ### select_variant
 

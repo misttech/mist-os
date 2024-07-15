@@ -20,6 +20,9 @@
 
 namespace ctaphid {
 
+namespace fhidbus = fuchsia_hardware_hidbus;
+namespace finput = fuchsia_hardware_input;
+
 void CtapHidDriver::CreatePacketHeader(uint8_t packet_sequence, uint32_t channel_id,
                                        fuchsia_fido_report::CtapHidCommand command_id,
                                        uint16_t payload_len, uint8_t* out, size_t out_size) {
@@ -49,15 +52,15 @@ void CtapHidDriver::CreatePacketHeader(uint8_t packet_sequence, uint32_t channel
 }
 
 zx_status_t CtapHidDriver::Start() {
-  uint8_t report_desc[HID_MAX_DESC_LEN];
-  size_t report_desc_size;
-  zx_status_t status = hiddev_.GetDescriptor(report_desc, HID_MAX_DESC_LEN, &report_desc_size);
-  if (status != ZX_OK) {
-    return status;
+  fidl::WireResult result = input_device_->GetReportDesc();
+  if (!result.ok()) {
+    zxlogf(ERROR, "GetReportDesc failed %d", result.status());
+    return result.status();
   }
 
   hid::DeviceDescriptor* dev_desc = nullptr;
-  hid::ParseResult parse_res = hid::ParseReportDescriptor(report_desc, report_desc_size, &dev_desc);
+  hid::ParseResult parse_res =
+      hid::ParseReportDescriptor(result->desc.data(), result->desc.count(), &dev_desc);
   if (parse_res != hid::ParseResult::kParseOk) {
     zxlogf(ERROR, "hid-parser: parsing report descriptor failed with error %d", int(parse_res));
     return ZX_ERR_INTERNAL;
@@ -78,16 +81,17 @@ zx_status_t CtapHidDriver::Start() {
                           MAX_PACKET_SEQ * (output_packet_size_ - CONTINUATION_PAYLOAD_DATA_OFFSET);
 
   // Register to listen for HID reports.
-  status = hiddev_.RegisterListener(this, &hid_report_listener_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to register for HID reports: %s", zx_status_get_string(status));
-    return status;
+  auto [client, server] = fidl::Endpoints<finput::DeviceReportsReader>::Create();
+  auto status = input_device_->GetDeviceReportsReader(std::move(server));
+  if (!status.ok()) {
+    zxlogf(ERROR, "Failed to get device reports reader: %s", status.FormatDescription().c_str());
+    return status.status();
   }
+  dev_reader_.Bind(std::move(client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  dev_reader_->ReadReports().Then(fit::bind_member<&CtapHidDriver::HandleReports>(this));
 
   return ZX_OK;
 }
-
-void CtapHidDriver::Stop() { hiddev_.UnregisterListener(); }
 
 zx_status_t CtapHidDriver::Bind() {
   zx_status_t status = Start();
@@ -96,7 +100,6 @@ zx_status_t CtapHidDriver::Bind() {
   }
   status = DdkAdd(ddk::DeviceAddArgs("SecurityKey"));
   if (status != ZX_OK) {
-    Stop();
     return status;
   }
   return ZX_OK;
@@ -104,10 +107,7 @@ zx_status_t CtapHidDriver::Bind() {
 
 void CtapHidDriver::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
 
-void CtapHidDriver::DdkRelease() {
-  Stop();
-  delete this;
-}
+void CtapHidDriver::DdkRelease() { delete this; }
 
 void CtapHidDriver::SendMessage(SendMessageRequestView request,
                                 SendMessageCompleter::Sync& completer) {
@@ -130,14 +130,15 @@ void CtapHidDriver::SendMessage(SendMessageRequestView request,
   // Divide up the request's data into a series of packets, starting with an initialization packet.
   auto data_it = request->data().begin();
   if (request->data().empty()) {
-    uint8_t curr_hid_report[HID_MAX_REPORT_LEN];
+    uint8_t curr_hid_report[fhidbus::wire::kMaxReportLen];
     CreatePacketHeader(INIT_PACKET_SEQ, channel_id, request->command_id(), request->payload_len(),
-                       curr_hid_report, HID_MAX_REPORT_LEN);
+                       curr_hid_report, fhidbus::wire::kMaxReportLen);
 
-    zx_status_t status = hiddev_.SetReport(HID_REPORT_TYPE_OUTPUT, output_packet_id_,
-                                           curr_hid_report, output_packet_size_);
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
+    auto result = input_device_->SetReport(
+        fhidbus::ReportType::kOutput, output_packet_id_,
+        fidl::VectorView<uint8_t>::FromExternal(curr_hid_report, output_packet_size_));
+    if (!result.ok()) {
+      completer.ReplyError(result.status());
       return;
     }
   }
@@ -146,9 +147,9 @@ void CtapHidDriver::SendMessage(SendMessageRequestView request,
        (packet_sequence < MAX_PACKET_SEQ || packet_sequence == INIT_PACKET_SEQ) &&
        data_it != request->data().end();
        packet_sequence++) {
-    uint8_t curr_hid_report[HID_MAX_REPORT_LEN];
+    uint8_t curr_hid_report[fhidbus::wire::kMaxReportLen];
     CreatePacketHeader(packet_sequence, channel_id, request->command_id(), request->payload_len(),
-                       curr_hid_report, HID_MAX_REPORT_LEN);
+                       curr_hid_report, fhidbus::wire::kMaxReportLen);
 
     // Write the payload.
     size_t byte_n = packet_sequence == INIT_PACKET_SEQ ? INITIALIZATION_PAYLOAD_DATA_OFFSET
@@ -158,17 +159,19 @@ void CtapHidDriver::SendMessage(SendMessageRequestView request,
       data_it++;
     }
 
-    zx_status_t status = hiddev_.SetReport(HID_REPORT_TYPE_OUTPUT, output_packet_id_,
-                                           curr_hid_report, output_packet_size_);
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
+    auto result = input_device_->SetReport(
+        fhidbus::ReportType::kOutput, output_packet_id_,
+        fidl::VectorView<uint8_t>::FromExternal(curr_hid_report, output_packet_size_));
+    if (!result.ok()) {
+      completer.ReplyError(result.status());
       return;
     }
   }
 
   // Set the pending response. The pending response will be reset once the device has sent a
   // response and it has been retrieved via GetMessage().
-  // TODO(https://fxbug.dev/42054989): have this clear after some time or when the list gets too large.
+  // TODO(https://fxbug.dev/42054989): have this clear after some time or when the list gets too
+  // large.
   pending_response_ = pending_response{
       .channel = channel_id,
       .next_packet_seq_expected = INIT_PACKET_SEQ,
@@ -231,13 +234,28 @@ void CtapHidDriver::ReplyToWaitingGetMessage() {
   }
 }
 
-void CtapHidDriver::HidReportListenerReceiveReport(const uint8_t* report, size_t report_size,
-                                                   zx_time_t report_time) {
-  fbl::AutoLock lock(&lock_);
+void CtapHidDriver::HandleReports(
+    fidl::WireUnownedResult<fuchsia_hardware_input::DeviceReportsReader::ReadReports>& result) {
+  if (!result.ok()) {
+    return;
+  }
+  if (result->is_error()) {
+    return;
+  }
 
+  dev_reader_->ReadReports().Then(fit::bind_member<&CtapHidDriver::HandleReports>(this));
+
+  for (const auto& report : result->value()->reports) {
+    fbl::AutoLock _(&lock_);
+    HandleReport(cpp20::span<uint8_t>(report.buf().data(), report.buf().count()),
+                 zx::time(report.timestamp()));
+  }
+}
+
+void CtapHidDriver::HandleReport(cpp20::span<uint8_t> report, zx::time report_time) {
   channel_id_t current_channel =
       (report[0] << 24) | (report[1] << 16) | (report[2] << 8) | report[3];
-  uint8_t data_size = static_cast<uint8_t>(report_size);
+  uint8_t data_size = static_cast<uint8_t>(report.size());
 
   if (pending_response_->channel != current_channel) {
     // This means that we have received an unexpected as there is no pending request on this channel
@@ -304,13 +322,20 @@ void CtapHidDriver::HidReportListenerReceiveReport(const uint8_t* report, size_t
 }
 
 zx_status_t ctaphid_bind(void* ctx, zx_device_t* parent) {
-  ddk::HidDeviceProtocolClient hiddev(parent);
-  if (!hiddev.is_valid()) {
+  zx::result<fidl::ClientEnd<finput::Controller>> controller =
+      ddk::Device<void>::DdkConnectFidlProtocol<finput::Service::Controller>(parent);
+  if (!controller.is_ok()) {
     return ZX_ERR_INTERNAL;
   }
 
+  auto [client, server] = fidl::Endpoints<finput::Device>::Create();
+  auto result = fidl::WireCall(controller.value())->OpenSession(std::move(server));
+  if (!result.ok()) {
+    return result.status();
+  }
+
   fbl::AllocChecker ac;
-  auto dev = fbl::make_unique_checked<CtapHidDriver>(&ac, parent, hiddev);
+  auto dev = fbl::make_unique_checked<CtapHidDriver>(&ac, parent, std::move(client));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

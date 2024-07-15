@@ -29,23 +29,22 @@
     auto retval = (X);                                                              \
     if (retval < 0) {                                                               \
       ADD_FAILURE() << #X << " failed: " << strerror(errno) << "(" << errno << ")"; \
-      _exit(-1);                                                                    \
+      retval = {};                                                                  \
     }                                                                               \
     retval;                                                                         \
   })
 
-#define SAFE_SYSCALL_SKIP_ON_EPERM(X)                                                 \
-  ({                                                                                  \
-    auto retval = (X);                                                                \
-    if (retval < 0) {                                                                 \
-      if (errno == EPERM) {                                                           \
-        GTEST_SKIP() << "Permission denied for " << #X << ", skipping tests.";        \
-      } else {                                                                        \
-        ADD_FAILURE() << #X << " failed: " << strerror(errno) << "(" << errno << ")"; \
-        _exit(-1);                                                                    \
-      }                                                                               \
-    }                                                                                 \
-    retval;                                                                           \
+#define SAFE_SYSCALL_SKIP_ON_EPERM(X)                                          \
+  ({                                                                           \
+    auto retval = (X);                                                         \
+    if (retval < 0) {                                                          \
+      if (errno == EPERM) {                                                    \
+        GTEST_SKIP() << "Permission denied for " << #X << ", skipping tests."; \
+      } else {                                                                 \
+        FAIL() << #X << " failed: " << strerror(errno) << "(" << errno << ")"; \
+      }                                                                        \
+    }                                                                          \
+    retval;                                                                    \
   })
 
 #define ASSERT_RESULT_SUCCESS_AND_RETURN(S)          \
@@ -296,7 +295,12 @@ class ScopedMMap {
     return fit::ok(ScopedMMap(mapping, length));
   }
 
-  ScopedMMap(ScopedMMap &&other) noexcept { *this = std::move(other); }
+  ScopedMMap(const ScopedMMap &) = delete;
+  ScopedMMap &operator=(const ScopedMMap &) = delete;
+
+  ScopedMMap(ScopedMMap &&other) noexcept : mapping_(MAP_FAILED), length_(0) {
+    *this = std::move(other);
+  }
 
   ~ScopedMMap() { Unmap(); }
 
@@ -322,7 +326,7 @@ class ScopedMMap {
   void *mapping() const { return mapping_; }
 
  private:
-  ScopedMMap(void *mapping, size_t length) : mapping_(mapping), length_(length) {}
+  explicit ScopedMMap(void *mapping, size_t length) : mapping_(mapping), length_(length) {}
 
   void *mapping_;
   size_t length_;

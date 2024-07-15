@@ -3,30 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Result};
-use scrutiny::model::controller::{DataController, HintDataType};
-use scrutiny::model::model::*;
-use scrutiny_utils::usage::*;
 use scrutiny_utils::zbi::*;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::value::Value;
 use std::fs::File;
 use std::io::prelude::*;
-use std::sync::Arc;
+use std::path::PathBuf;
 
-#[derive(Deserialize, Serialize)]
-pub struct ZbiExtractCmdlineRequest {
-    // The input path for the ZBI.
-    pub input: String,
-}
-
-#[derive(Default)]
 pub struct ZbiExtractCmdlineController {}
 
-impl DataController for ZbiExtractCmdlineController {
-    fn query(&self, _model: Arc<DataModel>, query: Value) -> Result<Value> {
-        let request: ZbiExtractCmdlineRequest = serde_json::from_value(query)?;
-        let mut zbi_file = File::open(request.input)?;
+impl ZbiExtractCmdlineController {
+    pub fn extract(input: PathBuf) -> Result<Value> {
+        let mut zbi_file = File::open(input)?;
         let mut zbi_buffer = Vec::new();
         zbi_file.read_to_end(&mut zbi_buffer)?;
         let mut reader = ZbiReader::new(zbi_buffer);
@@ -42,22 +30,5 @@ impl DataController for ZbiExtractCmdlineController {
             }
         }
         Err(anyhow!("Failed to find a cmdline section in the provided ZBI"))
-    }
-
-    fn description(&self) -> String {
-        "Extracts the kernel cmdline from a ZBI".to_string()
-    }
-
-    fn usage(&self) -> String {
-        UsageBuilder::new()
-            .name("tool.zbi.extract.cmdline - Extracts ZBI kernel cmdline")
-            .summary("tool.zbi.extract.cmdline --input foo.zbi")
-            .description("Extracts zircon boot images and retrieves the kernel cmdline.")
-            .arg("--input", "Path to the input zbi file")
-            .build()
-    }
-
-    fn hints(&self) -> Vec<(String, HintDataType)> {
-        vec![("--input".to_string(), HintDataType::NoType)]
     }
 }

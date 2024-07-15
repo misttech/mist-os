@@ -65,13 +65,4 @@ SYSCALL_IN_CATEGORY({{ LowerCaseWithUnderscores . }})
 {{- end }}
 SYSCALL_CATEGORY_END(test_category2)
 
-#define HAVE_SYSCALL_CATEGORY_vdsocall 1
-SYSCALL_CATEGORY_BEGIN(vdsocall)
-{{- range . }}
-{{- if .IsVdsoCall }}
-SYSCALL_IN_CATEGORY({{ LowerCaseWithUnderscores . }})
-{{- end }}
-{{- end }}
-SYSCALL_CATEGORY_END(vdsocall)
-
 {{ end }}

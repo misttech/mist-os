@@ -451,7 +451,7 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                                      properties:
                                          fnet_interfaces_ext::Properties {
                                              id,
-                                             device_class,
+                                             port_class,
                                              addresses: _,
                                              name: _,
                                              online: _,
@@ -460,11 +460,10 @@ async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step])
                                          },
                                      state: _,
                                  }| {
-                                    match device_class {
-                                        fnet_interfaces::DeviceClass::Device(
-                                            fhardware_network::DeviceClass::Bridge,
-                                        ) if Some(id.get())
-                                            != bridge.as_ref().map(ping::Node::id) =>
+                                    match port_class {
+                                        fnet_interfaces_ext::PortClass::Bridge
+                                            if Some(id.get())
+                                                != bridge.as_ref().map(ping::Node::id) =>
                                         {
                                             Some(id)
                                         }

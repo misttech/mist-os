@@ -862,22 +862,10 @@ impl TestRealmExt for netemul::TestRealm<'_> {
         .into_iter()
         .find_map(|(_id, properties_and_state): (u64, _)| {
             let fnet_interfaces_ext::PropertiesAndState {
-                properties:
-                    properties @ fnet_interfaces_ext::Properties {
-                        id: _,
-                        name: _,
-                        device_class,
-                        online: _,
-                        addresses: _,
-                        has_default_ipv4_route: _,
-                        has_default_ipv6_route: _,
-                    },
+                properties: properties @ fnet_interfaces_ext::Properties { port_class, .. },
                 state: (),
             } = properties_and_state;
-            match device_class {
-                fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty) => Some(properties),
-                fnet_interfaces::DeviceClass::Device(_) => None,
-            }
+            port_class.is_loopback().then_some(properties)
         });
         Ok(properties)
     }

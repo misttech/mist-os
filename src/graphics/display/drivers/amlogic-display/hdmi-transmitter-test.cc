@@ -122,7 +122,7 @@ TEST_F(HdmiTransmitterTest, ResetTest) {
       {.address = kHdmiTxTopClkCntlOffset, .value = 0xff, .write = true},
   }));
   zx::result<> result = dut_->Reset();
-  EXPECT_OK(result.status_value());
+  EXPECT_OK(result);
 }
 
 TEST_F(HdmiTransmitterTest, ModeSetTest) {
@@ -170,7 +170,7 @@ TEST_F(HdmiTransmitterTest, ModeSetTest) {
   mock_hdmitx_controller_->ExpectCalls(kExpectedCalls);
 
   zx::result<> result = dut_->ModeSet(display_timing, color_param);
-  EXPECT_OK(result.status_value());
+  EXPECT_OK(result);
 }
 
 }  // namespace amlogic_display

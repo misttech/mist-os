@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl_test_base.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
+#include <fuchsia/math/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -42,9 +43,9 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   using AcknowledgeVsyncFn = std::function<void(uint64_t cookie)>;
   using SetDisplayLayersFn = std::function<void(fuchsia::hardware::display::types::DisplayId,
                                                 std::vector<fuchsia::hardware::display::LayerId>)>;
-  using SetLayerPrimaryPositionFn = std::function<void(
-      fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::Transform,
-      fuchsia::hardware::display::types::Frame, fuchsia::hardware::display::types::Frame)>;
+  using SetLayerPrimaryPositionFn = std::function<void(fuchsia::hardware::display::LayerId,
+                                                       fuchsia::hardware::display::types::Transform,
+                                                       fuchsia::math::RectU, fuchsia::math::RectU)>;
 
   using SetDisplayModeFn = std::function<void(fuchsia::hardware::display::types::DisplayId,
                                               fuchsia::hardware::display::Mode)>;
@@ -127,11 +128,11 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   void SetLayerPrimaryPosition(fuchsia::hardware::display::LayerId layer_id,
                                fuchsia::hardware::display::types::Transform transform,
-                               fuchsia::hardware::display::types::Frame src_frame,
-                               fuchsia::hardware::display::types::Frame dest_frame) override {
+                               fuchsia::math::RectU image_source,
+                               fuchsia::math::RectU display_destination) override {
     ++set_layer_primary_position_count_;
     if (set_layer_primary_position_fn_) {
-      set_layer_primary_position_fn_(layer_id, transform, src_frame, dest_frame);
+      set_layer_primary_position_fn_(layer_id, transform, image_source, display_destination);
     }
   }
 

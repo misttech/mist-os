@@ -55,13 +55,6 @@ pub(crate) fn handle_info(hdl: HandleRef<'_>) -> Result<HandleInfo, Error> {
 pub(crate) fn handle_info(handle: HandleRef<'_>) -> Result<HandleInfo, Error> {
     use fuchsia_zircon as zx;
 
-    // zx_info_socket_t is able to be safely replaced with a byte representation and is a PoD type.
-    struct SocketInfoQuery;
-    unsafe impl zx::ObjectQuery for SocketInfoQuery {
-        const TOPIC: zx::Topic = zx::Topic::SOCKET;
-        type InfoTy = zx::sys::zx_info_socket_t;
-    }
-
     let basic_info = handle.basic_info()?;
 
     let handle_type = match basic_info.object_type {
@@ -72,12 +65,8 @@ pub(crate) fn handle_info(handle: HandleRef<'_>) -> Result<HandleInfo, Error> {
             HandleType::Channel(rights)
         }
         zx::ObjectType::SOCKET => {
-            let mut info = zx::sys::zx_info_socket_t::default();
-            let info = zx::object_get_info::<SocketInfoQuery>(
-                handle.as_handle_ref(),
-                std::slice::from_mut(&mut info),
-            )
-            .map(|_| zx::SocketInfo::from(info))?;
+            let socket = handle.cast::<zx::Socket>();
+            let info = socket.info()?;
             let socket_type = match info.options {
                 zx::SocketOpts::STREAM => SocketType::Stream,
                 zx::SocketOpts::DATAGRAM => SocketType::Datagram,

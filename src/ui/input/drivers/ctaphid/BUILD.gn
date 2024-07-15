@@ -26,8 +26,9 @@ source_set("driver-internals") {
   sources = [ "ctaphid.cc" ]
   public_deps = [
     ":ctaphid_bind",
-    "//sdk/banjo/fuchsia.hardware.hiddevice:fuchsia.hardware.hiddevice_banjo_cpp",
     "//sdk/fidl/fuchsia.fido.report:fuchsia.fido.report_cpp",
+    "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/ui/input/lib/hid",
@@ -63,6 +64,7 @@ test("ctaphid-test-bin") {
   deps = [
     ":driver-internals",
     "//sdk/fidl/fuchsia.fido.report:fuchsia.fido.report_hlcpp",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/testing/fidl:fidl_test_hlcpp",
     "//src/devices/testing/mock-ddk",

@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/hid-input-report.so",
         bind: "meta/bind/hid-input-report.bindbc",
         colocate: "true",
-        compat: "driver/hid-input-report.so",
-        default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "true",
     },
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.input.Service" },
+    ],
 }

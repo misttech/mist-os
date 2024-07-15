@@ -8,6 +8,7 @@
 #include <lib/async/default.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/sync/cpp/completion.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,12 +18,52 @@
 #include <zircon/status.h>
 
 namespace bt_transport_uart {
+namespace fhbt = fuchsia_hardware_bluetooth;
+
+ScoConnectionServer::ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler)
+    : send_handler_(std::move(send_handler)), stop_handler_(std::move(stop_handler)) {
+  // Pre-allocate the vector size to avoid resizing. Reserve the space for packet indicator by +1 on
+  // the size.
+  write_buffer_.reserve(fhbt::kScoPacketMax + 1);
+}
+
+// fhbt::ScoConnection overrides.
+void ScoConnectionServer::Send(SendRequest& request, SendCompleter::Sync& completer) {
+  write_buffer_.push_back(BtHciPacketIndicator::kHciSco);
+  write_buffer_.insert(write_buffer_.end(), request.packet().begin(), request.packet().end());
+  send_handler_(write_buffer_, [completer = completer.ToAsync()]() mutable { completer.Reply(); });
+  write_buffer_.clear();
+}
+
+void ScoConnectionServer::AckReceive(AckReceiveCompleter::Sync& completer) {}
+
+void ScoConnectionServer::Stop(StopCompleter::Sync& completer) { stop_handler_(); }
+
+void ScoConnectionServer::handle_unknown_method(
+    ::fidl::UnknownMethodMetadata<fhbt::ScoConnection> metadata,
+    ::fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown method in ScoConnection protocol, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
 
 BtTransportUart::BtTransportUart(fuchsia_driver_framework::DriverStartArgs start_args,
                                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("bt-transport-uart", std::move(start_args), std::move(driver_dispatcher)),
       dispatcher_(dispatcher()),
-      node_(fidl::WireClient(std::move(node()), dispatcher())) {}
+      node_(fidl::WireClient(std::move(node()), dispatcher())),
+      sco_connection_server_(
+          [this](std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
+            OnScoData(packet, std::move(callback));
+          },
+          [this] { OnScoStop(); }) {
+  // Pre-allocate the vector size to avoid resizing. Reserve the space for packet indicator by +1 on
+  // the size.
+  for (size_t i = 0; i < kSendQueueLimit; i++) {
+    std::vector<uint8_t> buffer;
+    buffer.reserve(fhbt::kAclPacketMax + 1);
+    available_buffers_.push(std::move(buffer));
+  }
+}
 
 zx::result<> BtTransportUart::Start() {
   FDF_LOG(DEBUG, "Start");
@@ -85,8 +126,6 @@ zx::result<> BtTransportUart::Start() {
     return zx::error(enable_result->error_value());
   }
 
-  queue_read_task_.Post(dispatcher_);
-
   zx_status_t status = ServeProtocols();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to serve protocols: %s", zx_status_get_string(status));
@@ -107,7 +146,7 @@ zx::result<> BtTransportUart::Start() {
 
   // Build offers
   auto offers = compat_server_.CreateOffers2(args_arena);
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_bluetooth::HciService>(args_arena));
+  offers.push_back(fdf::MakeOffer2<fhbt::HciService>(args_arena));
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(args_arena));
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(args_arena)
@@ -138,6 +177,7 @@ zx::result<> BtTransportUart::Start() {
 
   node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
 
+  queue_read_task_.Post(dispatcher_);
   return zx::ok();
 }
 
@@ -226,6 +266,59 @@ void BtTransportUart::ChannelCleanupLocked(zx::channel* channel) {
   channel->reset();
 }
 
+void BtTransportUart::SendSnoop(const std::vector<uint8_t>&& packet,
+                                fuchsia_hardware_bluetooth::SnoopPacket::Tag type,
+                                fhbt::PacketDirection direction) {
+  if (!snoop_client_.is_valid()) {
+    return;
+  }
+
+  static bool log_emitted = false;
+  if ((snoop_seq_ - acked_snoop_seq_) > kSeqNumMaxDiff) {
+    if (!log_emitted) {
+      FDF_LOG(
+          WARNING,
+          "Too many snoop packets not acked, current seq: %lu, acked seq: %lu, skipping snoop packets",
+          snoop_seq_, acked_snoop_seq_);
+      log_emitted = true;
+    }
+    return;
+  }
+  // Reset log when the acked sequence number catches up.
+  log_emitted = false;
+
+  fhbt::SnoopObservePacketRequest req;
+  switch (type) {
+    case fhbt::SnoopPacket::Tag::kEvent:
+      ZX_DEBUG_ASSERT(direction == fhbt::PacketDirection::kControllerToHost);
+      req.packet(fhbt::SnoopPacket::WithEvent(packet));
+      break;
+    case fhbt::SnoopPacket::Tag::kCommand:
+      ZX_DEBUG_ASSERT(direction == fhbt::PacketDirection::kHostToController);
+      req.packet(fhbt::SnoopPacket::WithCommand(packet));
+      break;
+    case fhbt::SnoopPacket::Tag::kAcl:
+      req.packet(fhbt::SnoopPacket::WithAcl(packet));
+      break;
+    case fhbt::SnoopPacket::Tag::kSco:
+      req.packet(fhbt::SnoopPacket::WithSco(packet));
+      break;
+    default:
+      // TODO(b/350753924): Handle ISO packets in this driver.
+      FDF_LOG(ERROR, "Unknown snoop packet type: %u", type);
+  }
+  req.direction(direction);
+  req.sequence(snoop_seq_++);
+
+  fit::result<::fidl::OneWayError> result = snoop_client_->ObservePacket(req);
+  if (!result.is_ok()) {
+    FDF_LOG(ERROR, "Failed to send snoop for sent packet: %s, unbinding snoop client",
+            result.error_value().FormatDescription().c_str());
+
+    auto result = snoop_client_.UnbindMaybeGetEndpoint();
+  }
+}
+
 void BtTransportUart::SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, size_t length) {
   if (!snoop_channel_.is_valid()) {
     return;
@@ -260,6 +353,25 @@ void BtTransportUart::HciBeginShutdown() {
   }
 }
 
+void BtTransportUart::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
+  if (available_buffers_.empty()) {
+    FDF_LOG(ERROR, "Send queue is full, closing SCO connection");
+    callback();
+    sco_connection_binding_.RemoveBindings(&sco_connection_server_);
+    return;
+  }
+
+  auto& buffer = available_buffers_.front();
+  buffer = std::move(packet);
+  send_queue_.emplace(std::move(buffer), std::move(callback));
+  available_buffers_.pop();
+  send_queue_task_.Post(dispatcher_);
+}
+
+void BtTransportUart::OnScoStop() {
+  sco_connection_binding_.RemoveBindings(&sco_connection_server_);
+}
+
 void BtTransportUart::SerialWrite(uint8_t* buffer, size_t length) {
   {
     std::lock_guard guard(mutex_);
@@ -268,7 +380,6 @@ void BtTransportUart::SerialWrite(uint8_t* buffer, size_t length) {
     // transaction at a time.
     can_write_ = false;
   }
-
   fdf::Arena arena('WRIT');
   auto data = fidl::VectorView<uint8_t>::FromExternal(buffer, length);
   serial_client_.buffer(arena)->Write(data).ThenExactlyOnce(
@@ -287,6 +398,66 @@ void BtTransportUart::SerialWrite(uint8_t* buffer, size_t length) {
         }
         HciWriteComplete(ZX_OK);
       });
+}
+
+void BtTransportUart::ProcessOnePacketFromSendQueue() {
+  if (!can_send_) {
+    return;
+  }
+  if (send_queue_.empty()) {
+    return;
+  }
+
+  auto& buffer_entry = send_queue_.front();
+  SerialWriteTransport(buffer_entry.data_, std::move(buffer_entry.callback_));
+
+  const std::vector<uint8_t> snoop_data(buffer_entry.data_.begin() + 1, buffer_entry.data_.end());
+
+  fhbt::SnoopPacket::Tag snoop_type = fhbt::SnoopPacket::Tag::kIso;
+  switch (buffer_entry.data_[0]) {
+    case BtHciPacketIndicator::kHciAclData:
+      snoop_type = fhbt::SnoopPacket::Tag::kAcl;
+      break;
+    case BtHciPacketIndicator::kHciCommand:
+      snoop_type = fhbt::SnoopPacket::Tag::kCommand;
+      break;
+    case BtHciPacketIndicator::kHciSco:
+      snoop_type = fhbt::SnoopPacket::Tag::kSco;
+      break;
+    default:
+      FDF_LOG(DEBUG, "Unsupported snoop sent packet type: %u", buffer_entry.data_[0]);
+      send_queue_.pop();
+      return;
+  }
+  SendSnoop(std::move(snoop_data), snoop_type, fhbt::PacketDirection::kHostToController);
+  buffer_entry.data_.clear();
+  available_buffers_.push(std::move(buffer_entry.data_));
+  send_queue_.pop();
+}
+
+void BtTransportUart::SerialWriteTransport(const std::vector<uint8_t>& data,
+                                           fit::function<void(void)> callback) {
+  can_send_ = false;
+
+  fdf::Arena arena('WRIT');
+  auto data_view = fidl::VectorView<uint8_t>::FromExternal(const_cast<std::vector<uint8_t>&>(data));
+  serial_client_.buffer(arena)->Write(data_view).ThenExactlyOnce(
+      [this](fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::Write>& result) mutable {
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "hci_bind: Write failed with FIDL error %s", result.status_string());
+          HciTransportWriteComplete(result.status());
+          return;
+        }
+
+        if (result->is_error()) {
+          FDF_LOG(ERROR, "hci_bind: Write failed with error %s",
+                  zx_status_get_string(result->error_value()));
+          HciTransportWriteComplete(result->error_value());
+          return;
+        }
+        HciTransportWriteComplete(ZX_OK);
+      });
+  callback();
 }
 
 // Returns false if there's an error while sending the packet to the hardware or
@@ -377,7 +548,6 @@ void BtTransportUart::HciHandleUartReadEvents(const uint8_t* buf, size_t length)
       // start of new packet. read packet type
       cur_uart_packet_type_ = static_cast<BtHciPacketIndicator>(*buf++);
     }
-
     switch (cur_uart_packet_type_) {
       case kHciEvent:
         ProcessNextUartPacketFromReadBuffer(
@@ -452,9 +622,7 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
     // The packet is incomplete, the next chunk should continue the same packet.
     return;
   }
-
   std::lock_guard guard(mutex_);
-
   // Attempt to send this packet to the channel. We are working on the callback thread from the
   // UART, so we need to do this inside of the lock to make sure that nothing closes the channel
   // out from under us while we try to write. If something goes wrong here, close the channel.
@@ -464,10 +632,66 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
       FDF_LOG(ERROR, "failed to write packet: %s", zx_status_get_string(status));
       ChannelCleanupLocked(&acl_channel_);
     }
-  }
+    // If the snoop channel is open then try to write the packet even if |channel| was closed.
+    SnoopChannelWriteLocked(bt_hci_snoop_flags(snoop_type, true), &buffer[1], packet_length - 1);
 
-  // If the snoop channel is open then try to write the packet even if |channel| was closed.
-  SnoopChannelWriteLocked(bt_hci_snoop_flags(snoop_type, true), &buffer[1], packet_length - 1);
+  } else {
+    auto fidl_vec = std::vector<uint8_t>(&buffer[1], &buffer[1] + packet_length - 1);
+    if (snoop_type == BT_HCI_SNOOP_TYPE_SCO) {
+      if (sco_connection_binding_.size() == 0) {
+        FDF_LOG(DEBUG, "No SCO connection available for sending SCO packets up.");
+        return;
+      }
+
+      sco_connection_binding_.ForEachBinding(
+          [&](const fidl::ServerBinding<fhbt::ScoConnection>& binding) {
+            fit::result<fidl::OneWayError> result = fidl::SendEvent(binding)->OnReceive(fidl_vec);
+
+            if (result.is_error()) {
+              FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s",
+                      result.error_value().status_string());
+            }
+          });
+    } else {
+      hci_transport_binding_.ForEachBinding(
+          [&](const fidl::ServerBinding<fhbt::HciTransport>& binding) {
+            if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
+              auto received_packet = fhbt::ReceivedPacket::WithAcl(fidl_vec);
+              fit::result<fidl::OneWayError> result =
+                  fidl::SendEvent(binding)->OnReceive(received_packet);
+              if (result.is_error()) {
+                FDF_LOG(ERROR, "Failed to send ACL packet to host: %s",
+                        result.error_value().status_string());
+              }
+            } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
+              auto received_packet = fhbt::ReceivedPacket::WithEvent(fidl_vec);
+              fit::result<fidl::OneWayError> result =
+                  fidl::SendEvent(binding)->OnReceive(received_packet);
+
+              if (result.is_error()) {
+                FDF_LOG(ERROR, "Failed to send event packet to host: %s",
+                        result.error_value().status_string());
+              }
+            } else {
+              FDF_LOG(ERROR, "Unsupported packet type received");
+            }
+          });
+    }
+
+    fhbt::SnoopPacket::Tag type = fhbt::SnoopPacket::Tag::kIso;
+    if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
+      type = fhbt::SnoopPacket::Tag::kAcl;
+    } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
+      type = fhbt::SnoopPacket::Tag::kEvent;
+    } else if (snoop_type == BT_HCI_SNOOP_TYPE_SCO) {
+      type = fhbt::SnoopPacket::Tag::kSco;
+    } else {
+      // TODO(b/350753924): Handle ISO packets in this driver.
+      FDF_LOG(ERROR, "Unsupported packet type for snoop.");
+    }
+
+    SendSnoop(std::move(fidl_vec), type, fhbt::PacketDirection::kControllerToHost);
+  }
 
   // reset buffer
   cur_uart_packet_type_ = kHciNone;
@@ -527,6 +751,27 @@ void BtTransportUart::HciWriteComplete(zx_status_t status) {
       sco_channel_wait_.pending = true;
     }
   }
+}
+
+void BtTransportUart::HciTransportWriteComplete(zx_status_t status) {
+  FDF_LOG(TRACE, "Write complete with status: %s", zx_status_get_string(status));
+
+  // If we are in the process of shutting down, we are done as soon as we
+  // have freed our operation.
+  if (atomic_load_explicit(&shutting_down_, std::memory_order_relaxed)) {
+    return;
+  }
+
+  if (status != ZX_OK) {
+    HciBeginShutdown();
+    return;
+  }
+
+  ZX_DEBUG_ASSERT(!can_send_);
+  can_send_ = true;
+
+  // Resume processing the data in queue.
+  send_queue_task_.Post(dispatcher_);
 }
 
 void BtTransportUart::OnChannelSignal(Wait* wait, zx_status_t status,
@@ -620,8 +865,9 @@ void BtTransportUart::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                                          OpenIsoDataChannelCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
-void BtTransportUart::ConfigureSco(ConfigureScoRequestView request,
-                                   ConfigureScoCompleter::Sync& completer) {
+void BtTransportUart::ConfigureSco(
+    fidl::WireServer<fhbt::Hci>::ConfigureScoRequestView request,
+    fidl::WireServer<fhbt::Hci>::ConfigureScoCompleter::Sync& completer) {
   // UART doesn't require any SCO configuration.
   completer.ReplySuccess();
 }
@@ -629,10 +875,90 @@ void BtTransportUart::ResetSco(ResetScoCompleter::Sync& completer) {
   // UART doesn't require any SCO configuration, so there's nothing to do.
   completer.ReplySuccess();
 }
-void BtTransportUart::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
+void BtTransportUart::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hci> metadata,
+                                            fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown method in Hci protocol, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+
+// fhbt::HciTransport protocol overrides.
+void BtTransportUart::Send(fidl::Server<fhbt::HciTransport>::SendRequest& request,
+                           fidl::Server<fhbt::HciTransport>::SendCompleter::Sync& completer) {
+  if (available_buffers_.empty()) {
+    FDF_LOG(ERROR, "Send queue is full, closing HciTransport connection");
+    completer.Reply();
+    hci_transport_binding_.RemoveBindings(this);
+    return;
+  }
+
+  auto& buffer = available_buffers_.front();
+  const char* data_type_name = nullptr;
+  // Figure out which data type we are dealing with and the constants which go
+  // along with it.
+  switch (request.Which()) {
+    case fhbt::SentPacket::Tag::kIso:
+      // TODO(b/350753924): Handle ISO packets in this driver.
+      FDF_LOG(ERROR, "Unexpected ISO data packet.");
+      return;
+    case fhbt::SentPacket::Tag::kAcl:
+      buffer.push_back(kHciAclData);
+      buffer.insert(buffer.end(), request.acl().value().begin(), request.acl().value().end());
+      data_type_name = "ACL";
+      break;
+    case fhbt::SentPacket::Tag::kCommand:
+      buffer.push_back(kHciCommand);
+      buffer.insert(buffer.end(), request.command().value().begin(),
+                    request.command().value().end());
+      data_type_name = "command";
+      break;
+    default:
+      FDF_LOG(ERROR, "Unknown packet type: %zu", request.Which());
+  }
+
+  FDF_LOG(TRACE, "received data type: %s", data_type_name);
+
+  send_queue_.emplace(std::move(buffer),
+                      [completer = completer.ToAsync()]() mutable { completer.Reply(); });
+  available_buffers_.pop();
+  send_queue_task_.Post(dispatcher_);
+}
+
+void BtTransportUart::AckReceive(
+    fidl::Server<fhbt::HciTransport>::AckReceiveCompleter::Sync& completer) {
+  // Will be used for flow control, do nothing now.
+  // TODO(b/349616746): Implement flow control base on this function.
+}
+void BtTransportUart::ConfigureSco(
+    fidl::Server<fhbt::HciTransport>::ConfigureScoRequest& request,
+    fidl::Server<fhbt::HciTransport>::ConfigureScoCompleter::Sync& completer) {
+  if (!request.connection().has_value()) {
+    FDF_LOG(ERROR, "No ScoConnection server end received from the host.");
+    return;
+  }
+  if (sco_connection_binding_.size() != 0) {
+    FDF_LOG(ERROR, "ScoConnection connection exists.");
+    return;
+  }
+
+  sco_connection_binding_.AddBinding(dispatcher_, std::move(request.connection().value()),
+                                     &sco_connection_server_, fidl::kIgnoreBindingClosure);
+}
+void BtTransportUart::SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) {
+  snoop_client_.Bind(std::move(request.snoop()), dispatcher(), this);
+  // Only useful in tests, it doesn't hurt to signal it when no one is waiting for it.
+  snoop_setup_.Signal();
+}
+
+fit::function<void(void)> BtTransportUart::WaitforSnoopCallback() {
+  return [this]() { snoop_setup_.Wait(); };
+}
+
+uint64_t BtTransportUart::GetAckedSnoopSeq() { return acked_snoop_seq_; }
+
+void BtTransportUart::handle_unknown_method(
+    ::fidl::UnknownMethodMetadata<fhbt::HciTransport> metadata,
+    ::fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown method in HciTransport protocol, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -688,6 +1014,16 @@ void BtTransportUart::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
+void BtTransportUart::OnAcknowledgePackets(
+    fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) {
+  acked_snoop_seq_ = std::max(event.sequence(), acked_snoop_seq_);
+}
+
+void BtTransportUart::handle_unknown_event(
+    fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) {
+  FDF_LOG(ERROR, "Unknown method in fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop>");
+}
+
 void BtTransportUart::QueueUartRead() {
   fdf::Arena arena('READ');
   serial_client_.buffer(arena)->Read().ThenExactlyOnce([this](fdf::WireUnownedResult<
@@ -716,14 +1052,20 @@ void BtTransportUart::QueueUartRead() {
 }
 
 zx_status_t BtTransportUart::ServeProtocols() {
-  // Add HCI service to the outgoing directory.
-  auto hci_protocol = [this](fidl::ServerEnd<fuchsia_hardware_bluetooth::Hci> server_end) mutable {
-    fidl::BindServer(dispatcher_, std::move(server_end), this);
+  // Add HCI services to the outgoing directory.
+  auto hci_protocol = [this](fidl::ServerEnd<fhbt::Hci> server_end) mutable {
+    ZX_DEBUG_ASSERT(hci_transport_binding_.size() == 0);
+    hci_binding_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
   };
-  fuchsia_hardware_bluetooth::HciService::InstanceHandler hci_handler(
-      {.hci = std::move(hci_protocol)});
-  auto status =
-      outgoing()->AddService<fuchsia_hardware_bluetooth::HciService>(std::move(hci_handler));
+  auto hci_transport_protocol = [this](fidl::ServerEnd<fhbt::HciTransport> server_end) mutable {
+    ZX_DEBUG_ASSERT(hci_binding_.size() == 0);
+    hci_transport_binding_.AddBinding(dispatcher_, std::move(server_end), this,
+                                      fidl::kIgnoreBindingClosure);
+  };
+
+  fhbt::HciService::InstanceHandler hci_handler(
+      {.hci = std::move(hci_protocol), .hci_transport = std::move(hci_transport_protocol)});
+  auto status = outgoing()->AddService<fhbt::HciService>(std::move(hci_handler));
   if (status.is_error()) {
     FDF_LOG(ERROR, "Failed to add HCI service to outgoing directory: %s\n", status.status_string());
     return status.error_value();

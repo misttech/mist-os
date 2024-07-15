@@ -70,6 +70,15 @@ zx::result<> StorageBackedTransferBuffer::Populate(uint64_t offset, uint64_t len
   TRACE_DURATION("blobfs", "StorageBackedTransferBuffer::Populate", "offset",
                  start_block * kBlobfsBlockSize, "length", block_count * kBlobfsBlockSize);
 
+  // Pre-commit pages to the VMO. Committing all of the pages at once can make copying data into the
+  // VMO faster
+  if (zx_status_t status =
+          vmo_.op_range(ZX_VMO_OP_COMMIT, 0, block_count * kBlobfsBlockSize, nullptr, 0);
+      status != ZX_OK) {
+    FX_LOGS(WARNING) << "Failed to commit vmo: " << zx_status_get_string(status);
+    // This is only an optimization, it's fine it it fails.
+  }
+
   // Navigate to the start block.
   zx_status_t status = IterateToBlock(&block_iter.value(), start_block);
   if (status != ZX_OK) {

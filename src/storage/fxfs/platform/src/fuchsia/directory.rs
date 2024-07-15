@@ -24,7 +24,7 @@ use std::any::Any;
 use std::sync::{Arc, Mutex};
 use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult, Sink};
-use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{
     Directory as VfsDirectory, DirectoryWatcher, MutableDirectory,
 };
@@ -674,12 +674,14 @@ impl MutableDirectory for FxDirectory {
 }
 
 impl DirectoryEntry for FxDirectory {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(self.object_id(), fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.open_dir(self)
+    }
+}
+
+impl GetEntryInfo for FxDirectory {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(self.object_id(), fio::DirentType::Directory)
     }
 }
 

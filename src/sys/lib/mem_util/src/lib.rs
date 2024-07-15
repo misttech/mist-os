@@ -88,7 +88,7 @@ mod tests {
     use fuchsia_zircon_status::Status;
     use futures::StreamExt;
     use std::sync::Arc;
-    use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+    use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
@@ -136,12 +136,14 @@ mod tests {
         struct NonVMOTestFile;
 
         impl DirectoryEntry for NonVMOTestFile {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
-            }
-
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
                 request.open_file(self)
+            }
+        }
+
+        impl GetEntryInfo for NonVMOTestFile {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
             }
         }
 

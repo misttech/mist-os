@@ -273,38 +273,62 @@ TEST_F(LowEnergyConnectionServerAutoStartTest, GetCodecLocalDelayCommandNotSuppo
   RunGetCodecDelayRangeTest(std::move(params), ZX_ERR_INTERNAL);
 }
 
-// Calling AcceptCis with CIG/CIS values matching those we are already waiting for causes the
-// IsochronousStream handle to be closed with an INVALID_ARGS epitaph.
-TEST_F(LowEnergyConnectionServerTest, AcceptCisCalledTwiceSameArgs) {
+// Class that creates and manages an AcceptCis request and associated objects
+class AcceptCisRequest {
+ public:
+  AcceptCisRequest(fble::Connection* connection_client, bt::iso::CigCisIdentifier id) {
+    fuchsia::bluetooth::le::ConnectionAcceptCisRequest params;
+    params.set_cig_id(id.cig_id());
+    params.set_cis_id(id.cis_id());
+    params.set_connection_stream(stream_handle_.NewRequest());
+    client_stream_ptr_ = stream_handle_.Bind();
+    client_stream_ptr_.set_error_handler([this](zx_status_t epitaph) { epitaph_ = epitaph; });
+    connection_client->AcceptCis(std::move(params));
+  }
+  std::optional<zx_status_t> epitaph() { return epitaph_; }
+
+ private:
+  fidl::InterfaceHandle<fuchsia::bluetooth::le::IsochronousStream> stream_handle_;
+  fuchsia::bluetooth::le::IsochronousStreamPtr client_stream_ptr_;
+  std::optional<zx_status_t> epitaph_;
+};
+
+// Verify that all calls to AcceptCis() with unique CIG/CIS pairs are accepted and duplicate
+// calls are rejected and the IsochronousStream handle is closed with an INVALID_ARGS epitaph.
+TEST_F(LowEnergyConnectionServerTest, MultipleAcceptCisCalls) {
   // AcceptCis() should only be called on a connection where we are acting as the peripheral.
   bt::testing::FakeController::Settings settings;
   settings.le_connection_role = pw::bluetooth::emboss::ConnectionRole::PERIPHERAL;
   test_device()->set_settings(settings);
   EstablishConnectionAndStartServer();
 
-  fuchsia::bluetooth::le::ConnectionAcceptCisRequest params1, params2;
-  params1.set_cig_id(0x10);
-  params2.set_cig_id(0x10);
-  params1.set_cis_id(0x08);
-  params2.set_cis_id(0x08);
-
-  fidl::InterfaceHandle<fuchsia::bluetooth::le::IsochronousStream> stream1_handle, stream2_handle;
-  params1.set_connection_stream(stream1_handle.NewRequest());
-  params2.set_connection_stream(stream2_handle.NewRequest());
-  fuchsia::bluetooth::le::IsochronousStreamPtr client1 = stream1_handle.Bind();
-  fuchsia::bluetooth::le::IsochronousStreamPtr client2 = stream2_handle.Bind();
-
-  std::optional<zx_status_t> client1_epitaph, client2_epitaph;
-  client1.set_error_handler([&](zx_status_t epitaph) { client1_epitaph = epitaph; });
-  client2.set_error_handler([&](zx_status_t epitaph) { client2_epitaph = epitaph; });
-
-  client()->AcceptCis(std::move(params1));
-  client()->AcceptCis(std::move(params2));
-
+  AcceptCisRequest request1(client(), {/*cig_id=*/0x10, /*cis_id=*/0x08});
+  AcceptCisRequest request2(client(), {/*cig_id=*/0x11, /*cis_id=*/0x08});
+  AcceptCisRequest request3(client(), {/*cig_id=*/0x10, /*cis_id=*/0x07});
+  AcceptCisRequest request1_dup(client(), {/*cig_id=*/0x10, /*cis_id=*/0x08});
   RunLoopUntilIdle();
-  EXPECT_FALSE(client1_epitaph);
-  ASSERT_TRUE(client2_epitaph);
-  EXPECT_EQ(*client2_epitaph, ZX_ERR_INVALID_ARGS);
+
+  // All unique requests are pending
+  EXPECT_FALSE(request1.epitaph());
+  EXPECT_FALSE(request2.epitaph());
+  EXPECT_FALSE(request3.epitaph());
+
+  // Duplicate request is rejected
+  ASSERT_TRUE(request1_dup.epitaph());
+  EXPECT_EQ(*(request1_dup.epitaph()), ZX_ERR_INVALID_ARGS);
+}
+
+// Calling AcceptCis when we are the central should fail with ZX_ERR_NOT_SUPPORTED
+TEST_F(LowEnergyConnectionServerTest, AcceptCisCalledFromCentral) {
+  bt::testing::FakeController::Settings settings;
+  settings.le_connection_role = pw::bluetooth::emboss::ConnectionRole::CENTRAL;
+  test_device()->set_settings(settings);
+  EstablishConnectionAndStartServer();
+
+  AcceptCisRequest request(client(), {/*cig_id=*/0x10, /*cis_id=*/0x08});
+  RunLoopUntilIdle();
+  ASSERT_TRUE(request.epitaph());
+  EXPECT_EQ(*(request.epitaph()), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(LowEnergyConnectionServerAutoStartTest, ServerClosedOnConnectionClosed) {

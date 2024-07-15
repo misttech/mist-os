@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::vmo::round_up_to_system_page_size;
+use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags};
+use crate::power::OnWakeOps;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -28,7 +29,9 @@ use starnix_sync::{
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
+use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::inotify_mask::InotifyMask;
+use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::Releasable;
 use starnix_uapi::seal_flags::SealFlags;
@@ -171,17 +174,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Syncs cached state associated with the file descriptor to persistent storage.
     ///
     /// The method blocks until the synchronization is complete.
-    fn sync(&self, file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
-        if !file.node().is_reg() && !file.node().is_dir() {
-            return error!(EINVAL);
-        }
-        Ok(())
-    }
+    fn sync(&self, file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno>;
 
     /// Syncs cached data, and only enough metadata to retrieve said data, to persistent storage.
     ///
     /// The method blocks until the synchronization is complete.
     fn data_sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
+        // TODO(https://fxbug.dev/297305634) make a default macro once data can be done separately
         self.sync(file, current_task)
     }
 
@@ -191,27 +190,28 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// The `length` is a hint for the desired size of the VMO. The returned VMO may be larger or
     /// smaller than the requested length.
     /// This method is typically called by [`Self::mmap`].
-    fn get_vmo(
+    fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         _prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         error!(ENODEV)
     }
 
-    /// Responds to an mmap call. The default implementation calls [`Self::get_vmo`] to get a VMO
+    /// Responds to an mmap call. The default implementation calls [`Self::get_memory`] to get a VMO
     /// and then maps it with [`crate::mm::MemoryManager::map`].
     /// Only implement this trait method if your file needs to control mapping, or record where
     /// a VMO gets mapped.
     fn mmap(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -219,27 +219,32 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     ) -> Result<UserAddress, Errno> {
         profile_duration!("FileOpsDefaultMmap");
         trace_duration!(CATEGORY_STARNIX_MM, c"FileOpsDefaultMmap");
-        let min_vmo_size = (vmo_offset as usize)
+        let min_memory_size = (memory_offset as usize)
             .checked_add(round_up_to_system_page_size(length)?)
             .ok_or(errno!(EINVAL))?;
-        let mut vmo = if options.contains(MappingOptions::SHARED) {
+        let mut memory = if options.contains(MappingOptions::SHARED) {
             profile_duration!("GetSharedVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetSharedVmo");
-            self.get_vmo(file, current_task, Some(min_vmo_size), prot_flags)?
+            self.get_memory(locked, file, current_task, Some(min_memory_size), prot_flags)?
         } else {
             profile_duration!("GetPrivateVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetPrivateVmo");
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
             let base_prot_flags = (prot_flags | ProtectionFlags::READ) - ProtectionFlags::WRITE;
-            let vmo = self.get_vmo(file, current_task, Some(min_vmo_size), base_prot_flags)?;
+            let memory = self.get_memory(
+                locked,
+                file,
+                current_task,
+                Some(min_memory_size),
+                base_prot_flags,
+            )?;
             let mut clone_flags = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
             if !prot_flags.contains(ProtectionFlags::WRITE) {
                 clone_flags |= zx::VmoChildOptions::NO_WRITE;
             }
             trace_duration!(CATEGORY_STARNIX_MM, c"CreatePrivateChildVmo");
             Arc::new(
-                vmo.create_child(clone_flags, 0, vmo.get_size().map_err(impossible_error)?)
-                    .map_err(impossible_error)?,
+                memory.create_child(clone_flags, 0, memory.get_size()).map_err(impossible_error)?,
             )
         };
 
@@ -263,7 +268,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
                 if prot_flags.contains(ProtectionFlags::EXEC) {
                     new_rights |= zx::Rights::EXECUTE;
                 }
-                vmo = Arc::new(vmo.duplicate_handle(new_rights).map_err(impossible_error)?);
+                memory = Arc::new(memory.duplicate_handle(new_rights).map_err(impossible_error)?);
 
                 FileWriteGuardRef(None)
             } else {
@@ -273,10 +278,10 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             FileWriteGuardRef(None)
         };
 
-        current_task.mm().map_vmo(
+        current_task.mm().map_memory(
             addr,
-            vmo,
-            vmo_offset,
+            memory,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -441,14 +446,15 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
         self.deref().data_sync(file, current_task)
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
-        self.deref().get_vmo(file, current_task, length, prot)
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        self.deref().get_memory(locked, file, current_task, length, prot)
     }
 
     fn mmap(
@@ -457,7 +463,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -468,7 +474,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
             file,
             current_task,
             addr,
-            vmo_offset,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -611,6 +617,7 @@ pub fn unbounded_seek(current_offset: off_t, target: SeekTarget) -> Result<off_t
     default_seek(current_offset, target, |_| Ok(MAX_LFS_FILESIZE as off_t))
 }
 
+#[macro_export]
 macro_rules! fileops_impl_delegate_read_and_seek {
     ($self:ident, $delegate:expr) => {
         fn is_seekable(&self) -> bool {
@@ -708,6 +715,7 @@ macro_rules! fileops_impl_seekless {
     };
 }
 
+#[macro_export]
 macro_rules! fileops_impl_dataless {
     () => {
         fn write(
@@ -736,6 +744,7 @@ macro_rules! fileops_impl_dataless {
 
 /// Implements [`FileOps`] methods in a way that makes sense for directories. You must implement
 /// [`FileOps::seek`] and [`FileOps::readdir`].
+#[macro_export]
 macro_rules! fileops_impl_directory {
     () => {
         fn is_seekable(&self) -> bool {
@@ -766,11 +775,27 @@ macro_rules! fileops_impl_directory {
     };
 }
 
+#[macro_export]
+macro_rules! fileops_impl_noop_sync {
+    () => {
+        fn sync(
+            &self,
+            file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
+        ) -> Result<(), starnix_uapi::errors::Errno> {
+            if !file.node().is_reg() && !file.node().is_dir() {
+                return starnix_uapi::error!(EINVAL);
+            }
+            Ok(())
+        }
+    };
+}
+
 // Public re-export of macros allows them to be used like regular rust items.
 
-pub(crate) use {
+pub use {
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_nonseekable, fileops_impl_seekable, fileops_impl_seekless,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fileops_impl_seekable, fileops_impl_seekless,
 };
 
 pub fn default_ioctl(
@@ -862,6 +887,8 @@ impl OPathOps {
 }
 
 impl FileOps for OPathOps {
+    fileops_impl_noop_sync!();
+
     fn has_persistent_offsets(&self) -> bool {
         false
     }
@@ -897,13 +924,14 @@ impl FileOps for OPathOps {
     ) -> Result<off_t, Errno> {
         error!(EBADF)
     }
-    fn get_vmo(
+    fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         _prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         error!(EBADF)
     }
     fn readdir(
@@ -957,13 +985,6 @@ impl FileOps for ProxyFileOps {
             offset: off_t,
             target: SeekTarget,
         ) -> Result<off_t, Errno>;
-        fn get_vmo(
-            &self,
-            _file: &FileObject,
-            _current_task: &CurrentTask,
-            _length: Option<usize>,
-            _prot: ProtectionFlags,
-        ) -> Result<Arc<zx::Vmo>, Errno>;
         fn wait_async(
             &self,
             _file: &FileObject,
@@ -979,6 +1000,7 @@ impl FileOps for ProxyFileOps {
             cmd: u32,
             arg: u64,
         ) -> Result<SyscallResult, Errno>;
+        fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno>;
     }
     // These don't take &FileObject making it too hard to handle them properly in the macro
     fn query_events(
@@ -1034,13 +1056,23 @@ impl FileOps for ProxyFileOps {
     ) -> Result<(), Errno> {
         self.0.ops().readdir(locked, &self.0, current_task, sink)
     }
+    fn get_memory(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno> {
+        self.0.ops.get_memory(locked, &self.0, current_task, length, prot)
+    }
     fn mmap(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -1051,7 +1083,7 @@ impl FileOps for ProxyFileOps {
             &self.0,
             current_task,
             addr,
-            vmo_offset,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -1125,6 +1157,9 @@ pub struct FileObject {
     /// `FileObject` as the control file.
     epoll_files: Mutex<HashSet<FdNumber>>,
 
+    /// See fcntl F_SETLEASE and F_GETLEASE.
+    lease: Mutex<FileLeaseType>,
+
     _file_write_guard: Option<FileWriteGuard>,
 }
 
@@ -1177,6 +1212,7 @@ impl FileObject {
                 flags: Mutex::new(flags - OpenFlags::CREAT),
                 async_owner: Default::default(),
                 epoll_files: Default::default(),
+                lease: Default::default(),
                 _file_write_guard: file_write_guard,
             }
             .into()
@@ -1463,12 +1499,16 @@ impl FileObject {
         self.ops().data_sync(self, current_task)
     }
 
-    pub fn get_vmo(
+    pub fn get_memory<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if prot.contains(ProtectionFlags::READ) && !self.can_read() {
             return error!(EACCES);
         }
@@ -1476,7 +1516,13 @@ impl FileObject {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().get_vmo(self, current_task, length, prot)
+        self.ops().get_memory(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            length,
+            prot,
+        )
     }
 
     pub fn mmap<L>(
@@ -1484,7 +1530,7 @@ impl FileObject {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        vmo_offset: u64,
+        memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
@@ -1510,7 +1556,7 @@ impl FileObject {
             self,
             current_task,
             addr,
-            vmo_offset,
+            memory_offset,
             length,
             prot_flags,
             options,
@@ -1651,6 +1697,27 @@ impl FileObject {
         *self.async_owner.lock() = owner;
     }
 
+    /// See fcntl(F_GETLEASE)
+    pub fn get_lease(&self, _current_task: &CurrentTask) -> FileLeaseType {
+        *self.lease.lock()
+    }
+
+    /// See fcntl(F_SETLEASE)
+    pub fn set_lease(
+        &self,
+        _current_task: &CurrentTask,
+        lease: FileLeaseType,
+    ) -> Result<(), Errno> {
+        if !self.node().is_reg() {
+            return error!(EINVAL);
+        }
+        if lease == FileLeaseType::Read && self.can_write() {
+            return error!(EAGAIN);
+        }
+        *self.lease.lock() = lease;
+        Ok(())
+    }
+
     /// Wait on the specified events and call the EventHandler when ready
     pub fn wait_async(
         &self,
@@ -1716,22 +1783,6 @@ impl FileObject {
     pub fn unregister_epfd(&self, fd: FdNumber) {
         self.epoll_files.lock().remove(&fd);
     }
-
-    /// Called when the underneath `FileOps` is waken up by the power framework.
-    pub fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel) {
-        // Activate associated wake leases in registered epfd.
-        for epfd in self.epoll_files.lock().iter() {
-            if let Ok(file) = current_task.files.get(*epfd) {
-                if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
-                    if let Some(weak_handle) = self.weak_handle.upgrade() {
-                        if let Err(e) = epoll_file.activate_lease(&weak_handle, baton_lease) {
-                            log_error!("Failed to activate wake lease in epoll control file: {e}");
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl Releasable for FileObject {
@@ -1766,6 +1817,24 @@ impl fmt::Debug for FileObject {
             .field("flags", &self.flags)
             .field("ops_ty", &self.ops().type_name())
             .finish()
+    }
+}
+
+impl OnWakeOps for FileReleaser {
+    /// Called when the underneath `FileOps` is waken up by the power framework.
+    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel) {
+        // Activate associated wake leases in registered epfd.
+        for epfd in self.epoll_files.lock().iter() {
+            if let Ok(file) = current_task.files.get(*epfd) {
+                if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
+                    if let Some(weak_handle) = self.weak_handle.upgrade() {
+                        if let Err(e) = epoll_file.activate_lease(&weak_handle, baton_lease) {
+                            log_error!("Failed to activate wake lease in epoll control file: {e}");
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

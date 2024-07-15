@@ -175,7 +175,9 @@ mod test {
     const RTT_BUCKET_SIZE: zx::Duration =
         zx::Duration::from_micros(HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE as i64);
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/351850665)
     const POLL_OFFSET_RTT_BUCKET_SIZE: zx::Duration = zx::Duration::from_micros(10000);
+    #[allow(dead_code)] // TODO(https://fxbug.dev/351850665)
     const POLL_OFFSET_RTT_FLOOR: zx::Duration = zx::Duration::from_micros(0);
 
     lazy_static! {

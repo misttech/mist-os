@@ -16,19 +16,12 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     let command = CommandBuilder::new("verify.structured_config")
         .param("policy", policy_path.clone())
         .build();
-    let plugins = vec![
-        "ZbiPlugin".to_string(),
-        "CorePlugin".to_string(),
-        "AdditionalBootConfigPlugin".to_string(),
-        "StaticPkgsPlugin".to_string(),
-        "VerifyPlugin".to_string(),
-    ];
     let model = if recovery {
         ModelConfig::from_product_bundle_recovery(&cmd.product_bundle)
     } else {
         ModelConfig::from_product_bundle(&cmd.product_bundle)
     }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+    let mut config = ConfigBuilder::with_model(model).command(command).build();
     config.runtime.logging.silent_mode = true;
 
     let scrutiny_output = launcher::launch_from_config(config).context("launching scrutiny")?;

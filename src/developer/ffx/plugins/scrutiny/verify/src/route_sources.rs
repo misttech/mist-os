@@ -52,19 +52,12 @@ impl TryFrom<&Command> for Query {
 fn verify_route_sources(query: Query) -> Result<HashSet<PathBuf>> {
     let command =
         CommandBuilder::new("verify.route_sources").param("input", query.config_path).build();
-    let plugins = vec![
-        "ZbiPlugin",
-        "AdditionalBootConfigPlugin",
-        "StaticPkgsPlugin",
-        "CorePlugin",
-        "VerifyPlugin",
-    ];
     let model = if query.recovery {
         ModelConfig::from_product_bundle_recovery(&query.product_bundle)
     } else {
         ModelConfig::from_product_bundle(&query.product_bundle)
     }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).plugins(plugins).build();
+    let mut config = ConfigBuilder::with_model(model).command(command).build();
     config.runtime.logging.silent_mode = true;
     config.runtime.model.tmp_dir_path = query.tmp_dir_path;
 

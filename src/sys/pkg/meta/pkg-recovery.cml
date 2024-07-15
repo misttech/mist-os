@@ -16,6 +16,10 @@
             url: "#meta/pkg-cache.cm",
         },
         {
+            name: "pkg-cache-config",
+            url: "#meta/pkg-cache-config.cm",
+        },
+        {
             name: "pkg-resolver",
             url: "#meta/pkg-resolver.cm",
         },
@@ -42,6 +46,15 @@
             rights: [
                 "execute",
                 "rw*",
+            ],
+        },
+        {
+            from: "#pkg-cache-config",
+            to: "#pkg-cache",
+            config: [
+                "fuchsia.pkgcache.AllPackagesExecutable",
+                "fuchsia.pkgcache.UseFxblob",
+                "fuchsia.pkgcache.UseSystemImage",
             ],
         },
         {
@@ -74,6 +87,7 @@
             to: [
                 "#fake-system-update-committer",
                 "#pkg-cache",
+                "#pkg-cache-config",
                 "#pkg-resolver",
                 "#system-updater",
             ],

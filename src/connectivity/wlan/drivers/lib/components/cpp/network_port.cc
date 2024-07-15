@@ -250,13 +250,13 @@ void NetworkPort::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) 
       .supported_flags = fuchsia_hardware_network::wire::TxFlags{},
   }};
 
-  fuchsia_hardware_network::wire::DeviceClass port_class;
+  fuchsia_hardware_network::wire::PortClass port_class;
   switch (role_) {
     case Role::Client:
-      port_class = fuchsia_hardware_network::wire::DeviceClass::kWlan;
+      port_class = fuchsia_hardware_network::wire::PortClass::kWlan;
       break;
     case Role::Ap:
-      port_class = fuchsia_hardware_network::wire::DeviceClass::kWlanAp;
+      port_class = fuchsia_hardware_network::wire::PortClass::kWlanAp;
       break;
   }
 

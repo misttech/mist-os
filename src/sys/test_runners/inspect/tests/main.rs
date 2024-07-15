@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use diagnostics_data::{hierarchy, Data, DiagnosticsHierarchy, InspectHandleName, Property};
+use diagnostics_data::{
+    hierarchy, Data, DiagnosticsHierarchy, InspectDataBuilder, InspectHandleName, Property,
+};
 use fake_archive_accessor::FakeArchiveAccessor;
 use ftest_manager::{CaseStatus, RunOptions, SuiteStatus};
 use fuchsia_component::server::ServiceFs;
@@ -137,21 +139,16 @@ async fn launch_and_test_sample_test() {
         "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/sample_inspect_tests.cm";
 
     let fake_data = vec![
-        Data::for_inspect(
-            "bootstrap/archivist",
-            Some(hierarchy! {
+        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+            .with_hierarchy(hierarchy! {
                 root: {
                     version: "1.0",
                 }
-            }),
-            0,
-            "no-url",
-            Some(InspectHandleName::filename("fake-file-name")),
-            vec![],
-        ),
-        Data::for_inspect(
-            "bootstrap/archivist",
-            Some(hierarchy! {
+            })
+            .with_name(InspectHandleName::filename("fake-file-name"))
+            .build(),
+        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+            .with_hierarchy(hierarchy! {
                 root: {
                     events: {
                         event_counts: {
@@ -159,24 +156,18 @@ async fn launch_and_test_sample_test() {
                         }
                     }
                 }
-            }),
-            0,
-            "no-url",
-            Some(InspectHandleName::filename("fake-file-name")),
-            vec![],
-        ),
+            })
+            .with_name(InspectHandleName::filename("fake-file-name"))
+            .build(),
         // Inject one that is missing data to ensure we retry correctly.
-        Data::for_inspect(
-            "bootstrap/archivist",
-            Some(hierarchy! {root: {}}),
-            0,
-            "no-url",
-            Some(InspectHandleName::filename("fake-file-name")),
-            vec![],
-        ),
-        Data::for_inspect(
-            "bootstrap/archivist",
-            Some(hierarchy! {
+        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+            .with_hierarchy(hierarchy! {
+                root: {}
+            })
+            .with_name(InspectHandleName::filename("fake-file-name"))
+            .build(),
+        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+            .with_hierarchy(hierarchy! {
                 root: {
                     events: {
                         recent_events: {
@@ -186,12 +177,9 @@ async fn launch_and_test_sample_test() {
                         }
                     }
                 }
-            }),
-            0,
-            "no-url",
-            Some(InspectHandleName::filename("fake-file-name")),
-            vec![],
-        ),
+            })
+            .with_name(InspectHandleName::filename("fake-file-name"))
+            .build(),
     ]
     .into_iter()
     .map(|d| serde_json::to_string_pretty(&d))
@@ -261,14 +249,10 @@ fn create_example_data(opts: ExampleDataOpts) -> Data<diagnostics_data::Inspect>
     .into_iter()
     .filter_map(|v| v)
     .collect();
-    Data::for_inspect(
-        "example",
-        Some(DiagnosticsHierarchy::new("root", properties, vec![])),
-        0,
-        "no-url",
-        Some(InspectHandleName::filename("fake-file-name")),
-        vec![],
-    )
+    InspectDataBuilder::new("example", "no-url", 0)
+        .with_hierarchy(DiagnosticsHierarchy::new("root", properties, vec![]))
+        .with_name(InspectHandleName::filename("fake-file-name"))
+        .build()
 }
 
 async fn example_test_success(test_url: &'static str, accessor_service: &'static str) {

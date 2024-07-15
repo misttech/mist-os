@@ -70,7 +70,7 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
   zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin, uint32_t controller_id,
                                 std::string gpio_name);
 
-  zx::result<> AddInitNodeSpec(fdf_devicetree::Node& child);
+  zx::result<> AddInitNodeSpec(fdf_devicetree::Node& child, uint32_t controller_id);
 
   bool is_match(const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties);
 

@@ -55,6 +55,7 @@ test("elfldltl-unittests") {
   deps = [
     "..",
     "../testing",
+    "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/symbolizer-markup",

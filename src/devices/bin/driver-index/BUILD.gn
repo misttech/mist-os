@@ -51,7 +51,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
@@ -69,6 +68,7 @@ rustc_binary("bin") {
   test_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:url",
   ]
 

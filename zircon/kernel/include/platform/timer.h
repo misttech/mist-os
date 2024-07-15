@@ -20,8 +20,29 @@ using zx_boot_time_t = int64_t;
 
 namespace internal {
 
-// Offset between the raw ticks counter and the monotonic ticks timeline.
-inline ktl::atomic<uint64_t> mono_ticks_offset{0};
+// A modifier that converts a raw ticks counter value to a point on the monotonic ticks timeline.
+// This modifier has two different modes of operation, and the mode is selected using the sign of
+// the variable.
+//
+// If the value is positive (> 0), the monotonic clock is paused and this variable contains the
+// value of the clock when it was paused.
+//
+// If the value is non-positive (<= 0), the monotonic clock is ticking and this variable contains
+// the offset between the monotonic ticks and the raw ticks counter.
+inline ktl::atomic<zx_ticks_t> mono_ticks_modifier{0};
+
+// This threshold detects when the initial ticks offset is set to a value that is "Very Close" to
+// setting bit 63. This would be a problem because modifying bit 63 would change the sign of the
+// offset value, which would then break our ability to use the sign as a sentinel that indicates
+// how the mono_ticks_modifier value should be interpreted (see the comment around that variable
+// for more information on how that works).
+//
+// "Very Close" in this case means a value that is within approximately 10 years of setting bit 63,
+// assuming a clock rate of 10ghz.
+inline constexpr zx_ticks_t kMonoTicksOopsThreshold =
+    0x8000'0000'0000'0000ul -
+    (static_cast<uint64_t>(365.2422 * 10 * 86400) *  // 10 years of seconds
+     10'000'000'000);                                // 10GHz
 
 // Offset between the raw ticks counter and the boot ticks timeline.
 inline ktl::atomic<uint64_t> boot_ticks_offset{0};
@@ -33,7 +54,18 @@ inline ktl::atomic<uint64_t> boot_ticks_offset{0};
 //
 // Must be called with interrupts disabled, before secondary CPUs are booted.
 inline void timer_set_initial_ticks_offset(uint64_t offset) {
-  internal::mono_ticks_offset.store(offset, ktl::memory_order_relaxed);
+  // Check that the new offset is non-positive. If it's not, this is an immediate failure.
+  const zx_ticks_t new_mono_offset = static_cast<zx_ticks_t>(offset);
+  DEBUG_ASSERT(new_mono_offset <= 0);
+
+  // Now, verify that the offset is not "dangerously close" to setting bit 63. If it is, emit
+  // a KERNEL OOPS. We have to negate the new_mono_offset as it's passed in as the negation of the
+  // current value of the ticks counter, and we want to undo that before comparing to the threshold.
+  if ((-new_mono_offset) > internal::kMonoTicksOopsThreshold) {
+    KERNEL_OOPS("initial ticks offset %ld is very close to setting the bit 63\n", new_mono_offset);
+  }
+
+  internal::mono_ticks_modifier.store(new_mono_offset, ktl::memory_order_relaxed);
   internal::boot_ticks_offset.store(offset, ktl::memory_order_relaxed);
 }
 
@@ -42,12 +74,9 @@ inline void timer_set_initial_ticks_offset(uint64_t offset) {
 // initializing the RO data for the VDSO, and when fixing up timer values during
 // vmexit on ARM (see arch/arm64/hypervisor/vmexit.cc).
 inline zx_ticks_t timer_get_mono_ticks_offset() {
-  return internal::mono_ticks_offset.load(ktl::memory_order_relaxed);
-}
-
-// Adds the given ticks to the existing monotonic ticks offset.
-inline void timer_add_mono_ticks_offset(zx_ticks_t additional) {
-  internal::mono_ticks_offset.fetch_add(additional, ktl::memory_order_relaxed);
+  const zx_ticks_t offset = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+  DEBUG_ASSERT(offset <= 0);
+  return offset;
 }
 
 // Access the offset from the raw ticks timeline to the boot ticks timeline.
@@ -156,11 +185,17 @@ inline zx_ticks_t platform_current_raw_ticks() {
 template <GetTicksSyncFlag Flags>
 inline zx_ticks_t timer_current_mono_ticks_synchronized() {
   while (true) {
-    const zx_ticks_t off1 = internal::mono_ticks_offset.load(ktl::memory_order_relaxed);
+    const zx_ticks_t obs1 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
     const zx_ticks_t raw_ticks = platform_current_raw_ticks_synchronized<Flags>();
-    const zx_ticks_t off2 = internal::mono_ticks_offset.load(ktl::memory_order_relaxed);
-    if (off1 == off2) {
-      return raw_ticks + off1;
+    const zx_ticks_t obs2 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+    if (obs1 == obs2) {
+      // If the observation is positive, it's the value of the paused monotonic clock, so return
+      // the observation directly. Otherwise, it's an offset, so return the sum of the observation
+      // and the raw ticks counter.
+      if (unlikely(obs1 > 0)) {
+        return obs1;
+      }
+      return raw_ticks + obs1;
     }
   }
 }
@@ -188,5 +223,33 @@ inline zx_ticks_t current_ticks() { return timer_current_mono_ticks(); }
 
 // The current boot time in ticks.
 inline zx_ticks_t current_boot_ticks() { return timer_current_boot_ticks(); }
+
+// Pause/unpause the monotonic clock.
+//
+// These functions are safe to call concurrently with `timer_current_mono_ticks_synchronized`, as
+// that function will retry its read of the current ticks if the value of the `mono_ticks_modifier`
+// is changed.
+//
+// It is NOT safe to call timer_pause_monotonic and timer_unpause_monotonic concurrently.
+inline void timer_pause_monotonic() {
+  const zx_ticks_t paused_ticks = current_ticks();
+  DEBUG_ASSERT(paused_ticks > 0);
+  internal::mono_ticks_modifier.store(paused_ticks, ktl::memory_order_relaxed);
+}
+inline void timer_unpause_monotonic() {
+  // First, load the existing modifier and assert that it is actually a paused value by checking
+  // that it is positive.
+  const zx_ticks_t paused_value = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+  DEBUG_ASSERT(paused_value > 0);
+
+  // Then, compute the new offset by subtracting the current raw ticks counter value from the
+  // paused value. Assert the new offset is non-positive as expected.
+  const zx_ticks_t raw_ticks = platform_current_raw_ticks();
+  const zx_ticks_t new_offset = paused_value - raw_ticks;
+  DEBUG_ASSERT(new_offset <= 0);
+
+  // Finally, update the modifier value with the new offset.
+  internal::mono_ticks_modifier.store(new_offset, ktl::memory_order_relaxed);
+}
 
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_TIMER_H_

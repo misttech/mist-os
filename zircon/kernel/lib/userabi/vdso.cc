@@ -398,6 +398,9 @@ void VDso::CreateTimeValuesVmo(KernelHandle<VmObjectDispatcher>* time_values_han
 }
 
 void VDso::AddMonotonicTicksOffset(zx_ticks_t additional) {
+  if (!instance_) {
+    return;
+  }
   for (auto time_values : instance_->time_values_) {
     // TODO(https://fxbug.dev/341785588): This code should be made resilient to a changing
     // mono_ticks_offset once we start pausing the clock during system suspension.

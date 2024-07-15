@@ -8,7 +8,7 @@
 mod tests;
 
 use crate::common::rights_to_posix_mode_bits;
-use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use crate::execution_scope::ExecutionScope;
 use crate::file::common::vmo_flags_to_rights;
 use crate::file::{File, FileLike, FileOptions, GetVmo, StreamIoConnection, SyncMode};
@@ -132,11 +132,13 @@ impl FileLike for VmoFile {
     }
 }
 
-impl DirectoryEntry for VmoFile {
+impl GetEntryInfo for VmoFile {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.inode, fio::DirentType::File)
     }
+}
 
+impl DirectoryEntry for VmoFile {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_file(self)
     }

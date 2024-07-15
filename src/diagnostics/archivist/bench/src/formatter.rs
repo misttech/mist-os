@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use diagnostics_data::{
-    BuilderArgs, Data, InspectHandleName, LogsDataBuilder, LogsField, LogsProperty, Severity,
+    BuilderArgs, InspectDataBuilder, InspectHandleName, LogsDataBuilder, LogsField, LogsProperty,
+    Severity,
 };
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
 use fidl_fuchsia_diagnostics::{DataType, Format};
@@ -25,15 +26,11 @@ fn bench_serialization(b: &mut criterion::Bencher, n: usize, m: usize, format: F
         }
         children.push(DiagnosticsHierarchy::new(i.to_string(), properties, vec![]));
     }
-    let data = Data::for_inspect(
-        "bench", /* moniker */
-        Some(DiagnosticsHierarchy::new("root", vec![], children)),
-        1, /* timestamp_nanos */
-        "fuchsia-pkg://fuchsia.com/testing#meta/bench.cm",
-        Some(InspectHandleName::filename("fuchsia.inspect.Tree")),
-        vec![],
-    );
-
+    let data =
+        InspectDataBuilder::new("bench", "fuchsia-pkg://fuchsia.com/testing#meta/bench.cm", 1)
+            .with_hierarchy(DiagnosticsHierarchy::new("root", vec![], children))
+            .with_name(InspectHandleName::filename("fuchsia.inspect.Tree"))
+            .build();
     b.iter(|| {
         let _ = criterion::black_box(SerializedVmo::serialize(&data, DataType::Inspect, format));
     });

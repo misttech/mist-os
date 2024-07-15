@@ -306,6 +306,7 @@ hlcpp_visibility = [
   "//src/ui/a11y/lib/util/*",
   "//src/ui/a11y/lib/view/*",
   "//src/ui/a11y/testing:*",
+  "//src/ui/bin/system_monitor:*",
   "//src/ui/bin/virtual_keyboard_manager/*",
   "//src/ui/examples/screen_recording:*",
   "//src/ui/examples/simplest_sysmem:*",

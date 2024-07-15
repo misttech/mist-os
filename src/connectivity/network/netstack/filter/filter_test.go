@@ -39,7 +39,7 @@ type testNicInfoProvider struct {
 var _ NicInfoProvider = (*testNicInfoProvider)(nil)
 
 // GetNicInfo implements NicInfoProvider.
-func (p *testNicInfoProvider) GetNicInfo(nicid tcpip.NICID) (string, *network.DeviceClass) {
+func (p *testNicInfoProvider) GetNicInfo(nicid tcpip.NICID) (string, *network.PortClass) {
 	nicInfo, ok := p.stack.NICInfo()[nicid]
 	if !ok {
 		return "", nil
@@ -728,12 +728,12 @@ func TestFilterUpdates(t *testing.T) {
 				{
 					Action:      filter.ActionDrop,
 					Direction:   filter.DirectionOutgoing,
-					DeviceClass: filter.DeviceClassWithMatch(network.DeviceClassEthernet),
+					DeviceClass: filter.DeviceClassWithMatch(network.PortClassEthernet),
 				},
 				{
 					Action:      filter.ActionDrop,
 					Direction:   filter.DirectionIncoming,
-					DeviceClass: filter.DeviceClassWithMatch(network.DeviceClassWlan),
+					DeviceClass: filter.DeviceClassWithMatch(network.PortClassWlan),
 				},
 			},
 			result: filter.FilterUpdateRulesResultWithResponse(filter.FilterUpdateRulesResponse{}),
@@ -756,7 +756,7 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Matchers: []stack.Matcher{
 								&deviceClassNICMatcher{
-									match:     network.DeviceClassWlan,
+									match:     network.PortClassWlan,
 									direction: NICMatcherDirectionInput,
 								},
 							},
@@ -777,7 +777,7 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Matchers: []stack.Matcher{
 								&deviceClassNICMatcher{
-									match:     network.DeviceClassEthernet,
+									match:     network.PortClassEthernet,
 									direction: NICMatcherDirectionOutput,
 								},
 							},
@@ -815,7 +815,7 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Matchers: []stack.Matcher{
 								&deviceClassNICMatcher{
-									match:     network.DeviceClassWlan,
+									match:     network.PortClassWlan,
 									direction: NICMatcherDirectionInput,
 								},
 							},
@@ -836,7 +836,7 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Matchers: []stack.Matcher{
 								&deviceClassNICMatcher{
-									match:     network.DeviceClassEthernet,
+									match:     network.PortClassEthernet,
 									direction: NICMatcherDirectionOutput,
 								},
 							},
@@ -1275,21 +1275,21 @@ func TestDeviceClassMatcher(t *testing.T) {
 		nic1Name = "eth1"
 		nic2Name = "eth2"
 	)
-	nic1Class := network.DeviceClassEthernet
-	nic2Class := network.DeviceClassWlan
+	nic1Class := network.PortClassEthernet
+	nic2Class := network.PortClassWlan
 	var cache enabledNicsCache
 	cache.init()
 	cache.add(nic0Name, cachedNicInfo{})
 	cache.add(nic1Name, cachedNicInfo{
-		deviceClass: &nic1Class,
+		PortClass: &nic1Class,
 	})
 	cache.add(nic2Name, cachedNicInfo{
-		deviceClass: &nic2Class,
+		PortClass: &nic2Class,
 	})
 	tests := []struct {
 		name       string
 		direction  NICMatcherDirection
-		match      network.DeviceClass
+		match      network.PortClass
 		inNicName  string
 		outNicName string
 		expect     bool

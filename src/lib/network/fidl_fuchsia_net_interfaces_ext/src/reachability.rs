@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Address, Properties, PropertiesAndState, Update, UpdateResult, WatcherOperationError};
+use crate::{
+    Address, PortClass, Properties, PropertiesAndState, Update, UpdateResult, WatcherOperationError,
+};
 
 use futures::{Stream, TryStreamExt};
 use net_types::{LinkLocalAddress as _, ScopeableAddress as _};
@@ -17,7 +19,7 @@ use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces};
 /// it has global scope.
 pub fn is_globally_routable(
     &Properties {
-        ref device_class,
+        ref port_class,
         online,
         ref addresses,
         has_default_ipv4_route,
@@ -25,18 +27,15 @@ pub fn is_globally_routable(
         ..
     }: &Properties,
 ) -> bool {
-    match device_class {
-        fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => {
-            return false;
-        }
-        fnet_interfaces::DeviceClass::Device(device) => match device {
-            fidl_fuchsia_hardware_network::DeviceClass::Virtual
-            | fidl_fuchsia_hardware_network::DeviceClass::Ethernet
-            | fidl_fuchsia_hardware_network::DeviceClass::Wlan
-            | fidl_fuchsia_hardware_network::DeviceClass::WlanAp
-            | fidl_fuchsia_hardware_network::DeviceClass::Ppp
-            | fidl_fuchsia_hardware_network::DeviceClass::Bridge => {}
-        },
+    match port_class {
+        PortClass::Loopback => return false,
+        PortClass::Virtual
+        | PortClass::Ethernet
+        | PortClass::Wlan
+        | PortClass::WlanAp
+        | PortClass::Ppp
+        | PortClass::Bridge
+        | PortClass::Lowpan => {}
     }
     if !online {
         return false;
@@ -166,9 +165,7 @@ mod tests {
         fnet_interfaces::Properties {
             id: Some(id),
             name: Some("test1".to_string()),
-            device_class: Some(fnet_interfaces::DeviceClass::Device(
-                fnetwork::DeviceClass::Ethernet,
-            )),
+            port_class: Some(fnet_interfaces::PortClass::Device(fnetwork::PortClass::Ethernet)),
             online: Some(true),
             addresses: Some(vec![
                 fnet_interfaces::Address {
@@ -207,7 +204,7 @@ mod tests {
         const ID: u64 = 1;
         // These combinations are not globally routable.
         assert!(!is_globally_routable(&Properties {
-            device_class: fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}),
+            port_class: PortClass::Loopback,
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {

@@ -69,15 +69,17 @@ pub const NEILS_PHILOSOPHY: &'static [u8] =
     b"It's not about the walls, Max, it's about what's outside of them.";
 
 impl vfs::directory::entry::DirectoryEntry for TestSymlink {
-    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
-        vfs::directory::entry::EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
-    }
-
     fn open_entry(
         self: Arc<Self>,
         request: vfs::directory::entry::OpenRequest<'_>,
     ) -> Result<(), fidl::Status> {
         request.open_symlink(self)
+    }
+}
+
+impl vfs::directory::entry::GetEntryInfo for TestSymlink {
+    fn entry_info(&self) -> vfs::directory::entry::EntryInfo {
+        vfs::directory::entry::EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Symlink)
     }
 }
 

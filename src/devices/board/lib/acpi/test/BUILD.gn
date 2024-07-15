@@ -16,6 +16,7 @@ source_set("mock-acpi") {
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
     "//src/devices/lib/acpi",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

@@ -61,7 +61,6 @@ Commands:
   package           Create and publish Fuchsia packages
   sdk               Modify or query the installed SDKs
   target            Interact with a target device or emulator
-  vendor            Run partner plugins
   version           Print out ffx tool and daemon versions
 ```
 
@@ -470,7 +469,7 @@ when running tests which use `ffx`.
 ## Next steps
 
 - Please provide feedback on this doc by [reaching out to the ffx team](#contacting_the_ffx_team)!
-- Learn how to [extend `ffx`](/docs/development/tools/ffx/development/plugins.md).
+- Learn how to [extend `ffx`](/docs/development/tools/ffx/development/README.md).
 
 
 <!-- Reference links -->

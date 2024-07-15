@@ -13,18 +13,16 @@ use fidl::prelude::*;
 use fidl_fuchsia_boot::ReadOnlyLogMarker;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::{unfold, Stream};
-use lazy_static::lazy_static;
 use moniker::ExtendedMoniker;
+use once_cell::sync::Lazy;
 use std::future::Future;
 use std::sync::Arc;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
-pub const KERNEL_URL: &str = "fuchsia-boot://kernel";
-lazy_static! {
-    pub static ref KERNEL_IDENTITY: Arc<ComponentIdentity> = {
-        Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str("./klog").unwrap(), KERNEL_URL))
-    };
-}
+const KERNEL_URL: &str = "fuchsia-boot://kernel";
+pub static KERNEL_IDENTITY: Lazy<Arc<ComponentIdentity>> = Lazy::new(|| {
+    Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str("./klog").unwrap(), KERNEL_URL))
+});
 
 pub trait DebugLog {
     /// Reads a single entry off the debug log into `buffer`.  Any existing

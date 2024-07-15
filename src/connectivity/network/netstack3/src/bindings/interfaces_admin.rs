@@ -32,6 +32,7 @@
 //! protocol does not remove the interface).
 
 use std::collections::hash_map;
+use std::fmt::Debug;
 use std::num::NonZeroU16;
 use std::ops::DerefMut as _;
 use std::pin::pin;
@@ -291,7 +292,6 @@ async fn create_interface(
                     }
                     netdevice_client::Error::RxFlags(_)
                     | netdevice_client::Error::FrameType(_)
-                    | netdevice_client::Error::NoProgress
                     | netdevice_client::Error::Config(_)
                     | netdevice_client::Error::LargeChain(_)
                     | netdevice_client::Error::Index(_, _)
@@ -318,7 +318,8 @@ async fn create_interface(
                 }
                 netdevice_worker::Error::ConfigurationNotSupported
                 | netdevice_worker::Error::MacNotUnicast { .. }
-                | netdevice_worker::Error::MismatchedRxFrameType { .. } => {
+                | netdevice_worker::Error::MismatchedRxFrameType { .. }
+                | netdevice_worker::Error::InvalidPortClass(_) => {
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::BadPort)
                 }
                 netdevice_worker::Error::DuplicateName(_) => {
@@ -676,7 +677,7 @@ async fn dispatch_control_request(
 ///
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
-    let (devices::StaticNetdeviceInfo { handler }, weak_id) = {
+    let (devices::StaticNetdeviceInfo { handler, tx_notifier: _ }, weak_id) = {
         let core_id = ctx
             .bindings_ctx()
             .devices
@@ -834,19 +835,18 @@ fn set_configuration(
             if let Some(_) = igmp {
                 warn!("TODO(https://fxbug.dev/42071402): support IGMP configuration changes")
             }
-            if let Some(_) = multicast_forwarding {
-                warn!(
-                "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
-            )
-            }
             if let Some(forwarding) = forwarding {
                 info!("updating IPv6 forwarding on {core_id:?} to enabled={forwarding}");
+            }
+            if let Some(forwarding) = multicast_forwarding {
+                info!("updating IPv6 multicast forwarding on {core_id:?} to enabled={forwarding}");
             }
 
             (
                 Some(Ipv4DeviceConfigurationUpdate {
                     ip_config: IpDeviceConfigurationUpdate {
-                        forwarding_enabled: forwarding,
+                        unicast_forwarding_enabled: forwarding,
+                        multicast_forwarding_enabled: multicast_forwarding,
                         ..Default::default()
                     },
                     ..Default::default()
@@ -875,13 +875,11 @@ fn set_configuration(
             if let Some(_) = mld {
                 warn!("TODO(https://fxbug.dev/42071402): support MLD configuration changes")
             }
-            if let Some(_) = multicast_forwarding {
-                warn!(
-                    "TODO(https://fxbug.dev/323052525): setting multicast_forwarding not yet supported"
-                )
-            }
             if let Some(forwarding) = forwarding {
                 info!("updating IPv6 forwarding on {core_id:?} to enabled={forwarding}");
+            }
+            if let Some(forwarding) = multicast_forwarding {
+                info!("updating IPv6 multicast forwarding on {core_id:?} to enabled={forwarding}");
             }
 
             let fnet_interfaces_admin::NdpConfiguration { nud, dad, __source_breaking } =
@@ -895,7 +893,8 @@ fn set_configuration(
             (
                 Some(Ipv6DeviceConfigurationUpdate {
                     ip_config: IpDeviceConfigurationUpdate {
-                        forwarding_enabled: forwarding,
+                        unicast_forwarding_enabled: forwarding,
+                        multicast_forwarding_enabled: multicast_forwarding,
                         ..Default::default()
                     },
                     dad_transmits: dad_transmits.map(|v| NonZeroU16::new(v)),
@@ -922,8 +921,11 @@ fn set_configuration(
         })
         .transpose()
         .map_err(|e| match e {
-            UpdateIpConfigurationError::ForwardingNotSupported => {
+            UpdateIpConfigurationError::UnicastForwardingNotSupported => {
                 fnet_interfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported
+            }
+            UpdateIpConfigurationError::MulticastForwardingNotSupported => {
+                fnet_interfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported
             }
         })?;
     let ipv6_update = ipv6_update
@@ -932,8 +934,11 @@ fn set_configuration(
         })
         .transpose()
         .map_err(|e| match e {
-            UpdateIpConfigurationError::ForwardingNotSupported => {
+            UpdateIpConfigurationError::UnicastForwardingNotSupported => {
                 fnet_interfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported
+            }
+            UpdateIpConfigurationError::MulticastForwardingNotSupported => {
+                fnet_interfaces_admin::ControlSetConfigurationError::Ipv6MulticastForwardingUnsupported
             }
         })?;
     let device_update = ctx
@@ -959,11 +964,15 @@ fn set_configuration(
     let ipv4 = ipv4_update.map(|u| {
         let Ipv4DeviceConfigurationUpdate { ip_config } =
             ctx.api().device_ip::<Ipv4>().apply_configuration(u);
-        let IpDeviceConfigurationUpdate { forwarding_enabled, ip_enabled: _, gmp_enabled: _ } =
-            ip_config;
+        let IpDeviceConfigurationUpdate {
+            unicast_forwarding_enabled,
+            multicast_forwarding_enabled,
+            ip_enabled: _,
+            gmp_enabled: _,
+        } = ip_config;
         fnet_interfaces_admin::Ipv4Configuration {
-            forwarding: forwarding_enabled,
-            multicast_forwarding: None,
+            forwarding: unicast_forwarding_enabled,
+            multicast_forwarding: multicast_forwarding_enabled,
             igmp: None,
             arp: arp.map(IntoFidl::into_fidl),
             __source_breaking: fidl::marker::SourceBreaking,
@@ -990,11 +999,15 @@ fn set_configuration(
         };
         let ndp = (ndp != Default::default()).then_some(ndp);
 
-        let IpDeviceConfigurationUpdate { forwarding_enabled, ip_enabled: _, gmp_enabled: _ } =
-            ip_config;
+        let IpDeviceConfigurationUpdate {
+            unicast_forwarding_enabled,
+            multicast_forwarding_enabled,
+            ip_enabled: _,
+            gmp_enabled: _,
+        } = ip_config;
         fnet_interfaces_admin::Ipv6Configuration {
-            forwarding: forwarding_enabled,
-            multicast_forwarding: None,
+            forwarding: unicast_forwarding_enabled,
+            multicast_forwarding: multicast_forwarding_enabled,
             mld: None,
             ndp,
             __source_breaking: fidl::marker::SourceBreaking,
@@ -1017,21 +1030,17 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
 
     let DeviceConfiguration { arp, ndp } = ctx.api().device_any().get_configuration(&core_id);
 
+    let IpDeviceConfiguration {
+        unicast_forwarding_enabled,
+        multicast_forwarding_enabled,
+        gmp_enabled: _,
+    } = ctx.api().device_ip::<Ipv4>().get_configuration(&core_id).config.ip_config;
     let ipv4 = Some(fnet_interfaces_admin::Ipv4Configuration {
-        forwarding: Some(
-            ctx.api()
-                .device_ip::<Ipv4>()
-                .get_configuration(&core_id)
-                .config
-                .ip_config
-                .forwarding_enabled,
-        ),
+        forwarding: Some(unicast_forwarding_enabled),
         // TODO(https://fxbug.dev/42071402): Support IGMP configuration
         // changes.
         igmp: None,
-        // TODO(https://fxbug.dev/323052525): Support multicast forwarding
-        // configuration changes.
-        multicast_forwarding: None,
+        multicast_forwarding: Some(multicast_forwarding_enabled),
         arp: arp.map(IntoFidl::into_fidl),
         __source_breaking: fidl::marker::SourceBreaking,
     });
@@ -1042,7 +1051,12 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
                 dad_transmits,
                 max_router_solicitations: _,
                 slaac_config: _,
-                ip_config: IpDeviceConfiguration { gmp_enabled: _, forwarding_enabled },
+                ip_config:
+                    IpDeviceConfiguration {
+                        gmp_enabled: _,
+                        unicast_forwarding_enabled,
+                        multicast_forwarding_enabled,
+                    },
             },
         flags: _,
     } = ctx.api().device_ip::<Ipv6>().get_configuration(&core_id);
@@ -1059,13 +1073,11 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
     });
 
     let ipv6 = Some(fnet_interfaces_admin::Ipv6Configuration {
-        forwarding: Some(forwarding_enabled),
+        forwarding: Some(unicast_forwarding_enabled),
         // TODO(https://fxbug.dev/42071402): Support MLD configuration
         // changes.
         mld: None,
-        // TODO(https://fxbug.dev/323052525): Support multicast forwarding
-        // configuration changes.
-        multicast_forwarding: None,
+        multicast_forwarding: Some(multicast_forwarding_enabled),
         ndp,
         __source_breaking: fidl::marker::SourceBreaking,
     });
@@ -1198,8 +1210,7 @@ fn grant_for_interface(ctx: &mut Ctx, id: BindingId) -> GrantForInterfaceAuthori
         .expect("device lifetime should be tied to channel lifetime");
 
     let external_state = core_id.external_state();
-    let StaticCommonInfo { authorization_token, tx_notifier: _ } =
-        external_state.static_common_info();
+    let StaticCommonInfo { authorization_token } = external_state.static_common_info();
 
     GrantForInterfaceAuthorization {
         interface_id: id.get(),
@@ -1392,9 +1403,13 @@ async fn run_address_state_provider(
                 panic!("`AddressInfo` unexpectedly missing for {:?}", address)
             }
         };
+    // After having removed ASP from the external state, the bindings ID may not
+    // be valid anymore if this is racing with device removal. Shadow the
+    // variable name to prevent misuse.
+    let id = ();
+    let () = id;
 
     let StateInCore { address: remove_address, subnet_route } = state_to_remove_from_core;
-    let device_id = bindings_ctx.devices.get_core_id(id).expect("interface not found");
 
     // The presence of this `route_set` indicates that we added a subnet route
     // previously due to the `add_subnet_route` AddressParameters option.
@@ -1406,7 +1421,7 @@ async fn run_address_state_provider(
 
     if remove_address {
         let result =
-            ctx.api().device_ip_any().del_ip_addr(&device_id, address).expect("address must exist");
+            ctx.api().device_ip_any().del_ip_addr(&core_id, address).expect("address must exist");
         let _: AddrSubnetEither = result
             .map_deferred(|d| {
                 d.map_left(|l| l.into_future("device addr", &address).map(Into::into))
@@ -1417,7 +1432,7 @@ async fn run_address_state_provider(
     }
 
     if let Some(removal_reason) = removal_reason {
-        send_address_removal_event(address.get(), id, control_handle, removal_reason.into());
+        send_address_removal_event(address.get(), &core_id, control_handle, removal_reason.into());
     }
 }
 
@@ -1710,13 +1725,13 @@ fn dispatch_address_state_provider_request(
 
 fn send_address_removal_event(
     addr: IpAddr,
-    id: BindingId,
+    id: impl Debug,
     control_handle: fnet_interfaces_admin::AddressStateProviderControlHandle,
     reason: fnet_interfaces_admin::AddressRemovalReason,
 ) {
     control_handle.send_on_address_removed(reason).unwrap_or_else(|e| {
         error!(
-            "failed to send address removal reason for addr {:?} on interface {}: {:?}",
+            "failed to send address removal reason for addr {:?} on interface {:?}: {:?}",
             addr, id, e
         );
     })

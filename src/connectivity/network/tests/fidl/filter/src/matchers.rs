@@ -7,14 +7,11 @@ use std::num::NonZeroU64;
 use std::ops::RangeInclusive;
 
 use fidl_fuchsia_net_filter_ext::{
-    AddressMatcher, AddressMatcherType, DeviceClass, InterfaceMatcher, Matchers, PortMatcher,
+    AddressMatcher, AddressMatcherType, InterfaceMatcher, Matchers, PortMatcher,
     TransportProtocolMatcher,
 };
 use net_types::ip::{Ip, IpVersion};
-use {
-    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
-};
+use {fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter};
 
 use crate::ip_hooks::{
     IcmpSocket, Interfaces, IrrelevantToTest, Ports, SocketType, Subnets, TcpSocket, UdpSocket,
@@ -125,24 +122,19 @@ impl Matcher for InterfaceDeviceClass {
         _subnets: Subnets,
         _ports: Ports,
     ) -> Matchers {
-        async fn get_device_class(interface: &netemul::TestInterface<'_>) -> InterfaceMatcher {
-            InterfaceMatcher::DeviceClass(
-                match interface.get_device_class().await.expect("get device class") {
-                    fnet_interfaces::DeviceClass::Loopback(fnet_interfaces::Empty {}) => {
-                        DeviceClass::Loopback
-                    }
-                    fnet_interfaces::DeviceClass::Device(device) => DeviceClass::Device(device),
-                },
+        async fn get_port_class(interface: &netemul::TestInterface<'_>) -> InterfaceMatcher {
+            InterfaceMatcher::PortClass(
+                interface.get_port_class().await.expect("get port class").into(),
             )
         }
 
         let Interfaces { ingress, egress } = interfaces;
         let in_interface = match ingress {
-            Some(ingress) => Some(get_device_class(ingress).await),
+            Some(ingress) => Some(get_port_class(ingress).await),
             None => None,
         };
         let out_interface = match egress {
-            Some(egress) => Some(get_device_class(egress).await),
+            Some(egress) => Some(get_port_class(egress).await),
             None => None,
         };
         Matchers { in_interface, out_interface, ..Default::default() }

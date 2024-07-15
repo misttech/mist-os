@@ -25,6 +25,11 @@ config("compiler") {
     cflags += [ "-ffuchsia-api-level=${fuchsia_target_api_level}" ]
   }
 
+  # Suppress compiler warnings
+  # TODO(https://fxbug.dev/344080745): After the issue is fixed,
+  # remove "-Wno-missing-template-arg-list-after-template-kw".
+  cflags += [ "-Wno-missing-template-arg-list-after-template-kw" ]
+
   # Add libfdio by default. This may change in future versions
   # in order to move away from POSIX applications and towards
   # the Fuchsia programming model.

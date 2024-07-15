@@ -6,6 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
+import("//tools/power_config/build/config.gni")
 
 driver_bind_rules("sdmmc-bind") {
   rules = "sdmmc.bind"
@@ -44,6 +45,7 @@ common_deps = [
   "//src/devices/block/lib/sdio",
   "//src/devices/block/lib/sdmmc",
   "//src/devices/lib/dev-operation",
+  "//tools/power_config/lib/cpp",
   "//zircon/system/ulib/async-loop:async-loop-cpp",
   "//zircon/system/ulib/async-loop:async-loop-default",
   "//zircon/system/ulib/fbl",
@@ -102,10 +104,18 @@ fuchsia_structured_config_values("sc-values") {
   }
 }
 
+power_config("power-config") {
+  output_name = "power_config.fidl"
+  value_file = "power_config.json5"
+}
+
 fuchsia_driver_package("package") {
   package_name = "sdmmc"
   driver_components = [ ":sdmmc" ]
-  deps = [ ":sc-values" ]
+  deps = [
+    ":power-config",
+    ":sc-values",
+  ]
 }
 
 test("sdmmc-block-test-bin") {
@@ -134,7 +144,10 @@ test("sdmmc-block-test-bin") {
 }
 
 fuchsia_unittest_package("sdmmc-block-test") {
-  deps = [ ":sdmmc-block-test-bin" ]
+  deps = [
+    ":power-config",
+    ":sdmmc-block-test-bin",
+  ]
   test_specs = {
     environments = basic_envs
     log_settings = {

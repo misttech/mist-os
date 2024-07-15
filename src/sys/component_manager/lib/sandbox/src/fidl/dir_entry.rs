@@ -32,7 +32,7 @@ mod tests {
     use crate::Capability;
     use fidl::endpoints::{self, ServerEnd};
     use test_util::Counter;
-    use vfs::directory::entry::{EntryInfo, OpenRequest};
+    use vfs::directory::entry::{EntryInfo, GetEntryInfo, OpenRequest};
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
@@ -41,12 +41,13 @@ mod tests {
 
     struct MockDir(Counter);
     impl DirectoryEntry for MockDir {
-        fn entry_info(&self) -> EntryInfo {
-            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-        }
-
         fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
             request.open_remote(self)
+        }
+    }
+    impl GetEntryInfo for MockDir {
+        fn entry_info(&self) -> EntryInfo {
+            EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         }
     }
     impl RemoteLike for MockDir {

@@ -232,7 +232,7 @@ impl TestEnvBuilder {
             }
             b.etag_override(self.etag_override).build().unwrap()
         }));
-        let url = OmahaServer::start(server.clone()).expect("start server");
+        let url = OmahaServer::start(server.clone()).await.expect("start server");
         mounts.write_version(self.version);
         if let Some(eager_package_config_builder) = self.eager_package_config_builder {
             let json = eager_package_config_builder(&url);

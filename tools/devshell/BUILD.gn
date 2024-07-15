@@ -54,6 +54,9 @@ if (!is_host) {
 
       # For `fx test2`.
       "//scripts/fxtest/rewrite:install($host_toolchain)",
+
+      # For Python devshell tools
+      "//tools/devshell/python:install($host_toolchain)",
     ]
   }
 }
@@ -62,7 +65,10 @@ if (!is_host) {
 # collects metadata (into tests.json) from the default toolchain.
 group("tests") {
   testonly = true
-  deps = [ ":fx_script_tests($host_toolchain)" ]
+  deps = [
+    ":fx_script_tests($host_toolchain)",
+    "//tools/devshell/python:tests($host_toolchain)",
+  ]
 }
 
 # This is the list of test scripts that should be run to

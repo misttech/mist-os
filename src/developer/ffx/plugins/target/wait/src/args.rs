@@ -14,10 +14,10 @@ use ffx_core::ffx_command;
     error_code(1, "Timeout while getting ssh address")
 )]
 
-pub struct WaitCommand {
+pub struct WaitOptions {
     #[argh(option, short = 't', default = "120")]
     /// the timeout in seconds [default = 120]. A value of 0 implies no timeout.
-    pub timeout: usize,
+    pub timeout: u64,
 
     #[argh(switch, short = 'd', description = "wait for target to go down")]
     /// wait for the target to go down

@@ -84,9 +84,9 @@ if (is_host) {
   python_mobly_test("blackout_integration_test_no_reboot") {
     main_source = "blackout.py"
     libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
-      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
     ]
     transport = "fuchsia-controller"
     params = {
@@ -107,9 +107,9 @@ if (is_host) {
   python_mobly_test("blackout_integration_test_reboot") {
     main_source = "blackout.py"
     libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
-      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
     ]
     transport = "fuchsia-controller"
     params = {
@@ -130,9 +130,9 @@ if (is_host) {
   python_mobly_test("blackout_integration_test_fail") {
     main_source = "blackout.py"
     libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
-      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
     ]
     transport = "fuchsia-controller"
     params = {
@@ -152,9 +152,9 @@ if (is_host) {
   python_mobly_test("blackout_fxfs_tree_soft_reboot") {
     main_source = "blackout.py"
     libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
-      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
     ]
     transport = "fuchsia-controller"
     params = {
@@ -180,9 +180,9 @@ if (is_host) {
   python_mobly_test("blackout_fxfs_tree_hard_reboot") {
     main_source = "blackout.py"
     libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
-      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
     ]
     transport = "fuchsia-controller"
     params = {
@@ -208,9 +208,9 @@ if (is_host) {
   python_mobly_test("blackout_fxfs_tree_idle_suspend_timer_resume") {
     main_source = "blackout.py"
     libraries = [
+      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
-      "//tools/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data",
     ]
     transport = "fuchsia-controller"
     params = {

@@ -243,6 +243,13 @@ impl ProductBundle {
             }
         }
     }
+
+    /// Get the product bundle name
+    pub fn get_product_bundle_name(&self) -> String {
+        match self {
+            Self::V2(pb) => pb.product_name.clone(),
+        }
+    }
 }
 
 /// Construct a Vec<FileSystemRepository> from product bundle.

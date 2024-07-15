@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use crate::execution_scope::ExecutionScope;
 use crate::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
 use crate::node::Node;
@@ -37,12 +37,14 @@ impl SimpleFile {
 }
 
 impl DirectoryEntry for SimpleFile {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_file(self)
+    }
+}
+
+impl GetEntryInfo for SimpleFile {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
     }
 }
 

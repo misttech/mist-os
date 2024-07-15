@@ -10,6 +10,7 @@
 
 #include <pw_async_fuchsia/dispatcher.h>
 
+#include "fidl/fuchsia.bluetooth.host/cpp/fidl.h"
 #include "fidl/fuchsia.hardware.bluetooth/cpp/fidl.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"

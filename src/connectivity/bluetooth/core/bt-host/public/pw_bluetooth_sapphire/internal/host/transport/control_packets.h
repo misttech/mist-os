@@ -5,9 +5,9 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_CONTROL_PACKETS_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_CONTROL_PACKETS_H_
 
-#include <endian.h>
-
 #include <memory>
+
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
@@ -33,7 +33,10 @@ class Packet<hci_spec::CommandHeader>
                                             size_t payload_size = 0u);
 
   // Returns the HCI command opcode currently in this packet.
-  hci_spec::OpCode opcode() const { return le16toh(view().header().opcode); }
+  hci_spec::OpCode opcode() const {
+    return pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                       view().header().opcode);
+  }
 
   // Convenience function to get a mutable payload of a packet.
   template <typename PayloadType>

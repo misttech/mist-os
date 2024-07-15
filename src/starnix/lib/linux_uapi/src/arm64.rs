@@ -17956,6 +17956,10 @@ pub const EVIOCGBIT_EV_MSC: __u32 = 2147566884;
 pub const EVIOCGPROP: __u32 = 2147763465;
 pub const EVIOCGABS_X: __u32 = 2149074240;
 pub const EVIOCGABS_Y: __u32 = 2149074241;
+pub const EVIOCGABS_MT_SLOT: __u32 = 2149074287;
+pub const EVIOCGABS_MT_TRACKING_ID: __u32 = 2149074297;
+pub const EVIOCGABS_MT_POSITION_X: __u32 = 2149074293;
+pub const EVIOCGABS_MT_POSITION_Y: __u32 = 2149074294;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct remote_binder_start_command {

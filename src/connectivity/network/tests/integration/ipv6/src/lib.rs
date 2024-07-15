@@ -676,13 +676,15 @@ async fn dad_assigns_when_echoed<N: Netstack>(name: &str) {
     let (_network, _realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
-    // An arbitrary number of neighbor solicitations to send to avoid CI timing
-    // flakes.
-    const ARBITRARY_NUM_SOLICITATIONS: u16 = 16;
+    let arbitrary_num_solicitations = match N::VERSION {
+        // Netstack2 does not support setting the number of DAD transmits.
+        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => 1u16,
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => 16u16,
+    };
 
     let control = iface.control();
     let _: Option<u16> =
-        iface.set_dad_transmits(ARBITRARY_NUM_SOLICITATIONS).await.expect("set dad transmits");
+        iface.set_dad_transmits(arbitrary_num_solicitations).await.expect("set dad transmits");
 
     let mut state_stream =
         add_address_for_dad(&iface, &fake_ep, &control, true, |fake_ep, ns| async move {
@@ -696,21 +698,35 @@ async fn dad_assigns_when_echoed<N: Netstack>(name: &str) {
     let assert_dad_success_fut =
         async move { assert_dad_success(&mut state_stream).await }.boxed_local();
 
+    // NB: we've already seen one probe from the above `add_address_for_dad` invocation.
+    let mut got_num_probes = 1usize;
+    let want_num_probes = usize::from(arbitrary_num_solicitations) + 3;
+
     let echo_ns_fut = async {
-        // NB: We're echoing back all traffic observed on the fake endpoint (not
-        // just neighbor solicitations).
-        loop {
+        while got_num_probes < want_num_probes {
+            // NB: We're echoing back all traffic observed on the fake endpoint (not
+            // just neighbor solicitations).
             let (data, _dropped) =
                 fake_ep.read().await.expect("reading from fake_ep should succeed");
+
+            if parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                net_types::ip::Ipv6,
+                _,
+                NeighborSolicitation,
+                _,
+            >(&data, EthernetFrameLengthCheck::NoCheck, |p| {
+                assert_matches!(&p.body().iter().collect::<Vec<_>>()[..], [NdpOption::Nonce(_)])
+            })
+            .is_ok()
+            {
+                got_num_probes += 1;
+            }
             fake_ep.write(&data).await.expect("echoing back ns should succeed");
         }
     }
     .boxed_local();
 
-    match futures::future::select(assert_dad_success_fut, echo_ns_fut).await {
-        future::Either::Left(((), _echo_ns_fut)) => (),
-        future::Either::Right(_) => unreachable!("echo_ns_fut should never complete"),
-    };
+    let ((), ()) = futures::future::join(assert_dad_success_fut, echo_ns_fut).await;
 }
 
 /// Tests to make sure default router discovery, prefix discovery and more-specific
@@ -884,7 +900,12 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
                         _,
                         NeighborSolicitation,
                         _,
-                    >(&data, EthernetFrameLengthCheck::NoCheck, |p| assert_eq!(p.body().iter().count(), 0))
+                    >(&data,
+                        EthernetFrameLengthCheck::NoCheck,
+                        |p| assert_eq!(p.body().iter().filter(|option| match option {
+                            NdpOption::Nonce(_) => false,
+                            _ => true,
+                        }).count(), 0))
                         .map_or(None, |(_src_mac, _dst_mac, _src_ip, _dst_ip, _ttl, message, _code)| {
                             // If the NS target_address does not have the prefix we have advertised,
                             // this is for some other address. We ignore it as it is not relevant to

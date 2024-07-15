@@ -49,23 +49,20 @@ for the build target
 
 As of this writing, this is done in the following way.
 
-1. Add the `//build/rust:cargo_toml_gen` target to the `host_labels`
-   in `args.gn` either of the following ways:
+1. Using `fx args`, add `//build/rust:cargo_toml_gen` to `host_labels`.
 
-   a. Run `fx args` and append `//build/rust:cargo_toml_gen` to the
-      `host_labels` list.
+2. Using `fx args`, add `//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:_wlansoftmac_c_rustc_static`
+   to `build_only_labels`.
 
-   b. Run `fx set` with the `--cargo-toml-gen` flag.
-
-2. Build the `cargo_toml_gen` target and generate the `Cargo.toml`
+3. Build the `cargo_toml_gen` target and generate the `Cargo.toml`
    manifest:
 
 ```
-fx args # then append "//build/rust:cargo_toml_gen" to the `host_labels` list
-OR
-fx set PRODUCT.BOARD --cargo_toml_gen ...
+fx args # then append "//build/rust:cargo_toml_gen" to `host_labels`
+fx args # then append "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:_wlansoftmac_c_rustc_static"
+        # to `build_only_labels`
 
-fx build build/rust:cargo_toml_gen
+fx build //build/rust:cargo_toml_gen
 fx gen-cargo //src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:_wlansoftmac_c_rustc_static
 ```
 

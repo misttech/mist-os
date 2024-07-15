@@ -351,17 +351,12 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
     success = display_configs[0].layer_count == 0;
   } else {
     const primary_layer_t& layer = display_configs[0].layer_list[0].cfg.primary;
-    frame_t frame = {
-        .x_pos = 0,
-        .y_pos = 0,
-        .width = kWidth,
-        .height = kHeight,
-    };
+    const rect_u_t display_area = {.x = 0, .y = 0, .width = kWidth, .height = kHeight};
     success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
               layer.transform_mode == FRAME_TRANSFORM_IDENTITY &&
               layer.image_metadata.width == kWidth && layer.image_metadata.height == kHeight &&
-              memcmp(&layer.dest_frame, &frame, sizeof(frame_t)) == 0 &&
-              memcmp(&layer.src_frame, &frame, sizeof(frame_t)) == 0 &&
+              memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
+              memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0 &&
               layer.alpha_mode == ALPHA_DISABLE;
   }
   if (!success) {

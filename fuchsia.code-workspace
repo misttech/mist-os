@@ -58,6 +58,7 @@
       "ms-python.python",
       "ms-python.mypy-type-checker",
       "ms-python.black-formatter",
+      "ms-python.vscode-pylance",
 
       // The GN language server from Microsoft
       "msedge-dev.gnls",
@@ -245,6 +246,7 @@
     "files.watcherExclude": {
       "**/.DS_Store": true,
       "**/.cipd": true,
+      "**/.git": true,
       ".jiri_root/goma_cache/**": true,
       ".jiri_root/update_history*/**": true,
       "out/**": true,

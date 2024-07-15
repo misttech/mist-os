@@ -13,6 +13,9 @@ bazel_driver_package("bazel_package") {
   bazel_target =
       "//sdk/lib/driver/devicetree/examples/example-board:example-board"
   package_name = "example-board"
+
+  # TODO(b/352586714) - Driver will link in restricted symbols when Bazel uses RBE.
+  remote_build = target_cpu != "riscv64"
 }
 
 devicetree("example-board") {
@@ -48,6 +51,9 @@ bazel_fuchsia_test_package("example-board-test-package") {
     ":test-dtb",
     "//sdk/lib/driver/devicetree/testing:devicetree-test-bazel-inputs",
   ]
+
+  # TODO(b/352586714) - Driver will link in restricted symbols when Bazel uses RBE.
+  remote_build = target_cpu != "riscv64"
 }
 
 group("tests") {

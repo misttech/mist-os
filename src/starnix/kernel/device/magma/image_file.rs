@@ -4,16 +4,17 @@
 
 use fuchsia_zircon::{AsHandleRef, HandleBased};
 use magma::magma_image_info_t;
-use starnix_core::fileops_impl_vmo;
+use starnix_core::mm::memory::MemoryObject;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{Anon, FileHandle, FileObject, FileOps, FsNodeInfo};
+use starnix_core::vfs::{Anon, FileHandle, FileOps, FsNodeInfo};
+use starnix_core::{fileops_impl_memory, fileops_impl_noop_sync};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Arc;
 use {fidl_fuchsia_ui_composition as fuicomp, fuchsia_zircon as zx};
 
 pub struct ImageInfo {
-    /// The magma image info associated with the `vmo`.
+    /// The magma image info associated with the `memory`.
     pub info: magma_image_info_t,
 
     /// The `BufferCollectionImportToken` associated with this file.
@@ -40,21 +41,25 @@ impl Clone for ImageInfo {
 pub struct ImageFile {
     pub info: ImageInfo,
 
-    pub vmo: Arc<zx::Vmo>,
+    pub memory: Arc<MemoryObject>,
 }
 
 impl ImageFile {
-    pub fn new_file(current_task: &CurrentTask, info: ImageInfo, vmo: zx::Vmo) -> FileHandle {
-        let vmo_size = vmo.get_size().unwrap();
+    pub fn new_file(
+        current_task: &CurrentTask,
+        info: ImageInfo,
+        memory: MemoryObject,
+    ) -> FileHandle {
+        let memory_size = memory.get_size();
 
         let file = Anon::new_file_extended(
             current_task,
-            Box::new(ImageFile { info, vmo: Arc::new(vmo) }),
+            Box::new(ImageFile { info, memory: Arc::new(memory) }),
             OpenFlags::RDWR,
             |id| {
                 let mut info =
                     FsNodeInfo::new(id, FileMode::from_bits(0o600), current_task.as_fscred());
-                info.size = vmo_size as usize;
+                info.size = memory_size as usize;
                 info
             },
         );
@@ -64,5 +69,6 @@ impl ImageFile {
 }
 
 impl FileOps for ImageFile {
-    fileops_impl_vmo!(self, &self.vmo);
+    fileops_impl_memory!(self, &self.memory);
+    fileops_impl_noop_sync!();
 }

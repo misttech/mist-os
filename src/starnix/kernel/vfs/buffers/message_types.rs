@@ -3,19 +3,22 @@
 // found in the LICENSE file.
 
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
 use zerocopy::{AsBytes, FromBytes};
 
+use crate::mm::VmsplicePayload;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::socket::{SocketAddress, SocketMessageFlags};
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
-    c_int, cmsghdr, errno, error, in6_addr, in6_addr__bindgen_ty_1, in6_pktinfo, timespec, timeval,
-    ucred, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_TOS, IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS,
-    SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP, SO_TIMESTAMPNS,
+    c_int, cmsghdr, errno, error, in6_addr, in6_addr__bindgen_ty_1, in6_pktinfo, sockaddr_in,
+    timespec, timeval, ucred, IPV6_HOPLIMIT, IPV6_PKTINFO, IPV6_TCLASS, IP_RECVORIGDSTADDR, IP_TOS,
+    IP_TTL, SCM_CREDENTIALS, SCM_RIGHTS, SCM_SECURITY, SOL_IP, SOL_IPV6, SOL_SOCKET, SO_TIMESTAMP,
+    SO_TIMESTAMPNS,
 };
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
@@ -124,6 +127,12 @@ impl AncillaryData {
             (SOL_IP, IP_TTL) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTtl(
                 read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
             ))),
+            (SOL_IP, IP_RECVORIGDSTADDR) => {
+                Ok(AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(
+                    <[u8; size_of::<sockaddr_in>()]>::read_from_prefix(&message.data[..])
+                        .ok_or(errno!(EINVAL))?,
+                )))
+            }
             (SOL_IPV6, IPV6_TCLASS) => Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(
                 read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
             ))),
@@ -165,6 +174,9 @@ impl AncillaryData {
             }
             AncillaryData::Ip(syncio::ControlMessage::IpTtl(value)) => {
                 Ok(ControlMsg::new(SOL_IP, IP_TTL, (value as c_int).as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(value)) => {
+                Ok(ControlMsg::new(SOL_IP, IP_RECVORIGDSTADDR, value.as_bytes().to_vec()))
             }
             AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(value)) => {
                 Ok(ControlMsg::new(SOL_IPV6, IPV6_TCLASS, (value as c_int).as_bytes().to_vec()))
@@ -384,10 +396,10 @@ pub trait MessageData: Sized {
     fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<Self, Errno>;
 
     /// Returns a pointer to this data.
-    fn ptr(&self) -> *const u8;
+    fn ptr(&self) -> Result<*const u8, Errno>;
 
     /// Calls the provided function with this data's bytes.
-    fn with_bytes<O, F: FnMut(&[u8]) -> O>(&self, f: F) -> O;
+    fn with_bytes<O, F: FnMut(&[u8]) -> Result<O, Errno>>(&self, f: F) -> Result<O, Errno>;
 
     /// Returns the number of bytes in the message.
     fn len(&self) -> usize;
@@ -417,11 +429,11 @@ impl MessageData for Vec<u8> {
         data.read_to_vec_exact(limit)
     }
 
-    fn ptr(&self) -> *const u8 {
-        self.as_ptr()
+    fn ptr(&self) -> Result<*const u8, Errno> {
+        Ok(self.as_ptr())
     }
 
-    fn with_bytes<O, F: FnMut(&[u8]) -> O>(&self, mut f: F) -> O {
+    fn with_bytes<O, F: FnMut(&[u8]) -> Result<O, Errno>>(&self, mut f: F) -> Result<O, Errno> {
         f(self)
     }
 
@@ -454,6 +466,7 @@ impl MessageData for Vec<u8> {
 #[derive(Debug)]
 pub enum PipeMessageData {
     Owned(Vec<u8>),
+    Vmspliced(Arc<VmsplicePayload>),
 }
 
 impl From<Vec<u8>> for PipeMessageData {
@@ -464,52 +477,55 @@ impl From<Vec<u8>> for PipeMessageData {
 
 impl MessageData for PipeMessageData {
     fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<Self, Errno> {
-        data.read_to_vec_exact(limit).map(Self::Owned)
+        MessageData::copy_from_user(data, limit).map(Self::Owned)
     }
 
-    fn ptr(&self) -> *const u8 {
+    fn ptr(&self) -> Result<*const u8, Errno> {
         match self {
-            Self::Owned(d) => d.as_ptr(),
+            Self::Owned(d) => MessageData::ptr(d),
+            Self::Vmspliced(d) => MessageData::ptr(d),
         }
     }
 
-    fn with_bytes<O, F: FnMut(&[u8]) -> O>(&self, mut f: F) -> O {
+    fn with_bytes<O, F: FnMut(&[u8]) -> Result<O, Errno>>(&self, f: F) -> Result<O, Errno> {
         match self {
-            Self::Owned(d) => f(d),
+            Self::Owned(d) => MessageData::with_bytes(d, f),
+            Self::Vmspliced(d) => MessageData::with_bytes(d, f),
         }
     }
 
     fn len(&self) -> usize {
         match self {
-            Self::Owned(d) => d.len(),
+            Self::Owned(d) => MessageData::len(d),
+            Self::Vmspliced(d) => MessageData::len(d),
         }
     }
 
     fn split_off(&mut self, index: usize) -> Option<Self> {
-        if index < self.len() {
-            match self {
-                Self::Owned(d) => Some(Self::Owned(d.split_off(index))),
-            }
-        } else {
-            None
+        match self {
+            Self::Owned(d) => MessageData::split_off(d, index).map(Self::Owned),
+            Self::Vmspliced(d) => MessageData::split_off(d, index).map(Self::Vmspliced),
         }
     }
 
     fn copy_to_user(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         match self {
-            Self::Owned(d) => data.write(d.as_ref()),
+            Self::Owned(d) => MessageData::copy_to_user(d, data),
+            Self::Vmspliced(d) => MessageData::copy_to_user(d, data),
         }
     }
 
     fn clone_at_most(&self, limit: usize) -> Self {
         match self {
-            Self::Owned(d) => Self::Owned(d[0..std::cmp::min(self.len(), limit)].to_vec()),
+            Self::Owned(d) => Self::Owned(MessageData::clone_at_most(d, limit)),
+            Self::Vmspliced(d) => Self::Vmspliced(MessageData::clone_at_most(d, limit)),
         }
     }
 
     fn truncate(&mut self, limit: usize) {
         match self {
-            Self::Owned(d) => d.truncate(limit),
+            Self::Owned(d) => MessageData::truncate(d, limit),
+            Self::Vmspliced(d) => MessageData::truncate(d, limit),
         }
     }
 }

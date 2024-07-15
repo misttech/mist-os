@@ -5,27 +5,44 @@
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/python/python_host_test.gni")
 
-if (is_host) {
-  python_host_test("update_platform_version_tests") {
-    enable_mypy = true
-    main_source = "update_platform_version_tests.py"
-    sources = [ "update_platform_version.py" ]
-  }
+assert(is_host)
 
-  python_host_test("freeze_in_development_api_level_test") {
-    enable_mypy = true
-    main_source = "freeze_in_development_api_level_test.py"
-    sources = [ "freeze_in_development_api_level.py" ]
+group("versioning") {
+  testonly = true
+
+  if (bump_api_level) {
+    deps = [ ":bump_api_level" ]
+  }
+  if (freeze_api_level) {
+    deps = [ ":freeze_api_level" ]
   }
 }
 
+# To make the tests buildable, include `--with-host //scripts/versioning:tests`
+# in the `fx set` command. The GN args for the actions below are unnecessary.
 group("tests") {
   testonly = true
 
   deps = [
-    ":freeze_in_development_api_level_test($host_toolchain)",
-    ":update_platform_version_tests($host_toolchain)",
+    ":freeze_in_development_api_level_test",
+    ":update_platform_version_tests",
   ]
+}
+
+# Run using the following command:
+# fx test //scripts/versioning:update_platform_version_tests
+python_host_test("update_platform_version_tests") {
+  enable_mypy = true
+  main_source = "update_platform_version_tests.py"
+  sources = [ "update_platform_version.py" ]
+}
+
+# Run using the following command:
+# fx test //scripts/versioning:freeze_in_development_api_level_test
+python_host_test("freeze_in_development_api_level_test") {
+  enable_mypy = true
+  main_source = "freeze_in_development_api_level_test.py"
+  sources = [ "freeze_in_development_api_level.py" ]
 }
 
 if (bump_api_level) {
@@ -40,20 +57,24 @@ if (bump_api_level) {
   # it updates several files in the checkout.
   #
   # To use this tool manually, run the following:
-  #   fx set bringup.x64 --with-host //scripts/versioning:bump_api_level --args=bump_api_level=true
-  #   fx build
+  #   fx set bringup.x64 --with-host //scripts/versioning --args=bump_api_level=true
+  #   fx build --host //scripts/versioning:bump_api_level
   action("bump_api_level") {
     testonly = true
 
-    # Generate the golden files and manifest before updating the platform version.
-    deps = [ "//sdk:compatibility_testing_goldens($target_toolchain)" ]
+    # The target below generates and checks the golden files for all Supported
+    # and Sunset API levels. When `bump_api_level=true`, it also generates
+    # golden files for the new API level. Since the levels are determined by GN
+    # args whose values are generated from the version_history file before it
+    # can be modified, the target below can be built before this target modifies
+    # the version_history file.
+    deps = [ "//sdk:generate_compatibility_goldens($default_toolchain)" ]
 
     script = "//scripts/versioning/update_platform_version.py"
 
     _version_history_file = "//sdk/version_history.json"
     _fidl_compatiblity_doc_path =
         "//docs/development/testing/ctf/fidl_api_compatibility_testing.md"
-    _goldens_manifest = "$root_build_dir/compatibility_testing_goldens.json"
     _stamp_file = "$target_out_dir/$target_name.status"
 
     # There must be no in-development (unfrozen) API level when adding a new one.
@@ -82,24 +103,17 @@ if (bump_api_level) {
     args = [
       "--stamp-file",
       rebase_path(_stamp_file, root_build_dir),
-      "--root-build-dir",
-      ".",
       "--root-source-dir",
       rebase_path("//", root_build_dir),
       "--sdk-version-history",
       rebase_path(_version_history_file, root_build_dir),
       "--fidl-compatibility-doc-path",
       rebase_path(_fidl_compatiblity_doc_path, root_build_dir),
-      "--goldens-manifest",
-      rebase_path(_goldens_manifest, root_build_dir),
-      "--fuchsia-api-level",
+      "--new-api-level",
       "$_next_level",
     ]
 
-    inputs = [
-      _version_history_file,
-      _goldens_manifest,
-    ]
+    inputs = [ _version_history_file ]
 
     outputs = [ _stamp_file ]
   }
@@ -116,8 +130,8 @@ if (freeze_api_level) {
   # it updates several files in the checkout.
   #
   # To use this tool manually, run the following:
-  #   fx set bringup.x64 --with-host //scripts/versioning:freeze_api_level --args=freeze_api_level=true
-  #   fx build
+  #   fx set bringup.x64 --with-host //scripts/versioning --args=freeze_api_level=true
+  #   fx build --host //scripts/versioning:freeze_api_level
   action("freeze_api_level") {
     testonly = true
 

@@ -98,6 +98,7 @@ pub(crate) mod testutil {
         (FakeSender { sender }, FakeSenderSink { receiver })
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/351850689)
     #[derive(Debug)]
     pub(crate) struct FakeReceiver<M>(PhantomData<M>);
 

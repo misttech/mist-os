@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context as _};
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use errors::ffx_bail;
@@ -28,6 +28,7 @@ use fuchsia_repo::repository::{PmRepository, RepoProvider};
 use fuchsia_repo::server::RepositoryServer;
 use futures::executor::block_on;
 use futures::{SinkExt, StreamExt};
+use package_tool::{cmd_repo_publish, RepoPublishCommand};
 use pkg::repo::register_target_with_fidl_proxies;
 use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
@@ -159,6 +160,35 @@ async fn repo_client_from_optional_trusted_root(
             .with_context(|| format!("Creating repo client using default trusted root"))?
     };
     Ok(repo_client)
+}
+
+/// Refreshes repository metadata, in the same way running a shell command
+/// `ffx repository publish /path/to/repository` would
+async fn refresh_repository_metadata(path: &Utf8PathBuf) -> Result<()> {
+    let rf = RepoPublishCommand {
+        signing_keys: None,
+        trusted_keys: None,
+        trusted_root: None,
+        package_manifests: vec![],
+        package_list_manifests: vec![],
+        package_archives: vec![],
+        product_bundle: vec![],
+        time_versioning: false,
+        metadata_current_time: chrono::Utc::now(),
+        refresh_root: false,
+        clean: false,
+        depfile: None,
+        copy_mode: fuchsia_repo::repository::CopyMode::Copy,
+        delivery_blob_type: 1,
+        watch: false,
+        ignore_missing_packages: false,
+        blob_manifest: None,
+        blob_repo_dir: None,
+        repo_path: path.clone(),
+    };
+    cmd_repo_publish(rf)
+        .await
+        .map_err(|e| fho::user_error!(format!("failed publishing to repo {}: {}", path, e)))
 }
 
 async fn main_connect_loop(
@@ -364,6 +394,13 @@ $ ffx doctor --restart-daemon"#,
                     .with_context(|| format!("Creating a repo client for {repo_name}"))?;
                 repo_manager.add(repo_name, repo_client);
             }
+
+            if cmd.refresh_metadata {
+                tracing::warn!(
+                    "--refresh-metadata is not supported with product bundles, ignoring"
+                );
+            }
+
             product_bundle
         }
         (repo_path, None) => {
@@ -394,6 +431,11 @@ $ ffx doctor --restart-daemon"#,
 
             let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
             repo_manager.add(repo_name, repo_client);
+
+            if cmd.refresh_metadata {
+                refresh_repository_metadata(&repo_path).await?;
+            }
+
             repo_path
         }
     };
@@ -846,128 +888,136 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_register() {
-        let test_env = get_test_env().await;
+        async fn run_test_start_register(refresh_metadata: bool) {
+            let test_env = get_test_env().await;
 
-        test_env
-            .context
-            .query(TARGET_DEFAULT_KEY)
-            .level(Some(ConfigLevel::User))
-            .set(TARGET_NODENAME.into())
+            test_env
+                .context
+                .query(TARGET_DEFAULT_KEY)
+                .level(Some(ConfigLevel::User))
+                .set(TARGET_NODENAME.into())
+                .await
+                .unwrap();
+
+            let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
+            let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
+            let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(None);
+
+            let frc = fake_repo.clone();
+            let fec = fake_engine.clone();
+
+            let tool_env = ToolEnv::new()
+                .remote_factory_closure(move || {
+                    let fake_repo = frc.clone();
+                    let fake_engine = fec.clone();
+                    async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
+                })
+                .target_factory_closure(move || {
+                    let fake_target_proxy = fake_target_proxy.clone();
+                    async { Ok(fake_target_proxy) }
+                });
+
+            let env = tool_env.make_environment(test_env.context.clone());
+
+            let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
+
+            let serve_tool = ServeTool {
+                cmd: ServeCommand {
+                    repository: Some(REPO_NAME.to_string()),
+                    trusted_root: None,
+                    address: (REPO_IPV4_ADDR, REPO_PORT).into(),
+                    repo_path: Some(EMPTY_REPO_PATH.into()),
+                    product_bundle: None,
+                    alias: vec!["example.com".into(), "fuchsia.com".into()],
+                    storage_type: Some(RepositoryStorageType::Ephemeral),
+                    alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
+                    port_path: Some(tmp_port_file.path().to_owned()),
+                    no_device: false,
+                    refresh_metadata: refresh_metadata,
+                },
+                context: env.context.clone(),
+                target_proxy_connector: Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make target proxy test connector"),
+                rcs_proxy_connector: Connector::try_from_env(&env)
+                    .await
+                    .expect("Could not make RCS test connector"),
+            };
+
+            let test_stdout = TestBuffer::default();
+            let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
+
+            // Run main in background
+            let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
+
+            // Future resolves once repo server communicates with them.
+            let _timeout = timeout(time::Duration::from_secs(10), async {
+                let _ = fake_target_rx.next().await.unwrap();
+                let _ = fake_repo_rx.next().await.unwrap();
+                let _ = fake_engine_rx.next().await.unwrap();
+            })
             .await
             .unwrap();
 
-        let (fake_repo, mut fake_repo_rx) = FakeRepositoryManager::new();
-        let (fake_engine, mut fake_engine_rx) = FakeEngine::new();
-        let (_, fake_target_proxy, mut fake_target_rx) = FakeTarget::new(None);
+            // Get dynamic port
+            let dynamic_repo_port =
+                fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
+            tmp_port_file.close().unwrap();
 
-        let frc = fake_repo.clone();
-        let fec = fake_engine.clone();
+            let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
 
-        let tool_env = ToolEnv::new()
-            .remote_factory_closure(move || {
-                let fake_repo = frc.clone();
-                let fake_engine = fec.clone();
-                async move { Ok(FakeRcs::new(fake_repo, fake_engine)) }
-            })
-            .target_factory_closure(move || {
-                let fake_target_proxy = fake_target_proxy.clone();
-                async { Ok(fake_target_proxy) }
-            });
-
-        let env = tool_env.make_environment(test_env.context.clone());
-
-        let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
-
-        let serve_tool = ServeTool {
-            cmd: ServeCommand {
-                repository: Some(REPO_NAME.to_string()),
-                trusted_root: None,
-                address: (REPO_IPV4_ADDR, REPO_PORT).into(),
-                repo_path: Some(EMPTY_REPO_PATH.into()),
-                product_bundle: None,
-                alias: vec!["example.com".into(), "fuchsia.com".into()],
-                storage_type: Some(RepositoryStorageType::Ephemeral),
-                alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
-                port_path: Some(tmp_port_file.path().to_owned()),
-                no_device: false,
-            },
-            context: env.context.clone(),
-            target_proxy_connector: Connector::try_from_env(&env)
-                .await
-                .expect("Could not make target proxy test connector"),
-            rcs_proxy_connector: Connector::try_from_env(&env)
-                .await
-                .expect("Could not make RCS test connector"),
-        };
-
-        let test_stdout = TestBuffer::default();
-        let writer = SimpleWriter::new_buffers(test_stdout.clone(), Vec::new());
-
-        // Run main in background
-        let _task = fasync::Task::local(async move { serve_tool.main(writer).await.unwrap() });
-
-        // Future resolves once repo server communicates with them.
-        let _timeout = timeout(time::Duration::from_secs(10), async {
-            let _ = fake_target_rx.next().await.unwrap();
-            let _ = fake_repo_rx.next().await.unwrap();
-            let _ = fake_engine_rx.next().await.unwrap();
-        })
-        .await
-        .unwrap();
-
-        // Get dynamic port
-        let dynamic_repo_port =
-            fs::read_to_string(tmp_port_file.path()).unwrap().parse::<u16>().unwrap();
-        tmp_port_file.close().unwrap();
-
-        let repo_url = format!("http://{REPO_ADDR}:{dynamic_repo_port}/{REPO_NAME}");
-
-        assert_eq!(
-            fake_repo.take_events(),
-            vec![RepositoryManagerEvent::Add {
-                repo: RepositoryConfig {
-                    mirrors: Some(vec![MirrorConfig {
-                        mirror_url: Some(repo_url.clone()),
-                        subscribe: Some(true),
+            assert_eq!(
+                fake_repo.take_events(),
+                vec![RepositoryManagerEvent::Add {
+                    repo: RepositoryConfig {
+                        mirrors: Some(vec![MirrorConfig {
+                            mirror_url: Some(repo_url.clone()),
+                            subscribe: Some(true),
+                            ..Default::default()
+                        }]),
+                        repo_url: Some(format!("fuchsia-pkg://{}", REPO_NAME)),
+                        root_keys: Some(vec![fuchsia_repo::test_utils::repo_key().into()]),
+                        root_version: Some(1),
+                        root_threshold: Some(1),
+                        use_local_mirror: Some(false),
+                        storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
                         ..Default::default()
-                    }]),
-                    repo_url: Some(format!("fuchsia-pkg://{}", REPO_NAME)),
-                    root_keys: Some(vec![fuchsia_repo::test_utils::repo_key().into()]),
-                    root_version: Some(1),
-                    root_threshold: Some(1),
-                    use_local_mirror: Some(false),
-                    storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
-                    ..Default::default()
-                }
-            }],
-        );
+                    }
+                }],
+            );
 
-        assert_eq!(
-            fake_engine.take_events(),
-            vec![
-                RewriteEngineEvent::ListDynamic,
-                RewriteEngineEvent::IteratorNext,
-                RewriteEngineEvent::ResetAll,
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("example.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionAdd {
-                    rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
-                },
-                RewriteEngineEvent::EditTransactionCommit,
-            ],
-        );
+            assert_eq!(
+                fake_engine.take_events(),
+                vec![
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
+                        rule: rule!("example.com" => REPO_NAME, "/" => "/"),
+                    },
+                    RewriteEngineEvent::EditTransactionAdd {
+                        rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
+                    },
+                    RewriteEngineEvent::EditTransactionCommit,
+                ],
+            );
 
-        // Check repository state.
-        let http_repo = HttpRepository::new(
-            fuchsia_hyper::new_client(),
-            Url::parse(&repo_url).unwrap(),
-            Url::parse(&format!("{repo_url}/blobs")).unwrap(),
-            BTreeSet::new(),
-        );
-        let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
+            // Check repository state.
+            let http_repo = HttpRepository::new(
+                fuchsia_hyper::new_client(),
+                Url::parse(&repo_url).unwrap(),
+                Url::parse(&format!("{repo_url}/blobs")).unwrap(),
+                BTreeSet::new(),
+            );
+            let mut repo_client = RepoClient::from_trusted_remote(http_repo).await.unwrap();
 
-        assert_matches!(repo_client.update().await, Ok(true));
+            assert_matches!(repo_client.update().await, Ok(true));
+        }
+
+        let test_cases = [false, true];
+        for tc in test_cases {
+            run_test_start_register(tc).await;
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1028,6 +1078,7 @@ mod test {
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
+                    refresh_metadata: false,
                 },
                 env.context.clone(),
                 writer,
@@ -1167,6 +1218,7 @@ mod test {
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
+                    refresh_metadata: false,
                 },
                 env.context.clone(),
                 writer,
@@ -1306,6 +1358,7 @@ mod test {
                     alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
                     port_path: Some(tmp_port_file_path),
                     no_device: false,
+                    refresh_metadata: false,
                 },
                 test_env.context.clone(),
                 writer,
@@ -1449,6 +1502,7 @@ mod test {
             alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             port_path: Some(tmp_port_file.path().to_owned()),
             no_device: true,
+            refresh_metadata: false,
         };
         let mut serve_cmd_with_root = serve_cmd_without_root.clone();
         serve_cmd_with_root.trusted_root = trusted_root_path.clone().into();

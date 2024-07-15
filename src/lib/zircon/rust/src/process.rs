@@ -6,7 +6,7 @@
 
 use crate::sys::{zx_handle_t, zx_rights_t};
 use crate::{
-    object_get_info, object_get_info_vec, object_get_property, object_set_property, ok,
+    object_get_info_single, object_get_info_vec, object_get_property, object_set_property, ok,
     AsHandleRef, Handle, HandleBased, HandleRef, Koid, ObjectQuery, Property, PropertyQuery,
     Status, Task, Thread, Topic, VmoInfo,
 };
@@ -294,9 +294,7 @@ impl Process {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_PROCESS topic.
     pub fn info(&self) -> Result<ProcessInfo, Status> {
-        let mut info = ProcessInfo::default();
-        object_get_info::<ProcessInfo>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<ProcessInfo>(self.as_handle_ref())
     }
 
     /// Wraps the
@@ -310,21 +308,12 @@ impl Process {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_TASK_STATS topic.
     pub fn task_stats(&self) -> Result<TaskStatsInfo, Status> {
-        let mut info = TaskStatsInfo::default();
-        object_get_info::<TaskStatsInfo>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<TaskStatsInfo>(self.as_handle_ref())
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_PROCESS_MAPS topic.
-    ///
-    /// Returns `(num_returned, num_remaining)` on success and writes `num_returned`, entries to
-    /// `info_out`.
-    pub fn info_maps(&self, info_out: &mut [ProcessMapsInfo]) -> Result<(usize, usize), Status> {
-        object_get_info::<ProcessMapsInfo>(self.as_handle_ref(), info_out)
-    }
-
     pub fn info_maps_vec(&self) -> Result<Vec<ProcessMapsInfo>, Status> {
         object_get_info_vec::<ProcessMapsInfo>(self.as_handle_ref())
     }
@@ -347,9 +336,7 @@ impl Process {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_PROCESS_HANDLE_STATS topic.
     pub fn handle_stats(&self) -> Result<ProcessHandleStats, Status> {
-        let mut info = ProcessHandleStats::default();
-        object_get_info::<ProcessHandleStats>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<ProcessHandleStats>(self.as_handle_ref())
     }
 
     /// Wraps the
@@ -520,25 +507,7 @@ mod tests {
             .map(0, &vmo, 0, system_get_page_size() as usize, VmarFlags::PERM_READ)
             .unwrap();
 
-        // Querying a single info. As we know there are at least two mappings this is guaranteed to
-        // not return all of them.
-        let mut info = ProcessMapsInfo::default();
-        let (returned, remaining) = process.info_maps(std::slice::from_mut(&mut info)).unwrap();
-        assert_eq!(returned, 1);
-        assert!(remaining > 0);
-
-        // Add some slack to the total to account for mappings created as a result of the heap
-        // allocation in Vec.
-        let total = returned + remaining + 10;
-
-        // Allocate and retrieve all of the mappings.
-        let mut info = Vec::with_capacity(total);
-        info.resize(total, ProcessMapsInfo::default());
-
-        let (_, remaining) = process.info_maps(info.as_mut_slice()).unwrap();
-        // Don't know exactly how many were returned, but since we are going to search for our
-        // mappings we do need to know that none are remaining.
-        assert_eq!(remaining, 0);
+        let info = process.info_maps_vec().unwrap();
 
         // We should find our two mappings in the info.
         let count = info

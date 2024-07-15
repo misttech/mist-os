@@ -14,7 +14,7 @@ namespace {
 
 const std::vector<vk::Format> kSupportedClientImageFormats = {
     vk::Format::eR8G8B8A8Srgb, vk::Format::eB8G8R8A8Srgb, vk::Format::eG8B8R83Plane420Unorm,
-    vk::Format::eG8B8R82Plane420Unorm};
+    vk::Format::eR5G6B5UnormPack16, vk::Format::eG8B8R82Plane420Unorm};
 
 const std::vector<vk::Format> kSupportedClientYuvImageFormats = {vk::Format::eG8B8R83Plane420Unorm,
                                                                  vk::Format::eG8B8R82Plane420Unorm};

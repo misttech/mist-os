@@ -56,12 +56,14 @@ fuchsia_package_with_single_component("collector") {
   deps = [ ":bin" ]
 }
 
-sdk_fuchsia_package("collector_sdk") {
-  distribution_name = "heapdump-collector"
-  package_label = ":collector"
-  category = "partner"
-  expected_files_exact = [ "meta/heapdump-collector.cm" ]
-  api_level_added = 18
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("collector_sdk") {
+    distribution_name = "heapdump-collector"
+    package_label = ":collector"
+    category = "partner"
+    expected_files_exact = [ "meta/heapdump-collector.cm" ]
+    api_level_added = 18
+  }
 }
 
 fuchsia_unittest_package("tests") {

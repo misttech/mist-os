@@ -184,28 +184,21 @@ TEST_F(FileCacheTest, WritebackOperation) {
   ASSERT_EQ(file.Writeback(op), 0UL);
   ASSERT_EQ(fs_->GetSuperblockInfo().GetPageCount(CountType::kWriteback), 0);
 
-  // The Pages should be kept but not set to uptodate since kernel can evict any clean pages.
+  // The Pages should be kept but not uptodate since kernel can evict any clean pages.
   {
-    LockedPage page;
-    ASSERT_EQ(file.GrabCachePage(0, &page), ZX_OK);
-    ASSERT_EQ(page->IsUptodate(), false);
-  }
-  {
-    LockedPage page;
-    ASSERT_EQ(file.GrabCachePage(1, &page), ZX_OK);
-    ASSERT_EQ(page->IsUptodate(), false);
+    fbl::RefPtr<Page> page1, page2;
+    ASSERT_EQ(file.FindPage(0, &page1), ZX_OK);
+    ASSERT_EQ(file.FindPage(1, &page2), ZX_OK);
+    ASSERT_EQ(LockedPage(std::move(page1))->IsUptodate(), false);
+    ASSERT_EQ(LockedPage(std::move(page2))->IsUptodate(), false);
   }
 
-  // Release clean Pages
-  file.CleanupPages();
-
+  // Invalidate pages
+  file.InvalidatePages();
   {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(file.FindPage(0, &page), ZX_ERR_NOT_FOUND);
-  }
-  {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(file.FindPage(1, &page), ZX_ERR_NOT_FOUND);
+    fbl::RefPtr<Page> page1, page2;
+    ASSERT_EQ(file.FindPage(0, &page1), ZX_ERR_NOT_FOUND);
+    ASSERT_EQ(file.FindPage(1, &page2), ZX_ERR_NOT_FOUND);
   }
 }
 

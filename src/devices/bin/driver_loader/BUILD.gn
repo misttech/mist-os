@@ -8,10 +8,18 @@ source_set("driver_loader") {
     "loader.cc",
     "loader.h",
   ]
-  deps = [ "//sdk/lib/ld:ld-stub.basic" ]
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/fdio",
+    "//sdk/lib/ld:ld-stub.basic",
+  ]
   public_deps = [
+    "//sdk/lib/ld:abi-headers",
+    "//sdk/lib/ld:headers",
     "//src/devices/lib/log",
     "//src/lib/elfldltl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 }

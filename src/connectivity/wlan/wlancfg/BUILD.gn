@@ -90,6 +90,7 @@ rustc_library("lib") {
     "src/client/roaming/lib.rs",
     "src/client/roaming/local_roam_manager/mod.rs",
     "src/client/roaming/mod.rs",
+    "src/client/roaming/roam_monitor/default_monitor.rs",
     "src/client/roaming/roam_monitor/mod.rs",
     "src/client/roaming/roam_monitor/stationary_monitor.rs",
     "src/client/scan/fidl_conversion.rs",

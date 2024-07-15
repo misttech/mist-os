@@ -6,7 +6,7 @@
 
 use core::cmp::Ordering;
 use core::convert::Infallible;
-use core::num::{NonZeroU32, NonZeroU8};
+use core::num::NonZeroU8;
 
 use log::error;
 use net_types::ip::{Ip, IpVersionMarker, Ipv6Addr, Ipv6SourceAddr, Mtu};
@@ -14,7 +14,7 @@ use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     trace_duration, AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    InstantContext, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
+    InstantContext, IpExt, Mms, SendFrameErrorReason, StrongDeviceIdentifier, TracingContext,
     WeakDeviceIdentifier as _,
 };
 use netstack3_filter::{
@@ -25,14 +25,14 @@ use packet::{BufferMut, PacketConstraints, SerializeError};
 use thiserror::Error;
 
 use crate::internal::base::{
-    FilterHandlerProvider, IpCounters, IpDeviceContext, IpExt, IpLayerIpExt, IpLayerPacketMetadata,
+    FilterHandlerProvider, IpCounters, IpDeviceContext, IpLayerIpExt, IpLayerPacketMetadata,
     IpPacketDestination, IpSendFrameError, IpSendFrameErrorReason, ResolveRouteError,
     SendIpPacketMeta,
 };
 use crate::internal::device::state::IpDeviceStateIpExt;
 use crate::internal::device::IpDeviceAddr;
 use crate::internal::types::{ResolvedRoute, RoutableIpAddr};
-use crate::HopLimits;
+use crate::{HopLimits, NextHop};
 
 /// An execution context defining a type of IP socket.
 pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
@@ -57,6 +57,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
+        transparent: bool,
     ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>;
 
     /// Sends an IP packet on a socket.
@@ -116,6 +117,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: &O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
+        transparent: bool,
     ) -> Result<(), SendOneShotIpPacketError<E>>
     where
         S: TransportPacketSerializer<I>,
@@ -124,7 +126,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         O: SendOptions<I>,
     {
         let tmp = self
-            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto)
+            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, transparent)
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
@@ -143,6 +145,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         options: &O,
         get_body_from_src_ip: F,
         mtu: Option<u32>,
+        transparent: bool,
     ) -> Result<(), IpSockCreateAndSendError>
     where
         S: TransportPacketSerializer<I>,
@@ -159,6 +162,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             options,
             |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
             mtu,
+            transparent,
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => err,
@@ -183,6 +187,9 @@ pub enum IpSockSendError {
     /// a non-loopback device.
     #[error("illegal loopback address")]
     IllegalLoopbackAddress,
+    /// Broadcast send is not allowed.
+    #[error("Broadcast send is not enabled for the socket")]
+    BroadcastNotAllowed,
 }
 
 impl From<SerializeError<Infallible>> for IpSockSendError {
@@ -236,26 +243,6 @@ pub enum IpSockCreateAndSendError {
 pub enum SendOneShotIpPacketError<E> {
     CreateAndSendError { err: IpSockCreateAndSendError },
     SerializeError(E),
-}
-
-/// Maximum packet size, that is the maximum IP payload one packet can carry.
-///
-/// More details from https://www.rfc-editor.org/rfc/rfc1122#section-3.3.2.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mms(NonZeroU32);
-
-impl Mms {
-    /// Creates a maximum packet size from an [`Mtu`] value.
-    pub fn from_mtu<I: IpExt>(mtu: Mtu, options_size: u32) -> Option<Self> {
-        NonZeroU32::new(mtu.get().saturating_sub(I::IP_HEADER_LENGTH.get() + options_size))
-            .map(|mms| Self(mms.min(I::IP_MAX_PAYLOAD_LENGTH)))
-    }
-
-    /// Returns the maximum packet size.
-    pub fn get(&self) -> NonZeroU32 {
-        let Self(mms) = *self;
-        mms
-    }
 }
 
 /// Possible errors when retrieving the maximum transport message size.
@@ -333,6 +320,11 @@ pub struct IpSockDefinition<I: IpExt, D> {
     pub device: Option<D>,
     /// The IP protocol the socket is bound to.
     pub proto: I::Proto,
+    /// Whether the socket is transparent.
+    ///
+    /// This allows transparently proxying traffic to the socket, and allows the
+    /// socket to be bound to a non-local address.
+    pub transparent: bool,
 }
 
 impl<I: IpExt, D> IpSock<I, D> {
@@ -351,6 +343,10 @@ impl<I: IpExt, D> IpSock<I, D> {
     /// Returns the socket's protocol.
     pub fn proto(&self) -> I::Proto {
         self.definition.proto
+    }
+    /// Returns whether the socket is transparent.
+    pub fn transparent(&self) -> bool {
+        self.definition.transparent
     }
 }
 
@@ -383,6 +379,7 @@ where
         device: Option<&Self::DeviceId>,
         src_ip: Option<IpDeviceAddr<I::Addr>>,
         dst_ip: RoutableIpAddr<I::Addr>,
+        transparent: bool,
     ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError>;
 
     /// Send an IP packet to the next-hop node.
@@ -421,6 +418,7 @@ where
         local_ip: Option<SocketIpAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
+        transparent: bool,
     ) -> Result<IpSock<I, CC::WeakDeviceId>, IpSockCreationError> {
         let device = device
             .as_ref()
@@ -432,8 +430,9 @@ where
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
-        let resolved_route = self.lookup_route(bindings_ctx, device, local_ip, remote_ip)?;
-        Ok(new_ip_socket(device, resolved_route, remote_ip, proto))
+        let resolved_route =
+            self.lookup_route(bindings_ctx, device, local_ip, remote_ip, transparent)?;
+        Ok(new_ip_socket(device, resolved_route, remote_ip, proto, transparent))
     }
 
     fn send_ip_packet<S, O>(
@@ -463,7 +462,7 @@ where
 /// instead of an inherent impl on a type so that users of sockets that don't
 /// need certain option types, like TCP for anything multicast-related, can
 /// avoid allocating space for those options.
-pub trait SendOptions<I: Ip> {
+pub trait SendOptions<I: IpExt> {
     /// Returns the hop limit to set on a packet going to the given destination.
     ///
     /// If `Some(u)`, `u` will be used as the hop limit (IPv6) or TTL (IPv4) for
@@ -474,19 +473,26 @@ pub trait SendOptions<I: Ip> {
     /// Returns true if outgoing multicast packets should be looped back and
     /// delivered to local receivers who joined the multicast group.
     fn multicast_loop(&self) -> bool;
+
+    /// `Some` if the socket can be used to send broadcast packets.
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker>;
 }
 
 /// Empty send options that never overrides default values.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct DefaultSendOptions;
 
-impl<I: Ip> SendOptions<I> for DefaultSendOptions {
+impl<I: IpExt> SendOptions<I> for DefaultSendOptions {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         None
     }
 
     fn multicast_loop(&self) -> bool {
         false
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        None
     }
 }
 
@@ -541,6 +547,7 @@ fn new_ip_socket<I, D>(
     route: ResolvedRoute<I, D>,
     remote_ip: SocketIpAddr<I::Addr>,
     proto: I::Proto,
+    transparent: bool,
 ) -> IpSock<I, D::Weak>
 where
     I: IpExt,
@@ -565,8 +572,13 @@ where
         .or(requested_device)
         .map(|d| d.downgrade());
 
-    let definition =
-        IpSockDefinition { local_ip: src_addr, remote_ip, device: socket_device, proto };
+    let definition = IpSockDefinition {
+        local_ip: src_addr,
+        remote_ip,
+        device: socket_device,
+        proto,
+        transparent,
+    };
     IpSock { definition }
 }
 
@@ -601,6 +613,7 @@ where
         device: &Option<CC::WeakDeviceId>,
         local_ip: IpDeviceAddr<I::Addr>,
         remote_ip: RoutableIpAddr<I::Addr>,
+        transparent: bool,
     ) -> Result<ResolvedRoute<I, CC::DeviceId>, IpSockSendError> {
         let device = match device.as_ref().map(|d| d.upgrade()) {
             Some(Some(device)) => Some(device),
@@ -608,21 +621,26 @@ where
             None => None,
         };
         let route = core_ctx
-            .lookup_route(bindings_ctx, device.as_ref(), Some(local_ip), remote_ip)
+            .lookup_route(bindings_ctx, device.as_ref(), Some(local_ip), remote_ip, transparent)
             .map_err(|e| IpSockSendError::Unroutable(e))?;
         assert_eq!(local_ip, route.src_addr);
         Ok(route)
     }
 
     let IpSock {
-        definition: IpSockDefinition { remote_ip, local_ip, device: socket_device, proto },
+        definition:
+            IpSockDefinition { remote_ip, local_ip, device: socket_device, proto, transparent },
     } = socket;
     let ResolvedRoute {
         src_addr: local_ip,
         device: mut egress_device,
         mut next_hop,
         mut local_delivery_device,
-    } = resolve(core_ctx, bindings_ctx, socket_device, *local_ip, *remote_ip)?;
+    } = resolve(core_ctx, bindings_ctx, socket_device, *local_ip, *remote_ip, *transparent)?;
+
+    if matches!(next_hop, NextHop::Broadcast(_)) && options.allow_broadcast().is_none() {
+        return Err(IpSockSendError::BroadcastNotAllowed);
+    }
 
     let previous_dst = remote_ip.addr();
     let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
@@ -657,20 +675,23 @@ where
             device: new_device,
             next_hop: new_next_hop,
             local_delivery_device: new_local_delivery_device,
-        } = resolve(core_ctx, bindings_ctx, socket_device, local_ip, remote_ip).inspect_err(
-            |_| {
+        } = resolve(core_ctx, bindings_ctx, socket_device, local_ip, remote_ip, *transparent)
+            .inspect_err(|_| {
                 packet_metadata.acknowledge_drop();
-            },
-        )?;
+            })?;
         local_ip = new_local_ip;
         egress_device = new_device;
         next_hop = new_next_hop;
         local_delivery_device = new_local_delivery_device;
     }
 
-    let loopback_packet = (options.multicast_loop()
-        && remote_ip.addr().is_multicast()
-        && !egress_device.is_loopback())
+    // The packet needs to be delivered locally if it's sent to a broadcast
+    // or multicast address. For multicast packets this feature can be disabled
+    // with IP_MULTICAST_LOOP.
+
+    let loopback_packet = (!egress_device.is_loopback()
+        && ((options.multicast_loop() && remote_ip.addr().is_multicast())
+            || next_hop.is_broadcast()))
     .then(|| body.serialize_new_buf(PacketConstraints::UNCONSTRAINED, packet::new_buf_vec))
     .transpose()?
     .map(|buf| RawIpBody::new(*proto, local_ip.addr(), remote_ip.addr(), buf));
@@ -716,11 +737,11 @@ where
                 packet_metadata,
             )
             .unwrap_or_else(|IpSendFrameError { serializer: _, error }| {
-                error!("failed to send multicast loopback packet: {error:?}")
+                error!("failed to send loopback packet: {error:?}")
             });
         }
         (Some(_loopback_packet), None) => {
-            error!("can't send multicast loopback packet without the loopback device")
+            error!("can't send a loopback packet without the loopback device")
         }
         _ => (),
     }
@@ -745,14 +766,15 @@ where
         bindings_ctx: &mut BC,
         ip_sock: &IpSock<I, Self::WeakDeviceId>,
     ) -> Result<Mms, MmsError> {
-        let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
+        let IpSockDefinition { remote_ip, local_ip, device, proto: _, transparent } =
+            &ip_sock.definition;
         let device = device
             .as_ref()
             .map(|d| d.upgrade().ok_or(ResolveRouteError::Unreachable))
             .transpose()?;
 
         let ResolvedRoute { src_addr: _, local_delivery_device: _, device, next_hop: _ } = self
-            .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip)
+            .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip, *transparent)
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, BC>::get_mtu(self, &device);
         // TODO(https://fxbug.dev/42072935): Calculate the options size when they
@@ -1216,8 +1238,15 @@ pub(crate) mod testutil {
             local_ip: Option<SocketIpAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
+            transparent: bool,
         ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
-            self.state.fake_ip_socket_ctx_mut().new_ip_socket(device, local_ip, remote_ip, proto)
+            self.state.fake_ip_socket_ctx_mut().new_ip_socket(
+                device,
+                local_ip,
+                remote_ip,
+                proto,
+                transparent,
+            )
         }
 
         fn send_ip_packet<S, O>(
@@ -1273,7 +1302,8 @@ pub(crate) mod testutil {
             addr: MulticastAddr<<I as Ip>::Addr>,
         ) -> Result<Self::DeviceId, ResolveRouteError> {
             let remote_ip = SocketIpAddr::new_from_multicast(addr);
-            self.lookup_route(None, None, remote_ip).map(|ResolvedRoute { device, .. }| device)
+            self.lookup_route(None, None, remote_ip, /* transparent */ false)
+                .map(|ResolvedRoute { device, .. }| device)
         }
     }
 
@@ -1573,14 +1603,15 @@ pub(crate) mod testutil {
             local_ip: Option<SocketIpAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
+            transparent: bool,
         ) -> Result<IpSock<I, D::Weak>, IpSockCreationError> {
             let device = device
                 .as_ref()
                 .map(|d| d.as_strong_ref().ok_or(ResolveRouteError::Unreachable))
                 .transpose()?;
             let device = device.as_ref().map(|d| d.as_ref());
-            let resolved_route = self.lookup_route(device, local_ip, remote_ip)?;
-            Ok(new_ip_socket(device, resolved_route, remote_ip, proto))
+            let resolved_route = self.lookup_route(device, local_ip, remote_ip, transparent)?;
+            Ok(new_ip_socket(device, resolved_route, remote_ip, proto, transparent))
         }
 
         fn lookup_route(
@@ -1588,14 +1619,20 @@ pub(crate) mod testutil {
             device: Option<&D>,
             local_ip: Option<IpDeviceAddr<I::Addr>>,
             addr: RoutableIpAddr<I::Addr>,
+            transparent: bool,
         ) -> Result<ResolvedRoute<I, D>, ResolveRouteError> {
             let Self { table, devices, forwarding } = self;
             let (destination, ()) = table
                 .lookup_filter_map(forwarding, device, addr.addr(), |_, d| match &local_ip {
                     None => Some(()),
-                    Some(local_ip) => devices.get(d).and_then(|state| {
-                        state.addresses.contains(local_ip.as_ref()).then_some(())
-                    }),
+                    Some(local_ip) => {
+                        if transparent {
+                            return Some(());
+                        }
+                        devices.get(d).and_then(|state| {
+                            state.addresses.contains(local_ip.as_ref()).then_some(())
+                        })
+                    }
                 })
                 .next()
                 .ok_or(ResolveRouteError::Unreachable)?;
@@ -1608,14 +1645,16 @@ pub(crate) mod testutil {
                     SocketIpAddr::new(addr.get()).expect("not valid socket addr")
                 }
                 Some(local_ip) => {
-                    // We already constrained the set of devices so this
-                    // should be a given.
-                    assert!(
-                        addrs.any(|a| a.get() == local_ip.addr()),
-                        "didn't find IP {:?} in {:?}",
-                        local_ip,
-                        addrs.collect::<Vec<_>>()
-                    );
+                    if !transparent {
+                        // We already constrained the set of devices so this
+                        // should be a given.
+                        assert!(
+                            addrs.any(|a| a.get() == local_ip.addr()),
+                            "didn't find IP {:?} in {:?}",
+                            local_ip,
+                            addrs.collect::<Vec<_>>()
+                        );
+                    }
                     local_ip
                 }
             };
@@ -1637,13 +1676,14 @@ pub(crate) mod testutil {
         where
             O: SendOptions<I>,
         {
-            let IpSockDefinition { remote_ip, local_ip, device, proto } = &socket.definition;
+            let IpSockDefinition { remote_ip, local_ip, device, proto, transparent } =
+                &socket.definition;
             let device = device
                 .as_ref()
                 .map(|d| d.upgrade().ok_or(ResolveRouteError::Unreachable))
                 .transpose()?;
             let ResolvedRoute { src_addr, device, next_hop, local_delivery_device: _ } =
-                self.lookup_route(device.as_ref(), Some(*local_ip), *remote_ip)?;
+                self.lookup_route(device.as_ref(), Some(*local_ip), *remote_ip, *transparent)?;
 
             let remote_ip: &SpecifiedAddr<_> = remote_ip.as_ref();
 

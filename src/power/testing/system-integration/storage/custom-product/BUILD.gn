@@ -35,7 +35,8 @@ bazel_input_directory("test_wrapped") {
 bazel_product_bundle("product_bundle") {
   testonly = true
   allow_eng_platform_bundle_use = true
-  generate_image = false
+  generate_image_metadata = false
+  generate_product_bundle_metadata = true
   product_bundle_name = "power_testing_storage.power_testing_storage_vim3"
   bazel_product_bundle_target = ":product_bundle.power_testing_storage_vim3"
   bazel_product_image_target = ":image.power_testing_storage_vim3"

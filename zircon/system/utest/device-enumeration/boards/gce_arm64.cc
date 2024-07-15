@@ -8,13 +8,14 @@ namespace {
 
 TEST_F(DeviceEnumerationTest, GceArm64Test) {
 #ifdef __aarch64__
-  static const char* kDevicePaths[] = {
-      // TODO(https://fxbug.dev/42052364): Once we use userspace PCI, add PCI devices we expect to see.
-      "sys/platform/pt/acpi",
-      "sys/platform/pt/acpi/_SB_",
+  static const char* kNodeMonikers[] = {
+      // TODO(https://fxbug.dev/42052364): Once we use userspace PCI, add PCI devices we expect to
+      // see.
+      "dev.sys.platform.pt.acpi",
+      "dev.sys.platform.pt.acpi._SB_",
   };
 
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+  VerifyNodes(kNodeMonikers);
   return;
 #endif
   ASSERT_TRUE(false, "GCE board not ARM64.");

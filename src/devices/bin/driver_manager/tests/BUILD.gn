@@ -295,13 +295,8 @@ fuchsia_test_package("driver-manager-tests") {
 
 fuchsia_test_package("driver-host-runner-tests") {
   test_components = [ ":driver-host-runner-test" ]
-  deps = [ "//src/devices/bin/driver_host2:component" ]
-
-  # TODO(https://fxbug.dev/341966687): the driver host runner will log an error
-  # due to the loader library not yet been implemented.
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
+  deps = [
+    "modules:modules.basic",
+    "//src/devices/bin/driver_host2:component",
+  ]
 }

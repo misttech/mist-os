@@ -181,7 +181,7 @@ mod test_util {
     use fidl::endpoints::ServerEnd;
     use sandbox::{Connector, Receiver};
     use std::sync::Arc;
-    use vfs::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+    use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
@@ -198,12 +198,14 @@ mod test_util {
         struct Sender(async_channel::Sender<(Path, zx::Channel)>);
 
         impl DirectoryEntry for Sender {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-            }
-
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
                 request.open_remote(self)
+            }
+        }
+
+        impl GetEntryInfo for Sender {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
             }
         }
 

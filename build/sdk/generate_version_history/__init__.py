@@ -36,7 +36,7 @@ def replace_special_abi_revisions_using_commit_hash(
 ) -> None:
     """Modifies `version_history`, assigning ABI revisions for the special API
     levels. The first 16 bits of the ABI revisions indicate whether the API
-    level is HEAD or PLATFORM. The remainder is a prefix of the given git
+    level is unstable or PLATFORM. The remainder is a prefix of the given git
     hash."""
     # Embed the first 48 bits of the git hash in the ABI. That should be
     # plenty to look up the full commit hash in git.
@@ -47,8 +47,9 @@ def replace_special_abi_revisions_using_commit_hash(
         assert (
             input_abi_revision == "GENERATED_BY_BUILD"
         ), f"ABI revision for special API level {level} was '{input_abi_revision}'; expected 'GENERATED_BY_BUILD'"
-        if level == "HEAD":
-            # ABI revisions for HEAD start with 0xFF00.
+        if level == "NEXT" or level == "HEAD":
+            # ABI revisions for unstable levels start with 0xFF00.
+            # All such levels share an ABI revision.
             value["abi_revision"] = "0x{:X}".format(
                 0xFF00_0000_0000_0000 | masked_git_hash
             )

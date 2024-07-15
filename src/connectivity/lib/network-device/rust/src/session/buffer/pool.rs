@@ -171,15 +171,49 @@ impl Pool {
         self: &Arc<Self>,
         num_bytes: usize,
     ) -> Result<Buffer<Tx>> {
+        self.alloc_tx_buffers(num_bytes).await?.next().unwrap()
+    }
+
+    /// Waits for at least one TX buffer to be available and returns an iterator
+    /// of buffers with `num_bytes` as capacity.
+    ///
+    /// The returned iterator is guaranteed to yield at least one item (though
+    /// it might be an error if the requested size cannot meet the device
+    /// requirement).
+    ///
+    /// # Note
+    ///
+    /// Given a `Buffer<Tx>` is returned to the pool when it's dropped, the
+    /// returned iterator will seemingly yield infinite items if the yielded
+    /// `Buffer`s are dropped while iterating.
+    pub(in crate::session) async fn alloc_tx_buffers<'a>(
+        self: &'a Arc<Self>,
+        num_bytes: usize,
+    ) -> Result<impl Iterator<Item = Result<Buffer<Tx>>> + 'a> {
         let BufferLayout { min_tx_data, min_tx_head, min_tx_tail, length: buffer_length } =
             self.buffer_layout;
         let tx_head = usize::from(min_tx_head);
         let tx_tail = usize::from(min_tx_tail);
         let total_bytes = num_bytes.max(min_tx_data) + tx_head + tx_tail;
         let num_parts = (total_bytes + buffer_length - 1) / buffer_length;
-        let mut alloc = self.alloc_tx(ChainLength::try_from(num_parts)?).await;
-        alloc.init(num_bytes)?;
-        alloc.try_into()
+        let chain_length = ChainLength::try_from(num_parts)?;
+        let first = self.alloc_tx(chain_length).await;
+        let iter = std::iter::once(first)
+            .chain(std::iter::from_fn(move || {
+                let mut state = self.tx_alloc_state.lock();
+                state
+                    .free_list
+                    .try_alloc(chain_length, &self.descriptors)
+                    .map(|allocated| AllocGuard::new(allocated, self.clone()))
+            }))
+            // Fuse afterwards so we're guaranteeing we can't see a new entry
+            // after having yielded `None` once.
+            .fuse()
+            .map(move |mut alloc| {
+                alloc.init(num_bytes)?;
+                Ok(alloc.into())
+            });
+        Ok(iter)
     }
 
     /// Frees rx descriptors.
@@ -281,7 +315,7 @@ impl Pool {
     ) -> Result<Buffer<Rx>> {
         let descs = self.descriptors.chain(head).collect::<Result<Chained<_>>>()?;
         let alloc = AllocGuard::new(descs, self.clone());
-        alloc.try_into()
+        Ok(alloc.into())
     }
 }
 
@@ -858,10 +892,8 @@ impl Debug for BufferPart {
     }
 }
 
-impl<K: AllocKind> TryFrom<AllocGuard<K>> for Buffer<K> {
-    type Error = Error;
-
-    fn try_from(alloc: AllocGuard<K>) -> Result<Self> {
+impl<K: AllocKind> From<AllocGuard<K>> for Buffer<K> {
+    fn from(alloc: AllocGuard<K>) -> Self {
         let AllocGuard { pool, descs: _ } = &alloc;
         let parts: Chained<BufferPart> = alloc
             .descriptors()
@@ -889,12 +921,12 @@ impl<K: AllocKind> TryFrom<AllocGuard<K>> for Buffer<K> {
                 // `BufferPart` is alive; `add` is safe because
                 // `offset + head_length is within the allocation and
                 // smaller than isize::MAX.
-                Ok(unsafe {
+                unsafe {
                     BufferPart::new(pool.base.as_ptr().add(offset + head_length), data_length, len)
-                })
+                }
             })
-            .collect::<Result<_>>()?;
-        Ok(Self { alloc, parts, pos: 0 })
+            .collect();
+        Self { alloc, parts, pos: 0 }
     }
 }
 
@@ -1147,7 +1179,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alloc_tx_distinct() {
+    fn alloc_tx_distinct() {
         let pool = Pool::new_test_default();
         let allocated = pool.alloc_tx_all(1);
         assert_eq!(allocated.len(), DEFAULT_TX_BUFFERS.get().into());
@@ -1162,7 +1194,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alloc_tx_free_len() {
+    fn alloc_tx_free_len() {
         let pool = Pool::new_test_default();
         {
             let allocated = pool.alloc_tx_all(2);
@@ -1176,7 +1208,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alloc_tx_chain() {
+    fn alloc_tx_chain() {
         let pool = Pool::new_test_default();
         let allocated = pool.alloc_tx_all(3);
         assert_eq!(allocated.len(), usize::from(DEFAULT_TX_BUFFERS.get()) / 3);
@@ -1185,7 +1217,41 @@ mod tests {
     }
 
     #[test]
-    fn test_alloc_tx_after_free() {
+    fn alloc_tx_many() {
+        let pool = Pool::new_test_default();
+        let data_len = u32::try_from(DEFAULT_BUFFER_LENGTH.get()).unwrap()
+            - u32::from(DEFAULT_MIN_TX_BUFFER_HEAD)
+            - u32::from(DEFAULT_MIN_TX_BUFFER_TAIL);
+        let data_len = usize::try_from(data_len).unwrap();
+        let mut buffers = pool
+            .alloc_tx_buffers(data_len)
+            .now_or_never()
+            .expect("failed to alloc")
+            .unwrap()
+            // Collect into a vec so we keep the buffers alive, otherwise they
+            // are immediately returned to the pool.
+            .collect::<Result<Vec<_>>>()
+            .expect("buffer error");
+        assert_eq!(buffers.len(), DEFAULT_TX_BUFFERS.get().into());
+
+        // We have all the buffers, which means allocating more should not
+        // resolve.
+        assert!(pool.alloc_tx_buffers(data_len).now_or_never().is_none());
+
+        // If we release a single buffer we should be able to retrieve it again.
+        assert_matches!(buffers.pop(), Some(_));
+        let mut more_buffers =
+            pool.alloc_tx_buffers(data_len).now_or_never().expect("failed to alloc").unwrap();
+        let buffer = assert_matches!(more_buffers.next(), Some(Ok(b)) => b);
+        assert_matches!(more_buffers.next(), None);
+        // The iterator is fused, so None is yielded even after dropping the
+        // buffer.
+        drop(buffer);
+        assert_matches!(more_buffers.next(), None);
+    }
+
+    #[test]
+    fn alloc_tx_after_free() {
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
         assert_matches!(pool.alloc_tx_now_or_never(2), None);
@@ -1196,7 +1262,7 @@ mod tests {
     }
 
     #[test]
-    fn test_blocking_alloc_tx() {
+    fn blocking_alloc_tx() {
         let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
@@ -1224,7 +1290,7 @@ mod tests {
     }
 
     #[test]
-    fn test_blocking_alloc_tx_cancel_before_free() {
+    fn blocking_alloc_tx_cancel_before_free() {
         let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
@@ -1248,7 +1314,7 @@ mod tests {
     }
 
     #[test]
-    fn test_blocking_alloc_tx_cancel_after_free() {
+    fn blocking_alloc_tx_cancel_after_free() {
         let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
         let mut allocated = pool.alloc_tx_all(1);
@@ -1272,7 +1338,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_blocking_alloc_tx_fulfill_order() {
+    fn multiple_blocking_alloc_tx_fulfill_order() {
         const TASKS_TOTAL: usize = 3;
         let mut executor = fasync::TestExecutor::new();
         let pool = Pool::new_test_default();
@@ -1338,7 +1404,7 @@ mod tests {
     }
 
     #[test]
-    fn test_singleton_tx_layout() {
+    fn singleton_tx_layout() {
         let pool = Pool::new_test_default();
         let buffers = std::iter::from_fn(|| {
             let data_len = u32::try_from(DEFAULT_BUFFER_LENGTH.get()).unwrap()
@@ -1377,7 +1443,7 @@ mod tests {
     }
 
     #[test]
-    fn test_chained_tx_layout() {
+    fn chained_tx_layout() {
         let pool = Pool::new_test_default();
         let alloc_len = 4 * DEFAULT_BUFFER_LENGTH.get()
             - usize::from(DEFAULT_MIN_TX_BUFFER_HEAD)
@@ -1427,7 +1493,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rx_distinct() {
+    fn rx_distinct() {
         let pool = Pool::new_test_default();
         let mut guard = pool.rx_pending.inner.lock();
         let (descs, _): &mut (Vec<_>, Option<Waker>) = &mut *guard;
@@ -1437,7 +1503,7 @@ mod tests {
     }
 
     #[test]
-    fn test_alloc_rx_layout() {
+    fn alloc_rx_layout() {
         let pool = Pool::new_test_default();
         let mut guard = pool.rx_pending.inner.lock();
         let (descs, _): &mut (Vec<_>, Option<Waker>) = &mut *guard;
@@ -1458,7 +1524,7 @@ mod tests {
     }
 
     #[test]
-    fn test_buffer_read_at_write_at() {
+    fn buffer_read_at_write_at() {
         let pool = Pool::new_test_default();
         let alloc_bytes = DEFAULT_BUFFER_LENGTH.get();
         let mut buffer =
@@ -1477,7 +1543,7 @@ mod tests {
     }
 
     #[test]
-    fn test_buffer_read_write_seek() {
+    fn buffer_read_write_seek() {
         let pool = Pool::new_test_default();
         let alloc_bytes = DEFAULT_BUFFER_LENGTH.get();
         let mut buffer =
@@ -1507,7 +1573,7 @@ mod tests {
 
     #[test_case(32; "single buffer part")]
     #[test_case(MAX_BUFFER_BYTES; "multiple buffer parts")]
-    fn test_buffer_pad(pad_size: usize) {
+    fn buffer_pad(pad_size: usize) {
         let mut pool = Pool::new_test_default();
         pool.set_min_tx_buffer_length(pad_size);
         for offset in 0..pad_size {
@@ -1521,7 +1587,7 @@ mod tests {
     }
 
     #[test]
-    fn test_buffer_pad_grow() {
+    fn buffer_pad_grow() {
         const BUFFER_PARTS: u8 = 3;
         let mut pool = Pool::new_test_default();
         let pad_size = u32::try_from(DEFAULT_BUFFER_LENGTH.get()).unwrap()
@@ -1552,7 +1618,7 @@ mod tests {
     #[test_case( 75; "writes in the second part")]
     #[test_case(135; "writes in the third part")]
     #[test_case(195; "writes in the last part")]
-    fn test_buffer_used(write_offset: usize) {
+    fn buffer_used(write_offset: usize) {
         let pool = Pool::new_test_default();
         let mut buffer =
             pool.alloc_tx_buffer_now_or_never(MAX_BUFFER_BYTES).expect("failed to allocate buffer");
@@ -1605,7 +1671,7 @@ mod tests {
     }
 
     #[test]
-    fn test_buffer_commit() {
+    fn buffer_commit() {
         let pool = Pool::new_test_default();
         for offset in 0..MAX_BUFFER_BYTES {
             let mut buffer = pool

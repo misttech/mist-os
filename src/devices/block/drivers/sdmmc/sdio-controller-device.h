@@ -187,14 +187,9 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   sdio_device_hw_info_t hw_info_ TA_GUARDED(lock_) = {};
   bool tuned_ = false;
   std::atomic<bool> tuning_in_progress_ = false;
-  inspect::Inspector inspector_;
   inspect::Node root_;
   inspect::UintProperty tx_errors_;
   inspect::UintProperty rx_errors_;
-
-  async_dispatcher_t* dispatcher_ = nullptr;
-
-  std::optional<inspect::ComponentInspector> exposed_inspector_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> sdio_controller_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;

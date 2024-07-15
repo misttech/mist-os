@@ -8,9 +8,6 @@ You can use the `ffx fuzz` tool to run a fuzzer on your local device. This is th
 run your fuzzer while you are developing it. The tool is useful in that it knows how to find
 fuzzing-related files and knows various common [options][options]{:.external}.
 
-Note: `ffx fuzz` is currently an [experimental plugin][experimental_plugin]. It is not yet available
-via the SDK and must be enabled before use by running `ffx config set fuzzing true`.
-
 When fuzzing locally, it is often convenient to use the interactive fuzzing shell, which can be
 started using `ffx fuzz shell`. This shell can maintain a connection to a fuzzer, and provides
 utilities such as tab-completion. It supports a number of commands:
@@ -173,7 +170,7 @@ See [Handling results found through fuzzing](handle-results.md#clusterfuzz-bugs)
 
 [component-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
 [clusterfuzz]: https://google.github.io/clusterfuzz/
-[experimental_plugin]: /docs/development/tools/ffx/development/plugin-experimental.md
+
 [fuchsia-gn]: /docs/development/build/build_system/intro.md
 [fx-serve]: /tools/devshell/serve
 [glossary.component_url]: /docs/glossary/README.md#component_url

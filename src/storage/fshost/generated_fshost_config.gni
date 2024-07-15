@@ -17,7 +17,9 @@ declare_args() {
   fxfs_blob = true
 }
 
-# Generates a structured config value file for fshost.
+# Generates a config CML file for fshost.
+# The name of the config CML is "{component_name}_config.cml" and the config
+# values can be routed from it.
 #
 # Parameters:
 #
@@ -31,7 +33,7 @@ declare_args() {
 #
 template("generated_fshost_config") {
   _manifest_target = "${target_name}_manifest"
-  _component_name = "fshost"
+  _component_name = "fshost_config"
   if (defined(invoker.component_name)) {
     _component_name = invoker.component_name
   }
@@ -45,7 +47,8 @@ template("generated_fshost_config") {
     }
   }
 
-  fuchsia_structured_config_values(target_name) {
+  fuchsia_structured_config_values2(target_name) {
+    output_component_name = _component_name + "_config"
     cm_label = ":$_manifest_target"
     values = {
       # Defaults

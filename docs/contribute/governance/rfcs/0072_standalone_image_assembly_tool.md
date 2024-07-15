@@ -300,7 +300,7 @@ The `ffx` interface for this tool will need to be documented.
 [build_package_gni]: https://fuchsia.googlesource.com/fuchsia/+/7461d8882167e7a9d1b494e3b1734d2c063830fc/build/package.gni#604
 [fuchsia.git]: https://fuchsia.googlesource.com/fuchsia/
 [ffx]: /docs/development/tools/ffx/overview.md
-[ffx plugin]: /docs/development/tools/ffx/development/plugins.md
+[ffx plugin]: /docs/development/tools/ffx/development/README.md
 [merkle-roots]: /docs/concepts/packages/merkleroot.md
 [pkgfs]: /docs/concepts/packages/garbage_collection.md
 [pkgfs-cmd]: /docs/reference/kernel/kernel_cmdline.md#zirconsystempkgfscmdcommand

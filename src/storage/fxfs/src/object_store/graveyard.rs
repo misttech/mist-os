@@ -6,6 +6,7 @@ use crate::errors::FxfsError;
 use crate::log::*;
 use crate::lsm_tree::merge::{Merger, MergerIterator};
 use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::lsm_tree::Query;
 use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{
@@ -18,7 +19,6 @@ use fuchsia_async::{self as fasync};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::StreamExt;
-use std::ops::Bound;
 use std::sync::{Arc, Mutex};
 
 enum ReaperTask {
@@ -300,7 +300,7 @@ impl Graveyard {
         GraveyardIterator::new(
             graveyard_object_id,
             merger
-                .seek(Bound::Included(&ObjectKey::graveyard_entry(graveyard_object_id, from)))
+                .query(Query::FullRange(&ObjectKey::graveyard_entry(graveyard_object_id, from)))
                 .await?,
         )
         .await

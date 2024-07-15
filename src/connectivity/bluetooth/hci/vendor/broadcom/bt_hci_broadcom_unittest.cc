@@ -4,6 +4,7 @@
 
 #include "bt_hci_broadcom.h"
 
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
@@ -25,7 +26,7 @@
 namespace bt_hci_broadcom {
 
 namespace {
-
+namespace fhbt = fuchsia_hardware_bluetooth;
 // Firmware binaries are a sequence of HCI commands containing the firmware as payloads. For
 // testing, we use 1 HCI command with a 1 byte payload.
 const std::vector<uint8_t> kFirmware = {
@@ -45,8 +46,9 @@ const std::array<uint8_t, 6> kCommandCompleteEvent = {
     0x00,        // return_code (success)
 };
 
-class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
-                            public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
+class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
+                            public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
+                            public fidl::Server<fhbt::HciTransport> {
  public:
   explicit FakeTransportDevice() = default;
 
@@ -56,28 +58,21 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
                                                       fidl::kIgnoreBindingClosure),
     });
   }
-  fuchsia_hardware_bluetooth::HciService::InstanceHandler GetHciInstanceHandler() {
-    return fuchsia_hardware_bluetooth::HciService::InstanceHandler({
+  fhbt::HciService::InstanceHandler GetHciInstanceHandler() {
+    return fhbt::HciService::InstanceHandler({
         .hci = hci_binding_group_.CreateHandler(
+            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+        .hci_transport = hci_transport_binding_group_.CreateHandler(
             this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
     });
   }
 
-  // Set a custom handler for commands. If null, command complete events will be automatically sent.
-  void SetCommandHandler(fit::function<void(std::vector<uint8_t>)> command_callback) {
-    command_callback_ = std::move(command_callback);
-  }
-
-  zx::channel& command_chan() { return command_channel_; }
+  void SetCustomizedReply(std::vector<uint8_t> reply) { customized_reply_.emplace(reply); }
 
   // fucshia_hardware_bluetooth::Hci request handler implementations:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
                           OpenCommandChannelCompleter::Sync& completer) override {
-    command_channel_ = std::move(request->channel);
-    cmd_chan_wait_.set_object(command_channel_.get());
-    cmd_chan_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-    cmd_chan_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    completer.ReplySuccess();
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
   void OpenAclDataChannel(OpenAclDataChannelRequestView request,
                           OpenAclDataChannelCompleter::Sync& completer) override {
@@ -87,8 +82,8 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
                           OpenScoDataChannelCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
-  void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override {
+  void ConfigureSco(fidl::WireServer<fhbt::Hci>::ConfigureScoRequestView request,
+                    fidl::WireServer<fhbt::Hci>::ConfigureScoCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
   void ResetSco(ResetScoCompleter::Sync& completer) override {}
@@ -101,9 +96,39 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
-    ZX_PANIC("Unknown method in HCI requests");
+    ZX_PANIC("Unknown method in Hci requests");
+  }
+
+  // fhbt::HciTransport request handler implementations:
+  void Send(SendRequest& request, SendCompleter::Sync& completer) override {
+    std::vector<uint8_t> reply;
+
+    if (customized_reply_) {
+      reply = *customized_reply_;
+    } else {
+      reply = std::vector<uint8_t>(kCommandCompleteEvent.data(),
+                                   kCommandCompleteEvent.data() + kCommandCompleteEvent.size());
+    }
+
+    hci_transport_binding_group_.ForEachBinding(
+        [&](const fidl::ServerBinding<fhbt::HciTransport>& binding) {
+          auto received_packet = fhbt::ReceivedPacket::WithEvent(reply);
+          fit::result<fidl::OneWayError> result =
+              fidl::SendEvent(binding)->OnReceive(received_packet);
+          ASSERT_FALSE(result.is_error());
+        });
+    completer.Reply();
+  }
+  void AckReceive(AckReceiveCompleter::Sync& completer) override {}
+  void ConfigureSco(
+      fidl::Server<fhbt::HciTransport>::ConfigureScoRequest& request,
+      fidl::Server<fhbt::HciTransport>::ConfigureScoCompleter::Sync& completer) override {}
+  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override {}
+  void handle_unknown_method(::fidl::UnknownMethodMetadata<fhbt::HciTransport> metadata,
+                             ::fidl::UnknownMethodCompleter::Sync& completer) override {
+    ZX_PANIC("Unknown method in HciTransport requests");
   }
 
   // fuchsia_hardware_serialimpl::Device FIDL request handler implementation.
@@ -140,49 +165,11 @@ class FakeTransportDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::
   }
 
  private:
-  void OnCommandChannelSignal(async_dispatcher_t*, async::WaitBase* wait, zx_status_t status,
-                              const zx_packet_signal_t* signal) {
-    ASSERT_EQ(status, ZX_OK);
-    if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-      command_channel_.reset();
-      return;
-    }
-    ASSERT_TRUE(signal->observed & ZX_CHANNEL_READABLE);
-    // Make buffer large enough to hold largest command packet.
-    std::vector<uint8_t> bytes(
-        sizeof(HciCommandHeader) +
-        std::numeric_limits<decltype(HciCommandHeader::parameter_total_size)>::max());
-    uint32_t actual_bytes = 0;
-    zx_status_t read_status = command_channel_.read(
-        /*flags=*/0, bytes.data(), /*handles=*/nullptr, static_cast<uint32_t>(bytes.size()),
-        /*num_handles=*/0, &actual_bytes, /*actual_handles=*/nullptr);
-    ASSERT_EQ(read_status, ZX_OK);
-    bytes.resize(actual_bytes);
-
-    cmd_chan_received_packets_.push_back(bytes);
-
-    if (command_callback_) {
-      command_callback_(std::move(bytes));
-    } else {
-      zx_status_t write_status = command_channel_.write(/*flags=*/0, kCommandCompleteEvent.data(),
-                                                        kCommandCompleteEvent.size(),
-                                                        /*handles=*/nullptr, /*num_handles=*/0);
-      EXPECT_EQ(write_status, ZX_OK);
-    }
-
-    // The wait needs to be restarted.
-    zx_status_t wait_begin_status = wait->Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
-  }
-
-  fit::function<void(std::vector<uint8_t>)> command_callback_;
-  zx::channel command_channel_;
-  std::vector<std::vector<uint8_t>> cmd_chan_received_packets_;
-  async::WaitMethod<FakeTransportDevice, &FakeTransportDevice::OnCommandChannelSignal>
-      cmd_chan_wait_{this};
+  std::optional<std::vector<uint8_t>> customized_reply_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_binding_group_;
-  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_group_;
+  fidl::ServerBindingGroup<fhbt::Hci> hci_binding_group_;
+  fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_group_;
 };
 
 class TestEnvironment : fdf_testing::Environment {
@@ -205,8 +192,7 @@ class TestEnvironment : fdf_testing::Environment {
         transport_device_.GetSerialInstanceHandler());
     EXPECT_TRUE(result.is_ok());
 
-    result = to_driver_vfs.AddService<fuchsia_hardware_bluetooth::HciService>(
-        transport_device_.GetHciInstanceHandler());
+    result = to_driver_vfs.AddService<fhbt::HciService>(transport_device_.GetHciInstanceHandler());
     EXPECT_TRUE(result.is_ok());
 
     device_server_.Init(component::kDefaultInstance, "root");
@@ -268,24 +254,21 @@ class BtHciBroadcomTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
   }
 
   void OpenVendor() {
-    class EventHandler : public fidl::WireSyncEventHandler<fuchsia_hardware_bluetooth::Vendor> {
+    class EventHandler : public fidl::WireSyncEventHandler<fhbt::Vendor> {
      public:
-      void OnFeatures(
-          fidl::WireEvent<fuchsia_hardware_bluetooth::Vendor::OnFeatures>* event) override {
+      void OnFeatures(fidl::WireEvent<fhbt::Vendor::OnFeatures>* event) override {
         EXPECT_TRUE(event->acl_priority_command());
         on_vendor_connect_handled_ = true;
       }
 
-      void handle_unknown_event(
-          fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Vendor> metadata) override {}
+      void handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Vendor> metadata) override {}
 
       bool on_vendor_connect_handled_ = false;
     };
 
     EventHandler event_handler;
     // Connect to Vendor protocol through devfs, get the channel handle from node server.
-    zx::result connect_result =
-        ConnectThroughDevfs<fuchsia_hardware_bluetooth::Vendor>("bt-hci-broadcom");
+    zx::result connect_result = ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
     ASSERT_EQ(ZX_OK, connect_result.status_value());
 
     // Bind the channel to a Vendor client end.
@@ -296,25 +279,15 @@ class BtHciBroadcomTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
 
   void OpenVendorWithHciClient() {
     // Connect to Vendor protocol through devfs, get the channel handle from node server.
-    zx::result connect_result =
-        ConnectThroughDevfs<fuchsia_hardware_bluetooth::Vendor>("bt-hci-broadcom");
+    zx::result connect_result = ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
     ASSERT_EQ(ZX_OK, connect_result.status_value());
 
-    fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci_end(connect_result.value().TakeChannel());
+    fidl::ClientEnd<fhbt::Hci> hci_end(connect_result.value().TakeChannel());
     hci_client_.Bind(std::move(hci_end));
   }
 
-  void OpenHci() {
-    // Connect to Hci through vendor protocol
-    auto open_hci_result = vendor_client_->OpenHci();
-    EXPECT_TRUE(open_hci_result.ok());
-    EXPECT_FALSE(open_hci_result->is_error());
-
-    hci_client_.Bind(std::move(open_hci_result->value()->channel));
-  }
-
-  fidl::WireSyncClient<fuchsia_hardware_bluetooth::Vendor> vendor_client_;
-  fidl::WireSyncClient<fuchsia_hardware_bluetooth::Hci> hci_client_;
+  fidl::WireSyncClient<fhbt::Vendor> vendor_client_;
+  fidl::WireSyncClient<fhbt::Hci> hci_client_;
 };
 
 class BtHciBroadcomInitializedTest : public BtHciBroadcomTest {
@@ -348,13 +321,8 @@ TEST_F(BtHciBroadcomTest, TooSmallFirmwareBuffer) {
 
 TEST_F(BtHciBroadcomTest, ControllerReturnsEventSmallerThanEventHeader) {
   RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    env.transport_device_.SetCommandHandler([&](const std::vector<uint8_t>& command) {
-      zx_status_t write_status =
-          env.transport_device_.command_chan().write(/*flags=*/0, kCommandCompleteEvent.data(),
-                                                     /*num_bytes=*/1,
-                                                     /*handles=*/nullptr, /*num_handles=*/0);
-      EXPECT_EQ(write_status, ZX_OK);
-    });
+    env.transport_device_.SetCustomizedReply(
+        std::vector<uint8_t>(kCommandCompleteEvent.data(), kCommandCompleteEvent.data() + 1));
   });
 
   SetFirmware();
@@ -364,13 +332,8 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsEventSmallerThanEventHeader) {
 
 TEST_F(BtHciBroadcomTest, ControllerReturnsEventSmallerThanCommandComplete) {
   RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    env.transport_device_.SetCommandHandler([&](const std::vector<uint8_t>& command) {
-      zx_status_t write_status =
-          env.transport_device_.command_chan().write(/*flags=*/0, kCommandCompleteEvent.data(),
-                                                     /*num_bytes=*/sizeof(HciEventHeader),
-                                                     /*handles=*/nullptr, /*num_handles=*/0);
-      EXPECT_EQ(write_status, ZX_OK);
-    });
+    env.transport_device_.SetCustomizedReply(std::vector<uint8_t>(
+        kCommandCompleteEvent.data(), kCommandCompleteEvent.data() + sizeof(HciEventHeader)));
   });
 
   SetFirmware();
@@ -384,13 +347,8 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
   SetMetadata(DEVICE_METADATA_MAC_ADDRESS, kMacAddress, kMacAddress.size() - 1);
   //  Respond to ReadBdaddr command with a command complete (which doesn't include the bdaddr).
   RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    env.transport_device_.SetCommandHandler([&](const std::vector<uint8_t>& command) {
-      zx_status_t write_status =
-          env.transport_device_.command_chan().write(/*flags=*/0, kCommandCompleteEvent.data(),
-                                                     /*num_bytes=*/kCommandCompleteEvent.size(),
-                                                     /*handles=*/nullptr, /*num_handles=*/0);
-      EXPECT_EQ(write_status, ZX_OK);
-    });
+    env.transport_device_.SetCustomizedReply(std::vector<uint8_t>(
+        kCommandCompleteEvent.data(), kCommandCompleteEvent.data() + kCommandCompleteEvent.size()));
   });
 
   // Ensure loading the firmware succeeds.
@@ -412,45 +370,15 @@ TEST_F(BtHciBroadcomTest, VendorProtocolUnknownMethod) {
   ASSERT_EQ(result.status(), ZX_ERR_NOT_SUPPORTED);
 }
 
-TEST_F(BtHciBroadcomTest, HciProtocolUnknownMethod) {
-  SetFirmware();
-  SetMetadata();
-  ASSERT_TRUE(StartDriver().is_ok());
-  OpenVendor();
-
-  // Connect to Hci through Vendor protocol
-  auto open_hci_result = vendor_client_->OpenHci();
-  EXPECT_TRUE(open_hci_result.ok());
-  EXPECT_FALSE(open_hci_result->is_error());
-
-  // Bind the channel to Vendor client end.
-  fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_client_end(
-      open_hci_result->value()->channel.TakeChannel());
-  fidl::WireSyncClient vendor_client(std::move(vendor_client_end));
-
-  fidl::Arena arena;
-  auto builder = fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams::Builder(arena);
-  builder.connection_handle(0);
-  builder.priority(fuchsia_hardware_bluetooth::wire::VendorAclPriority::kNormal);
-  builder.direction(fuchsia_hardware_bluetooth::wire::VendorAclDirection::kSource);
-
-  auto command =
-      fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
-  auto result = vendor_client->EncodeCommand(command);
-
-  ASSERT_EQ(result.status(), ZX_ERR_NOT_SUPPORTED);
-}
-
 TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersHighSink) {
   std::array<uint8_t, kBcmSetAclPriorityCmdSize> result_buffer;
   fidl::Arena arena;
-  auto builder = fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams::Builder(arena);
+  auto builder = fhbt::wire::VendorSetAclPriorityParams::Builder(arena);
   builder.connection_handle(0xFF00);
-  builder.priority(fuchsia_hardware_bluetooth::wire::VendorAclPriority::kHigh);
-  builder.direction(fuchsia_hardware_bluetooth::wire::VendorAclDirection::kSink);
+  builder.priority(fhbt::wire::VendorAclPriority::kHigh);
+  builder.direction(fhbt::wire::VendorAclDirection::kSink);
 
-  auto command =
-      fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
+  auto command = fhbt::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
   auto result = vendor_client_->EncodeCommand(command);
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
@@ -472,13 +400,12 @@ TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersHi
 TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersNormalSource) {
   std::array<uint8_t, kBcmSetAclPriorityCmdSize> result_buffer;
   fidl::Arena arena;
-  auto builder = fuchsia_hardware_bluetooth::wire::VendorSetAclPriorityParams::Builder(arena);
+  auto builder = fhbt::wire::VendorSetAclPriorityParams::Builder(arena);
   builder.connection_handle(0xFF00);
-  builder.priority(fuchsia_hardware_bluetooth::wire::VendorAclPriority::kNormal);
-  builder.direction(fuchsia_hardware_bluetooth::wire::VendorAclDirection::kSource);
+  builder.priority(fhbt::wire::VendorAclPriority::kNormal);
+  builder.direction(fhbt::wire::VendorAclDirection::kSource);
 
-  auto command =
-      fuchsia_hardware_bluetooth::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
+  auto command = fhbt::wire::VendorCommand::WithSetAclPriority(arena, builder.Build());
   auto result = vendor_client_->EncodeCommand(command);
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());

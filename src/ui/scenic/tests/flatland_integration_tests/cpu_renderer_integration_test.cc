@@ -16,9 +16,9 @@
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/pixel.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 #include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
@@ -31,7 +31,7 @@ using fuchsia::ui::composition::TransformId;
 
 constexpr auto kBytesPerPixel = 4;
 
-class CpuRendererIntegrationTest : public LoggingEventLoop, public ::testing::Test {
+class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
  public:
   CpuRendererIntegrationTest()
       : realm_(ScenicRealmBuilder({.renderer_type_config = "cpu", .display_rotation = 0})

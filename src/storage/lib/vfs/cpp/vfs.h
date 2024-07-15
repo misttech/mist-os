@@ -68,6 +68,12 @@ class Vfs {
                                 const fuchsia_io::wire::ConnectionProtocols& protocols,
                                 fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  zx::result<Open2Result> Open3(fbl::RefPtr<Vnode> vndir, std::string_view path,
+                                fuchsia_io::Flags flags, const fuchsia_io::wire::Options* options,
+                                fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
+#endif
+
   // Implements Unlink for a pre-validated and trimmed name.
   virtual zx_status_t Unlink(fbl::RefPtr<Vnode> vn, std::string_view name, bool must_be_dir)
       __TA_EXCLUDES(vfs_lock_);

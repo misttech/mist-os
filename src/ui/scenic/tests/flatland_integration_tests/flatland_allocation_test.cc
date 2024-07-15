@@ -18,8 +18,8 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 
 namespace integration_tests {
 
@@ -54,7 +54,7 @@ fuchsia::sysmem2::BufferCollectionConstraints GetDefaultBufferConstraints() {
 }
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class AllocationTest : public LoggingEventLoop, public zxtest::Test {
+class AllocationTest : public ui_testing::LoggingEventLoop, public zxtest::Test {
  public:
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the

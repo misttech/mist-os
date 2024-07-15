@@ -5,6 +5,7 @@
 library fuchsia.archivist.test;
 
 using fuchsia.diagnostics;
+using fuchsia.inspect;
 using zx;
 
 alias LogMessage = string:MAX;
@@ -93,6 +94,13 @@ open protocol InspectPuppet {
     /// TODO(https://fuchsia.dev/302716196): Split this into several methods
     /// tests can call to explicitly emit the same data as this method.
     flexible EmitExampleInspectData() -> ();
+
+    /// Escrow the current inspect data and immediately exit afterwards.
+    flexible EscrowAndExit(table {
+        1: name string:fuchsia.inspect.MAX_NAME_LENGTH;
+    }) -> (resource table {
+        1: token fuchsia.inspect.EscrowToken;
+    });
 };
 
 /// Records values on a lazy inspect node.

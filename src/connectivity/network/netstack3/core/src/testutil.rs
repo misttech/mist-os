@@ -360,16 +360,20 @@ where
         let _was_enabled: bool = self.set_ip_device_enabled::<Ipv6>(device, true);
     }
 
-    /// Enables or disables IP packet routing on `device`.
+    /// Enables or disables IP packet unicast forwarding on `device`.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub fn set_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>, enabled: bool) {
+    pub fn set_unicast_forwarding_enabled<I: IpExt>(
+        &mut self,
+        device: &DeviceId<BC>,
+        enabled: bool,
+    ) {
         let _config = self
             .core_api()
             .device_ip::<I>()
             .update_configuration(
                 device,
                 IpDeviceConfigurationUpdate {
-                    forwarding_enabled: Some(enabled),
+                    unicast_forwarding_enabled: Some(enabled),
                     ..Default::default()
                 }
                 .into(),
@@ -377,12 +381,12 @@ where
             .unwrap();
     }
 
-    /// Returns whether IP packet routing is enabled on `device`.
+    /// Returns whether IP packet unicast forwarding is enabled on `device`.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
-    pub fn is_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
+    pub fn is_unicast_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
         let configuration = self.core_api().device_ip::<I>().get_configuration(device);
-        let IpDeviceConfiguration { forwarding_enabled, .. } = configuration.as_ref();
-        *forwarding_enabled
+        let IpDeviceConfiguration { unicast_forwarding_enabled, .. } = configuration.as_ref();
+        *unicast_forwarding_enabled
     }
 
     /// Adds a loopback device with the IPv4/IPv6 loopback addresses assigned.
@@ -660,6 +664,13 @@ impl FakeBindingsCtx {
         conn: &UdpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx>,
     ) -> Vec<Vec<u8>> {
         self.state_mut().udp_state_mut::<I>().remove(conn).unwrap_or_else(Vec::default)
+    }
+
+    /// Seed the RNG.
+    pub fn seed_rng(&self, seed: u128) {
+        self.with_inner_mut(|ctx| {
+            ctx.rng = FakeCryptoRng::new_xorshift(seed);
+        })
     }
 }
 
@@ -1298,7 +1309,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         &mut self,
         device: &EthernetDeviceId<FakeBindingsCtx>,
         frame: Buf<Vec<u8>>,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let frame_meta = DispatchedFrame::Ethernet(device.downgrade());
         self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, frame.into_inner()));
         Ok(())
@@ -1309,7 +1320,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         device: &PureIpDeviceId<FakeBindingsCtx>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let frame_meta = DispatchedFrame::PureIp(PureIpDeviceAndIpVersion {
             device: device.downgrade(),
             version: ip_version,

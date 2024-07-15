@@ -403,7 +403,7 @@ macro_rules! trace_duration {
 pub(crate) use trace_duration;
 
 impl FilterBindingsTypes for BindingsCtx {
-    type DeviceClass = fidl_fuchsia_net_filter::DeviceClass;
+    type DeviceClass = fidl_fuchsia_net_interfaces::PortClass;
 }
 
 #[derive(Default)]
@@ -499,10 +499,12 @@ impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for BindingsCtx {
 
 impl<D: DeviceIdExt> TransmitQueueBindingsContext<D> for BindingsCtx {
     fn wake_tx_task(&mut self, device: &D) {
-        let external_state = device.external_state();
-        let StaticCommonInfo { tx_notifier, authorization_token: _ } =
-            external_state.static_common_info();
-        tx_notifier.schedule()
+        let netdevice = match device.external_state() {
+            DeviceSpecificInfo::Loopback(_) => panic!("loopback does not support tx tasks"),
+            DeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. }) => netdevice,
+            DeviceSpecificInfo::PureIp(PureIpDeviceInfo { netdevice, .. }) => netdevice,
+        };
+        netdevice.tx_notifier.schedule();
     }
 }
 
@@ -511,7 +513,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         &mut self,
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let EthernetInfo { mac: _, _mac_proxy: _, common_info: _, netdevice, dynamic_info } =
             device.external_state();
         let dynamic_info = dynamic_info.read();
@@ -528,7 +530,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         device: &PureIpDeviceId<Self>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
-    ) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+    ) -> Result<(), DeviceSendFrameError> {
         let frame_type = match ip_version {
             IpVersion::V4 => fhardware_network::FrameType::Ipv4,
             IpVersion::V6 => fhardware_network::FrameType::Ipv6,
@@ -541,7 +543,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
 
 /// Send a frame on a Netdevice backed device.
 fn send_netdevice_frame(
-    StaticNetdeviceInfo { handler }: &StaticNetdeviceInfo,
+    netdevice: &StaticNetdeviceInfo,
     DynamicNetdeviceInfo {
         phy_up,
         common_info:
@@ -549,7 +551,8 @@ fn send_netdevice_frame(
     }: &DynamicNetdeviceInfo,
     frame: Buf<Vec<u8>>,
     frame_type: fhardware_network::FrameType,
-) -> Result<(), DeviceSendFrameError<Buf<Vec<u8>>>> {
+) -> Result<(), DeviceSendFrameError> {
+    let StaticNetdeviceInfo { handler, .. } = netdevice;
     if *phy_up && *admin_enabled {
         handler
             .send(frame.as_ref(), frame_type)
@@ -969,7 +972,7 @@ impl Netstack {
     ) -> (
         futures::channel::oneshot::Sender<fnet_interfaces_admin::InterfaceRemovedReason>,
         BindingId,
-        [NamedTask; 3],
+        [NamedTask; 2],
     ) {
         // Add and initialize the loopback interface with the IPv4 and IPv6
         // loopback addresses and on-link routes to the loopback subnets.
@@ -983,18 +986,13 @@ impl Netstack {
             binding_id,
             InterfaceProperties {
                 name: LOOPBACK_NAME.to_string(),
-                device_class: fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                    fidl_fuchsia_net_interfaces::Empty {},
-                ),
+                port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Loopback,
             },
         );
         events.notify(InterfaceUpdate::OnlineChanged(true)).expect("interfaces worker not running");
 
         let loopback_info = LoopbackInfo {
-            static_common_info: StaticCommonInfo {
-                tx_notifier: Default::default(),
-                authorization_token: zx::Event::create(),
-            },
+            static_common_info: StaticCommonInfo { authorization_token: zx::Event::create() },
             dynamic_common_info: CoreRwLock::new(DynamicCommonInfo {
                 mtu: DEFAULT_LOOPBACK_MTU,
                 admin_enabled: true,
@@ -1018,20 +1016,13 @@ impl Netstack {
             crate::bindings::devices::spawn_rx_task(rx_notifier, self.ctx.clone(), &loopback);
         let binding_id = loopback.bindings_id().id;
         let loopback: DeviceId<_> = loopback.into();
-        let external_state = loopback.external_state();
-        let StaticCommonInfo { tx_notifier, authorization_token: _ } =
-            external_state.static_common_info();
         self.ctx.bindings_ctx().devices.add_device(binding_id, loopback.clone());
-        let tx_task = crate::bindings::devices::spawn_tx_task(
-            tx_notifier,
-            self.ctx.clone(),
-            loopback.clone(),
-        );
 
         // Don't need DAD and IGMP/MLD on loopback.
         let ip_config = IpDeviceConfigurationUpdate {
             ip_enabled: Some(true),
-            forwarding_enabled: Some(false),
+            unicast_forwarding_enabled: Some(false),
+            multicast_forwarding_enabled: Some(false),
             gmp_enabled: Some(false),
         };
 
@@ -1081,7 +1072,6 @@ impl Netstack {
             binding_id,
             [
                 NamedTask::new("loopback control", control_task),
-                NamedTask::new("loopback tx", tx_task),
                 NamedTask::new("loopback rx", rx_task),
             ],
         )

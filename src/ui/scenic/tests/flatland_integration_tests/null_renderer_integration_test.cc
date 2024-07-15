@@ -16,9 +16,9 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/logging_event_loop.h"
 #include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
 #include "src/ui/scenic/tests/utils/utils.h"
+#include "src/ui/testing/util/logging_event_loop.h"
 #include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
@@ -30,7 +30,7 @@ using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::TransformId;
 using ui_testing::Screenshot;
 
-class NullRendererIntegrationTest : public LoggingEventLoop, public ::testing::Test {
+class NullRendererIntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
  public:
   NullRendererIntegrationTest()
       : realm_(ScenicRealmBuilder({.renderer_type_config = "null"})

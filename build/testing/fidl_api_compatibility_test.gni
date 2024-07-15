@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 import("//build/fidl/fidl_ir.gni")
 import("//build/fidl/fidl_summary.gni")
-import("//build/testing/config.gni")
 
 template("fidl_api_compatibility_test") {
   assert(defined(invoker.target_api_level), "target_api_level is required")
@@ -12,11 +11,6 @@ template("fidl_api_compatibility_test") {
   assert(defined(invoker.policy), "policy is required")
 
   policy = invoker.policy
-
-  # Let command-line build args override values from target declarations.
-  if (update_goldens) {
-    policy = "update_golden"
-  }
 
   fidl_api_diff_tool_target = "//tools/fidl/fidl_api_diff:host"
   fidl_api_diff_tool_path = "$root_build_dir/host-tools/fidl_api_diff"

@@ -76,12 +76,14 @@ fuchsia_package("vkreadback_test_child_package") {
   validate_structured_config = false
 }
 
-sdk_fuchsia_package("vkreadback_test_sdk") {
-  distribution_name = "vkreadback_test"
-  category = "partner"
-  package_label = ":vkreadback_test_child_package"
-  expected_files_exact = [ "meta/vkreadback_child.cm" ]
-  api_level_added = 19
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("vkreadback_test_sdk") {
+    distribution_name = "vkreadback_test"
+    category = "partner"
+    package_label = ":vkreadback_test_child_package"
+    expected_files_exact = [ "meta/vkreadback_child.cm" ]
+    api_level_added = 19
+  }
 }
 
 fuchsia_test_component("vkreadback_test_component") {

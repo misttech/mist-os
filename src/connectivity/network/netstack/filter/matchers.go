@@ -58,8 +58,8 @@ type deviceClassNICMatcher struct {
 	// enabledNics keeps track of the enabled NIC cache that provides the
 	// matcher with the NIC's device class when available.
 	enabledNics *enabledNicsCache
-	// match is the device class the matcher matches on.
-	match network.DeviceClass
+	// match is the port class the matcher matches on.
+	match network.PortClass
 	// direction controls if the input or output interface should be matched on.
 	direction NICMatcherDirection
 }
@@ -81,8 +81,8 @@ func (d *deviceClassNICMatcher) Match(_ stack.Hook, _ *stack.PacketBuffer, inNic
 		panic(fmt.Sprintf("invalid nic matcher direction %d", d))
 	}
 	if nicName != "" {
-		deviceClass := d.enabledNics.nicDeviceClass(nicName)
-		return (deviceClass != nil && *deviceClass == d.match), false
+		PortClass := d.enabledNics.nicPortClass(nicName)
+		return (PortClass != nil && *PortClass == d.match), false
 	}
 	return false, false
 }

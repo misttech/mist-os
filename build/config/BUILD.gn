@@ -729,30 +729,35 @@ config("default_warnings") {
     "-Wno-sign-conversion",
     "-Wno-unused-parameter",
     "-Wnonportable-system-include-path",
-
-    # TODO(https://fxbug.dev/42142861): Disable "-Wmissing-field-initializers" which
-    # warns when designated initializers are used on some (but not all)
-    # fields in C++, but not C.
-    #
-    # There is ongoing discussion about whether it should apply to C++ or not.
-    # See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=96868 for details.
-    "-Wno-missing-field-initializers",
-
-    # TODO(https://fxbug.dev/324268041): Disable "-Wextra-qualification" which
-    # warns when an extra qualifier appears on a member.
-    "-Wno-extra-qualification",
-
-    # TODO(https://fxbug.dev/330769701): Disable "-Wcast-fuction-type-strict"
-    # and "-Wcast-function-type-mismatch"  which enforce an exact type match
-    # between a function pointer and the target function.
-    "-Wno-cast-function-type-strict",
-    "-Wno-cast-function-type-mismatch",
-    "-Wno-unknown-warning-option",
-
-    # TODO(https://fxbug.dev/344080745): After the issue is fixed,
-    # remove "-Wno-missing-template-arg-list-after-template-kw".
-    "-Wno-missing-template-arg-list-after-template-kw",
   ]
+
+  # TODO(https://fxbug.dev/42142861): Disable "-Wmissing-field-initializers"
+  # which warns when designated initializers are used on some (but not all)
+  # fields in C++, but not C.
+  #
+  # There is ongoing discussion about whether it should apply to C++ or not.
+  # See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=96868 for details.
+  cflags += [ "-Wno-missing-field-initializers" ]
+
+  # These -W... switches only exist in Clang, so are disabled only there.
+  if (!is_gcc) {
+    cflags += [
+      # TODO(https://fxbug.dev/324268041): Disable "-Wextra-qualification"
+      # which warns when an extra qualifier appears on a member.
+      "-Wno-extra-qualification",
+
+      # TODO(https://fxbug.dev/330769701): Disable "-Wcast-fuction-type-strict"
+      # and "-Wcast-function-type-mismatch"  which enforce an exact type match
+      # between a function pointer and the target function.
+      "-Wno-cast-function-type-strict",
+      "-Wno-cast-function-type-mismatch",
+      "-Wno-unknown-warning-option",
+
+      # TODO(https://fxbug.dev/344080745): After the issue is fixed,
+      # remove "-Wno-missing-template-arg-list-after-template-kw".
+      "-Wno-missing-template-arg-list-after-template-kw",
+    ]
+  }
 
   cflags_cc = []
   if (fuchsia_cxx_version == 20) {
@@ -785,6 +790,9 @@ config("default_warnings") {
     ]
 
     cflags += [
+      # This warns about compatibility with ancient binaries, not relevant.
+      "-Wno-psabi",
+
       # TODO(https://fxbug.dev/42052174): -Warray-bounds has false positives in GCC 12.
       # When https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105762 is fixed,
       # remove this.
@@ -795,9 +803,16 @@ config("default_warnings") {
       # warning on gcc to make it easier to see actual errors.
       "-Wno-deprecated-declarations",
 
-      # TODO(https://fxbug.dev/42076979): -Wstringop-overread has false positives in GCC
-      # 13.  Needs to be pursued upstream.
+      # TODO(https://fxbug.dev/351904809): -Wstringop-overread has false
+      # positives in GCC 13, and -Wstringop-overflow does in GCC 14.
+      # Needs to be pursued upstream.
       "-Wno-stringop-overread",
+      "-Wno-stringop-overflow",
+
+      # TODO(https://fxbug.dev/351904809): -Wmaybe-uninitialized has at least
+      # one false positive in GCC 14 that was not obvious how to work around
+      # locally.  Needs to be pursued upstream.
+      "-Wno-maybe-uninitialized",
     ]
   }
 
@@ -887,7 +902,6 @@ config("Wno-vla-cxx-extension") {
     "//src/connectivity/telephony/drivers/qmi-usb-transport:*",
     "//src/connectivity/wlan/drivers/lib/log/cpp/test:*",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:*",
-    "//src/connectivity/wlan/lib/mlme/cpp:*",
     "//src/developer/adb/bin/adb-file-sync:*",
     "//src/developer/debug/debug_agent/test_data:*",
     "//src/developer/ffx/lib/fuchsia-controller:*",
@@ -984,8 +998,6 @@ config("Wno-conversion") {
     "//src/connectivity/wlan/drivers/wlanphy:*",
     "//src/connectivity/wlan/drivers/wlansoftmac:*",
     "//src/connectivity/wlan/lib/common/cpp:*",
-    "//src/connectivity/wlan/lib/mlme/cpp:*",
-    "//src/connectivity/wlan/lib/mlme/cpp/tests:*",
     "//src/connectivity/wlan/testing/wlantap-driver:*",
     "//src/developer/debug/debug_agent:*",
     "//src/developer/debug/debug_agent/integration_tests:*",
@@ -1519,7 +1531,9 @@ config("no-tlsdesc") {
 # TODO(https://fxbug.dev/331282813): Disable "-Wdeprecated-pragma" which
 # warns for deprecated std::errc constants.
 config("Wno-deprecated-pragma") {
-  cflags = [ "-Wno-deprecated-pragma" ]
+  if (!is_gcc) {
+    cflags = [ "-Wno-deprecated-pragma" ]
+  }
 }
 
 # Adding this config directly to a linking target ensures that any deps on

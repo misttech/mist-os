@@ -10,13 +10,14 @@ if (is_host) {
   group("host_tests") {
     testonly = true
     if (has_board) {
-      deps = [ ":ffx_e2e_emu_test" ]
+      deps = [ ":e2e_emu_test" ]
     }
   }
 
   if (has_board) {
-    rustc_library("ffx_e2e_emu") {
+    rustc_library("e2e_emu") {
       testonly = true
+      name = "ffx_e2e_emu"
       edition = "2021"
       with_unit_tests = true
       sources = [ "src/lib.rs" ]
@@ -60,8 +61,7 @@ if (is_host) {
     _product_bundle = "$_pb_outdir/product_bundle"
 
     # Package repository inputs from the main build, so that `fx set ... --with //foo` will work.
-    _amber_files_label =
-        "//build/images/updates:prepare_publish($default_toolchain)"
+    _amber_files_label = "//build/images/updates:publish($default_toolchain)"
     _amber_files_path = "$root_build_dir/amber-files"
 
     host_test_data("isolated_emulator_data") {

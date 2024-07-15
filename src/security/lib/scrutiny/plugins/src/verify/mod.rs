@@ -2,32 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod collection;
-mod collector;
-mod controller;
+pub mod collection;
+pub mod collector;
+pub mod controller;
 
-use crate::verify::collector::component_model::V2ComponentModelDataCollector;
-use crate::verify::controller::build::VerifyBuildController;
-use crate::verify::controller::capability_routing::{
-    CapabilityRouteController, V2ComponentModelMappingController,
-};
-use crate::verify::controller::component_resolvers::ComponentResolversController;
-use crate::verify::controller::pre_signing::PreSigningController;
-use crate::verify::controller::route_sources::RouteSourcesController;
-use crate::verify::controller::structured_config::{
-    ExtractStructuredConfigController, VerifyStructuredConfigController,
-};
 use cm_fidl_analyzer::route::CapabilityRouteError;
 use cm_rust::CapabilityTypeName;
 use cm_types::Name;
 use moniker::Moniker;
 use routing::mapper::RouteSegment;
-use scrutiny::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::error::Error;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 pub use controller::pre_signing::PreSigningResponse;
 pub use controller::route_sources::{
@@ -36,29 +23,6 @@ pub use controller::route_sources::{
 pub use controller::structured_config::{
     ExtractStructuredConfigResponse, VerifyStructuredConfigResponse,
 };
-
-plugin!(
-    VerifyPlugin,
-    PluginHooks::new(
-        collectors! {
-            "V2ComponentModelDataCollector" => V2ComponentModelDataCollector::new(),
-        },
-        controllers! {
-            "/verify/build" => VerifyBuildController::default(),
-            "/verify/v2_component_model" => V2ComponentModelMappingController::default(),
-            "/verify/capability_routes" => CapabilityRouteController::default(),
-            "/verify/pre_signing" => PreSigningController::default(),
-            "/verify/route_sources" => RouteSourcesController::default(),
-            "/verify/component_resolvers" => ComponentResolversController::default(),
-            "/verify/structured_config" => VerifyStructuredConfigController::default(),
-
-            // This doesn't actually verify anything, but we need the verify model to get
-            // V2ComponentModel, and depending on this plugin in `toolkit` doesn't work.
-            "/verify/structured_config/extract" => ExtractStructuredConfigController::default(),
-        }
-    ),
-    vec![PluginDescriptor::new("CorePlugin")]
-);
 
 /// Error for use with serialization: Stores both structured error and message,
 /// and assesses equality using structured error.
@@ -183,7 +147,13 @@ mod tests {
         Component, Components, CoreDataDeps, Manifest, ManifestData, Manifests,
     };
     use crate::verify::collection::V2ComponentModel;
-    use crate::verify::collector::component_model::{DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL};
+    use crate::verify::collector::component_model::{
+        V2ComponentModelDataCollector, DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL,
+    };
+    use crate::verify::controller::capability_routing::{
+        CapabilityRouteController, ResponseLevel, V2ComponentModelMappingController,
+    };
+    use crate::verify::controller::component_resolvers::ComponentResolversController;
     use crate::zbi::Zbi;
     use anyhow::Result;
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -203,10 +173,12 @@ mod tests {
     use maplit::hashset;
     use routing::component_instance::ComponentInstanceInterface;
     use routing::environment::RunnerRegistry;
+    use scrutiny::prelude::*;
     use scrutiny_testing::fake::*;
     use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex};
     use serde_json::json;
     use std::collections::HashMap;
+    use std::sync::Arc;
     use {
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal, fidl_fuchsia_io as fio,
@@ -1117,13 +1089,16 @@ mod tests {
     fn test_capability_routing_all_results() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::All;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "all"}),
-        )?;
-
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
         let expected = json!({
           "deps": ["v2_component_tree_dep"],
             "results": [
@@ -1250,12 +1225,16 @@ mod tests {
     fn test_capability_routing_verbose_results() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::Verbose;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "verbose"}),
-        )?;
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
           "deps": ["v2_component_tree_dep"],
@@ -1431,12 +1410,16 @@ mod tests {
     fn test_capability_routing_warn() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::Warn;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "warn"}),
-        )?;
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
             "deps": [
@@ -1560,12 +1543,16 @@ mod tests {
     fn test_capability_routing_errors_only() -> Result<()> {
         let model = two_instance_component_model()?;
 
-        let controller = CapabilityRouteController::default();
-        let response = controller.query(
+        let capability_types =
+            HashSet::from([CapabilityTypeName::Directory, CapabilityTypeName::Protocol]);
+        let response_level = ResponseLevel::Error;
+        let response = CapabilityRouteController::get_results(
             model.clone(),
-            json!({ "capability_types": "directory protocol",
-                     "response_level": "error"}),
-        )?;
+            capability_types,
+            &response_level,
+        )
+        .unwrap();
+        let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
           "deps": ["v2_component_tree_dep"],

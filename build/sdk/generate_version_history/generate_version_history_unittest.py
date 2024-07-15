@@ -23,6 +23,11 @@ class GenerateVersionHistoryTests(unittest.TestCase):
                     },
                 },
                 "special_api_levels": {
+                    "NEXT": {
+                        "abi_revision": "GENERATED_BY_BUILD",
+                        "as_u32": 4291821568,
+                        "status": "in-development",
+                    },
                     "HEAD": {
                         "abi_revision": "GENERATED_BY_BUILD",
                         "as_u32": 4292870144,
@@ -57,6 +62,11 @@ class GenerateVersionHistoryTests(unittest.TestCase):
                         },
                     },
                     "special_api_levels": {
+                        "NEXT": {
+                            "abi_revision": "0xED74D73009C2B4E3",
+                            "as_u32": 4291821568,
+                            "status": "in-development",
+                        },
                         "HEAD": {
                             "abi_revision": "0xED74D73009C2B4E3",
                             "as_u32": 4292870144,
@@ -88,6 +98,11 @@ class GenerateVersionHistoryTests(unittest.TestCase):
                     },
                 },
                 "special_api_levels": {
+                    "NEXT": {
+                        "abi_revision": "GENERATED_BY_BUILD",
+                        "as_u32": 4291821568,
+                        "status": "in-development",
+                    },
                     "HEAD": {
                         "abi_revision": "GENERATED_BY_BUILD",
                         "as_u32": 4292870144,
@@ -122,6 +137,11 @@ class GenerateVersionHistoryTests(unittest.TestCase):
                         },
                     },
                     "special_api_levels": {
+                        "NEXT": {
+                            "abi_revision": "0xFF00E821407C0FFD",
+                            "as_u32": 4291821568,
+                            "status": "in-development",
+                        },
                         "HEAD": {
                             "abi_revision": "0xFF00E821407C0FFD",
                             "as_u32": 4292870144,

@@ -21,9 +21,8 @@
 use core::num::NonZeroU32;
 use core::time::Duration;
 
-use netstack3_base::Instant;
+use netstack3_base::{Instant, Mss};
 
-use crate::internal::base::Mss;
 use crate::internal::congestion::CongestionControlParams;
 
 /// Per RFC 8312 (https://tools.ietf.org/html/rfc8312#section-4.5):

@@ -14,9 +14,10 @@ use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
-use ffx_core::ffx_plugin;
+use ffx_config::EnvironmentContext;
 use ffx_fastboot::manifest::FlashManifestVersion;
 use ffx_product_create_args::CreateCommand;
+use fho::{return_bug, FfxMain, FfxTool, SimpleWriter};
 use fuchsia_pkg::PackageManifest;
 use fuchsia_repo::repo_builder::RepoBuilder;
 use fuchsia_repo::repo_keys::RepoKeys;
@@ -31,21 +32,31 @@ use walkdir::WalkDir;
 /// Default delivery blob type to use for products.
 const DEFAULT_DELIVERY_BLOB_TYPE: u32 = 1;
 
+#[derive(FfxTool)]
+pub struct ProductCreateTool {
+    #[command]
+    pub cmd: CreateCommand,
+    ctx: EnvironmentContext,
+}
+
+fho::embedded_plugin!(ProductCreateTool);
+
 /// Create a product bundle.
-#[ffx_plugin()]
-pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
-    let sdk = ffx_config::global_env_context()
-        .context("loading global environment context")?
-        .get_sdk()
-        .await
-        .context("getting sdk env context")?;
-    let sdk_version = match sdk.get_version() {
-        SdkVersion::Version(version) => version.to_string(),
-        SdkVersion::InTree => in_tree_sdk_version(),
-        SdkVersion::Unknown => bail!("Unable to determine SDK version"),
-    };
-    let tools = SdkToolProvider::try_new()?;
-    pb_create_with_sdk_version(cmd, &sdk_version, Box::new(tools)).await
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ProductCreateTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+        let sdk = self.ctx.get_sdk().await.context("getting sdk env context")?;
+        let sdk_version = match sdk.get_version() {
+            SdkVersion::Version(version) => version.to_string(),
+            SdkVersion::InTree => in_tree_sdk_version(),
+            SdkVersion::Unknown => return_bug!("Unable to determine SDK version"),
+        };
+        let tools = SdkToolProvider::try_new()?;
+        pb_create_with_sdk_version(self.cmd, &sdk_version, Box::new(tools))
+            .await
+            .map_err(Into::into)
+    }
 }
 
 /// Create a product bundle using the provided sdk.

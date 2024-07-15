@@ -27,7 +27,7 @@ use crate::errors::FxfsError;
 use crate::filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject};
 use crate::log::*;
 use crate::lsm_tree::types::LayerIterator;
-use crate::lsm_tree::{LSMTree, LayerSet};
+use crate::lsm_tree::{LSMTree, LayerSet, Query};
 use crate::metrics;
 use crate::object_handle::ObjectHandle as _;
 use crate::object_store::allocator::Reservation;
@@ -57,7 +57,7 @@ use rustc_hash::FxHashMap as HashMap;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::io::{Read, Write};
-use std::ops::{Bound, Range};
+use std::ops::Range;
 use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 use storage_device::Device;
@@ -327,7 +327,7 @@ async fn write<S: HandleOwner>(
     super_block_header.serialize_with_version(&mut writer.writer)?;
 
     let mut merger = items.merger();
-    let mut iter = LSMTree::major_iter(merger.seek(Bound::Unbounded).await?).await?;
+    let mut iter = LSMTree::major_iter(merger.query(Query::FullScan).await?).await?;
     while let Some(item) = iter.get() {
         writer.maybe_extend().await?;
         SuperBlockRecord::ObjectItem(item.cloned()).serialize_into(&mut writer.writer)?;
@@ -364,7 +364,7 @@ pub fn compact_root_parent(
     let layer_set = tree.layer_set();
     {
         let mut merger = layer_set.merger();
-        let mut iter = LSMTree::major_iter(merger.seek(Bound::Unbounded).now_or_never().unwrap()?)
+        let mut iter = LSMTree::major_iter(merger.query(Query::FullScan).now_or_never().unwrap()?)
             .now_or_never()
             .unwrap()?;
         let new_layer = LSMTree::new_mutable_layer();
@@ -443,7 +443,8 @@ impl SuperBlockManager {
             HandleOptions { skip_journal_checks: true, ..Default::default() },
             None,
         )
-        .await?;
+        .await
+        .context("Failed to open superblock object")?;
         write(&super_block_header, root_parent, handle).await?;
         self.metrics
             .last_super_block_offset

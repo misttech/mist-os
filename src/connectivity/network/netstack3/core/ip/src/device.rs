@@ -28,23 +28,24 @@ use net_types::ip::{
 use net_types::{MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    AnyDevice, DeferredResourceRemovalContext, DeviceIdContext, EventContext, ExistsError,
-    HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext, NotFoundError,
-    RemoveResourceResultWithContext, RngContext, SendFrameError, StrongDeviceIdentifier,
-    TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
+    AnyDevice, CounterContext, DeferredResourceRemovalContext, DeviceIdContext, EventContext,
+    ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes, InstantContext,
+    IpExt, NotFoundError, RemoveResourceResultWithContext, RngContext, SendFrameError,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
 use netstack3_filter::{IpPacket, ProofOfEgressCheck};
 use packet::{BufferMut, Serializer};
 use packet_formats::icmp::mld::MldPacket;
+use packet_formats::icmp::ndp::options::NdpNonce;
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 use zerocopy::ByteSlice;
 
-use crate::internal::base::IpPacketDestination;
+use crate::internal::base::{IpCounters, IpPacketDestination};
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
-use crate::internal::device::dad::{DadHandler, DadTimerId};
+use crate::internal::device::dad::{DadAddressStateLookupResult, DadHandler, DadTimerId};
 use crate::internal::device::nud::NudIpHandler;
 use crate::internal::device::route_discovery::{
     Ipv6DiscoveredRoute, Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler,
@@ -56,14 +57,11 @@ use crate::internal::device::state::{
     IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
     Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
     Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-    Ipv6DeviceState, Lifetime,
+    Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
 use crate::internal::gmp::{GmpHandler, GmpQueryHandler, GroupJoinResult, GroupLeaveResult};
-use crate::internal::types::IpTypesIpExt;
-
-use self::state::Ipv6NetworkLearnedParameters;
 
 /// An IP device timer.
 ///
@@ -899,7 +897,7 @@ impl<
     > IpDeviceHandler<I, BC> for CC
 {
     fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool {
-        is_ip_forwarding_enabled(self, device_id)
+        is_ip_unicast_forwarding_enabled(self, device_id)
     }
 
     fn set_default_hop_limit(&mut self, device_id: &Self::DeviceId, hop_limit: NonZeroU8) {
@@ -956,6 +954,21 @@ pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
         retrans_timer: NonZeroDuration,
     );
 
+    /// Handles a received neighbor solicitation that has been determined to be
+    /// due to a node performing duplicate address detection for `addr`. Removes
+    /// `addr` from `device_id` if it is determined `addr` is a duplicate
+    /// tentative address.
+    ///
+    /// Returns the assignment state of `addr` on the interface, if there was
+    /// one before any action was taken.
+    fn handle_received_dad_neighbor_solicitation(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr: UnicastAddr<Ipv6Addr>,
+        nonce: Option<NdpNonce<&'_ [u8]>>,
+    ) -> IpAddressState;
+
     /// Handles a received neighbor advertisement.
     ///
     /// Takes action in response to a received neighbor advertisement for the
@@ -964,7 +977,7 @@ pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
     /// this method returns `Some(Tentative {..})` when the address was
     /// tentatively assigned (and now removed), `Some(Assigned)` if the address
     /// was assigned (and so not removed), otherwise `None`.
-    fn remove_duplicate_tentative_address(
+    fn handle_received_neighbor_advertisement(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
@@ -1006,7 +1019,9 @@ pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
 
 impl<
         BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-        CC: Ipv6DeviceContext<BC> + Ipv6DeviceConfigurationContext<BC>,
+        CC: Ipv6DeviceContext<BC>
+            + Ipv6DeviceConfigurationContext<BC>
+            + CounterContext<IpCounters<Ipv6>>,
     > Ipv6DeviceHandler<BC> for CC
 {
     type LinkLayerAddr = CC::LinkLayerAddr;
@@ -1029,7 +1044,70 @@ impl<
         })
     }
 
-    fn remove_duplicate_tentative_address(
+    fn handle_received_dad_neighbor_solicitation(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device_id: &Self::DeviceId,
+        addr: UnicastAddr<Ipv6Addr>,
+        nonce: Option<NdpNonce<&'_ [u8]>>,
+    ) -> IpAddressState {
+        let addr_id = match self.get_address_id(device_id, addr.into_specified()) {
+            Ok(o) => o,
+            Err(NotFoundError) => return IpAddressState::Unavailable,
+        };
+
+        match self.with_ipv6_device_configuration(device_id, |_config, mut core_ctx| {
+            core_ctx.handle_incoming_dad_neighbor_solicitation(
+                bindings_ctx,
+                device_id,
+                &addr_id,
+                nonce,
+            )
+        }) {
+            DadAddressStateLookupResult::Assigned => IpAddressState::Assigned,
+            DadAddressStateLookupResult::Tentative { matched_nonce: true } => {
+                self.increment(|counters| &counters.version_rx.drop_looped_back_dad_probe);
+
+                // Per RFC 7527 section 4.2, "the receiver compares the nonce
+                // included in the message, with any stored nonce on the
+                // receiving interface. If a match is found, the node SHOULD log
+                // a system management message, SHOULD update any statistics
+                // counter, and MUST drop the received message."
+
+                // The matched nonce indicates the neighbor solicitation was
+                // looped back to us, so don't remove the address.
+                IpAddressState::Tentative
+            }
+            DadAddressStateLookupResult::Uninitialized
+            | DadAddressStateLookupResult::Tentative { matched_nonce: false } => {
+                // Per RFC 7527 section 4.2, "If the received NS(DAD) message
+                // includes a nonce and no match is found with any stored nonce,
+                // the node SHOULD log a system management message for a
+                // DAD-failed state and SHOULD update any statistics counter."
+                // -- meaning that we should treat this as an indication that we
+                // have detected a duplicate address.
+
+                match del_ip_addr(
+                    self,
+                    bindings_ctx,
+                    device_id,
+                    DelIpAddr::AddressId(addr_id),
+                    AddressRemovedReason::DadFailed,
+                ) {
+                    Ok(result) => {
+                        bindings_ctx.defer_removal_result(result);
+                        IpAddressState::Tentative
+                    }
+                    Err(NotFoundError) => {
+                        // We may have raced with user removal of this address.
+                        IpAddressState::Unavailable
+                    }
+                }
+            }
+        }
+    }
+
+    fn handle_received_neighbor_advertisement(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
@@ -1135,7 +1213,7 @@ impl<
 }
 
 /// The execution context for an IP device with a buffer.
-pub trait IpDeviceSendContext<I: IpTypesIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpDeviceSendContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Sends an IP packet through the device.
     fn send_ip_frame<S>(
         &mut self,
@@ -1232,7 +1310,7 @@ fn enable_ipv6_device_with_config<
     //    address.
     //
     // If we are operating as a router, we do not solicit routers.
-    if !config.ip_config.forwarding_enabled {
+    if !config.ip_config.unicast_forwarding_enabled {
         RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
     }
 }
@@ -1392,8 +1470,8 @@ pub fn get_ipv6_hop_limit<BT: IpDeviceStateBindingsTypes, CC: IpDeviceStateConte
     core_ctx.with_default_hop_limit(device, Clone::clone)
 }
 
-/// Is IP packet forwarding enabled?
-pub fn is_ip_forwarding_enabled<
+/// Is IP packet unicast forwarding enabled?
+pub fn is_ip_unicast_forwarding_enabled<
     I: IpDeviceIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<I, BC>,
@@ -1402,7 +1480,21 @@ pub fn is_ip_forwarding_enabled<
     device_id: &CC::DeviceId,
 ) -> bool {
     core_ctx.with_ip_device_configuration(device_id, |state, _ctx| {
-        AsRef::<IpDeviceConfiguration>::as_ref(state).forwarding_enabled
+        AsRef::<IpDeviceConfiguration>::as_ref(state).unicast_forwarding_enabled
+    })
+}
+
+/// Is IP packet multicast forwarding enabled?
+pub fn is_ip_multicast_forwarding_enabled<
+    I: IpDeviceIpExt,
+    BC: IpDeviceBindingsContext<I, CC::DeviceId>,
+    CC: IpDeviceConfigurationContext<I, BC>,
+>(
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
+) -> bool {
+    core_ctx.with_ip_device_configuration(device_id, |state, _ctx| {
+        AsRef::<IpDeviceConfiguration>::as_ref(state).multicast_forwarding_enabled
     })
 }
 

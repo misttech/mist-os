@@ -24,13 +24,6 @@ hermetic_code_blob("write_to_stack") {
 
   sources = [ "$current_cpu.S" ]
   deps = [ "//zircon/kernel/lib/arch" ]
-
-  # TODO(https://fxbug.dev/42079915): LLD lets --no-pie trump the code generation
-  # switches, but this needs to be compiled as PIC though linked differently.
-  if (toolchain_variant.tags + [ "lto" ] - [ "lto" ] !=
-      toolchain_variant.tags) {
-    ldflags = [ "-Wl,-mllvm,-relocation-model=pic" ]
-  }
 }
 
 # This is evaluated in the user.basic toolchain so that it can use

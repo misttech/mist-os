@@ -4,11 +4,10 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/mock_controller.h"
 
-#include <endian.h>
-
 #include <cstdint>
 
 #include <gtest/gtest.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
@@ -32,7 +31,8 @@ CommandTransaction::CommandTransaction(
     const std::vector<const ByteBuffer*>& replies,
     ExpectationMetadata meta)
     : Transaction(DynamicByteBuffer(), replies, meta), prefix_(true) {
-  hci_spec::OpCode le_opcode = htole16(expected_opcode);
+  hci_spec::OpCode le_opcode =
+      pw::bytes::ConvertOrderTo(cpp20::endian::little, expected_opcode);
   const BufferView expected(&le_opcode, sizeof(expected_opcode));
   set_expected({DynamicByteBuffer(expected), meta});
 }
@@ -153,7 +153,8 @@ void MockController::ClearTransactionCallback() {
 
 void MockController::OnCommandReceived(const ByteBuffer& data) {
   ASSERT_GE(data.size(), sizeof(hci_spec::OpCode));
-  const hci_spec::OpCode opcode = le16toh(data.To<hci_spec::OpCode>());
+  const hci_spec::OpCode opcode = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little, data.To<hci_spec::OpCode>());
   const uint8_t ogf = hci_spec::GetOGF(opcode);
   const uint16_t ocf = hci_spec::GetOCF(opcode);
 
@@ -164,8 +165,9 @@ void MockController::OnCommandReceived(const ByteBuffer& data) {
       << static_cast<uint16_t>(ogf) << ", OCF: 0x" << ocf;
 
   auto& transaction = cmd_transactions_.front();
-  const hci_spec::OpCode expected_opcode =
-      le16toh(transaction.expected().data.To<hci_spec::OpCode>());
+  const hci_spec::OpCode expected_opcode = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little,
+      transaction.expected().data.To<hci_spec::OpCode>());
   const uint8_t expected_ogf = hci_spec::GetOGF(expected_opcode);
   const uint16_t expected_ocf = hci_spec::GetOCF(expected_opcode);
 

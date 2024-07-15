@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::terminal::{ControllingSession, Terminal};
+use crate::device::terminal::{Terminal, TerminalController};
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::syscalls::{read_siginfo, WaitingOptions};
@@ -861,15 +861,17 @@ impl ThreadGroup {
         self.write().set_stopped(new_stopped, siginfo, finalize_only)
     }
 
-    /// Ensures |session| is the controlling session inside of |controlling_session|, and returns a
-    /// reference to the |ControllingSession|.
-    fn check_controlling_session<'a>(
+    /// Ensures |session| is the controlling session inside of |terminal_controller|, and returns a
+    /// reference to the |TerminalController|.
+    fn check_terminal_controller(
         session: &Arc<Session>,
-        controlling_session: &'a Option<ControllingSession>,
-    ) -> Result<&'a ControllingSession, Errno> {
-        if let Some(controlling_session) = controlling_session {
-            if controlling_session.session.as_ptr() == Arc::as_ptr(session) {
-                return Ok(controlling_session);
+        terminal_controller: &Option<TerminalController>,
+    ) -> Result<(), Errno> {
+        if let Some(terminal_controller) = terminal_controller {
+            if let Some(terminal_session) = terminal_controller.session.upgrade() {
+                if Arc::ptr_eq(session, &terminal_session) {
+                    return Ok(());
+                }
             }
         }
         error!(ENOTTY)
@@ -878,17 +880,16 @@ impl ThreadGroup {
     pub fn get_foreground_process_group(
         self: &Arc<Self>,
         terminal: &Arc<Terminal>,
-        is_main: bool,
     ) -> Result<pid_t, Errno> {
         let state = self.read();
         let process_group = &state.process_group;
         let terminal_state = terminal.read();
-        let controlling_session = terminal_state.get_controlling_session(is_main);
 
         // "When fd does not refer to the controlling terminal of the calling
         // process, -1 is returned" - tcgetpgrp(3)
-        let cs = Self::check_controlling_session(&process_group.session, controlling_session)?;
-        Ok(cs.foregound_process_group_leader)
+        Self::check_terminal_controller(&process_group.session, &terminal_state.controller)?;
+        let pid = process_group.session.read().get_foreground_process_group_leader();
+        Ok(pid)
     }
 
     pub fn set_foreground_process_group<L>(
@@ -896,7 +897,6 @@ impl ThreadGroup {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         terminal: &Arc<Terminal>,
-        is_main: bool,
         pgid: pid_t,
     ) -> Result<(), Errno>
     where
@@ -909,9 +909,8 @@ impl ThreadGroup {
             let pids = self.kernel.pids.read();
             let state = self.read();
             process_group = Arc::clone(&state.process_group);
-            let mut terminal_state = terminal.write();
-            let controlling_session = terminal_state.get_controlling_session_mut(is_main);
-            let cs = Self::check_controlling_session(&process_group.session, controlling_session)?;
+            let terminal_state = terminal.read();
+            Self::check_terminal_controller(&process_group.session, &terminal_state.controller)?;
 
             // pgid must be positive.
             if pgid < 0 {
@@ -923,16 +922,15 @@ impl ThreadGroup {
                 return error!(EPERM);
             }
 
+            let mut session_state = process_group.session.write();
             // If the calling process is a member of a background group and not ignoring SIGTTOU, a
             // SIGTTOU signal is sent to all members of this background process group.
-            send_ttou = process_group.leader != cs.foregound_process_group_leader
+            send_ttou = process_group.leader != session_state.get_foreground_process_group_leader()
                 && !current_task.read().signal_mask().has_signal(SIGTTOU)
                 && self.signal_actions.get(SIGTTOU).sa_handler != SIG_IGN;
+
             if !send_ttou {
-                *controlling_session = controlling_session
-                    .as_ref()
-                    .unwrap()
-                    .set_foregound_process_group(&new_process_group);
+                session_state.set_foreground_process_group(&new_process_group);
             }
         }
 
@@ -957,7 +955,6 @@ impl ThreadGroup {
         let state = self.read();
         let process_group = &state.process_group;
         let mut terminal_state = terminal.write();
-        let controlling_session = terminal_state.get_controlling_session_mut(is_main);
         let mut session_writer = process_group.session.write();
 
         // "The calling process must be a session leader and not have a
@@ -976,7 +973,7 @@ impl ThreadGroup {
         // terminal is stolen, and all processes that had it as controlling
         // terminal lose it." - tty_ioctl(4)
         if let Some(other_session) =
-            controlling_session.as_ref().and_then(|cs| cs.session.upgrade())
+            terminal_state.controller.as_ref().and_then(|cs| cs.session.upgrade())
         {
             if other_session != process_group.session {
                 if !has_admin || !steal {
@@ -994,7 +991,7 @@ impl ThreadGroup {
 
         session_writer.controlling_terminal =
             Some(ControllingTerminal::new(terminal.clone(), is_main));
-        *controlling_session = ControllingSession::new(process_group);
+        terminal_state.controller = TerminalController::new(&process_group.session);
         Ok(())
     }
 
@@ -1014,11 +1011,17 @@ impl ThreadGroup {
             let state = self.read();
             process_group = Arc::clone(&state.process_group);
             let mut terminal_state = terminal.write();
-            let controlling_session = terminal_state.get_controlling_session_mut(is_main);
             let mut session_writer = process_group.session.write();
 
             // tty must be the controlling terminal.
-            Self::check_controlling_session(&process_group.session, controlling_session)?;
+            Self::check_terminal_controller(&process_group.session, &terminal_state.controller)?;
+            if !session_writer
+                .controlling_terminal
+                .as_ref()
+                .map_or(false, |ct| ct.matches(terminal, is_main))
+            {
+                return error!(ENOTTY);
+            }
 
             // "If the process was session leader, then send SIGHUP and SIGCONT to the foreground
             // process group and all processes in the current session lose their controlling terminal."
@@ -1028,7 +1031,7 @@ impl ThreadGroup {
             // send them SIGHUP and SIGCONT.
 
             session_writer.controlling_terminal = None;
-            *controlling_session = None;
+            terminal_state.controller = None;
         }
 
         if process_group.session.leader == self.leader {
@@ -1338,7 +1341,7 @@ impl ThreadGroup {
             if self.leader != current_task.get_pid()
                 && (signal_info.code >= 0 || signal_info.code == SI_TKILL)
             {
-                return error!(EINVAL);
+                return error!(EPERM);
             }
 
             self.write().send_signal(signal_info);
@@ -1377,6 +1380,30 @@ impl ThreadGroup {
         security::check_signal_access_tg(current_task, &target_task, signal)?;
 
         Ok(Some(signal))
+    }
+}
+
+// ThreadGroup can't easily go into an OwnedRef, so instead of using Releasable we have a
+// Drop impl that avoids recursive locking.
+impl Drop for ThreadGroup {
+    fn drop(&mut self) {
+        // We don't want to drop parent while we hold the PidTable lock.
+        let parent = {
+            let mut pids = self.kernel.pids.write();
+            let mut state = self.mutable_state.write();
+
+            for zombie in state.zombie_children.drain(..) {
+                zombie.release(&mut pids);
+            }
+
+            state.zombie_ptracees.release(&mut pids);
+
+            state.parent.take()
+        };
+
+        // Now that the PidTable lock has been released the parent can be dropped since it will
+        // acquire that same lock again.
+        std::mem::drop(parent);
     }
 }
 

@@ -109,7 +109,7 @@ test("blobfs_unittest") {
     "//src/lib/testing/predicates",
     "//src/storage/blobfs",
     "//src/storage/blobfs:decompressor_impl",
-    "//src/storage/blobfs:fuchsia.blobfs.internal_hlcpp",
+    "//src/storage/blobfs:fuchsia.blobfs.internal_cpp",
     "//src/storage/lib/block_client/cpp:fake_device",
     "//src/storage/lib/fs_management",
     "//third_party/googletest:gmock",

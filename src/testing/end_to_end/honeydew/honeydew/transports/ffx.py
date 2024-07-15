@@ -307,7 +307,7 @@ class FFX(ffx_interface.FFX):
             errors.FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_ADD"] + [str(self._target_ip_port)]
-        ffx_cmd: list[str] = self._generate_ffx_cmd(
+        ffx_cmd: list[str] = self.generate_ffx_cmd(
             cmd=cmd, include_target=False
         )
 
@@ -534,7 +534,7 @@ class FFX(ffx_interface.FFX):
             errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
-        ffx_cmd: list[str] = self._generate_ffx_cmd(
+        ffx_cmd: list[str] = self.generate_ffx_cmd(
             cmd=cmd,
             include_target=include_target,
         )
@@ -582,7 +582,7 @@ class FFX(ffx_interface.FFX):
             subprocess.Popen[bytes] will be returned.
         """
         return host_shell.popen(
-            cmd=self._generate_ffx_cmd(cmd=cmd),
+            cmd=self.generate_ffx_cmd(cmd=cmd),
             **kwargs,
         )
 
@@ -724,8 +724,7 @@ class FFX(ffx_interface.FFX):
         _LOGGER.info("%s is not connected to host", self._target_name)
         return
 
-    # List all private methods
-    def _generate_ffx_cmd(
+    def generate_ffx_cmd(
         self,
         cmd: list[str],
         include_target: bool = True,

@@ -7,8 +7,8 @@ use crate::fs::sysfs::SysfsDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps, FsStr,
-    FsString, PathBuilder,
+    fileops_impl_noop_sync, fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps,
+    FsNode, FsNodeOps, FsStr, FsString, PathBuilder,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
@@ -314,6 +314,7 @@ impl UEventFile {
 
 impl FileOps for UEventFile {
     fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,

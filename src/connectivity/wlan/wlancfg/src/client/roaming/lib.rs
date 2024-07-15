@@ -9,24 +9,47 @@ use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
 
 pub const ROAMING_CHANNEL_BUFFER_SIZE: usize = 100;
 
+// LINT.IfChange
 #[derive(Clone, Copy)]
-pub enum RoamingProfile {
-    RoamingOff,
-    StationaryRoaming,
+pub enum RoamingPolicy {
+    Disabled,
+    Enabled { profile: RoamingProfile, mode: RoamingMode },
 }
 
-impl From<String> for RoamingProfile {
+#[derive(Clone, Copy)]
+pub enum RoamingProfile {
+    Stationary,
+}
+#[derive(Clone, Copy, Default)]
+pub enum RoamingMode {
+    MetricsOnly,
+    #[default]
+    CanRoam,
+}
+
+impl From<String> for RoamingPolicy {
     fn from(string: String) -> Self {
         match string.as_str() {
-            "roaming_off" => Self::RoamingOff,
-            "stationary_roaming" => Self::StationaryRoaming,
+            "enabled_stationary_can_roam" => RoamingPolicy::Enabled {
+                profile: RoamingProfile::Stationary,
+                mode: RoamingMode::CanRoam,
+            },
+            "enabled_stationary_metrics_only" => RoamingPolicy::Enabled {
+                profile: RoamingProfile::Stationary,
+                mode: RoamingMode::MetricsOnly,
+            },
+            "disabled" => RoamingPolicy::Disabled,
             _ => {
-                error!("Invalid roam profile: {}. Defaulting to RoamingOff.", string);
-                Self::RoamingOff
+                error!(
+                    "Unknown roaming profile string ({}). Continuing with roaming disabled.",
+                    string
+                );
+                RoamingPolicy::Disabled
             }
         }
     }
 }
+// LINT.ThenChange(//src/lib/assembly/config_schema/src/platform_config/connectivity_config.rs)
 
 /// Data tracked about a connection used to make roaming decisions.
 #[derive(Clone)]

@@ -97,6 +97,14 @@ template("_subbuild") {
                              "testonly",
                              "visibility",
                            ])
+
+    metadata = {
+      ninja_subbuilds = [
+        {
+          build_dir = rebase_path(_build_dir, root_build_dir)
+        },
+      ]
+    }
   }
 }
 
@@ -142,7 +150,7 @@ template("idk_subbuilds") {
         "idk_subbuild." + get_label_info(invoker.sdk_collection_label, "name")
   }
 
-  _api_levels = platform_version.build_time_supported_api_levels
+  _api_levels = platform_version.idk_buildable_api_levels
   _target_cpus = idk_target_cpus_default
 
   # First, define subbuild targets for the default API level.

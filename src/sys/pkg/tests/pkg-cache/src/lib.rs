@@ -626,26 +626,64 @@ where
             .add_child("pkg_cache", "#meta/pkg-cache.cm", ChildOptions::new())
             .await
             .unwrap();
-        if self.ignore_system_image || blob_implementation_overridden {
-            builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
-            if self.ignore_system_image {
-                builder
-                    .set_config_value(&pkg_cache, "use_system_image", false.into())
-                    .await
-                    .unwrap();
-            }
-            if blob_implementation_overridden {
-                builder
-                    .set_config_value(
-                        &pkg_cache,
-                        "use_fxblob",
-                        matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob)
-                            .into(),
-                    )
-                    .await
-                    .unwrap();
-            }
+        let pkg_cache_config = builder
+            .add_child("pkg_cache_config", "#meta/pkg-cache-config.cm", ChildOptions::new())
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.pkgcache.AllPackagesExecutable"))
+                    .from(&pkg_cache_config)
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
+        if self.ignore_system_image {
+            builder
+                .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                    name: "fuchsia.pkgcache.UseSystemImage".parse().unwrap(),
+                    value: false.into(),
+                }))
+                .await
+                .unwrap();
         }
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.pkgcache.UseSystemImage"))
+                    .from(if self.ignore_system_image {
+                        Ref::self_()
+                    } else {
+                        (&pkg_cache_config).into()
+                    })
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
+        if blob_implementation_overridden {
+            builder
+                .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                    name: "fuchsia.pkgcache.UseFxblob".parse().unwrap(),
+                    value: matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob)
+                        .into(),
+                }))
+                .await
+                .unwrap();
+        }
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.pkgcache.UseFxblob"))
+                    .from(if blob_implementation_overridden {
+                        Ref::self_()
+                    } else {
+                        (&pkg_cache_config).into()
+                    })
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
         let system_update_committer = builder
             .add_child(
                 "system_update_committer",

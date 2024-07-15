@@ -5,9 +5,11 @@
 #![allow(dead_code)]
 
 use super::*;
+use anyhow::anyhow;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_net_mdns::*;
 use fuchsia_component::client::connect_to_protocol;
+use futures::channel::oneshot as foneshot;
 
 const BORDER_AGENT_SERVICE_TYPE: &str = "_meshcop._udp.";
 
@@ -117,6 +119,7 @@ fn publish_border_agent_service(
     service_instance: String,
     txt: Vec<(String, Vec<u8>)>,
     port: u16,
+    cancellation_sender: foneshot::Sender<usize>,
 ) -> impl Future<Output = Result<(), anyhow::Error>> + 'static {
     let (client, server) = create_endpoints::<ServiceInstancePublicationResponder_Marker>();
 
@@ -194,7 +197,7 @@ fn publish_border_agent_service(
         },
     );
 
-    futures::future::try_join(
+    let future = futures::future::try_join(
         publish_init_future.inspect_err(|err| {
             error!(
                 tag = "meshcop",
@@ -208,7 +211,13 @@ fn publish_border_agent_service(
             );
         }),
     )
-    .map_ok(|_| ())
+    .map_ok(|_| ());
+
+    future.then(move |_| {
+        futures::future::ready(cancellation_sender.send(0).map_err(|e| {
+            anyhow!("publish_border_agent_service: failed to send via cancellation_sender: {:?}", e)
+        }))
+    })
 }
 
 async fn get_product_info() -> Result<fidl_fuchsia_hwinfo::ProductInfo, anyhow::Error> {
@@ -278,26 +287,31 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
 
             *last_txt_entries = txt.clone();
 
-            let original_task = self.border_agent_service.lock().take();
-
-            if let Some(task) = original_task {
-                // We must wait for the original task to fully stop.
-                if let Err(err) = task.cancel().transpose() {
-                    warn!(tag="meshcop","update_border_agent_service: Previous publication task ended with an error: {:?}", err);
-                }
-            }
-
-            let task = publish_border_agent_service(service_instance_name, txt, port);
-
-            if let Err(err) = self
-                .border_agent_service
-                .lock()
-                .replace(fasync::Task::spawn(task))
-                .and_then(|x| x.cancel())
-                .transpose()
+            let border_agent_service_pair = self.border_agent_service_pair.lock().take();
+            if let Some((original_task, original_task_cancellation_receiver)) =
+                border_agent_service_pair
             {
-                warn!(tag="meshcop","update_border_agent_service: Previous publication task ended with an error: {:?}", err);
+                if let Err(err) = original_task.cancel().transpose() {
+                    warn!(tag="meshcop", "update_border_agent_service: Previous publication task ended with an error: {:?}", err);
+                }
+                // We must wait for the original task to fully stop.
+                if let Ok(_) = original_task_cancellation_receiver.await {
+                    warn!(tag="meshcop", "update_border_agent_service: pervious task terminated earlier than expected");
+                }
+                info!(tag = "meshcop", "update_border_agent_service: pervious task terminated");
             }
+
+            let (task_cancellation_sender, task_cancellation_receiver) =
+                futures::channel::oneshot::channel();
+            let task = publish_border_agent_service(
+                service_instance_name,
+                txt,
+                port,
+                task_cancellation_sender,
+            );
+
+            *self.border_agent_service_pair.lock() =
+                Some((fasync::Task::spawn(task), task_cancellation_receiver));
         }
     }
 }

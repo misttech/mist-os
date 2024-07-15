@@ -21,6 +21,7 @@ import (
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
+	"fidl/fuchsia/hardware/network"
 	fnet "fidl/fuchsia/net"
 	"fidl/fuchsia/net/interfaces"
 
@@ -54,7 +55,7 @@ func testProperties() interfaces.Properties {
 	var properties interfaces.Properties
 	properties.SetId(testId)
 	properties.SetName("testif01")
-	properties.SetDeviceClass(interfaces.DeviceClassWithLoopback(interfaces.Empty{}))
+	properties.SetPortClass(interfaces.PortClassWithLoopback(interfaces.Empty{}))
 	properties.SetOnline(true)
 	properties.SetHasDefaultIpv4Route(true)
 	properties.SetHasDefaultIpv6Route(true)
@@ -902,7 +903,7 @@ func TestAddressToString(t *testing.T) {
 }
 
 func TestInterfaceAddedStringer(t *testing.T) {
-	want := "{Id:1, Name:testif01, DeviceClass:loopback, Online:true, HasDefaultIpv4Route:true, HasDefaultIpv6Route:true}"
+	want := "{Id:1, Name:testif01, PortClass:loopback, Online:true, HasDefaultIpv4Route:true, HasDefaultIpv6Route:true}"
 	if got := interfaceAdded(testProperties()).String(); got != want {
 		t.Fatalf("got \"%s\", want \"%s\"", got, want)
 	}
@@ -970,5 +971,14 @@ func TestAddressRemovedStringer(t *testing.T) {
 	want := "{nicid:1 addr:1.2.3.4/16 reason:ManualAction}"
 	if got := a.String(); got != want {
 		t.Fatalf("got = \"%s\", want = \"%s\"", got, want)
+	}
+}
+
+func TestPortClassConversions(t *testing.T) {
+	// Verify that `deviceClassFromPortClass` has a conversion for all possible
+	// variants of PortClass.
+	var arbitraryPortClass network.PortClass
+	for _, portClass := range network.PortClass.I_EnumValues(arbitraryPortClass) {
+		deviceClassFromPortClass(portClass)
 	}
 }

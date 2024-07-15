@@ -17,9 +17,9 @@ use netstack3_base::socket::{
 };
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, ReferenceNotifiers,
-    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, ResourceCounterContext,
-    StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
+    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, IpExt,
+    ReferenceNotifiers, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
+    ResourceCounterContext, StrongDeviceIdentifier, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
@@ -27,7 +27,6 @@ use packet_formats::icmp;
 use packet_formats::ip::IpPacket;
 use zerocopy::ByteSlice;
 
-use crate::internal::base::IpExt;
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
@@ -205,6 +204,7 @@ where
                     &send_options,
                     build_packet_fn,
                     None,
+                    false, /* transparent */
                 )
                 .map_err(|e| match e {
                     SendOneShotIpPacketError::CreateAndSendError { err } => {
@@ -762,6 +762,10 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
     fn multicast_loop(&self) -> bool {
         // TODO(https://fxbug.dev/344645667): Support IP_MULTICAST_LOOP.
         false
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        None
     }
 }
 

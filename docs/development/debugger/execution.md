@@ -1,8 +1,36 @@
-# Controlling thread execution in zxdb
+# Control thread execution
+
+When you use zxdb, you can control the execution of threads to help you debug.
+As you debug you can control execution through the use of the following:
+
+* Thread
+
+  A thread is a unit of execution within a process. It represents a single
+  sequence of instructions that can be executed independently.
+
+  To control execution through threads in zxdb, see [Threads](#threads).
+
+* Stack frame
+
+  A stack frame is a section of the call stack that is allocated when a function
+  is called. It stores information needed for the function's execution, such as:
+
+  * Local variables: Variables declared within the function.
+  * Parameters: Values passed to the function.
+  * Return address: The location in the code to return to after the
+    function completes.
+
+  To control execution through stack frames in zxdb, see
+  [Stack Frames](#stack-frames).
 
 ## Threads
 
-To list the current process’ threads (see “Interaction model” above for more):
+In zxdb, a `thread` is a [noun][zxdb-noun] that you can use with zxdb
+[verbs][zxdb-verb].
+
+To list the threads in the current process:
+
+Note: This is the `thread` noun. You can also use `t` to express `thread`.
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] thread
@@ -11,12 +39,19 @@ To list the current process’ threads (see “Interaction model” above for mo
   2 Running 3462 worker-thread
 ```
 
-Often when you attach to a process the thread will be “blocked”, meaning it is stopped on a system
-call. For asynchronous programs this will typically be some kind of wait.
+In some cases, you may notice that a thread is marked as `Blocked` which means
+that the thread is stopped on a system call. Typically, when you are debugging
+an asynchronous application this may also indicate a wait time.
 
-Most thread control and introspection commands only work when a thread is suspended (not blocked or
-running). A thread will be suspended when it is stopped at a breakpoint or crashes. You can
-explicitly suspend a thread with the `pause` command:
+Thread control commands only work on a suspended thread, not blocked or running
+threads. There are several ways to suspend a thread:
+
+* A [breakpoint][zxdb-breakpoints] stopped the thread.
+* Use the [`pause`](#pause-command) command.
+
+### `pause` a thread {#pause-command}
+
+For example, to suspend thread `2` with the `pause` command:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] thread 2 pause
@@ -28,37 +63,150 @@ explicitly suspend a thread with the `pause` command:
    69 m_syscall zx_timer_create 64 3 1
 ```
 
-> When a thread is paused the debugger will show the current source code
-> location. Often threads will be in a system call that will resolve to the
-> location in the assembly-language macro file that generated the system call
-> as shown in the above example.
+When a thread is paused zxdb shows the current source code location. If a thread
+is in a system call, like the example above, the source code location resolves
+to the location in the assembly-language macro file that generated the system
+call.
 
-Running `pause` by itself with no context will pause all threads of all processes currently
-attached:
+If you run `pause` without any additional context, zxdb pauses all threads of
+all processes that are currently attached.
+
+For example:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] pause
+   508                 const zx_port_packet_t* packet))
+   509
+ ▶ 510 BLOCKING_SYSCALL(port_wait, zx_status_t, /* no attributes */, 3, (handle, deadline, packet),
+   511                  (_ZX_SYSCALL_ANNO(use_handle("Fuchsia")) zx_handle_t handle, zx_time_t deadline,
+   512                   zx_port_packet_t* packet))
+🛑 $elf(SYSCALL_zx_port_wait) + 0x7 • syscalls.inc:510
 ```
 
-Unpause a thread with `continue`. As before, `continue` with no context will resume all threads:
+### `continue` a thread {#continue-thread}
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] continue
-```
+After you have paused a thread and started debugging an issue, you may want to
+`continue` the thread. Continuing means resuming execution until your program
+completes normally.
 
-Or continue a specific thread:
+For example, to `continue` thread `1`:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] thread 1 continue
 ```
 
-## Stack frames
+If you run `continue` without any additional context, zxdb continues all the
+threads of all attached processes.
 
-A stack frame is a function call. When a function calls another function, a new nested frame is
-created. So listing the frames of a thread tells you the call stack. You can only see the stack
-frames when a thread is suspended (see “Working with threads” above).
+For example:
 
-To list the current thread’s stack frames (the `f` abbreviation will also work).
+```none {:.devsite-disable-click-to-copy}
+[zxdb] continue
+```
+
+### Stepping a thread
+
+When a thread is paused you can control its execution. You can use any of these
+commands:
+
+Note: For more information on pausing a thread, see
+[`pause` a thread](#pause-command).
+
+* `finish` (`fi`)
+
+  Exits the function and stops right after the call.
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] finish
+  ```
+
+* `next` (`n`)
+
+  Advances to the next line, stepping over function calls.
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] next
+  ```
+
+* `nexti`
+
+  Advances to the next instruction, but steps over call instructions for the
+  target architecture.
+
+  Note: In this context, a call instruction is `call` on x64 and `bl` on arm64.
+  This does not work for all cases. For example, a manually set up call frame
+  and a `jump` may result stepping into a new stack frame.
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] nexti
+  ```
+
+* `ss`
+
+  List function calls on the current line and step in to the call selected. This
+  automatically completes any of the other calls that happen to occur first.
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] ss
+    1 std::string::string
+    2 MyClass::MyClass
+    3 HelperFunctionCall
+    4 MyClass::~MyClass
+    5 std::string::~string
+    quit
+  >
+  ```
+
+* `step` (`s`)
+
+  Advances to the next code line. If a function call happens before the next
+  line, that function is stepped into and execution stops at the
+  beginning of that function.
+
+  You can also supply an argument substring to match a specific function call.
+  Function names that do not contain the argument substring  are skipped and
+  only matching functions are stepped into.
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] step
+  [zxdb] step MyFunction
+  ```
+
+* `stepi`
+
+  Advances exactly one machine instruction.
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] stepi
+  ```
+
+
+* `until` (`u`)
+
+  Given a line location, continues the thread until execution gets there. For
+  example, to run until line `45` of the current file:
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] until 45
+  ```
+
+  You can also run until execution gets back to a given stack frame:
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] frame 2 until
+  ```
+
+## Stack frames {#stack-frames}
+
+A stack frame is a function call. When a function calls another function, a new
+frame is created. Listing the frames of a thread returns the call stack.
+
+Note: You can only see the stack frames when a thread is suspended. See
+[`pause` a specific thread](#pause-command).
+
+To list the stack frames in the current thread:
+
+Note: This is the `frame` noun. You can also use `f` to express `frame`.
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] frame
@@ -67,29 +215,49 @@ To list the current thread’s stack frames (the `f` abbreviation will also work
   2 main() • main.cc:174
 ```
 
-And to select a given frame as the default:
+When you work with stack frames, `0` indicates the top of the stack, which
+indicates the end of the execution. The bottom of the stack, which is the
+highest stack frame number, indicates the start of the execution.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] frame 2
-```
+### Navigating stack frames {#navigate-stack-frames}
 
-Frames are numbered with “0” being the top of the stack. Increasing numbers go backwards in time.
+You can use the `up` and `down` commands to navigate the frame list.
 
-You can use the `up` and `down` commands to navigate the frame list:
+For example, use `up` to navigate from the current frame `0` to frame `1`:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] up
   1 fxl::CommandLineFromIterators<const char *const *>() • command_line.h:204
+```
 
+For example, use `down` to navigate from the current frame `1` to frame `0`:
+
+```
 [zxdb] down
   0 fxl::CommandLineFromIteratorsFindFirstPositionalArg<const char *const *>() • command_line.h:185
 ```
 
-For more context, you can use the `backtrace` command. This is identical to `frame` but gives more
-detailed address information as well as function parameters. This command can be abbreviated `bt`:
+You can also navigate to a specific frame by using the `frame` command with a
+frame number:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] bt
+[zxdb] frame 1
+```
+
+### Use `backtrace` for additional details {#backtrace}
+
+In some cases, you may want to see additional address information that
+stack frames don't provide. The `backtrace` command is identical to `frame` but
+gives you more detailed address information as well as function parameters.
+
+Note: This is the `backtrace` verb. You can also use `bt` to express
+`backtrace`.
+
+To list the stack frames in the current thread, but with more detailed
+information, use `backtrace`:
+
+```none {:.devsite-disable-click-to-copy}
+[zxdb] backtrace
 ▶ 0 fxl::CommandLineFromIteratorsFindFirstPositionalArg<const char *const *>() • command_line.h:185
       IP = 0x10f982cf2ad0, BP = 0x66b45a01af50, SP = 0x66b45a01af38
       first = (const char* const*) 0x59f4e1268dc0
@@ -102,8 +270,22 @@ detailed address information as well as function parameters. This command can be
 ...
 ```
 
-Each stack frame has a code location. Use the `list` command to look at source code. By itself, it
-lists the source code around the current stack frame’s instruction pointer:
+### Use `list` to look at source code {#list}
+
+Each stack frame has a code location. Use the `list` command to look at the
+source code.
+
+You can list code around the instruction pointer of specific stack frames.
+
+For example, to `list` the source code around the instruction pointer of stack
+frame `3`:
+
+```none {:.devsite-disable-click-to-copy}
+[zxdb] frame 3 list
+```
+
+When you use `list` without context, zxdb lists the source code
+around the instruction pointer of the current stack frame:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] list
@@ -114,87 +296,34 @@ lists the source code around the current stack frame’s instruction pointer:
    187     *first_positional_arg = last;
 ```
 
-You can list code around the current instruction pointer of other stack frames, too:
+#### Additional use cases for `list`
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] frame 3 list
-```
+Additionally, you can use `list` to list specific things:
 
-Or you can list specific things like functions:
+* {Functions}
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] list MyClass::MyFunc
-```
+  Use `list` to list functions:
 
-File/line numbers:
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] list MyClass::MyFunc
+  ```
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] list foo.cc:43
-```
+* {Files}
 
-Or whole files:
+  Use `list` to list specific files:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] list --all myfile.cc:1
-```
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] list --all myfile.cc:1
+  ```
 
-## Stepping a thread
+* {File with line numbers}
 
-When a thread is suspended (see “Threads” above) you can control its execution:
+  Use `list` to list specific files with specific line numbers:
 
-`next` / `n`: Advances to the next line, stepping over function calls.
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] list foo.cc:43
+  ```
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] n
-```
-
-`step` / `s`: Advances to the next line. If a function call happens before the next line, that
-function will be stepped into and execution will stop at the beginning of it. You can also supply an
-argument, which is a substring to match of a specific function call. Function names not containing
-this substring will be skipped and only matching ones will be stepped into:
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] s
-[zxdb] s MyFunction
-```
-
-`ss`: List function calls on the current line and step in to the call selected, automatically
-completing any of the other calls that happen to occur first.
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] ss
-  1 std::string::string
-  2 MyClass::MyClass
-  3 HelperFunctionCall
-  4 MyClass::~MyClass
-  5 std::string::~string
-  quit
->
-```
-
-`finish` / `fi`: Exits the function and stops right after the call.
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] finish
-```
-
-`until` / `u`: Given a location (the same as breakpoints, see above), continues the thread until
-execution gets there. For example, to run until line 45 of the current file:
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] u 45
-```
-
-`jump`: Move the instruction pointer to a new address.
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] jump 22  // Line number
-[zxdb] jump 0x87534123  // Address
-```
-
-To run until execution gets back to a given stack frame:
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] frame 2 until
-```
-
+[zxdb-noun]: /docs/development/debugger/commands.md#noun
+[zxdb-verb]: /docs/development/debugger/commands.md#verbs
+[zxdb-breakpoints]: /docs/development/debugger/breakpoints.md

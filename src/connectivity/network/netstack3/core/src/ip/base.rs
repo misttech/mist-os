@@ -12,7 +12,9 @@ use log::trace;
 use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
 use net_types::{MulticastAddr, SpecifiedAddr};
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::{CounterContext, TokenBucket, WeakDeviceIdentifier};
+use netstack3_base::{
+    CounterContext, Icmpv4ErrorCode, Icmpv6ErrorCode, TokenBucket, WeakDeviceIdentifier,
+};
 use netstack3_datagram as datagram;
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_icmp_echo::{
@@ -22,15 +24,15 @@ use netstack3_icmp_echo::{
 };
 use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
 use netstack3_ip::icmp::{
-    self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, Icmpv4ErrorCode,
-    Icmpv6ErrorCode, InnerIcmpContext, InnerIcmpv4Context, NdpCounters,
+    self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, InnerIcmpContext,
+    InnerIcmpv4Context, NdpCounters,
 };
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
     self as ip, ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext,
     IpLayerContext, IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner,
     IpTransportContext, IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache,
-    PmtuContext, ResolveRouteError, ResolvedRoute, TransparentLocalDelivery, TransportReceiveError,
+    PmtuContext, ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, TransportReceiveError,
 };
 use netstack3_tcp::TcpIpTransportContext;
 use netstack3_udp::UdpIpTransportContext;
@@ -105,7 +107,7 @@ where
     ) -> Result<Self::DeviceId, ResolveRouteError> {
         let remote_ip = SocketIpAddr::new_from_multicast(addr);
         let ResolvedRoute { src_addr: _, device, local_delivery_device, next_hop: _ } =
-            ip::resolve_route_to_destination(self, None, None, Some(remote_ip))?;
+            ip::resolve_route_to_destination(self, None, None, Some(remote_ip), false)?;
         // NB: Because the original address is multicast, it cannot be assigned
         // to a local interface. Thus local delivery should never be requested.
         debug_assert!(local_delivery_device.is_none(), "{:?}", local_delivery_device);
@@ -252,7 +254,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         proto: Ipv4Proto,
         body: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv4>>,
+        meta: ReceiveIpPacketMeta<Ipv4>,
     ) -> Result<(), TransportReceiveError> {
         match proto {
             Ipv4Proto::Icmp => {
@@ -263,7 +265,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -279,7 +281,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -291,7 +293,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -313,7 +315,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         proto: Ipv6Proto,
         body: B,
-        transport_override: Option<TransparentLocalDelivery<Ipv6>>,
+        meta: ReceiveIpPacketMeta<Ipv6>,
     ) -> Result<(), TransportReceiveError> {
         match proto {
             Ipv6Proto::Icmpv6 => {
@@ -324,7 +326,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -340,7 +342,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -352,7 +354,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    transport_override,
+                    meta,
                 )
                 .map_err(|(_body, err)| err)
             }

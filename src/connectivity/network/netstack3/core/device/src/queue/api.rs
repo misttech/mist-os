@@ -6,7 +6,9 @@
 
 use core::marker::PhantomData;
 
-use netstack3_base::{ContextPair, Device, DeviceIdContext, WorkQueueReport};
+use netstack3_base::{
+    ContextPair, Device, DeviceIdContext, ResourceCounterContext, WorkQueueReport,
+};
 
 use crate::internal::base::DeviceSendFrameError;
 use crate::internal::queue::rx::{
@@ -14,11 +16,13 @@ use crate::internal::queue::rx::{
     ReceiveQueueContext as _, ReceiveQueueState,
 };
 use crate::internal::queue::tx::{
-    self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueCommon,
-    TransmitQueueConfiguration, TransmitQueueContext as _, TransmitQueueState,
+    self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
+    TransmitQueueContext as _, TransmitQueueState,
 };
 use crate::internal::queue::{fifo, DequeueResult, DequeueState, MAX_BATCH_SIZE};
 use crate::internal::socket::DeviceSocketHandler;
+use crate::DeviceCounters;
+use log::debug;
 
 /// An API to interact with device `D` transmit queues.
 pub struct TransmitQueueApi<D, C>(C, PhantomData<D>);
@@ -36,6 +40,8 @@ where
     C: ContextPair,
     C::CoreContext:
         TransmitDequeueContext<D, C::BindingsContext> + DeviceSocketHandler<D, C::BindingsContext>,
+    for<'a> <C::CoreContext as TransmitDequeueContext<D, C::BindingsContext>>::TransmitQueueCtx<'a>:
+        ResourceCounterContext<<C::CoreContext as DeviceIdContext<D>>::DeviceId, DeviceCounters>,
     C::BindingsContext:
         TransmitQueueBindingsContext<<C::CoreContext as DeviceIdContext<D>>::DeviceId>,
 {
@@ -48,7 +54,7 @@ where
     pub fn transmit_queued_frames(
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
-    ) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
+    ) -> Result<WorkQueueReport, DeviceSendFrameError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_dequed_packets_and_tx_queue_ctx(
             device_id,
@@ -74,17 +80,19 @@ where
 
                     match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
                         Ok(()) => {}
-                        Err(DeviceSendFrameError::DeviceNotReady(x)) => {
-                            // We failed to send the frame so requeue it and try
-                            // again later.
+                        Err(e) => {
+                            tx_queue_ctx.increment(device_id, |c| &c.send_dropped_dequeue);
+                            // We failed to send the frame so requeue the rest
+                            // and try again later. The failed packet is lost.
+                            // We shouldn't requeue it because it's already been
+                            // delivered to packet sockets.
                             tx_queue_ctx.with_transmit_queue_mut(
                                 device_id,
                                 |TransmitQueueState { allocator: _, queue }| {
-                                    dequed_packets.push_front(x);
                                     queue.as_mut().unwrap().requeue_items(dequed_packets);
                                 },
                             );
-                            return Err(DeviceSendFrameError::DeviceNotReady(()));
+                            return Err(e);
                         }
                     }
                 }
@@ -144,13 +152,10 @@ where
                         );
                         match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
                             Ok(()) => {}
-                            Err(DeviceSendFrameError::DeviceNotReady(x)) => {
+                            Err(err) => {
                                 // We swapped to no-queue and device cannot send
                                 // the frame so we just drop it.
-                                let _: (
-                                    <C::CoreContext as TransmitQueueCommon<_, _>>::Meta,
-                                    <C::CoreContext as TransmitQueueCommon<_, _>>::Buffer,
-                                ) = x;
+                                debug!("frame dropped during queue reconfiguration: {err:?}");
                             }
                         }
                     }

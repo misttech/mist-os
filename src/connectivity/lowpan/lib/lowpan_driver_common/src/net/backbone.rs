@@ -54,9 +54,8 @@ impl BackboneNetworkInterface {
 
         // for each Event::Existing and Event::Added, check the default route on that interface.
         // The restart should be done instantly without additional delay
-        let watch_all_if_events_stream = futures::stream::try_unfold(
-            None,
-            move |_state: Option<()>| {
+        let watch_all_if_events_stream =
+            futures::stream::try_unfold(None, move |_state: Option<()>| {
                 async move {
                     let fnif_state = connect_to_protocol::<StateMarker>()?;
                     let (watcher_client, req) = create_proxy::<WatcherMarker>()?;
@@ -68,24 +67,29 @@ impl BackboneNetworkInterface {
                             Event::Existing(fidl_fuchsia_net_interfaces::Properties {
                                 id,
                                 online,
-                                device_class,
+                                port_class,
                                 ..
                             })
                             | Event::Added(fidl_fuchsia_net_interfaces::Properties {
                                 id,
                                 online,
-                                device_class,
+                                port_class,
                                 ..
                             }) => {
-                                // Note: if multiple wlan interfaces are available, select the first one come online,
-                                // regardless whether it has an internet connection.
-                                info!("Looking for backbone if: id {:?} online {:?} device_class {:?}", id, online, device_class);
+                                // Note: if multiple wlan interfaces are
+                                // available, select the first one to come online,
+                                // regardless of whether it has an internet
+                                // connection.
+                                info!(
+                                    "Looking for backbone if: id {:?} online {:?} port_class {:?}",
+                                    id, online, port_class
+                                );
                                 if let (
-                                    Some(fidl_fuchsia_net_interfaces::DeviceClass::Device(
-                                        fidl_fuchsia_hardware_network::DeviceClass::Wlan,
+                                    Some(fidl_fuchsia_net_interfaces::PortClass::Device(
+                                        fidl_fuchsia_hardware_network::PortClass::Wlan,
                                     )),
                                     Some(id),
-                                ) = (device_class, id)
+                                ) = (port_class, id)
                                 {
                                     wlan_nicid_set.insert(id);
                                 }
@@ -101,12 +105,17 @@ impl BackboneNetworkInterface {
                             Event::Changed(fidl_fuchsia_net_interfaces::Properties {
                                 id,
                                 online,
-                                device_class,
+                                port_class,
                                 ..
                             }) => {
-                                // Note: if multiple wlan interfaces are available, select the first one come online,
-                                // regardless whether it has an internet connection.
-                                info!("Looking for backbone if: id {:?} online {:?} device_class {:?}", id, online, device_class);
+                                // Note: if multiple wlan interfaces are
+                                // available, select the first one to come online,
+                                // regardless of whether it has an internet
+                                // connection.
+                                info!(
+                                    "Looking for backbone if: id {:?} online {:?} port_class {:?}",
+                                    id, online, port_class
+                                );
                                 if let (Some(id), Some(true)) = (id, online) {
                                     if wlan_nicid_set.contains(&id) {
                                         info!("Looking for backbone if: wlan client is online");
@@ -119,8 +128,7 @@ impl BackboneNetworkInterface {
                         }
                     }
                 }
-            },
-        );
+            });
 
         watch_all_if_events_stream.boxed()
     }

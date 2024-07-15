@@ -15,6 +15,7 @@ use futures::{select, FutureExt};
 use std::any::Any;
 use tracing::{error, info, warn};
 
+pub mod default_monitor;
 pub mod stationary_monitor;
 
 // Struct to expose methods for state machine to send roam data, regardless of roam profile.

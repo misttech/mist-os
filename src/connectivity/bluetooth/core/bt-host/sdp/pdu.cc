@@ -4,9 +4,9 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/pdu.h"
 
-#include <endian.h>
-
 #include <memory>
+
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
@@ -65,8 +65,10 @@ MutableByteBufferPtr BuildNewPdu(OpCode pdu_id,
   MutableByteBufferPtr ptr = NewSdpBuffer(sizeof(Header) + param_length);
   MutablePacketView<Header> packet(ptr.get(), param_length);
   packet.mutable_header()->pdu_id = pdu_id;
-  packet.mutable_header()->tid = htobe16(tid);
-  packet.mutable_header()->param_length = htobe16(param_length);
+  packet.mutable_header()->tid =
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, tid);
+  packet.mutable_header()->param_length =
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, param_length);
   return ptr;
 }
 
@@ -193,7 +195,8 @@ fit::result<Error<>> ErrorResponse::Parse(const ByteBuffer& buf) {
   if (buf.size() != sizeof(ErrorCode)) {
     return ToResult(HostError::kPacketMalformed);
   }
-  error_code_ = ErrorCode(be16toh(buf.To<uint16_t>()));
+  error_code_ = ErrorCode(
+      pw::bytes::ConvertOrderFrom(cpp20::endian::big, buf.To<uint16_t>()));
   return fit::ok();
 }
 
@@ -207,7 +210,10 @@ MutableByteBufferPtr ErrorResponse::GetPDU(uint16_t,
   auto ptr = BuildNewPdu(kErrorResponse, tid, sizeof(ErrorCode));
   size_t written = sizeof(Header);
 
-  ptr->WriteObj(htobe16(static_cast<uint16_t>(error_code_.value())), written);
+  ptr->WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::big,
+                                static_cast<uint16_t>(error_code_.value())),
+      written);
 
   return ptr;
 }
@@ -246,7 +252,8 @@ ServiceSearchRequest::ServiceSearchRequest(const ByteBuffer& params)
     bt_log(TRACE, "sdp", "Search pattern invalid: no records");
     return;
   }
-  max_service_record_count_ = be16toh(params.view(read_size).To<uint16_t>());
+  max_service_record_count_ = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::big, params.view(read_size).To<uint16_t>());
   // Max returned count must be 0x0001-0xFFFF (Spec Vol 3, Part B, 4.5.1)
   if (max_service_record_count_ == 0) {
     bt_log(TRACE, "sdp", "Search invalid: max record count must be > 0");
@@ -293,7 +300,9 @@ ByteBufferPtr ServiceSearchRequest::GetPDU(TransactionId tid) const {
   auto write_view = buf->mutable_view(written);
   written += search_pattern.Write(&write_view);
   // Write MaxServiceRecordCount
-  buf->WriteObj(htobe16(max_service_record_count_), written);
+  buf->WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, max_service_record_count_),
+      written);
   written += sizeof(uint16_t);
   // Write Continuation State
   write_view = buf->mutable_view(written);
@@ -328,7 +337,8 @@ fit::result<Error<>> ServiceSearchResponse::Parse(const ByteBuffer& buf) {
     return ToResult(HostError::kPacketMalformed);
   }
 
-  uint16_t total_service_record_count = be16toh(buf.To<uint16_t>());
+  uint16_t total_service_record_count =
+      pw::bytes::ConvertOrderFrom(cpp20::endian::big, buf.To<uint16_t>());
   size_t read_size = sizeof(uint16_t);
   if (total_service_record_count_ != 0 &&
       total_service_record_count_ != total_service_record_count) {
@@ -337,7 +347,8 @@ fit::result<Error<>> ServiceSearchResponse::Parse(const ByteBuffer& buf) {
   }
   total_service_record_count_ = total_service_record_count;
 
-  uint16_t record_count = be16toh(buf.view(read_size).To<uint16_t>());
+  uint16_t record_count = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::big, buf.view(read_size).To<uint16_t>());
   read_size += sizeof(uint16_t);
   size_t expected_record_bytes = sizeof(ServiceHandle) * record_count;
   if (buf.size() < (read_size + expected_record_bytes)) {
@@ -367,7 +378,8 @@ fit::result<Error<>> ServiceSearchResponse::Parse(const ByteBuffer& buf) {
 
   for (uint16_t i = 0; i < record_count; i++) {
     auto view = buf.view(read_size + i * sizeof(ServiceHandle));
-    service_record_handle_list_.emplace_back(be32toh(view.To<uint32_t>()));
+    service_record_handle_list_.emplace_back(
+        pw::bytes::ConvertOrderFrom(cpp20::endian::big, view.To<uint32_t>()));
   }
   if (cont_state_view.size() == 0) {
     continuation_state_ = nullptr;
@@ -390,7 +402,8 @@ MutableByteBufferPtr ServiceSearchResponse::GetPDU(
   }
   uint16_t start_idx = 0;
   if (cont_state.size() == sizeof(uint16_t)) {
-    start_idx = be16toh(cont_state.To<uint16_t>());
+    start_idx = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                            cont_state.To<uint16_t>());
   } else if (cont_state.size() != 0) {
     // We don't generate continuation state of any other length.
     return nullptr;
@@ -454,13 +467,20 @@ MutableByteBufferPtr ServiceSearchResponse::GetPDU(
   BT_ASSERT(buf->size() <= max_size);
 
   size_t written = sizeof(Header);
-  buf->WriteObj(htobe16(response_record_count), written);
+  buf->WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, response_record_count),
+      written);
   written += sizeof(uint16_t);
-  buf->WriteObj(htobe16(current_record_count), written);
+  buf->WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, current_record_count),
+      written);
   written += sizeof(uint16_t);
 
   for (size_t i = 0; i < current_record_count; i++) {
-    buf->WriteObj(htobe32(service_record_handle_list_.at(start_idx + i)),
+    buf->WriteObj(pw::bytes::ConvertOrderTo(
+                      cpp20::endian::big,
+                      static_cast<uint32_t>(
+                          service_record_handle_list_.at(start_idx + i))),
                   written);
     written += sizeof(ServiceHandle);
   }
@@ -470,7 +490,8 @@ MutableByteBufferPtr ServiceSearchResponse::GetPDU(
   written += sizeof(uint8_t);
   if (info_length > 0) {
     start_idx += current_record_count;
-    buf->WriteObj(htobe16(start_idx), written);
+    buf->WriteObj(pw::bytes::ConvertOrderTo(cpp20::endian::big, start_idx),
+                  written);
     written += sizeof(uint16_t);
   }
   BT_DEBUG_ASSERT(written == sizeof(Header) + size);
@@ -487,9 +508,11 @@ ServiceAttributeRequest::ServiceAttributeRequest(const ByteBuffer& params) {
     return;
   }
 
-  service_record_handle_ = be32toh(params.To<uint32_t>());
+  service_record_handle_ =
+      pw::bytes::ConvertOrderFrom(cpp20::endian::big, params.To<uint32_t>());
   size_t read_size = sizeof(uint32_t);
-  max_attribute_byte_count_ = be16toh(params.view(read_size).To<uint16_t>());
+  max_attribute_byte_count_ = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::big, params.view(read_size).To<uint16_t>());
   if (max_attribute_byte_count_ < kMinMaximumAttributeByteCount) {
     bt_log(TRACE,
            "sdp",
@@ -553,10 +576,14 @@ ByteBufferPtr ServiceAttributeRequest::GetPDU(TransactionId tid) const {
 
   size_t written = sizeof(Header);
 
-  buf->WriteObj(htobe32(service_record_handle_), written);
+  buf->WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, service_record_handle_),
+      written);
   written += sizeof(uint32_t);
 
-  buf->WriteObj(htobe16(max_attribute_byte_count_), written);
+  buf->WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, max_attribute_byte_count_),
+      written);
   written += sizeof(uint16_t);
 
   auto mut_view = buf->mutable_view(written);
@@ -601,7 +628,8 @@ fit::result<Error<>> ServiceAttributeResponse::Parse(const ByteBuffer& buf) {
     return ToResult(HostError::kPacketMalformed);
   }
 
-  uint32_t attribute_list_byte_count = be16toh(buf.To<uint16_t>());
+  uint32_t attribute_list_byte_count =
+      pw::bytes::ConvertOrderFrom(cpp20::endian::big, buf.To<uint16_t>());
   size_t read_size = sizeof(uint16_t);
   if (buf.size() < read_size + attribute_list_byte_count + sizeof(uint8_t)) {
     bt_log(TRACE, "sdp", "Not enough bytes in rest of packet");
@@ -712,7 +740,8 @@ MutableByteBufferPtr ServiceAttributeResponse::GetPDU(
   // of the attribute list.
   uint32_t bytes_skipped = 0;
   if (cont_state.size() == sizeof(uint32_t)) {
-    bytes_skipped = be32toh(cont_state.To<uint32_t>());
+    bytes_skipped = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                                cont_state.To<uint32_t>());
   } else if (cont_state.size() != 0) {
     // We don't generate continuation states of any other length.
     return nullptr;
@@ -782,7 +811,10 @@ MutableByteBufferPtr ServiceAttributeResponse::GetPDU(
 
   size_t written = sizeof(Header);
 
-  buf->WriteObj(htobe16(attribute_list_byte_count), written);
+  buf->WriteObj(
+      pw::bytes::ConvertOrderTo(
+          cpp20::endian::big, static_cast<uint16_t>(attribute_list_byte_count)),
+      written);
   written += sizeof(uint16_t);
 
   auto attribute_list_bytes = NewBuffer(write_size);
@@ -797,7 +829,8 @@ MutableByteBufferPtr ServiceAttributeResponse::GetPDU(
   written += sizeof(uint8_t);
   if (info_length > 0) {
     bytes_skipped += attribute_list_byte_count;
-    buf->WriteObj(htobe32(bytes_skipped), written);
+    buf->WriteObj(pw::bytes::ConvertOrderTo(cpp20::endian::big, bytes_skipped),
+                  written);
     written += sizeof(uint32_t);
   }
   BT_DEBUG_ASSERT(written == sizeof(Header) + size);
@@ -844,7 +877,8 @@ ServiceSearchAttributeRequest::ServiceSearchAttributeRequest(
     return;
   }
 
-  max_attribute_byte_count_ = be16toh(params.view(read_size).To<uint16_t>());
+  max_attribute_byte_count_ = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::big, params.view(read_size).To<uint16_t>());
   if (max_attribute_byte_count_ < kMinMaximumAttributeByteCount) {
     bt_log(TRACE,
            "sdp",
@@ -928,7 +962,9 @@ ByteBufferPtr ServiceSearchAttributeRequest::GetPDU(TransactionId tid) const {
   auto mut_view = buf->mutable_view(written);
   written += search_pattern.Write(&mut_view);
 
-  buf->WriteObj(htobe16(max_attribute_byte_count_), written);
+  buf->WriteObj(
+      pw::bytes::ConvertOrderTo(cpp20::endian::big, max_attribute_byte_count_),
+      written);
   written += sizeof(uint16_t);
 
   mut_view = buf->mutable_view(written);
@@ -978,7 +1014,8 @@ fit::result<Error<>> ServiceSearchAttributeResponse::Parse(
     return ToResult(HostError::kPacketMalformed);
   }
 
-  uint16_t attribute_lists_byte_count = be16toh(buf.To<uint16_t>());
+  uint16_t attribute_lists_byte_count =
+      pw::bytes::ConvertOrderFrom(cpp20::endian::big, buf.To<uint16_t>());
   size_t read_size = sizeof(uint16_t);
   if (buf.view(read_size).size() <
       attribute_lists_byte_count + sizeof(uint8_t)) {
@@ -1114,7 +1151,8 @@ MutableByteBufferPtr ServiceSearchAttributeResponse::GetPDU(
   // of the attribute list.
   uint32_t bytes_skipped = 0;
   if (cont_state.size() == sizeof(uint32_t)) {
-    bytes_skipped = be32toh(cont_state.To<uint32_t>());
+    bytes_skipped = pw::bytes::ConvertOrderFrom(cpp20::endian::big,
+                                                cont_state.To<uint32_t>());
   } else if (cont_state.size() != 0) {
     // We don't generate continuation states of any other length.
     return nullptr;
@@ -1191,7 +1229,10 @@ MutableByteBufferPtr ServiceSearchAttributeResponse::GetPDU(
 
   size_t written = sizeof(Header);
 
-  buf->WriteObj(htobe16(attribute_lists_byte_count), written);
+  buf->WriteObj(pw::bytes::ConvertOrderTo(
+                    cpp20::endian::big,
+                    static_cast<uint16_t>(attribute_lists_byte_count)),
+                written);
   written += sizeof(uint16_t);
 
   auto attribute_list_bytes = NewBuffer(write_size);
@@ -1212,7 +1253,8 @@ MutableByteBufferPtr ServiceSearchAttributeResponse::GetPDU(
                     std::numeric_limits<uint32_t>::max());
     bytes_skipped =
         static_cast<uint32_t>(bytes_skipped + attribute_lists_byte_count);
-    buf->WriteObj(htobe32(bytes_skipped), written);
+    buf->WriteObj(pw::bytes::ConvertOrderTo(cpp20::endian::big, bytes_skipped),
+                  written);
     written += sizeof(uint32_t);
   }
   BT_DEBUG_ASSERT(written == sizeof(Header) + size);

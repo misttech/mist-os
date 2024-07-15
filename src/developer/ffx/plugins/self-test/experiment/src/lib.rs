@@ -2,11 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::*;
-use ffx_core::ffx_plugin;
 use ffx_selftest_experiment_args::ExperimentCommand;
+use fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
 
-#[ffx_plugin("selftest.experiment")]
-pub async fn experiment(_cmd: ExperimentCommand) -> Result<()> {
-    Ok(())
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("selftest.experiment"))]
+pub struct ExperimentTool {
+    #[command]
+    pub cmd: ExperimentCommand,
+}
+
+fho::embedded_plugin!(ExperimentTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ExperimentTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: Self::Writer) -> Result<()> {
+        Ok(())
+    }
 }

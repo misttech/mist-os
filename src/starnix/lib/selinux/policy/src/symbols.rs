@@ -505,7 +505,7 @@ pub(crate) fn find_common_symbol_by_name<'a, PS: ParseStrategy>(
     find_common_symbol_by_name_bytes(common_symbols, name.as_bytes())
 }
 
-fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
+pub(crate) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     name_bytes: &[u8],
 ) -> Option<&'a CommonSymbol<PS>> {

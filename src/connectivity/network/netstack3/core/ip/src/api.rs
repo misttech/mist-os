@@ -10,6 +10,7 @@ use net_types::{SpecifiedAddr, Witness as _};
 
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, StrongDeviceIdentifier,
+    WrapBroadcastMarker,
 };
 
 use crate::internal::base::{
@@ -20,7 +21,7 @@ use crate::internal::device::{
 };
 use crate::internal::types::{
     Destination, Entry, EntryAndGeneration, EntryEither, Metric, NextHop, OrderedEntry,
-    ResolvedRoute, RoutableIpAddr, WrapBroadcastMarker,
+    ResolvedRoute, RoutableIpAddr,
 };
 
 /// The routes API for a specific IP version `I`.
@@ -71,7 +72,7 @@ where
         ResolvedRoute<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         ResolveRouteError,
     > {
-        base::resolve_route_to_destination(self.core_ctx(), None, None, destination)
+        base::resolve_route_to_destination(self.core_ctx(), None, None, destination, false)
     }
 
     /// Selects the device to use for gateway routes when the device was

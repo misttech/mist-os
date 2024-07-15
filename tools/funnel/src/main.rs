@@ -105,6 +105,7 @@ struct SubCommandHost {
     wait_for_target_time: u64,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/351850455)
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "self-update")]
 /// Perform a self-update.

@@ -29,6 +29,15 @@
         },
         {
             from: "parent",
+            config: "fuchsia.gpu.test.SupportSysmemYv12",
+            key: "support_sysmem_yv12",
+            availability: "transitional",
+
+            // True if the GPU can import YV12 textures from sysmem.
+            type: "bool",
+        },
+        {
+            from: "parent",
             config: "fuchsia.gpu.test.SupportSysmemRenderableLinear",
             key: "support_sysmem_renderable_linear",
             availability: "transitional",
@@ -64,6 +73,7 @@
     config: {
         gpu_vendor_id: { type: "uint32" },
         support_sysmem_yuv: { type: "bool" },
+        support_sysmem_yv12: { type: "bool" },
         support_sysmem_renderable_linear: { type: "bool" },
         support_sysmem_linear_nonrgba: { type: "bool" },
         support_protected_memory: { type: "bool" },

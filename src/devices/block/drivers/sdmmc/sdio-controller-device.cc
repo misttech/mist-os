@@ -218,19 +218,6 @@ zx_status_t SdioControllerDevice::StartSdioIrqDispatcherIfNeeded() {
 zx_status_t SdioControllerDevice::AddDevice() {
   std::lock_guard<std::mutex> lock(lock_);
 
-  dispatcher_ = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher());
-
-  auto inspect_sink = parent_->driver_incoming()->Connect<fuchsia_inspect::InspectSink>();
-  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to inspect sink: %s",
-             inspect_sink.status_string());
-    return inspect_sink.status_value();
-  }
-  exposed_inspector_.emplace(
-      inspect::ComponentInspector(dispatcher_, {.inspector = inspector_,
-                                                .tree_name = "sdio-controller-device",
-                                                .client_end = std::move(inspect_sink.value())}));
-
   auto [controller_client_end, controller_server_end] =
       fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
   auto [node_client_end, node_server_end] =
@@ -268,7 +255,7 @@ zx_status_t SdioControllerDevice::AddDevice() {
     }
   }
 
-  root_ = inspector_.GetRoot().CreateChild("sdio_core");
+  root_ = parent_->driver_inspector().root().CreateChild("sdio_core");
   tx_errors_ = root_.CreateUint("tx_errors", 0);
   rx_errors_ = root_.CreateUint("rx_errors", 0);
 

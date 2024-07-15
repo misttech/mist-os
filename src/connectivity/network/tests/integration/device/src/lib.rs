@@ -6,6 +6,7 @@
 
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
+use std::pin::pin;
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
@@ -55,9 +56,9 @@ const_assert_eq!(
 ///
 /// The body of the ICMP packet will be filled with `payload_length` 0 bytes.
 /// Panics if the ping fails.
-async fn expect_successful_ping<Ip: ping::IpExt>(
+async fn expect_successful_ping<Ip: ping::FuchsiaIpExt>(
     source_realm: &netemul::TestRealm<'_>,
-    addr: Ip::Addr,
+    addr: Ip::SockAddr,
     payload_length: usize,
 ) {
     let icmp_sock = source_realm.icmp_socket::<Ip>().await.expect("failed to create ICMP socket");
@@ -197,6 +198,7 @@ fn icmp_event_stream<'a>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(
     "fragmented",
     netemul::DEFAULT_MTU.into(),
@@ -275,6 +277,8 @@ async fn ping_succeeds_with_expected_payload<N: Netstack>(
         std_socket_addr_v4!("192.168.254.1:0"),
         payload_length,
     )
+    // Box because it's a large future.
+    .boxed()
     .await;
 
     let icmp_event_stream = icmp_event_stream(&fake_ep);
@@ -300,6 +304,7 @@ async fn ping_succeeds_with_expected_payload<N: Netstack>(
 }
 
 #[netstack_test]
+#[variant(N, Netstack)]
 async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create source realm");
@@ -365,6 +370,7 @@ const MIN_ETH_FRAME: usize = ETHERNET_HDR_LEN_NO_TAG + ETH_BODY;
 const LARGE_BODY: usize = ETH_BODY + 1024;
 const LARGE_FRAME: usize = ETHERNET_HDR_LEN_NO_TAG + LARGE_BODY;
 #[netstack_test]
+#[variant(N, Netstack)]
 #[test_case(fposix_socket_packet::Kind::Network, 0, 0; "network no padding")]
 #[test_case(fposix_socket_packet::Kind::Link, 0, 0; "link no padding")]
 #[test_case(fposix_socket_packet::Kind::Network, ETH_HDR, 0; "network header only")]
@@ -405,7 +411,16 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
     assert_eq!(control.enable().await.expect("can enabled"), Ok(true));
     tun_port.set_online(true).await.expect("can set online");
 
-    let id = NonZeroU64::new(control.get_id().await.expect("get ID")).unwrap();
+    let id = control.get_id().await.expect("get ID");
+
+    let state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+    netstack_testing_common::interfaces::wait_for_online(&state, id, true)
+        .await
+        .expect("waiting interface online");
+
+    let id = NonZeroU64::new(id).unwrap();
 
     /// Arbitrary Ethernet frame type that doesn't correspond to any frames
     /// normally sent by the netstack.

@@ -53,12 +53,14 @@ fuchsia_package("cmd-buf-benchmark-test-child") {
   ]
 }
 
-sdk_fuchsia_package("cmd-buf-benchmark-test-sdk") {
-  distribution_name = "cmd-buf-benchmark-test"
-  category = "partner"
-  package_label = ":cmd-buf-benchmark-test-child"
-  api_level_added = 19
-  expected_files_exact = [ "meta/cmd-buf-benchmark-test-child.cm" ]
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("cmd-buf-benchmark-test-sdk") {
+    distribution_name = "cmd-buf-benchmark-test"
+    category = "partner"
+    package_label = ":cmd-buf-benchmark-test-child"
+    api_level_added = 19
+    expected_files_exact = [ "meta/cmd-buf-benchmark-test-child.cm" ]
+  }
 }
 
 config("vulkan_sdk_linux_config") {

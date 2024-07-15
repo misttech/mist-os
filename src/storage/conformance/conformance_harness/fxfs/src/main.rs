@@ -65,7 +65,7 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     supports_get_backing_memory: true,
                     supports_remote_dir: false,
                     supports_get_token: true,
-                    supports_open2: true,
+                    supports_open3: false,
                     supports_link_into: true,
                     supports_append: true,
                     supports_modify_directory: true,

@@ -6,6 +6,7 @@
 
 use crate::checksum::{Checksums, ChecksumsV32, ChecksumsV37, ChecksumsV38};
 use crate::lsm_tree::types::{OrdLowerBound, OrdUpperBound};
+use crate::round::{round_down, round_up};
 use crate::serialized_types::{migrate_to_version, Migrate};
 use bit_vec::BitVec;
 use fprint::TypeFingerprint;
@@ -34,6 +35,27 @@ pub type ExtentKey = ExtentKeyV32;
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub struct ExtentKeyV32 {
     pub range: Range<u64>,
+}
+
+const EXTENT_HASH_BUCKET_SIZE: u64 = 1 * 1024 * 1024;
+
+pub struct ExtentKeyPartitionIterator {
+    range: Range<u64>,
+}
+
+impl Iterator for ExtentKeyPartitionIterator {
+    type Item = Range<u64>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.range.start >= self.range.end {
+            None
+        } else {
+            let start = self.range.start;
+            self.range.start = start.saturating_add(EXTENT_HASH_BUCKET_SIZE);
+            let end = std::cmp::min(self.range.start, self.range.end);
+            Some(start..end)
+        }
+    }
 }
 
 impl ExtentKey {
@@ -76,6 +98,14 @@ impl ExtentKey {
     /// element > 100..150 under Ord).
     pub fn key_for_merge_into(&self) -> Self {
         Self { range: 0..self.range.start }
+    }
+
+    /// Returns an iterator over the ExtentKey partitions which overlap this key (see `FuzzyHash`).
+    pub fn fuzzy_hash_partition(&self) -> ExtentKeyPartitionIterator {
+        ExtentKeyPartitionIterator {
+            range: round_down(self.range.start, EXTENT_HASH_BUCKET_SIZE)
+                ..round_up(self.range.end, EXTENT_HASH_BUCKET_SIZE).unwrap_or(u64::MAX),
+        }
     }
 }
 

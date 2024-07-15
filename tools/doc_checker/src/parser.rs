@@ -7,7 +7,7 @@
 use pulldown_cmark::Event::{
     self, Code, End, FootnoteReference, HardBreak, Html, SoftBreak, Start, TaskListMarker, Text,
 };
-use pulldown_cmark::Tag;
+use pulldown_cmark::{CodeBlockKind, CowStr, Tag};
 use std::ops::Range;
 
 use crate::md_element::{DocContext, Element};
@@ -21,7 +21,7 @@ pub(crate) fn element_from_event<'a>(
     let newlines = span.chars().filter(|c| c == &'\n').count();
     let element = match event {
         // Start indicates the start of a Tag.
-        Start(Tag::Heading(_)) => {
+        Start(Tag::Heading(_, _, _)) => {
             let mut element = parse_tag_element(event, doc_context);
             // update the line number in doc_context, returning the line_number of the element.
             element.set_line_num(update_line_number(doc_context, span, newlines));
@@ -95,8 +95,8 @@ fn parse_tag_element<'a>(event: Event<'a>, doc_context: &mut DocContext<'a>) -> 
             doc_context.line_num += 1;
             block
         }
-        Start(Tag::Heading(level)) => {
-            let block = read_block(Tag::Heading(level), doc_context);
+        Start(Tag::Heading(level, id, classes)) => {
+            let block = read_block(Tag::Heading(level, id, classes), doc_context);
 
             doc_context.line_num += 1;
             block
@@ -105,8 +105,12 @@ fn parse_tag_element<'a>(event: Event<'a>, doc_context: &mut DocContext<'a>) -> 
             let block = read_block(Tag::BlockQuote, doc_context);
             block
         }
-        Start(Tag::CodeBlock(code)) => {
+        Start(Tag::CodeBlock(CodeBlockKind::Fenced(code))) => {
             let block = read_codeblock(code, doc_context);
+            block
+        }
+        Start(Tag::CodeBlock(CodeBlockKind::Indented)) => {
+            let block = read_block(Tag::CodeBlock(CodeBlockKind::Indented), doc_context);
             block
         }
         Start(Tag::List(starting)) => {
@@ -204,15 +208,14 @@ fn read_list<'a>(starting: Option<u64>, doc_context: &mut DocContext<'a>) -> Ele
     panic!("{:?} has no end?", starting);
 }
 
-fn read_codeblock<'a>(
-    code: pulldown_cmark::CowStr<'a>,
-    doc_context: &mut DocContext<'a>,
-) -> Element<'a> {
+fn read_codeblock<'a>(code: CowStr<'a>, doc_context: &mut DocContext<'a>) -> Element<'a> {
     let mut elements = vec![];
     let start = doc_context.line();
     while let Some((event, range)) = doc_context.parser.next() {
         match event {
-            End(Tag::CodeBlock(code)) => return Element::CodeBlock(code, elements, start),
+            End(Tag::CodeBlock(CodeBlockKind::Fenced(code))) => {
+                return Element::CodeBlock(code, elements, start)
+            }
             _ => elements.push(element_from_event(event, range, doc_context)),
         };
     }
@@ -238,12 +241,13 @@ fn read_block<'a>(block_type: Tag<'a>, doc_context: &mut DocContext<'a>) -> Elem
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
 
     use super::*;
     use crate::DocLine;
     use pulldown_cmark::CowStr::Borrowed;
-    use pulldown_cmark::LinkType;
+    use pulldown_cmark::{HeadingLevel, LinkType};
+    use std::path::PathBuf;
+
     #[test]
     fn test_basic_elements() {
         let doc_line1 = DocLine { line_num: 1, file_name: PathBuf::from("test1") };
@@ -269,7 +273,7 @@ mod test {
             (
                 "# Header 1",
                 vec![Element::Block(
-                    Tag::Heading(1),
+                    Tag::Heading(HeadingLevel::H1, None, vec![]),
                     vec![Element::Text(Borrowed("Header 1"), doc_line1.clone())],
                     doc_line1.clone(),
                 )],
@@ -280,7 +284,7 @@ Multiline
 "##,
                 vec![
                     Element::Block(
-                        Tag::Heading(1),
+                        Tag::Heading(HeadingLevel::H1, None, vec![]),
                         vec![Element::Text(Borrowed("Header 1"), doc_line1.clone())],
                         doc_line1.clone(),
                     ),
@@ -308,7 +312,11 @@ Multiline
         ];
 
         for (input, expected) in test_data {
-            let ctx = DocContext::new(PathBuf::from("test1"), input);
+            let callback = &mut |broken_link: pulldown_cmark::BrokenLink<'_>| {
+                DocContext::handle_broken_link(broken_link, input)
+            };
+
+            let ctx = DocContext::new(PathBuf::from("test1"), input, Some(callback));
             let actual: Vec<Element<'_>> = ctx.collect();
             assert_eq!(actual.len(), expected.len());
             let mut expected_iter = expected.iter();

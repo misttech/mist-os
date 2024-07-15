@@ -28,8 +28,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_starnix_container as fstarcontainer, fidl_fuchsia_starnix_device as fstardevice,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_zircon as zx,
 };
 
 use super::start_component;
@@ -179,14 +178,21 @@ pub async fn serve_container_controller(
                                 let fds = leader.files.get_all_fds();
                                 for fd in fds {
                                     if let Ok(file) = leader.files.get(fd) {
-                                        if let Ok(vmo) = file.get_vmo(
+                                        if let Ok(memory) = file.get_memory(
+                                            system_task
+                                                .kernel()
+                                                .kthreads
+                                                .unlocked_for_async()
+                                                .deref_mut(),
                                             system_task,
                                             None,
                                             starnix_core::mm::ProtectionFlags::READ,
                                         ) {
-                                            let vmo_koid =
-                                                vmo.info().expect("Failed to get vmo info").koid;
-                                            if vmo_koid.raw_koid() == koid {
+                                            let memory_koid = memory
+                                                .info()
+                                                .expect("Failed to get memory info")
+                                                .koid;
+                                            if memory_koid.raw_koid() == koid {
                                                 let process_name = thread_group
                                                     .process
                                                     .get_name()
@@ -334,44 +340,6 @@ pub async fn serve_graphical_presenter(
         })
         .await
         .map_err(Error::from)
-}
-
-pub async fn serve_sync_fence_registry(
-    request_stream: fstardevice::SyncFenceRegistryRequestStream,
-    kernel: &Kernel,
-) -> Result<(), Error> {
-    let sync_fence_registry = kernel.sync_fence_registry.clone();
-    kernel.kthreads.spawner().spawn(|_, _| {
-        let mut executor = fasync::LocalExecutor::new();
-        let _ = executor.run_singlethreaded(async move {
-            request_stream
-                .try_for_each_concurrent(None, |event| async {
-                    match event {
-                        fstardevice::SyncFenceRegistryRequest::CreateSyncFences {
-                            num_fences,
-                            responder,
-                        } => {
-                            let (fence_keys, events) =
-                                sync_fence_registry.create_sync_fences(num_fences);
-                            let _ = responder.send(fence_keys, events);
-                        }
-
-                        fstardevice::SyncFenceRegistryRequest::RegisterSignaledEvent {
-                            fence_key,
-                            event,
-                            ..
-                        } => {
-                            sync_fence_registry.register_signaled_event(fence_key, event);
-                        }
-                    }
-                    Ok(())
-                })
-                .await
-                .map_err(Error::from)
-        });
-    });
-
-    Ok(())
 }
 
 pub fn serve_memory_attribution_provider(

@@ -45,9 +45,10 @@ use magma::{
     MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
     MAGMA_VENDOR_ID_MALI,
 };
+use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, VmoFileObject};
+use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryFileObject};
 use starnix_logging::track_stub;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -495,7 +496,8 @@ pub fn export_buffer(
         )
     };
     if status == MAGMA_STATUS_OK {
-        let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) };
+        let memory =
+            MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) });
 
         let mut image_info_opt: Option<ImageInfo> = None;
         'outer: for image_map in connections.values() {
@@ -511,11 +513,11 @@ pub fn export_buffer(
 
         let file = {
             if let Some(image_info) = image_info_opt {
-                ImageFile::new_file(current_task, image_info, vmo)
+                ImageFile::new_file(current_task, image_info, memory)
             } else {
                 Anon::new_file(
                     current_task,
-                    Box::new(VmoFileObject::new(Arc::new(vmo))),
+                    Box::new(MemoryFileObject::new(Arc::new(memory))),
                     OpenFlags::RDWR,
                 )
             }
@@ -569,10 +571,11 @@ pub fn get_buffer_handle(
     if status != MAGMA_STATUS_OK {
         response.result_return = status as u64;
     } else {
-        let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) };
+        let memory =
+            MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) });
         let file = Anon::new_file(
             current_task,
-            Box::new(VmoFileObject::new(Arc::new(vmo))),
+            Box::new(MemoryFileObject::new(Arc::new(memory))),
             OpenFlags::RDWR,
         );
         let fd = current_task.add_file(file, FdFlags::empty())?;
@@ -605,17 +608,18 @@ pub fn query(
     };
 
     if result_buffer_out != zx::sys::ZX_HANDLE_INVALID {
-        let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) };
-        let vmo_size = vmo.get_size().unwrap();
+        let memory =
+            MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) });
+        let memory_size = memory.get_size();
         let file = Anon::new_file_extended(
             current_task,
-            Box::new(VmoFileObject::new(Arc::new(vmo))),
+            Box::new(MemoryFileObject::new(Arc::new(memory))),
             OpenFlags::RDWR,
             |id| {
                 let mut info =
                     FsNodeInfo::new(id, FileMode::from_bits(0o600), current_task.as_fscred());
                 // Enable seek for file size discovery.
-                info.size = vmo_size as usize;
+                info.size = memory_size as usize;
                 info
             },
         );

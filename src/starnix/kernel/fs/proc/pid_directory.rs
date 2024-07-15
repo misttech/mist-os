@@ -8,12 +8,12 @@ use crate::task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGr
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fs_node_impl_dir_readonly, parse_i32_file, serialize_i32_file, BytesFile, BytesFileOps,
-    CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget,
-    SimpleFileNode, StaticDirectory, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
-    VecDirectory, VecDirectoryEntry,
+    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, serialize_i32_file,
+    BytesFile, BytesFileOps, CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile,
+    DynamicFileBuf, DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode,
+    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile,
+    SeekTarget, SimpleFileNode, StaticDirectory, StaticDirectoryBuilder, StubEmptyFile,
+    SymlinkTarget, VecDirectory, VecDirectoryEntry,
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
@@ -123,6 +123,7 @@ impl FsNodeOps for Arc<TaskDirectory> {
 
 impl FileOps for TaskDirectory {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,
@@ -734,6 +735,7 @@ impl CommFile {
 
 impl FileOps for CommFile {
     fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,
@@ -840,6 +842,8 @@ impl MemFile {
 }
 
 impl FileOps for MemFile {
+    fileops_impl_noop_sync!();
+
     fn is_seekable(&self) -> bool {
         true
     }

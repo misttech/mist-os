@@ -116,12 +116,12 @@
 
 // On AArch64 ILP32, GOT entries are 4 bytes, not 8.
 # ifdef _LP64
-tlsdesc.r0 .req x0
-tlsdesc.r1 .req x1
+tlsdesc_r0 .req x0
+tlsdesc_r1 .req x1
 tlsdesc.value_offset = 8
 # else
-tlsdesc.r0 .req w0
-tlsdesc.r1 .req w1
+tlsdesc_r0 .req w0
+tlsdesc_r1 .req w1
 tlsdesc.value_offset = 4
 # endif
 

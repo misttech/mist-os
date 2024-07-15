@@ -5,37 +5,25 @@
 use anyhow::{anyhow, format_err, Context, Result};
 use fuchsia_hash::Hash;
 use fuchsia_url::{PackageName, PackageVariant};
-use scrutiny::model::controller::{DataController, HintDataType};
-use scrutiny::model::model::*;
 use scrutiny_utils::bootfs::*;
 use scrutiny_utils::key_value::parse_key_value;
 use scrutiny_utils::url::from_package_name_variant_path;
-use scrutiny_utils::usage::*;
 use scrutiny_utils::zbi::*;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serde_json::value::Value;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
+use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
 
 static BOOT_PACKAGE_INDEX: &str = "data/bootfs_packages";
 
-#[derive(Deserialize, Serialize)]
-pub struct ZbiListBootfsRequest {
-    // The input path for the ZBI.
-    pub input: String,
-}
-
-#[derive(Default)]
 pub struct ZbiListBootfsController {}
 
-impl DataController for ZbiListBootfsController {
-    fn query(&self, _model: Arc<DataModel>, query: Value) -> Result<Value> {
-        let request: ZbiListBootfsRequest = serde_json::from_value(query)?;
-        let mut zbi_file = File::open(request.input)?;
+impl ZbiListBootfsController {
+    pub fn extract(input: PathBuf) -> Result<Value> {
+        let mut zbi_file = File::open(input)?;
         let mut zbi_buffer = Vec::new();
         zbi_file.read_to_end(&mut zbi_buffer)?;
         let mut reader = ZbiReader::new(zbi_buffer);
@@ -52,38 +40,13 @@ impl DataController for ZbiListBootfsController {
         }
         Err(anyhow!("Failed to find a bootfs section in the provided ZBI"))
     }
-
-    fn description(&self) -> String {
-        "Extracts the bootfs file list from a ZBI".to_string()
-    }
-
-    fn usage(&self) -> String {
-        UsageBuilder::new()
-            .name("tool.zbi.list.bootfs - List ZBI bootfs files")
-            .summary("tool.zbi.list.bootfs --input foo.zbi")
-            .description("Extracts zircon boot images and retrieves the bootfs file list.")
-            .arg("--input", "Path to the input zbi file")
-            .build()
-    }
-
-    fn hints(&self) -> Vec<(String, HintDataType)> {
-        vec![("--input".to_string(), HintDataType::NoType)]
-    }
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct ZbiExtractBootfsPackageIndexRequest {
-    // The input path for the ZBI.
-    pub input: String,
-}
-
-#[derive(Default)]
 pub struct ZbiExtractBootfsPackageIndex {}
 
-impl DataController for ZbiExtractBootfsPackageIndex {
-    fn query(&self, _model: Arc<DataModel>, query: Value) -> Result<Value> {
-        let request: ZbiExtractBootfsPackageIndexRequest = serde_json::from_value(query)?;
-        let mut zbi_file = File::open(request.input)?;
+impl ZbiExtractBootfsPackageIndex {
+    pub fn extract(input: PathBuf) -> Result<Value> {
+        let mut zbi_file = File::open(input)?;
         let mut zbi_buffer = Vec::new();
         zbi_file.read_to_end(&mut zbi_buffer)?;
         let mut reader = ZbiReader::new(zbi_buffer);
@@ -128,23 +91,6 @@ impl DataController for ZbiExtractBootfsPackageIndex {
             }
         }
         Err(anyhow!("Failed to find a bootfs section in the provided ZBI"))
-    }
-
-    fn description(&self) -> String {
-        "Extracts the package index from from a ZBI's Bootfs image".to_string()
-    }
-
-    fn usage(&self) -> String {
-        UsageBuilder::new()
-            .name("tool.zbi.extract.bootfs.packages - Extract the bootfs package index.")
-            .summary("tool.zbi.extract.bootfs.packages --input foo.zbi")
-            .description("Extracts zircon boot images and retrieves the package index.")
-            .arg("--input", "Path to the input zbi file")
-            .build()
-    }
-
-    fn hints(&self) -> Vec<(String, HintDataType)> {
-        vec![("--input".to_string(), HintDataType::NoType)]
     }
 }
 

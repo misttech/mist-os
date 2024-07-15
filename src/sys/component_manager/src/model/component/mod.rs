@@ -54,7 +54,9 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::{debug, error, warn};
 use version_history::AbiRevision;
-use vfs::directory::entry::{DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest};
+use vfs::directory::entry::{
+    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
+};
 use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -977,14 +979,16 @@ impl ComponentInstance {
         }
 
         impl DirectoryEntry for GetOutgoing {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-            }
-
             fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
                 let component = self.component.upgrade().map_err(|e| e.as_zx_status())?;
                 request.spawn(component);
                 Ok(())
+            }
+        }
+
+        impl GetEntryInfo for GetOutgoing {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
             }
         }
 
@@ -1300,13 +1304,15 @@ impl ComponentInstance {
 }
 
 impl DirectoryEntry for ComponentInstance {
-    fn entry_info(&self) -> EntryInfo {
-        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
-    }
-
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), zx::Status> {
         request.spawn(self);
         Ok(())
+    }
+}
+
+impl GetEntryInfo for ComponentInstance {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
     }
 }
 

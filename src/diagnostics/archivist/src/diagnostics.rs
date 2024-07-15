@@ -8,36 +8,26 @@ use fuchsia_inspect::{
 };
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Duration};
-use lazy_static::lazy_static;
 use std::collections::BTreeMap;
+use std::ffi::CStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 
-lazy_static! {
-    // Exponential histograms for time in microseconds contains power-of-two intervals
-    static ref TIME_USEC_PARAMS : ExponentialHistogramParams<u64> = ExponentialHistogramParams {
-        floor: 0,
-        initial_step: 1,
-        step_multiplier: 2,
-        buckets: 26,
-    };
+pub(crate) static TRACE_CATEGORY: &CStr = c"archivist";
 
-    // Linear histogram for max snapshot size in bytes requested by clients.
-    // Divide configs into 10kb buckets, from 0mb to 1mb.
-    static ref MAX_SNAPSHOT_SIZE_BYTES_PARAMS : LinearHistogramParams<u64> = LinearHistogramParams {
-        floor: 0,
-        step_size: 10000,
-        buckets: 100,
-    };
+// Exponential histograms for time in microseconds contains power-of-two intervals
+static TIME_USEC_PARAMS: ExponentialHistogramParams<u64> =
+    ExponentialHistogramParams { floor: 0, initial_step: 1, step_multiplier: 2, buckets: 26 };
 
-    // Linear histogram tracking percent of schemas truncated for a given snapshot.
-    // Divide configs into 5% buckets, from 0% to 100%.
-    static ref SNAPSHOT_SCHEMA_TRUNCATION_PARAMS : LinearHistogramParams<u64> = LinearHistogramParams {
-        floor: 0,
-        step_size: 5,
-        buckets: 20,
-    };
-}
+// Linear histogram for max snapshot size in bytes requested by clients.
+// Divide configs into 10kb buckets, from 0mb to 1mb.
+static MAX_SNAPSHOT_SIZE_BYTES_PARAMS: LinearHistogramParams<u64> =
+    LinearHistogramParams { floor: 0, step_size: 10000, buckets: 100 };
+
+// Linear histogram tracking percent of schemas truncated for a given snapshot.
+// Divide configs into 5% buckets, from 0% to 100%.
+static SNAPSHOT_SCHEMA_TRUNCATION_PARAMS: LinearHistogramParams<u64> =
+    LinearHistogramParams { floor: 0, step_size: 5, buckets: 20 };
 
 pub struct AccessorStats {
     /// Inspect node for tracking usage/health metrics of diagnostics platform.

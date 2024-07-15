@@ -2,21 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mm::memory::MemoryObject;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_nonseekable, fs_node_impl_dir_readonly,
-    fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek, BytesFile, BytesFileOps, CacheMode,
-    DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    SeekTarget, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry, VmoFileNode,
+    emit_dotdot, fileops_impl_directory, fileops_impl_nonseekable, fileops_impl_noop_sync,
+    fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
+    BytesFile, BytesFileOps, CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryFileNode, SeekTarget, StaticDirectoryBuilder,
+    VecDirectory, VecDirectoryEntry,
 };
-
 use bstr::ByteSlice;
+use fuchsia_zircon as zx;
+use fuchsia_zircon::HandleBased;
 use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
-use starnix_logging::{log_error, log_info, track_stub};
+use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -25,10 +28,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::sync::Arc;
-
-const SELINUX_PERMS: &[&str] = &["add", "find", "read", "set"];
 
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
@@ -62,7 +62,12 @@ impl SeLinuxFs {
 
         // Read-only files & directories, exposing SELinux internal state.
         dir.entry(current_task, "checkreqprot", SeCheckReqProt::new_node(), mode!(IFREG, 0o644));
-        dir.entry(current_task, "class", SeLinuxClassDirectory::new(), mode!(IFDIR, 0o777));
+        dir.entry(
+            current_task,
+            "class",
+            SeLinuxClassDirectory::new(security_server.clone()),
+            mode!(IFDIR, 0o555),
+        );
         dir.entry(
             current_task,
             "deny_unknown",
@@ -105,7 +110,12 @@ impl SeLinuxFs {
             // When the selinux state changes in the future, the way to update this data (and
             // communicate updates with userspace) is to use the
             // ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
-            VmoFileNode::from_vmo(security_server.get_status_vmo()),
+            MemoryFileNode::from_memory(Arc::new(MemoryObject::from(
+                security_server
+                    .get_status_vmo()
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .map_err(impossible_error)?,
+            ))),
             mode!(IFREG, 0o444),
         );
 
@@ -167,7 +177,6 @@ impl SeLoad {
 
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        track_stub!(TODO("https://fxbug.dev/322874969"), "ignoring selinux policy");
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
@@ -333,6 +342,7 @@ struct AccessFile {
 
 impl FileOps for AccessFile {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,
@@ -450,6 +460,7 @@ impl FsNodeOps for Arc<SeLinuxBooleansDirectory> {
 
 impl FileOps for SeLinuxBooleansDirectory {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,
@@ -537,18 +548,19 @@ impl BytesFileOps for SeLinuxCommitBooleans {
 }
 
 struct SeLinuxClassDirectory {
-    entries: Mutex<BTreeMap<FsString, FsNodeHandle>>,
+    security_server: Arc<SecurityServer>,
 }
 
 impl SeLinuxClassDirectory {
-    fn new() -> Arc<Self> {
-        Arc::new(Self { entries: Mutex::new(BTreeMap::new()) })
+    fn new(security_server: Arc<SecurityServer>) -> Arc<Self> {
+        Arc::new(Self { security_server })
     }
 }
 
 impl FsNodeOps for Arc<SeLinuxClassDirectory> {
     fs_node_impl_dir_readonly!();
 
+    /// Returns the set of classes under the "class" directory.
     fn create_file_ops(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
@@ -557,13 +569,14 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(
-            self.entries
-                .lock()
+            self.security_server
+                .class_names()
+                .map_err(|_| errno!(ENOENT))?
                 .iter()
-                .map(|(name, node)| VecDirectoryEntry {
+                .map(|class_name| VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
-                    name: name.clone(),
-                    inode: Some(node.node_id),
+                    name: class_name.clone().into(),
+                    inode: None,
                 })
                 .collect(),
         ))
@@ -575,25 +588,80 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut entries = self.entries.lock();
-        let next_index = entries.len() + 1;
-        Ok(entries
-            .entry(name.to_owned())
-            .or_insert_with(|| {
-                let index = format!("{next_index}\n").into_bytes();
-                let fs = node.fs();
-                let mut dir = StaticDirectoryBuilder::new(&fs);
-                dir.entry(current_task, "index", BytesFile::new_node(index), mode!(IFREG, 0o444));
-                dir.subdir(current_task, "perms", 0o555, |perms| {
-                    for (i, perm) in SELINUX_PERMS.iter().enumerate() {
-                        let node = BytesFile::new_node(format!("{}\n", i + 1).into_bytes());
-                        perms.entry(current_task, perm, node, mode!(IFREG, 0o444));
-                    }
-                });
-                dir.set_mode(mode!(IFDIR, 0o555));
-                dir.build(current_task)
-            })
-            .clone())
+        let fs = node.fs();
+        let mut dir = StaticDirectoryBuilder::new(&fs);
+        dir.set_mode(mode!(IFDIR, 0o555));
+        let id =
+            self.security_server.class_id_by_name(&name.to_string()).map_err(|_| errno!(EINVAL))?;
+        let index_bytes = format!("{}", id).into_bytes();
+        dir.entry(current_task, "index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
+        dir.entry(
+            current_task,
+            "perms",
+            SeLinuxPermsDirectory::new(self.security_server.clone(), name.to_string()),
+            mode!(IFDIR, 0o555),
+        );
+        Ok(dir.build(current_task).clone())
+    }
+}
+
+/// Represents the perms/ directory under each class entry of the SeLinuxClassDirectory.
+struct SeLinuxPermsDirectory {
+    security_server: Arc<SecurityServer>,
+    class_name: String,
+}
+
+impl SeLinuxPermsDirectory {
+    fn new(security_server: Arc<SecurityServer>, class_name: String) -> Arc<Self> {
+        Arc::new(Self { security_server, class_name })
+    }
+}
+
+impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
+    fs_node_impl_dir_readonly!();
+
+    /// Lists all available permissions for the corresponding class.
+    fn create_file_ops(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(VecDirectory::new_file(
+            self.security_server
+                .class_permissions_by_name(&self.class_name)
+                .map_err(|_| errno!(ENOENT))?
+                .iter()
+                .map(|(_permission_id, permission_name)| VecDirectoryEntry {
+                    entry_type: DirectoryEntryType::DIR,
+                    name: permission_name.clone().into(),
+                    inode: None,
+                })
+                .collect(),
+        ))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        let found_permission_id = self
+            .security_server
+            .class_permissions_by_name(&(self.class_name))
+            .map_err(|_| errno!(ENOENT))?
+            .iter()
+            .find(|(_permission_id, permission_name)| permission_name == name.as_bytes())
+            .ok_or(errno!(ENOENT))?
+            .0;
+
+        Ok(node.fs().create_node(
+            current_task,
+            BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
+            FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
+        ))
     }
 }
 

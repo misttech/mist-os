@@ -32,6 +32,7 @@
 #include <region-alloc/region-alloc.h>
 
 #include "src/devices/sysmem/drivers/sysmem/memory_allocator.h"
+#include "src/devices/sysmem/drivers/sysmem/snapshot_annotation_register.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_metrics.h"
 
@@ -103,6 +104,7 @@ class Device final : public DdkDeviceType,
   [[nodiscard]] zx_status_t CreatePhysicalVmo(uint64_t base, uint64_t size,
                                               zx::vmo* vmo_out) override;
   void CheckForUnbind() override;
+  SnapshotAnnotationRegister& snapshot_annotation_register() override;
   SysmemMetrics& metrics() override;
   protected_ranges::ProtectedRangesCoreControl& protected_ranges_core_control(
       const fuchsia_sysmem2::Heap& heap) override;
@@ -401,6 +403,7 @@ class Device final : public DdkDeviceType,
 
   std::atomic<bool> waiting_for_unbind_ = false;
 
+  SnapshotAnnotationRegister snapshot_annotation_register_;
   SysmemMetrics metrics_;
 
   bool protected_ranges_disable_dynamic_ __TA_GUARDED(*loop_checker_) = false;

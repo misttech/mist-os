@@ -77,6 +77,62 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(complete.stdout, "temp-file.txt\n")
             self.assertEqual(complete.return_code, 0)
 
+    async def test_command_with_input(self) -> None:
+        """Test passing input to a command."""
+        cmd = await command.AsyncCommand.create(
+            "cat", input_bytes=b"hello\nworld"
+        )
+        events = []
+        complete = await cmd.run_to_completion(
+            lambda event: events.append(event)
+        )
+        self.assertEqual(len(events), 3, f"Events was actually {events}")
+
+        self.assertStdout(events[0], b"hello\n")
+        self.assertStdout(events[1], b"world")
+        self.assertTermination(events[2], 0)
+
+        self.assertEqual(complete.stdout, "hello\nworld")
+        self.assertEqual(complete.return_code, 0)
+
+    async def test_wrapper_with_input(self) -> None:
+        """Test passing input to a command that uses a symbolizer"""
+        cmd = await command.AsyncCommand.create(
+            "cat",
+            symbolizer_args=["sed", "s/hello/goodbye/g"],
+            input_bytes=b"hello\nworld",
+        )
+        events = []
+        complete = await cmd.run_to_completion(
+            lambda event: events.append(event)
+        )
+        self.assertEqual(len(events), 3, f"Events was actually {events}")
+
+        self.assertStdout(events[0], b"goodbye\n")
+        self.assertStdout(events[1], b"world")
+        self.assertTermination(events[2], 0)
+
+        self.assertEqual(complete.stdout, "goodbye\nworld")
+        self.assertEqual(complete.return_code, 0)
+
+    async def test_long_line_output(self) -> None:
+        """Test processing a very large output from a program"""
+        cmd = await command.AsyncCommand.create(
+            "cat",
+            input_bytes=b"a" * 1024 * 1024,
+        )
+        events = []
+        complete = await cmd.run_to_completion(
+            lambda event: events.append(event)
+        )
+        self.assertEqual(len(events), 2, f"Events was actually {events}")
+
+        self.assertStdout(events[0], b"a" * 1024 * 1024)
+        self.assertTermination(events[1], 0)
+
+        self.assertEqual(complete.stdout, "a" * 1024 * 1024)
+        self.assertEqual(complete.return_code, 0)
+
     async def test_basic_command_with_long_timeout(self) -> None:
         """Test running a basic command and getting the output.
 

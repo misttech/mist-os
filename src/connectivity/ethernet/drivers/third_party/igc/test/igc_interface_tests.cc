@@ -627,7 +627,7 @@ TEST_F(IgcInterfaceTest, NetworkPortGetInfo) {
 
   netdev::wire::PortBaseInfo& info = info_result->info;
 
-  EXPECT_EQ(info.port_class(), netdev::wire::DeviceClass::kEthernet);
+  EXPECT_EQ(info.port_class(), netdev::wire::PortClass::kEthernet);
   EXPECT_EQ(info.rx_types()[0], netdev::wire::FrameType::kEthernet);
   EXPECT_EQ(info.rx_types().count(), 1U);
   EXPECT_EQ(info.tx_types()[0].type, netdev::wire::FrameType::kEthernet);

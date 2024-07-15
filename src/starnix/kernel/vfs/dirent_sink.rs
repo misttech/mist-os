@@ -5,12 +5,12 @@
 use std::mem;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
-use crate::mm::vmo::round_up_to_increment;
 use crate::mm::MemoryAccessor;
 use crate::task::CurrentTask;
 use crate::vfs::FsStr;
 use starnix_uapi::errors::{Errno, ENOSPC};
 use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{errno, error, ino_t, off_t};
 
@@ -194,10 +194,10 @@ pub use x86_64::*;
 #[cfg(target_arch = "x86_64")]
 mod x86_64 {
     use super::{BaseDirentSink, DirectoryEntryType, DirentSink};
-    use crate::mm::vmo::round_up_to_increment;
     use crate::task::CurrentTask;
     use crate::vfs::FsStr;
     use starnix_uapi::errors::Errno;
+    use starnix_uapi::math::round_up_to_increment;
     use starnix_uapi::user_address::UserAddress;
     use starnix_uapi::{ino_t, off_t};
     use std::mem;

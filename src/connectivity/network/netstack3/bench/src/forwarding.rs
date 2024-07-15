@@ -40,7 +40,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
 
     let eth_device = idx_to_device_id[0].clone();
     let device: DeviceId<_> = eth_device.clone().into();
-    ctx.test_api().set_forwarding_enabled::<Ipv4>(&device, true);
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv4>(&device, true);
 
     assert!(
         frame_size

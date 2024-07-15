@@ -159,12 +159,7 @@ async fn inspect_nic(name: &str) {
         |if_map| {
             let loopback = if_map.values().find_map(
                 |fidl_fuchsia_net_interfaces_ext::PropertiesAndState { properties, state: _ }| {
-                    match properties.device_class {
-                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                            fidl_fuchsia_net_interfaces::Empty {},
-                        ) => Some(properties.clone()),
-                        fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
-                    }
+                    properties.port_class.is_loopback().then(|| properties.clone())
                 },
             )?;
             // Endpoint is up, has assigned IPv4 and at least the expected number of

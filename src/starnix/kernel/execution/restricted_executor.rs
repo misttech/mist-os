@@ -5,7 +5,7 @@
 #![allow(non_camel_case_types)]
 
 use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
-use crate::arch::execution::{generate_cfi_directives, restore_cfi_directives};
+use super::ErrorContext;
 use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
 use crate::task::{
@@ -35,24 +35,16 @@ use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 
 extern "C" {
-    /// The function which enters restricted mode. This function never technically returns, instead
-    /// it saves some register state and calls `zx_restricted_enter`. When the thread traps in
-    /// restricted mode, the kernel returns control to `restricted_return`, `restricted_return` then
-    /// restores the register state and returns back out to where `restricted_enter` was called
-    /// from.
-    ///
-    /// `exit_reason` is populated with reason code that identifies why the thread has returned to
-    /// normal mode. This is only written if this function returns ZX_OK and is otherwise not
-    /// touched.
-    fn restricted_enter(
+    fn restricted_enter_loop(
         options: u32,
         restricted_return: usize,
-        exit_reason: *mut zx::sys::zx_restricted_reason_t,
+        restricted_exit_callback: usize,
+        restricted_exit_callback_context: usize,
+        restricted_state_addr: usize,
+        extended_pstate_addr: usize,
     ) -> zx::sys::zx_status_t;
 
-    /// The function that is used to "return" from restricted mode. See `restricted_enter` for more
-    /// information.
-    fn restricted_return();
+    fn restricted_return_loop();
 
     /// `zx_restricted_bind_state` system call.
     fn zx_restricted_bind_state(
@@ -167,6 +159,15 @@ impl std::ops::Drop for RestrictedState {
 
 const RESTRICTED_ENTER_OPTIONS: u32 = 0;
 
+struct RestrictedEnterContext<'a> {
+    current_task: &'a mut CurrentTask,
+    restricted_state: RestrictedState,
+    state: zx::sys::zx_restricted_state_t,
+    profiling_guard: ProfileDuration,
+    error_context: Option<ErrorContext>,
+    exit_status: Result<ExitStatus, Error>,
+}
+
 /// Runs the `current_task` to completion.
 ///
 /// The high-level flow of this function looks as follows:
@@ -194,10 +195,10 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     firehose_trace_duration!(CATEGORY_STARNIX, NAME_RUN_TASK);
 
     // This is the pointer that is passed to `restricted_enter`.
-    let restricted_return_ptr = restricted_return as *const ();
+    let restricted_return_ptr = restricted_return_loop as *const ();
 
     // This tracks the last failing system call for debugging purposes.
-    let mut error_context = None;
+    let error_context = None;
 
     // Allocate a VMO and bind it to this thread.
     let mut out_vmo_handle = 0;
@@ -225,59 +226,87 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
     // We need to check for exit once, before the task starts executing, in case
     // the task has already been sent a signal that will cause it to exit.
-    let state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
-    if let Some(exit_status) =
-        process_completed_restricted_exit(current_task, &error_context, &state)?
-    {
+    if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)? {
         return Ok(exit_status);
     }
-    loop {
-        let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
-        // Copy the register state into the mapped VMO.
-        restricted_state.write_state(&state);
 
-        // We're about to hand control back to userspace, start measuring time in user code.
-        profiling_guard.pivot("RestrictedMode");
+    let state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
+    // Copy the initial register state into the mapped VMO.
+    restricted_state.write_state(&state);
 
-        let mut reason_code: zx::sys::zx_restricted_reason_t = u64::MAX;
-        let status = zx::Status::from_raw(unsafe {
-            // The closure provided to run_with_saved_state must be minimal to avoid using
-            // floating point or vector state. In particular, the zx::Status conversion compiles
-            // to a vector register operation by default and must happen outside this closure.
-            current_task.thread_state.extended_pstate.run_with_saved_state(|| {
-                restricted_enter(
-                    RESTRICTED_ENTER_OPTIONS,
-                    restricted_return_ptr as usize,
-                    &mut reason_code,
-                )
-            })
-        });
-        match { status } {
-            zx::Status::OK => {
-                // Successfully entered and exited restricted mode. At this point the task has
-                // trapped back out of restricted mode, so the restricted state contains the
-                // information about which system call to dispatch.
-            }
-            _ => return Err(format_err!("failed to restricted_enter: {:?} {:?}", state, status)),
+    let restricted_state_addr = restricted_state.bound_state.as_ptr() as usize;
+    let extended_pstate_addr = &current_task.thread_state.extended_pstate as *const _ as usize;
+
+    // We're about to hand control to userspace, start measuring time in user code.
+    profiling_guard.pivot("RestrictedMode");
+
+    let restricted_enter_context = RestrictedEnterContext {
+        current_task,
+        restricted_state,
+        state,
+        profiling_guard,
+        error_context,
+        exit_status: Ok(ExitStatus::Exit(0)),
+    };
+
+    unsafe {
+        restricted_enter_loop(
+            RESTRICTED_ENTER_OPTIONS,
+            restricted_return_ptr as usize,
+            restricted_exit_callback_c as usize,
+            &restricted_enter_context as *const _ as usize,
+            restricted_state_addr,
+            extended_pstate_addr,
+        );
+    }
+    restricted_enter_context.exit_status
+}
+
+extern "C" fn restricted_exit_callback_c(
+    context: usize,
+    reason_code: zx::sys::zx_restricted_reason_t,
+) -> bool {
+    let restricted_context = unsafe { &mut *(context as *mut RestrictedEnterContext<'_>) };
+    restricted_exit_callback(
+        reason_code,
+        restricted_context.current_task,
+        &mut restricted_context.restricted_state,
+        &mut restricted_context.state,
+        &mut restricted_context.profiling_guard,
+        &mut restricted_context.error_context,
+        &mut restricted_context.exit_status,
+    )
+}
+
+fn restricted_exit_callback(
+    reason_code: zx::sys::zx_restricted_reason_t,
+    current_task: &mut CurrentTask,
+    restricted_state: &mut RestrictedState,
+    state: &mut zx::sys::zx_restricted_state_t,
+    profiling_guard: &mut ProfileDuration,
+    error_context: &mut Option<ErrorContext>,
+    exit_status: &mut Result<ExitStatus, Error>,
+) -> bool {
+    match process_restricted_exit(
+        reason_code,
+        current_task,
+        restricted_state,
+        state,
+        profiling_guard,
+        error_context,
+    ) {
+        Ok(None) => {
+            // Keep going!
+            true
         }
-        match process_restricted_exit(
-            reason_code,
-            current_task,
-            &mut restricted_state,
-            &mut state,
-            &mut profiling_guard,
-            &mut error_context,
-        ) {
-            Ok(None) => {
-                // Keep going.
-            }
-            Ok(Some(exit_status)) => {
-                return Ok(exit_status);
-            }
-            Err(error) => {
-                return Err(error);
-            }
-        };
+        Ok(Some(completed_exit_status)) => {
+            *exit_status = Ok(completed_exit_status);
+            false
+        }
+        Err(error) => {
+            *exit_status = Err(error);
+            false
+        }
     }
 }
 
@@ -287,7 +316,7 @@ fn process_restricted_exit(
     restricted_state: &mut RestrictedState,
     state: &mut zx::sys::zx_restricted_state_t,
     profiling_guard: &mut ProfileDuration,
-    error_context: &mut Option<super::ErrorContext>,
+    error_context: &mut Option<ErrorContext>,
 ) -> Result<Option<ExitStatus>, Error> {
     // We just received control back from r-space, start measuring time in normal mode.
     profiling_guard.pivot("NormalMode");
@@ -309,18 +338,11 @@ fn process_restricted_exit(
             let syscall_decl =
                 SyscallDecl::from_number(current_task.thread_state.registers.syscall_register());
 
-            // Generate CFI directives so the unwinder will be redirected to unwind the restricted
-            // stack.
-            generate_cfi_directives!(*state);
-
             if let Some(new_error_context) =
                 execute_syscall(&mut locked, current_task, syscall_decl)
             {
                 *error_context = Some(new_error_context);
             }
-
-            // Restore the CFI directives before continuing.
-            restore_cfi_directives!();
 
             firehose_trace_duration_end!(
                 CATEGORY_STARNIX,
@@ -357,11 +379,14 @@ fn process_restricted_exit(
             return Err(format_err!("Received unexpected restricted reason code: {}", reason_code));
         }
     }
-    if let Some(exit_status) =
-        process_completed_restricted_exit(current_task, &error_context, state)?
-    {
+    if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)? {
         return Ok(Some(exit_status));
     }
+
+    // Copy the updated register state into the mapped VMO.
+    let state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
+    restricted_state.write_state(&state);
+
     Ok(None)
 }
 

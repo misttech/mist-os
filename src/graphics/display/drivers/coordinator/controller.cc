@@ -109,10 +109,10 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
         "test_layer should be a non-const alias for the first layer in test_configs");
     test_layer.cfg.primary.image_metadata.width = width;
     test_layer.cfg.primary.image_metadata.height = height;
-    test_layer.cfg.primary.src_frame.width = width;
-    test_layer.cfg.primary.src_frame.height = height;
-    test_layer.cfg.primary.dest_frame.width = width;
-    test_layer.cfg.primary.dest_frame.height = height;
+    test_layer.cfg.primary.image_source.width = width;
+    test_layer.cfg.primary.image_source.height = height;
+    test_layer.cfg.primary.display_destination.width = width;
+    test_layer.cfg.primary.display_destination.height = height;
 
     display_config_t& test_config = test_configs[0];
     test_config.mode = display::ToBanjoDisplayMode(timing);

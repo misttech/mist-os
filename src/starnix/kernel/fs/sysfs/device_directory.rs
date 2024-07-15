@@ -7,10 +7,10 @@ use crate::fs::sysfs::SysfsOps;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::{
-    fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-    BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
-    FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, StubEmptyFile, VecDirectory,
-    VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    fs_node_impl_not_dir, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    StubEmptyFile, VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked, WriteOps};
@@ -310,6 +310,7 @@ struct ReadAheadKbFile {
 
 impl FileOps for ReadAheadKbFile {
     fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

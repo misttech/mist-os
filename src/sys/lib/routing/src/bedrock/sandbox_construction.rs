@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap};
+use crate::capability_source::{CapabilitySource, InternalCapability};
+use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet, WithAvailability};
 use async_trait::async_trait;
@@ -16,6 +18,7 @@ use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Router, Unit};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::sync::Arc;
 use tracing::warn;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
@@ -89,8 +92,8 @@ pub type ChildInputs = StructuredDictMap<ComponentInput>;
 
 /// Once a component has been resolved and its manifest becomes known, this function produces the
 /// various dicts the component needs based on the contents of its manifest.
-pub fn build_component_sandbox(
-    moniker: &Moniker,
+pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: HashMap<ChildName, Router>,
     decl: &cm_rust::ComponentDecl,
     component_input: ComponentInput,
@@ -112,7 +115,7 @@ pub fn build_component_sandbox(
             .insert(
                 environment_decl.name.clone(),
                 build_environment(
-                    moniker,
+                    &component.moniker(),
                     &child_component_output_dictionary_routers,
                     &component_input,
                     environment_decl,
@@ -154,7 +157,7 @@ pub fn build_component_sandbox(
 
     for use_ in &decl.uses {
         extend_dict_with_use(
-            moniker,
+            &component.moniker(),
             &child_component_output_dictionary_routers,
             &component_input,
             &program_input_dict,
@@ -211,7 +214,7 @@ pub fn build_component_sandbox(
             }
         };
         extend_dict_with_offer(
-            moniker,
+            component,
             &child_component_output_dictionary_routers,
             &component_input,
             &program_output_router,
@@ -224,7 +227,7 @@ pub fn build_component_sandbox(
 
     for expose in &decl.exposes {
         extend_dict_with_expose(
-            moniker,
+            component,
             &child_component_output_dictionary_routers,
             &program_output_router,
             &framework_dict,
@@ -314,8 +317,8 @@ fn build_environment(
 
 /// Extends the given dict based on offer declarations. All offer declarations in `offers` are
 /// assumed to target `target_dict`.
-pub fn extend_dict_with_offers(
-    moniker: &Moniker,
+pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
@@ -326,7 +329,7 @@ pub fn extend_dict_with_offers(
 ) {
     for offer in dynamic_offers {
         extend_dict_with_offer(
-            moniker,
+            component,
             &child_component_output_dictionary_routers,
             component_input,
             program_output_router,
@@ -470,8 +473,8 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
     matches!(offer, cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_))
 }
 
-fn extend_dict_with_offer(
-    moniker: &Moniker,
+fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
     program_output_router: &Router,
@@ -498,13 +501,16 @@ fn extend_dict_with_offer(
         cm_rust::OfferSource::Parent => component_input.capabilities().lazy_get(
             source_path.to_owned(),
             RoutingError::offer_from_parent_not_found(
-                moniker,
+                &component.moniker(),
                 source_path.iter_segments().join("/"),
             ),
         ),
         cm_rust::OfferSource::Self_ => program_output_router.clone().lazy_get(
             source_path.to_owned(),
-            RoutingError::offer_from_self_not_found(moniker, source_path.iter_segments().join("/")),
+            RoutingError::offer_from_self_not_found(
+                &component.moniker(),
+                source_path.iter_segments().join("/"),
+            ),
         ),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
@@ -517,7 +523,7 @@ fn extend_dict_with_offer(
                 source_path.to_owned(),
                 RoutingError::offer_from_child_expose_not_found(
                     &child_name,
-                    &moniker,
+                    &component.moniker(),
                     offer.source_name().clone(),
                 ),
             )
@@ -532,14 +538,14 @@ fn extend_dict_with_offer(
             framework_dict.clone().lazy_get(
                 source_path.to_owned(),
                 RoutingError::capability_from_framework_not_found(
-                    moniker,
+                    &component.moniker(),
                     source_path.iter_segments().join("/"),
                 ),
             )
         }
         cm_rust::OfferSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
-                moniker,
+                &component.moniker(),
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
@@ -548,7 +554,9 @@ fn extend_dict_with_offer(
                 Router::new_error(err)
             }
         }
-        cm_rust::OfferSource::Void => UnitRouter::new(),
+        cm_rust::OfferSource::Void => {
+            UnitRouter::new(InternalCapability::Protocol(offer.source_name().clone()), component)
+        }
         // This is only relevant for services, so this arm is never reached.
         cm_rust::OfferSource::Collection(_name) => return,
     };
@@ -564,8 +572,8 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
     matches!(expose, cm_rust::ExposeDecl::Protocol(_) | cm_rust::ExposeDecl::Dictionary(_))
 }
 
-fn extend_dict_with_expose(
-    moniker: &Moniker,
+fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
+    component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     program_output_router: &Router,
     framework_dict: &Dict,
@@ -587,7 +595,7 @@ fn extend_dict_with_expose(
         cm_rust::ExposeSource::Self_ => program_output_router.clone().lazy_get(
             source_path.to_owned(),
             RoutingError::expose_from_self_not_found(
-                moniker,
+                &component.moniker(),
                 source_path.iter_segments().join("/"),
             ),
         ),
@@ -600,7 +608,7 @@ fn extend_dict_with_expose(
                     source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
                         &child_name,
-                        &moniker,
+                        &component.moniker(),
                         expose.source_name().clone(),
                     ),
                 )
@@ -618,14 +626,14 @@ fn extend_dict_with_expose(
             framework_dict.clone().lazy_get(
                 source_path.to_owned(),
                 RoutingError::capability_from_framework_not_found(
-                    moniker,
+                    &component.moniker(),
                     source_path.iter_segments().join("/"),
                 ),
             )
         }
         cm_rust::ExposeSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
-                moniker,
+                &component.moniker(),
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
@@ -634,7 +642,9 @@ fn extend_dict_with_expose(
                 Router::new_error(err)
             }
         }
-        cm_rust::ExposeSource::Void => UnitRouter::new(),
+        cm_rust::ExposeSource::Void => {
+            UnitRouter::new(InternalCapability::Protocol(expose.source_name().clone()), component)
+        }
         // This is only relevant for services, so this arm is never reached.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
@@ -646,17 +656,30 @@ fn extend_dict_with_expose(
     }
 }
 
-struct UnitRouter {}
+struct UnitRouter<C: ComponentInstanceInterface> {
+    capability: InternalCapability,
+    component: WeakComponentInstanceInterface<C>,
+}
 
-impl UnitRouter {
-    fn new() -> Router {
-        Router::new(UnitRouter {})
+impl<C: ComponentInstanceInterface + 'static> UnitRouter<C> {
+    fn new(capability: InternalCapability, component: &Arc<C>) -> Router {
+        Router::new(UnitRouter { capability, component: component.as_weak() })
     }
 }
 
 #[async_trait]
-impl sandbox::Routable for UnitRouter {
+impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C> {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
+        if request.debug {
+            return Ok(Capability::Dictionary(
+                CapabilitySource::Void {
+                    capability: self.capability.clone(),
+                    component: self.component.clone(),
+                }
+                .try_into()
+                .expect("failed to convert capability source to dictionary"),
+            ));
+        }
         match request.availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {
                 Err(RoutingError::SourceCapabilityIsVoid.into())

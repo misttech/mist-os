@@ -5,9 +5,8 @@
 //! Declares types related to the protocols of raw IP sockets.
 
 use net_types::ip::{GenericOverIp, Ip, IpVersion};
+use netstack3_base::IpExt;
 use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
-
-use crate::internal::base::IpExt;
 
 /// A witness type enforcing that the contained protocol is not the
 /// "reserved" IANA Internet protocol.

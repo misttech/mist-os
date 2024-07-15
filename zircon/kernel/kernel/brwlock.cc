@@ -206,6 +206,12 @@ ktl::optional<ResourceOwnership> BrwLock<PI>::TryWake() {
           .fetch_add((-kBrwLockWaiter + kBrwLockReader) * to_wake, ktl::memory_order_acq_rel);
     }
 
+#if LOCK_TRACING_ENABLED
+    for (const Thread& thread : unblock_list) {
+      LOCK_TRACE_FLOW_STEP("contend_rwlock", thread.lock_flow_id());
+    }
+#endif
+
     // Now actually do the wake.
     [[maybe_unused]] const OwnedWaitQueue::WakeThreadsResult results =
         wait_.WakeThreadsLocked(ktl::move(maybe_unblock_list).value(), hooks, wake_opt);
@@ -238,6 +244,12 @@ ktl::optional<ResourceOwnership> BrwLock<PI>::TryWake() {
     DEBUG_ASSERT(lock_result->count > 0);
     DEBUG_ASSERT(!lock_result->list.is_empty());
 
+#if LOCK_TRACING_ENABLED
+    for (const Thread& thread : lock_result->list) {
+      LOCK_TRACE_FLOW_STEP("contend_rwlock", thread.lock_flow_id());
+    }
+#endif
+
     Thread& first_wake = lock_result->list.front();
     first_wake.get_lock().AssertHeld();
 
@@ -260,7 +272,7 @@ ktl::optional<ResourceOwnership> BrwLock<PI>::TryWake() {
 
 template <BrwLockEnablePi PI>
 void BrwLock<PI>::ContendedReadAcquire() {
-  LOCK_TRACE_DURATION("ContendedReadAcquire");
+  LOCK_TRACE_DURATION("ContendedReadAcquire", ("name", class_name_ref()));
 
   // Remember the last call to current_ticks.
   zx_ticks_t now_ticks = current_ticks();
@@ -392,7 +404,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
 
 template <BrwLockEnablePi PI>
 void BrwLock<PI>::ContendedWriteAcquire() {
-  LOCK_TRACE_DURATION("ContendedWriteAcquire");
+  LOCK_TRACE_DURATION("ContendedWriteAcquire", ("name", class_name_ref()));
 
   // Remember the last call to current_ticks.
   zx_ticks_t now_ticks = current_ticks();
@@ -556,7 +568,7 @@ void BrwLock<PI>::WriteRelease() {
       ktl::atomic_ref(state_.state_).fetch_sub(kBrwLockWriter, ktl::memory_order_release);
 
   if (unlikely(StateHasWaiters(prev))) {
-    LOCK_TRACE_DURATION("ContendedWriteRelease");
+    LOCK_TRACE_DURATION("ContendedWriteRelease", ("name", class_name_ref()));
     // There are waiters, we need to wake them up
     ReleaseWakeup();
   }
@@ -599,7 +611,7 @@ void BrwLock<PI>::ReleaseWakeup() {
 
 template <BrwLockEnablePi PI>
 void BrwLock<PI>::ContendedReadUpgrade() {
-  LOCK_TRACE_DURATION("ContendedReadUpgrade");
+  LOCK_TRACE_DURATION("ContendedReadUpgrade", ("name", class_name_ref()));
   Thread* const current_thread = Thread::Current::Get();
   ContentionTimer timer(current_thread, current_ticks());
 

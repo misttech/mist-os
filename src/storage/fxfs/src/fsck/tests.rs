@@ -7,8 +7,9 @@ use crate::filesystem::{
 };
 use crate::fsck::errors::{FsckError, FsckFatal, FsckIssue, FsckWarning};
 use crate::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
-use crate::lsm_tree::simple_persistent_layer::SimplePersistentLayerWriter;
+use crate::lsm_tree::persistent_layer::PersistentLayerWriter;
 use crate::lsm_tree::types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Value};
+use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::allocator::{AllocatorKey, AllocatorValue, CoalescingIterator};
 use crate::object_store::directory::{self, Directory};
@@ -29,7 +30,7 @@ use fidl_fuchsia_io as fio;
 use fxfs_crypto::{Crypt, WrappedKeys};
 use fxfs_insecure_crypto::InsecureCrypt;
 use mundane::hash::{Digest, Hasher, Sha256};
-use std::ops::{Bound, Deref};
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use storage_device::fake_device::FakeDevice;
 use storage_device::DeviceHolder;
@@ -142,8 +143,9 @@ async fn install_items_in_store<K: Key, V: Value>(
     transaction.commit().await.expect("commit failed");
 
     {
-        let mut writer = SimplePersistentLayerWriter::<_, K, V>::new(
+        let mut writer = PersistentLayerWriter::<_, K, V>::new(
             Writer::new(&layer_handle).await,
+            items.as_ref().len(),
             filesystem.block_size(),
         )
         .await
@@ -340,8 +342,9 @@ async fn test_malformed_allocation() {
         transaction.commit().await.expect("commit failed");
 
         {
-            let mut writer = SimplePersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
+            let mut writer = PersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
                 Writer::new(&layer_handle).await,
+                1,
                 fs.block_size(),
             )
             .await
@@ -470,7 +473,7 @@ async fn test_allocation_mismatch() {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
             let iter = allocator
-                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
+                .filter(merger.query(Query::FullScan).await.expect("seek failed"), false)
                 .await
                 .expect("iter failed");
             let ItemRef { key: AllocatorKey { device_range }, .. } =
@@ -550,7 +553,7 @@ async fn test_volume_allocation_mismatch() {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
             let mut iter = allocator
-                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
+                .filter(merger.query(Query::FullScan).await.expect("seek failed"), false)
                 .await
                 .expect("iter failed");
             loop {
@@ -604,7 +607,7 @@ async fn test_missing_allocation() {
             let layer_set = allocator.tree().layer_set();
             let mut merger = layer_set.merger();
             let iter = allocator
-                .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
+                .filter(merger.query(Query::FullScan).await.expect("seek failed"), false)
                 .await
                 .expect("iter failed");
             let iter = CoalescingIterator::new(iter).await.expect("filter failed");
@@ -2514,8 +2517,9 @@ async fn test_full_disk() {
 
         // Now write out our 'fill the disk' allocation.
         {
-            let mut writer = SimplePersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
+            let mut writer = PersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
                 Writer::new(&layer_handle).await,
+                1,
                 fs.block_size(),
             )
             .await

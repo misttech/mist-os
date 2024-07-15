@@ -34,42 +34,58 @@ async fn serve_realm_factory(stream: RealmFactoryRequestStream) {
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut task_group = fasync::TaskGroup::new();
     let mut realms = vec![];
-    while let Ok(Some(request)) = stream.try_next().await {
-        match request {
-            RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
-                let realm_result = create_realm(options).await;
-                match realm_result {
-                    Ok(realm) => {
-                        let request_stream = realm_server.into_stream()?;
-                        task_group.spawn(async move {
-                            realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                        });
+    loop {
+        match stream.try_next().await {
+            Ok(Some(request)) => match request {
+                RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
+                    let realm_result = create_realm(options).await;
+                    match realm_result {
+                        Ok(realm) => {
+                            let request_stream = realm_server.into_stream()?;
+                            task_group.spawn(async move {
+                                realm_proxy::service::serve(realm, request_stream).await.unwrap();
+                            });
 
-                        responder.send(Ok(()))?;
-                    }
-                    Err(e) => {
-                        error!("Failed to create realm: {:?}", e);
-                        responder.send(Err(OperationError::Invalid))?;
+                            responder.send(Ok(()))?;
+                        }
+                        Err(e) => {
+                            error!("Failed to create realm: {:?}", e);
+                            responder.send(Err(OperationError::Invalid))?;
+                        }
                     }
                 }
-            }
-            RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
-                let realm_result = create_realm(options).await;
-                match realm_result {
-                    Ok(realm) => {
-                        realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
-                        realms.push(realm);
-                        responder.send(Ok(()))?;
-                    }
-                    Err(e) => {
-                        error!("Failed to create realm: {:?}", e);
-                        responder.send(Err(OperationError::Invalid))?;
+                RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
+                    let realm_result = create_realm(options).await;
+                    match realm_result {
+                        Ok(realm) => {
+                            realm
+                                .root
+                                .controller()
+                                .get_exposed_dictionary(dictionary)
+                                .await?
+                                .unwrap();
+                            realms.push(realm);
+                            responder.send(Ok(()))?;
+                        }
+                        Err(e) => {
+                            error!("Failed to create realm: {:?}", e);
+                            responder.send(Err(OperationError::Invalid))?;
+                        }
                     }
                 }
-            }
 
-            RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
-                control_handle.shutdown_with_epitaph(fuchsia_zircon_status::Status::NOT_SUPPORTED);
+                RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
+                    control_handle
+                        .shutdown_with_epitaph(fuchsia_zircon_status::Status::NOT_SUPPORTED);
+                }
+            },
+            Ok(None) => {
+                warn!("handle_request_stream got None stream item.");
+                break;
+            }
+            Err(e) => {
+                error!("handle_request_stream failed to get next stream item: {:?}", e);
+                break;
             }
         }
     }

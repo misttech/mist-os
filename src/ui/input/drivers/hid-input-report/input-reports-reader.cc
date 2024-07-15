@@ -4,12 +4,8 @@
 
 #include "input-reports-reader.h"
 
-#include <lib/ddk/debug.h>
-#include <lib/ddk/trace/event.h>
-
-#include <span>
-
-#include <fbl/auto_lock.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/trace/event.h>
 
 namespace hid_input_report_dev {
 
@@ -26,42 +22,13 @@ void hexdump(const cpp20::span<const uint8_t> data) {
       sprintf(&line[kCharsPerByte * j], "%02X ", data[i + j]);
     }
 
-    zxlogf(INFO, "hid-dump(%zu): %s", i, line);
+    FDF_LOG(INFO, "hid-dump(%zu): %s", i, line);
   }
 }
 
 }  // namespace
 
-std::unique_ptr<InputReportsReader> InputReportsReader::Create(
-    InputReportBase* base, uint32_t reader_id, async_dispatcher_t* dispatcher,
-    fidl::ServerEnd<fuchsia_input_report::InputReportsReader> request) {
-  // Invoked when the channel is closed or on any binding-related error.
-  fidl::OnUnboundFn<InputReportsReader> unbound_fn(
-      [](InputReportsReader* device, fidl::UnbindInfo info,
-         fidl::ServerEnd<fuchsia_input_report::InputReportsReader>) {
-        {
-          fbl::AutoLock lock(&device->readers_lock_);
-          // Any pending LLCPP completer must be either replied to or closed before we destroy it.
-          if (device->waiting_read_) {
-            device->waiting_read_->Close(ZX_ERR_PEER_CLOSED);
-            device->waiting_read_.reset();
-          }
-        }
-        // This frees the InputReportsReader class.
-        device->base_->RemoveReaderFromList(device);
-      });
-
-  auto reader = std::make_unique<InputReportsReader>(base, reader_id);
-  auto binding =
-      fidl::BindServer(dispatcher, std::move(request), reader.get(), std::move(unbound_fn));
-  fbl::AutoLock lock(&reader->readers_lock_);
-  reader->binding_.emplace(std::move(binding));
-  return reader;
-}
-
 void InputReportsReader::ReadInputReports(ReadInputReportsCompleter::Sync& completer) {
-  fbl::AutoLock lock(&readers_lock_);
-
   if (waiting_read_) {
     completer.ReplyError(ZX_ERR_ALREADY_BOUND);
     return;
@@ -93,7 +60,7 @@ void InputReportsReader::SendReportsToWaitingRead() {
                                                                               num_reports));
   fidl::Status result = waiting_read_->result_of_reply();
   if (!result.ok()) {
-    zxlogf(ERROR, "SendReport: Failed to send reports: %s\n", result.FormatDescription().c_str());
+    FDF_LOG(ERROR, "SendReport: Failed to send reports: %s\n", result.FormatDescription().c_str());
   }
   waiting_read_.reset();
 
@@ -101,28 +68,26 @@ void InputReportsReader::SendReportsToWaitingRead() {
   report_allocator_.Reset();
 }
 
-void InputReportsReader::ReceiveReport(const uint8_t* raw_report, size_t raw_report_size,
-                                       zx_time_t time, hid_input_report::Device* device) {
-  fbl::AutoLock lock(&readers_lock_);
-
+void InputReportsReader::ReceiveReport(cpp20::span<const uint8_t> raw_report, zx::time report_time,
+                                       hid_input_report::Device* device) {
   fuchsia_input_report::wire::InputReport report(report_allocator_);
 
   if (!device->InputReportId().has_value()) {
-    zxlogf(ERROR, "ReceiveReport: Device cannot receive input reports\n");
+    FDF_LOG(ERROR, "ReceiveReport: Device cannot receive input reports\n");
     return;
   }
 
   if (hid_input_report::ParseResult result =
-          device->ParseInputReport(raw_report, raw_report_size, report_allocator_, report);
+          device->ParseInputReport(raw_report.data(), raw_report.size(), report_allocator_, report);
       result != hid_input_report::ParseResult::kOk) {
-    zxlogf(ERROR, "ReceiveReport: Device failed to parse report correctly %s (%d)",
-           ParseResultGetString(result), static_cast<int>(result));
-    hexdump(cpp20::span<const uint8_t>{raw_report, raw_report_size});
+    FDF_LOG(ERROR, "ReceiveReport: Device failed to parse report correctly %s (%d)",
+            ParseResultGetString(result), static_cast<int>(result));
+    hexdump(raw_report);
     return;
   }
 
   report.set_report_id(*device->InputReportId());
-  report.set_event_time(report_allocator_, time);
+  report.set_event_time(report_allocator_, report_time.get());
   report.set_trace_id(report_allocator_, TRACE_NONCE());
 
   // If we are full, pop the oldest report.

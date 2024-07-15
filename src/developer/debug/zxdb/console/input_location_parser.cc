@@ -33,6 +33,13 @@
 namespace zxdb {
 
 namespace {
+const char kMissingFileError[] =
+    R"(There is no file name to use in the current context. Either specify a
+file and line number (e.g. main.cc:23), or ensure the process is stopped (try
+`pause`) and the file that you want to stop in is the active stack frame with
+`frame` to use line numbers with a contextual file name.
+
+See `help break` for details.)";
 
 // Searches the current object ("this") in the frame for local matches of the given identifier.
 // This will not return anything that exactly matches the input because it's assumed that value
@@ -84,8 +91,6 @@ Err ParseGlobalInputLocation(const Location& location, const std::string& input,
 
   // Check for one colon. Two colons is a C++ member function.
   size_t colon = input.find(':');
-  const char kMissingFileError[] =
-      "There is no current file name to use, you'll have to specify a file.";
   if (colon != std::string::npos && colon < input.size() - 1 && input[colon + 1] != ':') {
     // <file>:<line> format.
     std::string file = input.substr(0, colon);

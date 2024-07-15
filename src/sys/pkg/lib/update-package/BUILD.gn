@@ -15,7 +15,7 @@ rustc_library("update-package") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-url",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
+    "//src/lib/zircon/rust/fuchsia-zircon-status",
     "//src/sys/pkg/lib/epoch",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg",

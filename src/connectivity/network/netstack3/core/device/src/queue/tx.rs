@@ -92,7 +92,7 @@ pub trait TransmitQueueContext<D: Device, BC>: TransmitQueueCommon<D, BC> {
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         buf: Self::Buffer,
-    ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>>;
+    ) -> Result<(), DeviceSendFrameError>;
 }
 
 /// The core execution context for dequeueing TX frames from the transmit queue.
@@ -218,7 +218,7 @@ fn handle_post_enqueue<
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     status: EnqueueStatus<CC::Meta, CC::Buffer>,
-) -> Result<(), DeviceSendFrameError<()>> {
+) -> Result<(), DeviceSendFrameError> {
     match status {
         EnqueueStatus::NotAttempted(meta, body) => {
             // TODO(https://fxbug.dev/42077654): Deliver the frame to packet
@@ -226,9 +226,7 @@ fn handle_post_enqueue<
             deliver_to_device_sockets(core_ctx, bindings_ctx, device_id, &body, &meta);
             // Send the frame while not holding the TX queue exclusively to
             // not block concurrent senders from making progress.
-            core_ctx
-                .send_frame(bindings_ctx, device_id, meta, body)
-                .map_err(|_| DeviceSendFrameError::DeviceNotReady(()))
+            core_ctx.send_frame(bindings_ctx, device_id, meta, body)
         }
         EnqueueStatus::Attempted => Ok(()),
     }
@@ -302,18 +300,22 @@ mod tests {
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId,
     };
-    use netstack3_base::{ContextPair, CtxPair, WorkQueueReport};
+    use netstack3_base::{
+        ContextPair, CounterContext, CtxPair, ResourceCounterContext, WorkQueueReport,
+    };
     use test_case::test_case;
 
     use crate::internal::queue::api::TransmitQueueApi;
     use crate::internal::queue::{MAX_BATCH_SIZE, MAX_TX_QUEUED_LEN};
     use crate::internal::socket::{EthernetFrame, Frame};
+    use crate::DeviceCounters;
 
     #[derive(Default)]
     struct FakeTxQueueState {
         queue: TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>,
         transmitted_packets: Vec<Buf<Vec<u8>>>,
-        device_not_ready: bool,
+        no_buffers: bool,
+        device_counters: DeviceCounters,
     }
 
     #[derive(Default)]
@@ -381,16 +383,33 @@ mod tests {
             &mut self,
             _bindings_ctx: &mut FakeBindingsCtxImpl,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
-            meta: (),
+            (): (),
             buf: Buf<Vec<u8>>,
-        ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-            let FakeTxQueueState { queue: _, transmitted_packets, device_not_ready } =
-                &mut self.state;
-            if *device_not_ready {
-                Err(DeviceSendFrameError::DeviceNotReady((meta, buf)))
+        ) -> Result<(), DeviceSendFrameError> {
+            let FakeTxQueueState { transmitted_packets, no_buffers, .. } = &mut self.state;
+            if *no_buffers {
+                Err(DeviceSendFrameError::NoBuffers)
             } else {
                 Ok(transmitted_packets.push(buf))
             }
+        }
+    }
+
+    impl ResourceCounterContext<FakeLinkDeviceId, DeviceCounters> for FakeCoreCtxImpl {
+        fn with_per_resource_counters<O, F: FnOnce(&DeviceCounters) -> O>(
+            &mut self,
+            _resource: &FakeLinkDeviceId,
+            cb: F,
+        ) -> O {
+            // There's only a single device, this is just making the types
+            // happy.
+            cb(&DeviceCounters::default())
+        }
+    }
+
+    impl CounterContext<DeviceCounters> for FakeCoreCtxImpl {
+        fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.state.device_counters)
         }
     }
 
@@ -552,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    fn device_not_ready() {
+    fn dequeue_error() {
         let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         ctx.transmit_queue_api()
@@ -573,10 +592,10 @@ mod tests {
         assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_tx_tasks), [FakeLinkDeviceId]);
         assert_eq!(core_ctx.state.transmitted_packets, []);
 
-        core_ctx.state.device_not_ready = true;
+        core_ctx.state.no_buffers = true;
         assert_eq!(
-            ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
-            Err(DeviceSendFrameError::DeviceNotReady(())),
+            ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId),
+            Err(DeviceSendFrameError::NoBuffers),
         );
         let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.state.transmitted_packets, []);
@@ -590,19 +609,20 @@ mod tests {
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
 
-        core_ctx.state.device_not_ready = false;
+        core_ctx.state.no_buffers = false;
         assert_eq!(
-            ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId,),
+            ctx.transmit_queue_api().transmit_queued_frames(&FakeLinkDeviceId),
             Ok(WorkQueueReport::AllDone),
         );
         let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
-        assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), [body]);
+        // The packet that failed to dequeue is dropped.
+        assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), []);
     }
 
-    #[test_case(true; "device not ready")]
-    #[test_case(false; "device ready")]
-    fn drain_before_noqueue(device_not_ready: bool) {
+    #[test_case(true; "device no buffers")]
+    #[test_case(false; "device has buffers")]
+    fn drain_before_noqueue(no_buffers: bool) {
         let mut ctx = CtxPair::with_core_ctx(FakeCoreCtxImpl::default());
 
         ctx.transmit_queue_api()
@@ -623,7 +643,7 @@ mod tests {
         assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_tx_tasks), [FakeLinkDeviceId]);
         assert_eq!(core_ctx.state.transmitted_packets, []);
 
-        core_ctx.state.device_not_ready = device_not_ready;
+        core_ctx.state.no_buffers = no_buffers;
         ctx.transmit_queue_api()
             .set_configuration(&FakeLinkDeviceId, TransmitQueueConfiguration::None);
 
@@ -635,7 +655,7 @@ mod tests {
             delivered_to_sockets,
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
         );
-        if device_not_ready {
+        if no_buffers {
             assert_eq!(core_ctx.state.transmitted_packets, []);
         } else {
             assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), [body]);

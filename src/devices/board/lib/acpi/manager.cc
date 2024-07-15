@@ -5,7 +5,7 @@
 #include "src/devices/board/lib/acpi/manager.h"
 
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
-#include <lib/ddk/binding.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/zx/result.h>

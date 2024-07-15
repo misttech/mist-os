@@ -18,8 +18,8 @@ class Device {
   explicit Device(DeviceArgs&& args) : Device(args) {}
   explicit Device(DeviceArgs& args) {}
 
-  zx::result<> AddDevice(const char* name, cpp20::span<zx_device_prop_t> props,
-                         cpp20::span<zx_device_str_prop_t> str_props, uint32_t flags);
+  zx::result<> AddDevice(const char* name, cpp20::span<zx_device_str_prop_t> str_props,
+                         uint32_t flags);
 
   zx_status_t DdkAddCompositeNodeSpec(const char* name, const ddk::CompositeNodeSpec& spec) {
     // Delete ourselves, because device-builder will immediately release the unique_ptr.

@@ -25,8 +25,9 @@ use fidl_fuchsia_net_ext::IntoExt;
 use futures::{Stream, StreamExt as _, TryStreamExt as _};
 use thiserror::Error;
 use {
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
 };
 
 /// Conversion errors from `fnet_filter` FIDL types to the
@@ -77,7 +78,6 @@ mod type_names {
     pub(super) const IP_INSTALLATION_HOOK: &str = "fuchsia.net.filter/IpInstallationHook";
     pub(super) const NAT_INSTALLATION_HOOK: &str = "fuchsia.net.filter/NatInstallationHook";
     pub(super) const ROUTINE_TYPE: &str = "fuchsia.net.filter/RoutineType";
-    pub(super) const DEVICE_CLASS: &str = "fuchsia.net.filter/DeviceClass";
     pub(super) const INTERFACE_MATCHER: &str = "fuchsia.net.filter/InterfaceMatcher";
     pub(super) const ADDRESS_MATCHER_TYPE: &str = "fuchsia.net.filter/AddressMatcherType";
     pub(super) const TRANSPORT_PROTOCOL: &str = "fuchsia.net.filter/TransportProtocol";
@@ -90,6 +90,8 @@ mod type_names {
     pub(super) const CHANGE_VALIDATION_RESULT: &str = "fuchsia.net.filter/ChangeValidationResult";
     pub(super) const COMMIT_ERROR: &str = "fuchsia.net.filter/CommitError";
     pub(super) const COMMIT_RESULT: &str = "fuchsia.net.filter/CommitResult";
+    pub(super) const NET_INTERFACES_PORT_CLASS: &str = "fuchsia.net.interfaces/PortClass";
+    pub(super) const HARDWARE_NETWORK_PORT_CLASS: &str = "fuchsia.hardware.network/PortClass";
 }
 
 /// Extension type for [`fnet_filter::NamespaceId`].
@@ -442,42 +444,12 @@ impl TryFrom<fnet_filter::Routine> for Routine {
     }
 }
 
-/// Extension type for [`fnet_filter::DeviceClass`].
-#[derive(Debug, Clone, PartialEq)]
-pub enum DeviceClass {
-    Loopback,
-    Device(fhardware_network::DeviceClass),
-}
-
-impl From<DeviceClass> for fnet_filter::DeviceClass {
-    fn from(device_class: DeviceClass) -> Self {
-        match device_class {
-            DeviceClass::Loopback => fnet_filter::DeviceClass::Loopback(fnet_filter::Empty {}),
-            DeviceClass::Device(device_class) => fnet_filter::DeviceClass::Device(device_class),
-        }
-    }
-}
-
-impl TryFrom<fnet_filter::DeviceClass> for DeviceClass {
-    type Error = FidlConversionError;
-
-    fn try_from(device_class: fnet_filter::DeviceClass) -> Result<Self, Self::Error> {
-        match device_class {
-            fnet_filter::DeviceClass::Loopback(fnet_filter::Empty {}) => Ok(DeviceClass::Loopback),
-            fnet_filter::DeviceClass::Device(device_class) => Ok(DeviceClass::Device(device_class)),
-            fnet_filter::DeviceClass::__SourceBreaking { .. } => {
-                Err(FidlConversionError::UnknownUnionVariant(type_names::DEVICE_CLASS))
-            }
-        }
-    }
-}
-
 /// Extension type for [`fnet_filter::InterfaceMatcher`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterfaceMatcher {
     Id(NonZeroU64),
     Name(fnet_interfaces::Name),
-    DeviceClass(DeviceClass),
+    PortClass(fnet_interfaces_ext::PortClass),
 }
 
 impl From<InterfaceMatcher> for fnet_filter::InterfaceMatcher {
@@ -485,7 +457,7 @@ impl From<InterfaceMatcher> for fnet_filter::InterfaceMatcher {
         match matcher {
             InterfaceMatcher::Id(id) => Self::Id(id.get()),
             InterfaceMatcher::Name(name) => Self::Name(name),
-            InterfaceMatcher::DeviceClass(device_class) => Self::DeviceClass(device_class.into()),
+            InterfaceMatcher::PortClass(port_class) => Self::PortClass(port_class.into()),
         }
     }
 }
@@ -500,8 +472,19 @@ impl TryFrom<fnet_filter::InterfaceMatcher> for InterfaceMatcher {
                 Ok(Self::Id(id))
             }
             fnet_filter::InterfaceMatcher::Name(name) => Ok(Self::Name(name)),
-            fnet_filter::InterfaceMatcher::DeviceClass(device_class) => {
-                Ok(Self::DeviceClass(device_class.try_into()?))
+            fnet_filter::InterfaceMatcher::PortClass(port_class) => {
+                port_class.try_into().map(Self::PortClass).map_err(|e| match e {
+                    fnet_interfaces_ext::UnknownPortClassError::NetInterfaces(_) => {
+                        FidlConversionError::UnknownUnionVariant(
+                            type_names::NET_INTERFACES_PORT_CLASS,
+                        )
+                    }
+                    fnet_interfaces_ext::UnknownPortClassError::HardwareNetwork(_) => {
+                        FidlConversionError::UnknownUnionVariant(
+                            type_names::HARDWARE_NETWORK_PORT_CLASS,
+                        )
+                    }
+                })
             }
             fnet_filter::InterfaceMatcher::__SourceBreaking { .. } => {
                 Err(FidlConversionError::UnknownUnionVariant(type_names::INTERFACE_MATCHER))
@@ -1813,11 +1796,6 @@ mod tests {
         "Routine"
     )]
     #[test_case(
-        fnet_filter::DeviceClass::Loopback(fnet_filter::Empty {}),
-        DeviceClass::Loopback;
-        "DeviceClass"
-    )]
-    #[test_case(
         fnet_filter::InterfaceMatcher::Id(1),
         InterfaceMatcher::Id(const_unwrap_option(NonZeroU64::new(1)));
         "InterfaceMatcher"
@@ -2054,16 +2032,6 @@ mod tests {
                 ..Default::default()
             }),
             Err(FidlConversionError::MissingRoutineType)
-        );
-    }
-
-    #[test]
-    fn device_class_try_from_unknown_variant() {
-        assert_eq!(
-            DeviceClass::try_from(fnet_filter::DeviceClass::__SourceBreaking {
-                unknown_ordinal: 0
-            }),
-            Err(FidlConversionError::UnknownUnionVariant(type_names::DEVICE_CLASS))
         );
     }
 

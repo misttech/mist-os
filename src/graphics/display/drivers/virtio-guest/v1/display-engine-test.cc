@@ -12,6 +12,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/pmt.h>
@@ -202,6 +203,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   ~VirtioGpuTest() override = default;
 
   void SetUp() override {
+    fdf::Logger::SetGlobalInstance(&logger_);
+
     zx::bti bti;
     fake_bti_create(bti.reset_and_get_address());
 
@@ -215,7 +218,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 
     zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
         VirtioPciDevice::Create(std::move(bti), std::move(backend));
-    ASSERT_OK(virtio_device_result.status_value());
+    ASSERT_OK(virtio_device_result);
 
     std::unique_ptr<VirtioGpuDevice> gpu_device =
         std::make_unique<VirtioGpuDevice>(std::move(virtio_device_result).value());
@@ -236,6 +239,11 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   void TearDown() override {
     // Ensure the loop processes all queued FIDL messages.
     loop().Shutdown();
+
+    banjo_controller_.reset();
+    device_.reset();
+
+    fdf::Logger::SetGlobalInstance(nullptr);
   }
 
   void ImportBufferCollection(display::DriverBufferCollectionId buffer_collection_id) {
@@ -246,6 +254,9 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   }
 
  protected:
+  fdf::Logger logger_{"test", FUCHSIA_LOG_TRACE, zx::socket{},
+                      fidl::WireClient<fuchsia_logger::LogSink>{}};
+
   std::vector<uint8_t> virtio_control_queue_buffer_pool_;
   std::vector<uint8_t> virtio_cursor_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
@@ -256,9 +267,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -283,7 +292,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
     zx::result<DisplayEngine::BufferInfo> buffer_info_result =
         device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0,
                                                 kDefaultImageMetadata);
-    ASSERT_OK(buffer_info_result.status_value());
+    ASSERT_OK(buffer_info_result);
 
     const auto& buffer_info = buffer_info_result.value();
     EXPECT_EQ(4u, buffer_info.bytes_per_pixel);
@@ -292,9 +301,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
 }
 
 TEST_F(VirtioGpuTest, SetConstraints) {
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Import buffer collection.
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
@@ -342,9 +349,7 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
   zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Test ImportBufferCollection().
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
@@ -409,9 +414,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
   zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
 
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(banjo_controller_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                              reinterpret_cast<void*>(&proto)));
+  display_controller_impl_protocol_t proto = banjo_controller_->GetProtocol();
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::puppet::PuppetProxyExt;
-use crate::test_topology;
+use crate::{test_topology, utils};
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::Severity;
 use futures::StreamExt;
@@ -17,6 +17,8 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     const LOG_MESSAGE: &str = "logged before crashing";
     let puppet_moniker: String =
         format!("realm_factory/realm_builder:{REALM_NAME}/test/{PUPPET_NAME}");
+
+    let mut stop_checker = utils::StopChecker::new().await;
 
     // Create the test realm.
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
@@ -63,7 +65,7 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     }
 
     puppet.crash(PUPPET_CRASH_MESSAGE)?;
-    crate::utils::wait_for_component_to_crash(&puppet_moniker).await;
+    stop_checker.wait_for_component_to_crash(&puppet_moniker).await;
     drop(realm_proxy); // Closes the puppet's log stream so we don't loop forever.
 
     // Check for the panic message.

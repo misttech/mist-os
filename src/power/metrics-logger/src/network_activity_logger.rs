@@ -82,19 +82,16 @@ async fn watch_and_update_ports(
                         |base_info| {
                             base_info.port_class.map_or_else(
                                 || {
-                                    error!(
-                                        "Port with port id {:?} is missing device type",
-                                        port_id
-                                    );
+                                    error!("Port with port id {:?} is missing port class", port_id);
                                     None
                                 },
-                                |device_class| Some(device_class),
+                                |port_class| Some(port_class),
                             )
                         },
                     ) {
-                        Some(class) => {
-                            if class == fhwnet::DeviceClass::WlanAp
-                                || class == fhwnet::DeviceClass::Wlan
+                        Some(port_class) => {
+                            if port_class == fhwnet::PortClass::WlanAp
+                                || port_class == fhwnet::PortClass::Wlan
                             {
                                 if ports.borrow_mut().insert(port_id.base, port).is_none() {
                                     info!(port_id.base, port_id.salt, "Added a new/existing port");

@@ -24,6 +24,8 @@ namespace driver_manager {
 
 class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner> {
  public:
+  using StartDriverHostCallback = fit::callback<void(zx::result<>)>;
+
   class DriverHost : public fbl::DoublyLinkedListable<std::unique_ptr<DriverHost>> {
    public:
     DriverHost(zx::process process, zx::thread thread, zx::vmar root_vmar)
@@ -49,7 +51,7 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
 
-  zx::result<> StartDriverHost();
+  zx::result<> StartDriverHost(StartDriverHostCallback callback);
 
   // Returns all started driver hosts. This will be used by tests.
   std::unordered_set<const DriverHost*> DriverHosts();
@@ -60,22 +62,22 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
     fuchsia_component_runner::ComponentStartInfo info;
     fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller;
   };
-  using StartCallback = fit::callback<void(zx::result<StartedComponent>)>;
+  using StartComponentCallback = fit::callback<void(zx::result<StartedComponent>)>;
 
   // fidl::WireServer<fuchsia_component_runner::ComponentRunner>
   void Start(StartRequestView request, StartCompleter::Sync& completer) override;
 
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
-                                StartCallback callback);
-  void LoadDriverHost(const fuchsia_component_runner::ComponentStartInfo& start_info,
-                      std::string_view name);
+                                StartComponentCallback callback);
+  zx::result<> LoadDriverHost(const fuchsia_component_runner::ComponentStartInfo& start_info,
+                              std::string_view name);
 
   // Creates the process and starting thread for a driver host.
   zx::result<DriverHost*> CreateDriverHost(std::string_view name);
 
   zx::result<> CallCallback(zx_koid_t koid, zx::result<StartedComponent> component);
 
-  std::unordered_map<zx_koid_t, StartCallback> start_requests_;
+  std::unordered_map<zx_koid_t, StartComponentCallback> start_requests_;
   async_dispatcher_t* const dispatcher_;
   fidl::WireClient<fuchsia_component::Realm> realm_;
   fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> bindings_;

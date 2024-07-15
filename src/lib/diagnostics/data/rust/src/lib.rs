@@ -115,9 +115,6 @@ pub trait Metadata: DeserializeOwned + Serialize + Clone + Send {
     /// The type of error returned in this metadata.
     type Error: Clone + MetadataError;
 
-    /// Returns the component URL which generated this value.
-    fn component_url(&self) -> Option<&str>;
-
     /// Returns the timestamp at which this value was recorded.
     fn timestamp(&self) -> Timestamp;
 
@@ -158,10 +155,6 @@ impl DiagnosticsData for Inspect {
 impl Metadata for InspectMetadata {
     type Error = InspectError;
 
-    fn component_url(&self) -> Option<&str> {
-        self.component_url.as_ref().map(|s| s.as_str())
-    }
-
     fn timestamp(&self) -> Timestamp {
         Timestamp(self.timestamp)
     }
@@ -187,10 +180,6 @@ impl DiagnosticsData for Logs {
 
 impl Metadata for LogsMetadata {
     type Error = LogError;
-
-    fn component_url(&self) -> Option<&str> {
-        self.component_url.as_ref().map(|s| s.as_str())
-    }
 
     fn timestamp(&self) -> Timestamp {
         Timestamp(self.timestamp)
@@ -286,11 +275,24 @@ pub struct InspectMetadata {
     pub name: Option<InspectHandleName>,
 
     /// The url with which the component was launched.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub component_url: Option<String>,
+    pub component_url: String,
 
     /// Monotonic time in nanos.
     pub timestamp: i64,
+
+    /// When set to true, the data was escrowed. Otherwise, the data was fetched live from the
+    /// source component at runtime. When absent, it means the value is false.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default)]
+    pub escrowed: bool,
+}
+
+impl InspectMetadata {
+    /// Returns the component URL with which the component that emitted the associated Inspect data
+    /// was launched.
+    pub fn component_url(&self) -> &str {
+        self.component_url.as_str()
+    }
 }
 
 /// The metadata contained in a `DiagnosticsData` object where the data source is
@@ -343,6 +345,13 @@ pub struct LogsMetadata {
     /// that contain this field.
     #[serde(skip)]
     size_bytes: Option<usize>,
+}
+
+impl LogsMetadata {
+    /// Returns the component URL which generated this value.
+    pub fn component_url(&self) -> Option<&str> {
+        self.component_url.as_ref().map(|s| s.as_str())
+    }
 }
 
 /// Severities a log message can have, often called the log's "level".
@@ -565,34 +574,64 @@ pub type LogsHierarchy = DiagnosticsHierarchy<LogsField>;
 pub type LogsProperty = Property<LogsField>;
 
 impl Data<Inspect> {
-    /// Creates a new data instance for inspect.
-    pub fn for_inspect(
-        moniker: impl Into<String>,
-        inspect_hierarchy: Option<DiagnosticsHierarchy>,
-        timestamp: impl Into<Timestamp>,
-        component_url: impl Into<String>,
-        name: Option<InspectHandleName>,
-        errors: Vec<InspectError>,
-    ) -> InspectData {
-        let errors_opt = if errors.is_empty() { None } else { Some(errors) };
+    /// Access the name or filename within `self.metadata`.
+    pub fn name(&self) -> Option<&str> {
+        self.metadata.name.as_ref().map(InspectHandleName::as_ref)
+    }
+}
 
-        Data {
-            moniker: moniker.into(),
-            version: SCHEMA_VERSION,
-            data_source: DataSource::Inspect,
-            payload: inspect_hierarchy,
-            metadata: InspectMetadata {
-                timestamp: *(timestamp.into()),
-                component_url: Some(component_url.into()),
-                name,
-                errors: errors_opt,
+pub struct InspectDataBuilder {
+    data: Data<Inspect>,
+}
+
+impl InspectDataBuilder {
+    pub fn new(
+        moniker: impl Into<String>,
+        component_url: impl Into<String>,
+        timestamp: i64,
+    ) -> Self {
+        Self {
+            data: Data {
+                data_source: DataSource::Inspect,
+                moniker: moniker.into(),
+                payload: None,
+                version: 1,
+                metadata: InspectMetadata {
+                    errors: None,
+                    name: None,
+                    component_url: component_url.into(),
+                    timestamp,
+                    escrowed: false,
+                },
             },
         }
     }
 
-    /// Access the name or filename within `self.metadata`.
-    pub fn name(&self) -> Option<&str> {
-        self.metadata.name.as_ref().map(InspectHandleName::as_ref)
+    pub fn escrowed(mut self, escrowed: bool) -> Self {
+        self.data.metadata.escrowed = escrowed;
+        self
+    }
+
+    pub fn with_hierarchy(
+        mut self,
+        hierarchy: DiagnosticsHierarchy<<Inspect as DiagnosticsData>::Key>,
+    ) -> Self {
+        self.data.payload = Some(hierarchy);
+        self
+    }
+
+    pub fn with_errors(mut self, errors: Vec<InspectError>) -> Self {
+        self.data.metadata.errors = Some(errors);
+        self
+    }
+
+    pub fn with_name(mut self, name: InspectHandleName) -> Self {
+        self.data.metadata.name = Some(name);
+        self
+    }
+
+    pub fn build(self) -> Data<Inspect> {
+        self.data
     }
 }
 
@@ -1545,14 +1584,10 @@ mod tests {
         };
 
         hierarchy.sort();
-        let json_schema = Data::for_inspect(
-            "a/b/c/d",
-            Some(hierarchy),
-            123456i64,
-            TEST_URL,
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        );
+        let json_schema = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
+            .with_hierarchy(hierarchy)
+            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+            .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1578,14 +1613,10 @@ mod tests {
 
     #[fuchsia::test]
     fn test_errorful_json_inspect_formatting() {
-        let json_schema = Data::for_inspect(
-            "a/b/c/d",
-            None,
-            123456i64,
-            TEST_URL,
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            vec![InspectError { message: "too much fun being had.".to_string() }],
-        );
+        let json_schema = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
+            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+            .with_errors(vec![InspectError { message: "too much fun being had.".to_string() }])
+            .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1618,16 +1649,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_filter_returns_none_on_empty_hierarchy() {
-        let data = Data::for_inspect(
-            "a/b/c/d",
-            None,
-            123456i64,
-            TEST_URL,
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        );
+        let data = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64).build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
-
         assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
     }
 
@@ -1639,14 +1662,9 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = Data::for_inspect(
-            "a b c d",
-            Some(hierarchy),
-            123456i64,
-            TEST_URL,
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        );
+        let data = InspectDataBuilder::new("a b c d", TEST_URL, 123456i64)
+            .with_hierarchy(hierarchy)
+            .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
 
         assert_matches!(data.filter(&selectors), Err(Error::Moniker(_)));
@@ -1660,16 +1678,10 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = Data::for_inspect(
-            "b/c/d/e",
-            Some(hierarchy),
-            123456i64,
-            TEST_URL,
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        );
+        let data = InspectDataBuilder::new("b/c/d/e", TEST_URL, 123456i64)
+            .with_hierarchy(hierarchy)
+            .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
-
         assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
     }
 
@@ -1681,14 +1693,9 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = Data::for_inspect(
-            "a/b/c/d",
-            Some(hierarchy),
-            123456i64,
-            TEST_URL,
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        );
+        let data = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
+            .with_hierarchy(hierarchy)
+            .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
 
         assert_eq!(data.filter(&selectors).expect("FIlter OK"), None);
@@ -1703,14 +1710,10 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = Data::for_inspect(
-            "a/b/c/d",
-            Some(hierarchy),
-            123456i64,
-            TEST_URL,
-            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
-            Vec::new(),
-        );
+        let data = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
+            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+            .with_hierarchy(hierarchy)
+            .build();
         let selectors = parse_selectors(vec!["a/b/c/d:root:x"]);
 
         let expected_json = json!({

@@ -479,14 +479,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        meta: Self::Meta,
+        _meta: Self::Meta,
         buf: Self::Buffer,
-    ) -> Result<(), DeviceSendFrameError<(Self::Meta, Self::Buffer)>> {
-        DeviceLayerEventDispatcher::send_ethernet_frame(bindings_ctx, device_id, buf).map_err(
-            |DeviceSendFrameError::DeviceNotReady(buf)| {
-                DeviceSendFrameError::DeviceNotReady((meta, buf))
-            },
-        )
+    ) -> Result<(), DeviceSendFrameError> {
+        DeviceLayerEventDispatcher::send_ethernet_frame(bindings_ctx, device_id, buf)
     }
 }
 

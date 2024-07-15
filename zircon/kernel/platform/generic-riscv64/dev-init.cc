@@ -53,6 +53,7 @@ void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
       break;
     case ZBI_KERNEL_DRIVER_I8250_MMIO32_UART:
     case ZBI_KERNEL_DRIVER_DW8250_UART:
+    case ZBI_KERNEL_DRIVER_PXA_UART:
       Dw8250UartInitEarly(config, 4);
       break;
     case ZBI_KERNEL_DRIVER_MOTMOT_UART:
@@ -65,6 +66,7 @@ void UartInitLate(uint32_t extra) {
   switch (extra) {
     case ZBI_KERNEL_DRIVER_I8250_MMIO8_UART:
     case ZBI_KERNEL_DRIVER_I8250_MMIO32_UART:
+    case ZBI_KERNEL_DRIVER_PXA_UART:
     case ZBI_KERNEL_DRIVER_DW8250_UART:
       Dw8250UartInitLate();
       break;

@@ -310,6 +310,11 @@ fn test_dad_duplicate_address_detected_solicitation() {
 
     let (local, local_device_id) = make_ctx_and_dev();
     let (remote, remote_device_id) = make_ctx_and_dev();
+
+    // Seeded to avoid the local and remote stacks generating the same nonces.
+    local.bindings_ctx.seed_rng(1);
+    remote.bindings_ctx.seed_rng(2);
+
     let mut net = new_simple_fake_network(
         "local",
         local,
@@ -424,12 +429,17 @@ fn test_dad_duplicate_address_detected_advertisement() {
     let addr = AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap();
     let multicast_addr = local_ip().to_solicited_node_address();
     net.with_context("local", |ctx| {
+        // Seeded to avoid the local and remote stacks generating the same nonces.
+        ctx.bindings_ctx.seed_rng(1);
+
         let mut api = ctx.core_api().device_ip::<Ipv6>();
         let _: Ipv6DeviceConfigurationUpdate =
             api.update_configuration(&local_device_id, update).unwrap();
         api.add_ip_addr_subnet(&local_device_id, addr).unwrap();
     });
     net.with_context("remote", |ctx| {
+        // Seeded to avoid the local and remote stacks generating the same nonces.
+        ctx.bindings_ctx.seed_rng(2);
         let _: Ipv6DeviceConfigurationUpdate = ctx
             .core_api()
             .device_ip::<Ipv6>()
@@ -597,6 +607,9 @@ fn test_dad_three_transmits_with_conflicts() {
         ..Default::default()
     };
     net.with_context("local", |ctx| {
+        // Seed RNG to avoid both stacks generating the same nonces.
+        ctx.bindings_ctx.seed_rng(1);
+
         let _: Ipv6DeviceConfigurationUpdate = ctx
             .core_api()
             .device_ip::<Ipv6>()
@@ -609,6 +622,9 @@ fn test_dad_three_transmits_with_conflicts() {
             .unwrap();
     });
     net.with_context("remote", |ctx| {
+        // Seed RNG to avoid both stacks generating the same nonces.
+        ctx.bindings_ctx.seed_rng(2);
+
         let _: Ipv6DeviceConfigurationUpdate = ctx
             .core_api()
             .device_ip::<Ipv6>()
@@ -1380,8 +1396,8 @@ fn test_router_solicitation_on_forwarding_enabled_changes() {
     ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
     // Enable routing on device.
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, true);
-    assert!(ctx.test_api().is_forwarding_enabled::<Ipv6>(&device));
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, true);
+    assert!(ctx.test_api().is_unicast_forwarding_enabled::<Ipv6>(&device));
 
     // Should have not sent any new packets, but unset the router
     // solicitation timer.
@@ -1389,8 +1405,8 @@ fn test_router_solicitation_on_forwarding_enabled_changes() {
     assert_empty(ctx.bindings_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
 
     // Unsetting routing should succeed.
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, false);
-    assert!(!ctx.test_api().is_forwarding_enabled::<Ipv6>(&device));
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, false);
+    assert!(!ctx.test_api().is_unicast_forwarding_enabled::<Ipv6>(&device));
     assert_matches!(ctx.bindings_ctx.take_ethernet_frames()[..], []);
     ctx.bindings_ctx.timer_ctx().assert_timers_installed_range([(timer_id.clone(), ..)]);
 
@@ -1574,7 +1590,7 @@ fn test_router_stateless_address_autoconfiguration() {
         )
         .into();
     ctx.test_api().enable_device(&device);
-    ctx.test_api().set_forwarding_enabled::<Ipv6>(&device, true);
+    ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&device, true);
 
     let src_mac = config.remote_mac;
     let src_ip = src_mac.to_ipv6_link_local().addr().get();

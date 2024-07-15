@@ -4,6 +4,10 @@
 
 #include "src/developer/forensics/testing/stubs/power_broker_topology.h"
 
+#include <lib/stdcompat/functional.h>
+
+#include "src/developer/forensics/testing/stubs/power_broker_required_level.h"
+
 namespace forensics::stubs {
 
 void PowerBrokerTopology::AddElement(AddElementRequest& request,
@@ -12,6 +16,8 @@ void PowerBrokerTopology::AddElement(AddElementRequest& request,
   FX_CHECK(request.lessor_channel().has_value());
   FX_CHECK(request.dependencies().has_value());
   FX_CHECK(request.valid_levels().has_value());
+  FX_CHECK(request.level_control_channels().has_value());
+  FX_CHECK(request.initial_current_level().has_value());
 
   FX_CHECK(AddedElements().count(*request.element_name()) == 0)
       << "Duplicate element added to topology";
@@ -22,14 +28,26 @@ void PowerBrokerTopology::AddElement(AddElementRequest& request,
       std::move(element_control_endpoints->server), Dispatcher(),
       [this, element_name = *request.element_name()]() { AddedElements().erase(element_name); });
 
+  auto required_level_server = std::make_unique<PowerBrokerRequiredLevel>(
+      std::move(request.level_control_channels()->required()), Dispatcher(),
+      InitialRequiredLevel());
+
+  auto current_level_server = std::make_unique<PowerBrokerCurrentLevel>(
+      std::move(request.level_control_channels()->current()), Dispatcher(),
+      *request.initial_current_level());
+
   std::unique_ptr<PowerBrokerLessorBase> lessor_server =
-      ConstructLessor()(std::move(request.lessor_channel()).value());
+      ConstructLessor()(std::move(request.lessor_channel()).value(),
+                        /*level_changed=*/cpp20::bind_front(&PowerBrokerRequiredLevel::SetLevel,
+                                                            required_level_server.get()));
 
   AddedElements().insert(
       {*request.element_name(), PowerElement{
                                     .dependencies = std::move(request.dependencies()).value(),
                                     .element_control_server = std::move(element_control_server),
                                     .lessor_server = std::move(lessor_server),
+                                    .required_level_server = std::move(required_level_server),
+                                    .current_level_server = std::move(current_level_server),
                                 }});
 
   fuchsia_power_broker::TopologyAddElementResponse response(
@@ -45,6 +63,8 @@ void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
   FX_CHECK(request.lessor_channel().has_value());
   FX_CHECK(request.dependencies().has_value());
   FX_CHECK(request.valid_levels().has_value());
+  FX_CHECK(request.level_control_channels().has_value());
+  FX_CHECK(request.initial_current_level().has_value());
 
   FX_CHECK(AddedElements().count(*request.element_name()) == 0)
       << "Duplicate element added to topology";
@@ -55,14 +75,26 @@ void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
       std::move(element_control_endpoints->server), Dispatcher(),
       [this, element_name = *request.element_name()]() { AddedElements().erase(element_name); });
 
+  auto required_level_server = std::make_unique<PowerBrokerRequiredLevel>(
+      std::move(request.level_control_channels()->required()), Dispatcher(),
+      InitialRequiredLevel());
+
+  auto current_level_server = std::make_unique<PowerBrokerCurrentLevel>(
+      std::move(request.level_control_channels()->current()), Dispatcher(),
+      *request.initial_current_level());
+
   std::unique_ptr<PowerBrokerLessorBase> lessor_server =
-      ConstructLessor()(std::move(request.lessor_channel()).value());
+      ConstructLessor()(std::move(request.lessor_channel()).value(),
+                        /*level_changed=*/cpp20::bind_front(&PowerBrokerRequiredLevel::SetLevel,
+                                                            required_level_server.get()));
 
   AddedElements().insert(
       {*request.element_name(), PowerElement{
                                     .dependencies = std::move(request.dependencies()).value(),
                                     .element_control_server = std::move(element_control_server),
                                     .lessor_server = std::move(lessor_server),
+                                    .required_level_server = std::move(required_level_server),
+                                    .current_level_server = std::move(current_level_server),
                                 }});
 
   fuchsia_power_broker::TopologyAddElementResponse response(
@@ -103,12 +135,19 @@ bool PowerBrokerTopologyBase::IsLeaseActive(const std::string& element_name) con
   return added_elements_.find(element_name)->second.lessor_server->IsActive();
 }
 
-void PowerBrokerTopologyBase::SetLeaseStatus(const std::string& element_name,
-                                             fuchsia_power_broker::LeaseStatus status) {
+void PowerBrokerTopologyBase::SetRequiredLevel(const std::string& element_name,
+                                               const uint8_t level) {
   const auto element = added_elements_.find(element_name);
   FX_CHECK(element != added_elements_.end());
 
-  element->second.lessor_server->SetLeaseStatus(status);
+  element->second.required_level_server->SetLevel(level);
+}
+
+uint8_t PowerBrokerTopologyBase::GetCurrentLevel(const std::string& element_name) const {
+  const auto element = added_elements_.find(element_name);
+  FX_CHECK(element != added_elements_.end());
+
+  return element->second.current_level_server->GetLevel();
 }
 
 }  // namespace forensics::stubs

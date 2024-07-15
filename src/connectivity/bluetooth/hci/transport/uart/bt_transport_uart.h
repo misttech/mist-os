@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -19,6 +20,7 @@
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/thread_checker.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/event.h>
 #include <threads.h>
 #include <zircon/device/bt-hci.h>
@@ -29,11 +31,44 @@
 
 namespace bt_transport_uart {
 
+// HCI UART packet indicators
+enum BtHciPacketIndicator : uint8_t {
+  kHciNone = 0,
+  kHciCommand = 1,
+  kHciAclData = 2,
+  kHciSco = 3,
+  kHciEvent = 4,
+};
+
+class BtTransportUart;
+class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoConnection> {
+  using SendHandler = fit::function<void(std::vector<uint8_t>&, fit::function<void(void)>)>;
+  using StopHandler = fit::function<void(void)>;
+
+ public:
+  explicit ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler);
+
+  // fuchsia_hardware_bluetooth::ScoConnection overrides.
+  void Send(SendRequest& request, SendCompleter::Sync& completer) override;
+  void AckReceive(AckReceiveCompleter::Sync& completer) override;
+  void Stop(StopCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::ScoConnection> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override;
+
+ private:
+  SendHandler send_handler_;
+  StopHandler stop_handler_;
+  std::vector<uint8_t> write_buffer_;
+};
+
 class BtTransportUart
     : public fdf::DriverBase,
       public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
-      public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
+      public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
+      public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
+      public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
@@ -42,6 +77,7 @@ class BtTransportUart
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  void Stop() override { fdf::DriverBase::Stop(); }
 
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
@@ -57,12 +93,26 @@ class BtTransportUart
                           OpenScoDataChannelCompleter::Sync& completer) override;
   void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
                           OpenIsoDataChannelCompleter::Sync& completer) override;
-  void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override;
+  void ConfigureSco(
+      fidl::WireServer<fuchsia_hardware_bluetooth::Hci>::ConfigureScoRequestView request,
+      fidl::WireServer<fuchsia_hardware_bluetooth::Hci>::ConfigureScoCompleter::Sync& completer)
+      override;
   void ResetSco(ResetScoCompleter::Sync& completer) override;
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fuchsia_hardware_bluetooth::HciTransport protocol overrides.
+  void Send(SendRequest& request, SendCompleter::Sync& completer) override;
+  void AckReceive(AckReceiveCompleter::Sync& completer) override;
+  void ConfigureSco(
+      fidl::Server<fuchsia_hardware_bluetooth::HciTransport>::ConfigureScoRequest& request,
+      fidl::Server<fuchsia_hardware_bluetooth::HciTransport>::ConfigureScoCompleter::Sync&
+          completer) override;
+  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // fuchsia_hardware_serialimpl::Device FIDL request handler implementation.
   void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override;
@@ -78,16 +128,16 @@ class BtTransportUart
       fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
- private:
-  // HCI UART packet indicators
-  enum BtHciPacketIndicator : uint8_t {
-    kHciNone = 0,
-    kHciCommand = 1,
-    kHciAclData = 2,
-    kHciSco = 3,
-    kHciEvent = 4,
-  };
+  void OnAcknowledgePackets(
+      fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) override;
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) override;
 
+  // Used by tests only.
+  fit::function<void(void)> WaitforSnoopCallback();
+  uint64_t GetAckedSnoopSeq();
+
+ private:
   struct HciWriteCtx {
     BtTransportUart* ctx;
     // Owned.
@@ -121,9 +171,18 @@ class BtTransportUart
 
   void ChannelCleanupLocked(zx::channel* channel) __TA_REQUIRES(mutex_);
 
+  void SendSnoop(const std::vector<uint8_t>&& packet,
+                 fuchsia_hardware_bluetooth::SnoopPacket::Tag type,
+                 fuchsia_hardware_bluetooth::PacketDirection direction);
   void SnoopChannelWriteLocked(uint8_t flags, uint8_t* bytes, size_t length) __TA_REQUIRES(mutex_);
 
   void HciBeginShutdown() __TA_EXCLUDES(mutex_);
+
+  void OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> callback);
+  void OnScoStop();
+
+  void ProcessOnePacketFromSendQueue();
+  void SerialWriteTransport(const std::vector<uint8_t>& data, fit::function<void(void)> callback);
 
   void SerialWrite(uint8_t* buffer, size_t length) __TA_EXCLUDES(mutex_);
 
@@ -147,6 +206,7 @@ class BtTransportUart
       __TA_EXCLUDES(mutex_);
 
   void HciWriteComplete(zx_status_t status) __TA_EXCLUDES(mutex_);
+  void HciTransportWriteComplete(zx_status_t status);
 
   static int HciThread(void* arg) __TA_EXCLUDES(mutex_);
 
@@ -200,6 +260,9 @@ class BtTransportUart
   // true when the write completes.
   bool can_write_ __TA_GUARDED(mutex_) = true;
 
+  // Used in HciTransport send data path.
+  bool can_send_ = true;
+
   // type of current packet being read from the UART
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   BtHciPacketIndicator cur_uart_packet_type_ = kHciNone;
@@ -223,12 +286,44 @@ class BtTransportUart
   size_t sco_buffer_offset_ = 0;
 
   // for sending outbound packets to the UART
-  // kAclMaxFrameSize is the largest frame size sent.
-  uint8_t write_buffer_[kAclMaxFrameSize] __TA_GUARDED(mutex_);
+  // fuchsia_hardware_bluetooth::kAclPacketMax is the largest frame size sent.
+  // This buffer is used for packets received from different data channels.
+  // TODO(b/343259617): Remove it after HciTransport migration.
+  uint8_t write_buffer_[fuchsia_hardware_bluetooth::kAclPacketMax] __TA_GUARDED(mutex_);
+
+  struct BufferEntry {
+    std::vector<uint8_t> data_;
+    fit::function<void(void)> callback_;
+
+    BufferEntry(std::vector<uint8_t>&& packet, fit::function<void(void)> callback) : data_(packet) {
+      callback_ = std::move(callback);
+    }
+  };
+
+  // The send queue shouldn't be infinitely long, set a reasonable limit for the queue, so that when
+  // the limit is hit, it could indicate something goes wrong.(e.g. serial bus stucks)
+  static constexpr uint32_t kSendQueueLimit = 20;
+
+  // The buffer pool to store incoming SCO, ACL and command packets.
+  std::queue<std::vector<uint8_t>> available_buffers_;
+
+  // Queuing the data packets before the bus is available to send. The data buffer comes from
+  // |available_buffers_|. The driver will reply the FIDL completer to notify the caller of
+  // "ScoConnection::Send" or "HciTransport::Send" after it takes out a packet from the queue and
+  // throws it into the bus, for each protocol, the client side shouldn't send more packets if there
+  // are 10 sent packets' completers are not replied.
+  std::queue<BufferEntry> send_queue_;
+
+  // The task to fetch and send one packet in |send_queue_|, each task posted aims to deal with one
+  // packet, if the bus is not available, the task will post itself again until one packet gets
+  // sent.
+  async::TaskClosureMethod<BtTransportUart, &BtTransportUart::ProcessOnePacketFromSendQueue>
+      send_queue_task_{this};
 
   // Save the serial device pid for vendor drivers to fetch.
   uint32_t serial_pid_ = 0;
 
+  // We don't need this in the era of HciTransport.
   std::mutex mutex_;
 
   std::optional<async::Loop> loop_;
@@ -237,6 +332,22 @@ class BtTransportUart
 
   fidl::WireClient<fuchsia_driver_framework::Node> node_;
   fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
+
+  fidl::Client<fuchsia_hardware_bluetooth::Snoop> snoop_client_;
+
+  // When |snoop_seq_| - |acked_snoop_seq_| > |kSeqNumMaxDiff|, it means that the receiver of
+  // snoop packets can't catch up the speed that the driver sends packets. Drop snoop packets if
+  // this happens.
+  static constexpr uint64_t kSeqNumMaxDiff = 20;
+  uint64_t snoop_seq_ = 0;
+  uint64_t acked_snoop_seq_ = 0;
+  // Used for test only, to synchronize the snoop protocol setup.
+  libsync::Completion snoop_setup_;
+
+  ScoConnectionServer sco_connection_server_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::ScoConnection> sco_connection_binding_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_binding_;
 
   // The task which runs to queue a uart read.
   async::TaskClosureMethod<BtTransportUart, &BtTransportUart::QueueUartRead> queue_read_task_{this};

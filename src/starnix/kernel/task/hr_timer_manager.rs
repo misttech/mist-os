@@ -10,9 +10,10 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
 
 use std::collections::BinaryHeap;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use crate::fs::fuchsia::TimerOps;
+use crate::power::OnWakeOps;
 use crate::task::{CurrentTask, HandleWaitCanceler, WaitCanceler};
 use crate::vfs::FileObject;
 
@@ -127,7 +128,7 @@ impl HrTimerManager {
     fn start_next(
         self: &HrTimerManagerHandle,
         current_task: &CurrentTask,
-        file_object: Option<&FileObject>,
+        wake_source: Option<Weak<dyn OnWakeOps>>,
         guard: &mut MutexGuard<'_, HrTimerManagerState>,
     ) -> Result<(), Errno> {
         let _ = self.check_connection()?;
@@ -138,7 +139,6 @@ impl HrTimerManager {
             if guard.current_deadline != Some(new_deadline) {
                 let hrtimer_ref = node.hr_timer.clone();
                 let self_ref = self.clone();
-                let weak_file_handle = file_object.and_then(|f| Some(f.weak_handle.clone()));
                 self.stop(guard)?;
                 current_task.kernel().kthreads.spawn(move |_, current_task| {
                     if let Ok(device_proxy) = self_ref.check_connection() {
@@ -161,11 +161,9 @@ impl HrTimerManager {
                                     .event
                                     .as_handle_ref()
                                     .signal(zx::Signals::NONE, zx::Signals::TIMER_SIGNALED);
-                                if let Some(file_handle) =
-                                    weak_file_handle.and_then(|f| f.upgrade())
-                                {
+                                if let Some(wake_source) = wake_source.and_then(|f| f.upgrade()) {
                                     let lease_channel = lease.into_channel();
-                                    file_handle.on_wake(current_task, &lease_channel);
+                                    wake_source.on_wake(current_task, &lease_channel);
                                     // Drop the baton lease after wake leases in associated epfd
                                     // are activated.
                                     drop(lease_channel);
@@ -204,7 +202,7 @@ impl HrTimerManager {
     pub fn add_timer(
         self: &HrTimerManagerHandle,
         current_task: &CurrentTask,
-        file_object: Option<&FileObject>,
+        wake_source: Option<Weak<dyn OnWakeOps>>,
         new_timer: &HrTimerHandle,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
@@ -221,7 +219,7 @@ impl HrTimerManager {
             // If the new timer is in front, it has a sooner deadline. (Re)Start the HrTimer device
             // with the new deadline.
             if Arc::ptr_eq(&running_timer.hr_timer, new_timer) {
-                return self.start_next(current_task, file_object, &mut guard);
+                return self.start_next(current_task, wake_source, &mut guard);
             }
         }
         Ok(())
@@ -231,14 +229,14 @@ impl HrTimerManager {
     pub fn remove_timer(
         self: &HrTimerManagerHandle,
         current_task: &CurrentTask,
-        file_object: Option<&FileObject>,
+        wake_source: Option<Weak<dyn OnWakeOps>>,
         timer: &HrTimerHandle,
     ) -> Result<(), Errno> {
         let mut guard = self.lock();
         if let Some(running_timer_node) = guard.timer_heap.peek() {
             if Arc::ptr_eq(&running_timer_node.hr_timer, timer) {
                 guard.timer_heap.pop();
-                self.start_next(current_task, file_object, &mut guard)?;
+                self.start_next(current_task, wake_source, &mut guard)?;
                 return Ok(());
             }
         }
@@ -281,7 +279,7 @@ impl TimerOps for HrTimerHandle {
             .map_err(|status| from_status_like_fdio!(status))?;
         current_task.kernel().hrtimer_manager.add_timer(
             current_task,
-            Some(file_object),
+            Some(file_object.weak_handle.clone()),
             self,
             deadline,
         )?;
@@ -296,7 +294,7 @@ impl TimerOps for HrTimerHandle {
             .map_err(|status| from_status_like_fdio!(status))?;
         Ok(current_task.kernel().hrtimer_manager.remove_timer(
             current_task,
-            Some(file_object),
+            Some(file_object.weak_handle.clone()),
             self,
         )?)
     }

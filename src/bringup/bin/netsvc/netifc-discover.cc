@@ -134,16 +134,13 @@ struct Netdevice {
               return;
             }
             switch (port_info.base_info().port_class()) {
-              case fuchsia_hardware_network::DeviceClass::kEthernet:
-              case fuchsia_hardware_network::DeviceClass::kVirtual:
+              case fuchsia_hardware_network::wire::PortClass::kEthernet:
+              case fuchsia_hardware_network::wire::PortClass::kVirtual:
                 // NB: Historically this only netifc only accepts Ethernet
                 // device. We allow virtual interfaces as well which are used in
                 // testing.
                 break;
-              case fuchsia_hardware_network::DeviceClass::kBridge:
-              case fuchsia_hardware_network::DeviceClass::kWlan:
-              case fuchsia_hardware_network::DeviceClass::kPpp:
-              case fuchsia_hardware_network::DeviceClass::kWlanAp:
+              default:
                 printf("netifc: ignoring netdevice port (%d:%d) with class %hu\n", port_id.base,
                        port_id.salt,
                        static_cast<unsigned short>(port_info.base_info().port_class()));

@@ -127,10 +127,15 @@ type Properties = table {
     /// The device is enabled and its physical state is online.
     3: online bool;
     /// The device class of the interface. Immutable.
+    ///
+    /// # Deprecation
+    ///
+    /// Replaced by `port_class`. Scheduled for removal in 2025.
+    // TODO(https://fxbug.dev/42157740): Remove this type.
+    @available(deprecated=NEXT)
     4: device_class strict union {
         /// The interface is loopback.
         1: loopback Empty;
-        /// The interface's network device class.
         2: device fuchsia.hardware.network.DeviceClass;
     };
     /// Whether there is a default IPv4 route through this interface.
@@ -139,6 +144,18 @@ type Properties = table {
     6: has_default_ipv6_route bool;
     /// The name of the interface. Immutable.
     7: name Name;
+    /// The port class of the interface. Immutable.
+    @available(added=NEXT)
+    8: port_class PortClass;
+};
+
+/// The port class of an interface.
+@available(added=NEXT)
+type PortClass = flexible union {
+    /// The interface is loopback.
+    1: loopback Empty;
+    /// The interface's network device port class.
+    2: device fuchsia.hardware.network.PortClass;
 };
 
 /// Network interface state inspection and observation.

@@ -77,6 +77,8 @@ vk::Format ConvertToVkFormat(const fuchsia_images2::PixelFormat pixel_format) {
       return vk::Format::eR8G8B8A8Srgb;
     case fuchsia_images2::PixelFormat::kNv12:
       return vk::Format::eG8B8R82Plane420Unorm;
+    case fuchsia_images2::PixelFormat::kR5G6B5:
+      return vk::Format::eR5G6B5UnormPack16;
     default:
       FX_CHECK(false) << "Unsupported Zircon pixel format: " << static_cast<uint32_t>(pixel_format);
       return vk::Format::eUndefined;

@@ -18,26 +18,27 @@ IsoStreamServer::IsoStreamServer(
     : ServerBase(this, std::move(request)),
       on_closed_cb_(std::move(on_closed_cb)),
       weak_self_(this) {
-  set_error_handler([this](zx_status_t) { on_closed_cb_(); });
+  set_error_handler([this](zx_status_t) { OnClosed(); });
 }
 
 void IsoStreamServer::OnStreamEstablished(
-    pw::bluetooth::emboss::StatusCode status,
-    const std::optional<bt::iso::CisEstablishedParameters>& connection_params) {
+    bt::iso::IsoStream::WeakPtr stream_ptr,
+    const bt::iso::CisEstablishedParameters& connection_params) {
+  bt_log(INFO, "fidl", "CIS established");
+  iso_stream_ = stream_ptr;
   fuchsia::bluetooth::le::IsochronousStreamOnEstablishedRequest request;
+  request.set_result(ZX_OK);
+  fuchsia::bluetooth::le::CisEstablishedParameters params =
+      bthost::fidl_helpers::CisEstablishedParametersToFidl(connection_params);
+  request.set_established_params(std::move(params));
+  binding()->events().OnEstablished(std::move(request));
+}
 
-  if (status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
-    bt_log(WARN, "fidl", "CIS failed to be established: %u", static_cast<unsigned>(status));
-    request.set_result(ZX_ERR_INTERNAL);
-  } else {
-    BT_ASSERT(connection_params.has_value());
-    bt_log(INFO, "fidl", "CIS established");
-    request.set_result(ZX_OK);
-    fuchsia::bluetooth::le::CisEstablishedParameters params =
-        bthost::fidl_helpers::CisEstablishedParametersToFidl(*connection_params);
-    request.set_established_params(std::move(params));
-  }
-
+void IsoStreamServer::OnStreamEstablishmentFailed(pw::bluetooth::emboss::StatusCode status) {
+  BT_ASSERT(status != pw::bluetooth::emboss::StatusCode::SUCCESS);
+  bt_log(WARN, "fidl", "CIS failed to be established: %u", static_cast<unsigned>(status));
+  fuchsia::bluetooth::le::IsochronousStreamOnEstablishedRequest request;
+  request.set_result(ZX_ERR_INTERNAL);
   binding()->events().OnEstablished(std::move(request));
 }
 
@@ -49,9 +50,17 @@ void IsoStreamServer::SetupDataPath(
 
 void IsoStreamServer::Read(ReadCallback callback) {}
 
+void IsoStreamServer::OnClosed() {
+  if (iso_stream_.has_value() && iso_stream_->is_alive()) {
+    (*iso_stream_)->Close();
+  }
+  // This may free our instance.
+  on_closed_cb_();
+}
+
 void IsoStreamServer::Close(zx_status_t epitaph) {
   binding()->Close(epitaph);
-  on_closed_cb_();
+  OnClosed();
 }
 
 void IsoStreamServer::handle_unknown_method(uint64_t ordinal, bool has_response) {

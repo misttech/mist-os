@@ -154,20 +154,11 @@
                 "AffinityTest.Sanity",
 
                 // aio_test
-                "AIOTest.BasicWrite",
                 "AIOTest.MremapExpansion",
-                "AIOTest.BadWrite",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/3",
-                "AIOTest.ExitWithPendingIo",
                 "AIOTest.Mprotect",
                 "AIOTest.Mremap",
                 "AIOTest.Timeout",
                 "AIOTest.CloneVm",
-                "BadIOVecs/AIOVectorizedParamTest.BadIOVecs/0",
-                "BadIOVecs/AIOVectorizedParamTest.BadIOVecs/1",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/1",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/0",
-                "BadOffset/AIOReadWriteParamTest.BadOffset/2",
 
                 // cgroup_test
                 "CPUAcctCgroup.CPUAcctStat",
@@ -719,15 +710,8 @@
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.Sysemu_PokeUser",
 
-                // pty_test
-                "JobControlTest.ControllingProcessPersistsAfterChildExists",
-
                 // rlimits_test
                 "RlimitTest.RlimitNProc",
-
-                // rtsignal_test
-                "RtSignalTest.InvalidCodes",
-                "RtSignalTest.SignoMatch",
 
                 // sigaltstack_test - https://fxbug.dev/42159586
                 "SigaltstackTest.ResetByExecve",
@@ -765,9 +749,6 @@
                 "BindToDeviceTest/BindToDeviceTest.GetsockoptDevice/*",
                 "BindToDeviceTest/BindToDeviceTest.SetsockoptValidThenInvalid/*",
 
-                // socket_capability_test
-                "SocketTest.UnixConnectNeedsWritePerm",
-
                 // socket_filesystem_test
                 "FilesystemUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "FilesystemUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
@@ -801,6 +782,12 @@
                 "NetlinkRouteTest.AddAndRemoveAddr",
                 "NetlinkRouteTest.LinkedToNetns",
                 "NetlinkRouteTest.SpliceFromPipe",
+                "NetlinkRouteTest.GetLinkByIndex",
+                "NetlinkRouteTest.GetLinkByName",
+                "NetlinkRouteIpv4AndIpv6Tests/NetlinkRouteIpInvariantTest.AddAndRemoveRoute/*",
+                "_/NetlinkSetLinkTest.ChangeLinkName/*",
+                "_/NetlinkSetLinkTest.ChangeMACAddress/*",
+                "_/NetlinkSetLinkTest.ChangeMTU/*",
 
                 // socket_netlink_uevent
                 "NetlinkUeventTest.AttachFilter",
@@ -833,9 +820,6 @@
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCredsNoPasscred/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedCreds2/*",
                 "AllUnixDomainSockets/UnixStreamSocketPairTest.CoalescedDifferingCreds/*",
-
-                // stat_test
-                "StatTest.StatIgnoreNoAutomount",
 
                 // statfs_test
                 "FstatfsTest.BlocksFree",
@@ -974,6 +958,9 @@
                 // TODO(https://fxbug.dev/329684663): Re-enable once falke is resolved.
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
 
+                // Crashes due to assuming the aio context is a pointer.
+                "AIOTest.BasicWrite",
+
                 // This hangs on debug builds.
                 //
                 // See https://fxbug.dev/42084731.
@@ -1009,6 +996,11 @@
 
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
+
+                // Flaky b/352233059. We generate the error asynchronously, which means the
+                // test passes or fails depending on whether we generate the error before the
+                // test calls GetEvents.
+                "AIOTest.BadWrite",
 
                 // https://fxbug.dev/42085936
                 "AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
@@ -1063,9 +1055,6 @@
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllUnixDomainSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
-
-                // socket_ipv4_udp_unbound_loopback_test - crashes.
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
 
                 // socket_udp_test - hanging tests.
                 "AllInetTests/UdpSocketTest.ReadShutdown/*",

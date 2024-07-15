@@ -4,9 +4,9 @@
 
 pub mod additional_boot_args;
 pub mod core;
-pub mod engine;
 pub mod search;
 pub mod static_pkgs;
 pub mod toolkit;
+pub mod unified_plugin;
 pub mod verify;
 pub mod zbi;

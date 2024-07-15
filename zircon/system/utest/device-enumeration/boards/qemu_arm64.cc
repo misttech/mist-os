@@ -7,13 +7,13 @@
 namespace {
 
 TEST_F(DeviceEnumerationTest, QemuArm64Test) {
-  static const char* kDevicePaths[] = {
-      "sys/platform/pt/qemu-bus",
-      "sys/platform/pl031/rtc",
-      "sys/platform/pci/00:00.0_",
+  static const char* kNodeMonikers[] = {
+      "dev.sys.platform.pt.qemu-bus",
+      "dev.sys.platform.pl031.rtc",
+      "dev.sys.platform.pci.00_00.0_",
   };
 
-  ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
+  VerifyNodes(kNodeMonikers);
 }
 
 }  // namespace

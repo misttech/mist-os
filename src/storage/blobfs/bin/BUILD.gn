@@ -63,7 +63,6 @@ group("blobfs-component") {
     "//src/storage/fshost:*",
     "//src/storage/lib/fs_management/rust:*",
     "//src/sys/pkg/testing/blobfs-ramdisk:*",
-    "//tools/blackout/blobfs-checkerboard:*",
   ]
   deps = [
     ":component",

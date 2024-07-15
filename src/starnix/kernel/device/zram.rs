@@ -7,9 +7,10 @@ use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, DeviceSysfsOps, SysfsOps};
 use crate::task::{CurrentTask, KernelStats};
 use crate::vfs::{
-    fileops_impl_dataless, fileops_impl_seekless, fs_node_impl_dir_readonly, DirectoryEntryType,
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, StubEmptyFile, VecDirectory, VecDirectoryEntry,
+    fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless,
+    fs_node_impl_dir_readonly, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource,
+    FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, StubEmptyFile, VecDirectory,
+    VecDirectoryEntry,
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{bug_ref, log_error};
@@ -52,6 +53,7 @@ impl DeviceOps for Arc<ZramDevice> {
 impl FileOps for ZramDevice {
     fileops_impl_seekless!();
     fileops_impl_dataless!();
+    fileops_impl_noop_sync!();
 }
 
 impl BlockDeviceInfo for ZramDevice {

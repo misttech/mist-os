@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.math/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <zircon/assert.h>
 
@@ -237,28 +238,30 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   pending_layer_.type = LAYER_TYPE_PRIMARY;
   primary_layer_t& primary = pending_layer_.cfg.primary;
   primary.image_metadata = ImageMetadata(image_metadata).ToBanjo();
-  const frame_t new_frame = {
-      .x_pos = 0, .y_pos = 0, .width = image_metadata.width, .height = image_metadata.height};
-  primary.src_frame = new_frame;
-  primary.dest_frame = new_frame;
+  const rect_u_t image_area = {
+      .x = 0, .y = 0, .width = image_metadata.width, .height = image_metadata.height};
+  primary.image_source = image_area;
+  primary.display_destination = image_area;
   pending_image_config_gen_++;
   pending_image_ = nullptr;
   config_change_ = true;
 }
 
-void Layer::SetPrimaryPosition(fhdt::wire::Transform transform, fhdt::wire::Frame src_frame,
-                               fhdt::wire::Frame dest_frame) {
+void Layer::SetPrimaryPosition(fhdt::wire::Transform transform,
+                               fuchsia_math::wire::RectU image_source,
+                               fuchsia_math::wire::RectU display_destination) {
   primary_layer_t* primary_layer = &pending_layer_.cfg.primary;
 
-  static_assert(sizeof(fhdt::wire::Frame) == sizeof(frame_t), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, x_pos) == offsetof(frame_t, x_pos), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, y_pos) == offsetof(frame_t, y_pos), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, width) == offsetof(frame_t, width), "Struct mismatch");
-  static_assert(offsetof(fhdt::wire::Frame, height) == offsetof(frame_t, height),
+  static_assert(sizeof(fuchsia_math::wire::RectU) == sizeof(rect_u_t), "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, x) == offsetof(rect_u_t, x), "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, y) == offsetof(rect_u_t, y), "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, width) == offsetof(rect_u_t, width),
+                "Struct mismatch");
+  static_assert(offsetof(fuchsia_math::wire::RectU, height) == offsetof(rect_u_t, height),
                 "Struct mismatch");
 
-  memcpy(&primary_layer->src_frame, &src_frame, sizeof(frame_t));
-  memcpy(&primary_layer->dest_frame, &dest_frame, sizeof(frame_t));
+  memcpy(&primary_layer->image_source, &image_source, sizeof(rect_u_t));
+  memcpy(&primary_layer->display_destination, &display_destination, sizeof(rect_u_t));
   primary_layer->transform_mode = static_cast<uint8_t>(transform);
 
   config_change_ = true;

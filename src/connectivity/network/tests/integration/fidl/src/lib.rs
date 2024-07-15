@@ -115,8 +115,8 @@ async fn disable_interface_loopback<N: Netstack>(name: &str) {
         Ok(Some(fidl_fuchsia_net_interfaces::Event::Existing(
             fidl_fuchsia_net_interfaces::Properties {
                 id: Some(id),
-                device_class:
-                    Some(fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
+                port_class:
+                    Some(fidl_fuchsia_net_interfaces::PortClass::Loopback(
                         fidl_fuchsia_net_interfaces::Empty {},
                     )),
                 online: Some(true),

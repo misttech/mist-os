@@ -96,24 +96,19 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
 
     def check_connection(
         self,
-        timeout: float = fuchsia_controller_interface.TIMEOUTS["TARGET_WAIT"],
     ) -> None:
         """Checks the Fuchsia-Controller connection from host to Fuchsia device.
-
-        Args:
-            timeout: How long in seconds to wait.
 
         Raises:
             errors.FuchsiaControllerConnectionError
         """
         try:
             _LOGGER.debug(
-                "Waiting for %s sec for Fuchsia-Controller to check the "
+                "Waiting for for Fuchsia-Controller to check the "
                 "connection from host to %s...",
-                timeout,
                 self._target_name,
             )
-            self.ctx.target_wait(timeout)
+            self.ctx.target_wait(timeout=0)
             _LOGGER.debug(
                 "Fuchsia-Controller completed the connection check from host "
                 "to %s...",

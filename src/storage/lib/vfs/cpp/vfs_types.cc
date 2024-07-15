@@ -12,6 +12,28 @@
 
 namespace fio = fuchsia_io;
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+// Verify that permission flags align with the Rights enumeration.
+static_assert(static_cast<uint64_t>(fio::Rights::kConnect) ==
+              static_cast<uint64_t>(fio::Flags::kPermConnect));
+static_assert(static_cast<uint64_t>(fio::Rights::kReadBytes) ==
+              static_cast<uint64_t>(fio::Flags::kPermRead));
+static_assert(static_cast<uint64_t>(fio::Rights::kWriteBytes) ==
+              static_cast<uint64_t>(fio::Flags::kPermWrite));
+static_assert(static_cast<uint64_t>(fio::Rights::kExecute) ==
+              static_cast<uint64_t>(fio::Flags::kPermExecute));
+static_assert(static_cast<uint64_t>(fio::Rights::kGetAttributes) ==
+              static_cast<uint64_t>(fio::Flags::kPermGetAttributes));
+static_assert(static_cast<uint64_t>(fio::Rights::kUpdateAttributes) ==
+              static_cast<uint64_t>(fio::Flags::kPermSetAttributes));
+static_assert(static_cast<uint64_t>(fio::Rights::kEnumerate) ==
+              static_cast<uint64_t>(fio::Flags::kPermEnumerate));
+static_assert(static_cast<uint64_t>(fio::Rights::kTraverse) ==
+              static_cast<uint64_t>(fio::Flags::kPermTraverse));
+static_assert(static_cast<uint64_t>(fio::Rights::kModifyDirectory) ==
+              static_cast<uint64_t>(fio::Flags::kPermModify));
+#endif
+
 namespace fs {
 
 namespace {
@@ -165,6 +187,76 @@ fio::Rights DownscopeRights(fio::Rights rights, VnodeProtocol protocol) {
   }
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+namespace {
+
+constexpr fio::NodeProtocolKinds FlagsToProtocols(fio::Flags flags) {
+  fio::NodeProtocolKinds protocols;
+  if (flags & fio::Flags::kProtocolDirectory) {
+    protocols |= fio::NodeProtocolKinds::kDirectory;
+  }
+  if (flags & fio::Flags::kProtocolFile) {
+    protocols |= fio::NodeProtocolKinds::kFile;
+  }
+  if (flags & fio::Flags::kProtocolSymlink) {
+    protocols |= fio::NodeProtocolKinds::kSymlink;
+  }
+  if (flags & fio::Flags::kProtocolService) {
+    protocols |= fio::NodeProtocolKinds::kConnector;
+  }
+  return protocols;
+}
+
+}  // namespace
+
+zx::result<VnodeProtocol> NegotiateProtocol(fio::Flags flags, fio::NodeProtocolKinds supported) {
+  using fio::NodeProtocolKinds;
+
+  const NodeProtocolKinds requested = FlagsToProtocols(flags);
+
+  if (flags & fio::Flags::kProtocolNode) {
+    if (!requested || (requested & supported)) {
+      return zx::ok(VnodeProtocol::kNode);
+    }
+  } else {
+    // Remove protocols that were not requested from the set of supported protocols. If no protocols
+    // were requested, all *node* protocols are acceptable.
+    if (requested) {
+      supported = supported & requested;
+    } else {
+      supported &= ~NodeProtocolKinds::kConnector;
+    }
+    // Attempt to negotiate a protocol for the connection based on the following order. The
+    // fuchsia.io protocol does not enforce a particular order for resolution, and when callers
+    // specify multiple protocols, they must be prepared to accept any that were set in the request.
+    if (supported & NodeProtocolKinds::kConnector) {
+      return zx::ok(VnodeProtocol::kService);
+    }
+    if (supported & NodeProtocolKinds::kDirectory) {
+      return zx::ok(VnodeProtocol::kDirectory);
+    }
+    if (supported & NodeProtocolKinds::kFile) {
+      return zx::ok(VnodeProtocol::kFile);
+    }
+#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    if (supported & NodeProtocolKinds::kSymlink) {
+      return zx::ok(VnodeProtocol::kSymlink);
+    }
+#endif
+  }
+  // If we failed to resolve a protocol, we determine what error to return from a combination of the
+  // type of node and the protocols which were requested.
+  if ((requested & NodeProtocolKinds::kDirectory) && !(supported & NodeProtocolKinds::kDirectory)) {
+    return zx::error(ZX_ERR_NOT_DIR);
+  }
+  if ((requested & NodeProtocolKinds::kFile) && !(supported & NodeProtocolKinds::kFile)) {
+    return zx::error(ZX_ERR_NOT_FILE);
+  }
+  return zx::error(ZX_ERR_WRONG_TYPE);
+}
+
+#endif
+
 zx::result<VnodeProtocol> NegotiateProtocol(fio::NodeProtocolKinds supported,
                                             fio::NodeProtocolKinds requested) {
   using fio::NodeProtocolKinds;
@@ -221,12 +313,14 @@ fio::NodeProtocolKinds GetProtocols(const fio::wire::ConnectionProtocols& protoc
   return allowed_protocols;
 }
 
+namespace {
 // Helper function to reduce verbosity in |NodeAttributes:Build| impl below. Returns an external
 // (non-owning) |fidl::ObjectView| to |obj|.
 template <typename T>
 fidl::ObjectView<T> ExternalView(T& obj) {
   return fidl::ObjectView<T>::FromExternal(&obj);
 }
+}  // namespace
 
 zx::result<fio::wire::NodeAttributes2> NodeAttributeBuilder::Build(const Vnode& vnode,
                                                                    fio::NodeAttributesQuery query) {

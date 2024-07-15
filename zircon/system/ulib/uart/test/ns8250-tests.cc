@@ -21,6 +21,8 @@ TEST(Ns8250Tests, HelloWorld) {
 
   driver.io()
       .mock()
+      // Init()
+      .ExpectRead(uint8_t{0b0000'0000}, 1)
       .ExpectWrite(uint8_t{0b0000'0000}, 1)  // Init
       .ExpectRead(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{kDefaultLineControls | 0b1000'0000}, 3)
@@ -28,6 +30,7 @@ TEST(Ns8250Tests, HelloWorld) {
       .ExpectWrite(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{0b0000'0011}, 4)
       .ExpectRead(uint8_t{0b1110'0001}, 2)
+      // Write()
       .ExpectRead(uint8_t{0b0110'0000}, 5)  // TxReady -> true
       .ExpectWrite(uint8_t{'h'}, 0)         // Write
       .ExpectWrite(uint8_t{'i'}, 0)
@@ -43,6 +46,8 @@ TEST(Ns8250Tests, SetLineControl8N1) {
 
   driver.io()
       .mock()
+      // Init()
+      .ExpectRead(uint8_t{0b0000'0000}, 1)
       .ExpectWrite(uint8_t{0b0000'0000}, 1)  // Init
       .ExpectRead(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{kDefaultLineControls | 0b1000'0000}, 3)
@@ -50,6 +55,7 @@ TEST(Ns8250Tests, SetLineControl8N1) {
       .ExpectWrite(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{0b0000'0011}, 4)
       .ExpectRead(uint8_t{0b1110'0001}, 2)
+      // SetLineControl()
       .ExpectWrite(uint8_t{0b1000'0000}, 3)  // SetLineControl
       .ExpectWrite(uint8_t{0b0000'0001}, 0)
       .ExpectWrite(uint8_t{0b0000'0000}, 1)
@@ -64,6 +70,8 @@ TEST(Ns8250Tests, SetLineControl7E1) {
 
   driver.io()
       .mock()
+      // Init()
+      .ExpectRead(uint8_t{0b0000'0000}, 1)
       .ExpectWrite(uint8_t{0b0000'0000}, 1)  // Init
       .ExpectRead(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{kDefaultLineControls | 0b1000'0000}, 3)
@@ -71,6 +79,7 @@ TEST(Ns8250Tests, SetLineControl7E1) {
       .ExpectWrite(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{0b0000'0011}, 4)
       .ExpectRead(uint8_t{0b1110'0001}, 2)
+      // SetLineControl()
       .ExpectWrite(uint8_t{0b1000'0000}, 3)  // SetLineControl
       .ExpectWrite(uint8_t{0b0000'0001}, 0)
       .ExpectWrite(uint8_t{0b0000'0000}, 1)
@@ -85,6 +94,8 @@ TEST(Ns8250Tests, Read) {
 
   driver.io()
       .mock()
+      // Init()
+      .ExpectRead(uint8_t{0b0000'0000}, 1)
       .ExpectWrite(uint8_t{0b0000'0000}, 1)  // Init
       .ExpectRead(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{kDefaultLineControls | 0b1000'0000}, 3)
@@ -92,12 +103,15 @@ TEST(Ns8250Tests, Read) {
       .ExpectWrite(uint8_t{kDefaultLineControls}, 3)
       .ExpectWrite(uint8_t{0b0000'0011}, 4)
       .ExpectRead(uint8_t{0b1110'0001}, 2)
+      // Write()
       .ExpectRead(uint8_t{0b0110'0000}, 5)  // TxReady -> true
       .ExpectWrite(uint8_t{'?'}, 0)         // Write
       .ExpectWrite(uint8_t{'\r'}, 0)
       .ExpectWrite(uint8_t{'\n'}, 0)
+      // Read()
       .ExpectRead(uint8_t{0b0110'0001}, 5)  // Read (data_ready)
       .ExpectRead(uint8_t{'q'}, 0)          // Read (data)
+      // Read()
       .ExpectRead(uint8_t{0b0110'0001}, 5)  // Read (data_ready)
       .ExpectRead(uint8_t{'\r'}, 0);        // Read (data)
 

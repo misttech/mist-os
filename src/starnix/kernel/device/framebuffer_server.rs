@@ -10,6 +10,7 @@
 //! To display the `Framebuffer` as its view, a component must add the `framebuffer` feature to its
 //! `.cml`.
 
+use crate::mm::memory::MemoryObject;
 use crate::task::Kernel;
 use anyhow::anyhow;
 use fidl::endpoints::{create_proxy, create_request_stream, ClientEnd};
@@ -27,7 +28,10 @@ use fuchsia_scenic::BufferCollectionTokenPair;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::{FutureExt, StreamExt};
 use starnix_lifecycle::AtomicU64Counter;
+use starnix_logging::log_error;
 use starnix_sync::Mutex;
+use starnix_uapi::errno;
+use starnix_uapi::errors::Errno;
 use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
@@ -36,10 +40,6 @@ use {
     fidl_fuchsia_sysmem2 as fsysmem2, fidl_fuchsia_ui_composition as fuicomposition,
     fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
-
-use starnix_logging::log_error;
-use starnix_uapi::errno;
-use starnix_uapi::errors::Errno;
 
 /// The offset at which the framebuffer will be placed.
 pub const TRANSLATION_X: i32 = 0;
@@ -118,12 +118,13 @@ impl FramebufferServer {
     }
 
     /// Returns a clone of the VMO that is shared with Flatland.
-    pub fn get_vmo(&self) -> Result<zx::Vmo, Errno> {
+    pub fn get_memory(&self) -> Result<MemoryObject, Errno> {
         self.collection.buffers.as_ref().unwrap()[0]
             .vmo
             .as_ref()
             .ok_or_else(|| errno!(EINVAL))?
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
+            .map(MemoryObject::from)
             .map_err(|_| errno!(EINVAL))
     }
 

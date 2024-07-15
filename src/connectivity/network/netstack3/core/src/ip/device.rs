@@ -28,18 +28,19 @@ use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
 use netstack3_ip::device::{
     self, add_ip_addr_subnet_with_config, del_ip_addr_inner, get_ipv6_hop_limit,
-    is_ip_device_enabled, is_ip_forwarding_enabled, join_ip_multicast_with_config,
-    leave_ip_multicast_with_config, AddressRemovedReason, DadAddressContext, DadAddressStateRef,
-    DadContext, DadEvent, DadStateRef, DadTimerId, DefaultHopLimit, DelIpAddr,
-    DualStackIpDeviceState, IpAddressId, IpAddressIdSpec, IpAddressIdSpecContext, IpAddressState,
-    IpDeviceAddr, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceEvent, IpDeviceFlags,
-    IpDeviceIpExt, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateContext,
-    IpDeviceStateIpExt, IpDeviceTimerId, Ipv4AddressEntry, Ipv4AddressState,
-    Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState,
-    Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute,
-    Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext,
-    Ipv6RouteDiscoveryState, RsContext, RsState, SlaacAddressEntry, SlaacAddressEntryMut,
-    SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
+    is_ip_device_enabled, is_ip_multicast_forwarding_enabled, is_ip_unicast_forwarding_enabled,
+    join_ip_multicast_with_config, leave_ip_multicast_with_config, AddressRemovedReason,
+    DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadStateRef, DadTimerId,
+    DefaultHopLimit, DelIpAddr, DualStackIpDeviceState, IpAddressId, IpAddressIdSpec,
+    IpAddressIdSpecContext, IpAddressState, IpDeviceAddr, IpDeviceAddresses, IpDeviceConfiguration,
+    IpDeviceEvent, IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups,
+    IpDeviceStateBindingsTypes, IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId,
+    Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry,
+    Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceAddr, Ipv6DeviceConfiguration,
+    Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
+    Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
+    RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
+    SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
     GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
@@ -51,8 +52,9 @@ use netstack3_ip::{
     self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
     IpSendFrameError, IpStateContext, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
-use packet::{EmptyBuf, Serializer};
-use packet_formats::icmp::ndp::{NeighborSolicitation, RouterSolicitation};
+use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
+use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
+use packet_formats::icmp::ndp::{NeighborSolicitation, OptionSequenceBuilder, RouterSolicitation};
 use packet_formats::icmp::IcmpUnusedCode;
 
 use crate::context::prelude::*;
@@ -393,8 +395,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         )
     }
 
-    fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
-        is_ip_forwarding_enabled::<Ipv4, _, _>(self, device_id)
+    fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_unicast_forwarding_enabled::<Ipv4, _, _>(self, device_id)
+    }
+
+    fn is_device_multicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_multicast_forwarding_enabled::<Ipv4, _, _>(self, device_id)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -500,8 +506,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         )
     }
 
-    fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
-        is_ip_forwarding_enabled::<Ipv6, _, _>(self, device_id)
+    fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_unicast_forwarding_enabled::<Ipv6, _, _>(self, device_id)
+    }
+
+    fn is_device_multicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_multicast_forwarding_enabled::<Ipv6, _, _>(self, device_id)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -798,19 +808,20 @@ impl<
         device_id: &Self::DeviceId,
         dst_ip: MulticastAddr<Ipv6Addr>,
         message: NeighborSolicitation,
+        nonce: NdpNonce<&[u8]>,
     ) -> Result<(), ()> {
-        let Self { config: _, core_ctx } = self;
+        let options = [NdpOptionBuilder::Nonce(nonce)];
         ip::icmp::send_ndp_packet(
-            core_ctx,
+            self,
             bindings_ctx,
             device_id,
             None,
             dst_ip.into_specified(),
-            EmptyBuf,
+            OptionSequenceBuilder::new(options.iter()).into_serializer(),
             IcmpUnusedCode,
             message,
         )
-        .map_err(|IpSendFrameError { serializer: EmptyBuf, error }| {
+        .map_err(|IpSendFrameError { serializer: _, error }| {
             debug!("error sending DAD packet: {error:?}")
         })
     }
@@ -1205,9 +1216,8 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
         cb: F,
     ) -> O {
         let Self { config, core_ctx } = self;
-        let Ipv4DeviceConfiguration {
-            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
-        } = Borrow::borrow(&*config);
+        let Ipv4DeviceConfiguration { ip_config: IpDeviceConfiguration { gmp_enabled, .. } } =
+            Borrow::borrow(&*config);
 
         let mut state = crate::device::integration::ip_device_state(core_ctx, device);
         // Note that changes to `ip_enabled` is not possible in this context
@@ -1245,7 +1255,7 @@ impl<
             dad_transmits: _,
             max_router_solicitations: _,
             slaac_config: _,
-            ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
+            ip_config: IpDeviceConfiguration { gmp_enabled, .. },
         } = Borrow::borrow(&*config);
 
         let mut state = crate::device::integration::ip_device_state(core_ctx, device);

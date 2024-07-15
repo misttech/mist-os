@@ -4,15 +4,47 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("memalloc") {
-  sdk = "source"
-  sdk_headers = [
+if (zircon_toolchain == false) {
+  _headers = ""
+} else {
+  _headers = ":headers"
+}
+
+library_headers("range.headers") {
+  headers = [ "lib/memalloc/range.h" ]
+  public_deps = [
+    "//sdk/lib/stdcompat$_headers",
+
+    # <lib/memalloc/range.h> has #include <lib/zbi-format/zbi.h>.
+    "//sdk/lib/zbi-format",
+  ]
+}
+
+library_headers("headers") {
+  headers = [
     "lib/memalloc/pool-mem-config.h",
     "lib/memalloc/pool.h",
-    "lib/memalloc/range.h",
   ]
+
+  public_deps = [
+    ":range.headers",
+    "//sdk/lib/stdcompat$_headers",
+
+    # <lib/memalloc/pool.h> has #include <lib/fit/function.h>.
+    "//sdk/lib/fit$_headers",
+
+    # <lib/memalloc/pool.h> has #include <fbl/intrusive_double_list.h>.
+    "//zircon/system/ulib/fbl$_headers",
+
+    # <lib/memalloc/pool.h> has #include <lib/fit/result.h>.
+    "//zircon/system/ulib/zx$_headers",
+  ]
+}
+
+source_set("memalloc") {
+  public_deps = [ ":headers" ]
 
   sources = [
     "algorithm.cc",
@@ -32,23 +64,6 @@ zx_library("memalloc") {
   } else {
     sources += [ "ostream.cc" ]
   }
-
-  public_deps = [
-    "//sdk/lib/stdcompat:headers",
-
-    # <lib/memalloc/pool.h> has #include <lib/fit/function.h>.
-    # <lib/memalloc/range.h> has #include <lib/fit/function.h>.
-    "//sdk/lib/fit:headers",
-
-    # <lib/memalloc/range.h> has #include <lib/zbi-format/zbi.h>.
-    "//sdk/lib/zbi-format",
-
-    # <lib/memalloc/pool.h> has #include <fbl/intrusive_double_list.h>.
-    "//zircon/system/ulib/fbl:headers",
-
-    # <lib/memalloc/pool.h> has #include <lib/fit/result.h>.
-    "//zircon/system/ulib/zx:headers",
-  ]
 }
 
 source_set("testing") {

@@ -1071,10 +1071,23 @@ async fn handle_nl80211_message<I: IfaceManager>(
                                         )),
                                         ..Default::default()
                                     })
-                                    .context("Failed to send ScanAborted")?;
+                                    .context("Failed to send ScanAborted after scan cancelled")?;
                             }
                         }
-                        Err(e) => error!("Failed to run passive scan: {:?}", e),
+                        Err(e) => {
+                            error!("Failed to run passive scan: {:?}", e);
+                            if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
+                                proxy
+                                    .message(fidl_wlanix::Nl80211MulticastMessageRequest {
+                                        message: Some(build_nl80211_message(
+                                            Nl80211Cmd::ScanAborted,
+                                            vec![Nl80211Attr::IfaceIndex(iface_id)],
+                                        )),
+                                        ..Default::default()
+                                    })
+                                    .context("Failed to send ScanAborted after scan error")?;
+                            }
+                        }
                     }
                 }
                 Err(e) => {
@@ -1444,6 +1457,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::format_err;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy};
     use futures::channel::mpsc;
     use futures::task::Poll;
@@ -2700,8 +2714,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn scan_cancelled() {
+    #[test_case(Ok(ScanEnd::Cancelled); "Scan cancelled by user")]
+    #[test_case(Err(format_err!("scan ended unexpectedly")); "Scan fails with error")]
+    fn scan_abort(scan_result: Result<ScanEnd, Error>) {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, stream) =
             create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
@@ -2733,8 +2748,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
-        // After ending the scan we expect wlanix to broadcast the scan cancel.
-        scan_end_sender.send(Ok(ScanEnd::Cancelled)).expect("Failed to send scan end");
+        // After ending the scan we expect wlanix to broadcast the scan abort.
+        scan_end_sender.send(scan_result).expect("Failed to send scan result");
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let message = assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Ready(message) => message);
         assert_eq!(message.payload.cmd, Nl80211Cmd::ScanAborted);

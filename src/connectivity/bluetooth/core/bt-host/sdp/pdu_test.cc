@@ -6,6 +6,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/pdu.h"
 
 #include <gtest/gtest.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/sdp.h"
@@ -2094,8 +2095,9 @@ TEST(PDUTest, ResponseOutOfRangeContinuation) {
   auto buf = rsp_search.GetPDU(0xFFFF, 0x0110, kDefaultMaxSize, BufferView());
   EXPECT_TRUE(buf);
   // Out of Range (continuation is zero-indexed)
-  uint16_t handle_count =
-      htobe16(rsp_search.service_record_handle_list().size());
+  uint16_t handle_count = pw::bytes::ConvertOrderTo(
+      cpp20::endian::big,
+      static_cast<uint16_t>(rsp_search.service_record_handle_list().size()));
   auto service_search_cont = DynamicByteBuffer(sizeof(uint16_t));
   service_search_cont.WriteObj(handle_count, 0);
   buf = rsp_search.GetPDU(0xFFFF, 0x0110, kDefaultMaxSize, service_search_cont);
@@ -2111,7 +2113,8 @@ TEST(PDUTest, ResponseOutOfRangeContinuation) {
   buf = rsp_attr.GetPDU(0xFFFF, 0x0110, kDefaultMaxSize, BufferView());
   EXPECT_TRUE(buf);
 
-  uint32_t rsp_size = htobe32(buf->size() + 5);
+  uint32_t rsp_size = pw::bytes::ConvertOrderTo(
+      cpp20::endian::big, static_cast<uint32_t>(buf->size()) + 5);
   auto too_large_cont = DynamicByteBuffer(sizeof(uint32_t));
   too_large_cont.WriteObj(rsp_size, 0);
   buf = rsp_attr.GetPDU(0xFFFF, 0x0110, kDefaultMaxSize, too_large_cont);
@@ -2131,7 +2134,8 @@ TEST(PDUTest, ResponseOutOfRangeContinuation) {
 
   EXPECT_TRUE(buf);
 
-  rsp_size = htobe32(buf->size() + 5);
+  rsp_size = pw::bytes::ConvertOrderTo(cpp20::endian::big,
+                                       static_cast<uint32_t>(buf->size()) + 5);
   too_large_cont.WriteObj(rsp_size, 0);
   buf = rsp_attr.GetPDU(0xFFFF, 0x0110, kDefaultMaxSize, too_large_cont);
 

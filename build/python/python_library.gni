@@ -178,7 +178,7 @@ template("python_library") {
     # any dependencies.
     [
       "--target_name",
-      _library_name,
+      target_name,
       "--library_infos",
       rebase_path(_files.library_infos, root_build_dir),
       "--gen_dir",

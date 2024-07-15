@@ -11,10 +11,11 @@ use crate::task::{
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek,
-    BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
+    fileops_impl_noop_sync, fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink,
+    unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile,
+    SymlinkTarget,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
@@ -279,6 +280,7 @@ impl FsNodeOps for Arc<ProcDirectory> {
 
 impl FileOps for ProcDirectory {
     fileops_impl_directory!();
+    fileops_impl_noop_sync!();
 
     fn seek(
         &self,
@@ -341,6 +343,7 @@ struct ProcKmsgFile;
 
 impl FileOps for ProcKmsgFile {
     fileops_impl_seekless!();
+    fileops_impl_noop_sync!();
 
     fn wait_async(
         &self,
@@ -490,6 +493,7 @@ impl PressureFile {
 
 impl FileOps for PressureFile {
     fileops_impl_delegate_read_and_seek!(self, self.0);
+    fileops_impl_noop_sync!();
 
     /// Pressure notifications are configured by writing to the file.
     fn write(

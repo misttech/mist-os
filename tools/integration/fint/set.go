@@ -77,7 +77,6 @@ func setImpl(
 	}
 
 	artifacts := &fintpb.SetArtifacts{
-		UseGoma: staticSpec.UseGoma,
 		Metadata: &fintpb.SetArtifacts_Metadata{
 			Board:      staticSpec.Board,
 			Optimize:   strings.ToLower(staticSpec.Optimize.String()),
@@ -366,7 +365,7 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		if err := os.RemoveAll(dir); err != nil {
 			return nil, err
 		}
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, err
 		}
 		vars["gocache_dir"] = dir

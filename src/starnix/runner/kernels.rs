@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use attribution::{AttributionServer, AttributionServerHandle};
+use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::endpoints::{Proxy, ServerEnd};
 use fidl::HandleBased;
 use frunner::{ComponentControllerMarker, ComponentStartInfo};
@@ -29,7 +29,7 @@ pub struct Kernels {
     /// Mapping from kernel name to StarnixKernel.
     kernels: Arc<Mutex<HashMap<String, Arc<StarnixKernel>>>>,
     memory_attribution_server: AttributionServerHandle,
-    memory_update_publisher: attribution::Publisher,
+    memory_update_publisher: attribution_server::Publisher,
     background_tasks: ExecutionScope,
 }
 
@@ -85,7 +85,7 @@ impl Kernels {
     pub fn new_memory_attribution_observer(
         &self,
         control_handle: fattribution::ProviderControlHandle,
-    ) -> attribution::Observer {
+    ) -> attribution_server::Observer {
         self.memory_attribution_server.new_observer(control_handle)
     }
 }

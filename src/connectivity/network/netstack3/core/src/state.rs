@@ -95,7 +95,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         I::map_ip((), |()| &self.ipv4.inner, |()| &self.ipv6.inner)
     }
 
-    pub(crate) fn inner_icmp_state<I: ip::IpExt>(&self) -> &IcmpState<I, BT> {
+    pub(crate) fn inner_icmp_state<I: netstack3_base::IpExt>(&self) -> &IcmpState<I, BT> {
         I::map_ip((), |()| &self.ipv4.icmp.inner, |()| &self.ipv6.icmp.inner)
     }
 }
@@ -130,7 +130,7 @@ impl<BT: BindingsTypes> StackState<BT> {
         self.inner_ip_state::<I>()
     }
     /// Accessor for common ICMP state for `I`.
-    pub fn common_icmp<I: ip::IpExt>(&self) -> &IcmpState<I, BT> {
+    pub fn common_icmp<I: netstack3_base::IpExt>(&self) -> &IcmpState<I, BT> {
         self.inner_icmp_state::<I>()
     }
 }

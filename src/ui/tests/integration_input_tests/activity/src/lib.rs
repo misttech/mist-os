@@ -27,7 +27,7 @@ const TEST_UI_STACK: &str = "ui";
 const TEST_UI_STACK_URL: &str = "flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
 
 // Set a maximum bound test timeout.
-const TEST_TIMEOUT: Duration = Duration::from_minutes(2);
+const TEST_TIMEOUT: Duration = Duration::from_seconds(30);
 
 async fn assemble_realm() -> RealmInstance {
     let builder = RealmBuilder::new().await.expect("Failed to create RealmBuilder.");
@@ -89,7 +89,7 @@ async fn enters_idle_state_without_activity() {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in one minute.
+    // Do nothing. Activity service transitions to idle state in five seconds.
     let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -122,7 +122,7 @@ async fn does_not_enter_active_state_with_keyboard() {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in one minute.
+    // Do nothing. Activity service transitions to idle state in five seconds.
     let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -189,7 +189,7 @@ async fn enters_active_state_with_mouse() {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in one minute.
+    // Do nothing. Activity service transitions to idle state in five seconds.
     let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -255,7 +255,7 @@ async fn enters_active_state_with_touchscreen() {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in one minute.
+    // Do nothing. Activity service transitions to idle state in five seconds.
     let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
@@ -320,7 +320,7 @@ async fn enters_active_state_with_media_buttons() {
         State::Active
     );
 
-    // Do nothing. Activity service transitions to idle state in one minute.
+    // Do nothing. Activity service transitions to idle state in five seconds.
     let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {

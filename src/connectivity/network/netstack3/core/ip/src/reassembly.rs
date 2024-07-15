@@ -39,8 +39,8 @@ use core::time::Duration;
 use assert_matches::assert_matches;
 use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker};
 use netstack3_base::{
-    CoreTimerContext, HandleableTimer, InstantBindingsTypes, LocalTimerHeap, TimerBindingsTypes,
-    TimerContext,
+    CoreTimerContext, HandleableTimer, InstantBindingsTypes, IpExt, LocalTimerHeap,
+    TimerBindingsTypes, TimerContext,
 };
 use packet::BufferViewMut;
 use packet_formats::ip::IpPacket;
@@ -48,8 +48,6 @@ use packet_formats::ipv4::{Ipv4Header, Ipv4Packet};
 use packet_formats::ipv6::ext_hdrs::Ipv6ExtensionHeaderData;
 use packet_formats::ipv6::Ipv6Packet;
 use zerocopy::{ByteSlice, ByteSliceMut};
-
-use crate::internal::base::IpExt;
 
 /// The maximum amount of time from receipt of the first fragment to reassembly
 /// of a packet. Note, "first fragment" does not mean a fragment with offset 0;
@@ -820,8 +818,6 @@ mod tests {
     use packet_formats::ipv4::Ipv4PacketBuilder;
     use packet_formats::ipv6::Ipv6PacketBuilder;
 
-    use crate::internal::base;
-
     use super::*;
 
     struct FakeFragmentContext<I: Ip, BT: FragmentBindingsTypes> {
@@ -1119,7 +1115,7 @@ mod tests {
 
     /// Tries to reassemble the packet with the given fragment ID.
     fn try_reassemble_ip_packet<
-        I: TestIpExt + base::IpExt,
+        I: TestIpExt + netstack3_base::IpExt,
         CC: FragmentContext<I, BC>,
         BC: FragmentBindingsContext,
     >(
@@ -1206,7 +1202,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_reassembly<I: TestIpExt + base::IpExt>() {
+    fn test_ip_reassembly<I: TestIpExt + netstack3_base::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
 
@@ -1246,7 +1242,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_reassemble_with_missing_blocks<I: TestIpExt + base::IpExt>() {
+    fn test_ip_reassemble_with_missing_blocks<I: TestIpExt + netstack3_base::IpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
@@ -1289,7 +1285,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_reassemble_after_timer<I: TestIpExt + base::IpExt>() {
+    fn test_ip_reassemble_after_timer<I: TestIpExt + netstack3_base::IpExt>() {
         let fake_config = I::TEST_ADDRS;
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id = 5;
@@ -1381,7 +1377,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_fragment_cache_oom<I: TestIpExt + base::IpExt>() {
+    fn test_ip_fragment_cache_oom<I: TestIpExt + netstack3_base::IpExt>() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let mut fragment_id = 0;
         const THRESHOLD: usize = 8196usize;
@@ -1648,7 +1644,9 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_reassembly_with_multiple_intertwined_packets<I: TestIpExt + base::IpExt>() {
+    fn test_ip_reassembly_with_multiple_intertwined_packets<
+        I: TestIpExt + netstack3_base::IpExt,
+    >() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -1722,7 +1720,9 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<I: TestIpExt + base::IpExt>() {
+    fn test_ip_reassembly_timer_with_multiple_intertwined_packets<
+        I: TestIpExt + netstack3_base::IpExt,
+    >() {
         let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context::<I>();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;

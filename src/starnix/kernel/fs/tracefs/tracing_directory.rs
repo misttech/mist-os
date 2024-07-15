@@ -5,19 +5,17 @@
 use crate::task::CurrentTask;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::{
-    fileops_impl_delegate_read_and_seek, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FileObject, FileOps, FsNodeOps, SimpleFileNode,
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
 };
-use starnix_logging::CATEGORY_ATRACE;
-use starnix_sync::{Locked, WriteOps};
-use starnix_uapi::errors::Errno;
-
-use std::collections::HashMap;
-use std::sync::Mutex;
-
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::zx_ticks_t;
+use starnix_logging::CATEGORY_ATRACE;
+use starnix_sync::{Locked, WriteOps};
+use starnix_uapi::errors::Errno;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 /// trace_marker, used by applications to write trace events
 struct TraceMarkerFileSource;
@@ -46,6 +44,7 @@ impl TraceMarkerFile {
 
 impl FileOps for TraceMarkerFile {
     fileops_impl_delegate_read_and_seek!(self, self.source);
+    fileops_impl_noop_sync!();
 
     fn write(
         &self,

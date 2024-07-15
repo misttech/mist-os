@@ -18,11 +18,11 @@
 #include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
-#include <threads.h>
 
 #include <memory>
 #include <optional>
 
+#include <fbl/mutex.h>
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/intel-i915/clock/cdclk.h"
@@ -57,14 +57,15 @@ typedef struct buffer_allocation {
 class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                    public ddk::IntelGpuCoreProtocol<Controller> {
  public:
-  explicit Controller(zx_device_t* parent);
+  explicit Controller(zx_device_t* parent, inspect::Inspector inspector);
   ~Controller();
 
   // Creates a `Controller` instance and performs short-running initialization
   // of all subcomponents.
   //
   // Long-running initialization is performed in the Start() hook.
-  static zx::result<std::unique_ptr<Controller>> Create(zx_device_t* parent);
+  static zx::result<std::unique_ptr<Controller>> Create(zx_device_t* parent,
+                                                        inspect::Inspector inspector);
 
   // Corresponds to DFv1 `DdkInit()` and DFv2 `Start()`.
   void Start(fdf::StartCompleter completer);
@@ -283,7 +284,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
   bool driver_initialized_ __TA_GUARDED(display_lock_) = false;
 
   Gtt gtt_ __TA_GUARDED(gtt_lock_);
-  mutable mtx_t gtt_lock_;
+  mutable fbl::Mutex gtt_lock_;
   // These regions' VMOs are not owned
   fbl::Vector<std::unique_ptr<GttRegionImpl>> imported_images_ __TA_GUARDED(gtt_lock_);
   // These regions' VMOs are owned
@@ -299,7 +300,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
   ddk::Pci pci_;
   std::array<std::optional<fdf::MmioBuffer>, fuchsia_hardware_pci::wire::kMaxBarCount> mapped_bars_
       __TA_GUARDED(bar_lock_);
-  mtx_t bar_lock_;
+  fbl::Mutex bar_lock_;
   // The mmio_space_ is read only. The internal registers are guarded by various locks where
   // appropriate.
   std::optional<fdf::MmioView> mmio_space_;
@@ -312,7 +313,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
   fbl::Vector<std::unique_ptr<DisplayDevice>> display_devices_ __TA_GUARDED(display_lock_);
   // Display ID can't be kInvalidDisplayId.
   display::DisplayId next_id_ __TA_GUARDED(display_lock_) = display::DisplayId{1};
-  mtx_t display_lock_;
+  fbl::Mutex display_lock_;
 
   std::unique_ptr<DdiManager> ddi_manager_;
   std::unique_ptr<PipeManager> pipe_manager_;
@@ -330,7 +331,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
   buffer_allocation_t plane_buffers_[PipeIds<registers::Platform::kKabyLake>().size()]
                                     [registers::kImagePlaneCount] __TA_GUARDED(
                                         plane_buffers_lock_) = {};
-  mtx_t plane_buffers_lock_;
+  fbl::Mutex plane_buffers_lock_;
 
   // Buffer allocations for pipes
   buffer_allocation_t pipe_buffers_[PipeIds<registers::Platform::kKabyLake>().size()] __TA_GUARDED(

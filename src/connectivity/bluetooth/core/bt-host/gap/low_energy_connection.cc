@@ -135,6 +135,11 @@ LowEnergyConnection::AddRef() {
       self->conn_mgr_->ReleaseReference(handle);
     }
   };
+  auto accept_cis_cb = [self](iso::CigCisIdentifier id,
+                              iso::CisEstablishedCallback cb) {
+    BT_ASSERT(self.is_alive());
+    return self->AcceptCis(id, std::move(cb));
+  };
   auto bondable_cb = [self] {
     BT_ASSERT(self.is_alive());
     return self->bondable_mode();
@@ -151,6 +156,7 @@ LowEnergyConnection::AddRef() {
       new LowEnergyConnectionHandle(peer_id(),
                                     handle(),
                                     std::move(release_cb),
+                                    std::move(accept_cis_cb),
                                     std::move(bondable_cb),
                                     std::move(security_cb),
                                     std::move(role_cb)));
@@ -265,6 +271,14 @@ void LowEnergyConnection::OnInterrogationComplete() {
   BT_ASSERT(!interrogation_completed_);
   interrogation_completed_ = true;
   MaybeUpdateConnectionParameters();
+}
+
+iso::AcceptCisStatus LowEnergyConnection::AcceptCis(
+    iso::CigCisIdentifier id, iso::CisEstablishedCallback cb) {
+  if (role() != pw::bluetooth::emboss::ConnectionRole::PERIPHERAL) {
+    return iso::AcceptCisStatus::kNotPeripheral;
+  }
+  return iso_mgr_->AcceptCis(id, std::move(cb));
 }
 
 void LowEnergyConnection::AttachInspect(inspect::Node& parent,

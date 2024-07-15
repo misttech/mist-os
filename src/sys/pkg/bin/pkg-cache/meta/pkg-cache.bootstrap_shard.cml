@@ -14,6 +14,15 @@
     ],
     offer: [
         {
+            from: "parent",
+            to: "#pkg-cache",
+            config: [
+                "fuchsia.pkgcache.AllPackagesExecutable",
+                "fuchsia.pkgcache.UseFxblob",
+                "fuchsia.pkgcache.UseSystemImage",
+            ],
+        },
+        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#pkg-cache",

@@ -123,8 +123,9 @@ fuchsia_structured_config_rust_lib("config_lib") {
   visibility = [ ":*" ]
 }
 
-fuchsia_structured_config_values("config_values_from_gn") {
+fuchsia_structured_config_values2("config_values_from_gn") {
   cm_label = ":manifest"
+  output_component_name = "pkg-cache-config"
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
@@ -138,8 +139,9 @@ fuchsia_structured_config_values("config_values_from_gn") {
   visibility = [ ":*" ]
 }
 
-fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
+fuchsia_structured_config_values2("config_values_from_gn-ignore-system-image") {
   cm_label = ":manifest"
+  output_component_name = "pkg-cache-config"
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
@@ -151,8 +153,9 @@ fuchsia_structured_config_values("config_values_from_gn-ignore-system-image") {
   visibility = [ ":*" ]
 }
 
-fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
+fuchsia_structured_config_values2("config_values_from_gn-cpp-blobfs") {
   cm_label = ":manifest"
+  output_component_name = "pkg-cache-config"
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
@@ -162,8 +165,9 @@ fuchsia_structured_config_values("config_values_from_gn-cpp-blobfs") {
   visibility = [ ":*" ]
 }
 
-fuchsia_structured_config_values("config_values_from_gn-fxblob") {
+fuchsia_structured_config_values2("config_values_from_gn-fxblob") {
   cm_label = ":manifest"
+  output_component_name = "pkg-cache-config"
   values = {
     # TODO(https://fxbug.dev/331302451) Populate this correctly.
     all_packages_executable = false
@@ -210,7 +214,6 @@ group("production-component-and-config-fxblob") {
 }
 
 fuchsia_package("pkg-cache") {
-  validate_structured_config = false
   deps = [ ":component" ]
 }
 

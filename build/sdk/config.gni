@@ -7,8 +7,10 @@ declare_args() {
   # If false, any unacknowledged SDK change will cause a build failure.
   warn_on_sdk_changes = false
 
-  # Whether currently building a sub-build (vs. the main build).
-  # Can be true for any API level, including the default level.
+  # Whether currently building a sub-build (vs. the main build targeting
+  # "PLATFORM" and the primary target CPU architecture).
+  # Prefer using other mechanisms when possible.
+  # Can be true for any API level, including "PLATFORM", and CPU architecture.
   sdk_inside_sub_build = false
 
   # When true, uses the "legacy" way of assigning an ABI revision to unstable
@@ -64,7 +66,7 @@ declare_args() {
   # overrides unless `bazel_fuchsia_sdk_all_cpus` is true.
   #
   # To override the set of API levels, see
-  #`override_build_time_supported_api_levels`.
+  #`override_idk_buildable_api_levels`.
   override_idk_target_cpus = false
 }
 

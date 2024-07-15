@@ -45,8 +45,6 @@ paver_template("sherlock") {
 }
 paver_template("vim3") {
 }
-paver_template("violet") {
-}
 paver_template("x64") {
 }
 

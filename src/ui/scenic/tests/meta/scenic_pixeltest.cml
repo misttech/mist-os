@@ -7,7 +7,7 @@
         "inspect/client.shard.cml",
     ],
     program: {
-        binary: "bin/scenic_pixeltest_bin",
+        binary: "bin/scenic-pixeltest-bin",
     },
     use: [
         {

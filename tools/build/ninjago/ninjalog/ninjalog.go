@@ -7,7 +7,6 @@ package ninjalog
 import (
 	"bufio"
 	"container/heap"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -429,63 +428,28 @@ func Dedup(steps []Step) []Step {
 	return dedup
 }
 
-// MurmurHash64A computes Murmur hash using the same exact
-// algorithm and seed that is used by Ninja in .ninja_log.
-// See https://github.com/ninja-build/ninja/blob/cc79afb/src/build_log.cc#L64
-func MurmurHash64A(data []byte) uint64 {
-	const seed = uint64(0xDECAFBADDECAFBAD)
-	const m = uint64(0xc6a4a7935bd1e995)
-	const r = 47
-	h := seed ^ (uint64(len(data)) * m)
-	for len(data) >= 8 {
-		k := binary.LittleEndian.Uint64(data[0:])
-		k *= m
-		k ^= k >> r
-		k *= m
-		h ^= k
-		h *= m
-		data = data[8:]
-	}
-	switch len(data) & 7 {
-	case 7:
-		h ^= uint64(data[6]) << 48
-		fallthrough
-	case 6:
-		h ^= uint64(data[5]) << 40
-		fallthrough
-	case 5:
-		h ^= uint64(data[4]) << 32
-		fallthrough
-	case 4:
-		h ^= uint64(data[3]) << 24
-		fallthrough
-	case 3:
-		h ^= uint64(data[2]) << 16
-		fallthrough
-	case 2:
-		h ^= uint64(data[1]) << 8
-		fallthrough
-	case 1:
-		h ^= uint64(data[0])
-		h *= m
-	}
-	h ^= h >> r
-	h *= m
-	h ^= h >> r
-	return h
-}
-
-// Populate the steps with information from the compilation database.
+// Populate joins steps with commands based on outputs, instead of command
+// hashes. The later is known to be unreliable, see http://b/331707084.
 func Populate(steps []Step, commands []compdb.Command) []Step {
-	m := make(map[uint64]compdb.Command)
-	// TODO(phosek): consider computing hashes in parallel
+	outputToCommand := make(map[string]compdb.Command)
 	for _, c := range commands {
-		m[MurmurHash64A([]byte(c.Command))] = c
+		// Discard commands in compdb with no outputs. They won't match any actions
+		// anyways, since they should always have non-empty outputs.
+		if c.Output != "" {
+			outputToCommand[c.Output] = c
+		}
 	}
 	var populated []Step
 	for _, s := range steps {
-		if c, ok := m[s.CmdHash]; ok {
-			s.Command = &c
+		// Go though all outputs of the action, since compdb only list one of them.
+		//
+		// Only use the first match, although in reality there should only be one
+		// match. Since ninjatrace is a best-effort tool, it doesn't fail here.
+		for _, out := range s.AllOutputs() {
+			if c, ok := outputToCommand[out]; ok {
+				s.Command = &c
+				break
+			}
 		}
 		populated = append(populated, s)
 	}

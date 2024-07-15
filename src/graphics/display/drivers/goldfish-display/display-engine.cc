@@ -408,24 +408,24 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
         const primary_layer_t* layer = &display_configs[i].layer_list[0].cfg.primary;
         // Scaling is allowed if destination frame match display and
         // source frame match image.
-        frame_t dest_frame = {
-            .x_pos = 0,
-            .y_pos = 0,
+        const rect_u_t display_area = {
+            .x = 0,
+            .y = 0,
             .width = static_cast<uint32_t>(primary_display_device_.width_px),
             .height = static_cast<uint32_t>(primary_display_device_.height_px),
         };
-        frame_t src_frame = {
-            .x_pos = 0,
-            .y_pos = 0,
+        const rect_u_t image_area = {
+            .x = 0,
+            .y = 0,
             .width = layer->image_metadata.width,
             .height = layer->image_metadata.height,
         };
-        if (memcmp(&layer->dest_frame, &dest_frame, sizeof(frame_t)) != 0) {
+        if (memcmp(&layer->display_destination, &display_area, sizeof(rect_u_t)) != 0) {
           // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
           // accepts full screen dest frame.
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }
-        if (memcmp(&layer->src_frame, &src_frame, sizeof(frame_t)) != 0) {
+        if (memcmp(&layer->image_source, &image_area, sizeof(rect_u_t)) != 0) {
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_SRC_FRAME;
         }
 

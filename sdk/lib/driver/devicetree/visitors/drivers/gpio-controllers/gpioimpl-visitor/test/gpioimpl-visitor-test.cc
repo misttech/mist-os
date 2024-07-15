@@ -51,6 +51,7 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
   uint32_t node_tested_count = 0;
   uint32_t mgr_request_idx = 0;
   uint32_t gpioA_id = 0;
+  uint32_t gpioB_id = 0;
   for (size_t i = 0; i < node_count; i++) {
     auto node =
         gpio_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
@@ -149,6 +150,7 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
       fit::result controller_metadata =
           fidl::Unpersist<fuchsia_hardware_gpioimpl::ControllerMetadata>(metadata_blob0);
       ASSERT_TRUE(controller_metadata.is_ok());
+      gpioB_id = controller_metadata->id();
 
       // Init metadata.
       std::vector<uint8_t> metadata_blob1 = std::move(*(*metadata)[1].data());
@@ -215,7 +217,8 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
           (*mgr_request.parents())[3].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                    bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
+                                    bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id)}},
           (*mgr_request.parents())[3].bind_rules(), false));
     }
 
@@ -232,15 +235,23 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       // 1st parent is pdev. Skipping that.
       // 2nd and 3rd parents are GPIO INIT of different gpio controllers.
-      for (uint32_t i = 1; i < 3; i++) {
-        EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-            {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
-            (*mgr_request.parents())[i].properties(), false));
-        EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-            {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                      bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
-            (*mgr_request.parents())[i].bind_rules(), false));
-      }
+      EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
+          (*mgr_request.parents())[1].properties(), false));
+      EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
+          {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                    bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioA_id)}},
+          (*mgr_request.parents())[1].bind_rules(), false));
+
+      EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
+          (*mgr_request.parents())[2].properties(), false));
+      EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
+          {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                    bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_CONTROLLER, gpioB_id)}},
+          (*mgr_request.parents())[2].bind_rules(), false));
     }
   }
 

@@ -7,6 +7,8 @@
 #include <optional>
 #include <type_traits>
 
+#include <pw_bytes/endian.h>
+
 #include "lib/fit/function.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
@@ -124,8 +126,10 @@ void Phase3::OnCentralIdentification(
     Abort(ErrorCode::kCommandNotSupported);
     return;
   }
-  uint16_t ediv = le16toh(params.ediv);
-  uint64_t random = le64toh(params.rand);
+  uint16_t ediv =
+      pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.ediv);
+  uint64_t random =
+      pw::bytes::ConvertOrderFrom(cpp20::endian::little, params.rand);
 
   if (!ShouldReceiveLtk()) {
     bt_log(WARN, "sm", "received unexpected ediv/rand");
@@ -284,8 +288,11 @@ bool Phase3::SendEncryptionKey() {
   // Send EDiv & Rand
   sm_chan().SendMessage(
       kCentralIdentification,
-      CentralIdentificationParams{.ediv = htole16(local_ltk_->key().ediv()),
-                                  .rand = htole64(local_ltk_->key().rand())});
+      CentralIdentificationParams{
+          .ediv = pw::bytes::ConvertOrderTo(cpp20::endian::little,
+                                            local_ltk_->key().ediv()),
+          .rand = pw::bytes::ConvertOrderTo(cpp20::endian::little,
+                                            local_ltk_->key().rand())});
 
   return true;
 }

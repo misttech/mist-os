@@ -83,7 +83,8 @@ def _does_target_need_visiting(target, optional_rule = None):
     else:
         return True
 
-_APPLICABLE_LICENSES_ATTR = "applicable_licenses"
+_APPLICABLE_LICENSES_ATTR = "applicable_licenses"  # Bazel <= 7.x
+_PACKAGE_METADATA_ATTR = "package_metadata"  # Bazel >= 8.x
 
 def _visit_target(target, ctx):
     if not _does_target_need_visiting(target, optional_rule = ctx.rule):
@@ -96,15 +97,14 @@ def _visit_target(target, ctx):
     transitive_providers = []
 
     has_applicable_licenses = False
-    if hasattr(ctx.rule.attr, _APPLICABLE_LICENSES_ATTR):
+    for license_dep in getattr(ctx.rule.attr, _APPLICABLE_LICENSES_ATTR, getattr(ctx.rule.attr, _PACKAGE_METADATA_ATTR, [])):
         # This target has applicable_licenses. Lets collect the licenses.
-        for license_dep in ctx.rule.attr.applicable_licenses:
-            has_applicable_licenses = True
-            if LicenseInfo in license_dep:
-                license_infos.append(license_dep[LicenseInfo])
-            else:
-                # applicable_licenses must reference a `license` target, which is a provider of LicenseInfo.
-                fail("No LicenseInfo provided for %s. Is this target a `license` target?" + license_dep)
+        has_applicable_licenses = True
+        if LicenseInfo in license_dep:
+            license_infos.append(license_dep[LicenseInfo])
+        else:
+            # applicable_licenses must reference a `license` target, which is a provider of LicenseInfo.
+            fail("No LicenseInfo provided for %s. Is this target a `license` target?" + license_dep)
 
     target_needs_license = not has_applicable_licenses and _does_target_need_license(target, optional_rule = ctx.rule)
 
@@ -131,7 +131,7 @@ def _visit_target(target, ctx):
 
     def visit_attributes(attribute_names):
         ignore_attrs_by_rule = ignore_policy.rule_attributes[ctx.rule.kind] if ctx.rule.kind in ignore_policy.rule_attributes else []
-        ignore_attrs = bool_dict(ignore_attrs_by_rule + [_APPLICABLE_LICENSES_ATTR] + [e for e in dir(ctx.rule.executable)])
+        ignore_attrs = bool_dict(ignore_attrs_by_rule + [_APPLICABLE_LICENSES_ATTR, _PACKAGE_METADATA_ATTR] + [e for e in dir(ctx.rule.executable)])
 
         for attr_name in attribute_names:
             if attr_name in ignore_attrs:

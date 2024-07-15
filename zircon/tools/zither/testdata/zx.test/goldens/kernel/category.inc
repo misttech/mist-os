@@ -34,9 +34,3 @@ SYSCALL_CATEGORY_END(test_category1)
 SYSCALL_CATEGORY_BEGIN(test_category2)
 SYSCALL_IN_CATEGORY(syscall_test2)
 SYSCALL_CATEGORY_END(test_category2)
-
-#define HAVE_SYSCALL_CATEGORY_vdsocall 1
-SYSCALL_CATEGORY_BEGIN(vdsocall)
-SYSCALL_IN_CATEGORY(clock_get_monotonic)
-SYSCALL_IN_CATEGORY(system_get_page_size)
-SYSCALL_CATEGORY_END(vdsocall)

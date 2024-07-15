@@ -8,8 +8,8 @@ rustc_library("gidl_util") {
   edition = "2021"
   deps = [
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/zircon/rust:fuchsia-zircon-status",
-    "//src/lib/zircon/rust:fuchsia-zircon-types",
+    "//src/lib/zircon/rust/fuchsia-zircon-status",
+    "//src/lib/zircon/rust/fuchsia-zircon-types",
   ]
   if (is_fuchsia) {
     deps += [ "//src/lib/zircon/rust:fuchsia-zircon" ]

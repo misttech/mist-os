@@ -8,6 +8,7 @@
 #include <memory>
 
 #include <gtest/gtest.h>
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
@@ -121,7 +122,7 @@ class Phase2LegacyTest : public l2cap::testing::FakeChannelTest {
   }
 
   UInt128 GenerateConfirmValue(const UInt128& random, uint32_t tk = 0) const {
-    tk = htole32(tk);
+    tk = pw::bytes::ConvertOrderTo(cpp20::endian::little, tk);
     UInt128 tk128;
     tk128.fill(0);
     std::memcpy(tk128.data(), &tk, sizeof(tk));

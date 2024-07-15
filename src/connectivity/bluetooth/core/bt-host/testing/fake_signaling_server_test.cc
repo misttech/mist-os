@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_signaling_server.h"
 
+#include <pw_bytes/endian.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/test_packets.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_l2cap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
@@ -39,7 +41,8 @@ TEST_F(FakeSignalingServerTest, ExtendedFeaturesInformationRequest) {
       l2cap::testing::AclExtFeaturesInfoReq(kCommandId, kConnectionHandle);
   const auto& send_header = sent_acl_packet.To<hci_spec::ACLDataHeader>();
   auto send_header_len = sizeof(send_header);
-  auto send_payload_len = le16toh(send_header.data_total_length);
+  uint16_t send_payload_len = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little, send_header.data_total_length);
   auto sent_packet = DynamicByteBuffer(send_payload_len);
   sent_acl_packet.Copy(&sent_packet, send_header_len, send_payload_len);
   fake_l2cap.HandlePdu(0x001, sent_packet);
@@ -71,7 +74,8 @@ TEST_F(FakeSignalingServerTest, FixedChannelInformationRequest) {
       kCommandId, kConnectionHandle);
   const auto& send_header = sent_acl_packet.To<hci_spec::ACLDataHeader>();
   auto send_header_len = sizeof(send_header);
-  auto send_payload_len = le16toh(send_header.data_total_length);
+  uint16_t send_payload_len = pw::bytes::ConvertOrderFrom(
+      cpp20::endian::little, send_header.data_total_length);
   auto sent_packet = DynamicByteBuffer(send_payload_len);
   sent_acl_packet.Copy(&sent_packet, send_header_len, send_payload_len);
   fake_l2cap.HandlePdu(0x001, sent_packet);

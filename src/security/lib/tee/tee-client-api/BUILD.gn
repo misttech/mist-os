@@ -22,10 +22,6 @@ shared_library("tee-client-api") {
     "//sdk/lib/fidl",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 static_library("tee-client-api-static") {
@@ -39,8 +35,4 @@ static_library("tee-client-api-static") {
     "//sdk/lib/fidl",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

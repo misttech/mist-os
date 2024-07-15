@@ -94,7 +94,8 @@ TEST_F(IsoStreamServerTest, ClosedClientSide) {
 // it sends the stream parameters back to the client.
 TEST_F(IsoStreamServerTest, StreamEstablishedSuccessfully) {
   EXPECT_EQ(on_established_events_.size(), (size_t)0);
-  server()->OnStreamEstablished(pw::bluetooth::emboss::StatusCode::SUCCESS, kCisParameters);
+  bt::iso::IsoStream::WeakPtr null_stream_ptr;
+  server()->OnStreamEstablished(null_stream_ptr, kCisParameters);
   RunLoopUntilIdle();
   ASSERT_EQ(on_established_events_.size(), (size_t)1);
 
@@ -139,7 +140,7 @@ TEST_F(IsoStreamServerTest, StreamEstablishedSuccessfully) {
 // don't pass back any stream parameters.
 TEST_F(IsoStreamServerTest, StreamNotEstablished) {
   EXPECT_EQ(on_established_events_.size(), 0u);
-  server()->OnStreamEstablished(pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR, std::nullopt);
+  server()->OnStreamEstablishmentFailed(pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR);
   RunLoopUntilIdle();
   ASSERT_EQ(on_established_events_.size(), 1u);
   auto& event1 = on_established_events_.front();
@@ -148,7 +149,7 @@ TEST_F(IsoStreamServerTest, StreamNotEstablished) {
   ASSERT_FALSE(event1.has_established_params());
   on_established_events_.pop();
 
-  server()->OnStreamEstablished(pw::bluetooth::emboss::StatusCode::UNKNOWN_COMMAND, kCisParameters);
+  server()->OnStreamEstablishmentFailed(pw::bluetooth::emboss::StatusCode::UNKNOWN_COMMAND);
   RunLoopUntilIdle();
   ASSERT_EQ(on_established_events_.size(), 1u);
   auto& event2 = on_established_events_.front();

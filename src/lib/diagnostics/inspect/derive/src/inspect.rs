@@ -9,6 +9,7 @@ use fuchsia_inspect::{
 use futures::lock;
 use std::{cell, sync};
 use thiserror::Error;
+use tracing_mutex::lockapi::TracingWrapper;
 
 /// AttachError denotes a broken data acquisition invariant, such as when a
 /// mutex is held during attachment.
@@ -146,6 +147,19 @@ where
         match self.try_lock() {
             Some(mut inner) => inner.iattach(parent, name),
             None => Err("could not get exclusive access to futures::lock::Mutex".into()),
+        }
+    }
+}
+
+// Underlying type for `lock_api::Mutex`.
+impl<T> Inspect for &lock_api::Mutex<TracingWrapper<fuchsia_sync::RawSyncMutex>, T>
+where
+    for<'a> &'a mut T: Inspect,
+{
+    fn iattach(self, parent: &Node, name: impl AsRef<str>) -> Result<(), AttachError> {
+        match self.try_lock() {
+            Some(mut inner) => inner.iattach(parent, name),
+            None => Err("could not get exclusive access to lock_api::Mutex".into()),
         }
     }
 }

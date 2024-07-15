@@ -16,8 +16,9 @@ use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use netstack3_core::device::{DeviceId, EthernetDeviceId, EthernetLinkDevice};
 use netstack3_core::error::AddressResolutionFailed;
+use netstack3_core::ip::WrapBroadcastMarker;
 use netstack3_core::neighbor::{LinkResolutionContext, LinkResolutionResult};
-use netstack3_core::routes::{NextHop, ResolvedRoute, WrapBroadcastMarker};
+use netstack3_core::routes::{NextHop, ResolvedRoute};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,

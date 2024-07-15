@@ -114,13 +114,13 @@ import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 #    Type: bool
 #    Default: false
 #
-#  generate_product_bundle (optional; default = true)
+#  generate_product_bundle_metadata (optional; default = use_bazel_images_only)
 #    Whether to generate the product bundle metadata for this product bundle.
 #
 #  product_bundle_name (optional; default = 'product.board')
 #    The product bundle will use this name instead of the currently active product.board name.
 #
-#  generate_image (optional; default = use_bazel_images_only)
+#  generate_image_metadata (optional; default = use_bazel_images_only)
 #    Whether to generate image metadata for this product bundle.
 #
 #  image_has_fxfs_blob (optional; default = fxfs_blob)
@@ -151,7 +151,7 @@ template("bazel_product_bundle") {
   assert(defined(invoker.bazel_inputs_from_gn),
          "bazel_inputs_from_gn is required")
 
-  labels = {
+  targets = {
     bazel_product_bundle = "${target_name}_bazel_action"
     package_manifest_list = "${target_name}_package_manifests_list"
     transfer_manifest = "${target_name}_transfer_manifest"
@@ -178,8 +178,8 @@ template("bazel_product_bundle") {
     transfer_json = "${out_dir}/transfer.json"
 
     if (defined(invoker.bazel_product_image_target)) {
-      product_assembly_out_dir = labels.bazel_product_assembly
-      create_system_out_dir = labels.bazel_create_system
+      product_assembly_out_dir = targets.bazel_product_assembly
+      create_system_out_dir = targets.bazel_create_system
     }
   }
 
@@ -228,9 +228,9 @@ template("bazel_product_bundle") {
     }
   }
 
-  _generate_image = use_bazel_images_only
-  if (defined(invoker.generate_image)) {
-    _generate_image = invoker.generate_image
+  _generate_image_metadata = use_bazel_images_only
+  if (defined(invoker.generate_image_metadata)) {
+    _generate_image_metadata = invoker.generate_image_metadata
   }
 
   # NOTE: Only depend on product image targets if your outputs are not included
@@ -269,16 +269,15 @@ template("bazel_product_bundle") {
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
-    allow_directory_in_outputs = true
-    copy_outputs = [
+    directory_outputs = [
       {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
-        ninja = _create_system_target
+        bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
+        ninja_dir = _create_system_target
+        tracked_files = [ "images.json" ]
       },
     ]
-    directory_timestamp_outputs = [ "${_create_system_target}/images.json" ]
 
-    if (_generate_image) {
+    if (_generate_image_metadata) {
       _full_label = get_label_info(":${target_name}", "label_with_toolchain")
       metadata = {
         assembly_manifests = [
@@ -331,15 +330,13 @@ template("bazel_product_bundle") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
-      allow_directory_in_outputs = true
-      copy_outputs = [
+      directory_outputs = [
         {
-          bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
-          ninja = _create_recovery_system_target
+          bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
+          ninja_dir = _create_recovery_system_target
+          tracked_files = [ "images.json" ]
         },
       ]
-      directory_timestamp_outputs =
-          [ "${_create_recovery_system_target}/images.json" ]
     }
   }
 
@@ -412,16 +409,18 @@ template("bazel_product_bundle") {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
-      allow_directory_in_outputs = true
-
       _visualization_path = "${_product_size_checker_target}/visualization"
+      directory_outputs = [
+        {
+          bazel_dir = "{{BAZEL_TARGET_OUT_PATH}}_visualization"
+          ninja_dir = _visualization_path
+          tracked_files = [ "index.html" ]
+        },
+      ]
+
       _size_breakdown_path =
           "${_product_size_checker_target}/size_breakdown.txt"
       copy_outputs = [
-        {
-          bazel = "{{BAZEL_TARGET_OUT_PATH}}_visualization"
-          ninja = _visualization_path
-        },
         {
           bazel = "{{BAZEL_TARGET_OUT_PATH}}_size_breakdown.txt"
           ninja = _size_breakdown_path
@@ -494,7 +493,7 @@ template("bazel_product_bundle") {
   }
 
   if (defined(invoker.bazel_license_review_target)) {
-    bazel_build_action(labels.license_review_bazel_action_target) {
+    bazel_build_action(targets.license_review_bazel_action_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
@@ -526,7 +525,7 @@ template("bazel_product_bundle") {
     }
   }
 
-  bazel_build_action(labels.bazel_product_bundle) {
+  bazel_build_action(targets.bazel_product_bundle) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -543,29 +542,21 @@ template("bazel_product_bundle") {
       deps += invoker.deps
     }
 
-    # Directory outputs are OK because `product_bundle.json` correctly
-    # represents the freshness of all outputs.
-    allow_directory_in_outputs = true
-    copy_outputs = [
-      {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
-        ninja = files.product_bundle_out_dir
-      },
-    ]
-    directory_timestamp_outputs = [
-      "${files.product_bundle_out_dir}/product_bundle.json",
-      "${files.product_bundle_out_dir}/system_a/fuchsia.zbi",
+    _product_bundle_tracked_files = [
+      "product_bundle.json",
+      "system_a/fuchsia.zbi",
     ]
 
-    _generate_product_bundle = true
-    if (defined(invoker.generate_product_bundle)) {
-      _generate_product_bundle = invoker.generate_product_bundle
+    _generate_product_bundle_metadata = use_bazel_images_only
+    if (defined(invoker.generate_product_bundle_metadata)) {
+      _generate_product_bundle_metadata =
+          invoker.generate_product_bundle_metadata
     }
 
     metadata = {
     }
 
-    if (_generate_product_bundle) {
+    if (_generate_product_bundle_metadata) {
       # This value can be set (e.g. for testing) with `--args sdk_id=1234` on
       # the `fx set` call.
       # In the future, the product bundles should be versioned independently of
@@ -593,11 +584,11 @@ template("bazel_product_bundle") {
         },
       ]
     } else {
-      not_needed(invoker, "product_bundle_name")
+      not_needed(invoker, [ "product_bundle_name" ])
     }
 
     # Populate metadata when Bazel image is not used will pollute GN assembly.
-    if (_generate_image) {
+    if (_generate_image_metadata) {
       _full_label = get_label_info(":${target_name}", "label_with_toolchain")
       _system_a_root = rebase_path(target_out_dir, root_out_dir) +
                        "/${files.product_bundle_out_dir}/system_a"
@@ -613,12 +604,10 @@ template("bazel_product_bundle") {
       }
 
       if (_image_has_fxfs_blob) {
-        directory_timestamp_outputs +=
-            [ "${files.product_bundle_out_dir}/system_a/fxfs.blk" ]
+        _product_bundle_tracked_files += [ "system_a/fxfs.blk" ]
         assert(!_image_has_fvm, "Cannot have both fxfs and fvm.")
       } else if (_image_has_fvm) {
-        directory_timestamp_outputs +=
-            [ "${files.product_bundle_out_dir}/system_a/fvm.blk" ]
+        _product_bundle_tracked_files += [ "system_a/fvm.blk" ]
       }
 
       _image_use_vbmeta = use_vbmeta
@@ -627,8 +616,7 @@ template("bazel_product_bundle") {
       }
 
       if (_image_use_vbmeta) {
-        directory_timestamp_outputs +=
-            [ "${files.product_bundle_out_dir}/system_a/fuchsia.vbmeta" ]
+        _product_bundle_tracked_files += [ "system_a/fuchsia.vbmeta" ]
       }
 
       _image_has_recovery = true
@@ -809,9 +797,19 @@ template("bazel_product_bundle") {
                    "image_use_vbmeta",
                  ])
     }
+
+    # Directory outputs are OK because `product_bundle.json` correctly
+    # represents the freshness of all outputs.
+    directory_outputs = [
+      {
+        bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
+        ninja_dir = files.product_bundle_out_dir
+        tracked_files = _product_bundle_tracked_files
+      },
+    ]
   }
 
-  package_tool_package_manifest_list_create(labels.package_manifest_list) {
+  package_tool_package_manifest_list_create(targets.package_manifest_list) {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -819,16 +817,16 @@ template("bazel_product_bundle") {
                            ])
     product_bundle = "${target_out_dir}/${files.product_bundle_out_dir}"
     manifests_dir = "${target_out_dir}/${files.package_manifests_out_dir}"
-    deps = [ ":${labels.bazel_product_bundle}" ]
+    deps = [ ":${targets.bazel_product_bundle}" ]
   }
 
-  product_bundle_transfer_manifest(labels.transfer_manifest) {
+  product_bundle_transfer_manifest(targets.transfer_manifest) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    product_bundle_target = ":${labels.bazel_product_bundle}"
+    product_bundle_target = ":${targets.bazel_product_bundle}"
     product_bundle_dir = "${target_out_dir}/${files.product_bundle_out_dir}"
     outputs = [ "${target_out_dir}/${files.out_dir}/transfer.json" ]
   }
@@ -841,15 +839,15 @@ template("bazel_product_bundle") {
                              "visibility",
                            ])
     deps = [
-      ":${labels.package_manifest_list}",
-      ":${labels.transfer_manifest}",
+      ":${targets.package_manifest_list}",
+      ":${targets.transfer_manifest}",
     ]
 
     if (defined(invoker.bazel_license_review_target)) {
-      deps += [ ":${labels.license_review_bazel_action_target}" ]
+      deps += [ ":${targets.license_review_bazel_action_target}" ]
     }
 
     # Some dependents want to claim outputs from these targets as inputs.
-    public_deps = [ ":${labels.bazel_product_bundle}" ]
+    public_deps = [ ":${targets.bazel_product_bundle}" ]
   }
 }

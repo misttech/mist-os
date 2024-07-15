@@ -4,7 +4,6 @@
 
 library fuchsia.net.filter;
 
-using fuchsia.hardware.network;
 using fuchsia.net;
 using fuchsia.net.interfaces;
 
@@ -163,13 +162,8 @@ type InterfaceMatcher = flexible union {
     1: id fuchsia.net.InterfaceId;
     /// The name of the interface.
     2: name fuchsia.net.interfaces.Name;
-    /// The device class of the interface.
-    3: device_class flexible union {
-        /// The loopback interface.
-        1: loopback Empty;
-        /// The interface's network device class.
-        2: device fuchsia.hardware.network.DeviceClass;
-    };
+    /// The port class of the interface.
+    3: port_class fuchsia.net.interfaces.PortClass;
 };
 
 /// A matcher for IP addresses.

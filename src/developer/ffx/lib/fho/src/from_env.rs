@@ -518,13 +518,6 @@ impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
 }
 
 #[async_trait(?Send)]
-impl TryFromEnv for ffx_writer::Writer {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.injector.writer().await.user_message("Failed to create writer")
-    }
-}
-
-#[async_trait(?Send)]
 impl TryFromEnv for ffx_writer::SimpleWriter {
     async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
         Ok(ffx_writer::SimpleWriter::new())

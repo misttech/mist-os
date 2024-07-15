@@ -1765,11 +1765,6 @@ static bool arch_noncontiguous_map() {
 static bool arch_noncontiguous_map_with_upgrade() {
   BEGIN_TEST;
 
-  // Skip this test if `Upgrade` behavior is not enabled for this arch.
-  if constexpr (!ENABLE_PAGE_FAULT_UPGRADE) {
-    END_TEST;
-  }
-
   // Get some phys pages to test on
   paddr_t phys[3];
   struct list_node phys_list = LIST_INITIAL_VALUE(phys_list);

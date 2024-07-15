@@ -5,6 +5,8 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SCO_SCO_CONNECTION_MANAGER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SCO_SCO_CONNECTION_MANAGER_H_
 
+#include <cinttypes>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
@@ -108,7 +110,10 @@ class ScoConnectionManager final {
     ConnectionRequest& operator=(ConnectionRequest&&) = default;
     ~ConnectionRequest() {
       if (callback) {
-        bt_log(DEBUG, "sco", "Cancelling SCO connection request (id: %zu)", id);
+        bt_log(DEBUG,
+               "sco",
+               "Cancelling SCO connection request (id: %" PRIu64 ")",
+               id);
         callback(fit::error(HostError::kCanceled));
       }
     }

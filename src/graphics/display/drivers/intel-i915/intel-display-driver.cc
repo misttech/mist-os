@@ -66,7 +66,8 @@ IntelDisplayDriver::~IntelDisplayDriver() = default;
 
 // static
 zx::result<> IntelDisplayDriver::Create(zx_device_t* parent) {
-  auto controller_result = Controller::Create(parent);
+  zx::result<std::unique_ptr<Controller>> controller_result =
+      Controller::Create(parent, inspect::Inspector{});
   if (controller_result.is_error()) {
     return controller_result.take_error();
   }

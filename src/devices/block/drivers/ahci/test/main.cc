@@ -504,7 +504,7 @@ class AhciTest : public inspect::InspectTestHelper, public zxtest::TestWithParam
 };
 
 TEST_P(AhciTest, SataDeviceRead) {
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_->inspector().DuplicateVmo()));
+  ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_->inspect()));
   const auto* ahci = hierarchy().GetByPath({"ahci"});
   ASSERT_NOT_NULL(ahci);
   const auto* ncq = ahci->node().get_property<inspect::BoolPropertyValue>("native_command_queuing");

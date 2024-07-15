@@ -10,10 +10,6 @@ import fuchsia_controller_py as fuchsia_controller
 
 from honeydew.typing import custom_types
 
-TIMEOUTS: dict[str, float] = {
-    "TARGET_WAIT": 15,
-}
-
 
 class FuchsiaController(abc.ABC):
     """ABC with methods for Host-(Fuchsia)Target interactions via
@@ -30,13 +26,8 @@ class FuchsiaController(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_connection(
-        self, timeout: float = TIMEOUTS["TARGET_WAIT"]
-    ) -> None:
+    def check_connection(self) -> None:
         """Checks the Fuchsia-Controller connection from host to Fuchsia device.
-
-        Args:
-            timeout: How long in seconds to wait.
 
         Raises:
             errors.FuchsiaControllerConnectionError

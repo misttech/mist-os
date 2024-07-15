@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon threads.
 
 use crate::{
-    object_get_info, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Profile, Status,
-    Task, Topic,
+    object_get_info_single, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Profile,
+    Status, Task, Topic,
 };
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
@@ -84,21 +84,14 @@ impl Thread {
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_THREAD_EXCEPTION_REPORT topic.
     pub fn get_exception_report(&self) -> Result<sys::zx_exception_report_t, Status> {
-        let mut info: sys::zx_exception_report_t = unsafe { std::mem::zeroed() };
-        object_get_info::<ThreadExceptionReport>(
-            self.as_handle_ref(),
-            std::slice::from_mut(&mut info),
-        )
-        .map(|_| info)
+        object_get_info_single::<ThreadExceptionReport>(self.as_handle_ref())
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_THREAD_STATS topic.
     pub fn get_stats(&self) -> Result<sys::zx_info_thread_stats_t, Status> {
-        let mut info = sys::zx_info_thread_stats_t::default();
-        object_get_info::<ThreadStatsQuery>(self.as_handle_ref(), std::slice::from_mut(&mut info))
-            .map(|_| info)
+        object_get_info_single::<ThreadStatsQuery>(self.as_handle_ref())
     }
 
     pub fn read_state_general_regs(&self) -> Result<sys::zx_thread_state_general_regs_t, Status> {

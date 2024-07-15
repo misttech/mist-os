@@ -215,10 +215,8 @@ class PowerSampler:
     def has_samples(self) -> bool:
         return False
 
-    def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
-        pass
-
     def extract_samples(self) -> Sequence["Sample"]:
+        """Return recorded samples. May be expensive and require I/O."""
         return []
 
     @abc.abstractmethod
@@ -236,14 +234,6 @@ class PowerSampler:
 
 class _NoopPowerSampler(PowerSampler):
     """A no-op power sampler, used in environments where _MEASUREPOWER_PATH_ENV_VARIABLE isn't set."""
-
-    def __init__(self, config: PowerSamplerConfig) -> None:
-        """Constructor.
-
-        Args:
-            config (PowerSamplerConfig): Configuration.
-        """
-        super().__init__(config)
 
     def _start_impl(self) -> None:
         pass
@@ -348,11 +338,8 @@ class _RealPowerSampler(PowerSampler):
     def has_samples(self) -> bool:
         return self._sampled_data
 
-    def merge_power_data(self, model: trace_model.Model, fxt_path: str) -> None:
-        merge_power_data(model, self.extract_samples(), fxt_path)
-
     def extract_samples(self) -> Sequence["Sample"]:
-        return read_power_samples(self._csv_output_path)
+        return _read_power_samples(self._csv_output_path)
 
 
 def create_power_sampler(
@@ -384,7 +371,7 @@ def create_power_sampler(
     return _RealPowerSampler(config)
 
 
-def read_fuchsia_trace_cpu_usage(
+def _read_fuchsia_trace_cpu_usage(
     model: trace_model.Model,
 ) -> Mapping[int, Sequence[tuple[trace_time.TimePoint, float]]]:
     """
@@ -452,7 +439,7 @@ class Sample:
         )
 
 
-def read_power_samples(power_trace_path: str) -> list[Sample]:
+def _read_power_samples(power_trace_path: str) -> list[Sample]:
     """Return a tuple of the current and power samples from the power csv"""
     samples: list[Sample] = []
     with open(power_trace_path, "r") as power_csv:
@@ -481,7 +468,7 @@ def read_power_samples(power_trace_path: str) -> list[Sample]:
     return samples
 
 
-def append_power_data(
+def _append_power_data(
     fxt_path: str,
     power_samples: Sequence[Sample],
     starting_ticks: int,
@@ -755,8 +742,23 @@ def build_usage_samples(
 def merge_power_data(
     model: trace_model.Model, power_samples: Sequence[Sample], fxt_path: str
 ) -> None:
+    """Merges power_samples into model, placing merged trace at fxt_path.
+
+    NB: model MUST be the in-memory representation of the serialized trace stored at fxt_path.
+        This function merely appends data to fxt_path; it cannot write trace events other than
+        synthetic events representing the data from power_samples.
+
+    Upon return, the serialized trace at fxt_path will include the events from model along with
+    synthesized events representing the data in power_samples.
+
+    Args:
+        model: The in-memory representation of the trace model stored at fxt_path.
+        power_samples: Power readings to merge with model.
+        fxt_path: A path to a serialized trace which has been read into memory and provided in
+                  model.
+    """
     # We'll start by reading in the fuchsia cpu data from the trace model
-    scheduling_intervals = read_fuchsia_trace_cpu_usage(model)
+    scheduling_intervals = _read_fuchsia_trace_cpu_usage(model)
 
     # We can't just append the power data to the beginning of the trace. The
     # trace starts before the power collection starts at some unknown offset.
@@ -849,4 +851,4 @@ def merge_power_data(
         )
 
     print(f"Aligning Power Trace to start at {starting_ticks} ticks")
-    append_power_data(fxt_path, power_samples, starting_ticks)
+    _append_power_data(fxt_path, power_samples, starting_ticks)

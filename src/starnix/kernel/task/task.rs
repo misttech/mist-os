@@ -1513,7 +1513,7 @@ impl MemoryAccessor for Task {
         // is being read from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().vmo_read_memory(addr, bytes)
+        self.mm().syscall_read_memory(addr, bytes)
     }
 
     fn read_memory_partial_until_null_byte<'a>(
@@ -1525,7 +1525,7 @@ impl MemoryAccessor for Task {
         // is being read from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().vmo_read_memory_partial_until_null_byte(addr, bytes)
+        self.mm().syscall_read_memory_partial_until_null_byte(addr, bytes)
     }
 
     fn read_memory_partial<'a>(
@@ -1537,7 +1537,7 @@ impl MemoryAccessor for Task {
         // is being read from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().vmo_read_memory_partial(addr, bytes)
+        self.mm().syscall_read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1545,7 +1545,7 @@ impl MemoryAccessor for Task {
         // is being written to a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().vmo_write_memory(addr, bytes)
+        self.mm().syscall_write_memory(addr, bytes)
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -1553,7 +1553,7 @@ impl MemoryAccessor for Task {
         // is being written to a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().vmo_write_memory_partial(addr, bytes)
+        self.mm().syscall_write_memory_partial(addr, bytes)
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
@@ -1561,7 +1561,7 @@ impl MemoryAccessor for Task {
         // is being zeroed from a task different than the `CurrentTask`. When
         // this `Task` is not current, its address space is not mapped
         // so we need to go through the VMO.
-        self.mm().vmo_zero(addr, length)
+        self.mm().syscall_zero(addr, length)
     }
 }
 

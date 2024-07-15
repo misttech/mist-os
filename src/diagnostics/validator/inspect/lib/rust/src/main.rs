@@ -6,7 +6,6 @@ use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::create_request_stream;
 use fidl_diagnostics_validate::*;
 use fidl_fuchsia_inspect::TreeMarker;
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::hierarchy::*;
 /// Rust Puppet, receiving commands to drive the Rust Inspect library.
@@ -58,7 +57,7 @@ struct Actor {
 /// Handles publishing and unpublishing an inspect tree.
 struct Publisher {
     inspector: Option<Inspector>,
-    publish_task: Option<fasync::Task<()>>,
+    publish_task: Option<inspect_runtime::PublishedInspectController>,
 }
 
 impl Publisher {

@@ -96,10 +96,10 @@ use crate::log::*;
 use crate::lsm_tree::cache::NullCache;
 use crate::lsm_tree::skip_list_layer::SkipListLayer;
 use crate::lsm_tree::types::{
-    Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound, OrdUpperBound,
-    RangeKey, SortByU64,
+    FuzzyHash, Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
+    OrdUpperBound, RangeKey, SortByU64,
 };
-use crate::lsm_tree::{layers_from_handles, LSMTree};
+use crate::lsm_tree::{layers_from_handles, LSMTree, Query};
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::object_manager::ReservationUpdate;
 use crate::object_store::transaction::{
@@ -107,7 +107,7 @@ use crate::object_store::transaction::{
 };
 use crate::object_store::{tree, DataObjectHandle, DirectWriter, HandleOptions, ObjectStore};
 use crate::range::RangeExt;
-use crate::round::{round_div, round_down};
+use crate::round::{round_div, round_down, round_up};
 use crate::serialized_types::{
     Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
 };
@@ -119,13 +119,14 @@ use fprint::TypeFingerprint;
 use fuchsia_inspect::{ArrayProperty, HistogramProperty};
 use futures::FutureExt;
 use merge::{filter_marked_for_deletion, filter_tombstones, merge};
+use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher as _};
 use std::marker::PhantomData;
 use std::num::Saturating;
-use std::ops::{Bound, Range};
+use std::ops::Range;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
@@ -304,6 +305,41 @@ pub struct AllocatorKeyV32 {
 impl SortByU64 for AllocatorKey {
     fn get_leading_u64(&self) -> u64 {
         self.device_range.start
+    }
+}
+
+const EXTENT_HASH_BUCKET_SIZE: u64 = 1 * 1024 * 1024;
+
+pub struct AllocatorKeyPartitionIterator {
+    device_range: Range<u64>,
+}
+
+impl Iterator for AllocatorKeyPartitionIterator {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.device_range.start >= self.device_range.end {
+            None
+        } else {
+            let start = self.device_range.start;
+            self.device_range.start = start.saturating_add(EXTENT_HASH_BUCKET_SIZE);
+            let end = std::cmp::min(self.device_range.start, self.device_range.end);
+            let key = AllocatorKey { device_range: start..end };
+            let mut hasher = FxHasher::default();
+            key.hash(&mut hasher);
+            Some(hasher.finish())
+        }
+    }
+}
+
+impl FuzzyHash for AllocatorKey {
+    type Iter = AllocatorKeyPartitionIterator;
+
+    fn fuzzy_hash(&self) -> Self::Iter {
+        AllocatorKeyPartitionIterator {
+            device_range: round_down(self.device_range.start, EXTENT_HASH_BUCKET_SIZE)
+                ..round_up(self.device_range.end, EXTENT_HASH_BUCKET_SIZE).unwrap_or(u64::MAX),
+        }
     }
 }
 
@@ -917,7 +953,7 @@ impl Allocator {
 
         let mut to_add = Vec::new();
         let mut merger = layer_set.merger();
-        let mut iter = self.filter(merger.seek(Bound::Unbounded).await?, false).await?;
+        let mut iter = self.filter(merger.query(Query::FullScan).await?, false).await?;
         let mut last_offset = 0;
         while last_offset < self.device_size {
             let next_range = match iter.get() {
@@ -985,7 +1021,7 @@ impl Allocator {
         let mut merger = layer_set.merger();
         let mut iter = self
             .filter(
-                merger.seek(Bound::Included(&AllocatorKey { device_range: offset..0 })).await?,
+                merger.query(Query::FullRange(&AllocatorKey { device_range: offset..0 })).await?,
                 false,
             )
             .await?;
@@ -1987,14 +2023,16 @@ impl<'a> Flusher<'a> {
         let txn_options = Self::txn_options(object_manager.metadata_reservation());
 
         let layer_set = self.allocator.tree.immutable_layer_set();
+        let total_len = layer_set.sum_len();
         {
             let mut merger = layer_set.merger();
-            let iter = self.allocator.filter(merger.seek(Bound::Unbounded).await?, true).await?;
+            let iter = self.allocator.filter(merger.query(Query::FullScan).await?, true).await?;
             let iter = CoalescingIterator::new(iter).await?;
             self.allocator
                 .tree
                 .compact_with_iterator(
                     iter,
+                    total_len,
                     DirectWriter::new(&layer_object_handle, txn_options).await,
                     layer_object_handle.block_size(),
                 )
@@ -2112,7 +2150,7 @@ mod tests {
     use crate::lsm_tree::cache::NullCache;
     use crate::lsm_tree::skip_list_layer::SkipListLayer;
     use crate::lsm_tree::types::{Item, ItemRef, Layer, LayerIterator};
-    use crate::lsm_tree::LSMTree;
+    use crate::lsm_tree::{LSMTree, Query};
     use crate::object_handle::ObjectHandle;
     use crate::object_store::allocator::merge::merge;
     use crate::object_store::allocator::{
@@ -2180,7 +2218,7 @@ mod tests {
         let layer_set = lsm_tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter =
-            CoalescingIterator::new(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            CoalescingIterator::new(merger.query(Query::FullScan).await.expect("seek failed"))
                 .await
                 .expect("new failed");
         let ItemRef { key, value, .. } = iter.get().expect("get failed");
@@ -2215,7 +2253,7 @@ mod tests {
         let layer_set = lsm_tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter =
-            CoalescingIterator::new(merger.seek(Bound::Unbounded).await.expect("seek failed"))
+            CoalescingIterator::new(merger.query(Query::FullScan).await.expect("seek failed"))
                 .await
                 .expect("new failed");
         let ItemRef { key, value, .. } = iter.get().expect("get failed");
@@ -2251,7 +2289,7 @@ mod tests {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = allocator
-            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
+            .filter(merger.query(Query::FullScan).await.expect("seek failed"), false)
             .await
             .expect("build iterator");
         let mut allocations: Vec<Range<u64>> = Vec::new();
@@ -2269,7 +2307,7 @@ mod tests {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
         let mut iter = allocator
-            .filter(merger.seek(Bound::Unbounded).await.expect("seek failed"), false)
+            .filter(merger.query(Query::FullScan).await.expect("seek failed"), false)
             .await
             .expect("build iterator");
         let mut found = 0;

@@ -5,17 +5,20 @@
 // TODO(https://fxbug.dev/42178223): need validation after deserialization.
 use crate::checksum::Checksums;
 use crate::lsm_tree::types::{
-    Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey, SortByU64,
+    FuzzyHash, Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey,
+    SortByU64,
 };
 use crate::object_store::extent_record::{
-    ExtentKey, ExtentKeyV32, ExtentValue, ExtentValueV32, ExtentValueV37, ExtentValueV38,
+    ExtentKey, ExtentKeyPartitionIterator, ExtentKeyV32, ExtentValue, ExtentValueV32,
+    ExtentValueV37, ExtentValueV38,
 };
 use crate::serialized_types::{migrate_to_version, Migrate, Versioned};
 use fprint::TypeFingerprint;
 use fxfs_crypto::WrappedKeysV32;
+use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher as _};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// ObjectDescriptor is the set of possible records in the object store.
@@ -197,22 +200,6 @@ impl ObjectKey {
         Self { object_id, data: ObjectKeyData::ExtendedAttribute { name } }
     }
 
-    /// Returns the search key for this extent; that is, a key which is <= this key under Ord and
-    /// OrdLowerBound.
-    /// This would be used when searching for an extent with |find| (when we want to find any
-    /// overlapping extent, which could include extents that start earlier).
-    pub fn search_key(&self) -> Self {
-        if let Self {
-            object_id,
-            data: ObjectKeyData::Attribute(attribute_id, AttributeKey::Extent(e)),
-        } = self
-        {
-            Self::attribute(*object_id, *attribute_id, AttributeKey::Extent(e.search_key()))
-        } else {
-            self.clone()
-        }
-    }
-
     /// Returns the merge key for this key; that is, a key which is <= this key and any
     /// other possibly overlapping key, under Ord. This would be used for the hint in |merge_into|.
     pub fn key_for_merge_into(&self) -> Self {
@@ -288,6 +275,18 @@ impl LayerKey for ObjectKey {
             _ => None,
         }
     }
+
+    fn search_key(&self) -> Self {
+        if let Self {
+            object_id,
+            data: ObjectKeyData::Attribute(attribute_id, AttributeKey::Extent(e)),
+        } = self
+        {
+            Self::attribute(*object_id, *attribute_id, AttributeKey::Extent(e.search_key()))
+        } else {
+            self.clone()
+        }
+    }
 }
 
 impl RangeKey for ObjectKey {
@@ -304,6 +303,47 @@ impl RangeKey for ObjectKey {
                     && left_key.range.start < right_key.range.end
             }
             (a, b) => a == b,
+        }
+    }
+}
+
+pub enum ObjectKeyFuzzyHashIterator {
+    ExtentKey(/* object_id */ u64, /* attribute_id */ u64, ExtentKeyPartitionIterator),
+    NotExtentKey(/* hash */ Option<u64>),
+}
+
+impl Iterator for ObjectKeyFuzzyHashIterator {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::ExtentKey(oid, attr_id, extent_keys) => extent_keys.next().map(|range| {
+                let mut hasher = FxHasher::default();
+                ObjectKey::extent(*oid, *attr_id, range).hash(&mut hasher);
+                hasher.finish()
+            }),
+            Self::NotExtentKey(hash) => hash.take(),
+        }
+    }
+}
+
+impl FuzzyHash for ObjectKey {
+    type Iter = ObjectKeyFuzzyHashIterator;
+
+    fn fuzzy_hash(&self) -> Self::Iter {
+        match &self.data {
+            ObjectKeyData::Attribute(attr_id, AttributeKey::Extent(extent)) => {
+                ObjectKeyFuzzyHashIterator::ExtentKey(
+                    self.object_id,
+                    *attr_id,
+                    extent.fuzzy_hash_partition(),
+                )
+            }
+            _ => {
+                let mut hasher = FxHasher::default();
+                self.hash(&mut hasher);
+                ObjectKeyFuzzyHashIterator::NotExtentKey(Some(hasher.finish()))
+            }
         }
     }
 }

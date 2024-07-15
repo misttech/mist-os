@@ -12,7 +12,7 @@ type Controller interface {
 	Up() error
 	Down() error
 	SetPromiscuousMode(bool) error
-	DeviceClass() network.DeviceClass
+	PortClass() network.PortClass
 	ConnectPort(network.PortWithCtxInterfaceRequest)
 }
 

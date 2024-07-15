@@ -4,12 +4,26 @@
 
 #include "src/storage/blobfs/compression/external_decompressor.h"
 
+#include <fidl/fuchsia.blobfs.internal/cpp/wire.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/fifo.h>
+#include <lib/zx/result.h>
 #include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/rights.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
 
-#include "src/storage/lib/vfs/cpp/debug.h"
+#include <cstddef>
+#include <memory>
+#include <optional>
+#include <utility>
+
+#include "src/storage/blobfs/compression_settings.h"
 
 namespace blobfs {
 
@@ -17,9 +31,10 @@ DecompressorCreatorConnector& DecompressorCreatorConnector::DefaultServiceConnec
   class ServiceConnector final : public DecompressorCreatorConnector {
    public:
     // DecompressorCreatorConnector interface.
-    zx_status_t ConnectToDecompressorCreator(zx::channel remote_channel) final {
+    zx_status_t ConnectToDecompressorCreator(
+        fidl::ServerEnd<fuchsia_blobfs_internal::DecompressorCreator> remote_channel) final {
       return fdio_service_connect("/svc/fuchsia.blobfs.internal.DecompressorCreator",
-                                  remote_channel.release());
+                                  remote_channel.TakeChannel().release());
     }
   };
   static ServiceConnector singleton{};
@@ -54,87 +69,87 @@ zx::result<std::unique_ptr<ExternalDecompressorClient>> ExternalDecompressorClie
 
 zx_status_t ExternalDecompressorClient::Prepare() {
   zx_signals_t signal;
-  zx_status_t status =
-      fifo_.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED, zx::time::infinite_past(), &signal);
-  if (status == ZX_OK && (signal & ZX_FIFO_PEER_CLOSED) == 0 && (signal & ZX_FIFO_WRITABLE) != 0) {
+  if (zx_status_t status = fifo_.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED,
+                                          zx::time::infinite_past(), &signal);
+      status == ZX_OK && (signal & ZX_FIFO_PEER_CLOSED) == 0 && (signal & ZX_FIFO_WRITABLE) != 0) {
     return ZX_OK;
   }
 
-  status = PrepareDecompressorCreator();
-  if (status != ZX_OK) {
+  if (zx_status_t status = PrepareDecompressorCreator(); status != ZX_OK) {
     return status;
   }
 
   zx::vmo remote_decompressed_vmo;
-  status = decompressed_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &remote_decompressed_vmo);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to create remote duplicate of decompressed VMO: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status =
+          decompressed_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &remote_decompressed_vmo);
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to create remote duplicate of decompressed VMO";
     return status;
   }
   zx::vmo remote_compressed_vmo;
-  status = compressed_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &remote_compressed_vmo);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to create remote duplicate of compressed VMO: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status = compressed_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &remote_compressed_vmo);
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to create remote duplicate of compressed VMO";
     return status;
   }
 
   zx::fifo remote_fifo;
   // Sized for 4 elements, allows enough pipelining to keep the remote process
   // from descheduling to have 2 in flight requests/response pairs.
-  status = zx::fifo::create(4, sizeof(fuchsia_blobfs_internal::wire::DecompressRequest), 0, &fifo_,
-                            &remote_fifo);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed create fifo for external decompressor: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status = zx::fifo::create(
+          4, sizeof(fuchsia_blobfs_internal::wire::DecompressRequest), 0, &fifo_, &remote_fifo);
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed create fifo for external decompressor";
     return status;
   }
 
-  zx_status_t fidl_status =
-      decompressor_creator_->Create(std::move(remote_fifo), std::move(remote_compressed_vmo),
-                                    std::move(remote_decompressed_vmo), &status);
-  if (fidl_status == ZX_ERR_PEER_CLOSED) {
-    decompressor_creator_.Unbind();
+  auto fidl_result = fidl::WireCall(decompressor_creator_)
+                         ->Create(std::move(remote_fifo), std::move(remote_compressed_vmo),
+                                  std::move(remote_decompressed_vmo));
+  if (fidl_result.is_peer_closed()) {
+    decompressor_creator_.reset();
   }
-  if (fidl_status != ZX_OK) {
+  if (!fidl_result.ok()) {
     FX_LOGS(ERROR) << "FIDL error communicating with external decompressor: "
-                   << zx_status_get_string(fidl_status);
-    return fidl_status;
+                   << fidl_result.FormatDescription();
+    return fidl_result.status();
   }
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Error calling Create on DecompressorCreator service: "
-                   << zx_status_get_string(status);
+  if (fidl_result.value().status != ZX_OK) {
+    FX_PLOGS(ERROR, fidl_result.value().status)
+        << "Error calling Create on DecompressorCreator service";
   }
-  return status;
+  return fidl_result.value().status;
 }
 
 zx_status_t ExternalDecompressorClient::PrepareDecompressorCreator() {
-  if (decompressor_creator_.is_bound()) {
+  if (decompressor_creator_.is_valid()) {
     zx_signals_t signal;
-    zx_status_t status = decompressor_creator_.unowned_channel()->wait_one(
+    zx_status_t status = decompressor_creator_.channel().wait_one(
         ZX_CHANNEL_WRITABLE | ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &signal);
     if (status == ZX_OK && (signal & ZX_CHANNEL_PEER_CLOSED) == 0 &&
         (signal & ZX_CHANNEL_WRITABLE) != 0) {
       return ZX_OK;
     } else {
-      decompressor_creator_.Unbind();
+      decompressor_creator_.reset();
     }
   }
 
-  auto remote_channel = decompressor_creator_.NewRequest();
-  if (!decompressor_creator_.is_bound()) {
-    FX_LOGS(ERROR) << "Failed to create channel pair for external decompressor.";
-    return ZX_ERR_NO_RESOURCES;
+  auto remote_channel = fidl::CreateEndpoints(&decompressor_creator_);
+  if (remote_channel.is_error()) {
+    FX_PLOGS(ERROR, remote_channel.status_value())
+        << "Failed to create channel pair for external decompressor.";
+    return remote_channel.status_value();
   }
 
-  zx_status_t status = connector_->ConnectToDecompressorCreator(remote_channel.TakeChannel());
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to connect to DecompressorCreator service: "
-                   << zx_status_get_string(status);
-    decompressor_creator_.Unbind();
+  if (zx_status_t status =
+          connector_->ConnectToDecompressorCreator(std::move(remote_channel).value());
+      status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to connect to DecompressorCreator service";
+    decompressor_creator_.reset();
+    return status;
   }
-  return status;
+
+  return ZX_OK;
 }
 
 zx_status_t ExternalDecompressorClient::SendMessage(

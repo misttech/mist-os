@@ -16,8 +16,6 @@ pub enum Error {
     RxFlags(u32),
     #[error("unknown FrameType({0}) set by driver")]
     FrameType(u8),
-    #[error("the task is dropped so session can make no progress")]
-    NoProgress,
     #[error("invalid config: {0}")]
     Config(String),
     #[error("too many descriptors are chained ({0}), at most 4 are allowed")]

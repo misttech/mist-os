@@ -17,8 +17,6 @@ namespace {
 
 using namespace inspect::testing;
 
-using bt::testing::CommandTransaction;
-
 using TestingBase =
     bt::testing::FakeDispatcherControllerTest<bt::testing::MockController>;
 
@@ -32,25 +30,23 @@ using TestingBase =
   StaticByteBuffer( hci_spec::kCommandStatusEventCode, 0x04, \
                                  (statuscode), 0xF0,                 \
                                  LowerBits((opcode)), UpperBits((opcode)))
+// clang-format on
 
+const auto kWriteInquiryActivity =
+    testing::WriteInquiryScanActivity(kInquiryScanInterval, kInquiryScanWindow);
 
-const StaticByteBuffer kWriteInquiryActivity(
-    LowerBits(hci_spec::kWriteInquiryScanActivity), UpperBits(hci_spec::kWriteInquiryScanActivity),
-    0x04, // Param total size
-    LowerBits(kInquiryScanInterval), UpperBits(kInquiryScanInterval),
-    LowerBits(kInquiryScanWindow), UpperBits(kInquiryScanWindow)
-);
-
-const auto kWriteInquiryActivityRsp = COMMAND_COMPLETE_RSP(hci_spec::kWriteInquiryScanActivity);
+const auto kWriteInquiryActivityRsp =
+    testing::WriteInquiryScanActivityResponse();
 
 const StaticByteBuffer kWriteInquiryType(
-    LowerBits(hci_spec::kWriteInquiryScanType), UpperBits(hci_spec::kWriteInquiryScanType),
-    0x01, // Param total size
-    0x01 // Interlaced Inquiry Scan
+    LowerBits(hci_spec::kWriteInquiryScanType),
+    UpperBits(hci_spec::kWriteInquiryScanType),
+    0x01,  // Param total size
+    0x01   // Interlaced Inquiry Scan
 );
 
-const auto kWriteInquiryTypeRsp = COMMAND_COMPLETE_RSP(hci_spec::kWriteInquiryScanType);
-// clang-format on
+const auto kWriteInquiryTypeRsp =
+    COMMAND_COMPLETE_RSP(hci_spec::kWriteInquiryScanType);
 
 class BrEdrDiscoveryManagerTest : public TestingBase {
  public:
@@ -105,42 +101,37 @@ using GAP_BrEdrDiscoveryManagerTest = BrEdrDiscoveryManagerTest;
 // Suffix DeathTest has GoogleTest-specific behavior
 using BrEdrDiscoveryManagerDeathTest = BrEdrDiscoveryManagerTest;
 
-// clang-format off
-const StaticByteBuffer kInquiry(
-  LowerBits(hci_spec::kInquiry), UpperBits(hci_spec::kInquiry),
-  0x05, // Paramreter total size
-  0x33, 0x8B, 0x9E, // GIAC
-  0x08, // hci_spec::kInquiryLengthDefault
-  0x00 // Unlimited responses
-);
+const auto kInquiry = testing::InquiryCommandPacket();
 
 const auto kWriteLocalNameRsp =
-    COMMAND_STATUS_RSP(hci_spec::kWriteLocalName, pw::bluetooth::emboss::StatusCode::SUCCESS);
+    testing::WriteLocalNameResponse(pw::bluetooth::emboss::StatusCode::SUCCESS);
 
-const auto kWriteLocalNameRspError =
-    COMMAND_STATUS_RSP(hci_spec::kWriteLocalName, pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
+const auto kWriteLocalNameRspError = testing::WriteLocalNameResponse(
+    pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
 
 const auto kWriteExtendedInquiryResponseRsp =
-    COMMAND_STATUS_RSP(hci_spec::kWriteExtendedInquiryResponse, pw::bluetooth::emboss::StatusCode::SUCCESS);
+    testing::WriteExtendedInquiryResponse(
+        pw::bluetooth::emboss::StatusCode::SUCCESS);
 
 const auto kWriteExtendedInquiryResponseRspError =
-    COMMAND_STATUS_RSP(hci_spec::kWriteExtendedInquiryResponse, pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
+    testing::WriteExtendedInquiryResponse(
+        pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
 
-const auto kInquiryRsp = COMMAND_STATUS_RSP(hci_spec::kInquiry, pw::bluetooth::emboss::StatusCode::SUCCESS);
+const auto kInquiryRsp =
+    testing::InquiryCommandResponse(pw::bluetooth::emboss::StatusCode::SUCCESS);
 
-const auto kInquiryRspError = COMMAND_STATUS_RSP(hci_spec::kInquiry, pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
+const auto kInquiryRspError = testing::InquiryCommandResponse(
+    pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
 
 const StaticByteBuffer kInquiryComplete(
-  hci_spec::kInquiryCompleteEventCode,
-  0x01, // parameter_total_size (1 bytes)
-  pw::bluetooth::emboss::StatusCode::SUCCESS
-);
+    hci_spec::kInquiryCompleteEventCode,
+    0x01,  // parameter_total_size (1 bytes)
+    pw::bluetooth::emboss::StatusCode::SUCCESS);
 
 const StaticByteBuffer kInquiryCompleteError(
-  hci_spec::kInquiryCompleteEventCode,
-  0x01, // parameter_total_size (1 bytes)
-  pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE
-);
+    hci_spec::kInquiryCompleteEventCode,
+    0x01,  // parameter_total_size (1 bytes)
+    pw::bluetooth::emboss::StatusCode::HARDWARE_FAILURE);
 
 #define BD_ADDR(addr1) addr1, 0x00, 0x00, 0x00, 0x00, 0x00
 
@@ -157,6 +148,7 @@ const DeviceAddress kDeviceAddress3(DeviceAddress::Type::kBREDR,
 const DeviceAddress kLeAliasAddress3(DeviceAddress::Type::kLEPublic,
                                      kDeviceAddress3.value());
 
+// clang-format off
 const StaticByteBuffer kInquiryResult(
   hci_spec::kInquiryResultEventCode,
   0x0F, // parameter_total_size (15 bytes)
@@ -296,7 +288,6 @@ const StaticByteBuffer kSetExtendedMode(
 );
 
 const auto kSetExtendedModeRsp = COMMAND_COMPLETE_RSP(hci_spec::kWriteInquiryMode);
-
 
 const StaticByteBuffer kWriteLocalName(
   LowerBits(hci_spec::kWriteLocalName), UpperBits(hci_spec::kWriteLocalName),

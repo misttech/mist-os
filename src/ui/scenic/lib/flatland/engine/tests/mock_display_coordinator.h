@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl_test_base.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
+#include <fuchsia/math/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
@@ -76,7 +77,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   MOCK_METHOD(void, SetLayerPrimaryPosition,
               (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::Transform,
-               fuchsia::hardware::display::types::Frame, fuchsia::hardware::display::types::Frame));
+               fuchsia::math::RectU, fuchsia::math::RectU));
 
   MOCK_METHOD(void, SetLayerPrimaryAlpha,
               (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::AlphaMode,

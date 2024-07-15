@@ -152,20 +152,20 @@ impl Config {
                             id,
                             name,
                             online,
-                            device_class,
+                            port_class,
                             ..
                         },
                     ) => {
                         info!(
-                            "NICID: {:?}, name: {:?}, online: {:?}, device_class: {:?}",
-                            id, name, online, device_class
+                            "NICID: {:?}, name: {:?}, online: {:?}, port_class: {:?}",
+                            id, name, online, port_class
                         );
                         if let (
-                            Some(fidl_fuchsia_net_interfaces::DeviceClass::Device(
-                                fidl_fuchsia_hardware_network::DeviceClass::Wlan,
+                            Some(fidl_fuchsia_net_interfaces::PortClass::Device(
+                                fidl_fuchsia_hardware_network::PortClass::Wlan,
                             )),
                             Some(true),
-                        ) = (device_class, online)
+                        ) = (port_class, online)
                         {
                             return Some(id.unwrap_or(0) as ot::NetifIndex);
                         }

@@ -31,8 +31,8 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/api-types-cpp/frame.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
 
 namespace simple_display {
 
@@ -350,19 +350,19 @@ bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_
     return false;
   }
 
-  const display::Frame expected_frame = {
-      .x_pos = 0,
-      .y_pos = 0,
+  const display::Rectangle display_area({
+      .x = 0,
+      .y = 0,
       .width = properties_.width_px,
       .height = properties_.height_px,
-  };
-  const display::Frame actual_dest_frame = display::ToFrame(banjo_layer.dest_frame);
-  if (actual_dest_frame != expected_frame) {
+  });
+  const auto actual_display_destination = display::Rectangle::From(banjo_layer.display_destination);
+  if (actual_display_destination != display_area) {
     return false;
   }
 
-  const display::Frame actual_src_frame = display::ToFrame(banjo_layer.src_frame);
-  if (actual_src_frame != expected_frame) {
+  const auto actual_image_source = display::Rectangle::From(banjo_layer.image_source);
+  if (actual_image_source != display_area) {
     return false;
   }
 

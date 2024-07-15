@@ -6,18 +6,17 @@
 //! in this module provide a common interface for platform-specific buffers
 //! used by TCP.
 
+use netstack3_base::{Payload, SendPayload, SeqNum, WindowSize};
+
 use alloc::vec;
 use alloc::vec::Vec;
 use core::cmp;
 use core::fmt::Debug;
-use core::num::{NonZeroUsize, TryFromIntError};
+use core::num::NonZeroUsize;
 use core::ops::Range;
 use either::Either;
-use packet::InnerPacketBuilder;
 
 use crate::internal::base::BufferSizes;
-use crate::internal::segment::Payload;
-use crate::internal::seqnum::{SeqNum, WindowSize};
 use crate::internal::state::Takeable;
 
 /// Common super trait for both sending and receiving buffer.
@@ -102,86 +101,6 @@ pub struct BufferLimits {
 
     /// The number of readable bytes that the buffer currently holds.
     pub len: usize,
-}
-
-/// A type for the payload being sent.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum SendPayload<'a> {
-    /// The payload is contained in a single chunk of memory.
-    Contiguous(&'a [u8]),
-    /// The payload straddles across two chunks of memory.
-    Straddle(&'a [u8], &'a [u8]),
-}
-
-impl Payload for SendPayload<'_> {
-    fn len(&self) -> usize {
-        match self {
-            SendPayload::Contiguous(p) => p.len(),
-            SendPayload::Straddle(p1, p2) => p1.len() + p2.len(),
-        }
-    }
-
-    fn slice(self, range: Range<u32>) -> Self {
-        match self {
-            SendPayload::Contiguous(p) => SendPayload::Contiguous(p.slice(range)),
-            SendPayload::Straddle(p1, p2) => {
-                let Range { start, end } = range;
-                let start = usize::try_from(start).unwrap_or_else(|TryFromIntError { .. }| {
-                    panic!(
-                        "range start index {} out of range for slice of length {}",
-                        start,
-                        self.len()
-                    )
-                });
-                let end = usize::try_from(end).unwrap_or_else(|TryFromIntError { .. }| {
-                    panic!(
-                        "range end index {} out of range for slice of length {}",
-                        end,
-                        self.len()
-                    )
-                });
-                assert!(start <= end);
-                let first_len = p1.len();
-                if start < first_len && end > first_len {
-                    SendPayload::Straddle(&p1[start..first_len], &p2[0..end - first_len])
-                } else if start >= first_len {
-                    SendPayload::Contiguous(&p2[start - first_len..end - first_len])
-                } else {
-                    SendPayload::Contiguous(&p1[start..end])
-                }
-            }
-        }
-    }
-
-    fn partial_copy(&self, offset: usize, dst: &mut [u8]) {
-        match self {
-            SendPayload::Contiguous(p) => p.partial_copy(offset, dst),
-            SendPayload::Straddle(p1, p2) => {
-                if offset < p1.len() {
-                    let first_len = dst.len().min(p1.len() - offset);
-                    p1.partial_copy(offset, &mut dst[..first_len]);
-                    if dst.len() > first_len {
-                        p2.partial_copy(0, &mut dst[first_len..]);
-                    }
-                } else {
-                    p2.partial_copy(offset - p1.len(), dst);
-                }
-            }
-        }
-    }
-}
-
-impl InnerPacketBuilder for SendPayload<'_> {
-    fn bytes_len(&self) -> usize {
-        match self {
-            SendPayload::Contiguous(p) => p.len(),
-            SendPayload::Straddle(p1, p2) => p1.len() + p2.len(),
-        }
-    }
-
-    fn serialize(&self, buffer: &mut [u8]) {
-        self.partial_copy(0, buffer);
-    }
 }
 
 /// A circular buffer implementation.
@@ -873,8 +792,8 @@ pub(crate) mod testutil {
 mod test {
     use assert_matches::assert_matches;
     use packet::{
-        Buf, FragmentedBytesMut, PacketBuilder, PacketConstraints, SerializeError, SerializeTarget,
-        Serializer,
+        Buf, FragmentedBytesMut, InnerPacketBuilder as _, PacketBuilder, PacketConstraints,
+        SerializeError, SerializeTarget, Serializer,
     };
     use proptest::proptest;
     use proptest::strategy::{Just, Strategy};
@@ -883,7 +802,7 @@ mod test {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::seqnum::WindowSize;
+    use netstack3_base::WindowSize;
 
     const TEST_BYTES: &'static [u8] = "Hello World!".as_bytes();
 
@@ -1375,7 +1294,6 @@ mod test {
     }
     mod send_payload {
         use super::*;
-        use alloc::borrow::ToOwned as _;
 
         pub(super) fn with_index() -> impl Strategy<Value = (SendPayload<'static>, usize)> {
             proptest::prop_oneof![
@@ -1397,15 +1315,6 @@ mod test {
             with_index().prop_flat_map(|(payload, index)| {
                 (Just(payload), Just(index), 0..=TEST_BYTES.len() - index)
             })
-        }
-
-        impl SendPayload<'_> {
-            pub(super) fn to_vec(self) -> Vec<u8> {
-                match self {
-                    SendPayload::Contiguous(p) => p.to_owned(),
-                    SendPayload::Straddle(p1, p2) => [p1, p2].concat(),
-                }
-            }
         }
     }
 }

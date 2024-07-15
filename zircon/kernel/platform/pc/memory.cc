@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/arch/x86/boot-cpuid.h>
+#include <lib/memalloc/range.h>
 #include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -28,6 +29,7 @@
 #include <lk/init.h>
 #include <object/handle.h>
 #include <object/resource_dispatcher.h>
+#include <phys/handoff.h>
 #include <vm/bootreserve.h>
 #include <vm/vm.h>
 
@@ -76,56 +78,33 @@ void mark_pio_region_to_reserve(uint64_t base, size_t len) {
 
 // Populate global memory arenas from the given memory ranges.
 static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
-  // Create the kernel's singleton for address space management.
-  pmm_arena_info_t base_arena;
-  snprintf(base_arena.name, sizeof(base_arena.name), "%s", "memory");
-  base_arena.flags = 0;
-
-  LTRACEF("%zu memory ranges from physboot\n", ranges.size());
-  zbitl::MemRangeMerger merged_ranges(ranges.begin(), ranges.end());
-  // First process all the reserved ranges. We do this in case there are reserved regions that
-  // overlap with the RAM regions that occur later in the list. If we didn't process the reserved
-  // regions first, then we might add a pmm arena and have it carve out its vm_page_t array from
-  // what we will later learn is reserved memory.
-  for (const zbi_mem_range_t& range : merged_ranges) {
-    LTRACEF("Range at %#" PRIx64 " of %#" PRIx64 " bytes is %sreserved.\n", range.paddr,
-            range.length, range.type == ZBI_MEM_TYPE_RESERVED ? "" : "not ");
-    if (range.type == ZBI_MEM_TYPE_RESERVED) {
-      boot_reserve_add_range(range.paddr, range.length);
-    }
-  }
-  for (const zbi_mem_range_t& range : merged_ranges) {
-    LTRACEF("Range at %#" PRIx64 " of %#" PRIx64 " bytes is %smemory.\n", range.paddr, range.length,
-            range.type == ZBI_MEM_TYPE_RAM ? "" : "not ");
+  // We don't want RAM under 1MiB to feature in to any arenas, so normalize that
+  // here.
+  //
+  // TODO(https://fxbug.dev/347766366): Once PMM initialization deals in a span
+  // of normalized memory, we can just pass in the subspan of ranges that
+  // excludes RAM under 1 MiB and forgo this.
+  for (const zbi_mem_range_t& range : ranges) {
     if (range.type != ZBI_MEM_TYPE_RAM) {
       continue;
     }
-
-    // trim off parts of memory ranges that are smaller than a page
-    uint64_t base = ROUNDUP(range.paddr, PAGE_SIZE);
-    uint64_t size = ROUNDDOWN(range.paddr + range.length, PAGE_SIZE) - base;
-
-    // trim any memory below 1MB for safety and SMP booting purposes
-    if (base < 1 * MB) {
-      uint64_t adjust = 1 * MB - base;
-      if (adjust >= size)
-        continue;
-
-      base += adjust;
-      size -= adjust;
+    zbi_mem_range_t& ram = const_cast<zbi_mem_range_t&>(range);
+    if (ram.paddr >= 1 * MB) {
+      break;
     }
+    uint64_t end = ram.paddr + ram.length;
+    ram.paddr = 1 * MB;
+    ram.length = ram.paddr < end ? end - ram.paddr : 0;
+  }
 
-    mark_mmio_region_to_reserve(base, static_cast<size_t>(size));
-    auto arena = base_arena;
-    arena.base = base;
-    arena.size = size;
+  if (zx_status_t status = pmm_init(ranges); status != ZX_OK) {
+    return status;
+  }
 
-    LTRACEF("Adding pmm range at %#" PRIxPTR " of %#zx bytes.\n", arena.base, arena.size);
-    zx_status_t status = pmm_add_arena(&arena);
-
-    // print a warning and continue
-    if (status != ZX_OK) {
-      printf("MEM: Failed to add pmm range at %#" PRIxPTR " size %#zx\n", arena.base, arena.size);
+  zbitl::MemRangeMerger merged(ranges.begin(), ranges.end());
+  for (const zbi_mem_range_t& range : merged) {
+    if (range.type == ZBI_MEM_TYPE_RAM) {
+      mark_mmio_region_to_reserve(range.paddr, static_cast<size_t>(range.length));
     }
   }
 
@@ -152,36 +131,27 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges) {
   }
 
   // Find an area that we can use for 16 bit bootstrapping of other SMP cores.
-  bool initialized_bootstrap16 = false;
   constexpr uint64_t kAllocSize = k_x86_bootstrap16_buffer_size;
   constexpr uint64_t kMinBase = 2UL * PAGE_SIZE;
-  for (const auto& range : ranges) {
-    // Ignore ranges that are not normal RAM.
-    if (range.type != ZBI_MEM_TYPE_RAM) {
-      continue;
+
+  // TODO(https://fxbug.dev/347766366): Eventually gPhysHandoff->memory will be
+  // what is effectively passed to this function, and the subspan past the
+  // kReservedLow ranges is what will be passed to mem_arena_init().
+  for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
+    if (range.type != memalloc::Type::kReservedLow) {
+      TRACEF("WARNING - Failed to assign bootstrap16 region, SMP won't work\n");
+      break;
     }
 
-    // Only consider parts of the range that are in [kMinBase, 1MiB).
-    uint64_t base, length;
-    bool overlap =
-        GetIntersect(kMinBase, 1 * MB - kMinBase, range.paddr, range.length, &base, &length);
-    if (!overlap) {
-      continue;
-    }
-
-    // Ignore ranges that are too small.
-    if (length < kAllocSize) {
+    uint64_t base = ktl::max(range.addr, kMinBase);
+    if (base >= range.end() || range.end() - base < kAllocSize) {
       continue;
     }
 
     // We have a valid range.
     LTRACEF("Selected %" PRIxPTR " as bootstrap16 region\n", base);
     x86_bootstrap16_init(base);
-    initialized_bootstrap16 = true;
     break;
-  }
-  if (!initialized_bootstrap16) {
-    TRACEF("WARNING - Failed to assign bootstrap16 region, SMP won't work\n");
   }
 }
 

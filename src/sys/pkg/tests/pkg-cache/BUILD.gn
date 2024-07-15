@@ -36,6 +36,7 @@ rustc_test("driver") {
     "//src/storage/lib/blob_writer:blob-writer",
     "//src/storage/lib/delivery_blob",
     "//src/storage/lib/vfs/rust:vfs",
+    "//src/sys/lib/cm_rust",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//src/sys/pkg/lib/blobfs",

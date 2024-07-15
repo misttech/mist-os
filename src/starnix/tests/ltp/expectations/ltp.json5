@@ -49,16 +49,11 @@
                 "cve-2020-11494",
                 "cve-2021-4034",
                 "cve-2022-2590",
-                "delete_module02",
                 "epoll_wait06",
                 "fallocate04",
 
                 // Fails due to: "No supported filesystems"
                 "getxattr03",
-
-                // 23 requires F_SETLEASE
-                "fcntl23",
-                "fcntl23_64",
 
                 // 24 requires F_SETLEASE, and does not run on tmpfs.
                 "fcntl24",
@@ -78,7 +73,6 @@
                 "fdatasync03",
                 "fs_di",
                 "fsetxattr02",
-                "fstatat01",
                 "futimesat01",
                 "getitimer01",
                 "getpriority01",

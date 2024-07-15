@@ -332,7 +332,11 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         model: trace_model.Model = trace_importing.create_model_from_file_path(
             json_trace_file
         )
-        return list(cpu.metrics_processor(model, {}))
+        return list(
+            cpu.CpuMetricsProcessor(aggregates_only=False).process_metrics(
+                model
+            )
+        )
 
     async def _start_iperf3_servers(
         self, executor: concurrent.futures.ThreadPoolExecutor, flows: int

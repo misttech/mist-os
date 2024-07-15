@@ -602,7 +602,7 @@ void NetworkDevice::NetworkPortGetInfo(port_base_info_t* out_info) {
       .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw,
   }};
   *out_info = {
-      .port_class = static_cast<uint32_t>(fuchsia_hardware_network::wire::DeviceClass::kEthernet),
+      .port_class = static_cast<uint16_t>(fuchsia_hardware_network::wire::PortClass::kEthernet),
       .rx_types_list = kRxTypesList,
       .rx_types_count = std::size(kRxTypesList),
       .tx_types_list = kTxTypesList,

@@ -5,9 +5,9 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_L2CAP_PDU_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_L2CAP_PDU_H_
 
-#include <endian.h>
-
 #include <list>
+
+#include <pw_bytes/endian.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
@@ -46,10 +46,16 @@ class PDU final {
 
   // Returns the number of bytes that are currently contained in this PDU,
   // excluding the Basic L2CAP header.
-  uint16_t length() const { return le16toh(basic_header().length); }
+  uint16_t length() const {
+    return pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                       basic_header().length);
+  }
 
   // The L2CAP channel that this packet belongs to.
-  ChannelId channel_id() const { return le16toh(basic_header().channel_id); }
+  ChannelId channel_id() const {
+    return pw::bytes::ConvertOrderFrom(cpp20::endian::little,
+                                       basic_header().channel_id);
+  }
 
   // The connection handle that identifies the logical link this PDU is intended
   // for.

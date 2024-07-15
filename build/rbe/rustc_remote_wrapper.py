@@ -65,6 +65,12 @@ def remove_suffix(text: str, suffix: str) -> str:
 
 
 # Defined for convenient mocking.
+def _remove_files(files: Iterable[Path]) -> None:
+    for f in files:
+        f.unlink(missing_ok=True)  # does remove or rmdir
+
+
+# Defined for convenient mocking.
 def _readlines_from_file(path: Path) -> Sequence[str]:
     return path.read_text().splitlines(keepends=True)
 
@@ -525,8 +531,7 @@ class RustRemoteAction(object):
         yield f"--sysroot={fuchsia_use_host_rust_sysroot}"
 
     def _cleanup(self) -> None:
-        for f in self._cleanup_files:
-            f.unlink(missing_ok=True)  # does remove or rmdir
+        _remove_files(self._cleanup_files)
 
     def _local_depfile_inputs(self) -> Iterable[Path]:
         # Generate a local depfile for the purposes of discovering
@@ -535,7 +540,6 @@ class RustRemoteAction(object):
 
         dep_only_command, aux_rspfiles = self.dep_only_command_with_rspfiles
         cmd_str = cl_utils.command_quoted_str(dep_only_command)
-        self._cleanup_files.extend(aux_rspfiles)
 
         self.vmsg(f"scan-deps-only command: {cmd_str}")
         dep_status = _make_local_depfile(dep_only_command)
@@ -576,6 +580,10 @@ class RustRemoteAction(object):
                 accompany_rlib_with_so(expanded_remote_inputs), self.working_dir
             ),
         )
+
+        # If everything above succeeded, clean-up the temporary files,
+        # otherwise leave them to be examined.
+        _remove_files(aux_rspfiles)
 
     def _remote_compiler_inputs(self) -> Iterable[Path]:
         # remote compiler is an input

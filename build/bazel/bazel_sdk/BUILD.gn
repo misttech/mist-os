@@ -36,7 +36,7 @@ idk("idk") {
 
   api_levels = []
   if (bazel_fuchsia_sdk_all_api_levels) {
-    api_levels = platform_version.build_time_supported_api_levels
+    api_levels = platform_version.idk_buildable_api_levels
   }
 
   # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders

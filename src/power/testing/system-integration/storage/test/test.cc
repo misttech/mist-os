@@ -31,21 +31,38 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
     sag_control_state_client_end_ = std::move(result.value());
   }
 
-  zx_status_t ChangeSagState(test_sagcontrol::SystemActivityGovernorState state) {
-    std::cout << "Setting SAG state: " << FidlString(state) << std::endl;
-    auto set_result = fidl::Call(sag_control_state_client_end_)->Set(state);
-    if (!set_result.is_ok()) {
-      std::cout << "Failed to set SAG state: " << set_result.error_value() << std::endl;
-      return ZX_ERR_INTERNAL;
-    }
+  test_sagcontrol::SystemActivityGovernorState GetBootCompleteState() {
+    test_sagcontrol::SystemActivityGovernorState state;
+    state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kActive);
+    state.application_activity_level(fuchsia_power_system::ApplicationActivityLevel::kActive);
+    state.full_wake_handling_level(fuchsia_power_system::FullWakeHandlingLevel::kInactive);
+    state.wake_handling_level(fuchsia_power_system::WakeHandlingLevel::kInactive);
+    return state;
+  }
 
+  zx_status_t ChangeSagState(test_sagcontrol::SystemActivityGovernorState state) {
     while (true) {
+      std::cout << "Setting SAG state: " << FidlString(state) << std::endl;
+      auto set_result = fidl::Call(sag_control_state_client_end_)->Set(state);
+      if (!set_result.is_ok()) {
+        std::cout << "Failed to set SAG state: " << set_result.error_value() << std::endl;
+        return ZX_ERR_INTERNAL;
+      }
+      zx::nanosleep(zx::deadline_after(zx::sec(1)));
+
       const auto get_result = fidl::Call(sag_control_state_client_end_)->Get();
       if (get_result.value() == state) {
         break;
       }
-      std::cout << "Waiting for the SAG state to change. Last known state: "
-                << FidlString(get_result.value()) << std::endl;
+
+      std::cout << "Retrying SAG state change. Last known state: " << FidlString(get_result.value())
+                << std::endl;
+      set_result = fidl::Call(sag_control_state_client_end_)->Set(GetBootCompleteState());
+      if (!set_result.is_ok()) {
+        std::cout << "Failed to set boot complete SAG state: " << set_result.error_value()
+                  << std::endl;
+        return ZX_ERR_INTERNAL;
+      }
       zx::nanosleep(zx::deadline_after(zx::sec(1)));
     }
     std::cout << "SAG state change complete." << std::endl;
@@ -136,18 +153,9 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
 };
 
 TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
-  // TODO(b/342432339): Remove this.
-  // This is to confirm the theory that this test is running too early and interfering with fusb's
-  // power negotiation.
-  zx::nanosleep(zx::deadline_after(zx::sec(120)));
-
   // To enable changing SAG's power levels, first trigger the "boot complete" logic. This is done by
   // setting both exec state level and app activity level to active.
-  test_sagcontrol::SystemActivityGovernorState state;
-  state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kActive);
-  state.application_activity_level(fuchsia_power_system::ApplicationActivityLevel::kActive);
-  state.full_wake_handling_level(fuchsia_power_system::FullWakeHandlingLevel::kInactive);
-  state.wake_handling_level(fuchsia_power_system::WakeHandlingLevel::kInactive);
+  test_sagcontrol::SystemActivityGovernorState state = GetBootCompleteState();
   ASSERT_EQ(ChangeSagState(state), ZX_OK);
 
   auto result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();

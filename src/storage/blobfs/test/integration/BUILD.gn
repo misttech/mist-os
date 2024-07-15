@@ -58,7 +58,7 @@ test("external_decompressor_integration") {
     "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/blobfs",
-    "//src/storage/blobfs:fuchsia.blobfs.internal_hlcpp",
+    "//src/storage/blobfs:fuchsia.blobfs.internal_cpp",
     "//src/storage/blobfs/test:test_utils",
     "//src/storage/lib/block_client/cpp:fake_device",
     "//third_party/googletest:gtest",

@@ -10,7 +10,7 @@ use sandbox::{
     Capability, Dict, DirEntry, RemotableCapability, Request, Router, WeakInstanceToken,
 };
 use std::sync::Arc;
-use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo};
+use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo};
 use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
@@ -110,10 +110,6 @@ impl RouterExt for Router {
         where
             for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
         {
-            fn entry_info(&self) -> EntryInfo {
-                EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
-            }
-
             fn open_entry(
                 self: Arc<Self>,
                 mut request: entry::OpenRequest<'_>,
@@ -121,6 +117,15 @@ impl RouterExt for Router {
                 request.set_scope(self.scope.clone());
                 request.spawn(self);
                 Ok(())
+            }
+        }
+
+        impl<F> GetEntryInfo for RouterEntry<F>
+        where
+            for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
+        {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(fio::INO_UNKNOWN, self.entry_type)
             }
         }
 

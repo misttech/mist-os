@@ -17,7 +17,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+            ],
         },
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],

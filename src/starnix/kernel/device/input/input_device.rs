@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{parse_fidl_keyboard_event_to_linux_input_event, InputFile};
+use crate::{
+    parse_fidl_keyboard_event_to_linux_input_event, FuchsiaTouchEventToLinuxTouchEventConverter,
+    InputFile,
+};
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_pointer::{
-    EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent, TouchResponse as FidlTouchResponse,
-    TouchResponseType, {self as fuipointer},
+    TouchEvent as FidlTouchEvent, TouchResponse as FidlTouchResponse, TouchResponseType,
+    {self as fuipointer},
 };
 use futures::StreamExt as _;
 use starnix_core::device::kobject::DeviceMetadata;
@@ -21,7 +24,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::timeval_from_time;
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{input_id, timeval, BUS_VIRTUAL};
+use starnix_uapi::{input_id, BUS_VIRTUAL};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Weak};
 use {
@@ -119,6 +122,7 @@ impl InputDevice {
         touch_source_proxy: fuipointer::TouchSourceSynchronousProxy,
     ) {
         let slf = self.clone();
+        let mut fidl_to_linux_converter = FuchsiaTouchEventToLinuxTouchEventConverter::create();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
             let mut previous_event_disposition = vec![];
             loop {
@@ -129,25 +133,12 @@ impl InputDevice {
                         let num_received_events: u64 = touch_events.len().try_into().unwrap();
                         previous_event_disposition =
                             touch_events.iter().map(make_response_for_fidl_event).collect();
-
-                        let mut num_ignored_events: u64 = 0;
-                        let mut num_converted_events: u64 = 0;
-                        let mut converted_events: Vec<TouchEvent> = vec![];
-
-                        for event in touch_events.iter() {
-                            match parse_fidl_touch_event(event) {
-                                None => {
-                                    num_ignored_events += 1;
-                                }
-                                Some(e) => {
-                                    num_converted_events += 1;
-                                    converted_events.push(e);
-                                }
-                            }
-                        }
-                        let new_events: Vec<uapi::input_event> =
-                            converted_events.into_iter().flat_map(make_uapi_events).collect();
-                        let num_generated_events: u64 = new_events.len().try_into().unwrap();
+                        let (
+                            mut new_events,
+                            num_converted_events,
+                            num_ignored_events,
+                            num_unexpected_events,
+                        ) = fidl_to_linux_converter.handle(touch_events);
 
                         let mut files = slf.open_files.lock();
                         let filtered_files: Vec<Arc<InputFile>> =
@@ -158,15 +149,18 @@ impl InputDevice {
                                 Some(inspect_status) => {
                                     inspect_status.count_received_events(num_received_events);
                                     inspect_status.count_ignored_events(num_ignored_events);
+                                    inspect_status.count_unexpected_events(num_unexpected_events);
                                     inspect_status.count_converted_events(num_converted_events);
-                                    inspect_status.count_generated_events(num_generated_events);
+                                    inspect_status.count_generated_events(
+                                        new_events.len().try_into().unwrap(),
+                                    );
                                 }
                                 None => (),
                             }
                             // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
                             // not provide access to events that occurred before the file was
                             // opened.
-                            inner.events.extend(new_events.clone());
+                            inner.events.append(&mut new_events);
                             // TODO(https://fxbug.dev/42075439): Skip notify if `inner.events`
                             // is empty.
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
@@ -236,25 +230,48 @@ impl InputDevice {
                 if let Err(e) = registry_proxy.register_listener(listener, zx::Time::INFINITE) {
                     log_warn!("Failed to register media buttons listener: {:?}", e);
                 }
+
                 let mut power_was_pressed = false;
                 let mut function_was_pressed = false;
-                while let Some(Ok(request)) = listener_stream.next().await {
+                while let Some(request) = listener_stream.next().await {
                     match request {
-                        fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder } => {
-                            let (new_events, power_is_pressed, function_is_pressed) =
-                                parse_fidl_button_event(
-                                    &event,
-                                    power_was_pressed,
-                                    function_was_pressed,
-                                );
+                        Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder }) => {
+                            let (
+                                new_events,
+                                power_is_pressed,
+                                function_is_pressed,
+                            ) = parse_fidl_button_event(
+                                &event,
+                                power_was_pressed,
+                                function_was_pressed
+                            );
                             power_was_pressed = power_is_pressed;
                             function_was_pressed = function_is_pressed;
+
+                            let (converted_events, ignored_events, generated_events) = match new_events.len() {
+                              0 => (0u64, 1u64, 0u64),
+                              len => {
+                                  if len % 2 == 1 {
+                                      log_warn!("unexpectedly received {} events: there should always be an even number of non-empty events.", len);
+                                  }
+                                  (1u64, 0u64, len as u64)
+                              }
+                          };
 
                             let mut files = slf.open_files.lock();
                             let filtered_files: Vec<Arc<InputFile>> =
                                 files.drain(..).flat_map(|f| f.upgrade()).collect();
                             for file in filtered_files {
                                 let mut inner = file.inner.lock();
+                                match &inner.inspect_status {
+                                    Some(inspect_status) => {
+                                        inspect_status.count_received_events(1);
+                                        inspect_status.count_ignored_events(ignored_events);
+                                        inspect_status.count_converted_events(converted_events);
+                                        inspect_status.count_generated_events(generated_events);
+                                    }
+                                    None => (),
+                                }
                                 inner.events.extend(new_events.clone());
                                 inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 files.push(Arc::downgrade(&file));
@@ -262,9 +279,15 @@ impl InputDevice {
 
                             responder.send().expect("media buttons responder failed to respond");
                         }
-                        _ => {}
+                        Ok(_) => { /* Ignore deprecated OnMediaButtonsEvent */ }
+                        Err(e) => {
+                          log_warn!("Received an error while listening for events on MediaButtonsListener: {:?}", e);
+                          break;
+                        }
                     }
                 }
+
+                log_warn!("MediaButtonsListener request stream has ended");
             })
         });
     }
@@ -284,7 +307,10 @@ impl InputDevice {
                 ));
                 file
             }
-            InputDeviceType::Keyboard => Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, None)),
+            InputDeviceType::Keyboard => Arc::new(InputFile::new_keyboard(
+                KEYBOARD_INPUT_ID,
+                Some(self.input_files_node.create_child("keyboard_file")),
+            )),
         };
         self.open_files.lock().push(Arc::downgrade(&input_file));
         let file_object = starnix_core::vfs::FileObject::new(
@@ -338,46 +364,6 @@ pub fn get_next_device_id() -> u32 {
     NEXT_DEVICE_ID.fetch_add(1, Ordering::SeqCst)
 }
 
-#[derive(Copy, Clone)]
-// This module's representation of the information from `fuipointer::EventPhase`.
-enum PhaseChange {
-    Added,
-    Removed,
-}
-
-// This module's representation of the information from `fuipointer::TouchEvent`.
-struct TouchEvent {
-    time: timeval,
-    // Change in the contact state, if any. The phase change for a FIDL event reporting a move,
-    // for example, will have `None` here.
-    phase_change: Option<PhaseChange>,
-    pos_x: f32,
-    pos_y: f32,
-}
-
-/// Returns `Some` if the FIDL event included a `timestamp`, and a `pointer_sample` which includes
-/// both `position_in_viewport` and `phase`. Returns `None` otherwise.
-fn parse_fidl_touch_event(fidl_event: &FidlTouchEvent) -> Option<TouchEvent> {
-    match fidl_event {
-        FidlTouchEvent {
-            timestamp: Some(time_nanos),
-            pointer_sample:
-                Some(fuipointer::TouchPointerSample {
-                    position_in_viewport: Some([x, y]),
-                    phase: Some(phase),
-                    ..
-                }),
-            ..
-        } => Some(TouchEvent {
-            time: timeval_from_time(zx::Time::from_nanos(*time_nanos)),
-            phase_change: phase_change_from_fidl_phase(phase),
-            pos_x: *x,
-            pos_y: *y,
-        }),
-        _ => None,
-    }
-}
-
 fn parse_fidl_button_event(
     fidl_event: &MediaButtonsEvent,
     power_was_pressed: bool,
@@ -426,83 +412,6 @@ fn make_response_for_fidl_event(fidl_event: &FidlTouchEvent) -> FidlTouchRespons
     }
 }
 
-/// Returns a sequence of UAPI input events which represent the data in `event`.
-fn make_uapi_events(event: TouchEvent) -> Vec<uapi::input_event> {
-    let sync_event = uapi::input_event {
-        // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
-        time: event.time,
-        type_: uapi::EV_SYN as u16,
-        code: uapi::SYN_REPORT as u16,
-        value: 0,
-    };
-    let mut events = vec![];
-    events.extend(make_contact_state_uapi_events(&event).iter().flatten());
-    events.extend(make_position_uapi_events(&event));
-    events.push(sync_event);
-    events
-}
-
-/// Returns a sequence of UAPI input events representing `event`'s change in contact state,
-/// if any.
-fn make_contact_state_uapi_events(event: &TouchEvent) -> Option<[uapi::input_event; 2]> {
-    event.phase_change.map(|phase_change| {
-        let value = match phase_change {
-            PhaseChange::Added => 1,
-            PhaseChange::Removed => 0,
-        };
-        [
-            uapi::input_event {
-                time: event.time,
-                type_: uapi::EV_KEY as u16,
-                code: uapi::BTN_TOUCH as u16,
-                value,
-            },
-            // TODO(https://fxbug.dev/42075449): Reporting `BTN_TOOL_FINGER` here could cause some
-            // programs to interpret this device as a touchpad, rather than a touchscreen. Also,
-            // this isn't suitable if `InputFile` (eventually) supports multi-touch mode.
-            // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
-            uapi::input_event {
-                time: event.time,
-                type_: uapi::EV_KEY as u16,
-                code: uapi::BTN_TOOL_FINGER as u16,
-                value,
-            },
-        ]
-    })
-}
-
-/// Returns a sequence of UAPI input events representing `event`'s contact location.
-fn make_position_uapi_events(event: &TouchEvent) -> [uapi::input_event; 2] {
-    [
-        // The X coordinate.
-        uapi::input_event {
-            time: event.time,
-            type_: uapi::EV_ABS as u16,
-            code: uapi::ABS_X as u16,
-            value: event.pos_x as i32,
-        },
-        // The Y coordinate.
-        uapi::input_event {
-            time: event.time,
-            type_: uapi::EV_ABS as u16,
-            code: uapi::ABS_Y as u16,
-            value: event.pos_y as i32,
-        },
-    ]
-}
-
-/// Returns `Some` phase change if `fidl_phase` reports a change in contact state.
-/// Returns `None` otherwise.
-fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChange> {
-    match fidl_phase {
-        FidlEventPhase::Add => Some(PhaseChange::Added),
-        FidlEventPhase::Change => None, // `Change` indicates position change only
-        FidlEventPhase::Remove => Some(PhaseChange::Removed),
-        // TODO(https://fxbug.dev/42075450): Figure out whether this is correct.
-        FidlEventPhase::Cancel => None,
-    }
-}
-
 #[cfg(test)]
 mod test {
     #![allow(clippy::unused_unit)] // for compatibility with `test_case`
@@ -512,9 +421,10 @@ mod test {
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use fuipointer::{
-        EventPhase, TouchEvent, TouchPointerSample, TouchResponse, TouchSourceMarker,
-        TouchSourceRequest,
+        EventPhase, TouchEvent, TouchInteractionId, TouchPointerSample, TouchResponse,
+        TouchSourceMarker, TouchSourceRequest,
     };
+    use pretty_assertions::assert_eq;
     use starnix_core::task::{EventHandler, Waiter};
     use starnix_core::testing::{create_kernel_and_task, create_kernel_task_and_unlocked};
     use starnix_core::vfs::buffers::VecOutputBuffer;
@@ -587,50 +497,64 @@ mod test {
         current_task: &CurrentTask,
     ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
+        start_button_input_inspect(current_task, &inspector)
+    }
+
+    fn start_button_input_inspect(
+        current_task: &CurrentTask,
+        inspector: &fuchsia_inspect::Inspector,
+    ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
         let input_device = InputDevice::new_keyboard(inspector.root());
         let input_file = input_device.open_test(current_task).expect("Failed to create input file");
         let (device_registry_proxy, device_listener_stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
-                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+        fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
+            .expect("Failed to create DeviceListenerRegistry proxy and stream.");
         input_device.start_button_relay(current_task.kernel(), device_registry_proxy);
         (input_device, input_file, device_listener_stream)
     }
 
-    fn make_touch_event() -> fuipointer::TouchEvent {
+    fn make_touch_event(pointer_id: u32) -> fuipointer::TouchEvent {
         // Default to `Change`, because that has the fewest side effects.
-        make_touch_event_with_phase(EventPhase::Change)
+        make_touch_event_with_phase(EventPhase::Change, pointer_id)
     }
 
-    fn make_touch_event_with_phase(phase: EventPhase) -> fuipointer::TouchEvent {
-        TouchEvent {
-            timestamp: Some(0),
-            pointer_sample: Some(TouchPointerSample {
-                position_in_viewport: Some([0.0, 0.0]),
-                phase: Some(phase),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
+    fn make_touch_event_with_phase(phase: EventPhase, pointer_id: u32) -> fuipointer::TouchEvent {
+        make_touch_event_with_coords_phase(0.0, 0.0, phase, pointer_id)
     }
 
-    fn make_touch_event_with_coords(x: f32, y: f32) -> fuipointer::TouchEvent {
+    fn make_touch_event_with_coords_phase(
+        x: f32,
+        y: f32,
+        phase: EventPhase,
+        pointer_id: u32,
+    ) -> fuipointer::TouchEvent {
+        make_touch_event_with_coords_phase_timestamp(x, y, phase, pointer_id, 0)
+    }
+
+    fn make_touch_event_with_coords(x: f32, y: f32, pointer_id: u32) -> fuipointer::TouchEvent {
+        make_touch_event_with_coords_phase(x, y, EventPhase::Change, pointer_id)
+    }
+
+    fn make_touch_event_with_coords_phase_timestamp(
+        x: f32,
+        y: f32,
+        phase: EventPhase,
+        pointer_id: u32,
+        time_nanos: i64,
+    ) -> fuipointer::TouchEvent {
         TouchEvent {
-            timestamp: Some(0),
+            timestamp: Some(time_nanos),
             pointer_sample: Some(TouchPointerSample {
                 position_in_viewport: Some([x, y]),
                 // Default to `Change`, because that has the fewest side effects.
-                phase: Some(EventPhase::Change),
+                phase: Some(phase),
+                interaction: Some(TouchInteractionId {
+                    pointer_id,
+                    device_id: 0,
+                    interaction_id: 0,
+                }),
                 ..Default::default()
             }),
-            ..Default::default()
-        }
-    }
-
-    fn make_touch_pointer_sample() -> TouchPointerSample {
-        TouchPointerSample {
-            position_in_viewport: Some([0.0, 0.0]),
-            // Default to `Change`, because that has the fewest side effects.
-            phase: Some(EventPhase::Change),
             ..Default::default()
         }
     }
@@ -670,11 +594,11 @@ mod test {
     // `touch_event`. Returns the arguments to the `Watch()` call.
     async fn answer_next_watch_request(
         request_stream: &mut fuipointer::TouchSourceRequestStream,
-        touch_event: TouchEvent,
+        touch_events: Vec<TouchEvent>,
     ) -> Vec<TouchResponse> {
         match request_stream.next().await {
             Some(Ok(TouchSourceRequest::Watch { responses, responder })) => {
-                responder.send(&[touch_event]).expect("failure sending Watch reply");
+                responder.send(&touch_events).expect("failure sending Watch reply");
                 responses
             }
             unexpected_request => panic!("unexpected request {:?}", unexpected_request),
@@ -748,8 +672,12 @@ mod test {
         assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
 
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
@@ -773,14 +701,18 @@ mod test {
         assert!(futures::poll!(&mut waiter_thread).is_pending());
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
 
         // Wait for another `Watch`.
         //
         // TODO(https://fxbug.dev/42075452): Without this, `relay_thread` gets stuck `await`-ing
         // the reply to its first request. Figure out why that happens, and remove this second
         // reply.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
     }
 
     // Note: a user program may also want to be woken if events were already ready at the
@@ -817,9 +749,13 @@ mod test {
         waitkeys.into_iter().next().expect("failed to get first waitkey").cancel();
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
 
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
@@ -842,10 +778,14 @@ mod test {
         );
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
 
         // Check post-watch expectation.
         assert_eq!(
@@ -855,95 +795,432 @@ mod test {
         );
     }
 
-    #[test_case(EventPhase::Add, uapi::BTN_TOUCH => Some(1);
-        "add_yields_btn_touch_true")]
-    #[test_case(EventPhase::Change, uapi::BTN_TOUCH => None;
-        "change_yields_no_btn_touch_event")]
-    #[test_case(EventPhase::Remove, uapi::BTN_TOUCH => Some(0);
-        "remove_yields_btn_touch_false")]
-    #[test_case(EventPhase::Add, uapi::BTN_TOOL_FINGER => Some(1);
-        "add_yields_btn_tool_finger_true")]
-    #[test_case(EventPhase::Change, uapi::BTN_TOOL_FINGER => None;
-        "change_yields_no_btn_tool_finger_event")]
-    #[test_case(EventPhase::Remove, uapi::BTN_TOOL_FINGER => Some(0);
-        "remove_yields_btn_tool_finger_false")]
-    #[::fuchsia::test]
-    async fn translates_event_phase_to_expected_evkey_events(
-        fidl_phase: EventPhase,
-        event_code: u32,
-    ) -> Option<i32> {
-        let event_code = event_code as u16;
+    fn make_uapi_input_event(ty: u32, code: u32, value: i32) -> uapi::input_event {
+        make_uapi_input_event_with_timestamp(ty, code, value, 0)
+    }
 
+    fn make_uapi_input_event_with_timestamp(
+        ty: u32,
+        code: u32,
+        value: i32,
+        time_nanos: i64,
+    ) -> uapi::input_event {
+        uapi::input_event {
+            time: timeval_from_time(zx::Time::from_nanos(time_nanos)),
+            type_: ty as u16,
+            code: code as u16,
+            value,
+        }
+    }
+
+    #[::fuchsia::test]
+    async fn touch_event_ignored() {
+        // Set up resources.
+        let inspector = fuchsia_inspect::Inspector::default();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut touch_source_stream) =
+            start_touch_input_inspect(&current_task, &inspector);
+
+        // Touch add for pointer 1. This should be counted as a received event and a converted
+        // event. It should also yield 6 generated events.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure input_file done processing the first reply.
+        // Use an empty `TouchEvent`, to minimize the chance that this event creates unexpected
+        // `uapi::input_event`s. This should be counted as a received event and an ignored event.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+
+        // Consume all of the `uapi::input_event`s that are available.
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(events.len(), 6);
+
+        // Reply to `Watch` request of empty event. This should be counted as a received event and
+        // an ignored event.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+
+        // Wait for another `Watch`.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, .. })) => {
+                assert_matches!(responses.as_slice(), [_])
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(events, vec![]);
+        assert_data_tree!(inspector, root: {
+            touch_device: {
+                touch_file: {
+                    fidl_events_received_count: 3u64,
+                    fidl_events_ignored_count: 2u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 1u64,
+                    uapi_events_generated_count: 6u64,
+                    uapi_events_read_count: 6u64,
+                },
+            }
+        });
+    }
+
+    #[test_case(make_touch_event_with_phase(EventPhase::Add, 1); "touch add for pointer already added")]
+    #[test_case(make_touch_event_with_phase(EventPhase::Change, 2); "touch change for pointer not added")]
+    #[test_case(make_touch_event_with_phase(EventPhase::Remove, 2); "touch remove for pointer not added")]
+    #[test_case(make_touch_event_with_phase(EventPhase::Cancel, 1); "touch cancel")]
+    #[::fuchsia::test]
+    async fn touch_event_unexpected(event: TouchEvent) {
+        // Set up resources.
+        let inspector = fuchsia_inspect::Inspector::default();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut touch_source_stream) =
+            start_touch_input_inspect(&current_task, &inspector);
+
+        // Touch add for pointer 1. This should be counted as a received event and a converted
+        // event. It should also yield 6 generated events.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure input_file done processing the first reply.
+        // Use an empty `TouchEvent`, to minimize the chance that this event creates unexpected
+        // `uapi::input_event`s. This should be counted as a received event and an ignored event.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+
+        // Consume all of the `uapi::input_event`s that are available.
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(events.len(), 6);
+
+        // Reply to `Watch` request of given event. This should be counted as a received event and
+        // an unexpected event.
+        answer_next_watch_request(&mut touch_source_stream, vec![event]).await;
+
+        // Wait for another `Watch`.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responses, .. })) => {
+                assert_matches!(responses.as_slice(), [_])
+            }
+            unexpected_request => panic!("unexpected request {:?}", unexpected_request),
+        }
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(events, vec![]);
+        assert_data_tree!(inspector, root: {
+            touch_device: {
+                touch_file: {
+                    fidl_events_received_count: 3u64,
+                    fidl_events_ignored_count: 1u64,
+                    fidl_events_unexpected_count: 1u64,
+                    fidl_events_converted_count: 1u64,
+                    uapi_events_generated_count: 6u64,
+                    uapi_events_read_count: 6u64,
+                },
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn translates_touch_add() {
         // Set up resources.
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
 
-        // Reply to first `Watch` request.
+        // Touch add for pointer 1.
         answer_next_watch_request(
             &mut touch_source_stream,
-            make_touch_event_with_phase(fidl_phase),
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure input_file done processing the first reply.
+        // Use an empty `TouchEvent`, to minimize the chance that this event
+        // creates unexpected `uapi::input_event`s.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+
+        // Consume all of the `uapi::input_event`s that are available.
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 0),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
+    }
+
+    #[::fuchsia::test]
+    async fn translates_touch_change() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
+
+        // Touch add for pointer 1.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure input_file done processing the first reply.
+        // Use an empty `TouchEvent`, to minimize the chance that this event
+        // creates unexpected `uapi::input_event`s.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+
+        // Consume all of the `uapi::input_event`s that are available.
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(events.len(), 6);
+
+        // Reply to touch change.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_coords(10.0, 20.0, 1)],
         )
         .await;
 
         // Wait for another `Watch`.
-        // Use an empty `TouchEvent`, to minimize the chance that this event
-        // creates unexpected `uapi::input_event`s.
-        answer_next_watch_request(&mut touch_source_stream, TouchEvent::default()).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
 
-        // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
-
-        // Report the `value` of the first `event.code` event, or None if there wasn't one.
-        events.into_iter().find_map(|event| {
-            if event.type_ == uapi::EV_KEY as u16 && event.code == event_code {
-                Some(event.value)
-            } else {
-                None
-            }
-        })
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
     }
 
-    // Per https://www.kernel.org/doc/Documentation/input/event-codes.rst,
-    // 1. "BTN_TOUCH must be the first evdev code emitted".
-    // 2. "EV_SYN, isused to separate input events"
-    #[test_case((uapi::EV_KEY, uapi::BTN_TOUCH), 0; "btn_touch_is_first")]
-    #[test_case((uapi::EV_SYN, uapi::SYN_REPORT), -1; "syn_report_is_last")]
     #[::fuchsia::test]
-    async fn event_sequence_is_correct((event_type, event_code): (u32, u32), position: isize) {
-        let event_type = event_type as u16;
-        let event_code = event_code as u16;
-
+    async fn translates_touch_remove() {
         // Set up resources.
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
 
-        // Reply to first `Watch` request.
+        // Touch add for pointer 1.
         answer_next_watch_request(
             &mut touch_source_stream,
-            make_touch_event_with_phase(EventPhase::Add),
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
         )
         .await;
 
-        // Wait for another `Watch.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+        // Wait for another `Watch` to ensure input_file done processing the first reply.
+        // Use an empty `TouchEvent`, to minimize the chance that this event
+        // creates unexpected `uapi::input_event`s.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
 
         // Consume all of the `uapi::input_event`s that are available.
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
-        // Check that the expected event type and code are in the expected position.
-        let position = if position >= 0 {
-            position.unsigned_abs()
-        } else {
-            events.iter().len() - position.unsigned_abs()
-        };
-        assert_matches!(
-            events.get(position),
-            Some(&uapi::input_event { type_, code, ..}) if type_ == event_type && code == event_code,
-            "did not find type={}, code={} at position {}; `events` is {:?}",
-            event_type,
-            event_code,
-            position,
-            events
+        assert_eq!(events.len(), 6);
+
+        // Reply to touch change.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Remove, 1)],
+        )
+        .await;
+
+        // Wait for another `Watch`.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
+    }
+
+    #[::fuchsia::test]
+    async fn multi_touch_event_sequence() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
+
+        // Touch add for pointer 1.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Add, 1)],
+        )
+        .await;
+
+        // Wait for another `Watch`.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(events.len(), 6);
+
+        // Touch add for pointer 2.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![
+                make_touch_event_with_coords(10.0, 20.0, 1),
+                make_touch_event_with_phase(EventPhase::Add, 2),
+            ],
+        )
+        .await;
+
+        // Wait for another `Watch`.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 2),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 0),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
+
+        // Both pointers move.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![
+                make_touch_event_with_coords(11.0, 21.0, 1),
+                make_touch_event_with_coords(101.0, 201.0, 2),
+            ],
+        )
+        .await;
+
+        // Wait for another `Watch`.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 11),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 21),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 101),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 201),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
+
+        // Pointer 1 up.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![
+                make_touch_event_with_phase(EventPhase::Remove, 1),
+                make_touch_event_with_coords(101.0, 201.0, 2),
+            ],
+        )
+        .await;
+
+        // Wait for another `Watch`.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 101),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 201),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
+
+        // Pointer 2 up.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase(EventPhase::Remove, 2)],
+        )
+        .await;
+
+        // Wait for another `Watch`.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, -1),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
+    }
+
+    #[::fuchsia::test]
+    async fn multi_event_sequence_unsorted_in_one_watch() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
+
+        // Touch add for pointer 1.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![
+                make_touch_event_with_coords_phase_timestamp(
+                    10.0,
+                    20.0,
+                    EventPhase::Change,
+                    1,
+                    100,
+                ),
+                make_touch_event_with_coords_phase_timestamp(0.0, 0.0, EventPhase::Add, 1, 1),
+            ],
+        )
+        .await;
+
+        // Wait for another `Watch`.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_eq!(
+            events,
+            vec![
+                make_uapi_input_event_with_timestamp(uapi::EV_KEY, uapi::BTN_TOUCH, 1, 1),
+                make_uapi_input_event_with_timestamp(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 1),
+                make_uapi_input_event_with_timestamp(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1, 1),
+                make_uapi_input_event_with_timestamp(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 0, 1),
+                make_uapi_input_event_with_timestamp(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 0, 1),
+                make_uapi_input_event_with_timestamp(uapi::EV_SYN, uapi::SYN_REPORT, 0, 1),
+                make_uapi_input_event_with_timestamp(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0, 100),
+                make_uapi_input_event_with_timestamp(
+                    uapi::EV_ABS,
+                    uapi::ABS_MT_POSITION_X,
+                    10,
+                    100
+                ),
+                make_uapi_input_event_with_timestamp(
+                    uapi::EV_ABS,
+                    uapi::ABS_MT_POSITION_Y,
+                    20,
+                    100
+                ),
+                make_uapi_input_event_with_timestamp(uapi::EV_SYN, uapi::SYN_REPORT, 0, 100),
+            ]
         );
     }
 
@@ -957,14 +1234,15 @@ mod test {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
 
-        // Reply to first `Watch` request.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event_with_coords(x, y))
-            .await;
+        // Touch add.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_coords_phase(x, y, EventPhase::Add, 1)],
+        )
+        .await;
 
         // Wait for another `Watch`.
-        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
-
-        // Consume all of the `uapi::input_event`s that are available.
+        answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
         let events = read_uapi_events(&mut locked, &input_file, &current_task);
 
         // Check that the reported positions are within the acceptable error. The acceptable
@@ -972,12 +1250,16 @@ mod test {
         const ACCEPTABLE_ERROR: f32 = 1.0;
         let actual_x = events
             .iter()
-            .find(|event| event.type_ == uapi::EV_ABS as u16 && event.code == uapi::ABS_X as u16)
+            .find(|event| {
+                event.type_ == uapi::EV_ABS as u16 && event.code == uapi::ABS_MT_POSITION_X as u16
+            })
             .unwrap_or_else(|| panic!("did not find `ABS_X` event in {:?}", events))
             .value;
         let actual_y = events
             .iter()
-            .find(|event| event.type_ == uapi::EV_ABS as u16 && event.code == uapi::ABS_Y as u16)
+            .find(|event| {
+                event.type_ == uapi::EV_ABS as u16 && event.code == uapi::ABS_MT_POSITION_Y as u16
+            })
             .unwrap_or_else(|| panic!("did not find `ABS_Y` event in {:?}", events))
             .value;
         assert_near!(x, actual_x as f32, ACCEPTABLE_ERROR);
@@ -988,14 +1270,13 @@ mod test {
     //
     // > non-sample events should return an empty |TouchResponse| table to the
     // > server
-    #[test_case(TouchEvent {
-        timestamp: Some(0),
-        pointer_sample: Some(make_touch_pointer_sample()),
-        ..Default::default()
-      } => matches Some(TouchResponse { response_type: Some(_), ..});
-      "event_with_sample_yields_some_response_type")]
-    #[test_case(TouchEvent::default() => matches Some(TouchResponse { response_type: None, ..});
-      "event_without_sample_yields_no_response_type")]
+    #[test_case(
+        make_touch_event_with_phase(EventPhase::Add, 2)
+            => matches Some(TouchResponse { response_type: Some(_), ..});
+        "event_with_sample_yields_some_response_type")]
+    #[test_case(
+        TouchEvent::default() => matches Some(TouchResponse { response_type: None, ..});
+        "event_without_sample_yields_no_response_type")]
     #[::fuchsia::test]
     async fn sends_appropriate_reply_to_touch_source_server(
         event: TouchEvent,
@@ -1006,11 +1287,11 @@ mod test {
             start_touch_input(&current_task);
 
         // Reply to first `Watch` request.
-        answer_next_watch_request(&mut touch_source_stream, event).await;
+        answer_next_watch_request(&mut touch_source_stream, vec![event]).await;
 
         // Get response to `event`.
         let responses =
-            answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
+            answer_next_watch_request(&mut touch_source_stream, vec![TouchEvent::default()]).await;
 
         // Return the value for `test_case` to match on.
         responses.get(0).cloned()
@@ -1329,11 +1610,41 @@ mod test {
                 assert_matches!(responses.as_slice(), [_, _]);
                 responder
                     .send(&vec![
-                        make_touch_event_with_phase(EventPhase::Add),
-                        make_touch_event(),
-                        make_touch_event(),
-                        make_touch_event(),
-                        make_touch_event_with_phase(EventPhase::Remove),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Add,
+                            1,
+                            1,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Change,
+                            1,
+                            2,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Change,
+                            1,
+                            3,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Change,
+                            1,
+                            4,
+                        ),
+                        make_touch_event_with_coords_phase_timestamp(
+                            0.0,
+                            0.0,
+                            EventPhase::Remove,
+                            1,
+                            5,
+                        ),
                     ])
                     .expect("failure sending Watch reply");
             }
@@ -1357,8 +1668,96 @@ mod test {
                     fidl_events_ignored_count: 2u64,
                     fidl_events_unexpected_count: 0u64,
                     fidl_events_converted_count: 5u64,
-                    uapi_events_generated_count: 19u64,
-                    uapi_events_read_count: 19u64,
+                    uapi_events_generated_count: 22u64,
+                    uapi_events_read_count: 22u64,
+                },
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    fn keyboard_input_file_initialized_with_inspect_node() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let _keyboard_file = InputFile::new_keyboard(
+            KEYBOARD_INPUT_ID,
+            Some(inspector.root().create_child("keyboard_input_file")),
+        );
+
+        assert_data_tree!(inspector, root: {
+          keyboard_input_file: {
+                fidl_events_received_count: 0u64,
+                fidl_events_ignored_count: 0u64,
+                fidl_events_unexpected_count: 0u64,
+                fidl_events_converted_count: 0u64,
+                uapi_events_generated_count: 0u64,
+                uapi_events_read_count: 0u64,
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn button_relay_updates_keyboard_inspect_status() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut device_listener_stream) =
+            start_button_input_inspect(&current_task, &inspector);
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        // Each of these events should count toward received and converted.
+        // They also generate 2 uapi events each.
+        let power_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(false),
+            ..Default::default()
+        };
+
+        let power_release_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(false),
+            function: Some(false),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&power_event).await;
+        let _ = buttons_listener.on_event(&power_release_event).await;
+
+        let events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_eq!(events.len(), 4);
+        assert_eq!(events[0].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[0].value, 1);
+        assert_eq!(events[2].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[2].value, 0);
+
+        let _events = read_uapi_events(&mut locked, &input_file, &current_task);
+
+        assert_data_tree!(inspector, root: {
+            keyboard_device: {
+                keyboard_file: {
+                    fidl_events_received_count: 2u64,
+                    fidl_events_ignored_count: 0u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 2u64,
+                    uapi_events_generated_count: 4u64,
+                    uapi_events_read_count: 4u64,
                 },
             }
         });

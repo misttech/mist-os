@@ -86,9 +86,20 @@ namespace {
 constexpr uint32_t kFallbackHorizontalSizeMm = 160;
 constexpr uint32_t kFallbackVerticalSizeMm = 90;
 
-bool frame_contains(const frame_t& a, const frame_t& b) {
-  return b.x_pos < a.width && b.y_pos < a.height && b.x_pos + b.width <= a.width &&
-         b.y_pos + b.height <= a.height;
+// True iff `inner` is entirely contained within `outer`.
+//
+// `outer` must be positioned at the coordinate system's origin. Both `inner` and `outer` must be
+// non-empty.
+constexpr bool OriginRectangleContains(const rect_u_t& outer, const rect_u_t& inner) {
+  ZX_DEBUG_ASSERT(outer.x == 0);
+  ZX_DEBUG_ASSERT(outer.y == 0);
+  ZX_DEBUG_ASSERT(outer.width > 0);
+  ZX_DEBUG_ASSERT(outer.height > 0);
+  ZX_DEBUG_ASSERT(inner.width > 0);
+  ZX_DEBUG_ASSERT(inner.height > 0);
+
+  return inner.x < outer.width && inner.y < outer.height && inner.x + inner.width <= outer.width &&
+         inner.y + inner.height <= outer.height;
 }
 
 // We allocate some variable sized stack allocations based on the number of
@@ -526,7 +537,8 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
     TearDown();
     return;
   }
-  layer->SetPrimaryPosition(request->transform, request->src_frame, request->dest_frame);
+  layer->SetPrimaryPosition(request->transform, request->image_source,
+                            request->display_destination);
   pending_config_valid_ = false;
   // no Reply defined
 }
@@ -933,9 +945,9 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
     // Frame used for checking that each layer's dest_frame lies entirely
     // within the composed output.
-    frame_t display_frame = {
-        .x_pos = 0,
-        .y_pos = 0,
+    const rect_u_t display_area = {
+        .x = 0,
+        .y = 0,
         .width = banjo_display_config.mode.h_addressable,
         .height = banjo_display_config.mode.v_addressable,
     };
@@ -955,14 +967,14 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         primary_layer_t* primary_layer = &banjo_layer.cfg.primary;
         // Frame for checking that the layer's src_frame lies entirely
         // within the source image.
-        frame_t image_frame = {
-            .x_pos = 0,
-            .y_pos = 0,
+        const rect_u_t image_area = {
+            .x = 0,
+            .y = 0,
             .width = primary_layer->image_metadata.width,
             .height = primary_layer->image_metadata.height,
         };
-        invalid = (!frame_contains(image_frame, primary_layer->src_frame) ||
-                   !frame_contains(display_frame, primary_layer->dest_frame));
+        invalid = (!OriginRectangleContains(image_area, primary_layer->image_source) ||
+                   !OriginRectangleContains(display_area, primary_layer->display_destination));
         // The formats of layer images are negotiated by sysmem between clients
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.

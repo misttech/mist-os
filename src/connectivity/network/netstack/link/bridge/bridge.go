@@ -117,8 +117,8 @@ func (*Endpoint) SetPromiscuousMode(bool) error {
 	return nil
 }
 
-func (*Endpoint) DeviceClass() network.DeviceClass {
-	return network.DeviceClassBridge
+func (*Endpoint) PortClass() network.PortClass {
+	return network.PortClassBridge
 }
 
 func (*Endpoint) ConnectPort(port network.PortWithCtxInterfaceRequest) {

@@ -3,7 +3,7 @@
 FFX is divided into some areas of responsibility, with core functionality
 related to finding and running fuchsia-interacting programs being in the core
 program (the [ffx cli](/docs/development/tools/ffx/architecture/cli.md)) and
-the actual programs being built as 'subtools' (formerly plugins) that may either
+the actual programs being built as 'subtools' that may either
 be compiled in with the `ffx` cli, or run as external tools (using the
 [FHO subtool interface](/docs/development/tools/ffx/architecture/fho.md)).
 
@@ -12,11 +12,8 @@ own subtools and integrate them into the build.
 
 ## Get started with subtools
 
-To get started building a simple subtool (formerly called plugins) for `ffx`, see
+To get started building a simple subtool for `ffx`, see
 [developing an ffx subtool](subtools/getting-started.md).
-
-If you have an existing plugin and want or need to migrate it to the new subtool
-interface, take a look at [migrating an existing plugin](subtools/migrating.md).
 
 We also keep a reference implementation of a subtool that does some basic things
 called [`ffx-echo`](/src/developer/ffx/tools/echo/src) that should always act as
@@ -44,11 +41,3 @@ must have the [`ffx owners file`](/src/developer/ffx/OWNERS) referenced (ie.
 `file:/src/developer/ffx/OWNERS` in its OWNERS file) applying to any files at
 the api boundary between `ffx` and the subtool so that we can make pro-active
 changes to that api boundary over time.
-
-## Legacy plugin references
-
-If you're looking for information about the legacy plugin macro interface, see:
-
-* [Developing an ffx plugin](plugins.md)
-* [Experimental plugins](plugin-experimental.md)
-* [Plugin internals](plugin-internals.md)

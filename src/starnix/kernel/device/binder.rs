@@ -8,7 +8,7 @@ use crate::device::mem::new_null_file;
 use crate::device::remote_binder::RemoteBinderDevice;
 use crate::device::DeviceOps;
 use crate::fs::fuchsia::new_remote_file;
-use crate::mm::vmo::round_up_to_increment;
+use crate::mm::memory::MemoryObject;
 use crate::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt, ProtectionFlags,
 };
@@ -20,11 +20,11 @@ use crate::task::{
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fs_node_impl_dir_readonly, BinderDriverReleaser, CacheMode,
-    DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode, VecDirectory,
-    VecDirectoryEntry,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    BinderDriverReleaser, CacheMode, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
+    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
+    VecDirectory, VecDirectoryEntry,
 };
 use bitflags::bitflags;
 use fidl::endpoints::ClientEnd;
@@ -43,6 +43,7 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::file_mode::mode;
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::{
     release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, TempRef,
@@ -171,6 +172,7 @@ impl BinderConnection {
 
 impl FileOps for BinderConnection {
     fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
 
     fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
         self.close(current_task.kernel());
@@ -249,13 +251,14 @@ impl FileOps for BinderConnection {
         })
     }
 
-    fn get_vmo(
+    fn get_memory(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
         _prot: ProtectionFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
+    ) -> Result<Arc<MemoryObject>, Errno> {
         error!(EINVAL)
     }
 
@@ -265,7 +268,7 @@ impl FileOps for BinderConnection {
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
-        _vmo_offset: u64,
+        _memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
         mapping_options: MappingOptions,
@@ -890,8 +893,9 @@ impl BinderProcess {
         if shared_memory.is_some() {
             return error!(EINVAL);
         }
-        let size = vmo.get_size().map_err(|_| errno!(EINVAL))?;
-        *shared_memory = Some(SharedMemory::map(&vmo, mapped_address.into(), size as usize)?);
+        let memory = MemoryObject::from(vmo);
+        let size = memory.get_size();
+        *shared_memory = Some(SharedMemory::map(&memory, mapped_address.into(), size as usize)?);
         Ok(())
     }
 }
@@ -1151,12 +1155,18 @@ impl Drop for SharedMemory {
 unsafe impl Send for SharedMemory {}
 
 impl SharedMemory {
-    fn map(vmo: &zx::Vmo, user_address: UserAddress, length: usize) -> Result<Self, Errno> {
+    fn map(memory: &MemoryObject, user_address: UserAddress, length: usize) -> Result<Self, Errno> {
         profile_duration!("SharedMemoryMap");
         // Map the VMO into the kernel's address space.
         let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
-        let kernel_address = kernel_root_vmar
-            .map(0, vmo, 0, length, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
+        let kernel_address = memory
+            .map_in_vmar(
+                &kernel_root_vmar,
+                0,
+                0,
+                length,
+                zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+            )
             .map_err(|status| {
                 log_error!("failed to map shared binder region in kernel: {:?}", status);
                 errno!(ENOMEM)
@@ -4197,12 +4207,14 @@ impl BinderDriver {
         }
 
         // Create a VMO that will be shared between the driver and the client process.
-        let vmo = Arc::new(zx::Vmo::create(length as u64).map_err(|_| errno!(ENOMEM))?);
+        let memory = Arc::new(MemoryObject::from(
+            zx::Vmo::create(length as u64).map_err(|_| errno!(ENOMEM))?,
+        ));
 
         // Map the VMO into the binder process' address space.
-        let user_address = current_task.mm().map_vmo(
+        let user_address = current_task.mm().map_memory(
             addr,
-            vmo.clone(),
+            memory.clone(),
             0,
             length,
             prot_flags,
@@ -4212,7 +4224,7 @@ impl BinderDriver {
         )?;
 
         // Map the VMO into the driver's address space.
-        match SharedMemory::map(&vmo, user_address, length) {
+        match SharedMemory::map(&memory, user_address, length) {
             Ok(mem) => {
                 *shared_memory = Some(mem);
                 Ok(user_address)
@@ -4686,7 +4698,7 @@ pub mod tests {
         }
     }
 
-    /// Fills the provided shared memory with n buffers, each spanning 1/n-th of the vmo.
+    /// Fills the provided shared memory with n buffers, each spanning 1/n-th of the memory.
     fn fill_with_buffers(shared_memory: &mut SharedMemory, n: usize) -> Vec<UserAddress> {
         let mut addresses = vec![];
         for _ in 0..n {
@@ -4949,9 +4961,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_fails_with_invalid_offsets_length() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
         shared_memory
             .allocate_buffers(3, 1, 0, 0)
             .expect_err("offsets_length should be multiple of 8");
@@ -4965,9 +4978,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_aligns_offsets_buffer() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
 
         const DATA_LEN: usize = 3;
         const OFFSETS_COUNT: usize = 1;
@@ -5012,9 +5026,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_buffers_correctly_write_through() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
 
         const DATA_LEN: usize = 256;
         const OFFSETS_COUNT: usize = 4;
@@ -5031,19 +5046,20 @@ pub mod tests {
 
         // Check that the correct bit patterns were written through to the underlying VMO.
         let mut data = [0u8; DATA_LEN];
-        vmo.read(&mut data, 0).expect("read VMO failed");
+        memory.read(&mut data, 0).expect("read VMO failed");
         assert!(data.iter().all(|b| *b == DATA_FILL));
 
         let mut data = [0u64; OFFSETS_COUNT];
-        vmo.read(data.as_bytes_mut(), DATA_LEN as u64).expect("read VMO failed");
+        memory.read(data.as_bytes_mut(), DATA_LEN as u64).expect("read VMO failed");
         assert!(data.iter().all(|b| *b == OFFSETS_FILL));
     }
 
     #[fuchsia::test]
     fn shared_memory_allocates_multiple_buffers() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
 
         // Check that two buffers allocated from the same shared memory region don't overlap.
         const BUF1_DATA_LEN: usize = 64;
@@ -5120,9 +5136,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_too_large_allocation_fails() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
 
         shared_memory
             .allocate_buffers(VMO_LENGTH + 1, 0, 0, 0)
@@ -5140,9 +5157,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_wraps_in_order() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
         let n = 4;
 
         for buffer in fill_with_buffers(&mut shared_memory, n) {
@@ -5160,9 +5178,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_single() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
         let n = 1;
         let buffers = fill_with_buffers(&mut shared_memory, n);
 
@@ -5177,9 +5196,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_can_allocate_in_hole() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
         let n = 4;
 
         let buffers = fill_with_buffers(&mut shared_memory, n);
@@ -5195,9 +5215,10 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_doesnt_wrap_when_cant_fit() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
         let n = 4;
 
         let buffers = fill_with_buffers(&mut shared_memory, n);
@@ -5215,12 +5236,13 @@ pub mod tests {
 
     #[fuchsia::test]
     fn shared_memory_allocation_doesnt_wrap_when_cant_fit_at_end() {
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         let mut shared_memory =
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory");
 
         // Test that a buffer can still be allocated even if it can't fit at the end, but can fit
-        // at the start by first allocating 3/4 of the vmo.
+        // at the start by first allocating 3/4 of the memory.
         let buffer_1 = {
             let allocations =
                 shared_memory.allocate_buffers(VMO_LENGTH / 4, 0, 0, 0).expect("couldn't allocate");
@@ -5633,9 +5655,10 @@ pub mod tests {
         let receiver = test.new_process(&mut locked);
 
         // Explicitly install a VMO that we can read from later.
-        let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
+        let memory =
+            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
         *receiver.proc.shared_memory.lock() = Some(
-            SharedMemory::map(&vmo, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory"),
+            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory"),
         );
 
         // Map some memory for process 1.
@@ -5717,16 +5740,19 @@ pub mod tests {
 
         // Verify the contents of the copied data in process 2's shared memory VMO.
         let mut buffer = [0u8; BINDER_DATA.len() + std::mem::size_of::<flat_binder_object>()];
-        vmo.read(&mut buffer, (data_buffer.address - BASE_ADDR) as u64)
+        memory
+            .read(&mut buffer, (data_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read data");
         assert_eq!(&buffer[..], &transaction_data);
 
         let mut buffer = [0u8; std::mem::size_of::<u64>()];
-        vmo.read(&mut buffer, (offsets_buffer.address - BASE_ADDR) as u64)
+        memory
+            .read(&mut buffer, (offsets_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read offsets");
         assert_eq!(&buffer[..], offsets_data.as_bytes());
         let mut buffer = vec![0u8; security_context.len()];
-        vmo.read(&mut buffer[..], (security_context_buffer.address - BASE_ADDR) as u64)
+        memory
+            .read(&mut buffer[..], (security_context_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read security_context");
         assert_eq!(&buffer[..], security_context);
         transaction_state.release(());

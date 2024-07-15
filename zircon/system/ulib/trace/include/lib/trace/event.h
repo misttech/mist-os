@@ -24,6 +24,6 @@
 #define LIB_TRACE_EVENT_H_
 
 // For now userspace and DDK tracing share the same API and implementation.
-#include <lib/trace/internal/event_common.h>
+#include <lib/trace/internal/event_common.h>  // IWYU pragma: export
 
 #endif  // LIB_TRACE_EVENT_H_

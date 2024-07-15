@@ -28,7 +28,7 @@ import signal
 import time
 import typing
 from dataclasses import dataclass, field
-from io import StringIO
+from io import BytesIO, StringIO
 
 
 @dataclass
@@ -105,6 +105,17 @@ class CommandOutput:
 CommandEvent = StdoutEvent | StderrEvent | TerminationEvent
 
 
+@dataclass
+class _InputWriter:
+    input_bytes: bytes
+    writer: asyncio.StreamWriter
+
+    async def write_stream(self) -> None:
+        self.writer.write(self.input_bytes)
+        self.writer.write_eof()
+        await self.writer.drain()
+
+
 class AsyncCommand:
     """Asynchronously executed subprocess command.
 
@@ -118,6 +129,7 @@ class AsyncCommand:
         process: asyncio.subprocess.Process,
         wrapped_process: asyncio.subprocess.Process | None = None,
         timeout: float | None = None,
+        input_writer: _InputWriter | None = None,
     ):
         """Create an AsyncCommand that wraps a subprocess.
 
@@ -136,8 +148,9 @@ class AsyncCommand:
         self._event_queue: asyncio.Queue[CommandEvent] = asyncio.Queue(128)
         self._done_iterating = False
         self._start = time.time()
-        self._runner_task = asyncio.create_task(self._task())
         self._timeout = timeout
+        self._input_writer = input_writer
+        self._runner_task = asyncio.create_task(self._task())
 
     @classmethod
     async def create(
@@ -147,6 +160,7 @@ class AsyncCommand:
         symbolizer_args: list[str] | None = None,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
+        input_bytes: bytes | None = None,
     ) -> "AsyncCommand":
         """Create a new AsyncCommand that runs the given program.
 
@@ -162,6 +176,7 @@ class AsyncCommand:
                 Note: fx test's own environment is inherited and overridden by
                     the values in this dict, if set.
             timeout (float, optional): Terminate the command after the given number of seconds.
+            input_bytes (bytes, optional): If set, send this input to the running command.
 
         Returns:
             AsyncCommand: A new AsyncCommand executing the process.
@@ -187,19 +202,22 @@ class AsyncCommand:
         try:
 
             async def make_process(
-                output_pipe: typing.Union[int, typing.TextIO]
+                output_pipe: int | typing.TextIO, input_pipe: int | None = None
             ) -> asyncio.subprocess.Process:
                 return await asyncio.subprocess.create_subprocess_exec(
                     program,
                     *args,
                     stdout=output_pipe,
                     stderr=output_pipe,
+                    stdin=input_pipe,
                     env=env,
                     cwd=cwd,
                     preexec_fn=os.setpgrp,  # To support killing by pgid.
                 )
 
             base_command = None
+            input_pipe = None if input is None else asyncio.subprocess.PIPE
+            input_writer: _InputWriter | None = None
             if symbolizer_args:
                 # Wrap the base command we want to run in another
                 # command that executes the symbolizer. We need to explicitly
@@ -208,7 +226,7 @@ class AsyncCommand:
 
                 read_pipe, write_pipe = os.pipe()
 
-                base_command = await make_process(write_pipe)
+                base_command = await make_process(write_pipe, input_pipe)
                 os.close(write_pipe)
                 command = await asyncio.subprocess.create_subprocess_exec(
                     *symbolizer_args,
@@ -217,11 +235,22 @@ class AsyncCommand:
                     stdin=read_pipe,
                     preexec_fn=os.setpgrp,  # To support killing by pgid.
                 )
+                if input_bytes is not None and base_command.stdin is not None:
+                    input_writer = _InputWriter(input_bytes, base_command.stdin)
                 os.close(read_pipe)
             else:
-                command = await make_process(asyncio.subprocess.PIPE)
+                command = await make_process(
+                    asyncio.subprocess.PIPE, input_pipe
+                )
+                if input_bytes is not None and command.stdin is not None:
+                    input_writer = _InputWriter(input_bytes, command.stdin)
 
-            return AsyncCommand(command, base_command, timeout=timeout)
+            return AsyncCommand(
+                command,
+                base_command,
+                timeout=timeout,
+                input_writer=input_writer,
+            )
         except FileNotFoundError as e:
             raise AsyncCommandError(
                 f"The program '{e.filename}' was not found."
@@ -314,8 +343,34 @@ class AsyncCommand:
                 input_stream (asyncio.StreamReader): Reader to read from.
                 event_type: Either StdoutEvent or StderrEvent type, to wrap each line.
             """
-            async for line in input_stream:
-                await self._event_queue.put(event_type(text=line))
+
+            # Iteratively read blocks of data from the stream, splitting on newlines.
+
+            # buf is used to contain the line in progress, it will contain only
+            # one line and will never contain anything after a newline character.
+            buf = BytesIO()
+
+            while not input_stream.at_eof():
+                more: bytes = await input_stream.read(128 * 1024)
+                # Process the current buffer, splitting by lines.
+                while True:
+                    # Find the end of the line.
+                    if (idx := more.find(b"\n")) == -1:
+                        # No newline yet, buffer this batch and fetch more.
+                        buf.write(more)
+                        break
+
+                    # Append the rest of the line to the current line, then send as an event.
+                    buf.write(more[: idx + 1])
+                    await self._event_queue.put(event_type(text=buf.getvalue()))
+
+                    # Reset the buffer and continue with the next line.
+                    buf = BytesIO()
+                    more = more[idx + 1 :]
+
+            # Publish any remaining data as a line.
+            if len(buf.getvalue()) > 0:
+                await self._event_queue.put(event_type(text=buf.getvalue()))
 
         async def timeout_handler(
             timeout: float, timeout_signal: asyncio.Event
@@ -353,6 +408,8 @@ class AsyncCommand:
         tasks.append(
             asyncio.create_task(read_stream(self._process.stderr, StderrEvent))
         )
+        if self._input_writer is not None:
+            tasks.append(asyncio.create_task(self._input_writer.write_stream()))
 
         # Wait for the process to exit and get its return code.
         return_code = await self._process.wait()
@@ -378,7 +435,7 @@ class AsyncCommand:
             tasks.append(timeout_task)
 
         # Wait for all output to drain before termination event.
-        await asyncio.wait(tasks)
+        await asyncio.wait(tasks, return_when="FIRST_EXCEPTION")
         await self._event_queue.put(
             TerminationEvent(
                 return_code,

@@ -11,15 +11,15 @@ The Command Line Interface (CLI) provides the UX for FFX. It is responsible for:
 
 FFX uses the Rust crate [Argh](https://github.com/google/argh) to manage CLI
 parameter definitions and parsing. As Argh complies with the Google standard,
-code is able to be structured into decoupled plugins for FFX. Each subcommand
-in the FFX call can be represented by a plugin, so for example:
+code is able to be structured into decoupled subtools for FFX. Each subcommand
+in the FFX call can be represented by a subtool, so for example:
 
 ```sh
 $fx ffx component run /core/ffx-laboratory:hello_world_rust "fuchsia-pkg://fuchsia.com/hello_world_rust#meta/hello_world_rust.cm"
 ```
 
 The part of the command 'component run' is a subcommand that routes the code
-execution to the 'component run' plugin. More on this in the
+execution to the 'component run' subtool. More on this in the
 [routing](#routing) section.
 
 ## Communicating with the daemon
@@ -37,8 +37,8 @@ longer than average run times on the initial run of FFX.
 ## Routing
 
 The CLI is designed as an extensible architecture. In this architecture,
-plugins provide the code execution. Plugins are defined by a mixture of GN
-build rules and Rust attributes. Plugins are designed to be as decoupled from
+subtools provide the code execution. Subtools are defined by a mixture of GN
+build rules and Rust attributes. Subtools are designed to be as decoupled from
 the internal workings of FFX as possible. If you are interested in developing a
-plugin for FFX, please visit the [Integrating With FFX](/docs/development/tools/ffx/development/plugins.md) page.
-
+subtool for FFX, please visit
+[Integrating With FFX](/docs/development/tools/ffx/development/subtools/getting-started.md).

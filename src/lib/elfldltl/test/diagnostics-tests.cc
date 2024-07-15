@@ -6,6 +6,7 @@
 #include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/posix.h>
 #include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/fit/defer.h>
 
 #ifdef __Fuchsia__
 #include <lib/elfldltl/zircon.h>
@@ -25,9 +26,10 @@ using elfldltl::testing::ExpectedSingleError;
 using elfldltl::testing::ExpectReport;
 
 TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
-  std::array<char, 200> buffer{};
+  char* buffer = nullptr;
+  auto cleanup = fit::defer([&buffer]() { free(buffer); });
   auto printer = [&buffer](const char* format, auto&&... args) {
-    snprintf(buffer.data(), buffer.size(), format, std::forward<decltype(args)>(args)...);
+    asprintf(&buffer, format, std::forward<decltype(args)>(args)...);
   };
 
   constexpr uint32_t kPrefixValue = 42;
@@ -42,22 +44,27 @@ TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
   constexpr uint64_t kOffset64 = 0x456;
   constexpr uint32_t kAddress32 = 0x1234;
   constexpr uint64_t kAddress64 = 0x4567;
-  decltype(auto) retval =
-      report(kStringViewArg, kValue32, "bar", kValue64, elfldltl::FileOffset{kOffset32},
-             elfldltl::FileOffset{kOffset64}, elfldltl::FileAddress{kAddress32},
-             elfldltl::FileAddress{kAddress64}, " field32", elfldltl::Elf32<>::Addr{kValue32},
-             " field64", elfldltl::Elf64<>::Addr{kValue64});
+  constexpr int32_t kSigned32 = -123;
+  constexpr int64_t kSigned64 = -456;
+  decltype(auto) retval = report(  //
+      kStringViewArg, kValue32, "bar", kValue64, elfldltl::FileOffset{kOffset32},
+      elfldltl::FileOffset{kOffset64}, elfldltl::FileAddress{kAddress32},
+      elfldltl::FileAddress{kAddress64}, " field32", elfldltl::Elf32<>::Addr{kValue32}, " field64",
+      elfldltl::Elf64<>::Addr{kValue64}, " signed32", kSigned32, " signed64", kSigned64,
+      " sfield32", elfldltl::Elf32<>::Addend{kSigned32}, " sfield64",
+      elfldltl::Elf64<>::Addend{kSigned64});
 
   static_assert(std::is_same_v<decltype(retval), bool>);
   EXPECT_TRUE(retval);
 
-  ASSERT_EQ(buffer.back(), '\0');
   EXPECT_STREQ(
       "prefix 42: foo 123bar 456"
       " at file offset 0x123 at file offset 0x456"
       " at relative address 0x1234 at relative address 0x4567"
-      " field32 123 field64 456",
-      buffer.data());
+      " field32 123 field64 456"
+      " signed32 -123 signed64 -456"
+      " sfield32 -123 sfield64 -456",
+      buffer);
 }
 
 // clang-format off

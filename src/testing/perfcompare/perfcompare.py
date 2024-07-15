@@ -386,9 +386,7 @@ def CheckSampleSize(expected_sample_size, results_maps):
             if stats.sample_size != expected_sample_size:
                 mismatches.append("%s (got %d)" % (label, stats.sample_size))
     if len(mismatches) != 0:
-        # TODO(https://fxbug.dev/343997506): Turn this back into an
-        # exception when the check passes for all builds.
-        print(
+        raise AssertionError(
             "The following metrics had an unexpected sample size"
             " (expected %d):\n%s"
             % (expected_sample_size, "\n".join(mismatches))

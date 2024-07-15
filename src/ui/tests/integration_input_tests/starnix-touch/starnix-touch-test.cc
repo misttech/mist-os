@@ -26,6 +26,9 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <cstdint>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "relay-api.h"
@@ -39,7 +42,6 @@ using component_testing::ChildRef;
 using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Route;
-using component_testing::Storage;
 
 // Alias for Component child name as provided to Realm Builder.
 using ChildName = std::string;
@@ -51,16 +53,29 @@ struct TouchEvent {
   float local_x;  // The x-position, in the client's coordinate space.
   float local_y;  // The y-position, in the client's coordinate space.
   fuchsia_ui_pointer::EventPhase phase;
+  int slot_id;
+  int pointer_id;      // only phase add include this field.
+  bool has_btn_touch;  // only btn_touch event will only have this field.
+  int btn_touch;       // only btn_touch event will only have this field.
 };
 
-void ExpectLocationAndPhase(
+void ExpectLocationPhaseAndSlot(
     const TouchEvent& e, double expected_x, double expected_y,
-    fuchsia_ui_pointer::EventPhase expected_phase,
+    fuchsia_ui_pointer::EventPhase expected_phase, int expected_slot_id,
     const cpp20::source_location caller = cpp20::source_location::current()) {
   std::string caller_info = "line " + std::to_string(caller.line());
+  EXPECT_EQ(expected_slot_id, e.slot_id) << " from " << caller_info;
+  EXPECT_EQ(expected_phase, e.phase) << " from " << caller_info;
   EXPECT_NEAR(expected_x, e.local_x, kEpsilon) << " from " << caller_info;
   EXPECT_NEAR(expected_y, e.local_y, kEpsilon) << " from " << caller_info;
-  EXPECT_EQ(expected_phase, e.phase) << " from " << caller_info;
+  EXPECT_EQ(false, e.has_btn_touch) << " from " << caller_info;
+}
+
+void ExpectBtnTouch(const TouchEvent& e, int expected_value,
+                    const cpp20::source_location caller = cpp20::source_location::current()) {
+  std::string caller_info = "line " + std::to_string(caller.line());
+  EXPECT_EQ(true, e.has_btn_touch) << " from " << caller_info;
+  EXPECT_EQ(expected_value, e.btn_touch) << " from " << caller_info;
 }
 
 enum class TapLocation { kTopLeft, kBottomRight };
@@ -69,17 +84,15 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
  protected:
   struct EvDevPacket {
     // The event timestamp received by Starnix, from Fuchsia.
-    long sec;
-    long usec;
+    int64_t sec;
+    int64_t usec;
     // * For an overview of the following fields, see
     //   https://kernel.org/doc/html/latest/input/input.html#event-interface
     // * For details on the constants relevant to Starnix touch input, see
     //   https://kernel.org/doc/html/latest/input/event-codes.html
-    // * Note that Starnix touch input does _not_ currently use the multi-touch protocol
-    //   described in https://kernel.org/doc/html/latest/input/multi-touch-protocol.html
-    unsigned short type;
-    unsigned short code;
-    unsigned short value;
+    uint16_t type;
+    uint16_t code;
+    int32_t value;
   };
 
   ~StarnixTouchTest() override {
@@ -167,58 +180,71 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
         << "Got \"" << packet.data() << "\" with size " << packet.size();
   }
 
-  // Reads a single touch event from `touch_dump.cc`, via `local_socket_`.
-  TouchEvent GetTouchEvent() {
-    EvDevPacket pkt{};
-    float local_x;
-    float local_y;
-    fuchsia_ui_pointer::EventPhase phase;
+  // Reads a sequence touch event from `touch_dump.cc`, via `local_socket_`.
+  std::vector<TouchEvent> GetTouchEventSequence() {
+    std::vector<TouchEvent> result;
 
-    pkt = GetEvDevPacket();
-    EXPECT_EQ(pkt.type, EV_KEY);
-    EXPECT_EQ(pkt.code, BTN_TOUCH);
-    switch (pkt.value) {
-      case 0:
-        phase = fuchsia_ui_pointer::EventPhase::kRemove;
-        break;
-      case 1:
-        phase = fuchsia_ui_pointer::EventPhase::kAdd;
-        break;
-      default:
-        FX_LOGS(FATAL) << "Unexpected BTN_TOUCH value " << pkt.value;
-        // Keep clang from getting confused about whether `phase` is initialized below.
-        abort();
+    // read until sync event (end of sequence).
+    while (true) {
+      EvDevPacket pkt = GetEvDevPacket();
+
+      if (pkt.type == EV_SYN) {
+        return result;
+      }
+
+      if (pkt.type == EV_KEY) {
+        if (pkt.code != BTN_TOUCH) {
+          FX_LOGS(FATAL) << "unexpected key event code in touch event seq, code=" << pkt.code;
+        }
+        result.push_back(TouchEvent{.has_btn_touch = true, .btn_touch = pkt.value});
+
+        continue;
+      }
+
+      if (pkt.type != EV_ABS) {
+        FX_LOGS(FATAL) << "unexpected event type in touch event seq, type=" << pkt.type;
+      }
+
+      switch (pkt.code) {
+        case ABS_MT_SLOT:
+          result.push_back(
+              TouchEvent{.phase = fuchsia_ui_pointer::EventPhase::kChange, .slot_id = pkt.value});
+          break;
+        case ABS_MT_TRACKING_ID:
+          if (result.empty()) {
+            FX_LOGS(FATAL) << "receive ABS_MT_TRACKING_ID out of slot";
+          }
+
+          if (pkt.value == -1) {
+            result[result.size() - 1].phase = fuchsia_ui_pointer::EventPhase::kRemove;
+          } else {
+            result[result.size() - 1].phase = fuchsia_ui_pointer::EventPhase::kAdd;
+            result[result.size() - 1].pointer_id = pkt.value;
+          }
+
+          break;
+        case ABS_MT_POSITION_X:
+          if (result.empty()) {
+            FX_LOGS(FATAL) << "receive ABS_MT_POSITION_X out of slot";
+          }
+
+          result[result.size() - 1].local_x = static_cast<float>(pkt.value);
+
+          break;
+        case ABS_MT_POSITION_Y:
+          if (result.empty()) {
+            FX_LOGS(FATAL) << "receive ABS_MT_POSITION_X out of slot";
+          }
+
+          result[result.size() - 1].local_y = static_cast<float>(pkt.value);
+
+          break;
+        default:
+          FX_LOGS(FATAL) << "unexpected event code in touch event seq, code=" << pkt.code;
+      }
     }
 
-    pkt = GetEvDevPacket();
-    EXPECT_EQ(pkt.type, EV_KEY);
-    EXPECT_EQ(pkt.code, BTN_TOOL_FINGER);
-    switch (phase) {
-      case fuchsia_ui_pointer::EventPhase::kRemove:
-        EXPECT_EQ(0, pkt.value);
-        break;
-      case fuchsia_ui_pointer::EventPhase::kAdd:
-        EXPECT_EQ(1, pkt.value);
-        break;
-      default:
-        FX_LOGS(FATAL) << "Internal error: unexpected phase " << phase;
-    }
-
-    pkt = GetEvDevPacket();
-    EXPECT_EQ(pkt.type, EV_ABS);
-    EXPECT_EQ(pkt.code, ABS_X);
-    local_x = pkt.value;
-
-    pkt = GetEvDevPacket();
-    EXPECT_EQ(pkt.type, EV_ABS);
-    EXPECT_EQ(pkt.code, ABS_Y);
-    local_y = pkt.value;
-
-    pkt = GetEvDevPacket();
-    EXPECT_EQ(pkt.type, EV_SYN);
-    EXPECT_EQ(pkt.code, SYN_REPORT);
-
-    return {.local_x = local_x, .local_y = local_y, .phase = phase};
+    return result;
   }
 
  private:
@@ -227,8 +253,6 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
 
   class RealmEventHandler : public fidl::AsyncEventHandler<fuchsia_component::Realm> {
    public:
-    RealmEventHandler() : running_(true) {}
-
     // Ignores any later errors on `this`. Used to avoid false-failures during
     // test teardown.
     void Stop() { running_ = false; }
@@ -240,7 +264,7 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     }
 
    private:
-    bool running_;
+    bool running_ = true;
   };
 
   // To satisfy ui_testing::PortableUITest
@@ -360,21 +384,47 @@ TEST_F(StarnixTouchTest, Tap) {
 
   // Top-left.
   InjectInput(TapLocation::kTopLeft);
-  ExpectLocationAndPhase(GetTouchEvent(), static_cast<float>(display_width()) / 4.f,
-                         static_cast<float>(display_height()) / 4.f,
-                         fuchsia_ui_pointer::EventPhase::kAdd);
-  ExpectLocationAndPhase(GetTouchEvent(), static_cast<float>(display_width()) / 4.f,
-                         static_cast<float>(display_height()) / 4.f,
-                         fuchsia_ui_pointer::EventPhase::kRemove);
+
+  {
+    // down
+    auto events = GetTouchEventSequence();
+    EXPECT_EQ(events.size(), 2u);
+
+    ExpectBtnTouch(events[0], 1);
+    ExpectLocationPhaseAndSlot(events[1], static_cast<float>(display_width()) / 4.f,
+                               static_cast<float>(display_height()) / 4.f,
+                               fuchsia_ui_pointer::EventPhase::kAdd, 0);
+  }
+  {
+    // up
+    auto events = GetTouchEventSequence();
+    EXPECT_EQ(events.size(), 2u);
+
+    ExpectBtnTouch(events[0], 0);
+    ExpectLocationPhaseAndSlot(events[1], 0.0, 0.0, fuchsia_ui_pointer::EventPhase::kRemove, 0);
+  }
 
   // Bottom-right.
   InjectInput(TapLocation::kBottomRight);
-  ExpectLocationAndPhase(GetTouchEvent(), 3 * static_cast<float>(display_width()) / 4.f,
-                         3 * static_cast<float>(display_height()) / 4.f,
-                         fuchsia_ui_pointer::EventPhase::kAdd);
-  ExpectLocationAndPhase(GetTouchEvent(), 3 * static_cast<float>(display_width()) / 4.f,
-                         3 * static_cast<float>(display_height()) / 4.f,
-                         fuchsia_ui_pointer::EventPhase::kRemove);
+
+  {
+    // down
+    auto events = GetTouchEventSequence();
+    EXPECT_EQ(events.size(), 2u);
+
+    ExpectBtnTouch(events[0], 1);
+    ExpectLocationPhaseAndSlot(events[1], 3 * static_cast<float>(display_width()) / 4.f,
+                               3 * static_cast<float>(display_height()) / 4.f,
+                               fuchsia_ui_pointer::EventPhase::kAdd, 0);
+  }
+  {
+    // up
+    auto events = GetTouchEventSequence();
+    EXPECT_EQ(events.size(), 2u);
+
+    ExpectBtnTouch(events[0], 0);
+    ExpectLocationPhaseAndSlot(events[1], 0.0, 0.0, fuchsia_ui_pointer::EventPhase::kRemove, 0);
+  }
 }
 
 }  // namespace

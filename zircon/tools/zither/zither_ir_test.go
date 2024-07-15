@@ -1408,7 +1408,7 @@ closed protocol SyscallWithParameters {
 				},
 				{
 					member:   member{Name: "CategoryConstVdsoCall"},
-					Category: SyscallCategoryVdsoCall,
+					VdsoCall: true,
 					Const:    true,
 				},
 				{
@@ -1439,7 +1439,7 @@ closed protocol SyscallWithParameters {
 				},
 				{
 					member:   member{Name: "CategoryVdsoCall"},
-					Category: SyscallCategoryVdsoCall,
+					VdsoCall: true,
 				},
 			},
 		},

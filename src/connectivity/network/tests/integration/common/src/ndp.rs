@@ -6,6 +6,7 @@
 
 use crate::constants;
 use anyhow::Context as _;
+use assert_matches::assert_matches;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{future, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use net_types::ip::Ip as _;
@@ -14,7 +15,7 @@ use packet::serialize::{InnerPacketBuilder, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
-use packet_formats::icmp::ndp::options::NdpOptionBuilder;
+use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder};
 use packet_formats::icmp::ndp::{
     NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
 };
@@ -123,7 +124,10 @@ pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoin
                     NeighborSolicitation,
                     _,
                 >(&data, EthernetFrameLengthCheck::NoCheck, |p| {
-                    assert_eq!(p.body().iter().count(), 0)
+                    assert_matches!(
+                        &p.body().iter().collect::<Vec<_>>()[..],
+                        [NdpOption::Nonce(_)]
+                    );
                 })
                 .map_or(
                     None,

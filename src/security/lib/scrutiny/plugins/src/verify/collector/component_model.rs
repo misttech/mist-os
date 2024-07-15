@@ -59,6 +59,7 @@ pub struct ComponentTreeConfig {
     pub dynamic_components: HashMap<Moniker, DynamicComponent>,
 }
 
+#[derive(Default)]
 pub struct V2ComponentModelDataCollector {}
 
 impl V2ComponentModelDataCollector {

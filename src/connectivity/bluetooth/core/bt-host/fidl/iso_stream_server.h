@@ -19,9 +19,12 @@ class IsoStreamServer : public ServerBase<fuchsia::bluetooth::le::IsochronousStr
       fidl::InterfaceRequest<fuchsia::bluetooth::le::IsochronousStream> request,
       fit::callback<void()> on_closed_cb);
 
-  void OnStreamEstablished(
-      pw::bluetooth::emboss::StatusCode status,
-      const std::optional<bt::iso::CisEstablishedParameters>& connection_params);
+  void OnStreamEstablished(bt::iso::IsoStream::WeakPtr stream_ptr,
+                           const bt::iso::CisEstablishedParameters& connection_params);
+
+  void OnStreamEstablishmentFailed(pw::bluetooth::emboss::StatusCode status);
+
+  void OnClosed();
 
   void Close(zx_status_t epitaph);
 
@@ -36,6 +39,8 @@ class IsoStreamServer : public ServerBase<fuchsia::bluetooth::le::IsochronousStr
   void handle_unknown_method(uint64_t ordinal, bool has_response) override;
 
   fit::callback<void()> on_closed_cb_;
+
+  std::optional<bt::iso::IsoStream::WeakPtr> iso_stream_;
 
   WeakSelf<IsoStreamServer> weak_self_;
 

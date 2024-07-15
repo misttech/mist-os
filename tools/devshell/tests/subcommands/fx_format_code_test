@@ -80,6 +80,30 @@ TEST_fx-format-code-commands() {
   BT_EXPECT grep -q -E '"shac fmt .*/rust.rs .*/gn.gn .*/gn.gni .*/python3.py"' "${out}"
 }
 
+# Ensure that formatting a nonexistent file prints an error.
+TEST_fx-format-code-nonexistent-file() {
+  local err="${BT_TEMP_DIR}/_fx_format_code_stderr"
+  local path="${TESTDATA}/doesnotexist.py"
+  BT_EXPECT "${fx}" format-code --verbose --files="${path}" > /dev/null 2> "${err}"
+  BT_EXPECT grep -q -E '"ERROR: no such file: .*/doesnotexist.py"' "${err}"
+}
+
+# Ensure that no error gets printed if git reports a non-existent file, since it probably
+# means the file was deleted so it's expected that it would be ignored by `fx format-code`.
+TEST_fx-format-code-ignores-nonexistent-git-files() {
+  btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
+  btf::make_mock "${BT_TEMP_DIR}/tools/devshell/build"
+  btf::make_mock "git"
+  local out="${BT_TEMP_DIR}/_fx_format_code_ouput"
+  local err="${BT_TEMP_DIR}/_fx_format_code_stderr"
+  echo "${TESTDATA}/doestnotexist.cc" > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_stdout"
+  echo "no-such-file" > "git.mock_stdout"
+  BT_EXPECT "${fx}" format-code --verbose > "${out}" 2> "${err}"
+  BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "Files to be formatted:"
+  BT_EXPECT_FILE_CONTAINS_SUBSTRING "${out}" "no-such-file"
+  BT_EXPECT_EMPTY "$(cat "${err}")" "There should be no errors when given non-existent git files"
+}
+
 # Ensure that buildable format commands are built when needed
 TEST_fx-format-code-builds-required-commands() {
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"

@@ -18,6 +18,9 @@ namespace elfldltl {
 template <typename T, bool Swap>
 class UnsignedField;
 
+template <typename T, bool Swap>
+class SignedField;
+
 template <typename T>
 struct FileOffset;
 
@@ -33,15 +36,23 @@ template <typename T>
 struct PrintfType {
   // The default template also handles other unsigned types that are the
   // same size as one of the uintNN_t types but a different type, which
-  // just get widened to uint64_t.
-  static_assert(std::is_unsigned_v<T>, "missing specialization");
+  // just get widened to uint64_t.  Likewise for signed types to int64_t.
+  static_assert(std::is_integral_v<T>, "missing specialization");
+
+  using IntegerType = std::conditional_t<std::is_signed_v<T>, int64_t, uint64_t>;
 
   // This is a ConstString of a printf format string fragment.
-  static constexpr auto kFormat = ConstString(" %" PRIu64);
+  static constexpr auto kFormat = []() {
+    if constexpr (std::is_signed_v<T>) {
+      return ConstString(" %" PRId64);
+    } else {
+      return ConstString(" %" PRIu64);
+    }
+  }();
 
   // This is a function of T that returns a std::tuple<...> of the arguments to
   // pass to printf corresponding to the kFormat string.
-  static constexpr auto Arguments(uint64_t arg) { return std::make_tuple(arg); }
+  static constexpr auto Arguments(IntegerType arg) { return std::make_tuple(arg); }
 };
 
 template <typename T>
@@ -71,6 +82,24 @@ struct PrintfType<uint32_t> {
   static constexpr auto Arguments(uint32_t arg) { return std::make_tuple(arg); }
 };
 
+template <>
+struct PrintfType<int8_t> {
+  static constexpr auto kFormat = ConstString(" %" PRId8);
+  static constexpr auto Arguments(int8_t arg) { return std::make_tuple(arg); }
+};
+
+template <>
+struct PrintfType<int16_t> {
+  static constexpr auto kFormat = ConstString(" %" PRId16);
+  static constexpr auto Arguments(int16_t arg) { return std::make_tuple(arg); }
+};
+
+template <>
+struct PrintfType<int32_t> {
+  static constexpr auto kFormat = ConstString(" %" PRId32);
+  static constexpr auto Arguments(int32_t arg) { return std::make_tuple(arg); }
+};
+
 // A field.h type will implicitly convert to its underlying integer type, which
 // is is why diagnostics-ostream.h doesn't need to define operator<< for them.
 // But the generic definition (for uint64_t and equivalents) and the
@@ -79,6 +108,9 @@ struct PrintfType<uint32_t> {
 // types, because we don't want to use them for signed integer types.
 template <typename T, bool Swap>
 struct PrintfType<UnsignedField<T, Swap>> : public PrintfType<T> {};
+
+template <typename T, bool Swap>
+struct PrintfType<SignedField<T, Swap>> : public PrintfType<std::make_signed_t<T>> {};
 
 template <typename T, size_t N>
 struct Map {

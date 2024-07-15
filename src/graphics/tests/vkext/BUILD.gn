@@ -91,6 +91,7 @@ fuchsia_structured_config_values("default_config") {
   values = {
     gpu_vendor_id = 0
     support_sysmem_yuv = true
+    support_sysmem_yv12 = false
     support_sysmem_linear_nonrgba = true
     support_sysmem_renderable_linear = true
     support_protected_memory = false
@@ -106,12 +107,14 @@ fuchsia_package("vkext-child-package") {
   ]
 }
 
-sdk_fuchsia_package("vkext-test-sdk") {
-  distribution_name = "vkext-test"
-  category = "partner"
-  package_label = ":vkext-child-package"
-  api_level_added = 19
-  expected_files_exact = [ "meta/vkext-test-child.cm" ]
+if (current_toolchain == default_toolchain) {
+  sdk_fuchsia_package("vkext-test-sdk") {
+    distribution_name = "vkext-test"
+    category = "partner"
+    package_label = ":vkext-child-package"
+    api_level_added = 19
+    expected_files_exact = [ "meta/vkext-test-child.cm" ]
+  }
 }
 
 protected_libvulkan_envs = []
@@ -134,7 +137,26 @@ fuchsia_test_package("vkext-unprotected-package") {
   test_components = [ ":vkext-unprotected-test-component" ]
   subpackages = [ ":vkext-child-package" ]
   test_specs = {
-    environments = magma_libvulkan_hardware_envs - protected_libvulkan_envs
+    environments =
+        magma_libvulkan_hardware_envs - magma_libvulkan_arm_hardware_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_component("vkext-unprotected-mali-test-component") {
+  component_name = "vkext-unprotected-mali"
+  manifest = "meta/vkext_unprotected_mali.cml"
+  test_type = "vulkan"
+}
+
+fuchsia_test_package("vkext-unprotected-mali-package") {
+  package_name = "vkext_unprotected_mali_test"
+  test_components = [ ":vkext-unprotected-mali-test-component" ]
+  subpackages = [ ":vkext-child-package" ]
+  test_specs = {
+    environments = magma_libvulkan_arm_hardware_envs - protected_libvulkan_envs
     log_settings = {
       max_severity = "ERROR"
     }
@@ -195,6 +217,7 @@ group("vkext") {
   deps = [
     ":vkext-protected-package",
     ":vkext-unprotected-lavapipe-package",
+    ":vkext-unprotected-mali-package",
     ":vkext-unprotected-package",
   ]
 }

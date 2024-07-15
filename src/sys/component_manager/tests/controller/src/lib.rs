@@ -29,6 +29,7 @@ use {
 };
 
 const COLLECTION_NAME: &'static str = "col";
+const STATIC_CHILD_NAME: &'static str = "static_child";
 
 /// Marks the `component_status` as not running when dropped.
 struct DropMarksComponentAsStopped {
@@ -108,6 +109,10 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
         )
         .await
         .unwrap();
+    let static_child = builder
+        .add_child(STATIC_CHILD_NAME, "#meta/echo_server.cm", ChildOptions::new())
+        .await
+        .unwrap();
     builder
         .add_route(
             Route::new()
@@ -123,7 +128,8 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
                 .from(Ref::parent())
-                .to(Ref::collection(COLLECTION_NAME)),
+                .to(Ref::collection(COLLECTION_NAME))
+                .to(&static_child),
         )
         .await
         .unwrap();
@@ -132,7 +138,8 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .from(Ref::parent())
-                .to(Ref::collection(COLLECTION_NAME)),
+                .to(Ref::collection(COLLECTION_NAME))
+                .to(&static_child),
         )
         .await
         .unwrap();
@@ -162,6 +169,8 @@ struct SpawnedChild {
     handles_receiver: mpsc::UnboundedReceiver<LocalComponentHandles>,
     /// The `fuchsia.component.Controller` channel that was created for the child.
     controller_proxy: fcomponent::ControllerProxy,
+    /// The `ChildRef` used to create the child.
+    child_ref: fcdecl::ChildRef,
     /// Tracks when the component is and is not running.
     component_status: ComponentStatus,
     /// A oneshot that can be used to instruct the local component to exit.
@@ -227,12 +236,13 @@ async fn spawn_local_child_controller_from_create_child() -> SpawnedChild {
     builder.replace_realm_decl(child_decl).await.unwrap();
 
     let (url, local_child_task) = builder.initialize().await.unwrap();
-    let (controller_proxy, cm_realm_instance) = spawn_child_with_url(&url).await;
+    let (controller_proxy, child_ref, cm_realm_instance) = spawn_child_with_url(&url).await;
     SpawnedChild {
         _local_child_task: Some(local_child_task),
         cm_realm_instance,
         handles_receiver,
         controller_proxy,
+        child_ref,
         component_status,
         cancel_sender: Some(cancel_sender),
     }
@@ -259,19 +269,22 @@ async fn spawn_local_child_controller_from_open_controller() -> SpawnedChild {
         cm_realm_instance,
         handles_receiver,
         controller_proxy,
+        child_ref,
         component_status,
         cancel_sender: Some(cancel_sender),
     }
 }
 
-async fn spawn_child_with_url(url: &str) -> (fcomponent::ControllerProxy, RealmInstance) {
+async fn spawn_child_with_url(
+    url: &str,
+) -> (fcomponent::ControllerProxy, fcdecl::ChildRef, RealmInstance) {
     let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
-    let (_, cm_realm_instance) = spawn_child_with_url_with_args(
+    let (child_ref, cm_realm_instance) = spawn_child_with_url_with_args(
         url,
         fcomponent::CreateChildArgs { controller: Some(server_end), ..Default::default() },
     )
     .await;
-    (controller_proxy, cm_realm_instance)
+    (controller_proxy, child_ref, cm_realm_instance)
 }
 
 async fn spawn_child_with_url_with_args(
@@ -296,6 +309,40 @@ async fn spawn_child_with_url_with_args(
         collection: Some(COLLECTION_NAME.to_string()),
     };
     (child_ref, cm_realm_instance)
+}
+
+#[test_case(spawn_local_child_controller_from_create_child().boxed())]
+#[test_case(spawn_local_child_controller_from_open_controller().boxed())]
+#[fuchsia::test]
+async fn destroy(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
+    let spawned_child = spawn_child_future.await;
+    assert_matches!(spawned_child.controller_proxy.destroy().await.unwrap(), Ok(()));
+    assert_matches!(spawned_child.controller_proxy.take_event_stream().try_next().await, Ok(None));
+
+    let realm_proxy = spawned_child
+        .cm_realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+        .unwrap();
+    let (_controller, server) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    assert_matches!(
+        realm_proxy.open_controller(&spawned_child.child_ref, server).await.unwrap(),
+        Err(fcomponent::Error::InstanceNotFound)
+    );
+}
+
+#[fuchsia::test]
+async fn destroy_err() {
+    let spawned_child = spawn_local_child_controller_from_create_child().await;
+    let realm_proxy = spawned_child
+        .cm_realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+        .unwrap();
+    let (controller, server) = create_proxy::<fcomponent::ControllerMarker>().unwrap();
+    let static_child_ref = fcdecl::ChildRef { name: STATIC_CHILD_NAME.into(), collection: None };
+    realm_proxy.open_controller(&static_child_ref, server).await.unwrap().unwrap();
+    assert_matches!(controller.destroy().await.unwrap(), Err(fcomponent::Error::AccessDenied));
 }
 
 #[test_case(spawn_local_child_controller_from_create_child().boxed())]
@@ -600,7 +647,8 @@ async fn start_when_already_started(spawn_child_future: BoxFuture<'static, Spawn
 
 #[fuchsia::test]
 async fn get_exposed_dictionary() {
-    let (controller_proxy, _instance) = spawn_child_with_url("#meta/echo_server.cm").await;
+    let (controller_proxy, _child_ref, _instance) =
+        spawn_child_with_url("#meta/echo_server.cm").await;
     let (exposed_dict, server_end) = create_proxy().unwrap();
 
     controller_proxy.get_exposed_dictionary(server_end).await.unwrap().unwrap();

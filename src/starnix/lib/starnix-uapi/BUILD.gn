@@ -19,6 +19,7 @@ rustc_library("starnix-uapi") {
     "src/device_type.rs",
     "src/elf.rs",
     "src/errors.rs",
+    "src/file_lease.rs",
     "src/file_mode.rs",
     "src/inotify_mask.rs",
     "src/iptables_flags.rs",

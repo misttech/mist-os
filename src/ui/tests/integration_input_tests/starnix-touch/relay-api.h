@@ -12,7 +12,7 @@ namespace relay_api {
 
 constexpr char kReadyMessage[] = "READY";
 constexpr char kFailedMessage[] = "FAILED";
-constexpr char kEventFormat[] = "EVENT tv_sec=%ld tv_usec=%ld type=%hu code=%hu value=%hu";
+constexpr char kEventFormat[] = "EVENT tv_sec=%ld tv_usec=%ld type=%hu code=%hu value=%d";
 
 // The formatted event string will be sent across systems, so verify that the
 // size of a `long` is the same on both sides. Similarly for `unsigned short`.

@@ -31,18 +31,12 @@ type PortId = struct {
 
 /// Network device class.
 ///
-/// *Note*: Device implementers are encouraged to propose additions to this
-/// enumeration to avoid using ill-fitting variants if there's not a good match
-/// available.
-// TODO(https://fxbug.dev/42156114): Rename to PortClass once we can easily soft
-// transition through aliasing to prevent source breakages.
-// TODO(https://fxbug.dev/42157740): Make this a flexible enum once HLCPP flexible
-// enums don't break chromium.
+/// # Deprecation
+///
+/// Replaced by `PortClass`. Scheduled for removal in 2025.
+// TODO(https://fxbug.dev/42157740): Remove this type.
+@available(deprecated=NEXT)
 type DeviceClass = strict enum : uint16 {
-    // TODO(https://fxbug.dev/42157740): Transition this variant out of zero per
-    // recommendation in
-    // https://fuchsia.dev/fuchsia-src/concepts/api/fidl#enum once this is
-    // a flexible enum.
     VIRTUAL = 0;
     ETHERNET = 1;
     WLAN = 2;
@@ -52,8 +46,20 @@ type DeviceClass = strict enum : uint16 {
 };
 
 /// Network port class.
-@available(added=HEAD)
-alias PortClass = DeviceClass;
+///
+/// *Note*: Device implementers are encouraged to propose additions to this
+/// enumeration to avoid using ill-fitting variants if there's not a good match
+/// available.
+@available(added=NEXT)
+type PortClass = flexible enum : uint16 {
+    ETHERNET = 1;
+    WLAN = 2;
+    PPP = 3;
+    BRIDGE = 4;
+    WLAN_AP = 5;
+    VIRTUAL = 6;
+    LOWPAN = 7;
+};
 
 /// Port status bits, reported in [`PortStatus.flags`].
 @available(added=HEAD)

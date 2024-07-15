@@ -70,13 +70,12 @@ source_set("vsync_timing") {
 
 source_set("present_helpers") {
   sources = [
-    "present1_helper.cc",
-    "present1_helper.h",
     "present2_helper.cc",
     "present2_helper.h",
   ]
   deps = [
     "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/trace",
   ]
   public_deps = [

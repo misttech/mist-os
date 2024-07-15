@@ -6,14 +6,11 @@ use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_hardware_bluetooth::{
-    EmulatorError, EmulatorMarker, EmulatorProxy, EmulatorSettings, HostMarker, HostProxy,
-    VirtualControllerMarker,
+    EmulatorError, EmulatorMarker, EmulatorProxy, EmulatorSettings, VirtualControllerMarker,
 };
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use fuchsia_bluetooth::constants::{
-    DEV_DIR, HCI_DEVICE_DIR, HOST_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT,
-};
+use fuchsia_bluetooth::constants::{DEV_DIR, HCI_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT};
 use fuchsia_zircon as zx;
 use futures::TryFutureExt as _;
 use tracing::error;
@@ -77,37 +74,6 @@ impl Emulator {
             .await
             .context("publish transport")?
             .map_err(|e: EmulatorError| format_err!("failed to publish bt-hci device: {:#?}", e))
-    }
-
-    /// Sends a publish message emulator and returns a Future that resolves when a bt-host device is
-    /// published. Note that this requires the bt-host driver to be installed. On success, returns a
-    /// proxy to the bt-host device.
-    pub async fn publish_and_wait_for_host(
-        &self,
-        settings: EmulatorSettings,
-    ) -> Result<HostProxy, Error> {
-        let () = self.publish(settings).await?;
-        let dev = self.dev.as_ref().expect("emulator device accessed after it was destroyed!");
-        let topo = dev.get_topological_path().await?;
-        let TestDevice { dev_directory, controller: _, emulator: _ } = dev;
-        let host_dir = fuchsia_fs::directory::open_directory_no_describe(
-            dev_directory,
-            HOST_DEVICE_DIR,
-            fuchsia_fs::OpenFlags::empty(),
-        )?;
-        let host = device_watcher::wait_for_device_with(
-            &host_dir,
-            |device_watcher::DeviceInfo { filename, topological_path }| {
-                topological_path.starts_with(&topo).then(|| {
-                    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<HostMarker>(
-                        &host_dir, filename,
-                    )
-                })
-            },
-        )
-        .on_timeout(WATCH_TIMEOUT, || Err(format_err!("timed out waiting for device to appear")))
-        .await??;
-        Ok(host)
     }
 
     pub async fn publish_and_wait_for_device_path(

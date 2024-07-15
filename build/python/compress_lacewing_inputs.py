@@ -84,7 +84,7 @@ LACEWING_PYZ_NAME: str = "test.pyz"
 # be modified after the output (Lacewing archive) is created which results in
 # build failures such as:
 #  `recorded mtime of <output> older than most recent input <__pycache__>`
-EXCLUDE_STDLIB_FILE: str = "__pycache__"
+PYCACHE_DIR: str = "__pycache__"
 
 
 def _sanitize_paths(paths: list[str]) -> list[str]:
@@ -118,18 +118,18 @@ def main() -> int:
         for c_extension in args.c_extension_libs:
             shutil.copy2(c_extension, td)
 
+        # Record `src` in `ins` for depfile before copying.
+        def copy_and_record(src: str, dst: str) -> None:
+            ins.append(src)
+            shutil.copy2(src, dst)
+
         # Python standard libraries.
         shutil.copytree(
             args.cpython_stdlibs,
             Path(td) / os.path.basename(args.cpython_stdlibs),
-            ignore=shutil.ignore_patterns(EXCLUDE_STDLIB_FILE),
+            copy_function=copy_and_record,
+            ignore=shutil.ignore_patterns(PYCACHE_DIR),
         )
-        srcs = glob.glob(
-            str(Path(args.cpython_stdlibs) / "**" / "*"), recursive=True
-        )
-        ins += [
-            src for src in srcs if os.path.basename(src) != EXCLUDE_STDLIB_FILE
-        ]
 
         # FIDL IR.
         with args.fidl_ir_list.open() as f:

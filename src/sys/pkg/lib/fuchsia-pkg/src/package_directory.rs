@@ -118,20 +118,15 @@ impl PackageDirectory {
         self.proxy
     }
 
-    /// Open the file in the package given by `path` with the given access `rights`.
-    pub async fn open_file(
-        &self,
-        path: &str,
-        rights: OpenRights,
-    ) -> Result<fio::FileProxy, OpenError> {
-        fuchsia_fs::directory::open_file(&self.proxy, path, rights.to_flags()).await
-    }
-
     /// Read the file in the package given by `path`, and return its contents as
     /// a UTF-8 decoded string.
     async fn read_file_to_string(&self, path: &str) -> Result<String, ReadError> {
-        let f = self.open_file(path, OpenRights::Read).await?;
-        fuchsia_fs::file::read_to_string(&f).await
+        fuchsia_fs::directory::read_file_to_string(&self.proxy, path).await
+    }
+
+    /// Read the file in the package given by `path`, and return its contents.
+    pub async fn read_file(&self, path: &str) -> Result<Vec<u8>, ReadError> {
+        fuchsia_fs::directory::read_file(&self.proxy, path).await
     }
 
     /// Reads the merkle root of the package.
@@ -143,8 +138,8 @@ impl PackageDirectory {
     /// Reads and parses the package's meta/contents file.
     pub async fn meta_contents(&self) -> Result<MetaContents, LoadMetaContentsError> {
         let meta_contents =
-            self.read_file_to_string("meta/contents").await.map_err(LoadMetaContentsError::Read)?;
-        let meta_contents = MetaContents::deserialize(meta_contents.as_bytes())
+            self.read_file("meta/contents").await.map_err(LoadMetaContentsError::Read)?;
+        let meta_contents = MetaContents::deserialize(meta_contents.as_slice())
             .map_err(LoadMetaContentsError::Parse)?;
         Ok(meta_contents)
     }
@@ -152,8 +147,8 @@ impl PackageDirectory {
     /// Reads and parses the package's meta/package file.
     pub async fn meta_package(&self) -> Result<MetaPackage, LoadMetaPackageError> {
         let meta_package =
-            self.read_file_to_string("meta/package").await.map_err(LoadMetaPackageError::Read)?;
-        let meta_package = MetaPackage::deserialize(meta_package.as_bytes())
+            self.read_file("meta/package").await.map_err(LoadMetaPackageError::Read)?;
+        let meta_package = MetaPackage::deserialize(meta_package.as_slice())
             .map_err(LoadMetaPackageError::Parse)?;
         Ok(meta_package)
     }
@@ -161,8 +156,8 @@ impl PackageDirectory {
     /// Reads and parses the package's meta/fuchsia.pkg/subpackages file. If the file
     /// doesn't exist, an empty `MetaSubpackages` is returned.
     pub async fn meta_subpackages(&self) -> Result<MetaSubpackages, LoadMetaSubpackagesError> {
-        match self.read_file_to_string(MetaSubpackages::PATH).await {
-            Ok(file) => Ok(MetaSubpackages::deserialize(file.as_bytes())
+        match self.read_file(MetaSubpackages::PATH).await {
+            Ok(file) => Ok(MetaSubpackages::deserialize(file.as_slice())
                 .map_err(LoadMetaSubpackagesError::Parse)?),
             Err(ReadError::Open(OpenError::OpenError(zx_status::Status::NOT_FOUND))) => {
                 Ok(MetaSubpackages::default())
@@ -173,9 +168,7 @@ impl PackageDirectory {
 
     /// Reads and parses the package's meta/fuchsia.abi/abi-revision file.
     pub async fn abi_revision(&self) -> Result<AbiRevision, LoadAbiRevisionError> {
-        let abi_revision_bytes =
-            fuchsia_fs::file::read(&self.open_file(AbiRevision::PATH, OpenRights::Read).await?)
-                .await?;
+        let abi_revision_bytes = self.read_file(AbiRevision::PATH).await?;
         Ok(AbiRevision::try_from(abi_revision_bytes.as_slice())?)
     }
 
@@ -183,25 +176,6 @@ impl PackageDirectory {
     /// Hashes may appear more than once.
     pub async fn blobs(&self) -> Result<impl Iterator<Item = Hash>, LoadMetaContentsError> {
         Ok(self.meta_contents().await?.into_hashes_undeduplicated())
-    }
-}
-
-/// Possible open rights when opening a file within a package.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(missing_docs)]
-pub enum OpenRights {
-    Read,
-    ReadExecute,
-}
-
-impl OpenRights {
-    fn to_flags(&self) -> fio::OpenFlags {
-        match self {
-            OpenRights::Read => fio::OpenFlags::RIGHT_READABLE,
-            OpenRights::ReadExecute => {
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE
-            }
-        }
     }
 }
 

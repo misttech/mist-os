@@ -142,7 +142,7 @@ pub unsafe extern "C" fn ffx_connect_device_proxy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ffx_target_wait(ctx: *mut EnvContext, timeout: f64) -> zx_status::Status {
+pub unsafe extern "C" fn ffx_target_wait(ctx: *mut EnvContext, timeout: u64) -> zx_status::Status {
     let ctx = unsafe { get_arc(ctx) };
     let (responder, rx) = mpsc::sync_channel(1);
     ctx.lib_ctx().run(LibraryCommand::TargetWait { env: ctx.clone(), timeout, responder });

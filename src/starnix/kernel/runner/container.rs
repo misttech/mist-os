@@ -4,7 +4,7 @@
 
 use crate::{
     expose_root, get_serial_number, parse_features, run_container_features, serve_component_runner,
-    serve_container_controller, serve_graphical_presenter, serve_sync_fence_registry, Features,
+    serve_container_controller, serve_graphical_presenter, Features,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -49,8 +49,8 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
-    fidl_fuchsia_starnix_container as fstarcontainer, fidl_fuchsia_starnix_device as fstardevice,
-    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
+    fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
+    fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
@@ -181,8 +181,7 @@ impl Container {
             fs.dir("svc")
                 .add_fidl_service(ExposedServices::ComponentRunner)
                 .add_fidl_service(ExposedServices::ContainerController)
-                .add_fidl_service(ExposedServices::GraphicalPresenter)
-                .add_fidl_service(ExposedServices::SyncFenceRegistry);
+                .add_fidl_service(ExposedServices::GraphicalPresenter);
 
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
@@ -215,11 +214,6 @@ impl Container {
                             .await
                             .expect("failed to start GraphicalPresenter.")
                     }
-                    ExposedServices::SyncFenceRegistry(request_stream) => {
-                        serve_sync_fence_registry(request_stream, &self.kernel)
-                            .await
-                            .expect("failed to start SyncFenceRegistry.")
-                    }
                 }
             })
             .await
@@ -241,7 +235,6 @@ enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     ContainerController(fstarcontainer::ControllerRequestStream),
     GraphicalPresenter(felement::GraphicalPresenterRequestStream),
-    SyncFenceRegistry(fstardevice::SyncFenceRegistryRequestStream),
 }
 
 type TaskResult = Result<ExitStatus, Error>;

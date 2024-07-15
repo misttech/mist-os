@@ -10,6 +10,7 @@ mod common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
+use std::mem::MaybeUninit;
 use std::num::{NonZeroU16, NonZeroU64};
 use std::time::Duration;
 
@@ -360,6 +361,70 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
                 RemoteAddress: want_remote,
                 TransportProtocol: want_proto,
                 NetworkProtocol: I::NAME,
+                MulticastGroupMemberships: {},
+            },
+        }
+    })
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn inspect_multicast_group_memberships<I: TestIpExt>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    let loopback_id =
+        u32::try_from(get_loopback_id(&realm).await).expect("loopback ID should fit in u32");
+
+    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
+    let socket = realm
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("create datagram socket");
+
+    // Join a multicast group on the loopback interface.
+    let multicast_addr = match I::VERSION {
+        IpVersion::V4 => {
+            let mcast_addr = net_declare::std_ip_v4!("224.0.0.1");
+            let loopback_index = socket2::InterfaceIndexOrAddress::Index(loopback_id);
+            socket
+                .join_multicast_v4_n(&mcast_addr, &loopback_index)
+                .expect("failed to join multicast_group");
+            std::net::IpAddr::V4(mcast_addr)
+        }
+        IpVersion::V6 => {
+            let mcast_addr = net_declare::std_ip_v6!("ff00::1");
+            socket
+                .join_multicast_v6(&mcast_addr, loopback_id)
+                .expect("failed to join multicast_group");
+            std::net::IpAddr::V6(mcast_addr)
+        }
+    };
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    // NB: The sockets are keyed by an opaque debug identifier.
+    let sockets = data.get_child("Sockets").unwrap();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Sockets: {
+            sock_name => {
+                LocalAddress: "[NOT BOUND]",
+                RemoteAddress: "[NOT CONNECTED]",
+                TransportProtocol: "UDP",
+                NetworkProtocol: I::NAME,
+                MulticastGroupMemberships: {
+                    "0": {
+                        MulticastGroup: format!("{multicast_addr}"),
+                        Device: u64::from(loopback_id),
+                    },
+                },
             },
         }
     })
@@ -416,16 +481,13 @@ async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
     })
 }
 
-#[netstack_test]
-async fn inspect_routes(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
-
+/// Helper function that returns the ID of the loopback interface.
+async fn get_loopback_id(realm: &netemul::TestRealm<'_>) -> u64 {
     let interfaces_state = realm
         .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
         .expect("failed to connect to fuchsia.net.interfaces/State");
-    let loopback_id = fidl_fuchsia_net_interfaces_ext::wait_interface(
+
+    fidl_fuchsia_net_interfaces_ext::wait_interface(
         fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
             &interfaces_state,
             fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
@@ -435,23 +497,22 @@ async fn inspect_routes(name: &str) {
         |if_map| {
             if_map.values().find_map(
                 |fidl_fuchsia_net_interfaces_ext::PropertiesAndState {
-                     properties:
-                         fidl_fuchsia_net_interfaces_ext::Properties { device_class, id, .. },
+                     properties: fidl_fuchsia_net_interfaces_ext::Properties { port_class, id, .. },
                      state: (),
-                 }| {
-                    match device_class {
-                        fidl_fuchsia_net_interfaces::DeviceClass::Loopback(
-                            fidl_fuchsia_net_interfaces::Empty {},
-                        ) => Some(id.get()),
-                        fidl_fuchsia_net_interfaces::DeviceClass::Device(_) => None,
-                    }
-                },
+                 }| { port_class.is_loopback().then(|| id.get()) },
             )
         },
     )
     .await
-    .expect("getting loopback id");
+    .expect("getting loopback id")
+}
 
+#[netstack_test]
+async fn inspect_routes(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+    let loopback_id = get_loopback_id(&realm).await;
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
             .await
@@ -578,6 +639,7 @@ async fn inspect_devices(name: &str) {
                         SendIpv6Frame: 0u64,
                         NoQueue: 0u64,
                         QueueFull: 0u64,
+                        DequeueDrop: 0u64,
                         SerializeError: 0u64,
                     },
                     Ethernet: {
@@ -640,6 +702,7 @@ async fn inspect_devices(name: &str) {
                         SendIpv6Frame: diagnostics_assertions::AnyUintProperty,
                         NoQueue: 0u64,
                         QueueFull: 0u64,
+                        DequeueDrop: 0u64,
                         SerializeError: 0u64,
                     },
                     Ethernet: {
@@ -666,10 +729,25 @@ async fn inspect_counters(name: &str) {
         .datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
         .await
         .expect("datagram socket creation failed");
+    let receiver = realm
+        .datagram_socket(fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("datagram socket creation failed");
+
     let addr = net_declare::std_socket_addr!("127.0.0.1:8080");
-    let buf = [0; 8];
+    receiver.bind(&addr.into()).expect("binding receiver");
+
+    const MSG_SIZE: usize = 8;
+    let buf = [0; MSG_SIZE];
     let bytes_sent = sender.send_to(&buf, &addr.into()).expect("socket send to failed");
     assert_eq!(bytes_sent, buf.len());
+
+    // We don't care about the bytes, we just want to make sure we receive it so
+    // we know the message has made through the stack and the counters are as we
+    // expect.
+    let mut recv_buf = [MaybeUninit::<u8>::uninit(); MSG_SIZE];
+    let bytes_received = receiver.recv(&mut recv_buf[..]).expect("receiving bytes");
+    assert_eq!(bytes_received, MSG_SIZE);
 
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
@@ -694,6 +772,7 @@ async fn inspect_counters(name: &str) {
                     SendIpv6Frame: 0u64,
                     NoQueue: 0u64,
                     QueueFull: 0u64,
+                    DequeueDrop: 0u64,
                     SerializeError: 0u64,
                 },
                 "Ethernet": {
@@ -838,6 +917,7 @@ async fn inspect_counters(name: &str) {
                     DroppedTentativeDst: 0u64,
                     DroppedNonUnicastSrc: 0u64,
                     DroppedExtensionHeader: 0u64,
+                    DroppedLoopedBackDadProbe: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,

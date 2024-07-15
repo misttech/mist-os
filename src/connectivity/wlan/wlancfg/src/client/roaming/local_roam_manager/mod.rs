@@ -15,17 +15,25 @@ use futures::{select, StreamExt};
 use std::convert::Infallible;
 use tracing::{debug, error};
 
-// Create a roam monitor implementation.
+// Create a roam monitor implementation based on the roaming profile.
 fn create_roam_monitor(
+    roaming_policy: RoamingPolicy,
     currently_fulfilled_connection: types::ConnectSelection,
     signal: types::Signal,
     telemetry_sender: TelemetrySender,
 ) -> Box<dyn roam_monitor::RoamMonitorApi> {
-    Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
-        currently_fulfilled_connection,
-        signal,
-        telemetry_sender.clone(),
-    ))
+    match roaming_policy {
+        RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, .. } => {
+            Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
+                currently_fulfilled_connection,
+                signal,
+                telemetry_sender.clone(),
+            ))
+        }
+        RoamingPolicy::Disabled => {
+            Box::new(roam_monitor::default_monitor::DefaultRoamMonitor::new())
+        }
+    }
 }
 
 // Requests that can be made to roam manager service loop.
@@ -75,6 +83,7 @@ impl RoamManager {
 
 /// Service loop for handling roam manager requests.
 pub async fn serve_local_roam_manager_requests(
+    roaming_policy: RoamingPolicy,
     mut roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
     connection_selection_requester: ConnectionSelectionRequester,
     telemetry_sender: TelemetrySender,
@@ -91,7 +100,7 @@ pub async fn serve_local_roam_manager_requests(
                     // Create and start a roam monitor future, passing in handles from caller. This
                     // ensures that new data is initialized for every new called (e.g. connected_state).
                     RoamServiceRequest::InitializeRoamMonitor { currently_fulfilled_connection, signal, roam_sender, roam_trigger_data_receiver }=> {
-                        let monitor = create_roam_monitor(currently_fulfilled_connection, signal, telemetry_sender.clone());
+                        let monitor = create_roam_monitor(roaming_policy, currently_fulfilled_connection, signal, telemetry_sender.clone());
                         let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_sender.clone(), telemetry_sender.clone());
                         monitor_futs.push(Box::pin(monitor_fut));
                     }
@@ -116,6 +125,7 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use futures::task::Poll;
     use std::pin::pin;
+    use test_case::test_case;
     use wlan_common::assert_variant;
 
     struct RoamManagerServiceTestValues {
@@ -141,31 +151,46 @@ mod tests {
         }
     }
 
-    #[fuchsia::test()]
-    fn test_create_roam_monitor() {
+    #[test_case(RoamingPolicy::Disabled; "disabled")]
+    #[test_case(RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam }; "enabled_stationary_can_roam")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_create_roam_monitor(roaming_policy: RoamingPolicy) {
         let _exec = TestExecutor::new();
         let (telemetry_sender, _) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let monitor = create_roam_monitor(
+            roaming_policy,
             generate_connect_selection(),
             generate_random_signal(),
             telemetry_sender.clone(),
         );
-        let stationary_monitor: Box<dyn roam_monitor::RoamMonitorApi> =
-            Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
-                generate_connect_selection(),
-                generate_random_signal(),
-                telemetry_sender.clone(),
-            ));
+        match roaming_policy {
+            RoamingPolicy::Disabled => {
+                let default_monitor: Box<dyn roam_monitor::RoamMonitorApi> =
+                    Box::new(roam_monitor::default_monitor::DefaultRoamMonitor::new());
+                assert_eq!(default_monitor.type_id(), monitor.type_id());
+            }
+            RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, .. } => {
+                let stationary_monitor: Box<dyn roam_monitor::RoamMonitorApi> =
+                    Box::new(roam_monitor::stationary_monitor::StationaryMonitor::new(
+                        generate_connect_selection(),
+                        generate_random_signal(),
+                        telemetry_sender.clone(),
+                    ));
 
-        assert_eq!(stationary_monitor.type_id(), monitor.type_id());
+                assert_eq!(stationary_monitor.type_id(), monitor.type_id());
+            }
+        }
     }
 
-    #[fuchsia::test]
-    fn test_roam_manager_handles_get_roam_monitor_request() {
+    #[test_case(RoamingPolicy::Disabled; "disabled")]
+    #[test_case(RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam }; "enabled_stationary_can_roam")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_roam_manager_handles_get_roam_monitor_request(roaming_policy: RoamingPolicy) {
         let mut exec = TestExecutor::new();
         let mut test_values = setup_test();
         let mut serve_fut = pin!(serve_local_roam_manager_requests(
+            roaming_policy,
             test_values.roam_service_request_receiver,
             test_values.connection_selection_requester.clone(),
             test_values.telemetry_sender.clone(),
@@ -191,11 +216,14 @@ mod tests {
             .expect("error sending data via roam monitor sender");
     }
 
+    #[test_case(RoamingPolicy::Disabled; "disabled")]
+    #[test_case(RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam }; "enabled_stationary_can_roam")]
     #[fuchsia::test]
-    fn test_roam_manager_handles_terminated_roam_monitors() {
+    fn test_roam_manager_handles_terminated_roam_monitors(roaming_policy: RoamingPolicy) {
         let mut exec = TestExecutor::new();
         let mut test_values = setup_test();
         let mut serve_fut = pin!(serve_local_roam_manager_requests(
+            roaming_policy,
             test_values.roam_service_request_receiver,
             test_values.connection_selection_requester.clone(),
             test_values.telemetry_sender.clone(),

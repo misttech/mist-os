@@ -13,33 +13,17 @@ use std::sync::Arc;
 /// called.
 #[derive(Clone)]
 pub struct PluginHooks {
-    pub collectors: HashMap<String, Arc<dyn DataCollector>>,
+    pub collector: Arc<dyn DataCollector>,
     pub controllers: HashMap<String, Arc<dyn DataController>>,
 }
 
 impl PluginHooks {
     pub fn new(
-        collectors: HashMap<String, Arc<dyn DataCollector>>,
+        collector: Arc<dyn DataCollector>,
         controllers: HashMap<String, Arc<dyn DataController>>,
     ) -> Self {
-        Self { collectors: collectors, controllers: controllers }
+        Self { collector, controllers }
     }
-}
-
-// Utility macro to give unique names to each collector for a given plugin.
-// This additional naming information is used to make individual controllers
-// human readable.
-#[macro_export]
-macro_rules! collectors {
-    ($($ns:expr => $ctrl:expr,)+) => {collectors!($($ns => $ctrl),+)};
-    ($($ns:expr => $ctrl:expr),*) => {{
-            let mut _collectors: ::std::collections::HashMap<String,
-            std::sync::Arc<dyn DataCollector>> = ::std::collections::HashMap::new();
-            $(
-                _collectors.insert(String::from($ns), Arc::new($ctrl));
-            )*
-            _collectors
-        }}
 }
 
 // Utility macro to generate controller hook mappings from a namespace => constructor

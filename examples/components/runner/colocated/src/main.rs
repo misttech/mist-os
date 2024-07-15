@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use attribution::{AttributionServer, AttributionServerHandle, Observer, Publisher};
+use attribution_server::{AttributionServer, AttributionServerHandle, Observer, Publisher};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;

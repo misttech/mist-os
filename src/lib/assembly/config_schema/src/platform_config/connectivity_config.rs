@@ -145,9 +145,9 @@ pub struct PlatformWlanConfig {
     pub recovery_profile: Option<WlanRecoveryProfile>,
     #[serde(default)]
     pub recovery_enabled: bool,
-    /// Defines roaming features/triggers enabled for device.
+    /// Defines roaming behavior for device.
     #[serde(default)]
-    pub roaming_profile: Option<WlanRoamingProfile>,
+    pub roaming_policy: WlanRoamingPolicy,
     #[serde(default)]
     pub policy_layer: WlanPolicyLayer,
 }
@@ -170,14 +170,41 @@ pub enum WlanRecoveryProfile {
     ThresholdedRecovery,
 }
 
+// LINT.IfChange
+// Configures whether any roaming behavior is enabled.
+#[derive(Copy, Clone, Default, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WlanRoamingPolicy {
+    #[default]
+    Disabled,
+    Enabled {
+        #[serde(default)]
+        profile: WlanRoamingProfile,
+        #[serde(default)]
+        mode: WlanRoamingMode,
+    },
+}
+
+// Configures implementation details for roaming (e.g. what data is considered,
+// thresholds, maximum scan frequency, etc.).
 #[derive(Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum WlanRoamingProfile {
     #[default]
-    RoamingOff,
-    MetricsOnly,
-    StationaryRoaming,
+    Stationary,
 }
+
+// Configures what roaming behavior is allowed for enabled platform roaming. Defaults to
+// 'CanRoam', which does not restrict any roaming behavior in the profile.
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum WlanRoamingMode {
+    MetricsOnly,
+    #[default]
+    CanRoam,
+}
+// LINT.ThenChange(//src/connectivity/wlan/wlancfg/src/client/roaming/lib.rs)
+
 /// Platform configuration options to use for the mdns area.
 #[derive(
     Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,

@@ -9,6 +9,7 @@ use crate::vfs::{
     FileOps, FsNode, FsNodeInfo, FsNodeOps,
 };
 
+use crate::vfs::fileops_impl_noop_sync;
 use starnix_sync::{FileOpsCore, Locked, RwLock, WriteOps};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::Capabilities;
@@ -142,6 +143,7 @@ impl<Ops> std::clone::Clone for BytesFile<Ops> {
 
 impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
     fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
 
     fn read(
         &self,

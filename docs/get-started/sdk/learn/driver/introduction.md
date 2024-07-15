@@ -16,8 +16,8 @@ device for writing drivers that computes the factorial of a given integer.
 You'll also explore how to interact with drivers using the tools provided with
 the Fuchsia SDK.
 
-Note: For more details on the driver framework, see the
-[Driver Concepts][concepts-drivers].
+Note: For more details on the driver framework, see
+[Drivers][concepts-drivers] in the Concepts section.
 
 ## What you'll learn
 
@@ -25,10 +25,11 @@ Note: For more details on the driver framework, see the
 *   Registering and loading a new device driver
 *   Interacting with a running device driver
 
-## What you'll need
+## Prerequisites
 
 *   An x64-based machine running Linux
-*   A configured [Fuchsia SDK environment][driver-get-started]{:.external}
+*   A configured Fuchsia SDK environment using the
+    [SDK driver samples repository checkout][driver-get-started]{:.external}
 *   [Emulator product bundle][driver-product-bundle]
     for `core.x64`
 

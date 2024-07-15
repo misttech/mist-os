@@ -7,7 +7,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
 use crate::object_request::{ObjectRequestRef, ObjectRequestSend};
@@ -110,11 +110,13 @@ impl ServiceLike for Service {
     }
 }
 
-impl DirectoryEntry for Service {
+impl GetEntryInfo for Service {
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Service)
     }
+}
 
+impl DirectoryEntry for Service {
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
         request.open_service(self)
     }
@@ -160,7 +162,7 @@ pub fn serve(
     object_request: ObjectRequestRef<'_>,
 ) -> Result<(), Status> {
     if protocols.is_node() {
-        let options = protocols.to_node_options(service.is_directory())?;
+        let options = protocols.to_node_options(service.entry_info().type_())?;
         service.open_as_node(scope, options, object_request)
     } else {
         service.connect(scope, protocols.to_service_options()?, object_request)

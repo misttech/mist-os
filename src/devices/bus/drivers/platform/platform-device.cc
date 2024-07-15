@@ -27,6 +27,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <fbl/string_printf.h>
 
+#include "lib/inspect/component/cpp/component.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform-bus.h"
 #include "src/devices/bus/drivers/platform/platform-interrupt.h"
@@ -116,10 +117,12 @@ void RestrictPlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView r
 }
 
 zx_status_t PlatformDevice::Create(fpbus::Node node, zx_device_t* parent, PlatformBus* bus,
-                                   Type type, std::unique_ptr<platform_bus::PlatformDevice>* out) {
+                                   Type type, inspect::ComponentInspector& inspector,
+                                   std::unique_ptr<platform_bus::PlatformDevice>* out) {
+  auto inspect_node_name = std::string{node.name().value_or("unnamed")} + "-platform-device";
   fbl::AllocChecker ac;
-  std::unique_ptr<platform_bus::PlatformDevice> dev(
-      new (&ac) platform_bus::PlatformDevice(parent, bus, type, std::move(node)));
+  std::unique_ptr<platform_bus::PlatformDevice> dev(new (&ac) platform_bus::PlatformDevice(
+      parent, bus, type, inspector.root().CreateChild(inspect_node_name), std::move(node)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -131,7 +134,19 @@ zx_status_t PlatformDevice::Create(fpbus::Node node, zx_device_t* parent, Platfo
   return ZX_OK;
 }
 
-PlatformDevice::PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type, fpbus::Node node)
+fpromise::promise<inspect::Inspector> PlatformDevice::InspectNodeCallback() const {
+  inspect::Inspector inspector;
+  auto interrupt_vectors =
+      inspector.GetRoot().CreateUintArray("interrupt_vectors", interrupt_vectors_.size());
+  for (size_t i = 0; i < interrupt_vectors_.size(); ++i) {
+    interrupt_vectors.Set(i, interrupt_vectors_[i]);
+  }
+  inspector.emplace(std::move(interrupt_vectors));
+  return fpromise::make_result_promise(fpromise::ok(std::move(inspector)));
+}
+
+PlatformDevice::PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type,
+                               inspect::Node inspect_node, fpbus::Node node)
     : PlatformDeviceType(parent),
       bus_(bus),
       type_(type),
@@ -140,7 +155,8 @@ PlatformDevice::PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type,
       did_(node.did().value_or(0)),
       instance_id_(node.instance_id().value_or(0)),
       node_(std::move(node)),
-      outgoing_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
+      outgoing_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())),
+      inspect_node_(std::move(inspect_node)) {
   strlcpy(name_, node_.name().value_or("no name?").data(), sizeof(name_));
 }
 
@@ -165,6 +181,9 @@ zx_status_t PlatformDevice::Init() {
       [[maybe_unused]] auto unused = fragment.release();
     }
   }
+
+  inspect_node_.RecordLazyValues("interrupt_vectors",
+                                 fit::bind_member<&PlatformDevice::InspectNodeCallback>(this));
 
   return ZX_OK;
 }
@@ -229,6 +248,7 @@ zx_status_t PlatformDevice::PDevGetInterrupt(uint32_t index, uint32_t flags,
     zxlogf(ERROR, "platform_dev_map_interrupt: zx_interrupt_create failed %d", status);
     return status;
   }
+  interrupt_vectors_.emplace_back(vector);
   return status;
 }
 

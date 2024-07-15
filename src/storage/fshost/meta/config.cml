@@ -2,93 +2,169 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    config: {
-        // Disables zxcrypt for minfs partitions.
-        // This argument is ignored when using Fxfs instead of minfs, which has its own encryption.
-        no_zxcrypt: { type: "bool" },
-
-        // Mounts FVM (or Fxfs, when fxfs_blob is set) and its contained volumes in a ramdisk.
-        // On-disk FVM partitions will also be mounted, but its data and blob filesystems will
-        // not be mounted.
-        ramdisk_image: { type: "bool" },
-
-        // Enables all GPT devices.
-        gpt_all: { type: "bool" },
-
-        // Enables checking filesystems before mounting (if supported).
-        check_filesystems: { type: "bool" },
-
-        // Maximum number of bytes a blobfs partition can grow to. This applies only to non-ramdisk
-        // partitions unless "apply-limits-to-ramdisk" is set.
-        blobfs_max_bytes: { type: "uint64" },
-
-        // Maximum number of bytes the data partition can grow to. This applies only to non-ramdisk
-        // partitions unless "apply-limits-to-ramdisk" is set.
-        data_max_bytes: { type: "uint64" },
-
-        // Automatically formats the data partition if it is found to be corrupted.
-        format_data_on_corruption: { type: "bool" },
-
-        // Use the given format as the filesystem for the data partition.
-        data_filesystem_format: {
+    use: [
+        {
+            // Disables zxcrypt for minfs partitions. This argument is ignored
+            // when using Fxfs instead of minfs, which has its own encryption.
+            config: "fuchsia.fshost.NoZxcrypt",
+            key: "no_zxcrypt",
+            type: "bool",
+        },
+        {
+            // Mounts FVM (or Fxfs, when fxfs_blob is set) and its contained
+            // volumes in a ramdisk. On-disk FVM partitions will also be
+            // mounted, but its data and blob filesystems will not be mounted.
+            config: "fuchsia.fshost.RamdiskImage",
+            key: "ramdisk_image",
+            type: "bool",
+        },
+        {
+            // Enables all GPT devices.
+            config: "fuchsia.fshost.GptAll",
+            key: "gpt_all",
+            type: "bool",
+        },
+        {
+            // Enables checking filesystems before mounting (if supported).
+            config: "fuchsia.fshost.CheckFilesystems",
+            key: "check_filesystems",
+            type: "bool",
+        },
+        {
+            // Maximum number of bytes a blobfs partition can grow to. This
+            // applies only to non-ramdisk partitions unless
+            // "apply-limits-to-ramdisk" is set.
+            config: "fuchsia.fshost.BlobfsMaxBytes",
+            key: "blobfs_max_bytes",
+            type: "uint64",
+        },
+        {
+            // Maximum number of bytes the data partition can grow to. This
+            // applies only to non-ramdisk partitions unless
+            // "apply-limits-to-ramdisk" is set.
+            config: "fuchsia.fshost.DataMaxBytes",
+            key: "data_max_bytes",
+            type: "uint64",
+        },
+        {
+            // Automatically formats the data partition if it is found to be
+            // corrupted.
+            config: "fuchsia.fshost.FormatDataOnCorruption",
+            key: "format_data_on_corruption",
+            type: "bool",
+        },
+        {
+            // Use the given format as the filesystem for the data partition.
+            config: "fuchsia.fshost.DataFilesystemFormat",
+            key: "data_filesystem_format",
             type: "string",
             max_size: 64,
         },
-
-        // Enables NAND devices.
-        nand: { type: "bool" },
-
-        // Enables blobfs partitions.
-        blobfs: { type: "bool" },
-
-        // Enables bootpart partitions.
-        bootpart: { type: "bool" },
-
-        // Enables the factory partition (small partition of settings set in the factory and never
-        // written to otherwise).
-        factory: { type: "bool" },
-
-        // Enables a single FVM device.
-        fvm: { type: "bool" },
-
-        // Enables a single GPT device.
-        gpt: { type: "bool" },
-
-        // Enables MBR devices.
-        mbr: { type: "bool" },
-
-        // Enables data partitions.
-        data: { type: "bool" },
-
-        // Disables everything except fvm, gpt and bootpart.
-        netboot: { type: "bool" },
-
-        // If true, we will attempt to migrate to minfs by creating a second fxfs partition and
-        // copying data over to it. This removes the risk of power loss leading to factory reset
-        // but can only be done on devices with sufficient free space.
-        use_disk_migration: { type: "bool" },
-
-        // Disables the block watcher. This prevents fshost from binding drivers and launching
-        // filesystems using devices that appear in /dev.
-        disable_block_watcher: { type: "bool" },
-
-        // Slice size of the FVM partition used when reprovisioning storage.
-        fvm_slice_size: { type: "uint64" },
-
-        // Initial number of inodes to format Blobfs with when reprovisioning storage. If set to
-        // zero, the default value in Blobfs is used instead.
-        blobfs_initial_inodes: { type: "uint64" },
-
-        // If true, use derecated blob format (padded Merkle tree at start) when formatting Blobfs.
-        blobfs_use_deprecated_padded_format: { type: "bool" },
-
-        // If true, blobfs is stored on fxfs.
-        fxfs_blob: { type: "bool" },
-
-        // Path to the fxfs_crypt component.
-        fxfs_crypt_url: {
+        {
+            // Enables NAND devices.
+            config: "fuchsia.fshost.Nand",
+            key: "nand",
+            type: "bool",
+        },
+        {
+            // Enables blobfs partitions.
+            config: "fuchsia.fshost.Blobfs",
+            key: "blobfs",
+            type: "bool",
+        },
+        {
+            // Enables bootpart partitions.
+            config: "fuchsia.fshost.BootPart",
+            key: "bootpart",
+            type: "bool",
+        },
+        {
+            // Enables the factory partition (small partition of settings set
+            // in the factory and never written to otherwise).
+            config: "fuchsia.fshost.Factory",
+            key: "factory",
+            type: "bool",
+        },
+        {
+            // Enables a single FVM device.
+            config: "fuchsia.fshost.Fvm",
+            key: "fvm",
+            type: "bool",
+        },
+        {
+            // Enables a single GPT device.
+            config: "fuchsia.fshost.Gpt",
+            key: "gpt",
+            type: "bool",
+        },
+        {
+            // Enables MBR devices.
+            config: "fuchsia.fshost.Mbr",
+            key: "mbr",
+            type: "bool",
+        },
+        {
+            // Enables data partitions.
+            config: "fuchsia.fshost.Data",
+            key: "data",
+            type: "bool",
+        },
+        {
+            // Disables everything except fvm, gpt and bootpart.
+            config: "fuchsia.fshost.Netboot",
+            key: "netboot",
+            type: "bool",
+        },
+        {
+            // If true, we will attempt to migrate to minfs by creating a second
+            // fxfs partition and copying data over to it. This removes the risk
+            // of power loss leading to factory reset but can only be done on
+            // devices with sufficient free space.
+            config: "fuchsia.fshost.UseDiskMigration",
+            key: "use_disk_migration",
+            type: "bool",
+        },
+        {
+            // Disables the block watcher. This prevents fshost from binding
+            // drivers and launching filesystems using devices that appear in
+            // /dev.
+            config: "fuchsia.fshost.DisableBlockWatcher",
+            key: "disable_block_watcher",
+            type: "bool",
+        },
+        {
+            // Slice size of the FVM partition used when reprovisioning storage.
+            config: "fuchsia.fshost.FvmSliceSize",
+            key: "fvm_slice_size",
+            type: "uint64",
+        },
+        {
+            // Initial number of inodes to format Blobfs with when
+            // reprovisioning storage. If set to zero, the default value in
+            // Blobfs is used instead.
+            config: "fuchsia.fshost.BlobfsInitialInodes",
+            key: "blobfs_initial_inodes",
+            type: "uint64",
+        },
+        {
+            // If true, use derecated blob format (padded Merkle tree at start)
+            // when formatting Blobfs.
+            config: "fuchsia.fshost.BlobfsUseDeprecatedPaddedFormat",
+            key: "blobfs_use_deprecated_padded_format",
+            type: "bool",
+        },
+        {
+            // If true, blobfs is stored on fxfs.
+            config: "fuchsia.fshost.FxfsBlob",
+            key: "fxfs_blob",
+            type: "bool",
+        },
+        {
+            // Path to the fxfs_crypt component.
+            config: "fuchsia.fshost.FxfsCryptUrl",
+            key: "fxfs_crypt_url",
             type: "string",
             max_size: 64,
         },
-    },
+    ],
 }

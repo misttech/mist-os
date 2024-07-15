@@ -13,7 +13,7 @@ use cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource
 use cm_types::{Name, Url};
 use derivative::Derivative;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
-use sandbox::WeakInstanceTokenAny;
+use sandbox::{WeakInstanceToken, WeakInstanceTokenAny};
 use std::clone::Clone;
 use std::sync::{Arc, Weak};
 
@@ -225,6 +225,30 @@ impl<C: ComponentInstanceInterface> From<&Arc<C>> for WeakComponentInstanceInter
     }
 }
 
+impl<C: ComponentInstanceInterface + 'static> From<WeakComponentInstanceInterface<C>>
+    for WeakInstanceToken
+{
+    fn from(weak_component: WeakComponentInstanceInterface<C>) -> WeakInstanceToken {
+        WeakExtendedInstanceInterface::Component(weak_component).into()
+    }
+}
+
+impl<C: ComponentInstanceInterface + 'static> TryFrom<WeakInstanceToken>
+    for WeakComponentInstanceInterface<C>
+{
+    type Error = ();
+
+    fn try_from(
+        weak_component_token: WeakInstanceToken,
+    ) -> Result<WeakComponentInstanceInterface<C>, Self::Error> {
+        let weak_extended: WeakExtendedInstanceInterface<C> = weak_component_token.try_into()?;
+        match weak_extended {
+            WeakExtendedInstanceInterface::Component(weak_component) => Ok(weak_component),
+            WeakExtendedInstanceInterface::AboveRoot(_) => Err(()),
+        }
+    }
+}
+
 /// Either a type implementing `ComponentInstanceInterface` or its `TopInstance`.
 #[derive(Debug, Clone)]
 pub enum ExtendedInstanceInterface<C: ComponentInstanceInterface> {
@@ -286,6 +310,31 @@ impl<C: ComponentInstanceInterface> From<&ExtendedInstanceInterface<C>>
                 WeakExtendedInstanceInterface::AboveRoot(Arc::downgrade(top_instance))
             }
         }
+    }
+}
+
+impl<C: ComponentInstanceInterface + 'static> From<WeakExtendedInstanceInterface<C>>
+    for WeakInstanceToken
+{
+    fn from(weak_self: WeakExtendedInstanceInterface<C>) -> WeakInstanceToken {
+        WeakInstanceToken { inner: Arc::new(weak_self) }
+    }
+}
+
+impl<C: ComponentInstanceInterface + 'static> TryFrom<WeakInstanceToken>
+    for WeakExtendedInstanceInterface<C>
+{
+    type Error = ();
+
+    fn try_from(
+        weak_component_token: WeakInstanceToken,
+    ) -> Result<WeakExtendedInstanceInterface<C>, Self::Error> {
+        weak_component_token
+            .inner
+            .as_any()
+            .downcast_ref::<WeakExtendedInstanceInterface<C>>()
+            .cloned()
+            .ok_or(())
     }
 }
 

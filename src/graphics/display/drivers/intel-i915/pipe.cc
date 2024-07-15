@@ -526,8 +526,8 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   uint32_t y_offset;
   if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY ||
       primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
-    plane_width = primary->src_frame.width;
-    plane_height = primary->src_frame.height;
+    plane_width = primary->image_source.width;
+    plane_height = primary->image_source.height;
     stride =
         [&]() {
           uint64_t stride =
@@ -536,24 +536,25 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
                               "%lu overflows uint32_t", stride);
           return static_cast<uint32_t>(stride);
         }(),
-    x_offset = primary->src_frame.x_pos;
-    y_offset = primary->src_frame.y_pos;
+    x_offset = primary->image_source.x;
+    y_offset = primary->image_source.y;
   } else {
     uint32_t tile_height = height_in_tiles(image_metadata.tiling_type, image_metadata.height);
     uint32_t tile_px_height = get_tile_px_height(image_metadata.tiling_type);
     uint32_t total_height = tile_height * tile_px_height;
 
-    plane_width = primary->src_frame.height;
-    plane_height = primary->src_frame.width;
+    plane_width = primary->image_source.height;
+    plane_height = primary->image_source.width;
     stride = tile_height;
-    x_offset = total_height - primary->src_frame.y_pos - primary->src_frame.height;
-    y_offset = primary->src_frame.x_pos;
+    x_offset = total_height - primary->image_source.y - primary->image_source.height;
+    y_offset = primary->image_source.x;
   }
 
-  if (plane_width == primary->dest_frame.width && plane_height == primary->dest_frame.height) {
+  if (plane_width == primary->display_destination.width &&
+      plane_height == primary->display_destination.height) {
     auto plane_pos = pipe_regs.PlanePosition(plane_num).FromValue(0);
-    plane_pos.set_x_pos(primary->dest_frame.x_pos);
-    plane_pos.set_y_pos(primary->dest_frame.y_pos);
+    plane_pos.set_x_pos(primary->display_destination.x);
+    plane_pos.set_y_pos(primary->display_destination.y);
     plane_pos.WriteTo(mmio_space_);
 
     // If there's a scaler pointed at this plane, immediately disable it
@@ -578,11 +579,11 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     ps_ctrl.set_mode(registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
     if (platform_ != registers::Platform::kTigerLake) {
       // The mode bits are different in Tiger Lake.
-      if (primary->src_frame.width > 2048) {
+      if (primary->image_source.width > 2048) {
         float max_dynamic_height =
             static_cast<float>(plane_height) *
             registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
-        if (static_cast<uint32_t>(max_dynamic_height) < primary->dest_frame.height) {
+        if (static_cast<uint32_t>(max_dynamic_height) < primary->display_destination.height) {
           // TODO(stevensd): This misses some cases where 7x5 can be used.
           ps_ctrl.set_mode(registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
         }
@@ -594,13 +595,13 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     ps_ctrl.WriteTo(mmio_space_);
 
     auto ps_win_pos = pipe_scaler_regs.PipeScalerWindowPosition().FromValue(0);
-    ps_win_pos.set_x_position(primary->dest_frame.x_pos);
-    ps_win_pos.set_x_position(primary->dest_frame.y_pos);
+    ps_win_pos.set_x_position(primary->display_destination.x);
+    ps_win_pos.set_x_position(primary->display_destination.y);
     ps_win_pos.WriteTo(mmio_space_);
 
     auto ps_win_size = pipe_scaler_regs.PipeScalerWindowSize().FromValue(0);
-    ps_win_size.set_x_size(primary->dest_frame.width);
-    ps_win_size.set_y_size(primary->dest_frame.height);
+    ps_win_size.set_x_size(primary->display_destination.width);
+    ps_win_size.set_y_size(primary->display_destination.height);
     regs->ps_win_sz[*scaler_1_claimed] = ps_win_size.reg_value();
 
     scaled_planes_[pipe_id()][plane_num] = (*scaler_1_claimed) + 1;

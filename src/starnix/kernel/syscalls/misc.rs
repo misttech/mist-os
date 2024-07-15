@@ -22,7 +22,7 @@ use starnix_logging::{log_error, log_info, log_warn, track_stub};
 use starnix_syscalls::{
     for_each_syscall, syscall_number_to_name_literal_callback, SyscallResult, SUCCESS,
 };
-use starnix_uapi::auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT};
+use starnix_uapi::auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_MODULE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
@@ -355,6 +355,22 @@ pub fn sys_personality(
         state.personality = PersonalityFlags::from_bits_retain(persona);
     }
     Ok(previous_value.into())
+}
+
+pub fn sys_delete_module(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    user_name: UserCString,
+    _flags: u32,
+) -> Result<SyscallResult, Errno> {
+    if !current_task.creds().has_capability(CAP_SYS_MODULE) {
+        return error!(EPERM);
+    }
+    // According to LTP test delete_module02.c
+    const MODULE_NAME_LEN: usize = 64 - std::mem::size_of::<u64>();
+    let _name = current_task.read_c_string_to_vec(user_name, MODULE_NAME_LEN)?;
+    // We don't ever have any modules loaded.
+    error!(ENOENT)
 }
 
 pub fn sys_perf_event_open(

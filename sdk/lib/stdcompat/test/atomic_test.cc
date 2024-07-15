@@ -21,10 +21,26 @@ namespace {
 using int128_t = __int128;
 using uint128_t = unsigned __int128;
 
+template <typename T, typename = void>
+static constexpr bool kHasDifferenceType = false;
+
+template <typename T>
+static constexpr bool
+    kHasDifferenceType<T, std::enable_if_t<std::is_pointer_v<typename T::value_type> ||
+                                           std::is_integral_v<typename T::value_type> ||
+                                           std::is_floating_point_v<typename T::value_type>>> =
+        true;
+
 // For signature name, the specialization type T, can be used.
 #define ATOMIC_REF_HAS_METHOD_TRAIT(trait_name, fn_name, sig)            \
-  template <typename T>                                                  \
+                                                                         \
+  template <typename T, typename = void>                                 \
   struct trait_name {                                                    \
+    static constexpr bool value = false;                                 \
+  };                                                                     \
+                                                                         \
+  template <typename T>                                                  \
+  struct trait_name<T, std::enable_if_t<kHasDifferenceType<T>>> {        \
    private:                                                              \
     template <typename C>                                                \
     static std::true_type test(decltype(static_cast<sig>(&C::fn_name))); \
@@ -39,28 +55,31 @@ using uint128_t = unsigned __int128;
 
 ATOMIC_REF_HAS_METHOD_TRAIT(specialization_has_fetch_sub, fetch_add,
                             std::remove_volatile_t<typename T::value_type> (C::*)(
-                                typename T::difference_type, std::memory_order) const noexcept);
+                                std::remove_volatile_t<typename T::difference_type>,
+                                std::memory_order) const noexcept);
 ATOMIC_REF_HAS_METHOD_TRAIT(specialization_has_fetch_add, fetch_sub,
                             std::remove_volatile_t<typename T::value_type> (C::*)(
-                                typename T::difference_type, std::memory_order) const noexcept);
-
+                                std::remove_volatile_t<typename T::difference_type>,
+                                std::memory_order) const noexcept);
 ATOMIC_REF_HAS_METHOD_TRAIT(specialization_has_fetch_or, fetch_or,
                             std::remove_volatile_t<typename T::value_type> (C::*)(
-                                typename T::difference_type, std::memory_order) const noexcept);
+                                std::remove_volatile_t<typename T::difference_type>,
+                                std::memory_order) const noexcept);
 ATOMIC_REF_HAS_METHOD_TRAIT(specialization_has_fetch_and, fetch_and,
                             std::remove_volatile_t<typename T::value_type> (C::*)(
-                                typename T::difference_type, std::memory_order) const noexcept);
+                                std::remove_volatile_t<typename T::difference_type>,
+                                std::memory_order) const noexcept);
 ATOMIC_REF_HAS_METHOD_TRAIT(specialization_has_fetch_xor, fetch_xor,
                             std::remove_volatile_t<typename T::value_type> (C::*)(
-                                typename T::difference_type, std::memory_order) const noexcept);
+                                std::remove_volatile_t<typename T::difference_type>,
+                                std::memory_order) const noexcept);
 
 template <typename T>
 void CheckIntegerSpecialization() {
   static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::value_type, T>, "");
-  static_assert(
-      cpp17::is_same_v<typename cpp20::atomic_ref<T>::difference_type, std::remove_volatile_t<T>>,
-      "");
+  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::difference_type, T>, "");
   static_assert(cpp20::atomic_ref<T>::required_alignment == std::max(alignof(T), sizeof(T)), "");
+  static_assert(kHasDifferenceType<cpp20::atomic_ref<T>>, "");
 }
 
 template <typename T, typename U>
@@ -264,13 +283,12 @@ constexpr void CheckIntegerOperations() {
 
 template <typename T>
 void CheckFloatSpecialization() {
+  static_assert(kHasDifferenceType<cpp20::atomic_ref<T>>, "");
   static_assert(!specialization_has_fetch_and_v<cpp20::atomic_ref<T>>, "");
   static_assert(!specialization_has_fetch_or_v<cpp20::atomic_ref<T>>, "");
   static_assert(!specialization_has_fetch_xor_v<cpp20::atomic_ref<T>>, "");
   static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::value_type, T>, "");
-  static_assert(
-      cpp17::is_same_v<typename cpp20::atomic_ref<T>::difference_type, std::remove_volatile_t<T>>,
-      "");
+  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::difference_type, T>, "");
   static_assert(cpp20::atomic_ref<T>::required_alignment == alignof(T), "");
 }
 
@@ -310,6 +328,7 @@ constexpr void CheckFloatOperations() {
 
 template <typename T>
 constexpr void CheckPointerSpecialization() {
+  static_assert(kHasDifferenceType<cpp20::atomic_ref<T*>>, "");
   static_assert(!specialization_has_fetch_and_v<cpp20::atomic_ref<T*>>, "");
   static_assert(!specialization_has_fetch_or_v<cpp20::atomic_ref<T*>>, "");
   static_assert(!specialization_has_fetch_xor_v<cpp20::atomic_ref<T*>>, "");
@@ -355,6 +374,7 @@ constexpr void CheckPointerOperations() {
 
 template <typename T>
 void CheckNoSpecialization() {
+  static_assert(!kHasDifferenceType<cpp20::atomic_ref<T>>, "");
   static_assert(!specialization_has_fetch_add_v<cpp20::atomic_ref<T>>, "");
   static_assert(!specialization_has_fetch_sub_v<cpp20::atomic_ref<T>>, "");
   static_assert(!specialization_has_fetch_and_v<cpp20::atomic_ref<T>>, "");
@@ -363,10 +383,8 @@ void CheckNoSpecialization() {
 
   static_assert(cpp20::atomic_ref<T>::required_alignment >= alignof(T), "");
   static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::value_type, T>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::difference_type, T>, "");
 }
 
-// Trivially copyable struct.
 struct TriviallyCopyable {
   TriviallyCopyable(int a) : a(a) {}
 
@@ -376,7 +394,6 @@ struct TriviallyCopyable {
 
   int a = 0;
 };
-
 static_assert(cpp17::is_trivially_copyable_v<TriviallyCopyable>, "");
 
 TEST(AtomicRefTest, NoSpecialization) {
