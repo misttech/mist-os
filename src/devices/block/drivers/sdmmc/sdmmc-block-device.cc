@@ -23,6 +23,7 @@
 #include "sdmmc-root-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "src/devices/block/lib/common/include/common.h"
+#include "tools/power_config/lib/cpp/power_config.h"
 
 namespace sdmmc {
 namespace {
@@ -51,112 +52,30 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_h
   buffer_region.size = size;
   return zx::ok(std::move(buffer_region));
 }
-// TODO(b/329588116): Relocate this power config.
-// This power element represents the SDMMC controller hardware.
-fuchsia_hardware_power::PowerElementConfiguration GetHardwarePowerConfig(
-    const fuchsia_hardware_power::ParentElement& parent_element) {
-  // Add assertive dependency on parent driver's power element.
-  fuchsia_hardware_power::LevelTuple on_to_parent_on = {{
-      .child_level = SdmmcBlockDevice::kPowerLevelOn,
-      .parent_level = SdmmcBlockDevice::kPowerLevelOn,
-  }};
-  fuchsia_hardware_power::PowerDependency assertive_on_parent = {{
-      .child = SdmmcBlockDevice::kHardwarePowerElementName,
-      .parent = parent_element,
-      .level_deps = {{on_to_parent_on}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
 
-  // Add opportunistic dependency on SAG's (Execution State, wake handling) which allows for orderly
-  // power down of the hardware before the CPU suspends scheduling.
-  auto transitions_from_off =
-      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
-          .target_level = SdmmcBlockDevice::kPowerLevelOn,
-          .latency_us = 100,
-      }}};
-  auto transitions_from_on =
-      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
-          .target_level = SdmmcBlockDevice::kPowerLevelOff,
-          .latency_us = 200,
-      }}};
-  fuchsia_hardware_power::PowerLevel off = {{.level = SdmmcBlockDevice::kPowerLevelOff,
-                                             .name = "off",
-                                             .transitions = transitions_from_off}};
-  fuchsia_hardware_power::PowerLevel on = {
-      {.level = SdmmcBlockDevice::kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
-  fuchsia_hardware_power::PowerElement hardware_power = {{
-      .name = SdmmcBlockDevice::kHardwarePowerElementName,
-      .levels = {{off, on}},
-  }};
-
-  fuchsia_hardware_power::LevelTuple on_to_wake_handling = {{
-      .child_level = SdmmcBlockDevice::kPowerLevelOn,
-      .parent_level =
-          static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kWakeHandling),
-  }};
-  fuchsia_hardware_power::PowerDependency opportunistic_on_exec_state_wake_handling = {{
-      .child = SdmmcBlockDevice::kHardwarePowerElementName,
-      .parent = fuchsia_hardware_power::ParentElement::WithSag(
-          fuchsia_hardware_power::SagElement::kExecutionState),
-      .level_deps = {{on_to_wake_handling}},
-      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
-  }};
-
-  fuchsia_hardware_power::PowerElementConfiguration hardware_power_config = {
-      {.element = hardware_power,
-       .dependencies = {{opportunistic_on_exec_state_wake_handling, assertive_on_parent}}}};
-  return hardware_power_config;
+zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> GetAllPowerConfigs(
+    const fdf::Namespace& ns, fuchsia_hardware_power::ParentElement parent_element) {
+  zx::result open_result = ns.Open<fuchsia_io::File>("/pkg/data/power_config.fidl",
+                                                     fuchsia_io::wire::OpenFlags::kRightReadable);
+  if (!open_result.is_ok() || !open_result->is_valid()) {
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  zx::result config = power_config::Load(std::move(open_result.value()));
+  if (config.is_error()) {
+    return config;
+  }
+  for (fuchsia_hardware_power::PowerElementConfiguration& element :
+       config.value().power_elements()) {
+    if (!element.element().has_value() || !element.element().value().name().has_value()) {
+      continue;
+    }
+    if (element.element()->name().value() == "sdmmc-hardware") {
+      element.dependencies().value()[0].parent() = std::move(parent_element);
+    }
+  }
+  return config;
 }
 
-// TODO(b/329588116): Relocate this power config.
-// This power element does not represent real hardware. Its assertive dependency on SAG's
-// (Wake Handling, active) is used to secure the (Execution State, wake handling) necessary to
-// satisfy the hardware power element's dependency, thus allowing the hardware to wake up and serve
-// incoming requests.
-fuchsia_hardware_power::PowerElementConfiguration GetSystemWakeOnRequestPowerConfig() {
-  auto transitions_from_off =
-      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
-          .target_level = SdmmcBlockDevice::kPowerLevelOn,
-          .latency_us = 0,
-      }}};
-  auto transitions_from_on =
-      std::vector<fuchsia_hardware_power::Transition>{fuchsia_hardware_power::Transition{{
-          .target_level = SdmmcBlockDevice::kPowerLevelOff,
-          .latency_us = 0,
-      }}};
-  fuchsia_hardware_power::PowerLevel off = {{.level = SdmmcBlockDevice::kPowerLevelOff,
-                                             .name = "off",
-                                             .transitions = transitions_from_off}};
-  fuchsia_hardware_power::PowerLevel on = {
-      {.level = SdmmcBlockDevice::kPowerLevelOn, .name = "on", .transitions = transitions_from_on}};
-  fuchsia_hardware_power::PowerElement wake_on_request = {{
-      .name = SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName,
-      .levels = {{off, on}},
-  }};
-
-  fuchsia_hardware_power::LevelTuple on_to_active = {{
-      .child_level = SdmmcBlockDevice::kPowerLevelOn,
-      .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
-  }};
-  fuchsia_hardware_power::PowerDependency assertive_on_wake_handling_active = {{
-      .child = SdmmcBlockDevice::kSystemWakeOnRequestPowerElementName,
-      .parent = fuchsia_hardware_power::ParentElement::WithSag(
-          fuchsia_hardware_power::SagElement::kWakeHandling),
-      .level_deps = {{on_to_active}},
-      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-  }};
-
-  fuchsia_hardware_power::PowerElementConfiguration wake_on_request_config = {
-      {.element = wake_on_request, .dependencies = {{assertive_on_wake_handling_active}}}};
-  return wake_on_request_config;
-}
-
-// TODO(b/329588116): Relocate this power config.
-std::vector<fuchsia_hardware_power::PowerElementConfiguration> GetAllPowerConfigs(
-    const fuchsia_hardware_power::ParentElement& parent_element) {
-  return std::vector<fuchsia_hardware_power::PowerElementConfiguration>{
-      GetHardwarePowerConfig(parent_element), GetSystemWakeOnRequestPowerConfig()};
-}
 }  // namespace
 
 zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> SdmmcBlockDevice::AcquireLease(
@@ -391,9 +310,17 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   fuchsia_hardware_power::ParentElement parent_element =
       fuchsia_hardware_power::ParentElement::WithName(std::string(get_token.value()->name.data()));
 
+  zx::result natural_power_configs =
+      GetAllPowerConfigs(*parent_->driver_incoming(), std::move(parent_element));
+  if (natural_power_configs.is_error()) {
+    FDF_LOGL(INFO, logger(), "Error getting power configs: %s",
+             natural_power_configs.status_string());
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
   fidl::Arena<> arena;
-  const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs(parent_element));
-  if (power_configs.count() == 0) {
+  const fuchsia_hardware_power::wire::ComponentPowerConfiguration power_configs =
+      fidl::ToWire(arena, std::move(natural_power_configs.value()));
+  if (power_configs.power_elements.empty()) {
     FDF_LOGL(INFO, logger(), "No power configs found.");
     return zx::error(ZX_ERR_NOT_FOUND);
   }
@@ -406,7 +333,8 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   }
 
   // Register power configs with the Power Broker.
-  for (const auto& config : power_configs) {
+  for (const fuchsia_hardware_power::wire::PowerElementConfiguration& config :
+       power_configs.power_elements) {
     auto tokens = fdf_power::GetDependencyTokens(*parent_->driver_incoming(), config);
     if (tokens.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u.",

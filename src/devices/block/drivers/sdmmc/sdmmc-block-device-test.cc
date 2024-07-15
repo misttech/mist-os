@@ -492,6 +492,14 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
                       std::move(incoming->power_token_provider.GetInstanceHandler()), "default");
           ASSERT_TRUE(result.is_ok());
         }
+
+        // Add our package
+        {
+          auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+          ASSERT_OK(fdio_open("/pkg/", static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
+                              server.TakeChannel().release()));
+          ASSERT_OK(incoming->env.incoming_directory().AddDirectory(std::move(client), "pkg"));
+        }
       }
     });
 

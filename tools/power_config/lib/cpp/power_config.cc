@@ -22,18 +22,18 @@ zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> Load(
     fidl::ClientEnd<fuchsia_io::File> file_channel) {
   fidl::WireSyncClient file = fidl::WireSyncClient<fuchsia_io::File>(std::move(file_channel));
   fidl::WireResult seek_result = file->Seek(::fuchsia_io::wire::SeekOrigin::kEnd, 0);
-  if (!seek_result->is_ok() || !seek_result.ok()) {
+  if (!seek_result.ok() || !seek_result->is_ok()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
   uint64_t content_size = seek_result->value()->offset_from_start;
   fidl::WireResult seek_back_result = file->Seek(::fuchsia_io::wire::SeekOrigin::kStart, 0);
-  if (!seek_back_result->is_ok() || !seek_back_result.ok()) {
+  if (!seek_back_result.ok() || !seek_back_result->is_ok()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
 
   fidl::WireResult read_result = file->Read(content_size);
-  if (!read_result->is_ok() || !read_result.ok()) {
+  if (!read_result.ok() || !read_result->is_ok()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
 

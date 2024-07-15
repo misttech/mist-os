@@ -1,0 +1,100 @@
+[
+    {
+        element: {
+            name: "sdmmc-hardware",
+            levels: [
+                {
+                    level: 0,
+                    name: "off",
+                    transitions: [
+                        {
+                            target_level: 1,
+                            latency_us: 100,
+                        },
+                    ],
+                },
+                {
+                    level: 1,
+                    name: "on",
+                    transitions: [
+                        {
+                            target_level: 0,
+                            latency_us: 200,
+                        },
+                    ],
+                },
+            ],
+        },
+        dependencies: [
+            {
+                child: "sdmmc-hardware",
+                parent: {
+                    // NOTE: this name gets replaced at runtime by the driver.
+                    name: "parent",
+                },
+                level_deps: [
+                    {
+                        child_level: 1,
+                        parent_level: 1,
+                    },
+                ],
+                strength: "ASSERTIVE",
+            },
+            {
+                child: "sdmmc-hardware",
+                parent: {
+                    sag: "ExecutionState",
+                },
+                level_deps: [
+                    {
+                        child_level: 1,
+                        parent_level: 1,
+                    },
+                ],
+                strength: "OPPORTUNISTIC",
+            },
+        ],
+    },
+    {
+        element: {
+            name: "sdmmc-system-wake-on-request",
+            levels: [
+                {
+                    level: 0,
+                    name: "off",
+                    transitions: [
+                        {
+                            target_level: 1,
+                            latency_us: 0,
+                        },
+                    ],
+                },
+                {
+                    level: 1,
+                    name: "on",
+                    transitions: [
+                        {
+                            target_level: 0,
+                            latency_us: 0,
+                        },
+                    ],
+                },
+            ],
+        },
+        dependencies: [
+            {
+                child: "sdmmc-system-wake-on-request",
+                parent: {
+                    sag: "WakeHandling",
+                },
+                level_deps: [
+                    {
+                        child_level: 1,
+                        parent_level: 1,
+                    },
+                ],
+                strength: "ASSERTIVE",
+            },
+        ],
+    },
+]
