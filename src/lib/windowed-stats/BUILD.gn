@@ -26,6 +26,7 @@ rustc_library("windowed-stats") {
     "src/aggregations.rs",
     "src/experimental/clock.rs",
     "src/experimental/mod.rs",
+    "src/experimental/series/interpolation.rs",
     "src/experimental/series/mod.rs",
     "src/experimental/series/statistic.rs",
     "src/experimental/vec1.rs",

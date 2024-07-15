@@ -4,6 +4,7 @@
 
 //! Round-robin multi-resolution time series.
 
+pub mod interpolation;
 pub mod statistic;
 
 use derivative::Derivative;
