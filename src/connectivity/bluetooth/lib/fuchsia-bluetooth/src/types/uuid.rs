@@ -16,7 +16,13 @@ use crate::inspect::ToProperty;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Uuid(uuid::Uuid);
 
-/// Last eight bytes of the BASE UUID, in big-endian order, for comparision.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct U64Pair {
+    pub least_significant_bits: u64,
+    pub most_significant_bits: u64,
+}
+
+/// Last eight bytes of the BASE UUID, in big-endian order, for comparison.
 const BASE_UUID_FINAL_EIGHT_BYTES: [u8; 8] = [0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB];
 
 impl Uuid {
@@ -40,8 +46,18 @@ impl Uuid {
         self.0.as_bytes()
     }
 
-    pub const fn to_le_bytes(&self) -> [u8; Self::BLUETOOTH_UUID_LENGTH_BYTES] {
-        self.0.to_bytes_le()
+    pub fn to_u64_pair(&self) -> U64Pair {
+        let (msbs, lsbs) = self.0.as_u64_pair();
+        U64Pair { least_significant_bits: lsbs, most_significant_bits: msbs }
+    }
+
+    // This takes a U64Pair rather than two u64s to enforce clarity about which one is which.
+    pub fn from_u64_pair(u64_pair: U64Pair) -> Self {
+        let inner = uuid::Uuid::from_u64_pair(
+            u64_pair.most_significant_bits,
+            u64_pair.least_significant_bits,
+        );
+        Self(inner)
     }
 
     pub const fn new16(value: u16) -> Uuid {
@@ -228,5 +244,23 @@ mod tests {
         let uuid: fidl::Uuid = uuid.into();
         let expected = fidl::Uuid { value: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] };
         assert_eq!(expected, uuid);
+    }
+
+    #[test]
+    fn u64_pair_roundtrip() {
+        #[rustfmt::skip]
+        // Little-endian:      |--------------- lsbs ---------------|  |--------------- msbs----------------|
+        let bytes: [u8; 16] = [0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf];
+        let uuid = Uuid::from_bytes(bytes);
+        let u64_pair = uuid.to_u64_pair();
+
+        // The constants here are written in arabic numerals, which are big-endian, and so are
+        // backwards from the byte array above.
+        assert_eq!(0x0706050403020100, u64_pair.least_significant_bits);
+        assert_eq!(0x0f0e0d0c0b0a0908, u64_pair.most_significant_bits);
+
+        let result_uuid = Uuid::from_u64_pair(u64_pair);
+
+        assert_eq!(uuid, result_uuid);
     }
 }
