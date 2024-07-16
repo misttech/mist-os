@@ -48,11 +48,6 @@ static_library("ld-testing") {
       "test-vmo.cc",
     ]
     deps += [
-      # TODO(https://fxbug.dev/335737373): this is included for `LD_TEST_LIBPREFIX`.
-      # Instead `load-test-modules-info` should extract the exact path for each
-      # artifact to make it possible for the caller to more simply map a
-      # string -> filename.
-      "../test:load-test-modules-info",
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
       "//src/lib/elfldltl/testing",
@@ -65,5 +60,15 @@ static_library("ld-testing") {
       "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/zx",
     ]
+
+    # TODO(https://fxbug.dev/335737373): this is included for `LD_TEST_LIBPREFIX`.
+    # Instead `load-test-modules-info` should extract the exact path for each
+    # artifact to make it possible for the caller to more simply map a
+    # string -> filename.
+    deps += [ "../test:load-test-modules-info" ]
+    metadata = {
+      # Don't pick up all the test data that comes with it!
+      distribution_entries_barrier = []
+    }
   }
 }
