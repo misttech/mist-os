@@ -669,17 +669,17 @@ void Device::RetrieveStreamProperties() {
 // Some drivers return manufacturer or product strings with embedded '\0' characters. Trim them.
 void Device::SanitizeStreamPropertiesStrings(
     std::optional<fha::StreamProperties>& stream_properties) {
-  if (!stream_properties) {
+  if (!stream_properties.has_value()) {
     FX_LOGS(ERROR) << __func__ << " called with unspecified StreamProperties";
     return;
   }
 
-  if (stream_properties->manufacturer()) {
+  if (stream_properties->manufacturer().has_value()) {
     stream_properties->manufacturer(stream_properties->manufacturer()->substr(
         0, std::min<uint64_t>(stream_properties->manufacturer()->find('\0'),
                               fha::kMaxUiStringSize - 1)));
   }
-  if (stream_properties->product()) {
+  if (stream_properties->product().has_value()) {
     stream_properties->product(stream_properties->product()->substr(
         0,
         std::min<uint64_t>(stream_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
@@ -716,7 +716,7 @@ void Device::RetrieveCodecProperties() {
 }
 
 void Device::SanitizeCodecPropertiesStrings(std::optional<fha::CodecProperties>& codec_properties) {
-  if (!codec_properties) {
+  if (!codec_properties.has_value()) {
     FX_LOGS(ERROR) << __func__ << " called with unspecified CodecProperties";
     return;
   }
@@ -767,7 +767,7 @@ void Device::RetrieveCompositeProperties() {
 
 void Device::SanitizeCompositePropertiesStrings(
     std::optional<fha::CompositeProperties>& composite_properties) {
-  if (!composite_properties) {
+  if (!composite_properties.has_value()) {
     FX_LOGS(ERROR) << __func__ << " called with unspecified CompositeProperties";
     return;
   }
@@ -1442,7 +1442,7 @@ void Device::RetrieveStreamPlugState() {
         auto old_plug_state = plug_state_;
         plug_state_ = result->plug_state();
 
-        if (!old_plug_state) {
+        if (!old_plug_state.has_value()) {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received initial value";
           OnInitializationResponse();
         } else {
@@ -1488,7 +1488,7 @@ void Device::RetrieveCodecPlugState() {
     auto old_plug_state = plug_state_;
     plug_state_ = result->plug_state();
 
-    if (!old_plug_state) {
+    if (!old_plug_state.has_value()) {
       ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received initial value";
       OnInitializationResponse();
     } else {
@@ -1536,7 +1536,7 @@ void Device::RetrieveStreamHealthState() {
 
         ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
             << "RetrieveStreamConfigHealthState response: healthy";
-        if (!old_health_state) {
+        if (!old_health_state.has_value()) {
           OnInitializationResponse();
         }
       });
@@ -1569,7 +1569,7 @@ void Device::RetrieveCodecHealthState() {
     }
 
     ADR_LOG_OBJECT(kLogCodecFidlResponses) << "RetrieveCodecHealthState response: healthy";
-    if (!old_health_state) {
+    if (!old_health_state.has_value()) {
       OnInitializationResponse();
     }
   });
@@ -1607,7 +1607,7 @@ void Device::RetrieveCompositeHealthState() {
 
         ADR_LOG_OBJECT(kLogCompositeFidlResponses)
             << "RetrieveCompositeHealthState response: healthy";
-        if (!old_health_state) {
+        if (!old_health_state.has_value()) {
           OnInitializationResponse();
         }
       });
@@ -1706,10 +1706,10 @@ void Device::CreateDeviceClock() {
 
   ClockDomain clock_domain;
   if (is_stream_config()) {
-    FX_CHECK(stream_config_properties_->clock_domain()) << "Clock domain is required";
+    FX_CHECK(stream_config_properties_->clock_domain().has_value()) << "Clock domain is required";
     clock_domain = stream_config_properties_->clock_domain().value_or(fha::kClockDomainMonotonic);
   } else if (is_composite()) {
-    FX_CHECK(composite_properties_->clock_domain()) << "Clock domain is required";
+    FX_CHECK(composite_properties_->clock_domain().has_value()) << "Clock domain is required";
     clock_domain = composite_properties_->clock_domain().value_or(fha::kClockDomainMonotonic);
   } else {
     ADR_WARN_METHOD() << "Cannot create a device clock for device_type " << device_type();
@@ -1731,7 +1731,7 @@ zx::result<zx::clock> Device::GetReadOnlyClock() const {
   }
 
   auto dupe_clock = device_clock_->DuplicateZxClockReadOnly();
-  if (!dupe_clock) {
+  if (!dupe_clock.has_value()) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
 
@@ -1986,7 +1986,7 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
             return;
           }
 
-          if (codec_format_ && codec_format_->dai_format == dai_format &&
+          if (codec_format_.has_value() && codec_format_->dai_format == dai_format &&
               codec_format_->codec_format_info == result->state()) {
             // No DaiFormat change for this element
             notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError(0));
@@ -2098,7 +2098,7 @@ bool Device::Reset() {
         }
       }
 
-      if (codec_format_) {
+      if (codec_format_.has_value()) {
         // Reset our DaiFormat, even if no ControlNotify listens for notifications.
         codec_format_.reset();
         if (auto notify = GetControlNotify(); notify) {
@@ -2173,7 +2173,7 @@ bool Device::CodecStart() {
     ADR_WARN_METHOD() << "Codec must be controlled before Start can be called";
     return false;
   }
-  if (!codec_format_) {
+  if (!codec_format_.has_value()) {
     ADR_WARN_METHOD() << "Format must be set before Start can be called";
     return false;
   }
@@ -2224,7 +2224,7 @@ bool Device::CodecStop() {
     ADR_WARN_METHOD() << "Codec must be controlled before Stop can be called";
     return false;
   }
-  if (!codec_format_) {
+  if (!codec_format_.has_value()) {
     ADR_WARN_METHOD() << "Format must be set before Stop can be called";
     return false;
   }
@@ -2360,7 +2360,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
   } else if (bytes_per_sample == 8 && sample_format == fha::SampleFormat::kPcmFloat) {
     sample_type = fuchsia_audio::SampleType::kFloat64;
   }
-  FX_CHECK(sample_type)
+  FX_CHECK(sample_type.has_value())
       << "Invalid sample format was not detected in ValidateSampleFormatCompatibility";
   uint64_t active_channels_bitmask =
       (1ull << driver_format.pcm_format()->number_of_channels()) - 1ull;
@@ -2456,7 +2456,7 @@ void Device::RetrieveDelayInfo(ElementId element_id) {
               // Needed, to set requested_ring_buffer_frames_ before calling GetVmo.
               CalculateRequiredRingBufferSizes(element_id);
 
-              FX_CHECK(device_info_->clock_domain());
+              FX_CHECK(device_info_->clock_domain().has_value());
               const auto clock_position_notifications_per_ring =
                   *device_info_->clock_domain() == fha::kClockDomainMonotonic ? 0 : 2;
               GetVmo(element_id, static_cast<uint32_t>(ring_buffer.requested_ring_buffer_frames),
@@ -2482,7 +2482,7 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
   FX_CHECK(ring_buffer.ring_buffer_client.has_value() &&
            ring_buffer.ring_buffer_client->is_valid());
-  FX_CHECK(ring_buffer.driver_format);
+  FX_CHECK(ring_buffer.driver_format.has_value());
 
   (*ring_buffer.ring_buffer_client)
       ->GetVmo({{.min_frames = min_frames,
@@ -2520,8 +2520,8 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
   }
 
   // We're creating the ring buffer but don't have all our prerequisites yet.
-  if (!ring_buffer.ring_buffer_properties || !ring_buffer.delay_info ||
-      !ring_buffer.num_ring_buffer_frames) {
+  if (!ring_buffer.ring_buffer_properties.has_value() || !ring_buffer.delay_info.has_value() ||
+      !ring_buffer.num_ring_buffer_frames.has_value()) {
     return;
   }
 
@@ -2657,12 +2657,12 @@ void Device::CalculateRequiredRingBufferSizes(ElementId element_id) {
   ADR_LOG_METHOD(kLogRingBufferMethods);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
-  FX_CHECK(ring_buffer.vmo_format.channel_count());
-  FX_CHECK(ring_buffer.vmo_format.sample_type());
-  FX_CHECK(ring_buffer.vmo_format.frames_per_second());
-  FX_CHECK(ring_buffer.ring_buffer_properties);
-  FX_CHECK(ring_buffer.ring_buffer_properties->driver_transfer_bytes());
-  FX_CHECK(ring_buffer.requested_ring_buffer_bytes);
+  FX_CHECK(ring_buffer.vmo_format.channel_count().has_value());
+  FX_CHECK(ring_buffer.vmo_format.sample_type().has_value());
+  FX_CHECK(ring_buffer.vmo_format.frames_per_second().has_value());
+  FX_CHECK(ring_buffer.ring_buffer_properties.has_value());
+  FX_CHECK(ring_buffer.ring_buffer_properties->driver_transfer_bytes().has_value());
+  FX_CHECK(ring_buffer.requested_ring_buffer_bytes.has_value());
   FX_CHECK(*ring_buffer.requested_ring_buffer_bytes > 0);
 
   switch (*ring_buffer.vmo_format.sample_type()) {

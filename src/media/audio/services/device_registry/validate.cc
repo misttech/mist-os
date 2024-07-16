@@ -205,7 +205,7 @@ bool ValidateStreamProperties(const fha::StreamProperties& stream_props,
   }
 
   // If we already have this device's GainState, double-check against that.
-  if (gain_state) {
+  if (gain_state.has_value()) {
     if (*gain_state->gain_db() < *stream_props.min_gain_db() ||
         *gain_state->gain_db() > *stream_props.max_gain_db()) {
       FX_LOGS(WARNING) << "Gain range reported by GetProperties does not include current gain_db: "
@@ -226,7 +226,7 @@ bool ValidateStreamProperties(const fha::StreamProperties& stream_props,
   }
 
   // If we already have this device's PlugState, double-check against that.
-  if (plug_state && !(*plug_state->plugged()) &&
+  if (plug_state.has_value() && !(*plug_state->plugged()) &&
       *stream_props.plug_detect_capabilities() == fha::PlugDetectCapabilities::kHardwired) {
     FX_LOGS(WARNING) << "GetProperties reports HARDWIRED, but StreamConfig reports as UNPLUGGED";
     return false;
@@ -421,7 +421,7 @@ bool ValidateCodecProperties(const fha::CodecProperties& codec_props,
   }
 
   // If we already have this device's PlugState, double-check against that.
-  if (plug_state && !(*plug_state->plugged()) &&
+  if (plug_state.has_value() && !(*plug_state->plugged()) &&
       *codec_props.plug_detect_capabilities() == fha::PlugDetectCapabilities::kHardwired) {
     FX_LOGS(WARNING) << "GetProperties reports HARDWIRED, but Codec reports as UNPLUGGED";
     return false;
@@ -642,7 +642,7 @@ bool ValidateGainState(const fha::GainState& gain_state,
   }
 
   // If we already have this device's GainCapabilities, double-check against those.
-  if (stream_props) {
+  if (stream_props.has_value()) {
     if (*gain_state.gain_db() < *stream_props->min_gain_db() ||
         *gain_state.gain_db() > *stream_props->max_gain_db()) {
       FX_LOGS(WARNING) << "gain_db is out of range: " << *gain_state.gain_db();
@@ -680,7 +680,7 @@ bool ValidatePlugState(const fha::PlugState& plug_state,
   }
 
   // If we already have this device's PlugDetectCapabilities, double-check against those.
-  if (plug_detect_capabilities) {
+  if (plug_detect_capabilities.has_value()) {
     if (*plug_detect_capabilities == fha::PlugDetectCapabilities::kHardwired &&
         !plug_state.plugged().value_or(true)) {
       FX_LOGS(WARNING) << "Device reports as HARDWIRED, but PlugState.plugged is false";

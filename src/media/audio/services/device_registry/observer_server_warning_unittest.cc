@@ -91,7 +91,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchGainStateWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -124,7 +124,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchPlugState` call.
@@ -179,7 +179,7 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -213,7 +213,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchTopologyUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -255,7 +255,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchElementStateUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -304,7 +304,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -337,7 +337,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -367,7 +367,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchTopologyWhilePending) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
@@ -417,7 +417,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateUnknownElementId) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
@@ -465,7 +465,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
@@ -541,7 +541,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchGainState` call.
@@ -595,7 +595,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchPlugState` call.
@@ -660,7 +660,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchTopologyUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -702,7 +702,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchElementStateUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());

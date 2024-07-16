@@ -117,19 +117,19 @@ void FakeCodec::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCodec);
   // Gather the properties and return them.
   fha::CodecProperties codec_properties{};
-  if (is_input_) {
+  if (is_input_.has_value()) {
     codec_properties.is_input(*is_input_);
   }
-  if (manufacturer_) {
+  if (manufacturer_.has_value()) {
     codec_properties.manufacturer(*manufacturer_);
   }
-  if (product_) {
+  if (product_.has_value()) {
     codec_properties.product(*product_);
   }
-  if (uid_) {
+  if (uid_.has_value()) {
     codec_properties.unique_id(*uid_);
   }
-  if (plug_detect_capabilities_) {
+  if (plug_detect_capabilities_.has_value()) {
     codec_properties.plug_detect_capabilities(*plug_detect_capabilities_);
   }
 
@@ -177,13 +177,13 @@ void FakeCodec::SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter
   selected_format_.emplace(request.format());
 
   fha::CodecFormatInfo info;
-  if (external_delay_) {
+  if (external_delay_.has_value()) {
     info.external_delay(external_delay_->get());
   }
-  if (turn_on_delay_) {
+  if (turn_on_delay_.has_value()) {
     info.turn_on_delay(turn_on_delay_->get());
   }
-  if (turn_off_delay_) {
+  if (turn_off_delay_.has_value()) {
     info.turn_off_delay(turn_off_delay_->get());
   }
 
@@ -220,7 +220,7 @@ void FakeCodec::Reset(ResetCompleter::Sync& completer) {
     mono_stop_time_ = zx::clock::get_monotonic();
     is_running_ = false;
   }
-  if (selected_format_) {
+  if (selected_format_.has_value()) {
     selected_format_.reset();
     external_delay_.reset();
     turn_on_delay_.reset();
@@ -253,7 +253,7 @@ void FakeCodec::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
 
 void FakeCodec::InjectPluggedAt(zx::time plug_time) {
   ADR_LOG_METHOD(kLogFakeCodec) << "(plugged, " << plug_time.get() << ")";
-  ASSERT_TRUE(!watch_plug_state_completer_ || !plug_has_changed_)
+  ASSERT_TRUE(!watch_plug_state_completer_.has_value() || !plug_has_changed_)
       << "Inconsistent state: WatchPlugState is pending, but a plug change is waiting to be reported";
 
   // Compare to previously-reported plug state: only report _changes_ that occurred _later_.
@@ -267,7 +267,7 @@ void FakeCodec::InjectPluggedAt(zx::time plug_time) {
 
 void FakeCodec::InjectUnpluggedAt(zx::time plug_time) {
   ADR_LOG_METHOD(kLogFakeCodec) << "(unplugged, " << plug_time.get() << ")";
-  ASSERT_TRUE(!watch_plug_state_completer_ || !plug_has_changed_)
+  ASSERT_TRUE(!watch_plug_state_completer_.has_value() || !plug_has_changed_)
       << "Inconsistent state: WatchPlugState is pending, but a plug change is waiting to be reported";
 
   // Compare to previously-reported plug state: only report _changes_ that occurred _later_.
@@ -281,7 +281,7 @@ void FakeCodec::InjectUnpluggedAt(zx::time plug_time) {
 
 void FakeCodec::HandlePlugResponse() {
   // A WatchPlugState is pending; complete it.
-  if (watch_plug_state_completer_) {
+  if (watch_plug_state_completer_.has_value()) {
     watch_plug_state_completer_->Reply(fha::PlugState{{
         .plugged = plugged_,
         .plug_state_time = plug_state_time_.get(),

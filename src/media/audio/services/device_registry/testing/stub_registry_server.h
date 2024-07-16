@@ -30,7 +30,7 @@ class StubRegistryServer
 
   // fuchsia.audio.device.Registry implementation
   void WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& completer) final {
-    if (watch_devices_added_completer_) {
+    if (watch_devices_added_completer_.has_value()) {
       FX_LOGS(WARNING) << kClassName << "::" << __FUNCTION__
                        << ": previous request has not yet completed";
       completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDevicesAddedError>(
@@ -42,7 +42,7 @@ class StubRegistryServer
   }
 
   void WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& completer) final {
-    if (watch_device_removed_completer_) {
+    if (watch_device_removed_completer_.has_value()) {
       FX_LOGS(WARNING) << kClassName << "::" << __FUNCTION__
                        << ": previous request has not yet completed";
       completer.Reply(fit::error<fuchsia_audio_device::RegistryWatchDeviceRemovedError>(

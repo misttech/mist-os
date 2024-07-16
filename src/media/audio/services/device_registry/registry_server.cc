@@ -48,7 +48,7 @@ RegistryServer::~RegistryServer() {
 
 void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogRegistryServerMethods);
-  if (watch_devices_added_completer_) {
+  if (watch_devices_added_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `WatchDevicesAdded` request has not yet completed";
     completer.Reply(fit::error<fad::RegistryWatchDevicesAddedError>(
         fad::RegistryWatchDevicesAddedError::kAlreadyPending));
@@ -79,7 +79,7 @@ void RegistryServer::DeviceWasAdded(const std::shared_ptr<const Device>& new_dev
 
 // We just got either a completer, or a newly-added device. If now we have both, Reply.
 void RegistryServer::ReplyWithAddedDevices() {
-  if (!watch_devices_added_completer_) {
+  if (!watch_devices_added_completer_.has_value()) {
     ADR_LOG_METHOD(kLogRegistryServerMethods) << "no pending completer; just adding to our list";
     return;
   }
@@ -103,7 +103,7 @@ void RegistryServer::ReplyWithAddedDevices() {
 // TODO(https://fxbug.dev/42068345): is WatchDevicesRemoved (returning a vector) more ergonomic?
 void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogRegistryServerMethods);
-  if (watch_device_removed_completer_) {
+  if (watch_device_removed_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `WatchDeviceRemoved` request has not yet completed";
     completer.Reply(fit::error<fad::RegistryWatchDeviceRemovedError>(
         fad::RegistryWatchDeviceRemovedError::kAlreadyPending));
@@ -149,7 +149,7 @@ void RegistryServer::ReplyWithNextRemovedDevice() {
     ADR_LOG_METHOD(kLogRegistryServerMethods) << "devices_removed_since_notify_ is empty";
     return;
   }
-  if (!watch_device_removed_completer_) {
+  if (!watch_device_removed_completer_.has_value()) {
     ADR_LOG_METHOD(kLogRegistryServerMethods) << "no WatchDeviceRemoved completer";
     return;
   }
@@ -166,12 +166,12 @@ void RegistryServer::CreateObserver(CreateObserverRequest& request,
                                     CreateObserverCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogRegistryServerMethods);
 
-  if (!request.token_id()) {
+  if (!request.token_id().has_value()) {
     ADR_WARN_METHOD() << "required field 'id' is missing";
     completer.Reply(fit::error(fad::RegistryCreateObserverError::kInvalidTokenId));
     return;
   }
-  if (!request.observer_server()) {
+  if (!request.observer_server().has_value()) {
     ADR_WARN_METHOD() << "required field 'observer_server' is missing";
     completer.Reply(fit::error(fad::RegistryCreateObserverError::kInvalidObserver));
     return;

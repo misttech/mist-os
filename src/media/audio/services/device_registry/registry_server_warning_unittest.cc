@@ -176,7 +176,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());
@@ -224,7 +224,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());
@@ -279,7 +279,7 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverMissingObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());
@@ -327,7 +327,7 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverBadObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());
@@ -382,7 +382,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverMissingObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());
@@ -430,7 +430,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverBadObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());

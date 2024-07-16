@@ -172,10 +172,10 @@ void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& com
   }
 
   fha::GainState gain_state{{.gain_db = *request.target_state()->gain_db()}};
-  if (request.target_state()->muted()) {
+  if (request.target_state()->muted().has_value()) {
     gain_state.muted(*request.target_state()->muted());
   }
-  if (request.target_state()->agc_enabled()) {
+  if (request.target_state()->agc_enabled().has_value()) {
     gain_state.agc_enabled(*request.target_state()->agc_enabled());
   }
   device_->SetGain(gain_state);
@@ -224,26 +224,27 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     return;
   }
 
-  if (!request.options()) {
+  if (!request.options().has_value()) {
     ADR_WARN_METHOD() << "(element_id " << element_id << ") required field 'options' is missing";
     completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidOptions));
     return;
   }
-  if (!request.options()->format() || !request.options()->format()->sample_type() ||
-      !request.options()->format()->channel_count() ||
-      !request.options()->format()->frames_per_second()) {
+  if (!request.options()->format().has_value() ||
+      !request.options()->format()->sample_type().has_value() ||
+      !request.options()->format()->channel_count().has_value() ||
+      !request.options()->format()->frames_per_second().has_value()) {
     ADR_WARN_METHOD() << "(element_id " << element_id
                       << ") required 'options.format' (or one of its required members) is missing";
     completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidFormat));
     return;
   }
-  if (!request.options()->ring_buffer_min_bytes()) {
+  if (!request.options()->ring_buffer_min_bytes().has_value()) {
     ADR_WARN_METHOD() << "(element_id " << element_id
                       << ") required field 'options.ring_buffer_min_bytes' is missing";
     completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidMinBytes));
     return;
   }
-  if (!request.ring_buffer_server()) {
+  if (!request.ring_buffer_server().has_value()) {
     ADR_WARN_METHOD() << "(element_id " << element_id
                       << ") required field 'ring_buffer_server' is missing";
     completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidRingBuffer));
@@ -258,7 +259,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   auto driver_format =
       device_->SupportedDriverFormatForClientFormat(element_id, *request.options()->format());
   // Fail if device cannot satisfy the requested format.
-  if (!driver_format) {
+  if (!driver_format.has_value()) {
     ADR_WARN_METHOD() << "(element_id " << element_id
                       << ") device does not support the specified options";
     completer.Reply(fit::error(fad::ControlCreateRingBufferError::kFormatMismatch));
@@ -633,7 +634,7 @@ void ControlServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
 
   FX_CHECK(device_->info().has_value() &&
            device_->info()->signal_processing_topologies().has_value() &&
-           !device_->info()->signal_processing_topologies()->empty());
+           device_->info()->signal_processing_topologies()->size());
   completer.Reply(zx::ok(*device_->info()->signal_processing_topologies()));
 }
 
@@ -660,15 +661,13 @@ void ControlServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
     return;
   }
 
-  if (watch_topology_completer_) {
+  if (watch_topology_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `WatchTopology` request has not yet completed";
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
 
-  FX_CHECK(!watch_topology_completer_.has_value());
   watch_topology_completer_ = completer.ToAsync();
-  FX_CHECK(watch_topology_completer_.has_value());
   MaybeCompleteWatchTopology();
 }
 
@@ -722,7 +721,7 @@ void ControlServer::TopologyChanged(TopologyId topology_id) {
 }
 
 void ControlServer::MaybeCompleteWatchTopology() {
-  if (watch_topology_completer_ && topology_id_to_notify_) {
+  if (watch_topology_completer_.has_value() && topology_id_to_notify_.has_value()) {
     ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
         << "completing(" << *topology_id_to_notify_ << ")";
     auto completer = std::move(*watch_topology_completer_);
@@ -762,7 +761,7 @@ void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
 
   FX_CHECK(device_->info().has_value() &&
            device_->info()->signal_processing_elements().has_value() &&
-           !device_->info()->signal_processing_elements()->empty());
+           device_->info()->signal_processing_elements()->size());
   completer.Reply(zx::ok(*device_->info()->signal_processing_elements()));
 }
 

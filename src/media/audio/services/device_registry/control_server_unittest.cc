@@ -34,9 +34,9 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
     registry_client->WatchDevicesAdded().Then(
         [&added_device_id](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok()) << result.error_value();
-          ASSERT_TRUE(result->devices());
+          ASSERT_TRUE(result->devices().has_value());
           ASSERT_EQ(result->devices()->size(), 1u);
-          ASSERT_TRUE(result->devices()->at(0).token_id());
+          ASSERT_TRUE(result->devices()->at(0).token_id().has_value());
           added_device_id = *result->devices()->at(0).token_id();
         });
     RunLoopUntilIdle();
@@ -427,7 +427,7 @@ TEST_F(ControlServerCodecTest, GetTopologiesUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -458,7 +458,7 @@ TEST_F(ControlServerCodecTest, GetElementsUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -909,7 +909,7 @@ TEST_F(ControlServerCompositeTest, GetTopologies) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto initial_topologies = device->info()->signal_processing_topologies();
@@ -942,7 +942,7 @@ TEST_F(ControlServerCompositeTest, GetElements) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto initial_elements = device->info()->signal_processing_elements();
@@ -975,7 +975,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyInitial) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
@@ -1005,7 +1005,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyNoChange) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
@@ -1045,7 +1045,7 @@ TEST_F(ControlServerCompositeTest, WatchTopologyUpdate) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
@@ -1105,7 +1105,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateInitial) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
@@ -1151,7 +1151,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateNoChange) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
@@ -1202,7 +1202,7 @@ TEST_F(ControlServerCompositeTest, WatchElementStateUpdate) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
 
@@ -1350,7 +1350,7 @@ TEST_F(ControlServerCompositeTest, SetTopology) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   if (device->topology_ids().size() == 1) {
@@ -1695,7 +1695,7 @@ TEST_F(ControlServerStreamConfigTest, GetTopologiesUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -1726,7 +1726,7 @@ TEST_F(ControlServerStreamConfigTest, GetElementsUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());

@@ -407,7 +407,7 @@ inline std::ostream& operator<<(std::ostream& out, const fuchsia_audio::SampleTy
 // fuchsia_audio_device types
 inline std::ostream& operator<<(
     std::ostream& out, const std::optional<fuchsia_audio_device::DeviceType>& device_type) {
-  if (device_type) {
+  if (device_type.has_value()) {
     switch (*device_type) {
       case fuchsia_audio_device::DeviceType::kCodec:
         return (out << "CODEC");
@@ -449,7 +449,7 @@ inline std::ostream& operator<<(std::ostream& out,
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia_audio_device::PlugDetectCapabilities>& plug_caps) {
-  if (plug_caps) {
+  if (plug_caps.has_value()) {
     switch (*plug_caps) {
       case fuchsia_audio_device::PlugDetectCapabilities::kHardwired:
         return (out << "HARDWIRED");

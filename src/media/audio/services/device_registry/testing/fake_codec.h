@@ -146,7 +146,7 @@ class FakeCodec
 
   // fuchsia_hardware_audio::CodecConnector
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override {
-    FX_CHECK(!binding_) << "Codec is already bound; it cannot have multiple clients";
+    FX_CHECK(!binding_.has_value()) << "Codec is already bound; it cannot have multiple clients";
     binding_ = fidl::BindServer(dispatcher(), std::move(request.codec_protocol()), this);
   }
 
