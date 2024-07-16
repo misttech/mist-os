@@ -116,6 +116,9 @@ if (is_mistos) {
       # shell
       "//zircon/third_party/uapp/dash",
 
+      # Debug Broker
+      "//src/bringup/bin/kernel_debug_broker:component",
+
       # Driver Framework
       "//src/devices/bin/devfs:component",
       "//src/devices/bin/devfs:component-non-critical",

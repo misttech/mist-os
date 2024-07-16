@@ -5,6 +5,7 @@
     include: [
         "//src/bringup/bin/ptysvc/meta/ptysvc.bootstrap_shard.mistos.cml",
         "//src/bringup/bin/console/meta/console.shard.mistos.cml",
+        "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker.bootstrap_shard.mistos.cml",
         "//src/devices/bin/driver_framework/meta/driver_framework.bootstrap_shard.mistos.cml",
         "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.mistos.cml",
         "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.mistos.cml",
