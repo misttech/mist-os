@@ -78,6 +78,11 @@ impl Status {
     }
 }
 
+/// Convenience re-export of `Status::ok`.
+pub fn ok(raw: sys::zx_status_t) -> Result<(), Status> {
+    Status::ok(raw)
+}
+
 assoc_values!(Status, [
     OK                     = sys::ZX_OK;
     INTERNAL               = sys::ZX_ERR_INTERNAL;

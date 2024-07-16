@@ -4,9 +4,15 @@
 
 //! Type-safe bindings for Zircon object information.
 
+use crate::{ok, HandleRef, Status};
 use fuchsia_zircon_sys as sys;
+use std::mem::MaybeUninit;
 use std::ops::Deref;
-use zerocopy::{FromBytes, FromZeroes, NoCell};
+use zerocopy::{FromBytes, FromZeros, NoCell};
+
+// Tuning constants for get_info_vec(). pub(crate) to support unit tests.
+pub(crate) const INFO_VEC_SIZE_INITIAL: usize = 16;
+const INFO_VEC_SIZE_PAD: usize = 2;
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 #[repr(transparent)]
@@ -29,7 +35,7 @@ pub(crate) unsafe trait ObjectQuery {
     /// A `Topic` identifying this query.
     const TOPIC: Topic;
     /// The datatype returned by querying for Self::TOPIC.
-    type InfoTy: FromBytes + FromZeroes + NoCell;
+    type InfoTy: FromBytes + FromZeros + NoCell;
 }
 
 assoc_values!(Topic, [
@@ -60,3 +66,82 @@ assoc_values!(Topic, [
     VMO = sys::ZX_INFO_VMO;
     JOB = sys::ZX_INFO_JOB;
 ]);
+
+/// Query information about a zircon object. Returns a valid slice and any remaining capacity on
+/// success, along with a count of how many infos the kernel had available.
+fn object_get_info<'a, Q: ObjectQuery>(
+    handle: HandleRef<'_>,
+    out: &'a mut [MaybeUninit<Q::InfoTy>],
+) -> Result<(&'a mut [Q::InfoTy], &'a mut [MaybeUninit<Q::InfoTy>], usize), Status>
+where
+    Q::InfoTy: FromBytes + FromZeros + NoCell,
+{
+    let mut actual = 0;
+    let mut avail = 0;
+
+    // SAFETY: The slice pointer is known valid to write to for `size_of_val` because it came from
+    // a mutable reference.
+    let status = unsafe {
+        sys::zx_object_get_info(
+            handle.raw_handle(),
+            *Q::TOPIC,
+            out.as_mut_ptr() as *mut u8,
+            std::mem::size_of_val(out),
+            &mut actual,
+            &mut avail,
+        )
+    };
+    ok(status)?;
+
+    let (initialized, uninit) = out.split_at_mut(actual);
+
+    // TODO(https://fxbug.dev/352398385) switch to MaybeUninit::slice_assume_init_mut
+    // SAFETY: these values have been initialized by the kernel and implement the right zerocopy
+    // traits to be instantiated from arbitrary bytes.
+    let initialized: &mut [Q::InfoTy] = unsafe {
+        std::slice::from_raw_parts_mut(
+            initialized.as_mut_ptr() as *mut Q::InfoTy,
+            initialized.len(),
+        )
+    };
+
+    Ok((initialized, uninit, avail))
+}
+
+/// Query information about a zircon object, expecting only a single info in the return.
+pub(crate) fn object_get_info_single<Q: ObjectQuery>(
+    handle: HandleRef<'_>,
+) -> Result<Q::InfoTy, Status>
+where
+    Q::InfoTy: Copy + FromBytes + FromZeros + NoCell,
+{
+    let mut info = MaybeUninit::<Q::InfoTy>::uninit();
+    let (info, _, _) = object_get_info::<Q>(handle, std::slice::from_mut(&mut info))?;
+    Ok(info[0])
+}
+
+/// Query multiple records of information about a zircon object.
+/// Returns a vec of Q::InfoTy on success.
+/// Intended for calls that return multiple small objects.
+pub(crate) fn object_get_info_vec<Q: ObjectQuery>(
+    handle: HandleRef<'_>,
+) -> Result<Vec<Q::InfoTy>, Status> {
+    // Start with a few slots
+    let mut out = Vec::<Q::InfoTy>::with_capacity(INFO_VEC_SIZE_INITIAL);
+    loop {
+        let (init, _uninit, avail) =
+            object_get_info::<Q>(handle.clone(), out.spare_capacity_mut())?;
+        let num_initialized = init.len();
+        if num_initialized == avail {
+            // SAFETY: the kernel has initialized all of these values.
+            unsafe { out.set_len(num_initialized) };
+            return Ok(out);
+        } else {
+            // The number of records may increase between retries; reserve space for that.
+            let needed_space = avail * INFO_VEC_SIZE_PAD;
+            if let Some(to_grow) = needed_space.checked_sub(out.capacity()) {
+                out.reserve_exact(to_grow);
+            }
+        }
+    }
+}

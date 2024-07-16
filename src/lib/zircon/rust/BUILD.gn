@@ -26,6 +26,7 @@ _common_sources = [
   "src/iommu.rs",
   "src/job.rs",
   "src/lib.rs",
+  "src/macros.rs",
   "src/name.rs",
   "src/pager.rs",
   "src/pmt.rs",
@@ -38,6 +39,7 @@ _common_sources = [
   "src/signals.rs",
   "src/socket.rs",
   "src/stream.rs",
+  "src/system.rs",
   "src/task.rs",
   "src/thread.rs",
   "src/time.rs",
@@ -45,6 +47,7 @@ _common_sources = [
   "src/version.rs",
   "src/vmar.rs",
   "src/vmo.rs",
+  "src/wait.rs",
 ]
 _common_deps = [
   "//src/lib/zircon/rust/fuchsia-zircon-status",
