@@ -1188,6 +1188,10 @@
 
                 // TODO(https://fxbug.dev/353534690) deflake
                 "AllInetTests/RawPacketTest.SendFromLoopback/0",
+
+                // TODO(https://fxbug.dev/353539087) deflake and enable
+                "JobControlTest.ReuseControllingTTYAfterExit",
+                "JobControlTest.GetForegroundProcessGroupNonControlling",
             ],
         },
     ],
