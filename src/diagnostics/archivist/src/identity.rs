@@ -59,13 +59,13 @@ impl From<Vec<&str>> for ComponentIdentity {
 
 impl From<ComponentIdentity> for MonikerWithUrl {
     fn from(identity: ComponentIdentity) -> Self {
-        Self { moniker: identity.to_string(), url: identity.url.into() }
+        Self { moniker: identity.to_string(), url: identity.url }
     }
 }
 
 impl From<&ComponentIdentity> for MonikerWithUrl {
     fn from(identity: &ComponentIdentity) -> Self {
-        Self { moniker: identity.to_string(), url: identity.url.to_string() }
+        Self { moniker: identity.to_string(), url: identity.url.clone() }
     }
 }
 

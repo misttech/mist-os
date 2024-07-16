@@ -94,7 +94,7 @@ fn components_from_inspect_data(inspect_data: Vec<InspectData>) -> Vec<ListResul
     for value in inspect_data {
         result.push(ListResultItem::MonikerWithUrl(MonikerWithUrl {
             moniker: value.moniker,
-            component_url: value.metadata.component_url,
+            component_url: value.metadata.component_url.into(),
         }));
     }
     result

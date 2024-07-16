@@ -265,7 +265,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: String::default(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -279,7 +279,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: String::default(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -291,7 +291,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: String::default(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -321,7 +321,7 @@ mod test {
             let entry = make_log_entry(
                 diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                     timestamp_nanos: 0.into(),
-                    component_url: Some(String::default()),
+                    component_url: Some("".into()),
                     moniker: moniker.into(),
                     severity,
                 })
@@ -358,7 +358,7 @@ mod test {
             let entry = make_log_entry(
                 diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                     timestamp_nanos: 0.into(),
-                    component_url: Some(String::default()),
+                    component_url: Some("".into()),
                     moniker: "test_selector".into(),
                     severity,
                 })
@@ -384,7 +384,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: String::default(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -398,7 +398,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: String::default(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -410,7 +410,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: String::default(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -431,7 +431,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -442,7 +442,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Info,
             })
@@ -453,7 +453,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "other/moniker".to_string(),
                 severity: diagnostics_data::Severity::Debug,
             })
@@ -472,7 +472,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -484,7 +484,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -506,7 +506,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "bootstrap/archivist".into(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -518,7 +518,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "core/network/netstack".into(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -530,7 +530,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "core/network/dhcp".into(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -549,7 +549,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -561,7 +561,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -596,7 +596,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -607,7 +607,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Fatal,
             })
@@ -618,7 +618,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 // Include a "/" prefix on the moniker to test filter permissiveness.
                 moniker: "/included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Fatal,
@@ -630,7 +630,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "not/this/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -641,7 +641,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Warn,
             })
@@ -652,7 +652,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "other/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -663,7 +663,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -681,7 +681,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "klog".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -692,7 +692,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "klog".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -703,7 +703,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "klog".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -714,7 +714,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "klog".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -725,7 +725,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "klog".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -736,7 +736,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "other/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -754,7 +754,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "klog".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -765,7 +765,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "other/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -783,7 +783,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "core/last_segment".into(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -802,7 +802,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Error,
             })
@@ -813,7 +813,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "included/moniker".to_string(),
                 severity: diagnostics_data::Severity::Info,
             })
@@ -824,7 +824,7 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "other/moniker".to_string(),
                 severity: diagnostics_data::Severity::Debug,
             })
@@ -836,7 +836,7 @@ mod test {
         let entry = make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "other/moniker".to_string(),
                 severity: diagnostics_data::Severity::Debug,
             })
@@ -857,7 +857,7 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 moniker: "core/last_segment".into(),
                 severity: diagnostics_data::Severity::Error,
             })

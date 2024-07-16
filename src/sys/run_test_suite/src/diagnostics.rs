@@ -136,7 +136,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>".into(),
                 timestamp_nanos: 0i64.into(),
-                component_url: "test-root-url".to_string().into(),
+                component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
             .set_message("my info log")
@@ -144,7 +144,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child".into(),
                 timestamp_nanos: 1000i64.into(),
-                component_url: "test-child-url".to_string().into(),
+                component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
             .set_message("my info log")
@@ -153,7 +153,7 @@ mod test {
         let displayed_logs = vec![LogsDataBuilder::new(BuilderArgs {
             moniker: "child".into(),
             timestamp_nanos: 1000i64.into(),
-            component_url: "test-child-url".to_string().into(),
+            component_url: Some("test-child-url".into()),
             severity: Severity::Warn,
         })
         .set_message("my info log")
@@ -192,7 +192,7 @@ mod test {
         let a_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
         .set_message("A's info log")
@@ -200,7 +200,7 @@ mod test {
         let a_warn_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
         })
         .set_message("A's warn log")
@@ -208,7 +208,7 @@ mod test {
         let b_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
         .set_message("B's info log")
@@ -216,7 +216,7 @@ mod test {
         let b_warn_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
         })
         .set_message("B's warn log")
@@ -224,7 +224,7 @@ mod test {
         let c_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "c".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
         .set_message("C's info log")
@@ -273,7 +273,7 @@ mod test {
         let a_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
         .set_message("A's info log")
@@ -281,7 +281,7 @@ mod test {
         let a_warn_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "a".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
         })
         .set_message("A's warn log")
@@ -289,7 +289,7 @@ mod test {
         let b_info_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Info,
         })
         .set_message("B's info log")
@@ -297,7 +297,7 @@ mod test {
         let b_fatal_log = LogsDataBuilder::new(BuilderArgs {
             moniker: "b".into(),
             timestamp_nanos: 0i64.into(),
-            component_url: "test-root-url".to_string().into(),
+            component_url: Some("test-root-url".into()),
             severity: Severity::Fatal,
         })
         .set_message("B's fatal log")
@@ -341,7 +341,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>".into(),
                 timestamp_nanos: 0i64.into(),
-                component_url: "test-root-url".to_string().into(),
+                component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
             .set_message("my info log")
@@ -349,7 +349,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>/child/a".into(),
                 timestamp_nanos: 1000i64.into(),
-                component_url: "test-child-url".to_string().into(),
+                component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
             .set_message("my warn log")
@@ -359,7 +359,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>".into(),
                 timestamp_nanos: 0i64.into(),
-                component_url: "test-root-url".to_string().into(),
+                component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
             .set_message("my info log")
@@ -367,7 +367,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "a".into(),
                 timestamp_nanos: 1000i64.into(),
-                component_url: "test-child-url".to_string().into(),
+                component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
             .set_message("my warn log")
@@ -410,7 +410,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>".into(),
                 timestamp_nanos: 0i64.into(),
-                component_url: "test-root-url".to_string().into(),
+                component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
             .set_message("my info log")
@@ -418,7 +418,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child/a".into(),
                 timestamp_nanos: 1000i64.into(),
-                component_url: "test-child-url".to_string().into(),
+                component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
             .set_message("my warn log")
@@ -428,7 +428,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>".into(),
                 timestamp_nanos: 0i64.into(),
-                component_url: "test-root-url".to_string().into(),
+                component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
             .set_message("my info log")
@@ -436,7 +436,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child/a".into(),
                 timestamp_nanos: 1000i64.into(),
-                component_url: "test-child-url".to_string().into(),
+                component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
             })
             .set_message("my warn log")
@@ -479,7 +479,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>".into(),
                 timestamp_nanos: 0i64.into(),
-                component_url: "test-root-url".to_string().into(),
+                component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
             .set_message("my info log")
@@ -487,7 +487,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child".into(),
                 timestamp_nanos: 1000i64.into(),
-                component_url: "test-child-url".to_string().into(),
+                component_url: Some("test-child-url".into()),
                 severity: Severity::Error,
             })
             .set_message("my error log")
@@ -497,7 +497,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "<root>".into(),
                 timestamp_nanos: 0i64.into(),
-                component_url: "test-root-url".to_string().into(),
+                component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
             })
             .set_message("my info log")
@@ -505,7 +505,7 @@ mod test {
             LogsDataBuilder::new(BuilderArgs {
                 moniker: "child".into(),
                 timestamp_nanos: 1000i64.into(),
-                component_url: "test-child-url".to_string().into(),
+                component_url: Some("test-child-url".into()),
                 severity: Severity::Error,
             })
             .set_message("my error log")

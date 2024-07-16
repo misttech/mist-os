@@ -40,10 +40,9 @@ fn bench_json_packet_serializer(b: &mut criterion::Bencher, total_logs: u64) {
     let logs = (0u64..total_logs)
         .map(|i| {
             LogsDataBuilder::new(BuilderArgs {
-                component_url: Some(format!(
-                    "fuchsia-pkg://fuchsia.com/testing#meta/bench-{}.cm",
-                    i
-                )),
+                component_url: Some(
+                    format!("fuchsia-pkg://fuchsia.com/testing#meta/bench-{}.cm", i).into(),
+                ),
                 moniker: format!("moniker-{}", i),
                 severity: Severity::Info,
                 timestamp_nanos: (i as i64).into(),

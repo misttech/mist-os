@@ -275,7 +275,7 @@ pub struct InspectMetadata {
     pub name: Option<InspectHandleName>,
 
     /// The url with which the component was launched.
-    pub component_url: String,
+    pub component_url: FlyStr,
 
     /// Monotonic time in nanos.
     pub timestamp: i64,
@@ -306,7 +306,7 @@ pub struct LogsMetadata {
 
     /// The url with which the component was launched.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub component_url: Option<String>,
+    pub component_url: Option<FlyStr>,
 
     /// Monotonic time in nanos.
     pub timestamp: i64,
@@ -587,7 +587,7 @@ pub struct InspectDataBuilder {
 impl InspectDataBuilder {
     pub fn new(
         moniker: impl Into<String>,
-        component_url: impl Into<String>,
+        component_url: impl Into<FlyStr>,
         timestamp: i64,
     ) -> Self {
         Self {
@@ -667,7 +667,7 @@ pub struct BuilderArgs {
     /// The timestamp of the message in nanoseconds
     pub timestamp_nanos: Timestamp,
     /// The component URL
-    pub component_url: Option<String>,
+    pub component_url: Option<FlyStr>,
     /// The message severity
     pub severity: Severity,
 }
@@ -845,7 +845,7 @@ impl Data<Logs> {
         moniker: impl Into<String>,
         payload: Option<LogsHierarchy>,
         timestamp: impl Into<Timestamp>,
-        component_url: Option<String>,
+        component_url: Option<FlyStr>,
         severity: impl Into<Severity>,
         errors: Vec<LogError>,
     ) -> Self {
@@ -1741,7 +1741,7 @@ mod tests {
     #[fuchsia::test]
     fn default_builder_test() {
         let builder = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
+            component_url: Some("url".into()),
             moniker: String::from("moniker"),
             severity: Severity::Info,
             timestamp_nanos: 0.into(),
@@ -1773,7 +1773,7 @@ mod tests {
     #[fuchsia::test]
     fn regular_message_test() {
         let builder = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
+            component_url: Some("url".into()),
             moniker: String::from("moniker"),
             severity: Severity::Info,
             timestamp_nanos: 0.into(),
@@ -1826,7 +1826,7 @@ mod tests {
     fn display_for_logs() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -1851,7 +1851,7 @@ mod tests {
     fn display_for_logs_with_duplicate_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -1877,7 +1877,7 @@ mod tests {
     fn display_for_logs_with_duplicate_moniker_and_no_other_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -1902,7 +1902,7 @@ mod tests {
     fn display_for_logs_partial_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("test/moniker"),
             severity: Severity::Info,
         })
@@ -1930,7 +1930,7 @@ mod tests {
     fn display_for_logs_exclude_metadata() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -1958,7 +1958,7 @@ mod tests {
     fn display_for_logs_exclude_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -1986,7 +1986,7 @@ mod tests {
     fn display_for_logs_exclude_file() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -2014,7 +2014,7 @@ mod tests {
     fn display_for_logs_include_color_by_severity() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Error,
         })
@@ -2042,7 +2042,7 @@ mod tests {
     fn display_for_logs_highlight_line() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -2070,7 +2070,7 @@ mod tests {
     fn display_for_logs_with_wall_time() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -2107,7 +2107,7 @@ mod tests {
     fn display_for_logs_with_dropped_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -2141,7 +2141,7 @@ mod tests {
     fn display_for_logs_with_rolled_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -2175,7 +2175,7 @@ mod tests {
     fn display_for_logs_with_dropped_and_rolled_counts() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -2210,7 +2210,7 @@ mod tests {
     fn display_for_logs_no_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
+            component_url: Some(FlyStr::from("fake-url")),
             moniker: String::from("moniker"),
             severity: Severity::Info,
         })
@@ -2242,7 +2242,7 @@ mod tests {
           }
         });
         let expected_data = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
+            component_url: Some("url".into()),
             moniker: String::from("a/b"),
             severity: Severity::Info,
             timestamp_nanos: 123.into(),
@@ -2275,7 +2275,7 @@ mod tests {
           }
         });
         let expected_data = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
+            component_url: Some("url".into()),
             moniker: String::from("a/b"),
             severity: Severity::Info,
             timestamp_nanos: 123.into(),

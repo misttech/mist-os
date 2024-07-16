@@ -228,7 +228,7 @@ mod tests {
     fn write_to_serial_handles_denied_tags() {
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(1).into(),
-            component_url: Some("url".to_string()),
+            component_url: Some("url".into()),
             moniker: "core/foo".to_string(),
             severity: Severity::Info,
         })
@@ -249,7 +249,7 @@ mod tests {
         );
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(123456789).into(),
-            component_url: Some("url".to_string()),
+            component_url: Some("url".into()),
             moniker: "core/foo".to_string(),
             severity: Severity::Info,
         })
@@ -276,7 +276,7 @@ mod tests {
     fn when_no_tags_are_present_the_component_name_is_used() {
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(123456789).into(),
-            component_url: Some("url".to_string()),
+            component_url: Some("url".into()),
             moniker: "core/foo".to_string(),
             severity: Severity::Info,
         })

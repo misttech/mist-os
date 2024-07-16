@@ -155,7 +155,7 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
     Some(
         LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: record.timestamp.into(),
-            component_url: Some(KERNEL_IDENTITY.url.to_string()),
+            component_url: Some(KERNEL_IDENTITY.url.clone()),
             moniker: KERNEL_IDENTITY.to_string(),
             severity,
         })
@@ -186,7 +186,7 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })
@@ -218,7 +218,7 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })
@@ -236,7 +236,7 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })
@@ -269,7 +269,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })

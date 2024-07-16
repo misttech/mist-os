@@ -8,6 +8,7 @@ use diagnostics_data::{
     BuilderArgs, LegacySeverity, LogsData, LogsDataBuilder, LogsField, LogsProperty, Severity,
 };
 use diagnostics_log_encoding::{Argument, Value, ValueUnknown};
+use flyweights::FlyStr;
 use fuchsia_zircon as zx;
 use libc::{c_char, c_int};
 use serde::Serialize;
@@ -24,7 +25,7 @@ mod test;
 #[derive(Clone, Serialize)]
 pub struct MonikerWithUrl {
     pub moniker: String,
-    pub url: String,
+    pub url: FlyStr,
 }
 
 /// Transforms the given legacy log message (already parsed) into a `LogsData` containing the

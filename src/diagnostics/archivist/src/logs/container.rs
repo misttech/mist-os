@@ -176,7 +176,7 @@ impl LogsArtifactsContainer {
                                             LogsDataBuilder::new(BuilderArgs {
                                                 moniker: identity.to_string(),
                                                 timestamp_nanos: (*last_timestamp).into(),
-                                                component_url: Some(identity.url.to_string()),
+                                                component_url: Some(identity.url.clone()),
                                                 severity: diagnostics_data::Severity::Warn,
                                             })
                                             .add_error(

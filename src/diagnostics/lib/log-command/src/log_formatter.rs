@@ -740,7 +740,7 @@ mod test {
     fn logs_data_builder() -> LogsDataBuilder {
         diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: Timestamp::from(default_ts().as_nanos() as i64),
-            component_url: Some("component_url".to_string()),
+            component_url: Some("component_url".into()),
             moniker: "some/moniker".to_string(),
             severity: diagnostics_data::Severity::Warn,
         })

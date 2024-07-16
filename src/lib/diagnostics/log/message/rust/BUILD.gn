@@ -23,6 +23,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/log/encoding/rust",
+    "//src/lib/flyweights",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:libc",
