@@ -74,7 +74,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
   elf.AssertInterpMatchesBuildId(kGetInt, symbolize.build_id());
 
   // If the file can't be loaded in place, this Allocation owns its image.
-  Allocation loaded = elf.Load();
+  Allocation loaded = elf.Load(memalloc::Type::kPhysElf);
   elf.Relocate();
 
   // Since Context() was called above ContextOnLoad() should have printed

@@ -55,7 +55,7 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
     }
 
     add_one.AssertInterpMatchesBuildId(kAddOne, gSymbolize->build_id());
-    unpatched = add_one.Load({}, false);
+    unpatched = add_one.Load(memalloc::Type::kPhysElf, {}, false);
     add_one.Relocate();
 
     printf("%s: Calling %#" PRIx64 "...", gSymbolize->name(), add_one.entry());
@@ -76,7 +76,7 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
     }
 
     add_one.AssertInterpMatchesBuildId(kAddOne, gSymbolize->build_id());
-    patched = add_one.Load({}, false);
+    patched = add_one.Load(memalloc::Type::kPhysElf, {}, false);
     add_one.Relocate();
 
     enum class ExpectedCase : uint32_t { kAddOne = kAddOneCaseId };
@@ -113,7 +113,7 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
     }
 
     multiply.AssertInterpMatchesBuildId(kMultiply, gSymbolize->build_id());
-    patched_stub2 = multiply.Load({}, false);
+    patched_stub2 = multiply.Load(memalloc::Type::kPhysElf, {}, false);
     multiply.Relocate();
 
     enum class ExpectedCase : uint32_t { kMultiply = kMultiplyByFactorCaseId };
@@ -151,7 +151,7 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
     }
 
     multiply.AssertInterpMatchesBuildId(kMultiply, gSymbolize->build_id());
-    patched_stub10 = multiply.Load({}, false);
+    patched_stub10 = multiply.Load(memalloc::Type::kPhysElf, {}, false);
     multiply.Relocate();
 
     enum class ExpectedCase : uint32_t { kMultiply = kMultiplyByFactorCaseId };

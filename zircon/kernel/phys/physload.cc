@@ -110,7 +110,7 @@ void LogSerial(FILE* out = stdout) {
                 "kernel.phys.next ELF image with code-patches not supported");
 
   // Load the image, in place if space or copied elsewhere if not.
-  Allocation loaded = next_elf.Load();
+  Allocation loaded = next_elf.Load(memalloc::Type::kPhysElf);
 
   // Relocate the image.
   next_elf.Relocate();
