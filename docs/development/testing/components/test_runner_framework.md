@@ -222,10 +222,13 @@ Individual test runners have restrictions on these custom flags:
 
 #### GoogleTest runner {#gtest-runner-custom-arg}
 
-Note the following known behavior change:
+Note the following known behavior changes:
 
-**--gtest_break_on_failure**: As each test case is executed in a different process,
-this flag will not work.
+**--gtest_break_on_failure** - Instead use:
+
+```posix-terminal
+fx test --break-on-failure <test_url>
+```
 
 The following flags are restricted and the test fails if any are passed as
 fuchsia.test.Suite provides equivalent functionality that replaces them.
@@ -251,10 +254,13 @@ given glob patterns will be executed.
 
 #### GoogleTest (Gunit) runner {#gunit-runner-custom-arg}
 
-Note the following known behavior change:
+Note the following known behavior changes:
 
-**--gunit_break_on_failure**: As each test case is executed in a different process,
-this flag will not work.
+**--gunit_break_on_failure** - Instead use:
+
+```posix-terminal
+fx test --break-on-failure <test_url>
+```
 
 The following flags are restricted and the test fails if any are passed as
 fuchsia.test.Suite provides equivalent functionality that replaces them.
