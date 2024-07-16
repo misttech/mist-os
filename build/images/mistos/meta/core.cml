@@ -6,9 +6,11 @@
 // Realm that acts as a container for general system components.
 {
     include: [
-        "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
+
+        // Storage
+        "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
 
         // Build Info
         "//src/developer/build_info/meta/build_info.core_shard.mistos.cml",
@@ -35,9 +37,7 @@
         {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
-            to: [
-                "#network",
-            ],
+            to: [ "#network" ],
         },
         {
             protocol: [

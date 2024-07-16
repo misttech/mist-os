@@ -175,29 +175,6 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.virtualconsole.SessionManager" ],
-            from: "#virtual_console",
-            source_availability: "unknown",
-        },
-        {
-            protocol: "fuchsia.hardware.power.statecontrol.Admin",
-            from: "#shutdown_shim",
-        },
-        {
-            service: "fuchsia.power.broker.ElementInfoProviderService",
-            from: "#system-activity-governor",
-            source_availability: "unknown",
-        },
-        {
-            protocol: "fuchsia.power.button.Monitor",
-            from: "#critical-services",
-        },
-        {
-            protocol: "fuchsia.tpm.cr50.Cr50",
-            from: "#cr50_agent",
-            source_availability: "unknown",
-        },
-        {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
