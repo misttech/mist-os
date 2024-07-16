@@ -1163,14 +1163,6 @@ assembly_input_bundle("core_realm_eng") {
       components = [ "bt-avrcp-controller" ]
     },
     {
-      package = "display-detect"
-      components = [ "display_detect" ]
-    },
-    {
-      package = "display-png"
-      components = [ "display_png" ]
-    },
-    {
       package = "display-tool"
       components = [ "display-tool" ]
     },
