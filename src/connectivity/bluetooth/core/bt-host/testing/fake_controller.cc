@@ -1956,8 +1956,17 @@ void FakeController::OnLESetAdvertisingEnable(
     return;
   }
 
-  // TODO(https://fxbug.dev/42161900): if own address type is random, check that
-  // a random address is set
+  if (legacy_advertising_state_.own_address_type ==
+          pw::bluetooth::emboss::LEOwnAddressType::RANDOM &&
+      !legacy_advertising_state_.random_address.has_value()) {
+    bt_log(INFO,
+           "fake-hci",
+           "cannot enable, random address type requires a random address set");
+    RespondWithCommandComplete(
+        hci_spec::kLESetAdvertisingEnable,
+        pw::bluetooth::emboss::StatusCode::INVALID_HCI_COMMAND_PARAMETERS);
+    return;
+  }
 
   legacy_advertising_state_.enabled =
       params.advertising_enable().Read() == pwemb::GenericEnableParam::ENABLE;
@@ -3260,7 +3269,8 @@ void FakeController::OnLESetExtendedAdvertisingEnable(
     }
 
     // TODO(https://fxbug.dev/42161900): if own address type is random, check
-    // that a random address is set
+    // that a random address is set.
+
     state.enabled = true;
   }
 
