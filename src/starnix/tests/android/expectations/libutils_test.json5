@@ -12,7 +12,8 @@
         {
             type: "skip",
             matchers: [
-                // Flaky tests.
+                // TODO(https://fxbug.dev/353533754) de-flake and enable
+                "CallStackTest.log_stack",
                 "LooperTest.*",
                 "SystemClock.SystemClock",
             ],
