@@ -424,8 +424,11 @@ class Remote : public HasIo {
 
   zx_status_t Open(uint32_t flags, const char* path, size_t path_len, zxio_storage_t* storage);
 
-  zx_status_t Open2(const char* path, size_t path_len, const zxio_open_options_t* options,
+  zx_status_t Open2(const char* path, size_t path_len, const zxio_open2_options_t* options,
                     zxio_node_attributes_t* inout_attr, zxio_storage_t* storage);
+
+  zx_status_t Open3(const char* path, size_t path_len, zxio_open_flags_t flags,
+                    const zxio_open_options_t* options, zxio_storage_t* storage);
 
   zx_status_t OpenAsync(uint32_t flags, const char* path, size_t path_len, zx_handle_t request);
 
@@ -1058,7 +1061,7 @@ zx_status_t Remote<Protocol, kObjectType>::Open(uint32_t flags, const char* path
 
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::Open2(const char* path, size_t path_len,
-                                                 const zxio_open_options_t* options,
+                                                 const zxio_open2_options_t* options,
                                                  zxio_node_attributes_t* inout_attr,
                                                  zxio_storage_t* storage) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
@@ -1253,6 +1256,129 @@ zx_status_t Remote<Protocol, kObjectType>::Open2(const char* path, size_t path_l
     return result.status();
   }
   return zxio_create_with_on_representation(client_end.release(), inout_attr, storage);
+#else
+  return ZX_ERR_NOT_SUPPORTED;
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+}
+
+template <typename Protocol, zxio_object_type_t kObjectType>
+zx_status_t Remote<Protocol, kObjectType>::Open3(const char* path, size_t path_len,
+                                                 zxio_open_flags_t flags,
+                                                 const zxio_open_options_t* options,
+                                                 zxio_storage_t* storage) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  zx::channel client_end, server_end;
+  if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
+    return status;
+  }
+
+  fio::NodeAttributesQuery attributes;
+  fidl::WireTableFrame<fio::wire::MutableNodeAttributes> create_attributes_frame;
+  fio::wire::MutableNodeAttributes create_attributes;
+  fidl::WireTableFrame<fio::wire::Options> options_frame;
+  fio::wire::Options open_options;
+  if (options->inout_attr || options->create_attr) {
+    auto options_builder = fio::wire::Options::ExternalBuilder(
+        fidl::ObjectView<fidl::WireTableFrame<fio::wire::Options>>::FromExternal(&options_frame));
+
+    // -- attributes --
+    if (options->inout_attr) {
+      if (options->inout_attr->has.protocols)
+        attributes |= fio::NodeAttributesQuery::kProtocols;
+      if (options->inout_attr->has.abilities)
+        attributes |= fio::NodeAttributesQuery::kAbilities;
+      if (options->inout_attr->has.content_size)
+        attributes |= fio::NodeAttributesQuery::kContentSize;
+      if (options->inout_attr->has.storage_size)
+        attributes |= fio::NodeAttributesQuery::kStorageSize;
+      if (options->inout_attr->has.link_count)
+        attributes |= fio::NodeAttributesQuery::kLinkCount;
+      if (options->inout_attr->has.id)
+        attributes |= fio::NodeAttributesQuery::kId;
+      if (options->inout_attr->has.creation_time)
+        attributes |= fio::NodeAttributesQuery::kCreationTime;
+      if (options->inout_attr->has.modification_time)
+        attributes |= fio::NodeAttributesQuery::kModificationTime;
+      if (options->inout_attr->has.change_time)
+        attributes |= fio::NodeAttributesQuery::kChangeTime;
+      if (options->inout_attr->has.access_time)
+        attributes |= fio::NodeAttributesQuery::kAccessTime;
+      if (options->inout_attr->has.mode)
+        attributes |= fio::NodeAttributesQuery::kMode;
+      if (options->inout_attr->has.uid)
+        attributes |= fio::NodeAttributesQuery::kUid;
+      if (options->inout_attr->has.gid)
+        attributes |= fio::NodeAttributesQuery::kGid;
+      if (options->inout_attr->has.rdev)
+        attributes |= fio::NodeAttributesQuery::kRdev;
+      if (options->inout_attr->has.fsverity_options)
+        attributes |= fio::NodeAttributesQuery::kOptions;
+      if (options->inout_attr->has.fsverity_root_hash)
+        attributes |= fio::NodeAttributesQuery::kRootHash;
+      if (options->inout_attr->has.fsverity_enabled)
+        attributes |= fio::NodeAttributesQuery::kVerityEnabled;
+
+      if (attributes) {
+        options_builder.attributes(
+            fidl::ObjectView<fio::wire::NodeAttributesQuery>::FromExternal(&attributes));
+      }
+
+      // -- create_attributes --
+      if (options->create_attr) {
+        auto builder = fio::wire::MutableNodeAttributes::ExternalBuilder(
+            fidl::ObjectView<fidl::WireTableFrame<fio::wire::MutableNodeAttributes>>::FromExternal(
+                &create_attributes_frame));
+
+        // Reject attempts to set immutable attributes.
+        if (options->create_attr->has.protocols || options->create_attr->has.abilities ||
+            options->create_attr->has.id || options->create_attr->has.content_size ||
+            options->create_attr->has.storage_size || options->create_attr->has.link_count ||
+            options->create_attr->has.change_time) {
+          return ZX_ERR_INVALID_ARGS;
+        }
+
+        if (options->create_attr->has.creation_time) {
+          builder.creation_time(fidl::ObjectView<uint64_t>::FromExternal(
+              const_cast<uint64_t*>(&options->create_attr->creation_time)));
+        }
+        if (options->create_attr->has.modification_time) {
+          builder.modification_time(fidl::ObjectView<uint64_t>::FromExternal(
+              const_cast<uint64_t*>(&options->create_attr->modification_time)));
+        }
+        if (options->create_attr->has.access_time) {
+          builder.access_time(fidl::ObjectView<uint64_t>::FromExternal(
+              const_cast<uint64_t*>(&options->create_attr->access_time)));
+        }
+        if (options->create_attr->has.mode) {
+          builder.mode(options->create_attr->mode);
+        }
+        if (options->create_attr->has.uid) {
+          builder.uid(options->create_attr->uid);
+        }
+        if (options->create_attr->has.gid) {
+          builder.gid(options->create_attr->gid);
+        }
+        if (options->create_attr->has.rdev) {
+          builder.rdev(fidl::ObjectView<uint64_t>::FromExternal(
+              const_cast<uint64_t*>(&options->create_attr->rdev)));
+        }
+
+        create_attributes = builder.Build();
+        options_builder.create_attributes(
+            fidl::ObjectView<fio::wire::MutableNodeAttributes>::FromExternal(&create_attributes));
+      }
+    }
+    open_options = options_builder.Build();
+  }
+
+  const fidl::Status result = client()->Open3(
+      fidl::StringView::FromExternal(path, path_len),
+      fio::Flags::kFlagSendRepresentation | fio::Flags{flags}, open_options, std::move(server_end));
+
+  if (!result.ok()) {
+    return result.status();
+  }
+  return zxio_create_with_on_representation(client_end.release(), options->inout_attr, storage);
 #else
   return ZX_ERR_NOT_SUPPORTED;
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
@@ -1843,6 +1969,7 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
 
   ops.open = Adaptor::From<&Directory::Open>;
   ops.open2 = Adaptor::From<&Directory::Open2>;
+  ops.open3 = Adaptor::From<&Directory::Open3>;
   ops.open_async = Adaptor::From<&Directory::OpenAsync>;
   ops.unlink = Adaptor::From<&Directory::Unlink>;
   ops.token_get = Adaptor::From<&Directory::TokenGet>;

@@ -34,6 +34,7 @@
 		zxio_maybe_faultable_copy;
 		zxio_open;
 		zxio_open2;
+		zxio_open3;
 		zxio_open_async;
 		zxio_read;
 		zxio_read_at;

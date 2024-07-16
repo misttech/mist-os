@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/zxio/zxio.h>
@@ -11,8 +11,13 @@
 
 #include <zxtest/zxtest.h>
 
+#include "fidl/fuchsia.io/cpp/common_types.h"
+#include "fidl/fuchsia.io/cpp/natural_types.h"
+#include "lib/zxio/types.h"
 #include "sdk/lib/zxio/tests/test_directory_server_base.h"
 #include "sdk/lib/zxio/tests/test_file_server_base.h"
+
+namespace fio = fuchsia_io;
 
 namespace {
 
@@ -25,15 +30,15 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
   void Init(zx::event token) { token_ = std::move(token); }
 
   void Query(QueryCompleter::Sync& completer) final {
-    const std::string_view kProtocol = fuchsia_io::wire::kDirectoryProtocolName;
+    const std::string_view kProtocol = fio::wire::kDirectoryProtocolName;
     // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
 
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) final {
-    constexpr fuchsia_io::wire::OpenFlags kExpectedFlags =
-        fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kDescribe;
+    constexpr fio::OpenFlags kExpectedFlags =
+        fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe;
     if (request->flags != kExpectedFlags) {
       ADD_FAILURE() << "unexpected flags for Open request: " << std::showbase << std::hex
                     << static_cast<uint32_t>(request->flags) << " vs " << std::showbase << std::hex
@@ -41,7 +46,7 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
       completer.Close(ZX_ERR_INVALID_ARGS);
       return;
     }
-    constexpr fuchsia_io::wire::ModeType kExpectedMode = {};
+    constexpr fio::wire::ModeType kExpectedMode = {};
     if (request->mode != kExpectedMode) {
       ADD_FAILURE() << "unexpected mode for Open request: " << std::showbase << std::hex
                     << static_cast<uint32_t>(request->mode) << " vs " << std::showbase << std::hex
@@ -62,17 +67,63 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
     }
     open_calls_++;
     // Request looks good - generate an OnOpen event and bind to a File server.
-    fidl::ServerEnd<fuchsia_io::File> file_server(request->object.TakeChannel());
+    fidl::ServerEnd<fio::File> file_server(request->object.TakeChannel());
 
     zx::event file_event;
     ASSERT_OK(zx::event::create(0u, &file_event));
 
-    fuchsia_io::wire::FileObject file = {
+    fio::wire::FileObject file = {
         .event = std::move(file_event),
     };
     ASSERT_OK(fidl::WireSendEvent(file_server)
-                  ->OnOpen(ZX_OK, fuchsia_io::wire::NodeInfoDeprecated::WithFile(
+                  ->OnOpen(ZX_OK, fio::wire::NodeInfoDeprecated::WithFile(
                                       fidl::ObjectView<decltype(file)>::FromExternal(&file))));
+    fidl::BindServer(dispatcher_, std::move(file_server), &file_);
+  }
+
+  void Open3(Open3RequestView request, Open3Completer::Sync& completer) final {
+    constexpr fio::Flags kExpectedFlags =
+        fio::Flags::kPermRead | fio::Flags::kFlagSendRepresentation;
+    if (request->flags != kExpectedFlags) {
+      ADD_FAILURE() << "unexpected flags for Open request: " << std::showbase << std::hex
+                    << static_cast<zxio_open_flags_t>(request->flags) << " vs " << std::showbase
+                    << std::hex << static_cast<zxio_open_flags_t>(kExpectedFlags);
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    if (!request->options.has_attributes() ||
+        request->options.attributes() != fio::NodeAttributesQuery::kProtocols) {
+      ADD_FAILURE() << "expected request to query only protocols attribute";
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    if (request->path.get() != kTestPath) {
+      ADD_FAILURE() << "unexpected path for Open request: \"" << request->path.get() << "\" vs \""
+                    << kTestPath << "\"";
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    if (open_calls_ != 0) {
+      ADD_FAILURE() << "unexpected number of open calls: " << open_calls_;
+      completer.Close(ZX_ERR_BAD_STATE);
+      return;
+    }
+    open_calls_++;
+    fidl::ServerEnd<fio::File> file_server(std::move(request->object));
+
+    zx::event file_event;
+    ASSERT_OK(zx::event::create(0u, &file_event));
+
+    fio::FileInfo info;
+    info.observer() = std::move(file_event);
+    fidl::Arena arena;
+
+    fio::Representation representation = fio::Representation::WithFile(std::move(info));
+    fio::NodeAttributes2 attributes;
+    attributes.immutable_attributes().protocols() = fio::NodeProtocolKinds::kFile;
+    representation.file()->attributes() = attributes;
+    ASSERT_OK(fidl::WireSendEvent(file_server)
+                  ->OnRepresentation(fidl::ToWire(arena, std::move(representation))));
     fidl::BindServer(dispatcher_, std::move(file_server), &file_);
   }
 
@@ -88,7 +139,7 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
   }
 
   void GetAttr(GetAttrCompleter::Sync& completer) final {
-    completer.Reply(0, fuchsia_io::wire::NodeAttributes{});
+    completer.Reply(0, fio::wire::NodeAttributes{});
   }
 
   void Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) final {
@@ -129,10 +180,9 @@ class Directory : public zxtest::Test {
         directory_server_(server_loop_.dispatcher()) {}
 
   void SetUp() override {
-    auto [directory_client_end, directory_server_end] =
-        fidl::Endpoints<fuchsia_io::Directory>::Create();
+    auto [directory_client_end, directory_server_end] = fidl::Endpoints<fio::Directory>::Create();
 
-    auto [node_client_end, node_server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
+    auto [node_client_end, node_server_end] = fidl::Endpoints<fio::Node>::Create();
 
     zx::event token;
     ASSERT_OK(zx::event::create(0, &token));
@@ -175,7 +225,7 @@ TEST_F(Directory, Attr) {
 }
 
 TEST_F(Directory, Open) {
-  fuchsia_io::wire::OpenFlags flags = fuchsia_io::wire::OpenFlags::kRightReadable;
+  fio::OpenFlags flags = fio::OpenFlags::kRightReadable;
   zxio_storage_t file_storage;
   ASSERT_OK(zxio_open(directory(), static_cast<uint32_t>(flags), kTestPath.data(),
                       kTestPath.length(), &file_storage));
@@ -183,7 +233,33 @@ TEST_F(Directory, Open) {
 
   ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
 
-  // Sanity check the zxio by reading some test data from the server.
+  // Verify the zxio_t object by reading some test data from the server.
+  char buffer[sizeof(zxio_tests::TestReadFileServer::kTestData)];
+  size_t actual = 0u;
+
+  ASSERT_OK(zxio_read(file, buffer, sizeof(buffer), 0u, &actual));
+
+  EXPECT_EQ(sizeof(buffer), actual);
+  EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
+
+  ASSERT_OK(zxio_close(file, /*should_wait=*/true));
+}
+
+TEST_F(Directory, Open3) {
+  fio::Flags flags = fio::Flags::kPermRead;
+  zxio_node_attributes_t attrs = {};
+  attrs.has.protocols = true;
+  const zxio_open_options_t options{.inout_attr = &attrs};
+  zxio_storage_t file_storage;
+  ASSERT_OK(zxio_open3(directory(), kTestPath.data(), kTestPath.length(),
+                       static_cast<zxio_open_flags_t>(flags), &options, &file_storage));
+  ASSERT_TRUE(attrs.has.protocols);
+  ASSERT_EQ(attrs.protocols, ZXIO_NODE_PROTOCOL_FILE);
+  zxio_t* file = &file_storage.io;
+
+  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
+
+  // Verify the zxio_t object by reading some test data from the server.
   char buffer[sizeof(zxio_tests::TestReadFileServer::kTestData)];
   size_t actual = 0u;
 

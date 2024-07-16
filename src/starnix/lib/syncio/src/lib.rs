@@ -636,7 +636,7 @@ impl Zxio {
     ) -> Result<Self, zx::Status> {
         let zxio = Zxio::default();
 
-        let mut open_options = zxio::zxio_open_options::default();
+        let mut open_options = zxio::zxio_open2_options::default();
         if let Some(p) = options.node_protocols {
             if let Some(dir_options) = p.directory {
                 open_options.protocols |= ZXIO_NODE_PROTOCOL_DIRECTORY;
@@ -707,7 +707,7 @@ impl Zxio {
                 self.as_ptr(),
                 path.as_ptr() as *const c_char,
                 path.len(),
-                &zxio::zxio_open_options {
+                &zxio::zxio_open2_options {
                     node_flags: node_flags.bits(),
                     mode: CreationMode::Never.into(),
                     ..Default::default()
