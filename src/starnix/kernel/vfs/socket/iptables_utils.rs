@@ -32,6 +32,12 @@ const CHAIN_POSTROUTING: &str = "POSTROUTING";
 const IPT_REPLACE_SIZE: usize = size_of::<ipt_replace>();
 const IP6T_REPLACE_SIZE: usize = size_of::<ip6t_replace>();
 
+// Verdict codes for Standard targets, calculated the same way as Linux.
+const VERDICT_DROP: i32 = -(NF_DROP as i32) - 1;
+const VERDICT_ACCEPT: i32 = -(NF_ACCEPT as i32) - 1;
+const VERDICT_QUEUE: i32 = -(NF_QUEUE as i32) - 1;
+const VERDICT_RETURN: i32 = IPT_RETURN;
+
 #[derive(Debug, Error, PartialEq)]
 pub enum IpTableParseError {
     #[error("error during ascii conversion: {0}")]
@@ -225,26 +231,39 @@ impl TryFrom<ipt_ip> for IpInfo {
     type Error = IpTableParseError;
 
     fn try_from(ip: ipt_ip) -> Result<Self, Self::Error> {
+        let ipt_ip {
+            src,
+            dst,
+            smsk,
+            dmsk,
+            iniface,
+            outiface,
+            iniface_mask,
+            outiface_mask,
+            proto,
+            flags,
+            invflags,
+        } = ip;
         let src_subnet =
-            ipv4_to_subnet(ip.src, ip.smsk).map_err(IpTableParseError::IpAddressConversion)?;
+            ipv4_to_subnet(src, smsk).map_err(IpTableParseError::IpAddressConversion)?;
         let dst_subnet =
-            ipv4_to_subnet(ip.dst, ip.dmsk).map_err(IpTableParseError::IpAddressConversion)?;
+            ipv4_to_subnet(dst, dmsk).map_err(IpTableParseError::IpAddressConversion)?;
 
-        let in_interface = if ip.iniface_mask == [0u8; 16] {
+        let in_interface = if iniface_mask == [0u8; 16] {
             None
         } else {
-            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+            Some(ascii_to_string(&iniface).map_err(IpTableParseError::AsciiConversion)?)
         };
-        let out_interface = if ip.outiface_mask == [0u8; 16] {
+        let out_interface = if outiface_mask == [0u8; 16] {
             None
         } else {
-            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+            Some(ascii_to_string(&outiface).map_err(IpTableParseError::AsciiConversion)?)
         };
 
-        let flags = IptIpFlagsV4::from_bits(ip.flags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags: ip.flags })?;
-        let inverse_flags = IptIpInverseFlags::from_bits(ip.invflags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: ip.invflags })?;
+        let flags_v4 = IptIpFlagsV4::from_bits(flags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags })?;
+        let inverse_flags = IptIpInverseFlags::from_bits(invflags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: invflags })?;
 
         Ok(Self {
             src_subnet,
@@ -252,8 +271,8 @@ impl TryFrom<ipt_ip> for IpInfo {
             in_interface,
             out_interface,
             inverse_flags,
-            protocol: ip.proto.into(),
-            flags: IptIpFlags::V4(flags),
+            protocol: proto.into(),
+            flags: IptIpFlags::V4(flags_v4),
             // Unused in IPv4
             tos: 0,
         })
@@ -264,26 +283,41 @@ impl TryFrom<ip6t_ip6> for IpInfo {
     type Error = IpTableParseError;
 
     fn try_from(ip: ip6t_ip6) -> Result<Self, Self::Error> {
+        let ip6t_ip6 {
+            src,
+            dst,
+            smsk,
+            dmsk,
+            iniface,
+            outiface,
+            iniface_mask,
+            outiface_mask,
+            proto,
+            tos,
+            flags,
+            invflags,
+            __bindgen_padding_0,
+        } = ip;
         let src_subnet =
-            ipv6_to_subnet(ip.src, ip.smsk).map_err(IpTableParseError::IpAddressConversion)?;
+            ipv6_to_subnet(src, smsk).map_err(IpTableParseError::IpAddressConversion)?;
         let dst_subnet =
-            ipv6_to_subnet(ip.dst, ip.dmsk).map_err(IpTableParseError::IpAddressConversion)?;
+            ipv6_to_subnet(dst, dmsk).map_err(IpTableParseError::IpAddressConversion)?;
 
-        let in_interface = if ip.iniface_mask == [0u8; 16] {
+        let in_interface = if iniface_mask == [0u8; 16] {
             None
         } else {
-            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+            Some(ascii_to_string(&iniface).map_err(IpTableParseError::AsciiConversion)?)
         };
-        let out_interface = if ip.outiface_mask == [0u8; 16] {
+        let out_interface = if outiface_mask == [0u8; 16] {
             None
         } else {
-            Some(ascii_to_string(&ip.iniface).map_err(IpTableParseError::AsciiConversion)?)
+            Some(ascii_to_string(&outiface).map_err(IpTableParseError::AsciiConversion)?)
         };
 
-        let flags = IptIpFlagsV6::from_bits(ip.flags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags: ip.flags })?;
-        let inverse_flags = IptIpInverseFlags::from_bits(ip.invflags.into())
-            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: ip.invflags })?;
+        let flags_v6 = IptIpFlagsV6::from_bits(flags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpFlags { flags })?;
+        let inverse_flags = IptIpInverseFlags::from_bits(invflags.into())
+            .ok_or_else(|| IpTableParseError::InvalidIpInverseFlags { flags: invflags })?;
 
         Ok(Self {
             src_subnet,
@@ -291,9 +325,9 @@ impl TryFrom<ip6t_ip6> for IpInfo {
             in_interface,
             out_interface,
             inverse_flags,
-            protocol: ip.proto.into(),
-            flags: IptIpFlags::V6(flags),
-            tos: ip.tos,
+            protocol: proto.into(),
+            flags: IptIpFlags::V6(flags_v6),
+            tos,
         })
     }
 }
@@ -1036,19 +1070,16 @@ impl Entry {
             }
 
             // A negative verdict is one of the builtin targets.
-            // Translate them the same way as the iptables tool.
-            verdict if verdict == -(NF_DROP as i32) - 1 => Ok(Some(fnet_filter_ext::Action::Drop)),
+            VERDICT_DROP => Ok(Some(fnet_filter_ext::Action::Drop)),
 
-            verdict if verdict == -(NF_ACCEPT as i32) - 1 => {
-                Ok(Some(fnet_filter_ext::Action::Accept))
-            }
+            VERDICT_ACCEPT => Ok(Some(fnet_filter_ext::Action::Accept)),
 
-            verdict if verdict == -(NF_QUEUE as i32) - 1 => {
+            VERDICT_QUEUE => {
                 log_warn!("IpTables: ignored unsupported QUEUE target");
                 Ok(None)
             }
 
-            verdict if verdict == IPT_RETURN => Ok(Some(fnet_filter_ext::Action::Return)),
+            VERDICT_RETURN => Ok(Some(fnet_filter_ext::Action::Return)),
 
             verdict => Err(IpTableParseError::InvalidVerdict { verdict }),
         }
@@ -1284,12 +1315,13 @@ pub fn ipv6_to_subnet(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use itertools::Itertools;
     use net_declare::fidl_subnet;
     use starnix_uapi::{
         c_char, in6_addr__bindgen_ty_1, in_addr, ipt_entry, ipt_ip, ipt_replace,
         xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
         xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp, xt_udp,
-        IP6T_F_PROTO,
+        IP6T_F_PROTO, IPT_INV_SRCIP,
     };
     use test_case::test_case;
     use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
@@ -1368,28 +1400,24 @@ mod tests {
     }
 
     fn ipv4_table_with_ip_matchers() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
-
-        bytes.extend_from_slice(
-            ipt_replace {
-                name: string_to_32_chars("filter"),
-                num_entries: 5,
-                size: 808,
-                ..Default::default()
-            }
-            .as_bytes(),
-        );
+        let mut entries_bytes = Vec::new();
 
         // Entry 1: start of the chain.
-        extend_with_error_target_ipv4_entry(&mut bytes, "mychain");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
 
-        // Entry 2: accept TCP packets from 10.0.0.1.
-        bytes.extend_from_slice(
+        let ip_bytes = "10.0.0.1".parse::<std::net::Ipv4Addr>().unwrap().octets();
+        let ip_addr = in_addr { s_addr: u32::from_be_bytes(ip_bytes).to_be() };
+        let mask_bytes = "255.255.255.255".parse::<std::net::Ipv4Addr>().unwrap().octets();
+        let ip_mask = in_addr { s_addr: u32::from_be_bytes(mask_bytes).to_be() };
+
+        // Entry 2: drop TCP packets other than from ip_addr.
+        entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
-                    src: in_addr { s_addr: 16777226 },
-                    smsk: in_addr { s_addr: 4294967295 },
-                    proto: 6,
+                    src: ip_addr,
+                    smsk: ip_mask,
+                    invflags: IPT_INV_SRCIP as u8,
+                    proto: IPPROTO_TCP as u16,
                     ..Default::default()
                 },
                 target_offset: 112,
@@ -1398,10 +1426,27 @@ mod tests {
             }
             .as_bytes(),
         );
-        extend_with_standard_verdict(&mut bytes, -2);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 3: drop all packets going to en0 interface.
-        bytes.extend_from_slice(
+        // Entry 3: accept UDP packets from ip_addr.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip {
+                    src: ip_addr,
+                    smsk: ip_mask,
+                    proto: IPPROTO_UDP as u16,
+                    ..Default::default()
+                },
+                target_offset: 112,
+                next_offset: 152,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 4: drop all packets going to en0 interface.
+        entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
                     iniface: string_to_16_chars("en0"),
@@ -1414,53 +1459,67 @@ mod tests {
             }
             .as_bytes(),
         );
-        extend_with_standard_verdict(&mut bytes, -1);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 4: "policy" of the chain.
-        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
-
-        // Entry 5: end of input.
-        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
-
-        bytes
-    }
-
-    fn ipv6_table_with_ip_matchers() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
-
-        bytes.extend_from_slice(
-            ip6t_replace {
-                name: string_to_32_chars("filter"),
-                num_entries: 5,
-                size: 1088,
+        // Entry 5: accept all packets going from wifi1 interface.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip {
+                    outiface: string_to_16_chars("wifi1"),
+                    outiface_mask: [255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    ..Default::default()
+                },
+                target_offset: 112,
+                next_offset: 152,
                 ..Default::default()
             }
             .as_bytes(),
         );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 6: "policy" of the chain.
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
+
+        // Entry 7: end of input.
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 7,
+            size: entries_bytes.len() as u32,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    fn ipv6_table_with_ip_matchers() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
 
         // Entry 1: start of the chain.
-        extend_with_error_target_ipv6_entry(&mut bytes, "mychain");
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, "mychain");
 
-        // Entry 2: accept TCP packets from .
-        bytes.extend_from_slice(
+        let ip_addr = in6_addr {
+            in6_u: in6_addr__bindgen_ty_1 {
+                u6_addr8: "2001:4860:4860::".parse::<std::net::Ipv6Addr>().unwrap().octets(),
+            },
+        };
+        let ip_mask = in6_addr {
+            in6_u: in6_addr__bindgen_ty_1 {
+                u6_addr8: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0],
+            },
+        };
+
+        // Entry 2: drop TCP packets other than from `ip_addr`.
+        entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
-                    src: in6_addr {
-                        in6_u: in6_addr__bindgen_ty_1 {
-                            u6_addr8: [
-                                0x20, 0x1, 0x48, 0x60, 0x48, 0x60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                            ],
-                        },
-                    },
-                    smsk: in6_addr {
-                        in6_u: in6_addr__bindgen_ty_1 {
-                            u6_addr8: [
-                                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0,
-                                0, 0,
-                            ],
-                        },
-                    },
-                    proto: 6,
+                    src: ip_addr,
+                    smsk: ip_mask,
+                    invflags: IPT_INV_SRCIP as u8,
+                    proto: IPPROTO_TCP as u16,
                     flags: IP6T_F_PROTO as u8,
                     ..Default::default()
                 },
@@ -1470,10 +1529,28 @@ mod tests {
             }
             .as_bytes(),
         );
-        extend_with_standard_verdict(&mut bytes, -2);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 3: drop all packets going to en0 interface.
-        bytes.extend_from_slice(
+        // Entry 3: accept UDP packets from `ip_addr`.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    src: ip_addr,
+                    smsk: ip_mask,
+                    proto: IPPROTO_UDP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 208,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 4: drop all packets going to en0 interface.
+        entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
                     iniface: string_to_16_chars("en0"),
@@ -1486,14 +1563,39 @@ mod tests {
             }
             .as_bytes(),
         );
-        extend_with_standard_verdict(&mut bytes, -1);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 4: "policy" of the chain.
-        extend_with_standard_target_ipv6_entry(&mut bytes, -5);
+        // Entry 5: accept all packets going out from wifi1 interface.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    outiface: string_to_16_chars("wifi1"),
+                    outiface_mask: [255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 208,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
-        // Entry 5: end of input.
-        extend_with_error_target_ipv6_entry(&mut bytes, "ERROR");
+        // Entry 6: "policy" of the chain.
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_RETURN);
 
+        // Entry 7: end of input.
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, "ERROR");
+
+        let mut bytes = ip6t_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 7,
+            size: entries_bytes.len() as u32,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+        bytes.append(&mut entries_bytes);
         bytes
     }
 
@@ -1511,53 +1613,72 @@ mod tests {
         assert_eq!(routine_id.name, "mychain");
         assert_eq!(routine_id.namespace.0, expected_table_name);
 
-        let mut rules = table.rule_specs.iter();
-        let RuleSpec::Translated(rule1) = rules.next().expect("rule 1 exists") else {
-            panic!("rule 1 should be translated");
-        };
-        let expected_rule1 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 1, routine: routine_id.clone() },
-            matchers: fnet_filter_ext::Matchers {
-                src_addr: Some(fnet_filter_ext::AddressMatcher {
-                    matcher: fnet_filter_ext::AddressMatcherType::Subnet(
-                        fnet_filter_ext::Subnet::try_from(expected_subnet).unwrap(),
-                    ),
-                    invert: false,
-                }),
-                transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
-                    dst_port: None,
-                    src_port: None,
-                }),
-                ..Default::default()
+        let expected_rules = [
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId { index: 1, routine: routine_id.clone() },
+                matchers: fnet_filter_ext::Matchers {
+                    src_addr: Some(fnet_filter_ext::AddressMatcher {
+                        matcher: fnet_filter_ext::AddressMatcherType::Subnet(
+                            fnet_filter_ext::Subnet::try_from(expected_subnet).unwrap(),
+                        ),
+                        invert: true,
+                    }),
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Drop,
             },
-            action: fnet_filter_ext::Action::Accept,
-        };
-        assert_eq!(rule1, &expected_rule1);
-
-        let RuleSpec::Translated(rule2) = rules.next().expect("rule 2 exists") else {
-            panic!("rule 2 should be translated");
-        };
-        let expected_rule2 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 2, routine: routine_id.clone() },
-            matchers: fnet_filter_ext::Matchers {
-                in_interface: Some(fnet_filter_ext::InterfaceMatcher::Name("en0".to_string())),
-                ..Default::default()
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId { index: 2, routine: routine_id.clone() },
+                matchers: fnet_filter_ext::Matchers {
+                    src_addr: Some(fnet_filter_ext::AddressMatcher {
+                        matcher: fnet_filter_ext::AddressMatcherType::Subnet(
+                            fnet_filter_ext::Subnet::try_from(expected_subnet).unwrap(),
+                        ),
+                        invert: false,
+                    }),
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Accept,
             },
-            action: fnet_filter_ext::Action::Drop,
-        };
-        assert_eq!(rule2, &expected_rule2);
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId { index: 3, routine: routine_id.clone() },
+                matchers: fnet_filter_ext::Matchers {
+                    in_interface: Some(fnet_filter_ext::InterfaceMatcher::Name("en0".to_string())),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Drop,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId { index: 4, routine: routine_id.clone() },
+                matchers: fnet_filter_ext::Matchers {
+                    out_interface: Some(fnet_filter_ext::InterfaceMatcher::Name(
+                        "wifi1".to_string(),
+                    )),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId { index: 5, routine: routine_id.clone() },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Return,
+            },
+        ];
 
-        let RuleSpec::Translated(rule3) = rules.next().expect("rule 3 exists") else {
-            panic!("rule 3 should be translated");
-        };
-        let expected_rule3 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 3, routine: routine_id.clone() },
-            matchers: fnet_filter_ext::Matchers::default(),
-            action: fnet_filter_ext::Action::Return,
-        };
-        assert_eq!(rule3, &expected_rule3);
+        assert_eq!(table.rule_specs.len(), expected_rules.len());
 
-        assert!(rules.next().is_none());
+        for (rule_spec, expected) in table.rule_specs.iter().zip_eq(expected_rules.into_iter()) {
+            let rule = assert_matches!(rule_spec, RuleSpec::Translated(rule) => rule);
+            assert_eq!(rule, &expected);
+        }
     }
 
     #[fuchsia::test]
@@ -1573,51 +1694,50 @@ mod tests {
     }
 
     fn table_with_match_extensions() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
-
-        bytes.extend_from_slice(
-            ipt_replace {
-                name: string_to_32_chars("filter"),
-                num_entries: 5,
-                size: 904,
-                ..Default::default()
-            }
-            .as_bytes(),
-        );
+        let mut entries_bytes = Vec::new();
 
         // Entry 1: start of the chain.
-        extend_with_error_target_ipv4_entry(&mut bytes, "mychain");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
 
         // Entry 2: a rule on the chain.
-        bytes.extend_from_slice(
+        entries_bytes.extend_from_slice(
             ipt_entry { target_offset: 160, next_offset: 200, ..Default::default() }.as_bytes(),
         );
-        bytes.extend_from_slice(
+        entries_bytes.extend_from_slice(
             xt_entry_match { match_size: 48, name: string_to_29_chars("tcp"), revision: 0 }
                 .as_bytes(),
         );
-        bytes.extend_from_slice(xt_tcp::default().as_bytes());
-        bytes.extend_from_slice(&[0, 0, 0, 0]);
-        extend_with_standard_verdict(&mut bytes, -5);
+        entries_bytes.extend_from_slice(xt_tcp::default().as_bytes());
+        entries_bytes.extend_from_slice(&[0, 0, 0, 0]);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_RETURN);
 
         // Entry 3: another rule on the chain.
-        bytes.extend_from_slice(
+        entries_bytes.extend_from_slice(
             ipt_entry { target_offset: 160, next_offset: 200, ..Default::default() }.as_bytes(),
         );
-        bytes.extend_from_slice(
+        entries_bytes.extend_from_slice(
             xt_entry_match { match_size: 48, name: string_to_29_chars("udp"), revision: 0 }
                 .as_bytes(),
         );
-        bytes.extend_from_slice(xt_udp::default().as_bytes());
-        bytes.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
-        extend_with_standard_verdict(&mut bytes, -5);
+        entries_bytes.extend_from_slice(xt_udp::default().as_bytes());
+        entries_bytes.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_RETURN);
 
         // Entry 4: "policy" of the chain.
-        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
 
         // Entry 5: end of input.
-        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 5,
+            size: entries_bytes.len() as u32,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+        bytes.extend(entries_bytes);
         bytes
     }
 
@@ -1652,36 +1772,35 @@ mod tests {
     }
 
     fn table_with_jump_target() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
-
-        bytes.extend_from_slice(
-            ipt_replace {
-                name: string_to_32_chars("filter"),
-                num_entries: 6,
-                size: 984,
-                ..Default::default()
-            }
-            .as_bytes(),
-        );
+        let mut entries_bytes = Vec::new();
 
         // Entry 1: start of the chain1.
-        extend_with_error_target_ipv4_entry(&mut bytes, "chain1");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "chain1");
 
         // Entry 2: jump to chain2 for all packets.
-        extend_with_standard_target_ipv4_entry(&mut bytes, 656);
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, 656);
 
         // Entry 3: policy of chain1.
-        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
 
         // Entry 4: start of chain2.
-        extend_with_error_target_ipv4_entry(&mut bytes, "chain2");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "chain2");
 
         // Entry 5: policy of chain2.
-        extend_with_standard_target_ipv4_entry(&mut bytes, -5);
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
 
         // Entry 6: end of input.
-        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 6,
+            size: entries_bytes.len() as u32,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+        bytes.extend(entries_bytes);
         bytes
     }
 
@@ -1735,7 +1854,7 @@ mod tests {
     }
 
     fn table_with_wrong_size() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
+        let mut bytes = Vec::new();
 
         bytes.extend_from_slice(
             ipt_replace {
@@ -1747,104 +1866,56 @@ mod tests {
             .as_bytes(),
         );
 
-        bytes.extend_from_slice(
-            ipt_entry { target_offset: 112, next_offset: 176, ..Default::default() }.as_bytes(),
-        );
-        bytes.extend_from_slice(
-            xt_entry_target { target_size: 64, name: string_to_29_chars("ERROR"), revision: 0 }
-                .as_bytes(),
-        );
-        bytes.extend_from_slice(
-            ErrorNameWithPadding { errorname: string_to_30_chars("ERROR"), ..Default::default() }
-                .as_bytes(),
-        );
-
+        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
         bytes
     }
 
     fn table_with_wrong_num_entries() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
+        let mut entries_bytes = Vec::new();
 
-        bytes.extend_from_slice(
-            ipt_replace {
-                name: string_to_32_chars("filter"),
-                num_entries: 3,
-                size: 176,
-                ..Default::default()
-            }
-            .as_bytes(),
-        );
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
-        bytes.extend_from_slice(
-            ipt_entry { target_offset: 112, next_offset: 176, ..Default::default() }.as_bytes(),
-        );
-        bytes.extend_from_slice(
-            xt_entry_target { target_size: 64, name: string_to_29_chars("ERROR"), revision: 0 }
-                .as_bytes(),
-        );
-        bytes.extend_from_slice(
-            ErrorNameWithPadding { errorname: string_to_30_chars("ERROR"), ..Default::default() }
-                .as_bytes(),
-        );
-
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 3,
+            size: entries_bytes.len() as u32,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+        bytes.extend(entries_bytes);
         bytes
     }
 
     fn table_with_no_entries() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
-
-        bytes.extend_from_slice(
-            ipt_replace {
-                name: string_to_32_chars("filter"),
-                num_entries: 0,
-                size: 0,
-                ..Default::default()
-            }
-            .as_bytes(),
-        );
-
-        bytes
+        ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 0,
+            size: 0,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned()
     }
 
     fn table_with_chain_with_no_policy() -> Vec<u8> {
-        let mut bytes: Vec<u8> = vec![];
-
-        bytes.extend_from_slice(
-            ipt_replace {
-                name: string_to_32_chars("filter"),
-                num_entries: 2,
-                size: 352,
-                ..Default::default()
-            }
-            .as_bytes(),
-        );
+        let mut entries_bytes = Vec::new();
 
         // Entry 1: start of the chain.
-        bytes.extend_from_slice(
-            ipt_entry { target_offset: 112, next_offset: 176, ..Default::default() }.as_bytes(),
-        );
-        bytes.extend_from_slice(
-            xt_entry_target { target_size: 64, name: string_to_29_chars("ERROR"), revision: 0 }
-                .as_bytes(),
-        );
-        bytes.extend_from_slice(
-            ErrorNameWithPadding { errorname: string_to_30_chars("mychain"), ..Default::default() }
-                .as_bytes(),
-        );
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
 
         // Entry 2: end of input.
-        bytes.extend_from_slice(
-            ipt_entry { target_offset: 112, next_offset: 176, ..Default::default() }.as_bytes(),
-        );
-        bytes.extend_from_slice(
-            xt_entry_target { target_size: 64, name: string_to_29_chars("ERROR"), revision: 0 }
-                .as_bytes(),
-        );
-        bytes.extend_from_slice(
-            ErrorNameWithPadding { errorname: string_to_30_chars("ERROR"), ..Default::default() }
-                .as_bytes(),
-        );
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 2,
+            size: entries_bytes.len() as u32,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+        bytes.extend(entries_bytes);
         bytes
     }
 
@@ -1967,8 +2038,8 @@ mod tests {
     ) {
         assert_eq!(
             ipv4_to_subnet(
-                in_addr { s_addr: u32::from_ne_bytes(be_addr) },
-                in_addr { s_addr: u32::from_ne_bytes(be_mask) },
+                in_addr { s_addr: u32::from_be_bytes(be_addr).to_be() },
+                in_addr { s_addr: u32::from_be_bytes(be_mask).to_be() },
             ),
             expected
         );
