@@ -87,7 +87,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
   MaybeCompleteWatchGainState();
 }
 
-void ObserverServer::GainStateChanged(const fad::GainState& new_gain_state) {
+void ObserverServer::GainStateIsChanged(const fad::GainState& new_gain_state) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
 
   FX_DCHECK(device_->is_stream_config());
@@ -137,8 +137,8 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   MaybeCompleteWatchPlugState();
 }
 
-void ObserverServer::PlugStateChanged(const fad::PlugState& new_plug_state,
-                                      zx::time plug_change_time) {
+void ObserverServer::PlugStateIsChanged(const fad::PlugState& new_plug_state,
+                                        zx::time plug_change_time) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << new_plug_state << " @ " << plug_change_time.get();
 
@@ -280,7 +280,7 @@ void ObserverServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
   MaybeCompleteWatchTopology();
 }
 
-void ObserverServer::TopologyChanged(TopologyId topology_id) {
+void ObserverServer::TopologyIsChanged(TopologyId topology_id) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << "(topology_id " << topology_id << ")";
 
@@ -345,7 +345,7 @@ void ObserverServer::WatchElementState(WatchElementStateRequest& request,
   MaybeCompleteWatchElementState(element_id);
 }
 
-void ObserverServer::ElementStateChanged(
+void ObserverServer::ElementStateIsChanged(
     ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState element_state) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << "(element_id " << element_id << ")";

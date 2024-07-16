@@ -271,7 +271,7 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       element_id, *driver_format, *request.options()->ring_buffer_min_bytes(),
       [this,
        element_id](fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo> result) {
-        // If we have no async completer, maybe we're shutting down. Just exit.
+        // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
         if (create_ring_buffer_completers_.find(element_id) ==
             create_ring_buffer_completers_.end()) {
           ADR_WARN_OBJECT()
@@ -314,24 +314,24 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
 // This is only here because ControlNotify includes the methods from ObserverNotify. It might be
 // helpful for ControlServer to know when its SetGain call took effect, but this isn't needed.
 // ControlServer also has no gain-related hanging-get to complete.
-void ControlServer::GainStateChanged(const fad::GainState&) { ADR_LOG_METHOD(kLogNotifyMethods); }
+void ControlServer::GainStateIsChanged(const fad::GainState&) { ADR_LOG_METHOD(kLogNotifyMethods); }
 
 // This is only here because ControlNotify includes the methods from ObserverNotify. ControlServer
 // doesn't have a role to play in plug state changes, nor a client hanging-get to complete.
-void ControlServer::PlugStateChanged(const fad::PlugState& new_plug_state,
-                                     zx::time plug_change_time) {
+void ControlServer::PlugStateIsChanged(const fad::PlugState& new_plug_state,
+                                       zx::time plug_change_time) {
   ADR_LOG_METHOD(kLogNotifyMethods);
 }
 
 // We receive delay values for the first time during the configuration process. Once we have these
 // values, we can calculate the required ring-buffer size and request the VMO.
-void ControlServer::DelayInfoChanged(ElementId element_id, const fad::DelayInfo& delay_info) {
+void ControlServer::DelayInfoIsChanged(ElementId element_id, const fad::DelayInfo& delay_info) {
   ADR_LOG_METHOD(kLogControlServerResponses || kLogNotifyMethods);
 
   // Initialization is complete, so this represents a delay update.
   // If this is eventually exposed to Observers or any other watcher, notify them.
   if (auto ring_buffer_server = TryGetRingBufferServer(element_id); ring_buffer_server) {
-    ring_buffer_server->DelayInfoChanged(delay_info);
+    ring_buffer_server->DelayInfoIsChanged(delay_info);
   }
 }
 
@@ -379,9 +379,9 @@ void ControlServer::SetDaiFormat(SetDaiFormatRequest& request,
 // The Device's DaiFormat has changed. If `dai_format` is set, this resulted from `SetDaiFormat`
 // being called. Otherwise, the Device is newly-initialized or `Reset` was called, so
 // SetDaiFormat must be called again.
-void ControlServer::DaiFormatChanged(ElementId element_id,
-                                     const std::optional<fha::DaiFormat>& dai_format,
-                                     const std::optional<fha::CodecFormatInfo>& codec_format_info) {
+void ControlServer::DaiFormatIsChanged(
+    ElementId element_id, const std::optional<fha::DaiFormat>& dai_format,
+    const std::optional<fha::CodecFormatInfo>& codec_format_info) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods) << "(" << element_id << ")";
 
   auto completer_match = set_dai_format_completers_.find(element_id);
@@ -389,7 +389,7 @@ void ControlServer::DaiFormatChanged(ElementId element_id,
   // Device must be newly-initialized or Reset was called. Either way we don't expect a completion.
   if (!dai_format.has_value()) {
     FX_DCHECK(!codec_format_info.has_value());
-    // If there's a completer, it must have been in-progress when Reset  was called; cancel it.
+    // If there's a completer, it must have been in-progress when Reset was called; cancel it.
     if (completer_match != set_dai_format_completers_.end()) {
       auto completer = std::move(completer_match->second);
       set_dai_format_completers_.erase(element_id);
@@ -399,8 +399,9 @@ void ControlServer::DaiFormatChanged(ElementId element_id,
   }
 
   // SetDaiFormat was called and succeeded, but now we don't have a completer.
+  // We could be getting notified of the preexisting DaiFormat, upon establishing our Control.
   if (completer_match == set_dai_format_completers_.end()) {
-    ADR_WARN_METHOD() << "received Device notification, but completer is gone.";
+    ADR_LOG_METHOD(kLogNotifyMethods) << "unsolicited Device notification (no completer).";
     return;
   }
 
@@ -413,8 +414,8 @@ void ControlServer::DaiFormatChanged(ElementId element_id,
   }
 }
 
-void ControlServer::DaiFormatNotSet(ElementId element_id, const fha::DaiFormat& dai_format,
-                                    fad::ControlSetDaiFormatError error) {
+void ControlServer::DaiFormatIsNotChanged(ElementId element_id, const fha::DaiFormat& dai_format,
+                                          fad::ControlSetDaiFormatError error) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
       << "(" << element_id << ", error " << fidl::ToUnderlying(error) << ") for dai_format:";
   LogDaiFormat(dai_format);
@@ -483,11 +484,13 @@ void ControlServer::CodecStart(CodecStartCompleter::Sync& completer) {
   // it's also possible that the underlying driver will reject the request.
 }
 
-void ControlServer::CodecStarted(const zx::time& start_time) {
+void ControlServer::CodecIsStarted(const zx::time& start_time) {
   ADR_LOG_METHOD(kLogNotifyMethods) << "(" << start_time.get() << ")";
 
+  // The codec has been started, but we don't have a completer.
+  // We could be getting notified of the preexisting DAI state, upon establishing our Control.
   if (!codec_start_completer_.has_value()) {
-    ADR_WARN_METHOD() << "received notification from Device, but completer is gone";
+    ADR_LOG_METHOD(kLogNotifyMethods) << "unsolicited Device notification (no completer).";
     return;
   }
 
@@ -496,12 +499,12 @@ void ControlServer::CodecStarted(const zx::time& start_time) {
   completer.Reply(fit::success(fad::ControlCodecStartResponse{{.start_time = start_time.get()}}));
 }
 
-void ControlServer::CodecNotStarted() {
+void ControlServer::CodecIsNotStarted() {
   ADR_LOG_METHOD(kLogNotifyMethods);
 
   if (!codec_start_completer_.has_value()) {
-    ADR_WARN_METHOD()
-        << "received Device notification (CodecStart rejected), but completer is gone.";
+    // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
+    ADR_WARN_METHOD() << "codec_start_completer_ gone by the time CodecIsNotStarted ran";
     return;
   }
 
@@ -557,12 +560,15 @@ void ControlServer::CodecStop(CodecStopCompleter::Sync& completer) {
   // it's also possible that the underlying driver will reject the request.
 }
 
-void ControlServer::CodecStopped(const zx::time& stop_time) {
+void ControlServer::CodecIsStopped(const zx::time& stop_time) {
   ADR_LOG_METHOD(kLogNotifyMethods) << "(" << stop_time.get() << ")";
 
+  // The codec has been stopped, but we don't have a completer.
+  // We could be getting notified of the preexisting DAI state, upon establishing our Control.
+  // This could also occur if we were started when the DaiFormat was changed.
+  // And finally, this could be triggered by a Reset call.
   if (!codec_stop_completer_.has_value()) {
-    ADR_LOG_METHOD(kLogNotifyMethods)
-        << "received Device notification, but completer is gone. Reset occurred?";
+    ADR_LOG_METHOD(kLogNotifyMethods) << "unsolicited Device notification (no completer).";
     return;
   }
 
@@ -571,12 +577,12 @@ void ControlServer::CodecStopped(const zx::time& stop_time) {
   completer.Reply(fit::success(fad::ControlCodecStopResponse{{.stop_time = stop_time.get()}}));
 }
 
-void ControlServer::CodecNotStopped() {
+void ControlServer::CodecIsNotStopped() {
   ADR_LOG_METHOD(kLogNotifyMethods);
 
   if (!codec_stop_completer_.has_value()) {
-    ADR_WARN_METHOD()
-        << "received Device notification (CodecStop rejected), but completer is gone.";
+    // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
+    ADR_WARN_METHOD() << "codec_stop_completer_ gone by the time CodecIsNotStopped ran";
     return;
   }
 
@@ -712,7 +718,7 @@ void ControlServer::SetTopology(SetTopologyRequest& request,
   }
 }
 
-void ControlServer::TopologyChanged(TopologyId topology_id) {
+void ControlServer::TopologyIsChanged(TopologyId topology_id) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
       << "(topology_id " << topology_id << ")";
 
@@ -848,7 +854,7 @@ void ControlServer::SetElementState(SetElementStateRequest& request,
   }
 }
 
-void ControlServer::ElementStateChanged(
+void ControlServer::ElementStateIsChanged(
     ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState element_state) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
       << "(element_id " << element_id << ")";

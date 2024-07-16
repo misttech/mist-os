@@ -290,8 +290,8 @@ TEST_F(CodecTest, GetDaiFormats) {
 }
 
 // SetDaiFormat is tested (here and in CodecWarningTest) against all states and error cases:
-// States: First set, format-change, no-change. ControlNotify::DaiFormatChanged received.
-// SetDaiFormat stops Codec; ControlNotify::CodecStopped received if was started.
+// States: First set, format-change, no-change. ControlNotify::DaiFormatIsChanged received.
+// SetDaiFormat stops Codec; ControlNotify::CodecIsStopped received if was started.
 // Errors: StreamConfig type; Device has error, not controlled; invalid format; unsupported format.
 //
 // SetDaiFormat - use the first supported format
@@ -1033,7 +1033,6 @@ TEST_F(CompositeTest, Reset) {
 
   // Set DAI formats on every DAI element.
   auto dai_format_sets_by_element = device->dai_format_sets();
-  // ASSERT_FALSE(dai_format_sets_by_element.empty());
   ASSERT_EQ(device->dai_ids().size(), dai_format_sets_by_element.size());
   for (auto dai_id : device->dai_ids()) {
     auto safe_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, dai_format_sets_by_element);
@@ -1045,7 +1044,6 @@ TEST_F(CompositeTest, Reset) {
 
   // Create RingBuffers on every RingBuffer element.
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
-  // ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
   ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
   for (auto element_id : device->ring_buffer_ids()) {
     fake_driver->ReserveRingBufferSize(element_id, 4096);
@@ -1077,7 +1075,7 @@ TEST_F(CompositeTest, Reset) {
   EXPECT_TRUE(device->Reset());
 
   RunLoopUntilIdle();
-  // Reset should cause every DaiElement to emit DaiFormatChanged(id, std::nullopt, std::nullopt).
+  // Reset should cause every DaiElement to emit DaiFormatIsChanged(id, std::nullopt, std::nullopt).
   // So notify()->dai_formats() should contain an entry for each Dai element, of value std::nullopt.
   EXPECT_EQ(notify()->dai_formats().size(), device->dai_ids().size());
   for (const auto& [element_id, format] : notify()->dai_formats()) {
@@ -1089,9 +1087,9 @@ TEST_F(CompositeTest, Reset) {
   // Expect any RingBuffers to drop, eventually. Our Control should still be valid though.
   EXPECT_EQ(FakeCompositeRingBuffer::count(), 0u);
 
-  // Expect ElementState notifications, when implemented.
+  // Expect TopologyIsChanged if revert-to-default represents a topology change.
 
-  // Also expect (maybe) a TopologyChanged notification
+  // Expect ElementStateIsChanged for any element where revert-to-default represents a state change.
 }
 
 // RingBuffer test cases

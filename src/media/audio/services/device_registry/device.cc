@@ -343,7 +343,8 @@ void Device::OnInitializationResponse() {
   }
 }
 
-bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
+// Returns true if the specified entity successfully asserts control of this device.
+bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify_to_set) {
   ADR_LOG_METHOD(kLogDeviceState || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
 
@@ -362,25 +363,28 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
     return false;
   }
 
-  control_notify_ = control_notify;
-  AddObserver(std::move(control_notify));
+  control_notify_ = control_notify_to_set;
+  AddObserver(std::move(control_notify_to_set));
 
-  // For this new control, "catch it up" on the current state.
+  // For this new control, "catch it up" with notifications about the device's current state.
+  // We do this to explicitly confirm that a Device persists its set DaiFormats and CodecStart/Stop
+  // state even after its Control is dropped.
   if (auto notify = GetControlNotify(); notify) {
     // DaiFormat(s)
     if (is_codec()) {
       if (codec_format_) {
-        notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, codec_format_->dai_format,
-                                 codec_format_->codec_format_info);
+        notify->DaiFormatIsChanged(fad::kDefaultDaiInterconnectElementId, codec_format_->dai_format,
+                                   codec_format_->codec_format_info);
       } else {
-        notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt, std::nullopt);
+        notify->DaiFormatIsChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt,
+                                   std::nullopt);
       }
       // Codec start state
-      codec_start_state_.started ? notify->CodecStarted(codec_start_state_.start_stop_time)
-                                 : notify->CodecStopped(codec_start_state_.start_stop_time);
+      codec_start_state_.started ? notify->CodecIsStarted(codec_start_state_.start_stop_time)
+                                 : notify->CodecIsStopped(codec_start_state_.start_stop_time);
     } else if (is_composite()) {
       for (auto [element_id, dai_format] : composite_dai_formats_) {
-        notify->DaiFormatChanged(element_id, dai_format, std::nullopt);
+        notify->DaiFormatIsChanged(element_id, dai_format, std::nullopt);
       }
     }
   }
@@ -389,6 +393,7 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
   return true;
 }
 
+// Returns true if this device previously had a controlling entity.
 bool Device::DropControl() {
   ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods);
   FX_CHECK(state_ != State::DeviceInitializing);
@@ -429,24 +434,24 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
   }
   observers_.push_back(observer_to_add);
 
-  // For this new observer, "catch it up" on any current state that we already know.
+  // For this new observer, "catch it up" with notifications about the device's current state.
   // This may include:
   //
   // (1) current signalprocessing topology.
   if (current_topology_id_.has_value()) {
-    observer_to_add->TopologyChanged(*current_topology_id_);
+    observer_to_add->TopologyIsChanged(*current_topology_id_);
   }
 
   // (2) ElementState, for each signalprocessing element where this has already been retrieved.
   for (const auto& element_record : sig_proc_element_map_) {
     if (element_record.second.state.has_value()) {
-      observer_to_add->ElementStateChanged(element_record.first, *element_record.second.state);
+      observer_to_add->ElementStateIsChanged(element_record.first, *element_record.second.state);
     }
   }
 
   // (3) GainState (if StreamConfig).
   if (is_stream_config()) {
-    observer_to_add->GainStateChanged({{
+    observer_to_add->GainStateIsChanged({{
         .gain_db = *gain_state_->gain_db(),
         .muted = gain_state_->muted().value_or(false),
         .agc_enabled = gain_state_->agc_enabled().value_or(false),
@@ -455,7 +460,7 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
 
   // (4) PlugState (if Codec or StreamConfig).
   if (is_codec() || is_stream_config()) {
-    observer_to_add->PlugStateChanged(
+    observer_to_add->PlugStateIsChanged(
         *plug_state_->plugged() ? fad::PlugState::kPlugged : fad::PlugState::kUnplugged,
         zx::time(*plug_state_->plug_state_time()));
   }
@@ -1060,8 +1065,8 @@ void Device::RetrieveCurrentTopology() {
         if (!current_topology_id_.has_value() || *current_topology_id_ != topology_id) {
           current_topology_id_ = topology_id;
           ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "ForEachObserver => TopologyChanged: " << topology_id;
-          ForEachObserver([topology_id](auto obs) { obs->TopologyChanged(topology_id); });
+              << "ForEachObserver => TopologyIsChanged: " << topology_id;
+          ForEachObserver([topology_id](auto obs) { obs->TopologyIsChanged(topology_id); });
         }
 
         // Register for any future change in topology, whether this was a change or not.
@@ -1112,14 +1117,14 @@ void Device::RetrieveElementState(ElementId element_id) {
         if (element_record->second.state.has_value() &&
             *element_record->second.state == element_state) {
           ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "Not sending ElementStateChanged: state is unchanged.";
+              << "Not sending ElementStateIsChanged: state is unchanged.";
         } else {
           element_record->second.state = element_state;
           // Notify any Observers of this change in element state.
           ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "ForEachObserver => ElementStateChanged(" << element_id << ")";
+              << "ForEachObserver => ElementStateIsChanged(" << element_id << ")";
           ForEachObserver([element_id, element_state](auto obs) {
-            obs->ElementStateChanged(element_id, element_state);
+            obs->ElementStateIsChanged(element_id, element_state);
           });
         }
 
@@ -1153,7 +1158,7 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
   }
 
   // We don't check/prevent "no-change" here, since current_topology_id_ may not reflect in-flight
-  // updates. We update current_topology_id_ and call ObserverNotify::TopologyChanged (or
+  // updates. We update current_topology_id_ and call ObserverNotify::TopologyIsChanged (or
   // not, if no change) at only one place: the WatchTopology response handler.
 
   (*sig_proc_client_)
@@ -1167,7 +1172,7 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
 
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
         // Our hanging WatchTopology call will complete now, updating topology_id_ and calling
-        // ObserverNotify::TopologyChanged (or not, if no change).
+        // ObserverNotify::TopologyIsChanged (or not, if no change).
       });
 
   return ZX_OK;
@@ -1203,7 +1208,7 @@ zx_status_t Device::SetElementState(ElementId element_id,
   }
 
   // We don't check/prevent "no-change" here, since sig_proc_element_map_ may not reflect in-flight
-  // updates. We update sig_proc_element_map_ and call ObserverNotify::ElementStateChanged (or
+  // updates. We update sig_proc_element_map_ and call ObserverNotify::ElementStateIsChanged (or
   // not, if no change) at only one place: the WatchElementState response handler.
 
   (*sig_proc_client_)
@@ -1217,7 +1222,7 @@ zx_status_t Device::SetElementState(ElementId element_id,
 
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
         // Our hanging WatchElementState call will complete now, updating our cached state and
-        // calling ObserverNotify::ElementStateChanged (or not, if no change).
+        // calling ObserverNotify::ElementStateIsChanged (or not, if no change).
       });
 
   return ZX_OK;
@@ -1397,9 +1402,9 @@ void Device::RetrieveGainState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => GainStateChanged";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => GainStateIsChanged";
           ForEachObserver([gain_state = *gain_state_](auto obs) {
-            obs->GainStateChanged({{
+            obs->GainStateIsChanged({{
                 .gain_db = *gain_state.gain_db(),
                 .muted = gain_state.muted().value_or(false),
                 .agc_enabled = gain_state.agc_enabled().value_or(false),
@@ -1447,11 +1452,12 @@ void Device::RetrieveStreamPlugState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateIsChanged";
           ForEachObserver([plug_state = *plug_state_](auto obs) {
-            obs->PlugStateChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
-                                                                      : fad::PlugState::kUnplugged,
-                                  zx::time(*plug_state.plug_state_time()));
+            obs->PlugStateIsChanged(plug_state.plugged().value_or(true)
+                                        ? fad::PlugState::kPlugged
+                                        : fad::PlugState::kUnplugged,
+                                    zx::time(*plug_state.plug_state_time()));
           });
         }
         // Kick off the next watch.
@@ -1493,11 +1499,11 @@ void Device::RetrieveCodecPlugState() {
       OnInitializationResponse();
     } else {
       ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received update";
-      ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
+      ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateIsChanged";
       ForEachObserver([plug_state = *plug_state_](auto obs) {
-        obs->PlugStateChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
-                                                                  : fad::PlugState::kUnplugged,
-                              zx::time(*plug_state.plug_state_time()));
+        obs->PlugStateIsChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
+                                                                    : fad::PlugState::kUnplugged,
+                                zx::time(*plug_state.plug_state_time()));
       });
     }
     // Kick off the next watch.
@@ -1838,6 +1844,7 @@ std::optional<fha::Format> Device::SupportedDriverFormatForClientFormat(
   }};
 }
 
+// Returns true if the gain was successfully changed.
 bool Device::SetGain(fha::GainState& gain_state) {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
   FX_CHECK(state_ != State::DeviceInitializing);
@@ -1889,72 +1896,77 @@ std::shared_ptr<ControlNotify> Device::GetControlNotify() {
   return sh_ptr_control;
 }
 
+// This method guarantees that DaiFormatIsChanged or DaiFormatIsNotChanged will eventually be called
+// on the ControlNotify, either immediately or asynchronously upon completion of driver
+// SetDaiFormat.
 void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format) {
   ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls);
 
   auto notify = GetControlNotify();
   if (!notify) {
-    ADR_WARN_METHOD() << "Device must be controlled before SetDaiFormat can be called";
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot SetDaiFormat";
     return;
   }
 
   if (!is_codec() && !is_composite()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot SetDaiFormat";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fad::ControlSetDaiFormatError::kWrongDeviceType);
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kWrongDeviceType);
     return;
   }
 
   FX_CHECK(state_ != State::DeviceInitializing)
-      << "Cannot call SetDaiFormat before device is initialized";
+      << "Device is not yet initialized: cannot SetDaiFormat";
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError::kDeviceError);
+    ADR_WARN_METHOD() << "device already has an error: cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kDeviceError);
     return;
   }
 
   if (is_codec() ? (element_id != fad::kDefaultDaiInterconnectElementId)
                  : (dai_ids_.find(element_id) == dai_ids_.end())) {
-    ADR_WARN_METHOD() << "element_id not found, or not a DaiInterconnect element";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fad::ControlSetDaiFormatError::kInvalidElementId);
+    ADR_WARN_METHOD()
+        << "element_id not found, or not a DaiInterconnect element: cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kInvalidElementId);
     return;
   }
 
   if (!ValidateDaiFormat(dai_format)) {
-    ADR_WARN_METHOD() << "Invalid dai_format -- cannot SetDaiFormat";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fad::ControlSetDaiFormatError::kInvalidDaiFormat);
+    ADR_WARN_METHOD() << "Invalid dai_format: cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kInvalidDaiFormat);
     return;
   }
 
   if (!DaiFormatIsSupported(element_id, dai_format_sets(), dai_format)) {
-    ADR_WARN_METHOD() << "Unsupported dai_format cannot be set";
-    notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError::kFormatMismatch);
+    ADR_WARN_METHOD() << "Unsupported dai_format: cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kFormatMismatch);
     return;
   }
 
   // Check for no-change
 
   if (is_codec()) {
-    // auto new_dai_format = dai_format;
-
     // TODO(https://fxbug.dev/113429): handle command timeouts
 
     (*codec_client_)
         ->SetDaiFormat(dai_format)
         .Then([this, element_id, dai_format](fidl::Result<fha::Codec::SetDaiFormat>& result) {
+          std::string context("Codec/SetDaiFormat response: ");
           auto notify = GetControlNotify();
           if (!notify) {
-            ADR_WARN_OBJECT()
-                << "SetDaiFormat response: device must be controlled before SetDaiFormat can be called";
+            ADR_WARN_OBJECT() << context
+                              << "device must be controlled before SetDaiFormat can be called";
             return;
           }
 
           if (state_ == State::Error) {
-            ADR_WARN_OBJECT() << "Codec/SetDaiFormat response: device already has an error";
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fad::ControlSetDaiFormatError::kDeviceError);
+            ADR_WARN_OBJECT() << context << "device already has an error";
+            notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                          fad::ControlSetDaiFormatError::kDeviceError);
             return;
           }
 
@@ -1964,47 +1976,42 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
             if (result.error_value().is_domain_error() &&
                 (result.error_value().domain_error() == ZX_ERR_INVALID_ARGS ||
                  result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED)) {
-              ADR_WARN_OBJECT()
-                  << "Codec/SetDaiFormat response: ZX_ERR_INVALID_ARGS or ZX_ERR_NOT_SUPPORTED";
+              ADR_WARN_OBJECT() << context << "ZX_ERR_INVALID_ARGS or ZX_ERR_NOT_SUPPORTED";
               error = (result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED
                            ? fad::ControlSetDaiFormatError::kFormatMismatch
                            : fad::ControlSetDaiFormatError::kInvalidDaiFormat);
             } else {
-              LogResultError(result, "SetDaiFormat response");
+              LogResultError(result, context.c_str());
               error = fad::ControlSetDaiFormatError::kOther;
             }
-            notify->DaiFormatNotSet(element_id, dai_format, error);
+            notify->DaiFormatIsNotChanged(element_id, dai_format, error);
             return;
           }
 
-          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/SetDaiFormat: success";
+          ADR_LOG_OBJECT(kLogCodecFidlResponses) << context << "success";
           if (!ValidateCodecFormatInfo(result->state())) {
-            FX_LOGS(ERROR) << "Codec/SetDaiFormat error: " << result.error_value();
+            FX_LOGS(ERROR) << context << "error " << result.error_value();
             OnError(ZX_ERR_INVALID_ARGS);
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fad::ControlSetDaiFormatError::kInvalidDaiFormat);
+            notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                          fad::ControlSetDaiFormatError::kInvalidDaiFormat);
             return;
           }
 
           if (codec_format_.has_value() && codec_format_->dai_format == dai_format &&
               codec_format_->codec_format_info == result->state()) {
             // No DaiFormat change for this element
-            notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError(0));
+            notify->DaiFormatIsNotChanged(element_id, dai_format, fad::ControlSetDaiFormatError(0));
             return;
           }
 
-          // Reset Start state and DaiFormat (if it's a change). Notify our controlling entity.
-          bool was_started = codec_start_state_.started;
-          if (was_started) {
-            codec_start_state_.started = false;
-            codec_start_state_ = CodecStartState{false, zx::clock::get_monotonic()};
-          }
+          // Reset DaiFormat (and Start state if it's a change). Notify our controlling entity.
           codec_format_ = CodecFormat{dai_format, result->state()};
-          if (was_started) {
-            notify->CodecStopped(codec_start_state_.start_stop_time);
+          if (codec_start_state_.started) {
+            codec_start_state_ = CodecStartState{false, zx::clock::get_monotonic()};
+            notify->CodecIsStopped(codec_start_state_.start_stop_time);
           }
-          notify->DaiFormatChanged(element_id, codec_format_->dai_format,
-                                   codec_format_->codec_format_info);
+          notify->DaiFormatIsChanged(element_id, codec_format_->dai_format,
+                                     codec_format_->codec_format_info);
         });
   } else {
     // TODO(https://fxbug.dev/113429): handle command timeouts
@@ -2022,8 +2029,8 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
 
           if (state_ == State::Error) {
             ADR_WARN_OBJECT() << context << "device already has an error";
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fad::ControlSetDaiFormatError::kDeviceError);
+            notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                          fad::ControlSetDaiFormatError::kDeviceError);
             return;
           }
 
@@ -2042,28 +2049,31 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
               LogResultError(result, context.c_str());
               error = fad::ControlSetDaiFormatError::kOther;
             }
-            notify->DaiFormatNotSet(element_id, dai_format, error);
+            notify->DaiFormatIsNotChanged(element_id, dai_format, error);
             return;
           }
 
-          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "Composite/SetDaiFormat: success";
+          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << context << "success";
           if (auto match = composite_dai_formats_.find(element_id);
               match != composite_dai_formats_.end() && match->second == dai_format) {
             // No DaiFormat change for this element
-            notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError(0));
+            notify->DaiFormatIsNotChanged(element_id, dai_format, fad::ControlSetDaiFormatError(0));
             return;
           }
 
-          // Unlike Codec, Composite DAI elements don't generate `CodecStopped` notifications.
+          // Unlike Codec, Composite DAI elements don't generate `CodecIsStopped` notifications.
           composite_dai_formats_.insert_or_assign(element_id, dai_format);
-          notify->DaiFormatChanged(element_id, dai_format, std::nullopt);
+          notify->DaiFormatIsChanged(element_id, dai_format, std::nullopt);
         });
   }
 }
 
+// If true is returned, then we guarantee to call the ControlNotify (maybe CodecIsStopped and
+// DaiFormatIsChanged), if this changes the Start/Stop and DaiFormat.
+// If false is returned, then these notifications will not be called.
 bool Device::Reset() {
   if (!is_codec() && !is_composite()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Reset";
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot Reset";
     return false;
   }
 
@@ -2071,11 +2081,11 @@ bool Device::Reset() {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
+    ADR_WARN_METHOD() << "Device already has an error: cannot Reset";
     return false;
   }
   if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Codec must be controlled before Reset can be called";
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot Reset";
     return false;
   }
 
@@ -2083,27 +2093,28 @@ bool Device::Reset() {
 
   if (is_codec()) {
     (*codec_client_)->Reset().Then([this](fidl::Result<fha::Codec::Reset>& result) {
-      std::string context = "Codec/Reset response";
-      if (LogResultFrameworkError(result, context.c_str())) {
+      if (LogResultFrameworkError(result, "Codec/Reset")) {
         return;
       }
-      ADR_LOG_OBJECT(kLogCodecFidlResponses) << context;
+      ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Reset response";
+
+      auto notify = GetControlNotify();
 
       // Reset to Stopped (if Started), even if no ControlNotify listens for notifications.
       if (codec_start_state_.started) {
         codec_start_state_.started = false;
         codec_start_state_.start_stop_time = zx::clock::get_monotonic();
-        if (auto notify = GetControlNotify(); notify) {
-          notify->CodecStopped(codec_start_state_.start_stop_time);
+        if (notify) {
+          notify->CodecIsStopped(codec_start_state_.start_stop_time);
         }
       }
 
+      // Reset our DaiFormat, even if no ControlNotify listens for notifications.
       if (codec_format_.has_value()) {
-        // Reset our DaiFormat, even if no ControlNotify listens for notifications.
         codec_format_.reset();
-        if (auto notify = GetControlNotify(); notify) {
-          notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt,
-                                   std::nullopt);
+        if (notify) {
+          notify->DaiFormatIsChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt,
+                                     std::nullopt);
         }
       }
 
@@ -2113,51 +2124,48 @@ bool Device::Reset() {
   }
   if (is_composite()) {
     (*composite_client_)->Reset().Then([this](fidl::Result<fha::Composite::Reset>& result) {
-      std::string context = "Composite/Reset response";
-      if (LogResultError(result, context.c_str())) {
+      if (LogResultError(result, "Composite/Reset")) {
         return;
       }
-      ADR_LOG_OBJECT(kLogCompositeFidlResponses) << context;
+      ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "Composite/Reset response";
 
-      ////    Expect DeviceDroppedRingBuffer(element_id) from the driver, for all RingBuffers.
-      ////    We shouldn't need to format-reset them or reset any hanging gets or expressly
-      ////    change their state in any way.
-      //
-      // ring_buffer_map_.clear();
+      auto notify = GetControlNotify();
 
-      // For each DAI node, clear its DaiFormat and notify our controlling entity.
+      // We expect DeviceDroppedRingBuffer(element_id) from the driver, for all RingBuffers.
+      // We shouldn't need to expressly change their state in any way, reset any hanging gets
+      // or clear 'ring_buffer_map_'. Upon receiving the DeviceDroppedRingBuffer notifications,
+      // we destroy the client RingBuffer connections, and they will re-create them.
 
+      // For each DAI node with DaiFormat set, explicitly reset its state. ADR does this because the
+      // driver has no way of conveying that a DaiFormat has changed (or is no longer set).
       if (!composite_dai_formats_.empty()) {
-        // Reset our DaiFormat, even if no ControlNotify listens for notifications.
-        if (auto notify = GetControlNotify(); notify) {
+        // If a ControlNotify is listening, notify it about each DAI node.
+        if (notify) {
           for (const auto& [element_id, _] : composite_dai_formats_) {
-            notify->DaiFormatChanged(element_id, std::nullopt, std::nullopt);
+            notify->DaiFormatIsChanged(element_id, std::nullopt, std::nullopt);
           }
         }
         composite_dai_formats_.clear();
       }
 
-      ////    Expect the driver's WatchTopology and WatchElementState hanging-gets to all fire.
-      ////    We shouldn't need to touch the hardware in any way until then.
-      //
-      // TODO(https://fxbug.dev/323270827): implement signalprocessing
-      // current_topology_id_.reset();
-      // for (auto& [element_id, element_record] : sig_proc_element_map_) {
-      //   element_record.state.reset();
-      // }
-      //
-      ////    Maybe ObserverNotify should emit optionals for [Topology|ElementState]Changed?
-      //
-      // ForEachObserver([...](auto obs) { ... });
+      // We expect WatchTopology and WatchElementState notifications from the driver -- but ONLY
+      // IF these were set to something other than the power-on defaults (and thus change as a
+      // result of Composite::Reset). This is why we never need to convey that the Topology or
+      // ElementState are indeterminate (thus ObserverNotify need not emit OPTIONALs for
+      // TopologyIsChanged and ElementStateIsChanged).
+      // We shouldn't need to expressly touch the hardware in any way; the client will receive
+      // these notifications and re-establish the Topology and ElementStates.
     });
   }
 
   return true;
 }
 
+// If true is returned, then we guarantee to call CodecIsStarted/CodecIsNotStarted on ControlNotify.
+// If false is returned, then this notification will not be called.
 bool Device::CodecStart() {
   if (!is_codec()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Start";
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot CodecStart";
     return false;
   }
 
@@ -2165,41 +2173,46 @@ bool Device::CodecStart() {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
+    ADR_WARN_METHOD() << "device already has an error: cannot CodecStart";
     return false;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Codec must be controlled before Start can be called";
+
+  auto notify = GetControlNotify();
+  if (!notify) {
+    ADR_WARN_METHOD() << "Codec is not yet controlled: cannot CodecStart";
     return false;
   }
   if (!codec_format_.has_value()) {
-    ADR_WARN_METHOD() << "Format must be set before Start can be called";
+    ADR_WARN_METHOD() << "Format is not yet set: cannot CodecStart";
     return false;
   }
 
   if (codec_start_state_.started) {
-    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec is already started; ignoring CodecStart command";
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec already started; immediately completing";
+    notify->CodecIsStarted(codec_start_state_.start_stop_time);
     return true;
   }
 
+  // TODO(https://fxbug.dev/113429): handle command timeouts
+
   (*codec_client_)->Start().Then([this](fidl::Result<fha::Codec::Start>& result) {
-    if (LogResultFrameworkError(result, "Start response")) {
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecNotStarted();
+    auto notify = GetControlNotify();
+    if (LogResultFrameworkError(result, "CodecStart response")) {
+      if (notify) {
+        notify->CodecIsNotStarted();
       }
       return;
     }
 
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Start: success";
+    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "CodecStart: success";
 
     // Notify our controlling entity, if this was a change.
     if (!codec_start_state_.started ||
         codec_start_state_.start_stop_time.get() <= result->start_time()) {
       codec_start_state_.started = true;
       codec_start_state_.start_stop_time = zx::time(result->start_time());
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecStarted(codec_start_state_.start_stop_time);
+      if (notify) {
+        notify->CodecIsStarted(codec_start_state_.start_stop_time);
       }
     }
   });
@@ -2207,9 +2220,11 @@ bool Device::CodecStart() {
   return true;
 }
 
+// If true is returned, then we guarantee to call CodecIsStopped or CodecIsNotStopped on
+// ControlNotify. If false is returned, then this notification will not be called.
 bool Device::CodecStop() {
   if (!is_codec()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Stop";
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot CodecStop";
     return false;
   }
 
@@ -2217,42 +2232,46 @@ bool Device::CodecStop() {
   FX_CHECK(state_ != State::DeviceInitializing);
 
   if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
+    ADR_WARN_METHOD() << "device already has an error: cannot CodecStop";
     return false;
   }
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Codec must be controlled before Stop can be called";
+
+  auto notify = GetControlNotify();
+  if (!notify) {
+    ADR_WARN_METHOD() << "Codec is not yet controlled: cannot CodecStop";
     return false;
   }
   if (!codec_format_.has_value()) {
-    ADR_WARN_METHOD() << "Format must be set before Stop can be called";
+    ADR_WARN_METHOD() << "Format is not yet set: cannot CodecStop";
     return false;
   }
 
   if (!codec_start_state_.started) {
-    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec is already stopped; ignoring CodecStop command";
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec already stopped; immediately completing";
+    notify->CodecIsStopped(codec_start_state_.start_stop_time);
     return true;
   }
 
   // TODO(https://fxbug.dev/113429): handle command timeouts
 
   (*codec_client_)->Stop().Then([this](fidl::Result<fha::Codec::Stop>& result) {
-    if (LogResultFrameworkError(result, "Stop response")) {
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecNotStopped();
+    auto notify = GetControlNotify();
+    if (LogResultFrameworkError(result, "CodecStop response")) {
+      if (notify) {
+        notify->CodecIsNotStopped();
       }
       return;
     }
 
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Stop: success";
+    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "CodecStop: success";
 
     // Notify our controlling entity, if this was a change.
     if (codec_start_state_.started ||
         codec_start_state_.start_stop_time.get() <= result->stop_time()) {
       codec_start_state_.started = false;
       codec_start_state_.start_stop_time = zx::time(result->stop_time());
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecStopped(codec_start_state_.start_stop_time);
+      if (notify) {
+        notify->CodecIsStopped(codec_start_state_.start_stop_time);
       }
     }
   });
@@ -2260,24 +2279,28 @@ bool Device::CodecStop() {
   return true;
 }
 
+// This method guarantees to call create_ring_buffer_callback (immediately or asynchronously).
+// For certain unrecoverable errors, OnError is called as well.
 bool Device::CreateRingBuffer(
     ElementId element_id, const fha::Format& format, uint32_t requested_ring_buffer_bytes,
     fit::callback<void(fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>)>
         create_ring_buffer_callback) {
   ADR_LOG_METHOD(kLogRingBufferMethods);
   if (!is_composite() && !is_stream_config()) {
-    ADR_WARN_METHOD() << "Wrong device type";
+    ADR_WARN_METHOD() << "Wrong device type: cannot CreateRingBuffer";
     create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kWrongDeviceType));
     return false;
   }
 
   if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Device must be controlled before CreateRingBuffer can be called";
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot CreateRingBuffer";
     create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kOther));
     return false;
   }
 
   if (ring_buffer_ids_.find(element_id) == ring_buffer_ids_.end()) {
+    ADR_WARN_METHOD() << "No RingBuffer element found for id " << element_id
+                      << ": cannot CreateRingBuffer";
     create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
     return false;
   }
@@ -2465,7 +2488,7 @@ void Device::RetrieveDelayInfo(ElementId element_id) {
 
             // Notify our controlling entity, if we have one.
             if (auto notify = GetControlNotify(); notify) {
-              notify->DelayInfoChanged(
+              notify->DelayInfoIsChanged(
                   element_id, {{
                                   .internal_delay = ring_buffer.delay_info->internal_delay(),
                                   .external_delay = ring_buffer.delay_info->external_delay(),
@@ -2558,7 +2581,7 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
   ring_buffer.create_ring_buffer_callback = nullptr;
 }
 
-// Returns TRUE if it actually calls out to the driver. It avoid doing so if it already knows
+// Returns TRUE if it actually calls out to the driver. We avoid doing so if we already know
 // that this RingBuffer does not support SetActiveChannels.
 bool Device::SetActiveChannels(
     ElementId element_id, uint64_t channel_bitmask,

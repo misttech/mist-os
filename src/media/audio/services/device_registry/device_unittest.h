@@ -122,20 +122,20 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     //
     void DeviceIsRemoved() final { ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses); }
     void DeviceHasError() final { ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses); }
-    void GainStateChanged(const fuchsia_audio_device::GainState& new_gain_state) final {
+    void GainStateIsChanged(const fuchsia_audio_device::GainState& new_gain_state) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       gain_state_ = new_gain_state;
     }
-    void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
-                          zx::time plug_change_time) final {
+    void PlugStateIsChanged(const fuchsia_audio_device::PlugState& new_plug_state,
+                            zx::time plug_change_time) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       plug_state_ = std::make_pair(new_plug_state, plug_change_time);
     }
-    void TopologyChanged(TopologyId topology_id) final {
+    void TopologyIsChanged(TopologyId topology_id) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(topology_id " << topology_id << ")";
       topology_id_ = topology_id;
     }
-    void ElementStateChanged(
+    void ElementStateIsChanged(
         ElementId element_id,
         fuchsia_hardware_audio_signalprocessing::ElementState element_state) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
@@ -147,12 +147,12 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     void DeviceDroppedRingBuffer(ElementId element_id) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
     }
-    void DelayInfoChanged(ElementId element_id,
-                          const fuchsia_audio_device::DelayInfo& new_delay_info) final {
+    void DelayInfoIsChanged(ElementId element_id,
+                            const fuchsia_audio_device::DelayInfo& new_delay_info) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
       delay_infos_.insert_or_assign(element_id, new_delay_info);
     }
-    void DaiFormatChanged(
+    void DaiFormatIsChanged(
         ElementId element_id, const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
         const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(element_id " << element_id << ")";
@@ -170,30 +170,31 @@ class DeviceTestBase : public gtest::TestLoopFixture {
         dai_formats_.insert_or_assign(element_id, std::nullopt);
       }
     }
-    void DaiFormatNotSet(ElementId element_id, const fuchsia_hardware_audio::DaiFormat& dai_format,
-                         fuchsia_audio_device::ControlSetDaiFormatError error) final {
+    void DaiFormatIsNotChanged(ElementId element_id,
+                               const fuchsia_hardware_audio::DaiFormat& dai_format,
+                               fuchsia_audio_device::ControlSetDaiFormatError error) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses)
           << "(element_id " << element_id << ", " << error << ")";
       dai_format_errors_.insert_or_assign(element_id, error);
     }
 
-    void CodecStarted(const zx::time& start_time) final {
+    void CodecIsStarted(const zx::time& start_time) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(" << start_time.get() << ")";
       codec_start_failed_ = false;
       codec_start_time_ = start_time;
       codec_stop_time_.reset();
     }
-    void CodecNotStarted() final {
+    void CodecIsNotStarted() final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       codec_start_failed_ = true;
     }
-    void CodecStopped(const zx::time& stop_time) final {
+    void CodecIsStopped(const zx::time& stop_time) final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses) << "(" << stop_time.get() << ")";
       codec_stop_failed_ = false;
       codec_stop_time_ = stop_time;
       codec_start_time_.reset();
     }
-    void CodecNotStopped() final {
+    void CodecIsNotStopped() final {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       codec_stop_failed_ = true;
     }

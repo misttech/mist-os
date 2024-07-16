@@ -261,7 +261,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
   MaybeCompleteWatchDelayInfo();
 }
 
-void RingBufferServer::DelayInfoChanged(const fad::DelayInfo& delay_info) {
+void RingBufferServer::DelayInfoIsChanged(const fad::DelayInfo& delay_info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogNotifyMethods);
 
   new_delay_info_to_notify_ = delay_info;
