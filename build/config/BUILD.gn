@@ -942,6 +942,11 @@ config("Wno-vla-cxx-extension") {
   ]
 }
 
+# TODO(https://fxbug.dev/353575163): Remove this when instances have been resolved.
+config("Wno-gnu-folding-constant") {
+  cflags = [ "-Wno-gnu-folding-constant" ]
+}
+
 # TODO(https://fxbug.dev/42136089): clean up instances of this outside of third party code.
 #
 # NOTE: Do not add this to public_configs under any circumstances. Public
