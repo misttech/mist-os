@@ -146,7 +146,7 @@ PECOFF_SECTION_RW(.lprfvt, VTableData, VTableProfData)
 PECOFF_SECTION_RO(.lprfvns, VNames, char)
 #endif
 
-PECOFF_SECTION_RW(.lprfc, Counters, uint64_t)
+PECOFF_SECTION_RW(.lprfc, Counters, char)
 
 PECOFF_SECTION_RW(.lprfb, Bitmap, char)
 
@@ -176,9 +176,9 @@ extern "C" {
     "section$end$__DATA$" INSTR_PROF_VNAME_SECT_NAME);
 #endif
 
-[[gnu::visibility("hidden")]] extern uint64_t CountersBegin[] __asm__(
+[[gnu::visibility("hidden")]] extern char CountersBegin[] __asm__(
     "section$start$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
-[[gnu::visibility("hidden")]] extern uint64_t CountersEnd[] __asm__(
+[[gnu::visibility("hidden")]] extern char CountersEnd[] __asm__(
     "section$end$__DATA$" INSTR_PROF_CNTS_SECT_NAME);
 
 [[gnu::visibility("hidden")]] extern char BitmapBegin[] __asm__(
@@ -229,7 +229,7 @@ PROFDATA_SECTION(const VTableProfData, VTableDataBegin, VTableDataEnd, INSTR_PRO
 PROFDATA_SECTION(const char, VNamesBegin, VNamesEnd, INSTR_PROF_VNAME_COMMON, "");
 #endif
 
-PROFDATA_SECTION(uint64_t, CountersBegin, CountersEnd, INSTR_PROF_CNTS_COMMON, "w");
+PROFDATA_SECTION(char, CountersBegin, CountersEnd, INSTR_PROF_CNTS_COMMON, "w");
 
 PROFDATA_SECTION(char, BitmapBegin, BitmapEnd, INSTR_PROF_BITS_COMMON, "w");
 
@@ -283,19 +283,25 @@ template <typename T>
 
 // This is the .bss data that gets updated live by instrumented code when the
 // bias is set to zero.
-[[gnu::const]] cpp20::span<uint64_t> ProfCountersData() {
-  return cpp20::span<uint64_t>(&CountersBegin[0], CountersEnd - CountersBegin);
+[[gnu::const]] cpp20::span<char> ProfCountersData() {
+  return cpp20::span<char>(&CountersBegin[0], CountersEnd - CountersBegin);
 }
 
 [[gnu::const]] cpp20::span<char> ProfBitmapData() {
   return cpp20::span<char>(&BitmapBegin[0], BitmapEnd - BitmapBegin);
 }
 
+[[gnu::const]] size_t CountersSize() {
+  if (LlvmProfdata::UsingSingleByteCounters())
+    return sizeof(uint8_t);
+  return sizeof(uint64_t);
+}
+
 [[gnu::const]] ProfRawHeader GetHeader(cpp20::span<const std::byte> build_id) {
   // These are used by the INSTR_PROF_RAW_HEADER initializers.
   const uint64_t NumData = ProfDataArray().size();
   const uint64_t PaddingBytesBeforeCounters = 0;
-  const uint64_t NumCounters = ProfCountersData().size();
+  const uint64_t NumCounters = ProfCountersData().size() / CountersSize();
   const uint64_t PaddingBytesAfterCounters = 0;
   const uint64_t NumBitmapBytes = ProfBitmapData().size();
   const uint64_t PaddingBytesAfterBitmapBytes = 0;
@@ -343,6 +349,13 @@ void MergeSelfData(cpp20::span<std::byte> to, cpp20::span<FromT> from, const cha
   MergeData<T, Op>(to.subspan(0, from.size_bytes()), cpp20::as_bytes(from));
 }
 
+void MergeCounters(cpp20::span<std::byte> to, cpp20::span<const std::byte> from) {
+  if (LlvmProfdata::UsingSingleByteCounters())
+    MergeData<uint8_t, std::logical_and>(to, from);
+  else
+    MergeData<uint64_t, std::plus>(to, from);
+}
+
 }  // namespace
 
 void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
@@ -359,7 +372,7 @@ void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
   counters_offset_ = sizeof(header) + header.binary_ids_size() +
                      (static_cast<size_t>(header.NumData) * sizeof(__llvm_profile_data)) +
                      static_cast<size_t>(header.PaddingBytesBeforeCounters);
-  counters_size_bytes_ = static_cast<size_t>(header.NumCounters) * sizeof(uint64_t);
+  counters_size_bytes_ = static_cast<size_t>(header.NumCounters) * CountersSize();
   ZX_ASSERT(counters_size_bytes_ == ProfCountersData().size_bytes());
 
   size_bytes_ = counters_offset_ + counters_size_bytes_ +
@@ -374,6 +387,10 @@ void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
   size_bytes_ +=
       static_cast<size_t>(header.VNamesSize) + PaddingSize(static_cast<size_t>(header.VNamesSize));
 #endif
+}
+
+bool LlvmProfdata::UsingSingleByteCounters() {
+  return INSTR_PROF_RAW_VERSION_VAR & VARIANT_MASK_BYTE_COVERAGE;
 }
 
 LlvmProfdata::LiveData LlvmProfdata::DoFixedData(cpp20::span<std::byte> data, bool match) {
@@ -481,11 +498,17 @@ void LlvmProfdata::CopyLiveData(LiveData data) {
 // Instead of copying, merge the old counters with our values by summation and
 // the old bitmap by bitwise OR.
 void LlvmProfdata::MergeLiveData(LiveData data) {
-  MergeSelfData<uint64_t, std::plus>(data.counters, ProfCountersData(), "counters");
+  auto data_counters = data.counters;
+  auto prof_counters = ProfCountersData();
+  ZX_ASSERT_MSG(data_counters.size_bytes() >= prof_counters.size_bytes(),
+                "merging %zu bytes of counters with only %zu bytes left!",
+                prof_counters.size_bytes(), data_counters.size_bytes());
+  MergeCounters(data_counters, cpp20::as_bytes(ProfCountersData()));
+  MergeSelfData<char, std::bit_or>(data.bitmap, ProfBitmapData(), "bitmap");
 }
 
 void LlvmProfdata::MergeLiveData(LiveData to, LiveData from) {
-  MergeData<uint64_t, std::plus>(to.counters, from.counters);
+  MergeCounters(to.counters, from.counters);
   MergeData<char, std::bit_or>(to.bitmap, from.bitmap);
 }
 
