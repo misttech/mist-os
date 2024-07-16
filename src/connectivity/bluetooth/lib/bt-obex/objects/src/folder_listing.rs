@@ -373,7 +373,7 @@ impl FolderListing {
             .unwrap_or(&default_version)
             .value;
         if version != FolderListing::DEFAULT_VERSION {
-            return Err(Error::InvalidData(version.to_string()));
+            return Err(Error::UnsupportedVersion);
         }
         Ok(())
     }

@@ -63,12 +63,12 @@ impl MasConfig {
             })
             .is_none()
         {
-            return Err(MapError::DoesNotExist(ServiceRecordItem::MasServiceClassId));
+            return Err(MapError::InvalidSdp(ServiceRecordItem::MasServiceClassId));
         }
 
         // Ensure MAP profile is advertised.
         let profile_desc = find_profile_descriptors(&attributes)
-            .map_err(|_| MapError::DoesNotExist(ServiceRecordItem::MapProfileDescriptor))?;
+            .map_err(|_| MapError::InvalidSdp(ServiceRecordItem::MapProfileDescriptor))?;
         if profile_desc
             .iter()
             .find(|desc| {
@@ -76,7 +76,7 @@ impl MasConfig {
             })
             .is_none()
         {
-            return Err(MapError::DoesNotExist(ServiceRecordItem::MapProfileDescriptor));
+            return Err(MapError::InvalidSdp(ServiceRecordItem::MapProfileDescriptor));
         }
 
         let protocol = protocol
@@ -106,7 +106,7 @@ impl MasConfig {
                 };
                 Some(raw_val)
             })
-            .ok_or(MapError::DoesNotExist(ServiceRecordItem::MasInstanceId))?;
+            .ok_or(MapError::InvalidSdp(ServiceRecordItem::MasInstanceId))?;
 
         let name = attributes
             .iter()
@@ -124,7 +124,7 @@ impl MasConfig {
                     _ => Some(FALLBACK_MAS_SERVICE_NAME.to_string()),
                 }
             })
-            .ok_or(MapError::DoesNotExist(ServiceRecordItem::ServiceName))?;
+            .ok_or(MapError::InvalidSdp(ServiceRecordItem::ServiceName))?;
 
         // Get supported times
         let supported_message_types = attributes
@@ -142,7 +142,7 @@ impl MasConfig {
                     supported.into_iter().filter_map(|r| r.ok()).collect();
                 Some(supported)
             })
-            .ok_or(MapError::DoesNotExist(ServiceRecordItem::SupportedMessageTypes))?;
+            .ok_or(MapError::InvalidSdp(ServiceRecordItem::SupportedMessageTypes))?;
 
         // We intersect the features supported by Sapphire and the features supported by
         // the peer device.
@@ -157,7 +157,7 @@ impl MasConfig {
                 };
                 Some(MapSupportedFeatures::from_bits_truncate(raw_val))
             })
-            .ok_or(MapError::DoesNotExist(ServiceRecordItem::MapSupportedFeatures))?;
+            .ok_or(MapError::InvalidSdp(ServiceRecordItem::MapSupportedFeatures))?;
 
         let config =
             MasConfig { instance_id: id, name, supported_message_types, connection, features };

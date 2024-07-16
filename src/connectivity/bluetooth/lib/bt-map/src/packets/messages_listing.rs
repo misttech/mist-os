@@ -8,12 +8,12 @@ use std::collections::HashSet;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
-use tracing::debug;
 use xml::attribute::OwnedAttribute;
 use xml::reader::{ParserConfig, XmlEvent};
 use xml::writer::{EmitterConfig, XmlEvent as XmlWriteEvent};
 use xml::EventWriter;
 
+use crate::packets::{bool_to_string, str_to_bool, truncate_string, ISO_8601_TIME_FORMAT};
 use crate::MessageType;
 
 // From MAP v1.4.2 section 3.1.6 Message-Listing Object:
@@ -80,10 +80,6 @@ const CONVERSATION_ID_ATTR: &str = "conversation_id";
 const CONVERSATION_NAME_ATTR: &str = "conversation_name";
 const DIRECTION_ATTR: &str = "direction";
 const ATTACHMENT_MIME_TYPES_ATTR: &str = "attachment_mime_types";
-
-/// The ISO 8601 time format used in the Time Header packet.
-/// The format is YYYYMMDDTHHMMSS where "T" delimits the date from the time.
-const ISO_8601_TIME_FORMAT: &str = "%Y%m%dT%H%M%S";
 
 #[derive(Debug, PartialEq)]
 pub enum ReceptionStatus {
@@ -200,25 +196,9 @@ impl FromStr for MessagesListingVersion {
         match src {
             "1.0" => Ok(Self::V1_0),
             "1.1" => Ok(Self::V1_1),
-            v => Err(Error::invalid_data(v)),
+            _v => Err(Error::UnsupportedVersion),
         }
     }
-}
-
-/// Some string values have byte data length limit.
-/// We truncate the strings to fit that limit if necessary.
-fn truncate_string(value: &String, max_len: usize) -> String {
-    let mut v = value.clone();
-    if v.len() <= max_len {
-        return v;
-    }
-    let mut l = max_len;
-    while !v.is_char_boundary(l) {
-        l -= 1;
-    }
-    v.truncate(l);
-    debug!("truncated string value from length {} to {}", value.len(), v.len());
-    v
 }
 
 /// List of attributes available for messages-listing v1.0 objects.
@@ -265,15 +245,6 @@ impl TryFrom<&OwnedAttribute> for AttributeV1_0 {
     type Error = Error;
 
     fn try_from(src: &OwnedAttribute) -> Result<Self, Error> {
-        // Converts the "yes" / "no" values to corresponding boolean.
-        fn str_to_bool(val: &str) -> Result<bool, Error> {
-            match val {
-                "yes" => Ok(true),
-                "no" => Ok(false),
-                val => Err(Error::invalid_data(val)),
-            }
-        }
-
         let attr_name = src.name.local_name.as_str();
         let attribute = match attr_name {
             HANDLE_ATTR => {
@@ -337,14 +308,6 @@ impl TryFrom<&OwnedAttribute> for AttributeV1_0 {
 }
 
 impl AttributeV1_0 {
-    fn bool_to_string(val: bool) -> String {
-        if val {
-            "yes".to_string()
-        } else {
-            "no".to_string()
-        }
-    }
-
     // Validate the attribute against the message listing version.
     fn validate(&self) -> Result<(), Error> {
         if let Self::RecipientAddressing(v) = self {
@@ -379,7 +342,7 @@ impl AttributeV1_0 {
 
     fn xml_attribute_value(&self) -> String {
         match self {
-            Self::Handle(v) => v.to_string(),
+            Self::Handle(v) => hex::encode(v.to_be_bytes()),
             Self::Subject(v) => truncate_string(v, 256),
             Self::Datetime(v) => v.format(ISO_8601_TIME_FORMAT).to_string(),
             Self::SenderName(v) => v.clone(),
@@ -393,7 +356,7 @@ impl AttributeV1_0 {
             | Self::Priority(v)
             | Self::Read(v)
             | Self::Sent(v)
-            | Self::Protected(v) => Self::bool_to_string(*v),
+            | Self::Protected(v) => bool_to_string(*v),
             Self::ReceiptionStatus(v) => v.to_string(),
             Self::AttachmentSize(v) => v.to_string(),
         }
@@ -712,7 +675,7 @@ impl Parser for MessagesListing {
         prev.push(ParsedXmlEvent::MessagesListingElement);
         let mut messages_listing = MessagesListing::new(version);
 
-        // Process remaining elements elements.
+        // Process remaining elements.
         let mut finished_document = false;
         let mut finished_messages_listing = false;
         while !finished_document {
@@ -804,6 +767,7 @@ impl Builder for MessagesListing {
         Ok(w.write(XmlWriteEvent::end_element())?)
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

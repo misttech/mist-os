@@ -11,8 +11,11 @@ rustc_library("bt-map") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.bluetooth.map:fuchsia.bluetooth.map_rust",
+    "//src/connectivity/bluetooth/lib/bt-obex",
     "//src/connectivity/bluetooth/lib/bt-obex/objects",
     "//src/connectivity/bluetooth/lib/packet-encoding",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:hex",
@@ -25,6 +28,7 @@ rustc_library("bt-map") {
 
   sources = [
     "src/lib.rs",
+    "src/packets/event_report.rs",
     "src/packets/messages_listing.rs",
     "src/packets/mod.rs",
   ]
@@ -35,10 +39,16 @@ rustc_library("bt-map") {
 resource("test-files") {
   sources = [
     "//src/connectivity/bluetooth/lib/bt-obex/objects/test/bad_sample.xml",
+    "test/bad_sample_event_report_v1_0_1.xml",
+    "test/bad_sample_event_report_v1_0_2.xml",
+    "test/bad_sample_event_report_v1_1.xml",
     "test/bad_sample_messages_listing_v1_0_1.xml",
     "test/bad_sample_messages_listing_v1_0_2.xml",
     "test/bad_sample_messages_listing_v1_1_1.xml",
     "test/bad_sample_messages_listing_v1_1_2.xml",
+    "test/sample_event_report_v1_0.xml",
+    "test/sample_event_report_v1_1.xml",
+    "test/sample_event_report_v1_2.xml",
     "test/sample_messages_listing_v1_0_1.xml",
     "test/sample_messages_listing_v1_0_2.xml",
     "test/sample_messages_listing_v1_1_1.xml",
