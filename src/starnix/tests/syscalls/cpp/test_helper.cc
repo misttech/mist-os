@@ -168,6 +168,25 @@ ScopedTempDir::~ScopedTempDir() {
   }
 }
 
+ScopedTempSymlink::ScopedTempSymlink(const char *target_path) {
+  std::string prefix = "/tmp/syscall_test_symlink_";
+  size_t retries = 100;
+  while (retries--) {
+    std::string path = prefix + RandomHexString(6);
+    if (symlink(target_path, path.c_str()) == 0) {
+      path_ = path;
+      return;
+    }
+  }
+  path_.clear();
+}
+
+ScopedTempSymlink::~ScopedTempSymlink() {
+  if (!path_.empty()) {
+    unlink(path_.c_str());
+  }
+}
+
 void waitForChildSucceeds(unsigned int waitFlag, int cloneFlags, int (*childRunFunction)(void *),
                           int (*parentRunFunction)(void *)) {
   CloneHelper cloneHelper;
@@ -262,6 +281,18 @@ std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_vie
   return find_memory_mapping(
       [addr](const MemoryMapping &mapping) { return mapping.start <= addr && addr < mapping.end; },
       maps);
+}
+
+std::string RandomHexString(size_t length) {
+  constexpr char kHexCharacters[] = "0123456789ABCDEF";
+  constexpr size_t kRadix = sizeof(kHexCharacters) - 1;
+
+  std::string value(length, '\0');
+  for (size_t i = 0; i < length; ++i) {
+    value[i] = kHexCharacters[random() % kRadix];
+  }
+
+  return value;
 }
 
 bool HasCapability(uint32_t cap) {

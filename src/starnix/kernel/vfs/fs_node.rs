@@ -857,10 +857,11 @@ macro_rules! fs_node_impl_symlink {
         fn create_file_ops(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
+            node: &crate::vfs::FsNode,
             _current_task: &CurrentTask,
             _flags: starnix_uapi::open_flags::OpenFlags,
         ) -> Result<Box<dyn crate::vfs::FileOps>, starnix_uapi::errors::Errno> {
+            assert!(node.is_lnk());
             unreachable!("Symlink nodes cannot be opened.");
         }
     };

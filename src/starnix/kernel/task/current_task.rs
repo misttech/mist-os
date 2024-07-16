@@ -540,11 +540,13 @@ impl CurrentTask {
                                 flags,
                             )
                         }
-                        SymlinkTarget::Node(node) => {
-                            if context.resolve_flags.contains(ResolveFlags::NO_MAGICLINKS) {
+                        SymlinkTarget::Node(name) => {
+                            if context.resolve_flags.contains(ResolveFlags::NO_MAGICLINKS)
+                                || name.entry.node.is_lnk()
+                            {
                                 error!(ELOOP)
                             } else {
-                                Ok((node, false))
+                                Ok((name, false))
                             }
                         }
                     }

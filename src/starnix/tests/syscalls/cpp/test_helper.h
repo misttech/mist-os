@@ -158,6 +158,20 @@ class ScopedTempDir {
   std::string path_;
 };
 
+class ScopedTempSymlink {
+ public:
+  explicit ScopedTempSymlink(const char *target_path);
+  ~ScopedTempSymlink();
+
+  bool is_valid() const { return !path_.empty(); }
+  explicit operator bool() const { return is_valid(); }
+
+  const std::string &path() const { return path_; }
+
+ private:
+  std::string path_;
+};
+
 #define HANDLE_EINTR(x)                                     \
   ({                                                        \
     decltype(x) eintr_wrapper_result;                       \
@@ -337,6 +351,9 @@ std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const Memory
                                                  std::string_view maps);
 
 std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps);
+
+// Returns a random hex string of the given length.
+std::string RandomHexString(size_t length);
 
 // Returns true if running with sysadmin capabilities.
 bool HasSysAdmin();
