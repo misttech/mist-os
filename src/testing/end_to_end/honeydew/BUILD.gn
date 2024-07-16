@@ -153,7 +153,7 @@ group("honeydew_fidl_ir_and_deps") {
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_host_test_data(${toolchain_variant.base})",
 
     # Required by Fuchsia Controller itself.
-    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data(${toolchain_variant.base})",
   ]
 }
 
