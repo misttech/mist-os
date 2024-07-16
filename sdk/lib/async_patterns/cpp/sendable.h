@@ -27,7 +27,12 @@ namespace async_patterns {
 /// ## Safety of sending arguments
 ///
 /// Because the |args| are used at a later time, one needs to be aware of risks
-/// of use-after-free and dace races. There are also the following restrictions:
+/// of use-after-free and data races. There are also the following restrictions:
+///
+/// - When sending a ref-counted pointer such as |std::shared_ptr<Arg>|, both the
+///   sender and the |callable| will be able to concurrently access |Arg|. Be
+///   sure to add appropriate synchronization to |Arg|, for example protecting
+///   fields with mutexes. This pattern is called "shared-state concurrency".
 ///
 /// - Value types may be sent via copying or moving. Whether one passes an |Arg|,
 ///   |const Arg&|, or |Arg&&| etc on the sending side, the |callable| will have
@@ -44,11 +49,6 @@ namespace async_patterns {
 /// - If the |callable| takes |const Arg&| as an argument, one may send an
 ///   instance of |Arg| via copying or moving. The instance will live until the
 ///   callable finishes executing.
-///
-/// - When sending a ref-counted pointer such as |std::shared_ptr<Arg>|, both the
-///   sender and the |callable| will be able to concurrently access |Arg|. Be
-///   sure to add appropriate synchronization to |Arg|, for example protecting
-///   fields with mutexes. This pattern is called "shared-state concurrency".
 ///
 /// - These checks are performed for each argument, but there could still be raw
 ///   pointers or references inside an object that is sent. One must ensure that

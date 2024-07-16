@@ -9,6 +9,6 @@
   "pkg/async_patterns_cpp/include/lib/async_patterns/cpp/internal/task_queue.h": "f3189fa6612a6225aa728d237a296a8c",
   "pkg/async_patterns_cpp/include/lib/async_patterns/cpp/pending_call.h": "1d04cacb40c8dfea83bb71a9919090b9",
   "pkg/async_patterns_cpp/include/lib/async_patterns/cpp/receiver.h": "47c814f51ca0fa198abc1789ec66a517",
-  "pkg/async_patterns_cpp/include/lib/async_patterns/cpp/sendable.h": "080fd10bea2bb5a368c580d617579332",
+  "pkg/async_patterns_cpp/include/lib/async_patterns/cpp/sendable.h": "d93f9df0104bb922f729edab7f319219",
   "pkg/async_patterns_cpp/include/lib/async_patterns/cpp/task_scope.h": "ab2650e421322acc7a247df7782e70aa"
 }
