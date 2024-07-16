@@ -4,8 +4,8 @@
 
 #include "aml-light.h"
 
+#include <fidl/fuchsia.hardware.light/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <string.h>
@@ -13,7 +13,6 @@
 
 #include <cmath>
 
-#include <ddk/metadata/lights.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
@@ -196,22 +195,6 @@ zx_status_t AmlLight::Create(void* ctx, zx_device_t* parent) {
 
 zx_status_t AmlLight::Init() {
   zx_status_t status = ZX_OK;
-  struct name_t {
-    char name[kNameLength];
-  };
-  auto names = ddk::GetMetadataArray<name_t>(parent(), DEVICE_METADATA_NAME);
-  if (!names.is_ok()) {
-    return names.error_value();
-  }
-  auto configs = ddk::GetMetadataArray<lights_config_t>(parent(), DEVICE_METADATA_LIGHTS);
-  if (!configs.is_ok()) {
-    return configs.error_value();
-  }
-  if (names->size() != configs->size()) {
-    zxlogf(ERROR, "number of names [%lu] does not match number of configs [%lu]", names->size(),
-           configs->size());
-    return ZX_ERR_INTERNAL;
-  }
 
   ddk::PDevFidl pdev(parent(), "pdev");
   pdev_board_info_t board_info = {};
@@ -220,21 +203,48 @@ zx_status_t AmlLight::Init() {
     board_info.pid = PDEV_PID_GENERIC;
   }
 
+  zx::result metadata =
+      pdev.GetMetadata<fuchsia_hardware_light::Metadata>(fuchsia_hardware_light::kMetadataType);
+  if (metadata.is_error()) {
+    zxlogf(ERROR, "Failed to get metadata: %s", metadata.status_string());
+    return metadata.status_value();
+  }
+
   const zx::duration pwm_period = board_info.pid == PDEV_PID_NELSON ? kNelsonPwmPeriod : kPwmPeriod;
 
   zxlogf(INFO, "PWM period: %ld ns", pwm_period.to_nsecs());
 
-  for (uint32_t i = 0; i < configs->size(); i++) {
-    auto* config = &configs.value()[i];
-    char* name = names.value()[i].name;
+  const std::optional<std::vector<fuchsia_hardware_light::Config>>& configs = metadata->configs();
+  if (!configs.has_value()) {
+    zxlogf(ERROR, "Metadata missing configs");
+    return ZX_ERR_INTERNAL;
+  }
+  for (size_t i = 0; i < configs.value().size(); ++i) {
+    const fuchsia_hardware_light::Config& config = configs.value()[i];
+    const std::optional<std::string>& name = config.name();
+    const std::optional<bool> brightness = config.brightness();
+    const std::optional<bool> init_on = config.init_on();
+
+    if (!name.has_value()) {
+      zxlogf(ERROR, "Config %lu is missing its name property.", i);
+      return ZX_ERR_INTERNAL;
+    }
+    if (!brightness.has_value()) {
+      zxlogf(ERROR, "Config %lu is missing its brightness property.", i);
+      return ZX_ERR_INTERNAL;
+    }
+    if (!init_on.has_value()) {
+      zxlogf(ERROR, "Config %lu is missing its init_on property.", i);
+      return ZX_ERR_INTERNAL;
+    }
 
     std::string fragment_name;
-    if (std::string("AMBER_LED") == name) {
+    if (std::string("AMBER_LED") == *name) {
       fragment_name = "amber-led";
-    } else if (std::string("GREEN_LED") == name) {
+    } else if (std::string("GREEN_LED") == *name) {
       fragment_name = "green-led";
     } else {
-      zxlogf(ERROR, "Unsupported light: %s", name);
+      zxlogf(ERROR, "Unsupported light: %s", name.value().c_str());
       return ZX_ERR_NOT_SUPPORTED;
     }
 
@@ -246,7 +256,7 @@ zx_status_t AmlLight::Init() {
       return gpio.status_value();
     }
 
-    if (config->brightness) {
+    if (brightness.value()) {
       zx::result client_end = DdkConnectFragmentFidlProtocol<fuchsia_hardware_pwm::Service::Pwm>(
           parent(), ("pwm-" + fragment_name).c_str());
       if (client_end.is_error()) {
@@ -255,12 +265,12 @@ zx_status_t AmlLight::Init() {
       }
       fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm(std::move(client_end.value()));
 
-      lights_.emplace_back(name, std::move(gpio.value()), std::move(pwm), pwm_period);
+      lights_.emplace_back(*name, std::move(gpio.value()), std::move(pwm), pwm_period);
     } else {
-      lights_.emplace_back(name, std::move(gpio.value()), std::nullopt, pwm_period);
+      lights_.emplace_back(*name, std::move(gpio.value()), std::nullopt, pwm_period);
     }
 
-    if ((status = lights_.back().Init(config->init_on)) != ZX_OK) {
+    if ((status = lights_.back().Init(init_on.value())) != ZX_OK) {
       zxlogf(ERROR, "Could not initialize light");
       return status;
     }

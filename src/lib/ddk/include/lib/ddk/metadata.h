@@ -80,9 +80,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // list of buttons_gpio_config_t
 #define DEVICE_METADATA_BUTTONS_GPIOS 0x474E5442  // BTNG
 
-// list of char[ZX_MAX_NAME_LEN]
-#define DEVICE_METADATA_NAME 0x454D414E  // NAME
-
 // type: fuchsia_hardware_thermal_ThermalDeviceInfo
 #define DEVICE_METADATA_THERMAL_CONFIG 0x54485243  // THRC
 
@@ -128,10 +125,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // Maximum screen brightness in nits. Used by the backlight driver.
 // type: double
 #define DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS 0x4C4B4342  // BCKL
-
-// list of lights_config_t
-#define DEVICE_METADATA_LIGHTS 0x5448474C             // LGHT
-#define DEVICE_METADATA_LIGHTS_GROUP_NAME 0x4E505247  // GRPN
 
 // type: FIDL fuchsia.hardware.registers/Metadata
 #define DEVICE_METADATA_REGISTERS 0x53474552  // REGS
