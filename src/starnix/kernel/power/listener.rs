@@ -8,9 +8,68 @@ use crate::power::manager::{SuspendResult, SuspendResumeManagerHandle, STARNIX_P
 use fidl::endpoints::create_request_stream;
 use futures::StreamExt;
 use starnix_logging::{log_error, log_info, log_warn};
-use {fidl_fuchsia_power_system as fsystem, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fsession,
+    fuchsia_zircon as zx,
+};
 
 pub(super) fn init_listener(
+    power_manager: &SuspendResumeManagerHandle,
+    activity_governor: &fsystem::ActivityGovernorSynchronousProxy,
+    system_task: &CurrentTask,
+) {
+    // TODO(https://fxbug.dev/353575594): have session power management
+    // available everywhere, and remove fallback logic.
+    log_info!("Initializing power listener");
+    if let Err(e) = init_session_listener(power_manager, system_task) {
+        log_info!("Connecting to session power management returned {e}");
+        log_info!("Session power management unavailable, falling back to system power management");
+        init_sag_listener(power_manager, activity_governor, system_task)
+    }
+}
+
+fn init_session_listener(
+    power_manager: &SuspendResumeManagerHandle,
+    system_task: &CurrentTask,
+) -> Result<(), anyhow::Error> {
+    let listener_registry = system_task
+        .kernel()
+        .connect_to_protocol_at_container_svc::<fsession::ListenerRegistryMarker>()?
+        .into_sync_proxy();
+    let (listener_client_end, mut listener_stream) =
+        create_request_stream::<fsession::BlockingListenerMarker>().unwrap();
+    listener_registry.register_blocking_listener(listener_client_end, zx::Time::INFINITE)?;
+
+    let power_manager = power_manager.clone();
+    system_task.kernel().kthreads.spawn_future(async move {
+        log_info!("Session Power Listener task starting...");
+
+        while let Some(stream) = listener_stream.next().await {
+            match stream {
+                Ok(req) => match req {
+                    fsession::BlockingListenerRequest::OnResumeStarted { responder } => {
+                        handle_on_resume(&power_manager, || responder.send())
+                    }
+                    fsession::BlockingListenerRequest::OnSuspendFailed { responder } => {
+                        handle_on_suspend_fail(&power_manager, || responder.send())
+                    }
+                    fsession::BlockingListenerRequest::_UnknownMethod { ordinal, .. } => {
+                        handle_unknown_method(ordinal)
+                    }
+                },
+                Err(e) => {
+                    log_error!("listener server got an error: {}", e);
+                    break;
+                }
+            }
+        }
+
+        log_warn!("Session Power Listener task done");
+    });
+    Ok(())
+}
+
+fn init_sag_listener(
     power_manager: &SuspendResumeManagerHandle,
     activity_governor: &fsystem::ActivityGovernorSynchronousProxy,
     system_task: &CurrentTask,
