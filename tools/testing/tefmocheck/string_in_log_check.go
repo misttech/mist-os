@@ -391,6 +391,12 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			String: "Exceeded safe temperature range",
 			Type:   syslogType,
 		},
+		&stringInLogCheck{
+			// LINT.IfChange(blob_write_failure)
+			String: "failed to write blob",
+			// LINT.ThenChange(/src/storage/fxfs/platform/src/fuchsia/fxblob/writer.rs:blob_write_failure)
+			Type: serialLogType,
+		},
 	}
 
 	oopsExceptBlocks := []*logBlock{

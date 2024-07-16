@@ -473,10 +473,12 @@ impl DeliveryBlobWriter {
         }
         // Process the data from the buffer.
         self.process_buffer().await.with_context(|| {
+            // LINT.IfChange(blob_write_failure)
             format!(
                 "failed to write blob {} (bytes_written = {}, offset = {}, delivery_size = {})",
                 self.hash, bytes_written, write_offset, expected_size
             )
+            // LINT.ThenChange(/tools/testing/tefmocheck/string_in_log_check.go:blob_write_failure)
         })?;
         // If all bytes for this delivery blob were written successfully, attempt to verify the blob
         // and add it to the parent directory.
