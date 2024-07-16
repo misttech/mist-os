@@ -240,6 +240,9 @@
 
                 // TODO(https://fxbug.dev/329897718) Re-enable once falke is resolved.
                 "sched_setscheduler04",
+
+                // TODO(https://fxbug.dev/353535860) deflake and enable
+                "pidfd_open03",
             ],
         },
     ],
