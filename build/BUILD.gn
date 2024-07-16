@@ -429,6 +429,7 @@ group("config_data_template_allowlist") {
     "//src/connectivity/weave/weavestack:config",
     "//src/connectivity/wlan/wlancfg:config",
     "//src/developer/forensics:exceptions_enable_jitd_on_startup",
+    "//src/developer/forensics:feedback_upload_config_for_eng",
     "//src/developer/forensics:feedback_user_config_for_eng",
     "//src/developer/forensics:feedback_userdebug_config_for_eng",
     "//src/developer/memory/buckets",
