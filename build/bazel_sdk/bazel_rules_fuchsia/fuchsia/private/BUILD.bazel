@@ -6,6 +6,7 @@ exports_files(
     [
         "driver.ld",
         "visitor.ld",
+        "driver_restricted_symbols.txt",
     ] + glob([
         "templates/*",
     ]),

@@ -25,7 +25,7 @@ load(
     "FuchsiaUnitTestComponentInfo",
     "FuchsiaUnstrippedBinaryInfo",
 )
-load(":utils.bzl", "forward_providers", "get_runfiles", "is_lib", "make_resource_struct", "rule_variant", "rule_variants")
+load(":utils.bzl", "find_cc_toolchain", "forward_providers", "get_runfiles", "is_lib", "make_resource_struct", "rule_variant", "rule_variants")
 
 KNOWN_PROVIDERS = [
     CcInfo,
@@ -48,6 +48,8 @@ def _fuchsia_cc_impl(ctx):
     native_outputs = ctx.attr.native_target.files.to_list()
     if len(native_outputs) != 1:
         fail("Expected exactly 1 native output for %s, got %s" % (ctx.attr.native_target, native_outputs))
+
+    target_in = native_outputs[0]
 
     # Make sure we have a trailing "/"
     install_root = ctx.attr.install_root and ctx.attr.install_root.removesuffix("/") + "/"
@@ -75,6 +77,36 @@ def _fuchsia_cc_impl(ctx):
         if is_lib(file)
     ]
 
+    # Check the restricted symbols
+    if ctx.attr.restricted_symbols:
+        cc_toolchain = find_cc_toolchain(ctx)
+
+        # Create a copy of the input so that we ensure that this action runs.
+        # We do not want to rely on links here since they may not play well with
+        # remote builds.
+        target_out = ctx.actions.declare_file("_" + target_in.basename)
+
+        ctx.actions.run(
+            executable = ctx.executable._check_restricted_symbols,
+            arguments = [
+                "--binary",
+                target_in.path,
+                "--objdump",
+                cc_toolchain.objdump_executable,
+                "--output",
+                target_out.path,
+                "--restricted_symbols_file",
+                ctx.file.restricted_symbols.path,
+            ],
+            inputs = [target_in, ctx.file.restricted_symbols],
+            outputs = [target_out],
+            tools = cc_toolchain.all_files,
+            progress_message = "Checking that binary does not have restricted symbols %s" % target_in,
+            mnemonic = "CheckRestrictedSymbols",
+        )
+    else:
+        target_out = target_in
+
     # Forward CC providers along with metadata for packaging.
     return forward_providers(
         ctx,
@@ -86,13 +118,14 @@ def _fuchsia_cc_impl(ctx):
         FuchsiaPackageResourcesInfo(resources = resources),
         FuchsiaUnstrippedBinaryInfo(
             dest = install_root + ctx.attr.bin_name,
-            unstripped_file = native_outputs[0],
+            unstripped_file = target_out,
         ),
     ]
 
 _fuchsia_cc_binary, _fuchsia_cc_test = rule_variants(
     variants = ("executable", "test"),
     implementation = _fuchsia_cc_impl,
+    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     doc = """Attaches fuchsia-specific metadata to native cc_* targets.
 
     This allows them to be directly included in fuchsia_component.
@@ -135,6 +168,24 @@ _fuchsia_cc_binary, _fuchsia_cc_test = rule_variants(
         "data": attr.label_list(
             doc = "Packaged files needed by this target at runtime.",
             providers = [FuchsiaPackageResourcesInfo],
+        ),
+        "restricted_symbols": attr.label(
+            doc = """A file containing a list of restricted symbols.
+
+            If provided, this list will be checked against the symbols in the binary.
+            If any of the restricted symbols are present in the binary then this
+            rule will fail.
+            """,
+            allow_single_file = True,
+            mandatory = False,
+        ),
+        "_check_restricted_symbols": attr.label(
+            default = "//fuchsia/tools:check_restricted_symbols",
+            executable = True,
+            cfg = "exec",
+        ),
+        "_cc_toolchain": attr.label(
+            default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
         ),
     },
 )

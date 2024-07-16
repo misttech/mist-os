@@ -199,3 +199,9 @@ py_binary(
     srcs = ["ensure_build_config.py"],
     python_version = "PY3",
 )
+
+py_binary(
+    name = "check_restricted_symbols",
+    srcs = ["check_restricted_symbols.py"],
+    python_version = "PY3",
+)
