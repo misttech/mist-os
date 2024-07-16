@@ -127,11 +127,8 @@ zx_status_t Astro::LightInit() {
   fpbus::Node light_node;
   light_node.name() = "gpio-light";
   light_node.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  ;
   light_node.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
-  ;
   light_node.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_GPIO_LIGHT;
-  ;
   light_node.metadata() = {
       {{
           .type = fuchsia_hardware_light::kMetadataType,
