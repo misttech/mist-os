@@ -280,6 +280,7 @@ mod tests {
             let mut m = HashMap::new();
             read_file_into_hashmap(GOLDEN_DIR, "dir/empty", &mut m);
             read_file_into_hashmap(GOLDEN_DIR, "dir/lorem.txt", &mut m);
+            read_file_into_hashmap(GOLDEN_DIR, "dir/simple-copy.txt", &mut m);
             read_file_into_hashmap(GOLDEN_DIR, "empty", &mut m);
             read_file_into_hashmap(GOLDEN_DIR, "random.dat", &mut m);
             read_file_into_hashmap(GOLDEN_DIR, "simple.txt", &mut m);

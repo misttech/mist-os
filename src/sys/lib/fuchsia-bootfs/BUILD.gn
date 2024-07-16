@@ -37,6 +37,7 @@ resource("testdata_golden_subdir") {
   sources = [
     "testdata/input/dir/empty",
     "testdata/input/dir/lorem.txt",
+    "testdata/input/dir/simple-copy.txt",
   ]
   outputs = [ "data/golden/dir/{{source_file_part}}" ]
 }
