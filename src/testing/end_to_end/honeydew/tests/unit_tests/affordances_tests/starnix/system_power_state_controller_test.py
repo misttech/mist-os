@@ -193,7 +193,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_run_starnix_console_shell_cmd.assert_called_once_with(
             mock.ANY,
             cmd=starnix_system_power_state_controller._StarnixCmds.IDLE_SUSPEND,
-            timeout=None,
         )
 
     @mock.patch.object(
@@ -213,7 +212,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_run_starnix_console_shell_cmd.assert_called_once_with(
             mock.ANY,
             cmd=starnix_system_power_state_controller._StarnixCmds.IDLE_SUSPEND,
-            timeout=None,
         )
 
     @mock.patch.object(
@@ -252,7 +250,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_wait_for_timer_end.assert_called_once_with(
             mock.ANY,
             proc=mock.ANY,
-            resume_mode=resume_mode,
         )
 
     def test_set_timer(self) -> None:
@@ -311,28 +308,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 proc=mock_subprocess_popen,
             )
 
-    @mock.patch("time.time", side_effect=[0, 1, 2], autospec=True)
-    def test_wait_for_timer_start_timeout_exception(
-        self, mock_time: mock.Mock
-    ) -> None:
-        """Test case for SystemPowerStateController._wait_for_timer_start()
-        returning HoneydewTimeoutError exception."""
-        mock_subprocess_popen = mock.MagicMock(spec=subprocess.Popen)
-        mock_subprocess_popen.stdout = mock.MagicMock(spec=io.TextIOWrapper)
-        mock_subprocess_popen.stdout.readline.return_value = (
-            _HRTIMER_CTL_OUTPUT_NO_TIMER_START_FOR_TIMEOUT
-        )
-
-        with self.assertRaisesRegex(
-            errors.HoneydewTimeoutError,
-            "Timer has not been started on.*?in.*?sec",
-        ):
-            self.system_power_state_controller_obj._wait_for_timer_start(
-                proc=mock_subprocess_popen,
-            )
-
-        mock_time.assert_called()
-
     def test_wait_for_timer_end(self) -> None:
         """Test case for SystemPowerStateController._wait_for_timer_end()
         success case."""
@@ -345,9 +320,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
 
         self.system_power_state_controller_obj._wait_for_timer_end(
             proc=mock_subprocess_popen,
-            resume_mode=system_power_state_controller_interface.TimerResume(
-                duration=3
-            ),
         )
 
     def test_wait_for_timer_end_exception_1(self) -> None:
@@ -367,9 +339,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         ):
             self.system_power_state_controller_obj._wait_for_timer_end(
                 proc=mock_subprocess_popen,
-                resume_mode=system_power_state_controller_interface.TimerResume(
-                    duration=3
-                ),
             )
 
     def test_wait_for_timer_end_exception_2(self) -> None:
@@ -390,9 +359,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         ):
             self.system_power_state_controller_obj._wait_for_timer_end(
                 proc=mock_subprocess_popen,
-                resume_mode=system_power_state_controller_interface.TimerResume(
-                    duration=3
-                ),
             )
 
     @mock.patch(

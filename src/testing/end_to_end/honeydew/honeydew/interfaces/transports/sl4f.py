@@ -10,10 +10,6 @@ from typing import Any
 
 from honeydew.utils import properties
 
-TIMEOUTS: dict[str, float] = {
-    "RESPONSE": 30,
-}
-
 DEFAULTS: dict[str, int] = {
     "ATTEMPTS": 3,
     "INTERVAL": 3,
@@ -48,7 +44,7 @@ class SL4F(abc.ABC):
         self,
         method: str,
         params: dict[str, Any] | None = None,
-        timeout: float = TIMEOUTS["RESPONSE"],
+        timeout: float | None = None,
         attempts: int = DEFAULTS["ATTEMPTS"],
         interval: int = DEFAULTS["INTERVAL"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
@@ -58,7 +54,8 @@ class SL4F(abc.ABC):
         Args:
             method: SL4F method.
             params: Any optional params needed for method param.
-            timeout: Timeout in seconds to wait for SL4F request to complete.
+            timeout: Timeout in seconds to wait for SL4F request to complete. By
+                default, timeout is not set.
             attempts: number of attempts to try in case of a failure.
             interval: wait time in sec before each retry in case of a failure.
             exceptions_to_skip: Any non fatal exceptions for which retry will

@@ -109,7 +109,7 @@ class SL4F(sl4f_interface.SL4F):
         self,
         method: str,
         params: dict[str, Any] | None = None,
-        timeout: float = sl4f_interface.TIMEOUTS["RESPONSE"],
+        timeout: float | None = None,
         attempts: int = sl4f_interface.DEFAULTS["ATTEMPTS"],
         interval: int = sl4f_interface.DEFAULTS["INTERVAL"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
@@ -119,7 +119,8 @@ class SL4F(sl4f_interface.SL4F):
         Args:
             method: SL4F method.
             params: Any optional params needed for method param.
-            timeout: Timeout in seconds to wait for SL4F request to complete.
+            timeout: Timeout in seconds to wait for SL4F request to complete. By
+                default, timeout is not set.
             attempts: number of attempts to try in case of a failure.
             interval: wait time in sec before each retry in case of a failure.
             exceptions_to_skip: Any non fatal exceptions for which retry will

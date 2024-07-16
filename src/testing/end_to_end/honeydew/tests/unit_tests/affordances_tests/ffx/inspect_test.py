@@ -201,7 +201,6 @@ class InspectFfxTests(unittest.TestCase):
         self.mock_ffx.run.assert_called_with(
             cmd=expected_cmd,
             log_output=False,
-            timeout=None,
         )
 
     @parameterized.expand(

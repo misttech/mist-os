@@ -714,7 +714,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         with self.assertRaisesRegex(
             errors.FuchsiaDeviceError, "failed to go offline"
         ):
-            self.fd_obj.wait_for_offline(timeout=2)
+            self.fd_obj.wait_for_offline()
 
         mock_ffx_wait_for_rcs_disconnection.assert_called()
 
@@ -734,7 +734,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     @mock.patch.object(
         ffx_transport.FFX,
         "wait_for_rcs_connection",
-        side_effect=errors.FuchsiaDeviceError("some error"),
+        side_effect=errors.FfxCommandError("error"),
         autospec=True,
     )
     def test_wait_for_online_fail(

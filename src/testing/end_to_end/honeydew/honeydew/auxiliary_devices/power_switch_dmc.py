@@ -15,10 +15,6 @@ from honeydew.utils import host_shell
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_TIMEOUTS: dict[str, float] = {
-    "COMMAND_RESPONSE": 60,
-}
-
 DMC_PATH_KEY: str = "DMC_PATH"
 
 
@@ -113,22 +109,16 @@ class PowerSwitchDmc(power_switch.PowerSwitch):
             f"-state {power_state}"
         ).split()
 
-    def _run(
-        self, command: list[str], timeout: float = _TIMEOUTS["COMMAND_RESPONSE"]
-    ) -> None:
+    def _run(self, command: list[str]) -> None:
         """Helper method to run a command and returns the output.
 
         Args:
             command: Command to run.
-            timeout: How long in sec to wait for command to complete.
 
         Raises:
             PowerSwitchError: In case of failure.
         """
         try:
-            host_shell.run(
-                cmd=command,
-                timeout=timeout,
-            )
+            host_shell.run(cmd=command)
         except errors.HostCmdError as err:
             raise power_switch.PowerSwitchError(err) from err

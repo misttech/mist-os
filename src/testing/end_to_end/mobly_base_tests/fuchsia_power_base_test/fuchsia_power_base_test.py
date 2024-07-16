@@ -163,7 +163,6 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
                 self.device.ffx.run_test_component(
                     self.ffx_test_url,
                     ffx_test_args=ffx_test_args,
-                    timeout=self.timeout_sec,
                     capture_output=False,
                 )
             finally:

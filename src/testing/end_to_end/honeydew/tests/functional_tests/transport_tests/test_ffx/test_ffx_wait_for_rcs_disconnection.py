@@ -14,7 +14,6 @@ from honeydew.interfaces.device_classes import fuchsia_device
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _REBOOT: list[str] = ["target", "reboot"]
-_RCS_CONNECTION_WAIT: float = 60
 
 
 class FFXWaitForRCSDisconnectionTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -31,13 +30,13 @@ class FFXWaitForRCSDisconnectionTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_wait_for_rcs_connection(self) -> None:
         """Test case for FFX.wait_for_rcs_connection()."""
-        self.device.ffx.wait_for_rcs_connection(timeout=_RCS_CONNECTION_WAIT)
+        self.device.ffx.wait_for_rcs_connection()
 
         self.device.ffx.run(_REBOOT)
 
         self.device.ffx.wait_for_rcs_disconnection()
 
-        self.device.ffx.wait_for_rcs_connection(timeout=_RCS_CONNECTION_WAIT)
+        self.device.ffx.wait_for_rcs_connection()
 
         # Make the device ready after reboot
         self.device.on_device_boot()

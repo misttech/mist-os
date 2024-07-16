@@ -266,7 +266,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             # TODO(https://fxbug.dev/42124566): Currently, we are using the link used for ssh to
             # also inject data traffic. This is prone to interference to ssh and to the tests.
             # On NUC7, we can use a separate usb-ethernet interface for the test traffic.
-            else self._device.ffx.get_target_ssh_address(timeout=None).ip
+            else self._device.ffx.get_target_ssh_address().ip
         )
         results: list[dict[str, Any]] = []
         for message_size in [64, 1024, 1400]:
@@ -365,7 +365,6 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             try:
                 output = self._device.ffx.run_ssh_cmd(
                     cmd=f"iperf3 -n 1 -c 127.0.0.1 -p {port}",
-                    timeout=None,
                 )
                 asserts.assert_not_in(
                     "iperf3: error - unable to connect to server: Connection refused",
@@ -453,7 +452,6 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         args = " ".join(cmd_args)
         output = self._device.ffx.run_ssh_cmd(
             cmd=f"iperf3 {args}",
-            timeout=None,
         )
         # We're writing to a file so that the output is available for troubleshooting purposes when
         # run in Infra.
@@ -514,7 +512,6 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         try:
             self._device.ffx.run_ssh_cmd(
                 cmd="killall iperf3",
-                timeout=None,
             )
         except Exception:  # pylint: disable=broad-except
             # killall returns -1 and prints "no tasks found" in its output

@@ -7,7 +7,6 @@
 import abc
 from collections.abc import Callable
 
-from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing import custom_types
 
 
@@ -28,24 +27,12 @@ class RebootCapableDevice(abc.ABC):
         """Register a function that will be called in on_device_boot."""
 
     @abc.abstractmethod
-    def wait_for_offline(
-        self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]
-    ) -> None:
-        """Wait for Fuchsia device to go offline.
-
-        Args:
-            timeout: How long in sec to wait for device to go offline.
-        """
+    def wait_for_offline(self) -> None:
+        """Wait for Fuchsia device to go offline."""
 
     @abc.abstractmethod
-    def wait_for_online(
-        self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]
-    ) -> None:
-        """Wait for Fuchsia device to go online.
-
-        Args:
-            timeout: How long in sec to wait for device to go offline.
-        """
+    def wait_for_online(self) -> None:
+        """Wait for Fuchsia device to go online."""
 
 
 class FuchsiaDeviceLogger(abc.ABC):

@@ -5,7 +5,6 @@
 """SystemPowerStateController affordance implementation using startnix."""
 
 import contextlib
-import enum
 import io
 import logging
 import os
@@ -23,6 +22,7 @@ from honeydew.interfaces.affordances import (
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.typing import custom_types
+from honeydew.utils import decorators
 
 
 class _StarnixCmds:
@@ -55,13 +55,6 @@ class _FuchsiaCmds:
     @staticmethod
     def set_timer_command(duration: int) -> str:
         return f"hrtimer-ctl --id 2 --event {duration}"
-
-
-class _Timeouts(enum.IntEnum):
-    """Class to hold the timeouts."""
-
-    STARNIX_CMD = 15
-    FFX_LOGS_CMD = 60
 
 
 class _RegExPatterns:
@@ -315,7 +308,7 @@ class SystemPowerStateController(
         """
         try:
             self._run_starnix_console_shell_cmd(
-                cmd=_StarnixCmds.IDLE_SUSPEND, timeout=None
+                cmd=_StarnixCmds.IDLE_SUSPEND,
             )
         except Exception as err:  # pylint: disable=broad-except
             raise errors.SystemPowerStateControllerError(
@@ -359,7 +352,7 @@ class SystemPowerStateController(
         if isinstance(
             resume_mode, system_power_state_controller_interface.TimerResume
         ):
-            self._wait_for_timer_end(proc=proc, resume_mode=resume_mode)
+            self._wait_for_timer_end(proc=proc)
 
     def _set_timer(self, duration: int) -> subprocess.Popen[str]:
         """Sets the timer.
@@ -389,6 +382,7 @@ class SystemPowerStateController(
                 f"Failed to set timer on {self._device_name}"
             ) from err
 
+    @decorators.liveness_check
     def _wait_for_timer_start(self, proc: subprocess.Popen[str]) -> None:
         """Wait for the timer to start on the device.
 
@@ -397,19 +391,14 @@ class SystemPowerStateController(
 
         Raises:
             errors.SystemPowerStateControllerError: Timer start failed.
-            errors.HoneydewTimeoutError: Wait for timer start resulted in
-                timeout.
         """
-        timeout: int = 2
-        start_time: float = time.time()
-        end_time: float = start_time + timeout
-
         std_out: typing.IO[str] | None = proc.stdout
         if not isinstance(std_out, io.TextIOWrapper):
             raise errors.SystemPowerStateControllerError(
                 f"Failed to read hrtimer-ctl output on {self._device_name}"
             )
-        while time.time() < end_time:
+        _LOGGER.info("Waiting for the timer to start on %s", self._device_name)
+        while True:
             try:
                 line: str = std_out.readline()
                 _LOGGER.debug(
@@ -430,33 +419,23 @@ class SystemPowerStateController(
                 raise errors.SystemPowerStateControllerError(
                     f"Timer has not been started on {self._device_name}"
                 ) from err
-        else:
-            raise errors.HoneydewTimeoutError(
-                f"Timer has not been started on {self._device_name} in "
-                f"{timeout} sec"
-            )
 
+    @decorators.liveness_check
     def _wait_for_timer_end(
         self,
         proc: subprocess.Popen[str],
-        resume_mode: system_power_state_controller_interface.TimerResume,
     ) -> None:
         """Wait for the timer to end on the device.
 
         Args:
             proc: process used to set the timer.
-            resume_mode: Information about how to resume the device.
 
         Raises:
             errors.SystemPowerStateControllerError: Timer end failed.
         """
         output: str
         error: str
-        # For timer to end, wait for minimum of that duration. Otherwise, there
-        # is a chance that proc.communicate() timeout can happen right at the
-        # same time as timer expires
-        timeout: float = resume_mode.duration + 1
-        output, error = proc.communicate(timeout=timeout)
+        output, error = proc.communicate()
 
         if proc.returncode != 0:
             message: str = (
@@ -474,14 +453,12 @@ class SystemPowerStateController(
                 "hrtimer-ctl completed without ending the timer"
             )
 
-    def _run_starnix_console_shell_cmd(
-        self, cmd: list[str], timeout: float | None = _Timeouts.STARNIX_CMD
-    ) -> str:
+    @decorators.liveness_check
+    def _run_starnix_console_shell_cmd(self, cmd: list[str]) -> str:
         """Run a starnix console command and return its output.
 
         Args:
             cmd: cmd that need to be run excluding `starnix /bin/sh -c`.
-            timeout: command timeout.
 
         Returns:
             Output of `ffx -t {target} starnix /bin/sh -c {cmd}`.
@@ -489,7 +466,6 @@ class SystemPowerStateController(
         Raises:
             errors.StarnixError: In case of starnix command failure.
             errors.NotSupportedError: If Fuchsia device does not support Starnix.
-            subprocess.TimeoutExpired: In case of command timeout.
         """
         # starnix console requires the process to run in tty:
         host_fd: int
@@ -504,7 +480,7 @@ class SystemPowerStateController(
             stdout=child_fd,
             stderr=child_fd,
         )
-        process.wait(timeout)
+        process.wait()
 
         # Note: This call may sometime return less chars than _MAX_READ_SIZE
         # even when command output contains more chars. This happened with
@@ -664,7 +640,6 @@ class SystemPowerStateController(
 
         suspend_resume_logs: list[str] = self._ffx.run(
             suspend_resume_logs_cmd,
-            timeout=_Timeouts.FFX_LOGS_CMD,
         ).split("\n")
 
         suspend_time: float = 0

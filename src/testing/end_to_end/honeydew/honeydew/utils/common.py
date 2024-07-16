@@ -8,34 +8,54 @@ import time
 from collections.abc import Callable
 
 from honeydew import errors
+from honeydew.utils import decorators
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
+def _retry_condition(end_time: float | None = None) -> bool:
+    if end_time is None:
+        return True
+
+    return time.time() < end_time
+
+
+@decorators.liveness_check
 def wait_for_state(
-    state_fn: Callable[[], bool], expected_state: bool, timeout: float
+    state_fn: Callable[[], bool],
+    expected_state: bool,
+    timeout: float | None = None,
+    wait_time: float = 1,
 ) -> None:
     """Wait for specified time for state_fn to return expected_state.
 
     Args:
         state_fn: function to call for getting current state.
         expected_state: expected state to wait for.
-        timeout: How long in sec to wait.
+        timeout: How long in sec to wait. By default, no timeout is set.
+        wait_time: How long in sec to wait between the retries.
 
     Raises:
         errors.HoneydewTimeoutError: If state_fn does not return the
             expected_state with in specified timeout.
     """
-    _LOGGER.info(
-        "Waiting for %s sec for %s to return %s...",
-        timeout,
-        state_fn.__qualname__,
-        expected_state,
+    message: str = (
+        f"Waiting for {state_fn.__qualname__} to return {expected_state}..."
     )
+    end_time: float | None = None
 
-    start_time: float = time.time()
-    end_time: float = start_time + timeout
-    while time.time() < end_time:
+    if timeout:
+        start_time: float = time.time()
+        end_time = start_time + timeout
+
+        message = (
+            f"Waiting for {timeout} sec for {state_fn.__qualname__} "
+            f"to return {expected_state}..."
+        )
+
+    _LOGGER.info(message)
+
+    while _retry_condition(end_time):
         _LOGGER.debug("calling %s", state_fn.__qualname__)
         try:
             current_state: bool = state_fn()
@@ -47,39 +67,50 @@ def wait_for_state(
         except Exception as err:  # pylint: disable=broad-except
             # `state_fn()` raised an exception. Retry again
             _LOGGER.debug(err)
-        time.sleep(0.5)
+        time.sleep(wait_time)
     else:
-        raise errors.HoneydewTimeoutError(
-            f"{state_fn.__qualname__} didn't return {expected_state} in "
-            f"{timeout} sec"
-        )
+        message = f"{state_fn.__qualname__} didn't return {expected_state}"
+        if timeout:
+            message += f" in {timeout} sec"
+        raise errors.HoneydewTimeoutError(message)
 
 
+@decorators.liveness_check
 def retry(
-    fn: Callable[[], object], timeout: float, wait_time: int = 1
+    fn: Callable[[], object],
+    timeout: float | None = None,
+    wait_time: int = 1,
 ) -> object:
     """Wait for specified time for fn to succeed.
 
     Args:
         fn: function to call.
-        timeout: How long in sec to retry in case of failure.
+        timeout: How long in sec to retry in case of failure. By default, no
+            timeout is set.
         wait_time: How long in sec to wait between the retries.
 
     Raises:
         errors.HoneydewTimeoutError: If fn does not succeed with in specified
             timeout.
     """
-    _LOGGER.info(
-        "Retry for %s sec with wait time of %s sec between the retries until "
-        "%s succeeds...",
-        timeout,
-        wait_time,
-        fn.__qualname__,
+    message: str = (
+        f"Run {fn.__qualname__} until it succeeds, with wait time "
+        f"of {wait_time}sec between the retries..."
     )
+    end_time: float | None = None
 
-    start_time: float = time.time()
-    end_time: float = start_time + timeout
-    while time.time() < end_time:
+    if timeout:
+        start_time: float = time.time()
+        end_time = start_time + timeout
+
+        message = (
+            f"Run {fn.__qualname__} until it succeeds or {timeout}sec timeout "
+            f"hit, with wait time of {wait_time}sec between the retries..."
+        )
+
+    _LOGGER.info(message)
+
+    while _retry_condition(end_time):
         _LOGGER.debug("calling %s", fn.__qualname__)
         try:
             ret_value: object = fn()

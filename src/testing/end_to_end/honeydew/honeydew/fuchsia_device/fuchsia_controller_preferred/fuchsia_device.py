@@ -148,7 +148,6 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         Raises:
             errors.FuchsiaControllerError: On FIDL communication failure.
         """
-        # Restart SL4F server on the device with 60 sec retry in case of failure
-        common.retry(fn=self.sl4f.start_server, timeout=60, wait_time=5)
+        common.retry(fn=self.sl4f.start_server, wait_time=5)
 
         super().on_device_boot()

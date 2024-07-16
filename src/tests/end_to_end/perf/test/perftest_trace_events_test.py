@@ -36,7 +36,6 @@ class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):
                     "--enable-tracing",
                     "--filter=^Null$",
                 ],
-                timeout=None,
                 capture_output=False,
             )
 

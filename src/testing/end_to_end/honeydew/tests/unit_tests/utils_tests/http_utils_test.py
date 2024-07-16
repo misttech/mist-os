@@ -30,7 +30,7 @@ _PARAMS: dict[str, Any] = {
         "Content-Type": "application/json; charset=utf-8",
         "Content-Length": 58,  # len(json.dumps(_PARAMS["data"]))
     },
-    "timeout": http_utils._TIMEOUTS["HTTP_RESPONSE"] + 15,
+    "timeout": 15,
     "attempts": http_utils._DEFAULTS["ATTEMPTS"] + 5,
     "interval": http_utils._DEFAULTS["INTERVAL"] + 5,
     "exceptions_to_skip": [],

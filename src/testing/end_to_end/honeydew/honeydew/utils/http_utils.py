@@ -12,12 +12,9 @@ from collections.abc import Iterable
 from typing import Any
 
 from honeydew import errors
+from honeydew.utils import decorators
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-
-_TIMEOUTS: dict[str, float] = {
-    "HTTP_RESPONSE": 30,
-}
 
 _DEFAULTS: dict[str, int] = {
     "ATTEMPTS": 3,
@@ -25,11 +22,12 @@ _DEFAULTS: dict[str, int] = {
 }
 
 
+@decorators.liveness_check
 def send_http_request(
     url: str,
     data: dict[str, Any] | None = None,
     headers: dict[str, Any] | None = None,
-    timeout: float = _TIMEOUTS["HTTP_RESPONSE"],
+    timeout: float | None = None,
     attempts: int = _DEFAULTS["ATTEMPTS"],
     interval: int = _DEFAULTS["INTERVAL"],
     exceptions_to_skip: Iterable[type[Exception]] | None = None,
@@ -43,7 +41,8 @@ def send_http_request(
         url: URL to which HTTP request need to be sent.
         data: data that needs to be set in HTTP request.
         headers: headers that need to be included while sending HTTP request.
-        timeout: how long in sec to wait for HTTP connection attempt.
+        timeout: how long in sec to wait for HTTP connection attempt. By
+            default, timeout is not set.
         attempts: number of attempts to try in case of a failure.
         interval: wait time in sec before each retry in case of a failure.
         exceptions_to_skip: Any non fatal exceptions for which retry will not be

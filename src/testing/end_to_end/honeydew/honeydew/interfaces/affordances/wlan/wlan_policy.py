@@ -13,10 +13,6 @@ from honeydew.typing.wlan import (
     SecurityType,
 )
 
-DEFAULTS: dict[str, float] = {
-    "UPDATE_TIMEOUT_S": 30.0,
-}
-
 
 class WlanPolicy(abc.ABC):
     """Abstract base class for WlanPolicy affordance."""
@@ -51,7 +47,8 @@ class WlanPolicy(abc.ABC):
 
     @abc.abstractmethod
     def get_update(
-        self, timeout: float = DEFAULTS["UPDATE_TIMEOUT_S"]
+        self,
+        timeout: float | None = None,
     ) -> ClientStateSummary:
         """Gets one client listener update.
 
@@ -63,7 +60,8 @@ class WlanPolicy(abc.ABC):
 
         Args:
             timeout: Timeout in seconds to wait for the get_update command to
-                return.
+                return. By default it is set to None (which means timeout is
+                disabled)
 
         Returns: ClientStateSummary
         """

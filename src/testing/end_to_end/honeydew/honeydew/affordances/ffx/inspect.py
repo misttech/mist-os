@@ -68,7 +68,6 @@ class Inspect(inspect.Inspect):
             inspect_data_json_str: str = self._ffx.run(
                 cmd=cmd,
                 log_output=False,
-                timeout=None,
             )
             _LOGGER.info("Collected the inspect data from %s.", self._name)
 
