@@ -7,38 +7,40 @@ import("//build/config/fuchsia/target_api_level.gni")
 
 _lowest_reserved_api_level = 2147483648  # 0x80000000
 
-# `current_build_target_api_level` may be a string or integer. First, determine
-# which it is.
-if (current_build_target_api_level == "$current_build_target_api_level") {
-  # `current_build_target_api_level` is a string and likely a reserved level.
-  # Handle the special named API levels defined in
-  # https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0246_api_levels_are_32_bits#special_api_levels
-
+# `current_build_target_api_level` may be a string or integer. If it is not one
+# of the special named API levels defined in
+# https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0246_api_levels_are_32_bits#special_api_levels,
+# it must be a numbered API level.
+if (current_build_target_api_level == "NEXT") {
   rust_lesser_or_equal_fuchsia_api_levels =
       platform_version.all_numbered_api_levels + [ "NEXT" ]
-  rust_greater_fuchsia_api_levels = []
+  rust_greater_fuchsia_api_levels = [
+    "HEAD",
+    "PLATFORM",
+  ]
+} else if (current_build_target_api_level == "HEAD") {
+  assert(
+      false,
+      "Targeting \"HEAD\" is not currently supported. See https://fxbug.dev/334936990.")
 
-  if (current_build_target_api_level == "NEXT") {
-    rust_greater_fuchsia_api_levels += [
-      "HEAD",
-      "PLATFORM",
-    ]
-  } else if (current_build_target_api_level == "HEAD") {
-    assert(
-        false,
-        "Targeting \"HEAD\" is not currently supported. See https://fxbug.dev/334936990.")
-    rust_lesser_or_equal_fuchsia_api_levels += [ "HEAD" ]
-    rust_greater_fuchsia_api_levels += [ "PLATFORM" ]
-  } else if (current_build_target_api_level == "PLATFORM") {
-    rust_lesser_or_equal_fuchsia_api_levels += [
-      "HEAD",
-      "PLATFORM",
-    ]
-  } else {
-    assert(false,
-           "Unrecognized reserved API level ${current_build_target_api_level}")
-  }
+  rust_lesser_or_equal_fuchsia_api_levels =
+      platform_version.all_numbered_api_levels + [
+        "NEXT",
+        "HEAD",
+      ]
+  rust_greater_fuchsia_api_levels += [ "PLATFORM" ]
+} else if (current_build_target_api_level == "PLATFORM") {
+  rust_lesser_or_equal_fuchsia_api_levels =
+      platform_version.all_numbered_api_levels + [
+        "NEXT",
+        "HEAD",
+        "PLATFORM",
+      ]
+  rust_greater_fuchsia_api_levels = []
 } else {
+  assert(current_build_target_api_level != "$current_build_target_api_level",
+         "Unrecognized API level string ${current_build_target_api_level}")
+
   # `current_build_target_api_level` is not a string and is likely an integer.
   # This condition will fail if either variable is not an integer (or the target
   # is in the reserved range).
