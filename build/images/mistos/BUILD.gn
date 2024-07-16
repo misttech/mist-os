@@ -76,6 +76,7 @@ if (is_mistos) {
       "//src/security/policy/component_manager_policy_base.json5",
       "//src/security/policy/component_manager_policy_build_type_base.json5",
       "//src/security/policy/component_manager_policy_eng.json5",
+      "//src/security/policy/subsystems/component_manager_policy_starnix.json5",
       "//src/sys/component_manager/configs/bootfs_config.mistos.json5",
     ]
     dest = "config/component_manager"
@@ -176,6 +177,20 @@ if (is_mistos) {
       "//src/connectivity/policy/http-client:component",
       "//src/connectivity/policy/netcfg:component-basic",
       "//src/connectivity/policy/reachability:component",
+
+      ## Starnix (starnix_support)
+      "//src/starnix/config:starnix.profiles",
+
+      # Runner (starnix_package)
+      "//src/starnix/runner:starnix_runner_bin",
+      "//src/starnix/runner:starnix_runner_component",
+      "//src/starnix/runner:starnix_runner_component_manifest",
+
+      # Kernel (starnix_kernel_package)
+      "//src/starnix/containers:default_init",
+      "//src/starnix/kernel:kernel_config",
+      "//src/starnix/kernel:starnix_kernel",
+      "//src/starnix/kernel:starnix_kernel_manifest",
     ]
 
     output_dir = root_out_dir

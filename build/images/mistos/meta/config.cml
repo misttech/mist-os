@@ -139,6 +139,13 @@
             to: "parent",
             availability: "optional",
         },
+
+        // Starnix
+        {
+            config: "fuchsia.starnix.runner.EnableDataCollection",
+            from: "self",
+            to: "parent",
+        },
     ],
     capabilities: [
         {
@@ -175,7 +182,8 @@
                 max_size: 50,
             },
             value: [
-                "/bootstrap/**"
+                "/bootstrap/**",
+                "/core/starnix_runner/**",
             ],
         },
         {
@@ -298,6 +306,13 @@
         // Power
         {
             config: "fuchsia.power.SuspendEnabled",
+            type: "bool",
+            value: false,
+        },
+
+        // Starnix
+        {
+            config: "fuchsia.starnix.runner.EnableDataCollection",
             type: "bool",
             value: false,
         },

@@ -20,8 +20,6 @@ use input_device::uinput::register_uinput_device;
 #[cfg(not(feature = "starnix_lite"))]
 use input_device::InputDevice;
 #[cfg(not(feature = "starnix_lite"))]
-use input_device::InputDevice;
-#[cfg(not(feature = "starnix_lite"))]
 use magma_device::magma_device_init;
 use selinux::security_server;
 #[cfg(not(feature = "starnix_lite"))]
@@ -36,22 +34,15 @@ use starnix_core::device::perfetto_consumer::start_perfetto_consumer_thread;
 use starnix_core::device::remote_block_device::remote_block_device_init;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::touch_power_policy_device::TouchPowerPolicyDevice;
-#[cfg(feature = "starnix_lite")]
-use starnix_core::task::KernelFeatures;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::vfs::FsString;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_logging::log_error;
 use starnix_sync::{Locked, Unlocked};
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::error;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::errors::Errno;
 #[cfg(not(feature = "starnix_lite"))]
 use std::sync::mpsc::channel;
-#[cfg(not(feature = "starnix_lite"))]
 use std::sync::Arc;
 
 #[cfg(not(feature = "starnix_lite"))]
@@ -156,8 +147,8 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("gralloc", _) => features.gralloc = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("magma", _) => features.magma = true,
-            #[cfg(not(feature = "starnix_lite"))]
             ("network_manager", _) => features.network_manager = true,
+            #[cfg(not(feature = "starnix_lite"))]
             ("gfxstream", _) => features.gfxstream = true,
             #[cfg(not(feature = "starnix_lite"))]
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
@@ -193,13 +184,14 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
 /// Runs all the features that are enabled in `system_task.kernel()`.
 pub fn run_container_features(
     #[cfg(not(feature = "starnix_lite"))] locked: &mut Locked<'_, Unlocked>,
-    #[cfg(not(feature = "starnix_lite"))] system_task: &CurrentTask,
+    #[cfg(feature = "starnix_lite")] _locked: &mut Locked<'_, Unlocked>,
+    system_task: &CurrentTask,
     features: &Features,
 ) -> Result<(), Error> {
-    #[cfg(not(feature = "starnix_lite"))]
     let kernel = system_task.kernel();
 
     let mut enabled_profiling = false;
+
     #[cfg(not(feature = "starnix_lite"))]
     if features.framebuffer || features.framebuffer2 {
         fb_device_init(locked, system_task);
@@ -319,14 +311,16 @@ pub fn run_container_features(
 }
 
 /// Runs features requested by individual components inside the container.
-#[cfg(not(feature = "starnix_lite"))]
 pub fn run_component_features(
-    kernel: &Arc<Kernel>,
+    #[cfg(not(feature = "starnix_lite"))] kernel: &Arc<Kernel>,
+    #[cfg(feature = "starnix_lite")] _kernel: &Arc<Kernel>,
     entries: &Vec<String>,
-    mut incoming_dir: Option<fidl_fuchsia_io::DirectoryProxy>,
+    #[cfg(not(feature = "starnix_lite"))] mut incoming_dir: Option<fidl_fuchsia_io::DirectoryProxy>,
+    #[cfg(feature = "starnix_lite")] _incoming_dir: Option<fidl_fuchsia_io::DirectoryProxy>,
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
+            #[cfg(not(feature = "starnix_lite"))]
             "framebuffer" => {
                 kernel
                     .framebuffer

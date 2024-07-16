@@ -20,7 +20,7 @@ use {
 };
 
 /// The component URL of the Starnix kernel.
-const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
+const KERNEL_URL: &str = "#meta/starnix_kernel.cm";
 
 /// [`Kernels`] manages a collection of starnix kernels.
 ///

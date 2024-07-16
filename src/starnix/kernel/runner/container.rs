@@ -9,26 +9,19 @@ use crate::{
     serve_container_controller, serve_graphical_presenter, Features,
 };
 #[cfg(feature = "starnix_lite")]
-use crate::{parse_features, run_container_features, Features};
+use crate::{
+    expose_root, parse_features, run_container_features, serve_component_runner,
+    serve_container_controller, Features,
+};
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
 #[cfg(not(feature = "starnix_lite"))]
 use fasync::OnSignals;
-//#[cfg(feature = "starnix_lite")]
-//use fidl::endpoints::{ClientEnd, Proxy};
-#[cfg(not(feature = "starnix_lite"))]
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl::AsyncChannel;
-#[cfg(not(feature = "starnix_lite"))]
-use fidl_fuchsia_element as felement;
-#[cfg(not(feature = "starnix_lite"))]
 use fidl_fuchsia_scheduler::RoleManagerMarker;
-#[cfg(feature = "starnix_lite")]
-use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use fuchsia_async::DurationExt;
-#[cfg(not(feature = "starnix_lite"))]
 use fuchsia_component::client::connect_to_protocol_sync;
-#[cfg(not(feature = "starnix_lite"))]
 use fuchsia_component::server::ServiceFs;
 #[cfg(not(feature = "starnix_lite"))]
 use fuchsia_zircon::{
@@ -39,9 +32,6 @@ use fuchsia_zircon::{
     Task as _, {self as zx},
 };
 use futures::channel::oneshot;
-#[cfg(feature = "starnix_lite")]
-use futures::{FutureExt, StreamExt};
-#[cfg(not(feature = "starnix_lite"))]
 use futures::{FutureExt, StreamExt, TryStreamExt};
 #[cfg(not(feature = "starnix_lite"))]
 use magma_device::get_magma_params;
@@ -57,41 +47,23 @@ use starnix_core::execution::{
 #[cfg(feature = "starnix_lite")]
 use starnix_core::execution::{
     create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
-    parse_numbered_handles,
 };
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
-#[cfg(feature = "starnix_lite")]
-use starnix_core::task::{CurrentTask, ExitStatus, Kernel, Task};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
 use starnix_kernel_config::Config;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
-};
-#[cfg(feature = "starnix_lite")]
-use starnix_logging::{
-    log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
-};
-#[cfg(feature = "starnix_lite")]
-use starnix_logging::{
-    log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
-#[cfg(feature = "starnix_lite")]
-use starnix_uapi::errno;
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-#[cfg(feature = "starnix_lite")]
-use starnix_uapi::rlimit;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_uapi::{errno, rlimit};
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -100,14 +72,15 @@ use std::sync::Arc;
 #[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_starnix_container as fstarcontainer,
-    fidl_fuchsia_starnix_device as fstardevice, fuchsia_async as fasync,
+    fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
+    fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
 #[cfg(feature = "starnix_lite")]
 use {
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_inspect as inspect,
-    fuchsia_runtime as fruntime,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_io as fio, fidl_fuchsia_starnix_container as fstarcontainer,
+    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
@@ -125,7 +98,6 @@ struct ConfigWrapper {
     /// The outgoing directory of the container, used to serve protocols on behalf of the container.
     /// For example, the starnix_kernel serves a component runner in the containers' outgoing
     /// directory.
-    #[cfg(not(feature = "starnix_lite"))]
     outgoing_dir: Option<zx::Channel>,
 
     /// The svc directory of the container, used to access protocols from the container.
@@ -142,7 +114,6 @@ impl std::ops::Deref for ConfigWrapper {
     }
 }
 
-#[cfg(not(feature = "starnix_lite"))]
 fn get_ns_entry(
     ns: &mut Option<Vec<frunner::ComponentNamespaceEntry>>,
     entry_name: &str,
@@ -155,7 +126,6 @@ fn get_ns_entry(
     })
 }
 
-#[cfg(not(feature = "starnix_lite"))]
 fn get_config_from_component_start_info(
     mut start_info: frunner::ComponentStartInfo,
 ) -> ConfigWrapper {
@@ -208,9 +178,7 @@ fn to_cstr(str: &str) -> CString {
 
 #[must_use = "The container must run serve on this config"]
 pub struct ContainerServiceConfig {
-    #[cfg(not(feature = "starnix_lite"))]
     config: ConfigWrapper,
-    #[cfg(not(feature = "starnix_lite"))]
     request_stream: frunner::ComponentControllerRequestStream,
     receiver: oneshot::Receiver<Result<ExitStatus, Error>>,
 }
@@ -232,7 +200,6 @@ impl Container {
         self.kernel.kthreads.system_task()
     }
 
-    #[cfg(not(feature = "starnix_lite"))]
     async fn serve_outgoing_directory(
         &self,
         outgoing_dir: Option<zx::Channel>,
@@ -243,8 +210,10 @@ impl Container {
             let mut fs = ServiceFs::new_local();
             fs.dir("svc")
                 .add_fidl_service(ExposedServices::ComponentRunner)
-                .add_fidl_service(ExposedServices::ContainerController)
-                .add_fidl_service(ExposedServices::GraphicalPresenter);
+                .add_fidl_service(ExposedServices::ContainerController);
+
+            #[cfg(not(feature = "starnix_lite"))]
+            fs.dir("svc").add_fidl_service(ExposedServices::GraphicalPresenter);
 
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
@@ -272,6 +241,7 @@ impl Container {
                             .await
                             .expect("failed to start container.")
                     }
+                    #[cfg(not(feature = "starnix_lite"))]
                     ExposedServices::GraphicalPresenter(request_stream) => {
                         serve_graphical_presenter(request_stream, &self.kernel)
                             .await
@@ -284,7 +254,6 @@ impl Container {
         Ok(())
     }
 
-    #[cfg(not(feature = "starnix_lite"))]
     pub async fn serve(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
         let (r, _) = futures::join!(
             self.serve_outgoing_directory(service_config.config.outgoing_dir),
@@ -292,24 +261,18 @@ impl Container {
         );
         r
     }
-
-    pub async fn run(&self, service_config: ContainerServiceConfig) -> Result<(), Error> {
-        let _ = futures::join!(run_container_controller(service_config.receiver));
-        Ok(())
-    }
 }
 
 /// The services that are exposed in the container component's outgoing directory.
-#[cfg(not(feature = "starnix_lite"))]
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     ContainerController(fstarcontainer::ControllerRequestStream),
+    #[cfg(not(feature = "starnix_lite"))]
     GraphicalPresenter(felement::GraphicalPresenterRequestStream),
 }
 
 type TaskResult = Result<ExitStatus, Error>;
 
-#[cfg(not(feature = "starnix_lite"))]
 async fn server_component_controller(
     request_stream: frunner::ComponentControllerRequestStream,
     task_complete: oneshot::Receiver<TaskResult>,
@@ -348,29 +311,6 @@ async fn server_component_controller(
     fruntime::job_default().kill().expect("Failed to kill job");
 }
 
-async fn run_container_controller(task_complete: oneshot::Receiver<TaskResult>) {
-    enum Event<T> {
-        Completion(T),
-    }
-
-    if let Some(event) = task_complete.into_stream().map(Event::Completion).next().await {
-        match event {
-            Event::Completion(result) => {
-                match result {
-                    Ok(Ok(ExitStatus::Exit(0))) => {
-                        log_info!("Exit gracefully")
-                    }
-                    _ => log_warn!("Something went wrong"),
-                };
-            }
-        }
-    }
-
-    // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
-    fruntime::job_default().kill().expect("Failed to kill job");
-}
-
-#[cfg(not(feature = "starnix_lite"))]
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
@@ -386,6 +326,7 @@ pub async fn create_component_from_stream(
                     })?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
 
+                #[cfg(not(feature = "starnix_lite"))]
                 container.kernel.kthreads.spawn_future({
                     let vvar = container.kernel.vdso.vvar_writeable.clone();
                     let utc_clock =
@@ -405,48 +346,6 @@ pub async fn create_component_from_stream(
         }
     }
     bail!("did not receive Start request");
-}
-
-#[cfg(feature = "starnix_lite")]
-fn open_boot() -> zx::Channel {
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let (server, client) = zx::Channel::create();
-    fdio::open("/boot", rights, server).expect("failed to open /boot");
-    client
-}
-
-/*
-#[cfg(feature = "starnix_lite")]
-fn open_svc() -> zx::Channel {
-    let rights = fio::OpenFlags::RIGHT_READABLE;
-    let (server, client) = zx::Channel::create();
-    fdio::open("/svc", rights, server).expect("failed to open /svc");
-    client
-}
-
-#[cfg(feature = "starnix_lite")]
-fn open_data() -> zx::Channel {
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let (server, client) = zx::Channel::create();
-    fdio::open("/data", rights, server).expect("failed to open /data");
-    client
-}
-    */
-
-#[cfg(feature = "starnix_lite")]
-pub async fn create_container_from_config(
-    config: Config,
-) -> Result<(Container, ContainerServiceConfig), Error> {
-    let mut config_wrapper =
-        ConfigWrapper { config: config, pkg_dir: Some(open_boot()), svc_dir: None, data_dir: None };
-
-    let (sender, receiver) = oneshot::channel::<TaskResult>();
-    let container =
-        create_container(&mut config_wrapper, sender).await.with_source_context(|| {
-            format!("creating container \"{}\"", &config_wrapper.config.name)
-        })?;
-    let service_config = ContainerServiceConfig { receiver };
-    return Ok((container, service_config));
 }
 
 async fn create_container(
@@ -473,11 +372,11 @@ async fn create_container(
 
     let features = parse_features(&config.features)?;
 
+    #[cfg(not(feature = "starnix_lite"))]
+    let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
     #[cfg(feature = "starnix_lite")]
     let kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
 
-    #[cfg(not(feature = "starnix_lite"))]
-    let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
     #[cfg(not(feature = "starnix_lite"))]
     if features.android_serialno {
         match get_serial_number().await {
@@ -496,9 +395,7 @@ async fn create_container(
 
     // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
-    #[cfg(not(feature = "starnix_lite"))]
     let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
-    #[cfg(not(feature = "starnix_lite"))]
     let role_manager = if let Err(e) =
         set_thread_role(&role_manager, &*fuchsia_runtime::thread_self(), Default::default())
     {
@@ -508,9 +405,6 @@ async fn create_container(
         log_info!("Thread role set successfully.");
         Some(role_manager)
     };
-
-    #[cfg(feature = "starnix_lite")]
-    let role_manager: Option<RoleManagerSynchronousProxy> = None;
 
     let node = inspect::component::inspector().root().create_child("container");
     let security_server = match features.selinux {
@@ -573,15 +467,11 @@ async fn create_container(
 
     // Run all common features that were specified in the .cml.
     {
-        #[cfg(not(feature = "starnix_lite"))]
         run_container_features(
             kernel.kthreads.unlocked_for_async().deref_mut(),
             &system_task,
             &features,
         )?;
-
-        #[cfg(feature = "starnix_lite")]
-        run_container_features(&features)?;
     }
 
     #[cfg(not(feature = "starnix_lite"))]
@@ -633,12 +523,6 @@ async fn create_container(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         init_task,
         move |locked, init_task| {
-            #[cfg(feature = "starnix_lite")]
-            parse_numbered_handles(init_task, None, &init_task.files).map_err(|e| {
-                log_error!("Error while parsing the numbered handles: {e:?}");
-                errno!(EINVAL)
-            })?;
-
             init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])
         },
         move |result| {

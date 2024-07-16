@@ -4,7 +4,8 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/core/meta/core.root_shard.mistos.cml"
+        "//src/sys/core/meta/core.root_shard.mistos.cml",
+        "//src/starnix/runner/meta/starnix_runner.root_shard.cml",
     ],
     children: [
         {

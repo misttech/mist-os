@@ -1,0 +1,106 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    offer: [
+        {
+            protocol: [
+                "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.routes.StateV4",
+                "fuchsia.net.routes.StateV6",
+                "fuchsia.net.stack.Stack",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.posix.socket.raw.Provider",
+            ],
+            from: "#network",
+            to: "#starnix_runner",
+        },
+        //{
+        //    protocol: [ "fuchsia.net.tun.Control" ],
+        //    from: "#network-tun",
+        //    to: "#starnix_runner",
+        //},
+        {
+            protocol: [ "fuchsia.buildinfo.Provider" ],
+            from: "#build-info",
+            to: "#starnix_runner",
+        },
+        {
+            protocol: [ "fuchsia.net.filter.Control_OnlyForStarnix" ],
+            from: "#network",
+            as: "fuchsia.net.filter.Control",
+            to: "#starnix_runner",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.net.root.Interfaces_OnlyForStarnix" ],
+            from: "#network",
+            as: "fuchsia.net.root.Interfaces",
+            to: "#starnix_runner",
+        },
+        {
+            protocol: [ "fuchsia.posix.socket.packet.Provider_OnlyForStarnix" ],
+            from: "#network",
+            as: "fuchsia.posix.socket.packet.Provider",
+            to: "#starnix_runner",
+        },
+        {
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.sysinfo.SysInfo",
+            ],
+            from: "parent",
+            to: "#starnix_runner",
+        },
+        {
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
+            from: "parent",
+            to: [ "#starnix_runner" ],
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            as: "boot-kernel",
+            to: [ "#starnix_runner" ],
+            subdir: "kernel",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-hrtimer",
+            to: [ "#starnix_runner" ],
+            subdir: "hrtimer",
+        },
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            from: "parent",
+            to: "#starnix_runner",
+            availability: "optional",
+        },
+        {
+            from: "parent",
+            to: "#starnix_runner",
+            config: "fuchsia.starnix.runner.EnableDataCollection",
+        },
+    ],
+    expose: [
+        {
+            service: "fuchsia.starnix.runner.Manager",
+            from: "#starnix_runner",
+        },
+    ],
+}

@@ -7,6 +7,7 @@
 use tracing_mutex as _;
 
 pub mod arch;
+#[cfg(not(feature = "starnix_lite"))]
 pub mod bpf;
 pub mod device;
 pub mod dynamic_thread_spawner;
@@ -23,6 +24,7 @@ pub mod syscalls;
 pub mod task;
 pub mod time;
 pub mod timer;
+#[cfg(not(feature = "starnix_lite"))]
 pub mod vdso;
 pub mod vfs;
 
