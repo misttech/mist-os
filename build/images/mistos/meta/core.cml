@@ -9,6 +9,9 @@
         "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
+
+        // Build Info
+        "//src/developer/build_info/meta/build_info.core_shard.mistos.cml",
     ],
     children: [
         {

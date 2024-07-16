@@ -116,6 +116,10 @@ if (is_mistos) {
       # shell
       "//zircon/third_party/uapp/dash",
 
+      # Build-Information
+      "//src/developer/build_info:build-info",
+      "//src/developer/build_info:shell_bin",
+
       # Debug Broker
       "//src/bringup/bin/kernel_debug_broker:component",
 
