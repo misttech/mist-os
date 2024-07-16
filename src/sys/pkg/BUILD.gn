@@ -15,6 +15,8 @@ group("pkg") {
 group("tests") {
   testonly = true
   public_deps = [
+    ":host_tests($host_toolchain)",
+    ":non_hermetic_tests($target_toolchain)",
     "bin:tests",
     "lib:tests",
     "scripts:tests",
@@ -23,6 +25,25 @@ group("tests") {
     "//src/sys/lib/fidl-fuchsia-pkg-ext:tests",
     "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext:tests",
   ]
+}
+
+if (is_fuchsia) {
+  group("hermetic_tests") {
+    testonly = true
+    public_deps = []
+  }
+
+  group("non_hermetic_tests") {
+    testonly = true
+    public_deps = []
+  }
+}
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    public_deps = []
+  }
 }
 
 group("e2e_tests") {
