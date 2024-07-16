@@ -12,6 +12,7 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock, Weak};
 use std::task::{Context, Poll};
+use tracing::warn;
 
 use crate::types::{
     EndpointType, Error, ErrorCode, MediaCodecType, MediaType, Result as AvdtpResult,
@@ -22,8 +23,9 @@ use crate::{Peer, SimpleResponder};
 pub type StreamEndpointUpdateCallback = Box<dyn Fn(&StreamEndpoint) -> () + Sync + Send>;
 
 /// The state of a StreamEndpoint.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Default, Clone, Copy)]
 pub enum StreamState {
+    #[default]
     Idle,
     Configured,
     // An Open command has been accepted, but streams have not been established yet.
@@ -32,18 +34,6 @@ pub enum StreamState {
     Streaming,
     Closing,
     Aborting,
-}
-
-impl StreamState {
-    fn configured(&self) -> bool {
-        match self {
-            StreamState::Configured
-            | StreamState::Opening
-            | StreamState::Open
-            | StreamState::Streaming => true,
-            _ => false,
-        }
-    }
 }
 
 /// An AVDTP StreamEndpoint. StreamEndpoints represent a particular capability of the application
@@ -58,7 +48,7 @@ pub struct StreamEndpoint {
     /// The media type this stream represents.
     media_type: MediaType,
     /// Current state the stream is in. See Section 6.5 for an overview.
-    state: StreamState,
+    state: Arc<Mutex<StreamState>>,
     /// The media transport channel
     /// This should be Some(channel) when state is Open or Streaming.
     transport: Option<Arc<RwLock<Channel>>>,
@@ -73,6 +63,9 @@ pub struct StreamEndpoint {
     configuration: Vec<ServiceCapability>,
     /// Callback that is run whenever the endpoint is updated
     update_callback: Option<StreamEndpointUpdateCallback>,
+    /// In-progress task. This is only used for the Release procedure which places the state in Closing
+    /// and must wait for the peer to close transport channels.
+    in_progress: Option<Task<()>>,
 }
 
 impl fmt::Debug for StreamEndpoint {
@@ -105,12 +98,13 @@ impl StreamEndpoint {
             capabilities,
             media_type,
             endpoint_type,
-            state: StreamState::Idle,
+            state: Default::default(),
             transport: None,
             stream_held: Arc::new(Mutex::new(false)),
             remote_id: None,
             configuration: vec![],
             update_callback: None,
+            in_progress: None,
         })
     }
 
@@ -126,7 +120,7 @@ impl StreamEndpoint {
 
     /// Set the state to the given value and run the `update_callback` afterwards
     fn set_state(&mut self, state: StreamState) {
-        self.state = state;
+        *self.state.lock() = state;
         self.update_callback();
     }
 
@@ -154,13 +148,20 @@ impl StreamEndpoint {
             capabilities,
             media_type: info.media_type().clone(),
             endpoint_type: info.endpoint_type().clone(),
-            state: StreamState::Idle,
+            state: Default::default(),
             transport: None,
             stream_held: Arc::new(Mutex::new(false)),
             remote_id: None,
             configuration: vec![],
             update_callback: None,
+            in_progress: None,
         }
+    }
+
+    /// Checks that the state is in the set of states.
+    /// If not, returns Err(ErrorCode::BadState).
+    fn state_is(&self, state: StreamState) -> Result<(), ErrorCode> {
+        (*self.state.lock() == state).then_some(()).ok_or(ErrorCode::BadState)
     }
 
     /// Attempt to Configure this stream using the capabilities given.
@@ -171,9 +172,7 @@ impl StreamEndpoint {
         remote_id: &StreamEndpointId,
         capabilities: Vec<ServiceCapability>,
     ) -> Result<(), (ServiceCategory, ErrorCode)> {
-        if self.state != StreamState::Idle {
-            return Err((ServiceCategory::None, ErrorCode::BadState));
-        }
+        self.state_is(StreamState::Idle).map_err(|e| (ServiceCategory::None, e))?;
         self.remote_id = Some(remote_id.clone());
         for cap in &capabilities {
             if !self
@@ -197,9 +196,7 @@ impl StreamEndpoint {
         &mut self,
         mut capabilities: Vec<ServiceCapability>,
     ) -> Result<(), (ServiceCategory, ErrorCode)> {
-        if self.state != StreamState::Open {
-            return Err((ServiceCategory::None, ErrorCode::BadState));
-        }
+        self.state_is(StreamState::Open).map_err(|e| (ServiceCategory::None, e))?;
         // Only application capabilities are allowed to be reconfigured. See Section 8.11.1
         if let Some(cap) = capabilities.iter().find(|x| !x.is_application()) {
             return Err((cap.category(), ErrorCode::InvalidCapabilities));
@@ -220,7 +217,7 @@ impl StreamEndpoint {
     /// If the stream is not configured, returns None.
     /// Used for the Steam Get Configuration Procedure, see Section 6.10
     pub fn get_configuration(&self) -> Option<&Vec<ServiceCapability>> {
-        if !self.state.configured() {
+        if self.configuration.is_empty() {
             return None;
         }
         Some(&self.configuration)
@@ -237,7 +234,7 @@ impl StreamEndpoint {
     /// Returns Err(InvalidState) if this Endpoint is not expecting a channel to be established,
     /// closing |c|.
     pub fn receive_channel(&mut self, c: Channel) -> AvdtpResult<bool> {
-        if self.state != StreamState::Opening || self.transport.is_some() {
+        if self.state_is(StreamState::Opening).is_err() || self.transport.is_some() {
             return Err(Error::InvalidState);
         }
         self.transport = Some(Arc::new(RwLock::new(c)));
@@ -251,25 +248,11 @@ impl StreamEndpoint {
     /// Begin opening this stream.  The stream must be in a Configured state.
     /// See Stream Establishment, Section 6.11
     pub fn establish(&mut self) -> Result<(), ErrorCode> {
-        if self.state != StreamState::Configured || self.transport.is_some() {
+        if self.state_is(StreamState::Configured).is_err() || self.transport.is_some() {
             return Err(ErrorCode::BadState);
         }
         self.set_state(StreamState::Opening);
         Ok(())
-    }
-
-    /// Waits for the MediaTransport Channel to be closed up to Duration.
-    /// Returns Err(Status::TIMED_OUT) if the channel didn't close.
-    pub async fn wait_for_channel_close(&self, timeout: Duration) -> Result<(), Status> {
-        if self.transport.is_none() {
-            return Ok(());
-        }
-        // TODO: this variable triggered the `must_not_suspend` lint and may be held across an await
-        // If this is the case, it is an error. See https://fxbug.dev/42168913 for more details
-        let channel =
-            self.transport.as_ref().unwrap().try_read().map_err(|_e| Status::BAD_STATE)?;
-        let closed_fut = channel.closed();
-        closed_fut.on_timeout(timeout.after_now(), || Err(Status::TIMED_OUT)).await
     }
 
     /// Attempts to set audio direction priority of the MediaTransport channel based on
@@ -285,6 +268,7 @@ impl StreamEndpoint {
             Err(_) => return,
             Ok(channel) => channel.set_audio_priority(priority).map(|_| ()),
         };
+        // TODO(https://fxbug.dev/331621666): We should avoid detaching this.
         Task::spawn(fut).detach();
     }
 
@@ -297,44 +281,64 @@ impl StreamEndpoint {
             Err(_) => return,
             Ok(channel) => channel.set_flush_timeout(Some(timeout)).map(|_| ()),
         };
+        // TODO(https://fxbug.dev/331621666): We should avoid detaching this.
         Task::spawn(fut).detach();
     }
 
-    /// Close this stream.  This procedure checks that the media channels are closed.
-    /// If the channels are not closed in 3 seconds, it initiates an abort procedure with the
-    /// remote |peer| and completes when that finishes.
-    pub async fn release<'a>(
-        &'a mut self,
-        responder: SimpleResponder,
-        peer: &'a Peer,
-    ) -> AvdtpResult<()> {
-        if self.state != StreamState::Open && self.state != StreamState::Streaming {
-            return responder.reject(ErrorCode::BadState);
+    /// Close this stream.  This procedure will wait until media channels are closed before
+    /// transitioning to Idle.  If the channels are not closed in 3 seconds, we initiate an abort
+    /// procedure with the remote |peer| to force a transition to Idle.
+    pub fn release(&mut self, responder: SimpleResponder, peer: &Peer) -> AvdtpResult<()> {
+        {
+            let lock = self.state.lock();
+            if *lock != StreamState::Open && *lock != StreamState::Streaming {
+                return responder.reject(ErrorCode::BadState);
+            }
         }
         self.set_state(StreamState::Closing);
         responder.send()?;
-        let timeout = 3.seconds();
-        if let Err(Status::TIMED_OUT) = self.wait_for_channel_close(timeout).await {
-            return Ok(self.abort(Some(peer)).await);
-        }
-        // Closing returns this endpoint to the Idle state.
+        let release_wait_fut = {
+            // Take our transport and remote id - after this procedure it will be closed.
+            // These must be Some(_) because we are in Open / Streaming state.
+            let seid = self.remote_id.take().unwrap();
+            let transport = self.transport.take().unwrap();
+            let peer = peer.clone();
+            let state = self.state.clone();
+            async move {
+                let Ok(transport) = transport.try_read() else {
+                    warn!("unable to lock transport channel, dropping and assuming closed");
+                    *state.lock() = StreamState::Idle;
+                    return;
+                };
+                let closed_fut = transport
+                    .closed()
+                    .on_timeout(3.seconds().after_now(), || Err(Status::TIMED_OUT));
+                if let Err(Status::TIMED_OUT) = closed_fut.await {
+                    let _ = peer.abort(&seid).await;
+                    *state.lock() = StreamState::Aborting;
+                    // As the initiator of the Abort, we close our channel.
+                    drop(transport);
+                }
+                *state.lock() = StreamState::Idle;
+            }
+        };
+        self.in_progress = Some(Task::local(release_wait_fut));
+        // Closing will return this endpoint to the Idle state, one way or another with no
+        // configuration
         self.configuration.clear();
-        self.remote_id = None;
-        self.set_state(StreamState::Idle);
+        self.update_callback();
         Ok(())
     }
 
     /// Returns the current state of this endpoint.
-    pub fn state(&self) -> &StreamState {
-        &self.state
+    pub fn state(&self) -> StreamState {
+        *self.state.lock()
     }
 
     /// Start this stream.  This can be done only from the Open State.
     /// Used for the Stream Start procedure, See Section 6.12
     pub fn start(&mut self) -> Result<(), ErrorCode> {
-        if self.state != StreamState::Open {
-            return Err(ErrorCode::BadState);
-        }
+        self.state_is(StreamState::Open)?;
         self.try_priority(true);
         self.set_state(StreamState::Streaming);
         Ok(())
@@ -343,24 +347,27 @@ impl StreamEndpoint {
     /// Suspend this stream.  This can be done only from the Streaming state.
     /// Used for the Stream Suspend procedure, See Section 6.14
     pub fn suspend(&mut self) -> Result<(), ErrorCode> {
-        if self.state != StreamState::Streaming {
-            return Err(ErrorCode::BadState);
-        }
+        self.state_is(StreamState::Streaming)?;
         self.set_state(StreamState::Open);
         self.try_priority(false);
         Ok(())
     }
 
     /// Abort this stream.  This can be done from any state, and will always return the state
-    /// to Idle.  If peer is not None, we are initiating this procedure and all our channels will
-    /// be closed.
-    pub async fn abort<'a>(&'a mut self, peer: Option<&'a Peer>) {
-        if let Some(peer) = peer {
-            if let Some(seid) = &self.remote_id {
-                let _ = peer.abort(&seid).await;
-                self.set_state(StreamState::Aborting);
-            }
+    /// to Idle.  We are initiating this procedure so will wait for a response and all our
+    /// channels will be closed.
+    pub async fn initiate_abort<'a>(&'a mut self, peer: &'a Peer) {
+        if let Some(seid) = self.remote_id.take() {
+            let _ = peer.abort(&seid).await;
+            self.set_state(StreamState::Aborting);
         }
+        self.abort()
+    }
+
+    /// Abort this stream.  This can be done from any state, and will always return the state
+    /// to Idle.  We are receiving this abort from the peer, and all our channels will close.
+    pub fn abort(&mut self) {
+        self.set_state(StreamState::Aborting);
         self.configuration.clear();
         self.remote_id = None;
         self.transport = None;
@@ -401,9 +408,10 @@ impl StreamEndpoint {
 
     /// Make a StreamInformation which represents the current state of this stream.
     pub fn information(&self) -> StreamInformation {
+        let in_use = self.state_is(StreamState::Idle).is_err();
         StreamInformation::new(
             self.id.clone(),
-            self.state != StreamState::Idle,
+            in_use,
             self.media_type.clone(),
             self.endpoint_type.clone(),
         )
@@ -537,7 +545,7 @@ impl io::AsyncWrite for MediaStream {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::{expect_remote_recv, recv_remote, setup_peer};
+    use crate::tests::{expect_remote_recv, setup_peer};
     use crate::Request;
 
     use assert_matches::assert_matches;
@@ -774,20 +782,17 @@ mod tests {
 
         let (peer, signaling, responder) = setup_peer_for_release(&mut exec);
 
-        let mut release_fut = Box::pin(s.release(responder, &peer));
-        let complete = exec.run_until_stalled(&mut release_fut);
-
-        // We should still be pending since the transport hasn't been closed.
-        assert!(complete.is_pending());
-
+        // We expect release to succeed in this state.
+        s.release(responder, &peer).unwrap();
         // Expect a "yes" response.
         expect_remote_recv(&[0x42, 0x08], &signaling);
 
         // Close the transport channel by dropping it.
         drop(remote_transport);
 
-        // After the transport is closed the release future should be complete.
-        assert_matches!(exec.run_until_stalled(&mut release_fut), Poll::Ready(Ok(())));
+        // After the transport is closed we should transition to Idle.
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+        assert_eq!(s.state(), StreamState::Idle);
     }
 
     #[test]
@@ -860,30 +865,29 @@ mod tests {
         let mut s = test_endpoint(EndpointType::Sink);
 
         assert_matches!(s.configure(&REMOTE_ID, vec![ServiceCapability::MediaTransport]), Ok(()));
-        let _remote_transport = establish_stream(&mut s);
-        let (peer, signaling, responder) = setup_peer_for_release(&mut exec);
+        let remote_transport = establish_stream(&mut s);
+        let (peer, mut signaling, responder) = setup_peer_for_release(&mut exec);
 
-        let mut release_fut = Box::pin(s.release(responder, &peer));
-        let complete = exec.run_until_stalled(&mut release_fut);
-
-        // We should still be pending since the transport hasn't been closed.
-        assert!(complete.is_pending());
-
+        // We expect release to succeed in this state, then start the task to wait for the close.
+        s.release(responder, &peer).unwrap();
         // Expect a "yes" response.
         expect_remote_recv(&[0x42, 0x08], &signaling);
 
-        let _ = exec.wake_next_timer();
-        let complete = exec.run_until_stalled(&mut release_fut);
-        // Now we're waiting on response from the Abort
-        assert!(complete.is_pending());
-        // Should have got an abort
-        let received = recv_remote(&signaling).unwrap();
+        // Should get an abort
+        let next = std::pin::pin!(signaling.next());
+        let received =
+            exec.run_singlethreaded(next).expect("channel not closed").expect("successful read");
         assert_eq!(0x0A, received[1]);
         let txlabel = received[0] & 0xF0;
         // Send a response
         assert!(signaling.as_ref().write(&[txlabel | 0x02, 0x0A]).is_ok());
 
-        assert_matches!(exec.run_until_stalled(&mut release_fut), Poll::Ready(Ok(())));
+        let _ = exec.run_singlethreaded(&mut remote_transport.closed());
+
+        // We will then end up in Idle.
+        while s.state() != StreamState::Idle {
+            let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+        }
     }
 
     #[test]
@@ -956,20 +960,14 @@ mod tests {
         let (peer, signaling, responder) = setup_peer_for_release(&mut exec);
 
         {
-            let mut release_fut = Box::pin(s.release(responder, &peer));
-            let complete = exec.run_until_stalled(&mut release_fut);
-
-            // We should still be pending since the transport hasn't been closed.
-            assert!(complete.is_pending());
-
+            s.release(responder, &peer).unwrap();
             // Expect a "yes" response.
             expect_remote_recv(&[0x42, 0x08], &signaling);
-
             // Close the transport channel by dropping it.
             drop(remote);
-
-            // After the channel is closed we should be done.
-            assert_matches!(exec.run_until_stalled(&mut release_fut), Poll::Ready(Ok(())));
+            while s.state() != StreamState::Idle {
+                let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+            }
         }
 
         // Shouldn't be able to start or suspend again.
@@ -1035,7 +1033,6 @@ mod tests {
 
     #[test]
     fn get_configuration() {
-        let mut exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
 
         // Can't get configuration if we aren't configured.
@@ -1058,12 +1055,8 @@ mod tests {
             x => panic!("Expected Ok from get_configuration but got {:?}", x),
         };
 
-        {
-            // Abort this stream, putting it back to the idle state.
-            let mut abort_fut = Box::pin(s.abort(None));
-            let complete = exec.run_until_stalled(&mut abort_fut);
-            assert_matches!(complete, Poll::Ready(()));
-        }
+        // Abort this stream, putting it back to the idle state.
+        s.abort();
 
         assert!(s.get_configuration().is_none());
     }
@@ -1088,7 +1081,8 @@ mod tests {
     /// not validated here. They are validated in other tests.
     #[test]
     fn update_callback() {
-        let mut exec = fasync::TestExecutor::new();
+        // Need an executor to make a socket
+        let _exec = fasync::TestExecutor::new();
         let mut s = test_endpoint(EndpointType::Sink);
         let (cb, call_count) = call_count_callback();
         s.set_update_callback(cb);
@@ -1122,11 +1116,7 @@ mod tests {
         assert!(call_count.load(Ordering::SeqCst) > 0, "Update callback called at least once");
         call_count.store(0, Ordering::SeqCst); // clear call count
 
-        {
-            // Abort this stream, putting it back to the idle state.
-            let mut abort_fut = Box::pin(s.abort(None));
-            let _ = exec.run_until_stalled(&mut abort_fut);
-            assert!(call_count.load(Ordering::SeqCst) > 0, "Update callback called at least once");
-        }
+        // Abort this stream, putting it back to the idle state.
+        s.abort();
     }
 }

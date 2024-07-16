@@ -17,7 +17,7 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::{BoxFuture, Either};
 use futures::stream::FuturesUnordered;
 use futures::task::{Context, Poll, Waker};
 use futures::{select, Future, FutureExt, StreamExt};
@@ -364,8 +364,7 @@ impl Peer {
             let (local_id, local_capabilities) = {
                 let peer = PeerInner::upgrade(peer.clone())?;
                 let lock = peer.lock();
-                let stream = lock.find_compatible_local(codec_params, &remote_id)?;
-                (stream.local_id().clone(), stream.capabilities().clone())
+                lock.find_compatible_local_capabilities(codec_params, &remote_id)?
             };
 
             let local_by_cat: HashMap<ServiceCategory, ServiceCapability> =
@@ -497,8 +496,12 @@ impl Peer {
                             Some(Ok(request)) => match peer.upgrade() {
                                 None => return,
                                 Some(p) => {
-                                    let mut lock = p.lock();
-                                    if let Err(e) = lock.handle_request(request).await {
+                                    let result_or_future = p.lock().handle_request(request);
+                                    let result = match result_or_future {
+                                        Either::Left(result) => result,
+                                        Either::Right(future) => future.await,
+                                    };
+                                    if let Err(e) = result {
                                         warn!(peer_id = %id, ?e, "Error handling request");
                                     }
                                 }
@@ -694,7 +697,7 @@ impl PeerInner {
                 .open()
                 .filter_map(|stream| {
                     let endpoint = stream.endpoint();
-                    endpoint.remote_id().cloned().map(|id| (endpoint.local_id().clone(), id))
+                    endpoint.remote_id().map(|id| (endpoint.local_id().clone(), id.clone()))
                 })
                 .collect();
             (peer.peer.clone(), stream_pairs)
@@ -770,19 +773,26 @@ impl PeerInner {
     }
 
     /// Finds a stream in the local stream set which is compatible with the remote_id given the codec config.
-    /// Returns the local stream ID if found, or OutOfRange if one could not be found.
-    pub fn find_compatible_local(
+    /// Returns the local stream ID and capabilities if found, or OutOfRange if one could not be found.
+    pub fn find_compatible_local_capabilities(
         &self,
         codec_params: &ServiceCapability,
         remote_id: &StreamEndpointId,
-    ) -> avdtp::Result<&StreamEndpoint> {
+    ) -> avdtp::Result<(StreamEndpointId, Vec<ServiceCapability>)> {
         let config = codec_params.try_into()?;
         let our_direction = self.remote_endpoint(remote_id).map(|e| e.endpoint_type().opposite());
         debug!(?codec_params, local = ?self.local, "Looking for compatible local stream");
         self.local
             .compatible(config)
-            .find(|s| our_direction.map_or(true, |d| &d == s.endpoint().endpoint_type()))
-            .map(|s| s.endpoint())
+            .find_map(|s| {
+                let endpoint = s.endpoint();
+                if let Some(d) = our_direction {
+                    if &d != endpoint.endpoint_type() {
+                        return None;
+                    }
+                }
+                Some((endpoint.local_id().clone(), endpoint.capabilities().clone()))
+            })
             .ok_or(avdtp::Error::OutOfRange)
     }
 
@@ -839,7 +849,7 @@ impl PeerInner {
     ) -> avdtp::Result<StreamEndpointId> {
         let peer_id = self.peer_id;
         let stream = self.get_mut(&local_id).map_err(|e| avdtp::Error::RequestInvalid(e))?;
-        let remote_id = stream.endpoint().remote_id().cloned().ok_or(avdtp::Error::InvalidState)?;
+        let remote_id = stream.endpoint().remote_id().ok_or(avdtp::Error::InvalidState)?.clone();
         info!(%peer_id, "Suspend stream local {local_id} <-> {remote_id} remote");
         stream.suspend().map_err(|c| avdtp::Error::RequestInvalid(c))?;
         let _ = self.started.remove(local_id);
@@ -862,151 +872,164 @@ impl PeerInner {
     }
 
     /// Handle a single request event from the avdtp peer.
-    async fn handle_request(&mut self, request: avdtp::Request) -> avdtp::Result<()> {
+    fn handle_request(
+        &mut self,
+        request: avdtp::Request,
+    ) -> Either<avdtp::Result<()>, impl Future<Output = avdtp::Result<()>>> {
         use avdtp::ErrorCode;
         use avdtp::Request::*;
         trace!("Handling {request:?} from peer..");
-        match request {
-            Discover { responder } => responder.send(&self.local.information()),
-            GetCapabilities { responder, stream_id }
-            | GetAllCapabilities { responder, stream_id } => match self.local.get(&stream_id) {
-                None => responder.reject(ErrorCode::BadAcpSeid),
-                Some(stream) => responder.send(stream.endpoint().capabilities()),
-            },
-            Open { responder, stream_id } => {
-                if self.opening.is_none() {
-                    return responder.reject(ErrorCode::BadState);
-                }
-                let Ok(stream) = self.get_mut(&stream_id) else {
-                    return responder.reject(ErrorCode::BadAcpSeid);
-                };
-                match stream.endpoint_mut().establish() {
-                    Ok(()) => responder.send(),
-                    Err(_) => responder.reject(ErrorCode::BadState),
-                }
-            }
-            Close { responder, stream_id } => {
-                let peer = self.peer.clone();
-                let Ok(stream) = self.get_mut(&stream_id) else {
-                    return responder.reject(ErrorCode::BadAcpSeid);
-                };
-                stream.release(responder, &peer).await
-            }
-            SetConfiguration { responder, local_stream_id, remote_stream_id, capabilities } => {
-                if self.opening.is_some() {
-                    return responder.reject(ServiceCategory::None, ErrorCode::BadState);
-                }
-                let peer_id = self.peer_id;
-                let Ok(stream) = self.get_mut(&local_stream_id) else {
-                    return responder.reject(ServiceCategory::None, ErrorCode::BadAcpSeid);
-                };
-                match stream.configure(&peer_id, &remote_stream_id, capabilities) {
-                    Ok(_) => {
-                        self.opening = Some(local_stream_id);
-                        responder.send()
+        let immediate_result = 'result: {
+            match request {
+                Discover { responder } => responder.send(&self.local.information()),
+                GetCapabilities { responder, stream_id }
+                | GetAllCapabilities { responder, stream_id } => match self.local.get(&stream_id) {
+                    None => responder.reject(ErrorCode::BadAcpSeid),
+                    Some(stream) => responder.send(stream.endpoint().capabilities()),
+                },
+                Open { responder, stream_id } => {
+                    if self.opening.is_none() {
+                        break 'result responder.reject(ErrorCode::BadState);
                     }
-                    Err((category, code)) => responder.reject(category, code),
-                }
-            }
-            GetConfiguration { stream_id, responder } => {
-                let Some(stream) = self.local.get(&stream_id) else {
-                    return responder.reject(ErrorCode::BadAcpSeid);
-                };
-                match stream.endpoint().get_configuration() {
-                    Some(c) => responder.send(&c),
-                    // Only happens when the stream is in the wrong state
-                    None => responder.reject(ErrorCode::BadState),
-                }
-            }
-            Reconfigure { responder, local_stream_id, capabilities } => {
-                let Ok(stream) = self.get_mut(&local_stream_id) else {
-                    return responder.reject(ServiceCategory::None, ErrorCode::BadAcpSeid);
-                };
-                match stream.reconfigure(capabilities) {
-                    Ok(_) => responder.send(),
-                    Err((cat, code)) => responder.reject(cat, code),
-                }
-            }
-            Start { responder, stream_ids } => {
-                let mut immediate_suspend = Vec::new();
-                // Fail on the first failed endpoint, as per the AVDTP spec 8.13 Note 5
-                let result = stream_ids.into_iter().try_for_each(|seid| {
-                    let Some(stream) = self.local.get(&seid) else {
-                        return Err((seid, ErrorCode::BadAcpSeid));
+                    let Ok(stream) = self.get_mut(&stream_id) else {
+                        break 'result responder.reject(ErrorCode::BadAcpSeid);
                     };
-                    let Some(remote_id) = stream.endpoint().remote_id().cloned() else {
-                        return Err((seid, ErrorCode::BadState));
-                    };
-                    let Ok(permit) = self.get_permit_or_reserve(&seid) else {
-                        // Happens when we cannot start because of permits.
-                        // Accept this one, then queue up for suspend.
-                        // We are already reserved for a permit.
-                        immediate_suspend.push(remote_id);
-                        return Ok(());
-                    };
-                    match self.start_local_stream(permit, &seid) {
-                        Ok(()) => Ok(()),
-                        Err(avdtp::Error::RequestInvalid(code)) => Err((seid, code)),
-                        Err(_) => Err((seid, ErrorCode::BadState)),
+                    match stream.endpoint_mut().establish() {
+                        Ok(()) => responder.send(),
+                        Err(_) => responder.reject(ErrorCode::BadState),
                     }
-                });
-                let response_result = match result {
-                    Ok(()) => responder.send(),
-                    Err((seid, code)) => responder.reject(&seid, code),
-                };
-                if !immediate_suspend.is_empty() {
-                    return self.peer.suspend(immediate_suspend.as_slice()).await;
                 }
-                response_result
-            }
-            Suspend { responder, stream_ids } => {
-                for seid in stream_ids {
-                    match self.suspend_local_stream(&seid) {
-                        Ok(_remote_id) => {}
-                        Err(avdtp::Error::RequestInvalid(code)) => {
-                            return responder.reject(&seid, code)
+                Close { responder, stream_id } => {
+                    let peer = self.peer.clone();
+                    let Ok(stream) = self.get_mut(&stream_id) else {
+                        break 'result responder.reject(ErrorCode::BadAcpSeid);
+                    };
+                    stream.release(responder, &peer)
+                }
+                SetConfiguration { responder, local_stream_id, remote_stream_id, capabilities } => {
+                    if self.opening.is_some() {
+                        break 'result responder.reject(ServiceCategory::None, ErrorCode::BadState);
+                    }
+                    let peer_id = self.peer_id;
+                    let Ok(stream) = self.get_mut(&local_stream_id) else {
+                        break 'result responder
+                            .reject(ServiceCategory::None, ErrorCode::BadAcpSeid);
+                    };
+                    match stream.configure(&peer_id, &remote_stream_id, capabilities) {
+                        Ok(_) => {
+                            self.opening = Some(local_stream_id);
+                            responder.send()
                         }
-                        Err(_e) => return responder.reject(&seid, ErrorCode::BadState),
+                        Err((category, code)) => responder.reject(category, code),
                     }
                 }
-                responder.send()
-            }
-            Abort { responder, stream_id } => {
-                let Ok(stream) = self.get_mut(&stream_id) else {
-                    // No response is sent on an invalid ID for an Abort
-                    return Ok(());
-                };
-                stream.abort(None).await;
-                self.opening = self.opening.take().filter(|local_id| local_id != &stream_id);
-                responder.send()
-            }
-            DelayReport { responder, delay, stream_id } => {
-                // Delay is in 1/10 ms
-                let delay_ns = delay as u64 * 100000;
-                // Record delay to cobalt.
-                self.metrics.log_integer(
-                    bt_metrics::AVDTP_DELAY_REPORT_IN_NANOSECONDS_METRIC_ID,
-                    delay_ns.try_into().unwrap_or(-1),
-                    vec![],
-                );
-                // Report should only come after a stream is configured
-                let Some(stream) = self.local.get_mut(&stream_id) else {
-                    return responder.reject(avdtp::ErrorCode::BadAcpSeid);
-                };
-                let delay_str = format!("delay {}.{} ms", delay / 10, delay % 10);
-                let peer = self.peer_id;
-                match stream.set_delay(std::time::Duration::from_nanos(delay_ns)) {
-                    Ok(()) => info!(%peer, %stream_id, "reported {delay_str}"),
-                    Err(avdtp::ErrorCode::BadState) => {
-                        info!(%peer, %stream_id, "bad state {delay_str}");
-                        return responder.reject(avdtp::ErrorCode::BadState);
+                GetConfiguration { stream_id, responder } => {
+                    let Ok(stream) = self.get_mut(&stream_id) else {
+                        break 'result responder.reject(ErrorCode::BadAcpSeid);
+                    };
+                    let Some(vec_capabilities) = stream.endpoint().get_configuration() else {
+                        break 'result responder.reject(ErrorCode::BadState);
+                    };
+                    responder.send(vec_capabilities.as_slice())
+                }
+                Reconfigure { responder, local_stream_id, capabilities } => {
+                    let Ok(stream) = self.get_mut(&local_stream_id) else {
+                        break 'result responder
+                            .reject(ServiceCategory::None, ErrorCode::BadAcpSeid);
+                    };
+                    match stream.reconfigure(capabilities) {
+                        Ok(_) => responder.send(),
+                        Err((cat, code)) => responder.reject(cat, code),
                     }
-                    Err(e) => info!(%peer, %stream_id, ?e, "failed {delay_str}"),
-                };
-                // Can't really respond with an Error
-                responder.send()
+                }
+                Start { responder, stream_ids } => {
+                    let mut immediate_suspend = Vec::new();
+                    // Fail on the first failed endpoint, as per the AVDTP spec 8.13 Note 5
+                    let result = stream_ids.into_iter().try_for_each(|seid| {
+                        let Some(stream) = self.local.get_mut(&seid) else {
+                            return Err((seid, ErrorCode::BadAcpSeid));
+                        };
+                        let remote_id = stream.endpoint().remote_id().cloned();
+                        let Some(remote_id) = remote_id else {
+                            return Err((seid, ErrorCode::BadState));
+                        };
+                        let Ok(permit) = self.get_permit_or_reserve(&seid) else {
+                            // Happens when we cannot start because of permits.
+                            // Accept this one, then queue up for suspend.
+                            // We are already reserved for a permit.
+                            immediate_suspend.push(remote_id.clone());
+                            return Ok(());
+                        };
+                        match self.start_local_stream(permit, &seid) {
+                            Ok(()) => Ok(()),
+                            Err(avdtp::Error::RequestInvalid(code)) => Err((seid, code)),
+                            Err(_) => Err((seid, ErrorCode::BadState)),
+                        }
+                    });
+                    let response_result = match result {
+                        Ok(()) => responder.send(),
+                        Err((seid, code)) => responder.reject(&seid, code),
+                    };
+                    {
+                        let peer = self.peer.clone();
+                        return Either::Right(async move {
+                            if !immediate_suspend.is_empty() {
+                                peer.suspend(immediate_suspend.as_slice()).await?;
+                            }
+                            response_result
+                        });
+                    }
+                }
+                Suspend { responder, stream_ids } => {
+                    for seid in stream_ids {
+                        match self.suspend_local_stream(&seid) {
+                            Ok(_remote_id) => {}
+                            Err(avdtp::Error::RequestInvalid(code)) => {
+                                break 'result responder.reject(&seid, code)
+                            }
+                            Err(_e) => break 'result responder.reject(&seid, ErrorCode::BadState),
+                        }
+                    }
+                    responder.send()
+                }
+                Abort { responder, stream_id } => {
+                    let Ok(stream) = self.get_mut(&stream_id) else {
+                        // No response is sent on an invalid ID for an Abort
+                        break 'result Ok(());
+                    };
+                    stream.abort();
+                    self.opening = self.opening.take().filter(|local_id| local_id != &stream_id);
+                    responder.send()
+                }
+                DelayReport { responder, delay, stream_id } => {
+                    // Delay is in 1/10 ms
+                    let delay_ns = delay as u64 * 100000;
+                    // Record delay to cobalt.
+                    self.metrics.log_integer(
+                        bt_metrics::AVDTP_DELAY_REPORT_IN_NANOSECONDS_METRIC_ID,
+                        delay_ns.try_into().unwrap_or(-1),
+                        vec![],
+                    );
+                    // Report should only come after a stream is configured
+                    let Some(stream) = self.local.get_mut(&stream_id) else {
+                        break 'result responder.reject(avdtp::ErrorCode::BadAcpSeid);
+                    };
+                    let delay_str = format!("delay {}.{} ms", delay / 10, delay % 10);
+                    let peer = self.peer_id;
+                    match stream.set_delay(std::time::Duration::from_nanos(delay_ns)) {
+                        Ok(()) => info!(%peer, %stream_id, "reported {delay_str}"),
+                        Err(avdtp::ErrorCode::BadState) => {
+                            info!(%peer, %stream_id, "bad state {delay_str}");
+                            break 'result responder.reject(avdtp::ErrorCode::BadState);
+                        }
+                        Err(e) => info!(%peer, %stream_id, ?e, "failed {delay_str}"),
+                    };
+                    // Can't really respond with an Error
+                    responder.send()
+                }
             }
-        }
+        };
+        Either::Left(immediate_result)
     }
 }
 
@@ -2983,6 +3006,104 @@ mod tests {
             Poll::Ready(Some(task)) => task,
             x => panic!("Expected media task to start: {x:?}"),
         };
+        assert!(media_task.is_started());
+    }
+
+    // Scenario: when we are waiting for a suspend response from the peer after a permit was not
+    // available, we try to start the peer (because a dwell has expired)
+    #[fuchsia::test]
+    fn permit_suspend_start_while_suspending() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let mut streams = Streams::default();
+        let mut test_builder = TestMediaTaskBuilder::new();
+        streams.insert(Stream::build(
+            make_sbc_endpoint(1, avdtp::EndpointType::Sink),
+            test_builder.builder(),
+        ));
+        streams.insert(Stream::build(
+            make_sbc_endpoint(2, avdtp::EndpointType::Sink),
+            test_builder.builder(),
+        ));
+        let mut next_task_fut = test_builder.next_task();
+
+        let permits = Permits::new(1);
+        let (remote, _profile_request_stream, _, peer) =
+            setup_test_peer(false, streams, Some(permits.clone()));
+
+        let remote_peer = avdtp::Peer::new(remote);
+        let mut remote_requests = remote_peer.take_request_stream();
+
+        let sbc_endpoint_id = 1_u8.try_into().unwrap();
+
+        let sbc_caps = sbc_capabilities();
+        let mut set_config_fut =
+            remote_peer.set_configuration(&sbc_endpoint_id, &sbc_endpoint_id, &sbc_caps);
+
+        match exec.run_until_stalled(&mut set_config_fut) {
+            Poll::Ready(Ok(())) => {}
+            x => panic!("Set capabilities should be ready but got {:?}", x),
+        };
+
+        let mut open_fut = remote_peer.open(&sbc_endpoint_id);
+        match exec.run_until_stalled(&mut open_fut) {
+            Poll::Ready(Ok(())) => {}
+            x => panic!("Open should be ready but got {:?}", x),
+        };
+
+        // Establish a media transport stream
+        let (_remote_transport, transport) = Channel::create();
+        assert_eq!(Some(()), peer.receive_channel(transport).ok());
+
+        // At this point, we are dwelling, waiting for the peer to start the stream. Skip the timer.
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+        let Some(_deadline) = exec.wake_next_timer() else {
+            panic!("Expected a timer to be waiting to run");
+        };
+
+        // We will try to start it ourselves, which will take the only permit and send a start.
+        let start_responder = match exec.run_singlethreaded(&mut remote_requests.next()) {
+            Some(Ok(avdtp::Request::Start { stream_ids, responder })) => {
+                assert_eq!(stream_ids, vec![sbc_endpoint_id.clone()]);
+                responder
+            }
+            x => panic!("Expected a Start request, got {x:?}"),
+        };
+
+        assert!(permits.get().is_none());
+
+        // The peer doesn't notice. Instead try to start it from the peer side (bad timing)
+        let mut start_fut = remote_peer.start(&[sbc_endpoint_id.clone()]);
+
+        // We get an OK, and then immediately a suspend request because there are no
+        // permits available.
+        match exec.run_singlethreaded(&mut start_fut) {
+            Ok(()) => {}
+            x => panic!("Expected OK response from start future but got {x:?}"),
+        }
+
+        let suspend_responder = match exec.run_singlethreaded(&mut remote_requests.next()) {
+            Some(Ok(avdtp::Request::Suspend { stream_ids, responder })) => {
+                assert_eq!(stream_ids, vec![sbc_endpoint_id.clone()]);
+                responder
+            }
+            x => panic!("Expected a suspend got {x:?}"),
+        };
+
+        // At this point, the peer notices the start request and responds.
+        start_responder.send().unwrap();
+
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Okay I guess..
+        suspend_responder.send().unwrap();
+
+        // And we should start a task.
+        let media_task = match exec.run_until_stalled(&mut next_task_fut) {
+            Poll::Ready(Some(task)) => task,
+            x => panic!("Local task should be created at this point: {:?}", x),
+        };
+
         assert!(media_task.is_started());
     }
 

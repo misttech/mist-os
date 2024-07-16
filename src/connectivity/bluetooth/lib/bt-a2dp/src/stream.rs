@@ -58,7 +58,7 @@ impl Inspect for &mut Stream {
         let endpoint_state_prop = self.inspect.create_string("endpoint_state", "");
         let callback =
             move |stream: &StreamEndpoint| endpoint_state_prop.set(&format!("{:?}", stream));
-        callback(self.endpoint_mut());
+        callback(self.endpoint());
         self.endpoint_mut().set_update_callback(Some(Box::new(callback)));
         Ok(())
     }
@@ -96,7 +96,7 @@ impl Stream {
     }
 
     fn media_codec_config(&self) -> Option<MediaCodecConfig> {
-        find_codec_capability(&self.endpoint.capabilities())
+        find_codec_capability(self.endpoint.capabilities())
             .and_then(|x| MediaCodecConfig::try_from(x).ok())
     }
 
@@ -236,18 +236,23 @@ impl Stream {
     }
 
     /// Releases the endpoint and stops the processing of audio.
-    pub async fn release(
+    pub fn release(
         &mut self,
         responder: avdtp::SimpleResponder,
         peer: &avdtp::Peer,
     ) -> avdtp::Result<()> {
         self.stop_media_task();
-        self.endpoint.release(responder, peer).await
+        self.endpoint.release(responder, peer)
     }
 
-    pub async fn abort(&mut self, peer: Option<&avdtp::Peer>) {
+    pub fn abort(&mut self) {
         self.stop_media_task();
-        self.endpoint.abort(peer).await
+        self.endpoint.abort()
+    }
+
+    pub async fn initiate_abort(&mut self, peer: &avdtp::Peer) {
+        self.stop_media_task();
+        self.endpoint.initiate_abort(peer).await
     }
 }
 
@@ -416,13 +421,14 @@ impl Streams {
     /// Inserts a stream, indexing it by the local endpoint id.
     /// It replaces any other stream with the same endpoint id.
     pub fn insert(&mut self, stream: Stream) {
-        if let Some(s) = self.streams.insert(stream.endpoint().local_id().clone(), stream) {
-            warn!("Replacing stream with local id {}", s.endpoint().local_id());
+        let local_id = stream.endpoint().local_id().clone();
+        if self.streams.insert(local_id.clone(), stream).is_some() {
+            warn!("Replacing stream with local id {local_id}");
         }
     }
 
     /// Retrieves a reference to the Stream referenced by `id`, if the stream exists,
-    pub fn get(&mut self, id: &StreamEndpointId) -> Option<&Stream> {
+    pub fn get(&self, id: &StreamEndpointId) -> Option<&Stream> {
         self.streams.get(id)
     }
 
@@ -438,12 +444,12 @@ impl Streams {
 
     /// Returns streams that are in the open (established but not streaming) state
     pub fn open(&self) -> impl Iterator<Item = &Stream> {
-        self.streams.values().filter(|s| s.endpoint().state() == &avdtp::StreamState::Open)
+        self.streams.values().filter(|s| s.endpoint().state() == avdtp::StreamState::Open)
     }
 
     /// Returns streams that are streaming.
     pub fn streaming(&self) -> impl Iterator<Item = &Stream> {
-        self.streams.values().filter(|s| s.endpoint().state() == &avdtp::StreamState::Streaming)
+        self.streams.values().filter(|s| s.endpoint().state() == avdtp::StreamState::Streaming)
     }
 
     /// Finds streams in the set which are compatible with `codec_config`.
