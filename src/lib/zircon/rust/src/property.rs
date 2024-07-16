@@ -6,6 +6,7 @@
 
 use crate::{sys, HandleRef, Status};
 use std::ops::Deref;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Object property types for use with [object_get_property()] and [object_set_property].
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -36,7 +37,7 @@ pub(crate) unsafe trait PropertyQuery {
     /// The raw `Property` value
     const PROPERTY: Property;
     /// The data type of this property
-    type PropTy;
+    type PropTy: AsBytes + FromBytes + FromZeros + NoCell;
 }
 
 assoc_values!(Property, [
@@ -62,7 +63,10 @@ assoc_values!(Property, [
 /// Get a property on a zircon object
 pub(crate) fn object_get_property<P: PropertyQuery>(
     handle: HandleRef<'_>,
-) -> Result<P::PropTy, Status> {
+) -> Result<P::PropTy, Status>
+where
+    P::PropTy: FromBytes + FromZeros + NoCell,
+{
     // this is safe due to the contract on the P::PropTy type in the ObjectProperty trait.
     let mut out = ::std::mem::MaybeUninit::<P::PropTy>::uninit();
     let status = unsafe {
@@ -80,7 +84,10 @@ pub(crate) fn object_get_property<P: PropertyQuery>(
 pub(crate) fn object_set_property<P: PropertyQuery>(
     handle: HandleRef<'_>,
     val: &P::PropTy,
-) -> Result<(), Status> {
+) -> Result<(), Status>
+where
+    P::PropTy: AsBytes + NoCell,
+{
     let status = unsafe {
         sys::zx_object_set_property(
             handle.raw_handle(),

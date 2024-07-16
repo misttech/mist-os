@@ -5,7 +5,7 @@
 use crate::sys::ZX_MAX_NAME_LEN;
 use crate::Status;
 use bstr::BStr;
-use zerocopy::{FromBytes, FromZeros, NoCell};
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// A wrapper around zircon name fields.
 ///
@@ -14,7 +14,18 @@ use zerocopy::{FromBytes, FromZeros, NoCell};
 ///
 /// Can be created from regular strings or byte slices.
 #[derive(
-    Copy, Clone, Default, Eq, FromBytes, FromZeros, Hash, NoCell, PartialEq, PartialOrd, Ord,
+    AsBytes,
+    Copy,
+    Clone,
+    Default,
+    Eq,
+    FromBytes,
+    FromZeros,
+    Hash,
+    NoCell,
+    PartialEq,
+    PartialOrd,
+    Ord,
 )]
 #[repr(transparent)]
 pub struct Name([u8; ZX_MAX_NAME_LEN]);
