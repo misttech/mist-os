@@ -81,7 +81,6 @@ bool Image::OnFenceReady(FenceReference* fence) {
 
 void Image::StartPresent() {
   ZX_DEBUG_ASSERT(wait_fence_ == nullptr);
-  ZX_DEBUG_ASSERT(mtx_trylock(mtx()) == thrd_busy);
   TRACE_DURATION("gfx", "Image::StartPresent", "id", id.value());
   TRACE_FLOW_BEGIN("gfx", "present_image", id.value());
 
@@ -114,7 +113,6 @@ void Image::RetireWithFence(fbl::RefPtr<FenceReference>&& fence) {
 
 void Image::StartRetire() {
   ZX_DEBUG_ASSERT(wait_fence_ == nullptr);
-  ZX_DEBUG_ASSERT(mtx_trylock(mtx()) == thrd_busy);
 
   if (!presenting_) {
     RetireWithFence(std::move(retire_fence_));
@@ -126,8 +124,6 @@ void Image::StartRetire() {
 }
 
 void Image::OnRetire() {
-  ZX_DEBUG_ASSERT(mtx_trylock(mtx()) == thrd_busy);
-
   presenting_ = false;
   presenting_property_.Set(false);
 

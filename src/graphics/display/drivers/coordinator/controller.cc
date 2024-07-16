@@ -666,7 +666,6 @@ void Controller::OnClientDead(ClientProxy* client) {
 }
 
 zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(DisplayId display_id) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   if (unbinding_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -685,7 +684,6 @@ zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(Displ
 
 zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
     DisplayId display_id) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   fbl::Array<CoordinatorPixelFormat> formats_out;
   for (auto& display : displays_) {
     if (display.id == display_id) {
