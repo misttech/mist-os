@@ -560,10 +560,10 @@ impl Executor {
                 let mut waker = None;
                 {
                     let mut tasks = task.scope.lock();
-                    if !task.future.is_detached_or_cancelled() {
-                        waker = tasks.join_wakers.remove(&task.id);
-                    } else if task.id != MAIN_TASK_ID {
+                    if task.future.is_detached() {
                         tasks.all_tasks.remove(&task.id);
+                    } else {
+                        waker = tasks.join_wakers.remove(&task.id);
                     }
                 }
                 if let Some(waker) = waker {
@@ -572,7 +572,14 @@ impl Executor {
                 true
             }
             AttemptPollResult::Cancelled => {
-                task.scope.lock().all_tasks.remove(&task.id);
+                let waker = {
+                    let mut tasks = task.scope.lock();
+                    tasks.all_tasks.remove(&task.id);
+                    tasks.join_wakers.remove(&task.id)
+                };
+                if let Some(waker) = waker {
+                    waker.wake();
+                }
                 true
             }
             _ => false,
@@ -790,11 +797,12 @@ fn waker_drop(weak_raw: *const ()) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{LocalExecutor, Task};
-    use std::future::poll_fn;
+    use crate::{EHandle, LocalExecutor, SendExecutor, Task, Timer};
+    use fuchsia_sync::{Condvar, Mutex};
+    use std::future::{poll_fn, Future as _};
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
-    use std::task::Poll;
+    use std::task::{Context, Poll};
 
     async fn yield_to_executor() {
         let mut done = false;
@@ -862,7 +870,7 @@ mod tests {
                 })
             };
 
-            assert_eq!(task.cancel(), None);
+            assert_eq!(task.cancel().await, None);
             while Arc::strong_count(&ref_count) != 1 {
                 yield_to_executor().await;
             }
@@ -880,9 +888,102 @@ mod tests {
                 yield_to_executor().await;
             }
 
-            assert_eq!(task.cancel(), Some(()));
+            assert_eq!(task.cancel().await, Some(()));
         });
 
         assert!(e.ehandle.root_scope.lock().join_wakers.is_empty());
+    }
+
+    #[test]
+    fn test_cancel_waits() {
+        let mut executor = SendExecutor::new(2);
+        let running = Arc::new((Mutex::new(false), Condvar::new()));
+        let task = {
+            let running = running.clone();
+            executor.root_scope().spawn(async move {
+                *running.0.lock() = true;
+                running.1.notify_all();
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                *running.0.lock() = false;
+                "foo"
+            })
+        };
+        executor.run(async move {
+            {
+                let mut guard = running.0.lock();
+                while !*guard {
+                    running.1.wait(&mut guard);
+                }
+            }
+            assert_eq!(task.cancel().await, Some("foo"));
+            assert!(!*running.0.lock());
+        });
+    }
+
+    fn test_clean_up(callback: impl FnOnce(Task<()>) + Send + 'static) {
+        let mut executor = SendExecutor::new(2);
+        let running = Arc::new((Mutex::new(false), Condvar::new()));
+        let can_quit = Arc::new((Mutex::new(false), Condvar::new()));
+        let task = {
+            let running = running.clone();
+            let can_quit = can_quit.clone();
+            executor.root_scope().spawn(async move {
+                *running.0.lock() = true;
+                running.1.notify_all();
+                {
+                    let mut guard = can_quit.0.lock();
+                    while !*guard {
+                        can_quit.1.wait(&mut guard);
+                    }
+                }
+                *running.0.lock() = false;
+            })
+        };
+        executor.run(async move {
+            {
+                let mut guard = running.0.lock();
+                while !*guard {
+                    running.1.wait(&mut guard);
+                }
+            }
+
+            callback(task);
+
+            *can_quit.0.lock() = true;
+            can_quit.1.notify_all();
+
+            let ehandle = EHandle::local();
+            let scope = ehandle.root_scope();
+
+            // The only way of testing for this is to poll.
+            while scope.lock().all_tasks.len() > 1 || scope.lock().join_wakers.len() > 0 {
+                Timer::new(std::time::Duration::from_millis(1)).await;
+            }
+
+            assert!(!*running.0.lock());
+        });
+    }
+
+    #[test]
+    fn test_dropped_cancel_cleans_up() {
+        test_clean_up(|task| {
+            let cancel_fut = std::pin::pin!(task.cancel());
+            let waker = futures::task::noop_waker();
+            assert!(cancel_fut.poll(&mut Context::from_waker(&waker)).is_pending());
+        });
+    }
+
+    #[test]
+    fn test_dropped_task_cleans_up() {
+        test_clean_up(|task| {
+            std::mem::drop(task);
+        });
+    }
+
+    #[test]
+    fn test_detach_cleans_up() {
+        test_clean_up(|task| {
+            task.detach();
+        });
     }
 }

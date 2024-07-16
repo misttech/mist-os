@@ -136,6 +136,19 @@ pub enum AttemptPollResult {
     Cancelled,
 }
 
+/// The result of calling the `cancel_and_detach` function.
+#[must_use]
+pub enum CancelAndDetachResult {
+    /// The future has finished; it can be dropped.
+    Done,
+
+    /// The future needs to be added to a run queue to be cancelled.
+    AddToRunQueue,
+
+    /// The future is soon to be cancelled and nothing needs to be done.
+    Pending,
+}
+
 impl<'a> AtomicFuture<'a> {
     /// Create a new `AtomicFuture`.
     pub fn new<F: Future<Output = R> + Send + 'a, R: Send + 'a>(future: F, detached: bool) -> Self {
@@ -280,9 +293,23 @@ impl<'a> AtomicFuture<'a> {
         self.state.fetch_or(DETACHED, Relaxed);
     }
 
-    /// Returns true if the task is detached or cancelled.
-    pub fn is_detached_or_cancelled(&self) -> bool {
-        self.state.load(Relaxed) & (DETACHED | CANCELLED) != 0
+    /// Marks the task as cancelled and detached (for when the caller isn't interested in waiting
+    /// for the cancellation to be finished).  Returns true if the task should be added to a run
+    /// queue.
+    pub fn cancel_and_detach(&self) -> CancelAndDetachResult {
+        let old_state = self.state.fetch_or(CANCELLED | DETACHED | READY, Relaxed);
+        if old_state & DONE != 0 {
+            CancelAndDetachResult::Done
+        } else if old_state & (INACTIVE | READY) == INACTIVE {
+            CancelAndDetachResult::AddToRunQueue
+        } else {
+            CancelAndDetachResult::Pending
+        }
+    }
+
+    /// Returns true if the task is detached.
+    pub fn is_detached(&self) -> bool {
+        self.state.load(Relaxed) & DETACHED != 0
     }
 
     /// Takes the result.

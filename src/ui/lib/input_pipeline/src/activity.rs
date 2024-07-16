@@ -93,7 +93,7 @@ impl ActivityManager {
                     if let Some(t) = self.idle_transition_task.take() {
                         // If the task returns a completed output, we can assume the
                         // state has transitioned to Idle.
-                        if let Some(()) = t.cancel() {
+                        if let Some(()) = t.cancel().await {
                             state_publisher.set(State::Active);
                         }
                     }

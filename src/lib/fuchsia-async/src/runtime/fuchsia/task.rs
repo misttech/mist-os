@@ -115,27 +115,31 @@ impl<T: 'static> Task<T> {
 }
 
 impl<T: 'static> Task<T> {
-    /// Initiate cancellation of this task.
-    ///
-    /// Returns the tasks output if it was available prior to cancelation.
-    ///
-    /// NOTE: If `None` is returned, the underlying future may continue executing for a
-    /// short period before getting dropped. If so, do not assume any resources held
-    /// by the task's future are released. If `Some(..)` is returned, such resources
-    /// are guaranteed to be released.
-    pub fn cancel(mut self) -> Option<T> {
+    /// Cancel a task and wait for cancellation to complete.
+    pub async fn cancel(mut self) -> Option<T> {
         // SAFETY: We spawned the task so the return type should be correct.
         let result = unsafe { self.scope.cancel(self.task_id) };
-        self.task_id = 0;
-        result
+        match result {
+            Some(output) => Some(output),
+            None => {
+                // If we are dropped from here, we'll end up calling `cancel_and_detach` (see
+                // below).
+                let result = std::future::poll_fn(|cx| {
+                    // SAFETY: We spawned the task so the return type should be correct.
+                    unsafe { self.scope.poll_cancelled(self.task_id, cx) }
+                })
+                .await;
+                self.task_id = 0;
+                result
+            }
+        }
     }
 }
 
 impl<T> Drop for Task<T> {
     fn drop(&mut self) {
         if self.task_id != 0 {
-            // SAFETY: We spawned the task so the return type should be correct.
-            unsafe { self.scope.cancel::<T>(self.task_id) };
+            self.scope.cancel_and_detach(self.task_id);
         }
     }
 }
