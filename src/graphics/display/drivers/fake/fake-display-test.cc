@@ -784,20 +784,21 @@ TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ImportImageForCapture) {
   constexpr uint64_t kFakeCollectionId = 1;
   constexpr uint32_t kFakeCollectionIndex = 0;
   uint64_t out_capture_handle;
-  EXPECT_EQ(display()->DisplayControllerImplImportImageForCapture(
-                kFakeCollectionId, kFakeCollectionIndex, &out_capture_handle),
-            ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(display()->DisplayControllerImplImportImageForCapture(
+                    kFakeCollectionId, kFakeCollectionIndex, &out_capture_handle),
+                ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, StartCapture) {
   constexpr uint64_t kFakeCaptureHandle = 1;
-  EXPECT_EQ(display()->DisplayControllerImplStartCapture(kFakeCaptureHandle), ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(display()->DisplayControllerImplStartCapture(kFakeCaptureHandle),
+                ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ReleaseCapture) {
   constexpr uint64_t kFakeCaptureHandle = 1;
-  EXPECT_EQ(display()->DisplayControllerImplReleaseCapture(kFakeCaptureHandle),
-            ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(display()->DisplayControllerImplReleaseCapture(kFakeCaptureHandle),
+                ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace

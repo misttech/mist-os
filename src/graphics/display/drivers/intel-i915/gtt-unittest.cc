@@ -15,6 +15,7 @@
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace i915 {
 
@@ -27,7 +28,7 @@ constexpr size_t kPageSize = PAGE_SIZE;
 constexpr size_t kTableSize = (1 << 21);
 void Configure2MbGtt(ddk::Pci& pci) {
   zx_status_t status = pci.WriteConfig16(registers::GmchGfxControl::kAddr, 0x40);
-  EXPECT_EQ(ZX_OK, status);
+  EXPECT_OK(status);
 }
 
 fdf::MmioBuffer MakeMmioBuffer(uint8_t* buffer, size_t size) {
@@ -58,7 +59,7 @@ TEST_F(GttTest, InitWithZeroSizeGtt) {
   fdf::MmioBuffer mmio = MakeMmioBuffer(&buffer, 0);
 
   Gtt gtt;
-  EXPECT_EQ(ZX_ERR_INTERNAL, gtt.Init(pci_, std::move(mmio), 0));
+  EXPECT_STATUS(ZX_ERR_INTERNAL, gtt.Init(pci_, std::move(mmio), 0));
 
   // No MMIO writes should have occurred.
   EXPECT_EQ(0, buffer);
@@ -72,7 +73,7 @@ TEST_F(GttTest, InitGtt) {
   fdf::MmioBuffer mmio = MakeMmioBuffer(buffer.get(), kTableSize);
 
   Gtt gtt;
-  EXPECT_EQ(ZX_OK, gtt.Init(pci_, std::move(mmio), 0));
+  EXPECT_OK(gtt.Init(pci_, std::move(mmio), 0));
 
   // The table should contain 2MB / sizeof(uint64_t) 64-bit entries that map to the fake scratch
   // buffer. The "+ 1" marks bit 0 as 1 which denotes that's the page is present.
@@ -84,7 +85,7 @@ TEST_F(GttTest, InitGtt) {
 
   // Allocated GTT regions should start from base 0.
   std::unique_ptr<GttRegionImpl> region;
-  EXPECT_EQ(ZX_OK, gtt.AllocRegion(kPageSize, kPageSize, &region));
+  EXPECT_OK(gtt.AllocRegion(kPageSize, kPageSize, &region));
   ASSERT_TRUE(region != nullptr);
   EXPECT_EQ(0u, region->base());
   EXPECT_EQ(kPageSize, region->size());
@@ -102,7 +103,7 @@ TEST_F(GttTest, InitGttWithFramebufferOffset) {
   fdf::MmioBuffer mmio = MakeMmioBuffer(buffer.get(), kTableSize);
 
   Gtt gtt;
-  EXPECT_EQ(ZX_OK, gtt.Init(pci_, std::move(mmio), kFbOffset));
+  EXPECT_OK(gtt.Init(pci_, std::move(mmio), kFbOffset));
 
   // The first page-aligned region of addresses should remain unmodified.
   for (unsigned i = 0; i < kFbPages; i++) {
@@ -119,7 +120,7 @@ TEST_F(GttTest, InitGttWithFramebufferOffset) {
 
   // The first allocated GTT regions should exclude the framebuffer pages.
   std::unique_ptr<GttRegionImpl> region;
-  EXPECT_EQ(ZX_OK, gtt.AllocRegion(kPageSize, kPageSize, &region));
+  EXPECT_OK(gtt.AllocRegion(kPageSize, kPageSize, &region));
   ASSERT_TRUE(region != nullptr);
   EXPECT_EQ(kFbPages * kPageSize, region->base());
   EXPECT_EQ(kPageSize, region->size());
@@ -131,7 +132,7 @@ TEST_F(GttTest, SetupForMexec) {
   fdf::MmioBuffer mmio = MakeMmioBuffer(buffer.get(), kTableSize);
 
   Gtt gtt;
-  EXPECT_EQ(ZX_OK, gtt.Init(pci_, std::move(mmio), 0));
+  EXPECT_OK(gtt.Init(pci_, std::move(mmio), 0));
 
   // Assign an arbitrary page-aligned number as the stolen framebuffer address.
   constexpr uintptr_t kStolenFbMemory = kPageSize * 2;

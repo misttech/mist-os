@@ -76,14 +76,14 @@ class IntegrationTest : public ::testing::Test {
               fuchsia_hardware_pci::Service::InstanceHandler(
                   {.device = pci_.bind_handler(pci_loop_.dispatcher())}));
         });
-    ASSERT_EQ(add_service_result.status_value(), ZX_OK);
+    ASSERT_OK(add_service_result);
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(endpoints.status_value(), ZX_OK);
+    ASSERT_OK(endpoints);
 
     zx::result<> serve_result =
         outgoing_.SyncCall(&component::OutgoingDirectory::Serve, std::move(endpoints->server));
-    ASSERT_EQ(serve_result.status_value(), ZX_OK);
+    ASSERT_OK(serve_result);
 
     parent_->AddFidlService(fuchsia_hardware_pci::Service::Name, std::move(endpoints->client),
                             "pci");
@@ -135,7 +135,7 @@ TEST_F(IntegrationTest, BindAndInit) {
 
   // Perform the async initialization and wait for a response.
   async::PostTask(current_dispatcher, [&] { dev->InitOp(); });
-  driver_runtime_->PerformBlockingWork([&] { EXPECT_EQ(ZX_OK, dev->WaitUntilInitReplyCalled()); });
+  driver_runtime_->PerformBlockingWork([&] { EXPECT_OK(dev->WaitUntilInitReplyCalled()); });
 
   // Unbind the device and ensure it completes synchronously.
   async::PostTask(current_dispatcher, [&] { dev->UnbindOp(); });
@@ -164,7 +164,7 @@ TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   Controller* controller = intel_display_driver->controller();
 
   uint64_t addr;
-  EXPECT_EQ(ZX_OK, controller->IntelGpuCoreGttAlloc(1, &addr));
+  EXPECT_OK(controller->IntelGpuCoreGttAlloc(1, &addr));
   EXPECT_EQ(0u, addr);
 }
 
@@ -201,7 +201,7 @@ TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   Controller* controller = intel_display_driver->controller();
 
   uint64_t addr;
-  EXPECT_EQ(ZX_OK, controller->IntelGpuCoreGttAlloc(1, &addr));
+  EXPECT_OK(controller->IntelGpuCoreGttAlloc(1, &addr));
   EXPECT_EQ(ZX_ROUNDUP(kHeight * kStride * 3, PAGE_SIZE), addr);
 }
 

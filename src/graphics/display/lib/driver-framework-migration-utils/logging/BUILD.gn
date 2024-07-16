@@ -86,6 +86,7 @@ test("logging-dfv2-tests-bin") {
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",
   ]

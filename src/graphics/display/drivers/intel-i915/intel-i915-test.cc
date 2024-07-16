@@ -118,8 +118,9 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
-  EXPECT_EQ(display_.DisplayControllerImplReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
-            ZX_ERR_NOT_FOUND);
+  EXPECT_STATUS(
+      display_.DisplayControllerImplReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
+      ZX_ERR_NOT_FOUND);
   EXPECT_OK(display_.DisplayControllerImplReleaseBufferCollection(kBanjoValidBufferCollectionId));
 
   loop_.RunUntilIdle();
@@ -296,8 +297,8 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   static constexpr image_buffer_usage_t kInvalidTilingUsage = {
       .tiling_type = 1000000,
   };
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
-                                     &kInvalidTilingUsage, kBanjoBufferCollectionId));
+  EXPECT_STATUS(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
+                                         &kInvalidTilingUsage, kBanjoBufferCollectionId));
 
   loop_.RunUntilIdle();
 

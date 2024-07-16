@@ -305,7 +305,7 @@ TEST_P(PostTaskTest, PostAfterShutdown) {
   std::atomic<bool> callback_called = false;
   zx::result<> post_task_result = PostTask<kCaptureSize>(
       dispatcher_, [&]() { callback_called.store(true, std::memory_order_relaxed); });
-  EXPECT_EQ(ZX_ERR_BAD_STATE, post_task_result.status_value()) << post_task_result.status_string();
+  EXPECT_STATUS(post_task_result, zx::error(ZX_ERR_BAD_STATE));
   EXPECT_FALSE(callback_called.load(std::memory_order_relaxed));
 }
 
@@ -315,7 +315,7 @@ TEST_P(PostTaskTest, CaptureDestructionOnPostAfterShutdown) {
 
   zx::result<> post_task_result = PostTask<kCaptureSize>(
       dispatcher_, [&, _ = CallFromDestructor([&] { RecordCaptureDestruction(); })]() {});
-  EXPECT_EQ(ZX_ERR_BAD_STATE, post_task_result.status_value()) << post_task_result.status_string();
+  EXPECT_STATUS(post_task_result, zx::error(ZX_ERR_BAD_STATE));
 
   ASSERT_TRUE(CapturesDestroyed());
   EXPECT_TRUE(thrd_equal(main_thread_, CapturesDestructionThread()));
@@ -466,7 +466,7 @@ TEST_P(PostTaskStateTest, PostAfterShutdown) {
   zx::result<> post_task_result = PostTask(std::move(post_task_state), dispatcher_, [&]() {
     callback_called.store(true, std::memory_order_relaxed);
   });
-  EXPECT_EQ(ZX_ERR_BAD_STATE, post_task_result.status_value()) << post_task_result.status_string();
+  EXPECT_STATUS(post_task_result, zx::error(ZX_ERR_BAD_STATE));
   EXPECT_FALSE(callback_called.load(std::memory_order_relaxed));
 }
 
@@ -478,7 +478,7 @@ TEST_P(PostTaskStateTest, CaptureDestructionOnSuccessfulRunOnPostAfterShutdown) 
   zx::result<> post_task_result =
       PostTask(std::move(post_task_state), dispatcher_,
                [&, _ = CallFromDestructor([&] { RecordCaptureDestruction(); })]() {});
-  EXPECT_EQ(ZX_ERR_BAD_STATE, post_task_result.status_value()) << post_task_result.status_string();
+  EXPECT_STATUS(post_task_result, zx::error(ZX_ERR_BAD_STATE));
   ASSERT_TRUE(CapturesDestroyed());
   EXPECT_TRUE(thrd_equal(main_thread_, CapturesDestructionThread()));
 }

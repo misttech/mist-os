@@ -41,18 +41,18 @@ class DriverDispatcherTest : public ::testing::Test {
     // Create start args
     node_server_.emplace("root");
     zx::result start_args = node_server_->CreateStartArgsAndServe();
-    EXPECT_EQ(ZX_OK, start_args.status_value());
+    EXPECT_OK(start_args);
 
     // Start the test environment
     test_environment_.emplace();
     zx::result result =
         test_environment_->Initialize(std::move(start_args->incoming_directory_server));
-    EXPECT_EQ(ZX_OK, result.status_value());
+    EXPECT_OK(result);
 
     // Start driver
     zx::result start_result =
         runtime_.RunToCompletion(driver_.Start(std::move(start_args->start_args)));
-    EXPECT_EQ(ZX_OK, start_result.status_value());
+    EXPECT_OK(start_result);
   }
 
   void TearDown() override {
@@ -71,7 +71,7 @@ class DriverDispatcherTest : public ::testing::Test {
       return false;
     }
     zx::result prepare_stop_result = runtime_.RunToCompletion(driver_.PrepareStop());
-    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
+    EXPECT_OK(prepare_stop_result);
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
     driver_stopped_ = true;
     return true;

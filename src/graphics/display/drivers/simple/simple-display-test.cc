@@ -321,8 +321,8 @@ TEST_F(SimpleDisplayTest, ImportBufferCollection) {
 
   // Test ReleaseBufferCollection().
   const uint64_t kBanjoInvalidCollectionId = 2u;
-  EXPECT_EQ(display.DisplayControllerImplReleaseBufferCollection(kBanjoInvalidCollectionId),
-            ZX_ERR_NOT_FOUND);
+  EXPECT_STATUS(display.DisplayControllerImplReleaseBufferCollection(kBanjoInvalidCollectionId),
+                ZX_ERR_NOT_FOUND);
   EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBanjoValidCollectionId));
 
   loop.RunUntilIdle();

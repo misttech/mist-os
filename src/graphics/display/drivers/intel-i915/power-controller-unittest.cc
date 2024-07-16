@@ -17,6 +17,7 @@
 #include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace i915 {
 
@@ -153,7 +154,7 @@ TEST_F(PowerControllerTest, TransactCommandTimeout) {
       .data = 0x1234'5678'9abc'def0,
       .timeout_us = 3,
   });
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, TransactCommandZeroTimeout) {
@@ -249,7 +250,7 @@ TEST_F(PowerControllerTest, TransactPreviousCommandTimeout) {
       .data = 0x1234'5678'9abc'def0,
       .timeout_us = 3,
   });
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelNoRetrySuccess) {
@@ -300,7 +301,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetryRefused) {
 
   const zx::result<> result =
       power_controller.RequestDisplayVoltageLevel(1, PowerController::RetryBehavior::kNoRetry);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetryReplyTimeout) {
@@ -321,7 +322,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelLowLevelNoRetryReplyTimeou
 
   const zx::result<> result =
       power_controller.RequestDisplayVoltageLevel(1, PowerController::RetryBehavior::kNoRetry);
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryImmediateSuccess) {
@@ -393,7 +394,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryTimeoutBeforeRetry) {
 
   const zx::result<> result = power_controller.RequestDisplayVoltageLevel(
       3, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryTimeoutAfterRetry) {
@@ -429,7 +430,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryTimeoutAfterRetry) {
 
   const zx::result<> result = power_controller.RequestDisplayVoltageLevel(
       2, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryReplyTimeout) {
@@ -450,7 +451,7 @@ TEST_F(PowerControllerTest, RequestDisplayVoltageLevelRetryReplyTimeout) {
 
   const zx::result<> result = power_controller.RequestDisplayVoltageLevel(
       3, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnNoRetrySuccess) {
@@ -501,7 +502,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetryRefuse
 
   const zx::result<> result = power_controller.SetDisplayTypeCColdBlockingTigerLake(
       false, PowerController::RetryBehavior::kNoRetry);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetryReplyTimeout) {
@@ -522,7 +523,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffNoRetryReplyT
 
   const zx::result<> result = power_controller.SetDisplayTypeCColdBlockingTigerLake(
       false, PowerController::RetryBehavior::kNoRetry);
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryImmediateSuccess) {
@@ -594,7 +595,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryTimeoutBe
 
   const zx::result<> result = power_controller.SetDisplayTypeCColdBlockingTigerLake(
       true, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryTimeoutAfterRetry) {
@@ -630,7 +631,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOnRetryTimeoutAf
 
   const zx::result<> result = power_controller.SetDisplayTypeCColdBlockingTigerLake(
       true, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffOnRetryReplyTimeout) {
@@ -651,7 +652,7 @@ TEST_F(PowerControllerTest, SetDisplayTypeCColdBlockingTigerLakeOffOnRetryReplyT
 
   const zx::result<> result = power_controller.SetDisplayTypeCColdBlockingTigerLake(
       false, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseNoRetrySuccess) {
@@ -702,7 +703,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetryRefused) 
 
   const zx::result<> result = power_controller.SetSystemAgentGeyservilleEnabled(
       true, PowerController::RetryBehavior::kNoRetry);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetryReplyTimeout) {
@@ -723,7 +724,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledTrueNoRetryReplyTime
 
   const zx::result<> result = power_controller.SetSystemAgentGeyservilleEnabled(
       true, PowerController::RetryBehavior::kNoRetry);
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryImmediateSuccess) {
@@ -795,7 +796,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryTimeoutBef
 
   const zx::result<> result = power_controller.SetSystemAgentGeyservilleEnabled(
       false, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryTimeoutAfterRetry) {
@@ -831,7 +832,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryTimeoutAft
 
   const zx::result<> result = power_controller.SetSystemAgentGeyservilleEnabled(
       false, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryReplyTimeout) {
@@ -850,7 +851,7 @@ TEST_F(PowerControllerTest, SetSystemAgentGeyservilleEnabledFalseRetryReplyTimeo
 
   const zx::result<> result = power_controller.SetSystemAgentGeyservilleEnabled(
       false, PowerController::RetryBehavior::kRetryUntilStateChanges);
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeSuccess) {
@@ -885,7 +886,7 @@ TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeError) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<uint32_t> result = power_controller.GetSystemAgentBlockTimeUsTigerLake();
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeTimeout) {
@@ -905,7 +906,7 @@ TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsTigerLakeTimeout) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<uint32_t> result = power_controller.GetSystemAgentBlockTimeUsTigerLake();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, GetSystemAgentBlockTimeUsKabyLake) {
@@ -957,7 +958,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupOneFailure) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<std::array<uint8_t, 8>> result = power_controller.GetRawMemoryLatencyDataUs();
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupTwoFailure) {
@@ -983,7 +984,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupTwoFailure) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<std::array<uint8_t, 8>> result = power_controller.GetRawMemoryLatencyDataUs();
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupOneTimeout) {
@@ -1003,7 +1004,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupOneTimeout) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<std::array<uint8_t, 8>> result = power_controller.GetRawMemoryLatencyDataUs();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupTwoTimeout) {
@@ -1032,7 +1033,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupTwoTimeout) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<std::array<uint8_t, 8>> result = power_controller.GetRawMemoryLatencyDataUs();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST(MemorySubsystemInfoGlobalInfoTest, CreateFromMailboxDataTigerLake) {
@@ -1216,7 +1217,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointOneFailure) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<MemorySubsystemInfo> result = power_controller.GetMemorySubsystemInfoTigerLake();
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointTwoFailure) {
@@ -1251,7 +1252,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointTwoFailure) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<MemorySubsystemInfo> result = power_controller.GetMemorySubsystemInfoTigerLake();
-  EXPECT_EQ(ZX_ERR_IO_REFUSED, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_REFUSED));
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeGlobalInfoTimeout) {
@@ -1271,7 +1272,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakeGlobalInfoTimeout) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<MemorySubsystemInfo> result = power_controller.GetMemorySubsystemInfoTigerLake();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointOneTimeout) {
@@ -1300,7 +1301,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointOneTimeout) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<MemorySubsystemInfo> result = power_controller.GetMemorySubsystemInfoTigerLake();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointTwoTimeout) {
@@ -1338,7 +1339,7 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointTwoTimeout) {
   PowerController power_controller(&mmio_buffer_);
 
   const zx::result<MemorySubsystemInfo> result = power_controller.GetMemorySubsystemInfoTigerLake();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, result.status_value());
+  EXPECT_STATUS(result, zx::error(ZX_ERR_IO_MISSED_DEADLINE));
 }
 
 }  // namespace

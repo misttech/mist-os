@@ -64,7 +64,7 @@ TEST_F(InterruptTest, InitErrorWithoutAvailablePciInterrupt) {
     return interrupts->Init(NopPipeVsyncCallback, NopHotplugCallback, pci_, &mmio_buffer_,
                             kTestDeviceDid);
   });
-  EXPECT_EQ(ZX_ERR_INTERNAL, init_status);
+  EXPECT_STATUS(ZX_ERR_INTERNAL, init_status);
 }
 
 TEST_F(InterruptTest, InitWithLegacyInterrupt) {
@@ -124,17 +124,18 @@ TEST_F(InterruptTest, SetInterruptCallback) {
 
   constexpr intel_gpu_core_interrupt_t callback = {.callback = NopIrqCallback, .ctx = nullptr};
   const uint32_t gpu_interrupt_mask = 0;
-  EXPECT_EQ(ZX_OK, interrupts.SetGpuInterruptCallback(callback, gpu_interrupt_mask));
+  EXPECT_OK(interrupts.SetGpuInterruptCallback(callback, gpu_interrupt_mask));
 
   // Setting a callback when one is already assigned should fail.
-  EXPECT_EQ(ZX_ERR_ALREADY_BOUND, interrupts.SetGpuInterruptCallback(callback, gpu_interrupt_mask));
+  EXPECT_STATUS(ZX_ERR_ALREADY_BOUND,
+                interrupts.SetGpuInterruptCallback(callback, gpu_interrupt_mask));
 
   // Clearing the existing callback with a null callback should fail.
   constexpr intel_gpu_core_interrupt_t null_callback = {.callback = nullptr, .ctx = nullptr};
-  EXPECT_EQ(ZX_OK, interrupts.SetGpuInterruptCallback(null_callback, gpu_interrupt_mask));
+  EXPECT_OK(interrupts.SetGpuInterruptCallback(null_callback, gpu_interrupt_mask));
 
   // It should be possible to set a new callback after clearing the old one.
-  EXPECT_EQ(ZX_OK, interrupts.SetGpuInterruptCallback(callback, gpu_interrupt_mask));
+  EXPECT_OK(interrupts.SetGpuInterruptCallback(callback, gpu_interrupt_mask));
 }
 
 }  // namespace

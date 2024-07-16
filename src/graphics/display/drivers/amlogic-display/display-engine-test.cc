@@ -68,7 +68,7 @@ class MockBufferCollectionBase
 
   void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override {
     zx::vmo vmo;
-    EXPECT_EQ(ZX_OK, zx::vmo::create(ZX_PAGE_SIZE, 0u, &vmo));
+    EXPECT_OK(zx::vmo::create(ZX_PAGE_SIZE, 0u, &vmo));
     auto collection = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena_)
                           .buffers(std::vector{fuchsia_sysmem2::wire::VmoBuffer::Builder(arena_)
                                                    .vmo(std::move(vmo))

@@ -301,21 +301,21 @@ class VirtioGpuTest : public ::testing::Test {
   void SetUp() override {
     // Create start args.
     zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
-    EXPECT_EQ(ZX_OK, start_args.status_value());
+    EXPECT_OK(start_args);
 
     // Serve outgoing directory.
     driver_outgoing_ = std::move(start_args->outgoing_directory_client);
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+    EXPECT_OK(svc_endpoints);
     zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
                                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
                                       svc_endpoints->server.TakeChannel().release());
-    EXPECT_EQ(ZX_OK, status);
+    EXPECT_OK(status);
 
     // Setup the test environment.
     zx::result init_result = test_environment_.SyncCall(
         &TestEnvironment::Initialize, std::move(start_args->incoming_directory_server));
-    EXPECT_EQ(ZX_OK, init_result.status_value());
+    EXPECT_OK(init_result);
 
     auto pci_handler = fake_pci_parent_.SyncCall(&FakePciParent::GetInstanceHandler);
     test_environment_.SyncCall(
@@ -343,13 +343,13 @@ class VirtioGpuTest : public ::testing::Test {
         driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>::Start,
                          std::move(start_args->start_args)));
 
-    EXPECT_EQ(ZX_OK, start_result.status_value());
+    EXPECT_OK(start_result);
   }
 
   void TearDown() override {
     zx::result stop_result = runtime_.RunToCompletion(driver_.SyncCall(
         &fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>::PrepareStop));
-    EXPECT_EQ(ZX_OK, stop_result.status_value());
+    EXPECT_OK(stop_result);
   }
 
   async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }

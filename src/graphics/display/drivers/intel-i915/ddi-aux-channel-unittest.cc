@@ -16,6 +16,7 @@
 #include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace i915 {
 
@@ -494,8 +495,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiReportsReceiveError) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, DdiReportsTimeout) {
@@ -507,8 +507,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiReportsTimeout) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, EmptyReply) {
@@ -520,8 +519,7 @@ TEST_F(DdiAuxChannelTransactTest, EmptyReply) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, LongReply) {
@@ -533,8 +531,7 @@ TEST_F(DdiAuxChannelTransactTest, LongReply) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, DdiTimesOut) {
@@ -555,8 +552,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiTimesOut) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value());
 }
 
 class DdiAuxChannelReadReplyTest : public DdiAuxChannelTest {
