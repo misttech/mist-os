@@ -83,6 +83,7 @@ system-update-committer
 ?timekeeper
 ?trusted-apps
 ?tzdata-provider
+?uart
 ?ui
 ?virtual_keyboard_manager
 ?vmm_launcher

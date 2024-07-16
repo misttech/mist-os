@@ -429,6 +429,16 @@ assembly_input_bundle("wlanphy_driver") {
   ]
 }
 
+# AIB for the bt-transport-uart driver.
+assembly_input_bundle("bt_transport_uart_driver") {
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/bluetooth/hci/transport/uart:uart"
+      driver_components = [ "meta/bt-transport-uart.cm" ]
+    },
+  ]
+}
+
 # The most minimal AIB that is included in eng assembled systems that are meant
 # to be standalone.
 #

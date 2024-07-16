@@ -56,6 +56,11 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             builder.platform_bundle("bluetooth_pandora");
         }
 
+        // Include bt-transport-uart driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::bt_transport_uart") {
+            builder.platform_bundle("bt_transport_uart_driver");
+        }
+
         Ok(())
     }
 }

@@ -12,6 +12,7 @@ assert(current_cpu == "arm64",
 
 board_configuration("vim3") {
   provided_features = [
+    "fuchsia::bt_transport_uart",
     "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
@@ -295,11 +296,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/graphics/drivers/msd-vsi-vip"
       package_set = "base"
       driver_components = [ "meta/libmsd_vsi.cm" ]
-    },
-    {
-      package_target = "//src/connectivity/bluetooth/hci/transport/uart"
-      package_set = "base"
-      driver_components = [ "meta/bt-transport-uart.cm" ]
     },
     {
       package_target = "//src/power/fake-powersource:fake-battery"
