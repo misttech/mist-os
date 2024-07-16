@@ -191,6 +191,11 @@ void HandoffPrep::SetMemory() {
     return true;
   };
   memalloc::NormalizeRanges(pool, record_ranges, normed_type);
+
+  if (gBootOptions->phys_verbose) {
+    printf("%s: Physical memory handed off to the kernel:\n", ProgramName());
+    memalloc::PrintRanges(handoff_ranges, ProgramName());
+  }
 }
 
 BootOptions& HandoffPrep::SetBootOptions(const BootOptions& boot_options) {
