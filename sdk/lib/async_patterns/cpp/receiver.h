@@ -12,33 +12,31 @@
 #include <lib/fit/function_traits.h>
 #include <lib/fit/nullable.h>
 
-#include <memory>
-
 namespace async_patterns {
 
-// A |Receiver| is a hub for an owner object to asynchronously receive messages
-// and calls from other objects living on different async dispatchers. A
-// |Receiver| should be embedded as a member variable of an owner object which
-// wishes to receive messages. The receiver will silently discard pending
-// messages when it destructs, typically as part of its parent.
-//
-// The |Receiver| is thread-unsafe, and must be used and managed from a
-// [synchronized dispatcher][synchronized-dispatcher].
-//
-// Calls posted to the same |Receiver| will be processed in the order they are
-// made, regardless which |Function|s and |Callback|s they are made from.
-//
-// Calls posted to different |Receiver|s living on the same dispatcher are not
-// guaranteed to be processed before or after one another.
-//
-// [synchronized-dispatcher]:
-// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
+/// A |Receiver| is a hub for an owner object to asynchronously receive messages
+/// and calls from other objects living on different async dispatchers. A
+/// |Receiver| should be embedded as a member variable of an owner object which
+/// wishes to receive messages. The receiver will silently discard pending
+/// messages when it destructs, typically as part of its parent.
+///
+/// The |Receiver| is thread-unsafe, and must be used and managed from a
+/// [synchronized dispatcher][synchronized-dispatcher].
+///
+/// Calls posted to the same |Receiver| will be processed in the order they are
+/// made, regardless which |Function|s and |Callback|s they are made from.
+///
+/// Calls posted to different |Receiver|s living on the same dispatcher are not
+/// guaranteed to be processed before or after one another.
+///
+/// [synchronized-dispatcher]:
+/// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 template <typename Owner>
 class Receiver : private internal::ReceiverBase {
  public:
-  // Constructs a receiver. |owner| should be `this`. |dispatcher| should be
-  // the dispatcher that the current task is running on, and where |Owner|
-  // typically lives.
+  /// Constructs a receiver. |owner| should be `this`. |dispatcher| should be
+  /// the dispatcher that the current task is running on, and where |Owner|
+  /// typically lives.
   explicit Receiver(Owner* owner, async_dispatcher_t* dispatcher)
       : ReceiverBase(dispatcher), owner_(owner) {}
 
@@ -47,26 +45,26 @@ class Receiver : private internal::ReceiverBase {
   Receiver(Receiver&&) = delete;
   Receiver& operator=(Receiver&&) = delete;
 
-  // Mints a |Callback| object that holds a capability to send |Args| to the
-  // owner object once. When the resulting |Callback| is invoked on some other
-  // thread, |member| is scheduled to be called on the |dispatcher|.
-  //
-  // |member| should be a pointer to member function. It should have the
-  // function signature `void Owner::SomeMember(Args...)` where Args are some
-  // number of arguments.
+  /// Mints a |Callback| object that holds a capability to send |Args| to the
+  /// owner object once. When the resulting |Callback| is invoked on some other
+  /// thread, |member| is scheduled to be called on the |dispatcher|.
+  ///
+  /// |member| should be a pointer to member function. It should have the
+  /// function signature `void Owner::SomeMember(Args...)` where Args are some
+  /// number of arguments.
   template <typename Member>
   auto Once(Member Owner::*member) {
     return BindImpl<Callback, typename fit::callable_traits<Member>::return_type>(
         std::mem_fn(member), typename fit::callable_traits<Member>::args{});
   }
 
-  // Mints a |Callback| object that holds a capability to send |Args| to the
-  // owner object once. When the resulting |Callback| is invoked on some other
-  // thread, |callable| is scheduled to be called on the |dispatcher|.
-  //
-  // |callable| should be a lambda without any captures. It should have the
-  // function signature `void(Owner*, Args...)` where Args are some number of
-  // arguments.
+  /// Mints a |Callback| object that holds a capability to send |Args| to the
+  /// owner object once. When the resulting |Callback| is invoked on some other
+  /// thread, |callable| is scheduled to be called on the |dispatcher|.
+  ///
+  /// |callable| should be a lambda without any captures. It should have the
+  /// function signature `void(Owner*, Args...)` where Args are some number of
+  /// arguments.
   template <typename StatelessLambda>
   auto Once(StatelessLambda callable) {
     // TODO(https://fxbug.dev/42070737): We'll be able to support lambda with captures
@@ -78,26 +76,26 @@ class Receiver : private internal::ReceiverBase {
         callable, typename Pop<typename fit::callable_traits<StatelessLambda>::args>::pack{});
   }
 
-  // Mints a |Function| object that holds a capability to send |Args| to the
-  // owner object repeatedly. When the resulting |Function| is invoked on some
-  // other thread, |member| is scheduled to be called on the |dispatcher|.
-  //
-  // |member| should be a pointer to member function. It should have the
-  // function signature `void Owner::SomeMember(Args...)` where Args are some
-  // number of arguments.
+  /// Mints a |Function| object that holds a capability to send |Args| to the
+  /// owner object repeatedly. When the resulting |Function| is invoked on some
+  /// other thread, |member| is scheduled to be called on the |dispatcher|.
+  ///
+  /// |member| should be a pointer to member function. It should have the
+  /// function signature `void Owner::SomeMember(Args...)` where Args are some
+  /// number of arguments.
   template <typename Member>
   auto Repeating(Member Owner::*member) {
     return BindImpl<Function, typename fit::callable_traits<Member>::return_type>(
         std::mem_fn(member), typename fit::callable_traits<Member>::args{});
   }
 
-  // Mints a |Function| object that holds a capability to send |Args| to the
-  // owner object repeatedly. When the resulting |Function| is invoked on some
-  // other thread, |callable| is scheduled to be called on the |dispatcher|.
-  //
-  // |callable| should be a lambda without any captures. It should have the
-  // function signature `void(Owner*, Args...)` where Args are some number of
-  // arguments.
+  /// Mints a |Function| object that holds a capability to send |Args| to the
+  /// owner object repeatedly. When the resulting |Function| is invoked on some
+  /// other thread, |callable| is scheduled to be called on the |dispatcher|.
+  ///
+  /// |callable| should be a lambda without any captures. It should have the
+  /// function signature `void(Owner*, Args...)` where Args are some number of
+  /// arguments.
   template <typename StatelessLambda>
   auto Repeating(StatelessLambda callable) {
     // TODO(https://fxbug.dev/42070737): We'll be able to support lambda with captures
