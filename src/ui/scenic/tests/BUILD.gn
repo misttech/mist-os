@@ -8,7 +8,6 @@ import("//src/lib/vulkan/vulkan.gni")
 group("tests") {
   testonly = true
   public_deps = [
-    ":cpu-renderer-integration-test-root",
     ":display-integration-tests",
     ":flatland-integration-tests",
     ":flatland-null-renderer-integration-test",
@@ -16,6 +15,12 @@ group("tests") {
     ":flatland-protected-memory-integration-test",
     ":observer-integration-tests",
   ]
+
+  # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
+  # riscv64.
+  if (target_cpu != "riscv64") {
+    public_deps += [ ":cpu-renderer-integration-test" ]
+  }
 }
 
 # TODO(https://fxbug.dev/42175597): use common-deps-zxtest for CTF tests.
@@ -120,6 +125,83 @@ executable("flatland-allocation-test-bin") {
   ]
 }
 
+# Generate CTF tests required package format.
+#
+# Usage:
+#
+# ```
+# ctf_components_packages("the-test-name") {
+#   sources = [ "test.cc" ]
+#   deps = [
+#     "deps for *.cc test body"
+#   ]
+#   test_spec = { ... }
+# }
+# ```
+#
+# To run the test:
+# fx test the-test-name
+#
+# This requires file name in format:
+#  - validator cml: $prefix-validator.cml
+#  - test root cml: #prefix.cml
+#
+# Topology:
+#
+# test package: *-integration-test
+#   component: *-integration-test-component (test root)
+# ---------------------------------------------------------------------------
+#  Latest Code                    |  Latest code and Build archives
+# ---------------------------------------------------------------------------
+#  package: scenic-realm-factory  |  package: *-test-suites
+#             (real factory)      |    component: *-validator
+#                                 |      bin: *-validator-bin (test codes)
+#                                 ↑
+#             fuchsia.ui.test.context.ScenicRealmFactory
+template("ctf_components_packages") {
+  _test_specs = invoker.test_specs
+  assert(defined(_test_specs), "test_specs must be provided")
+  test_prefix = target_name
+
+  executable("${test_prefix}-validator-bin") {
+    testonly = true
+    sources = invoker.sources
+    output_name = "${test_prefix}-validator"
+    deps = invoker.deps
+  }
+
+  fuchsia_component("${test_prefix}-validator") {
+    testonly = true
+    manifest = "meta/${test_prefix}-validator.cml"
+    deps = [ ":${test_prefix}-validator-bin" ]
+  }
+
+  # ctf_fuchsia_package
+  fuchsia_package("${test_prefix}-suite") {
+    package_name = "${test_prefix}-suite"
+    testonly = true
+    deps = [ ":${test_prefix}-validator" ]
+  }
+
+  _test_component_target = "${test_prefix}-component"
+
+  fuchsia_test_component("$_test_component_target") {
+    testonly = true
+    component_name = "${test_prefix}"
+    manifest = "meta/${test_prefix}.cml"
+    test_type = "system"  # ctf
+  }
+
+  fuchsia_test_package(target_name) {
+    test_components = [ ":$_test_component_target" ]
+    subpackages = [
+      ":${test_prefix}-suite",
+      "//src/ui/testing/scenic_realm_factory:pkg",
+    ]
+    test_specs = _test_specs
+  }
+}
+
 fuchsia_test_component("flatland-allocation-test") {
   component_name = "flatland-allocation-test"
   manifest = "meta/flatland_allocation_test.cml"
@@ -199,17 +281,8 @@ fuchsia_test_component("flatland-view-integration-test") {
   test_type = "vulkan"
 }
 
-############# cpu-renderer-integration-test #############
-
-executable("cpu-renderer-integration-test-bin") {
-  testonly = true
-  output_name = "cpu-renderer-integration-test-validator"
-
-  # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
-  # riscv64.
-  if (target_cpu != "riscv64") {
-    sources = [ "flatland_integration_tests/cpu_renderer_integration_test.cc" ]
-  }
+ctf_components_packages("cpu-renderer-integration-test") {
+  sources = [ "flatland_integration_tests/cpu_renderer_integration_test.cc" ]
   deps = [
     ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
@@ -218,43 +291,12 @@ executable("cpu-renderer-integration-test-bin") {
     "//src/ui/scenic/lib/flatland/buffers",
     "//src/ui/scenic/lib/utils:utils",
   ]
-}
-
-fuchsia_component("cpu-renderer-integration-test-validator") {
-  testonly = true
-  manifest = "meta/cpu-renderer-integration-test-validator.cml"
-  deps = [ ":cpu-renderer-integration-test-bin" ]
-}
-
-# ctf_fuchsia_package
-fuchsia_package("cpu-renderer-integration-test-suite") {
-  package_name = "cpu-renderer-integration-test-suite"
-  testonly = true
-  deps = [ ":cpu-renderer-integration-test-validator" ]
-}
-
-fuchsia_test_component("cpu-renderer-integration-test-component") {
-  testonly = true
-  component_name = "cpu-renderer-integration-test"
-  manifest = "meta/cpu-renderer-integration-test.cml"
-  test_type = "system"  # ctf
-}
-
-fuchsia_test_package("cpu-renderer-integration-test-root") {
-  test_components = [ ":cpu-renderer-integration-test-component" ]
-  subpackages = [
-    ":cpu-renderer-integration-test-suite",
-    "//src/ui/testing/scenic_realm_factory:pkg",
-  ]
-
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
 }
-
-############# null-renderer-integration-test #############
 
 executable("null-renderer-integration-test-bin") {
   testonly = true
