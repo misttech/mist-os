@@ -509,10 +509,10 @@ impl IptReplaceParser {
         }
     }
 
-    pub fn get_table_name(&self) -> String {
+    pub fn get_namespace_id(&self) -> fnet_filter_ext::NamespaceId {
         match self.protocol {
-            Ip::V4 => format!("ipv4-{}", self.replace_info.name),
-            Ip::V6 => format!("ipv6-{}", self.replace_info.name),
+            Ip::V4 => fnet_filter_ext::NamespaceId(format!("ipv4-{}", self.replace_info.name)),
+            Ip::V6 => fnet_filter_ext::NamespaceId(format!("ipv6-{}", self.replace_info.name)),
         }
     }
 
@@ -756,7 +756,7 @@ impl IpTable {
 
     fn from_parser(mut parser: IptReplaceParser) -> Result<Self, IpTableParseError> {
         let domain = parser.get_domain();
-        let table_name = parser.get_table_name();
+        let namespace = parser.get_namespace_id();
 
         let mut entries: Vec<Entry> = vec![];
 
@@ -774,7 +774,8 @@ impl IpTable {
 
         // Pass 2: Translate chain-definition entries into `Routine`s, and wrap rule-specification
         // entries in `RuleSpecs::Untranslated`.
-        let (routine_map, untranslated_rules) = create_routine_map_and_rules(&table_name, entries)?;
+        let (routine_map, untranslated_rules) =
+            create_routine_map_and_rules(namespace.clone(), &parser.replace_info.name, entries)?;
 
         // Pass 3: Translate `RuleSpecs` into `Rule`s.
         let rule_specs: Vec<_> = untranslated_rules
@@ -784,10 +785,7 @@ impl IpTable {
 
         Ok(IpTable {
             parser,
-            namespace: fnet_filter_ext::Namespace {
-                id: fnet_filter_ext::NamespaceId(table_name),
-                domain,
-            },
+            namespace: fnet_filter_ext::Namespace { id: namespace, domain },
             routine_map,
             rule_specs,
         })
@@ -1090,7 +1088,8 @@ impl Entry {
 // the chain's first rule/policy (there must be at least one).
 // Rules are returned in a Vec as `UntranslatedRule`.
 fn create_routine_map_and_rules(
-    table_name: &String,
+    namespace: fnet_filter_ext::NamespaceId,
+    table_name: &str,
     mut entries: Vec<Entry>,
 ) -> Result<(HashMap<usize, fnet_filter_ext::Routine>, Vec<UntranslatedRule>), IpTableParseError> {
     // There must be at least 1 entry and the last entry must be an error target named "ERROR".
@@ -1136,14 +1135,12 @@ fn create_routine_map_and_rules(
             }
 
             let routine_id = fnet_filter_ext::RoutineId {
-                namespace: fnet_filter_ext::NamespaceId(table_name.clone()),
+                namespace: namespace.clone(),
                 name: chain_name.clone(),
             };
-            let routine_type = get_routine_type(table_name.as_str(), chain_name.as_str());
-            current_routine = RoutineState::Pending(fnet_filter_ext::Routine {
-                id: routine_id,
-                routine_type: routine_type,
-            });
+            let routine_type = get_routine_type(table_name, chain_name.as_str());
+            current_routine =
+                RoutineState::Pending(fnet_filter_ext::Routine { id: routine_id, routine_type });
         } else {
             if let RoutineState::None = current_routine {
                 return Err(IpTableParseError::RuleBeforeFirstChain);
