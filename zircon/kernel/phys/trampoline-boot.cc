@@ -433,15 +433,15 @@ fit::result<BootZbi::Error> TrampolineBoot::Load(uint32_t extra_data_capacity,
   // Now we know how much space the kernel image needs.
   // Reserve it at the fixed load address.
   auto& pool = Allocation::GetPool();
-  if (auto result = pool.UpdateFreeRamSubranges(memalloc::Type::kFixedAddressKernel,
-                                                *kernel_load_address_, KernelMemorySize());
+  if (auto result = pool.UpdateRamSubranges(memalloc::Type::kFixedAddressKernel,
+                                            *kernel_load_address_, KernelMemorySize());
       result.is_error()) {
     return fit::error{BootZbi::Error{.zbi_error = "unable to reserve kernel's load image"sv}};
   }
 
   if (data_load_address_) {
-    if (auto result = pool.UpdateFreeRamSubranges(memalloc::Type::kDataZbi, *data_load_address_,
-                                                  DataLoadSize() + extra_data_capacity);
+    if (auto result = pool.UpdateRamSubranges(memalloc::Type::kDataZbi, *data_load_address_,
+                                              DataLoadSize() + extra_data_capacity);
         result.is_error()) {
       return fit::error{BootZbi::Error{.zbi_error = "unable to reserve data ZBI's load image"sv}};
     }

@@ -184,22 +184,21 @@ class Pool {
                                               std::optional<uint64_t> min_addr = {},
                                               std::optional<uint64_t> max_addr = {});
 
-  // Attempts to perform a "weak allocation" of the given range, wherein all
-  // kFreeRam subranges are updated to `type`. The given range must be
-  // comprised of tracked subranges of allocated type, kFreeRam, or
-  // kBookkeeping. `addr + size` cannot exceed UINT64_MAX.
+  // Destructively reallocates all RAM types within the given range to the
+  // provided allocated type.
   //
-  // The utility of weak allocation lies in situations where there is a special
-  // range that we ultimately want reserved for "something" later on, but it is
-  // immaterial what occupies it in the meantime, so long as nothing is further
-  // allocated from there. For example, when loading a fixed-address kernel
-  // image, we would want to prevent page tables - which must persist
-  // across the boot -from being allocated out of that load range.
+  // `addr + size` cannot exceed UINT64_MAX.
+  //
+  // The utility of this method lies in situations where there is a special
+  // range that we ultimately want to reserve for another booting context that
+  // we are handing pool bookkeeping off to. For example, when loading a
+  // fixed-address kernel image, we would want to prevent page tables - which
+  // must persist across the boot - from being allocated out of that load range.
   //
   // fit::failed is returned if there is insufficient bookkeeping to track any
   // new ranges of memory.
   //
-  fit::result<fit::failed> UpdateFreeRamSubranges(Type type, uint64_t addr, uint64_t size);
+  fit::result<fit::failed> UpdateRamSubranges(Type type, uint64_t addr, uint64_t size);
 
   // Attempts to free a subrange of a previously allocated range or one of
   // an allocated type that had previously been passed to Init(). This subrange

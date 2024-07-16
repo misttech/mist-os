@@ -28,8 +28,8 @@ void Allocation::Init(ktl::span<memalloc::Range> mem_ranges,
     // [0, *kArchAllocationMinAddr), it can be strictly enforced by allocating
     // all such RAM now. Plus, it is convenient to distinguish this memory at
     // hand-off time.
-    ZX_ASSERT(pool->UpdateFreeRamSubranges(memalloc::Type::kReservedLow, 0, *kArchAllocationMinAddr)
-                  .is_ok());
+    ZX_ASSERT(
+        pool->UpdateRamSubranges(memalloc::Type::kReservedLow, 0, *kArchAllocationMinAddr).is_ok());
   } else {
     ZX_ASSERT(pool->Init(ranges).is_ok());
   }

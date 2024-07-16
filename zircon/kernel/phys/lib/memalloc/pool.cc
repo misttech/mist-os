@@ -566,7 +566,7 @@ fit::result<fit::failed, uint64_t> Pool::Resize(const Range& original, uint64_t 
   return fit::ok(new_addr);
 }
 
-fit::result<fit::failed> Pool::UpdateFreeRamSubranges(Type type, uint64_t addr, uint64_t size) {
+fit::result<fit::failed> Pool::UpdateRamSubranges(Type type, uint64_t addr, uint64_t size) {
   ZX_ASSERT(IsAllocatedType(type));
   ZX_ASSERT(kMax - addr >= size);
 
@@ -581,7 +581,7 @@ fit::result<fit::failed> Pool::UpdateFreeRamSubranges(Type type, uint64_t addr, 
 
   mutable_iterator it = ranges_.begin();
   while (it != ranges_.end() && addr + size > it->addr) {
-    if (addr < it->end() && it->type == Type::kFreeRam) {
+    if (addr < it->end() && IsRamType(it->type)) {
       uint64_t first = std::max(it->addr, addr);
       uint64_t last = std::min(it->end(), addr + size);
       const Range range{.addr = first, .size = last - first, .type = type};

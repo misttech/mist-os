@@ -60,7 +60,7 @@ void FindTestRamReservation(RamReservation& ram) {
       uint64_t aligned_start = (it->addr + it->size - ram.size) & -uint64_t{ZX_PAGE_SIZE};
       uint64_t aligned_end = aligned_start + ram.size;
       if (aligned_start >= it->addr && aligned_end <= aligned_start + ram.size) {
-        if (pool.UpdateFreeRamSubranges(memalloc::Type::kTestRamReserve, aligned_start, ram.size)
+        if (pool.UpdateRamSubranges(memalloc::Type::kTestRamReserve, aligned_start, ram.size)
                 .is_ok()) {
           ram.paddr = aligned_start;
           if (gBootOptions->phys_verbose) {
