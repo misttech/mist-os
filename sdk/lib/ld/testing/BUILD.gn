@@ -16,11 +16,13 @@ library_headers("headers") {
   public_deps = []
   if (is_fuchsia) {
     headers += [
+      "lib/ld/testing/mock-debugdata.h",
       "lib/ld/testing/mock-loader-service.h",
       "lib/ld/testing/test-processargs.h",
       "lib/ld/testing/test-vmo.h",
     ]
     public_deps += [
+      "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp",
       "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
       "//third_party/googletest:gmock",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -40,6 +42,7 @@ static_library("ld-testing") {
   deps = []
   if (is_fuchsia) {
     sources += [
+      "mock-debugdata.cc",
       "mock-loader-service.cc",
       "test-processargs.cc",
       "test-vmo.cc",
@@ -53,7 +56,13 @@ static_library("ld-testing") {
       "//sdk/lib/fdio",
       "//sdk/lib/stdcompat",
       "//src/lib/elfldltl/testing",
+      "//src/storage/lib/vfs/cpp",
       "//third_party/googletest:gtest",
+      "//zircon/system/ulib/async",
+      "//zircon/system/ulib/async:async-cpp",
+      "//zircon/system/ulib/async-loop",
+      "//zircon/system/ulib/async-loop:async-loop-cpp",
+      "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/zx",
     ]
   }
