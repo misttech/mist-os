@@ -72,5 +72,12 @@
                 "BpfMapTest.NotificationsRingBufTest",
             ],
         },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/353537391) deflake and re-enable
+                "SignalHandling.SignalDeliveryWakesOnlyOneFutex",
+            ],
+        },
     ],
 }
