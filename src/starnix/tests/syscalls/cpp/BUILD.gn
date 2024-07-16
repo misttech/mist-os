@@ -27,6 +27,7 @@ syscall_tests = [
   "fsverity_test",
   "fuse_test",
   "futex_test",
+  "getrandom_test",
   "input_test",
   "ioctl_test",
   "loop_test",
