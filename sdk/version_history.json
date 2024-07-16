@@ -49,7 +49,7 @@
             },
             "15": {
                 "abi_revision": "0x7D68E46C02F819AE",
-                "status": "supported"
+                "status": "unsupported"
             },
             "16": {
                 "abi_revision": "0x5669335A144B052A",
