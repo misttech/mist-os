@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::power::{SuspendState, SuspendStats};
+use crate::power::{listener, SuspendState, SuspendStats};
 use crate::task::CurrentTask;
 
 use std::collections::HashSet;
@@ -10,13 +10,13 @@ use std::sync::{Arc, Condvar, Mutex as StdMutex};
 
 use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
-use fidl::endpoints::{create_request_stream, create_sync_proxy};
+use fidl::endpoints::create_sync_proxy;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use starnix_logging::{log_error, log_info, log_warn};
+use starnix_logging::{log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -58,10 +58,10 @@ pub struct SuspendResumeManager {
     power_mode: OnceCell<PowerElement>,
     inner: Mutex<SuspendResumeManagerInner>,
 }
-static STARNIX_POWER_ON_LEVEL: fbroker::PowerLevel = 4;
+pub(super) static STARNIX_POWER_ON_LEVEL: fbroker::PowerLevel = 4;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum SuspendResult {
+pub(super) enum SuspendResult {
     /// Indicates suspension was successful.
     ///
     /// Note that a successful suspension result may be returned _after_ resuming
@@ -121,7 +121,7 @@ impl SuspendResumeManager {
             .connect_to_protocol_at_container_svc::<fpower::HandoffMarker>()?
             .into_sync_proxy();
         self.init_power_element(&activity_governor, &handoff)?;
-        self.init_listener(&activity_governor, system_task);
+        listener::init_listener(self, &activity_governor, system_task);
         self.init_stats_watcher(system_task);
         Ok(())
     }
@@ -213,93 +213,6 @@ impl SuspendResumeManager {
         Ok(())
     }
 
-    fn init_listener(
-        self: &SuspendResumeManagerHandle,
-        activity_governor: &fsystem::ActivityGovernorSynchronousProxy,
-        system_task: &CurrentTask,
-    ) {
-        let (listener_client_end, mut listener_stream) =
-            create_request_stream::<fsystem::ActivityGovernorListenerMarker>().unwrap();
-        let self_ref = self.clone();
-        system_task.kernel().kthreads.spawn_future(async move {
-            log_info!("Activity Governor Listener task starting...");
-
-            while let Some(stream) = listener_stream.next().await {
-                match stream {
-                    Ok(req) => match req {
-                        fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
-                            log_info!("Resuming from suspend");
-                            match self_ref.update_power_level(STARNIX_POWER_ON_LEVEL) {
-                                Ok(_) => {
-                                    // The server is expected to respond once it has performed the
-                                    // operations required to keep the system awake.
-                                    if let Err(e) = responder.send() {
-                                        log_error!(
-                                            "OnResume server failed to send a respond to its
-                                            client: {}",
-                                            e
-                                        );
-                                    }
-                                }
-                                Err(e) => log_error!("Failed to create a power-on lease: {}", e),
-                            }
-
-                            // Wake up a potentially blocked suspend.
-                            //
-                            // NB: We can't send this event on the `OnSuspend` listener event
-                            // since that event is emitted before suspension is actually
-                            // attempted.
-                            self_ref.notify_suspension(SuspendResult::Success);
-                        }
-                        fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                            log_info!("Attempting to transition to a low-power state");
-                        }
-                        fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                            log_warn!("Failed to suspend");
-
-                            // We failed to suspend so bring us back to the power on level.
-                            match self_ref.update_power_level(STARNIX_POWER_ON_LEVEL) {
-                                Ok(()) => {}
-                                // What can we really do here?
-                                Err(e) => log_error!(
-                                    "Failed to create a power-on lease after suspend failure: {e}"
-                                ),
-                            }
-
-                            // Wake up a potentially blocked suspend.
-                            self_ref.notify_suspension(SuspendResult::Failure);
-
-                            if let Err(e) = responder.send() {
-                                log_error!("Failed to send OnSuspendFail response: {e}");
-                            }
-                        }
-                        fsystem::ActivityGovernorListenerRequest::_UnknownMethod {
-                            ordinal,
-                            ..
-                        } => {
-                            log_error!("Got unexpected method: {}", ordinal)
-                        }
-                    },
-                    Err(e) => {
-                        log_error!("listener server got an error: {}", e);
-                        break;
-                    }
-                }
-            }
-
-            log_warn!("Activity Governor Listener task done");
-        });
-        if let Err(err) = activity_governor.register_listener(
-            fsystem::ActivityGovernorRegisterListenerRequest {
-                listener: Some(listener_client_end),
-                ..Default::default()
-            },
-            zx::Time::INFINITE,
-        ) {
-            log_error!("failed to register listener in sag {}", err)
-        }
-    }
-
     fn update_stats(&self, stats: fsuspend::SuspendStats) {
         let stats_guard = &mut self.lock().suspend_stats;
 
@@ -364,7 +277,7 @@ impl SuspendResumeManager {
         HashSet::from([SuspendState::Ram, SuspendState::Idle])
     }
 
-    fn update_power_level(&self, level: fbroker::PowerLevel) -> Result<(), Errno> {
+    pub(super) fn update_power_level(&self, level: fbroker::PowerLevel) -> Result<(), Errno> {
         let power_mode = self.power_mode()?;
         // Before the old lease is dropped, a new lease must be created to transit to the
         // new level. This ensures a smooth transition without going back to the initial
@@ -419,7 +332,7 @@ impl SuspendResumeManager {
         Ok(())
     }
 
-    fn notify_suspension(&self, result: SuspendResult) {
+    pub(super) fn notify_suspension(&self, result: SuspendResult) {
         let waiters = std::mem::take(&mut self.lock().suspend_waiter);
         for waiter in waiters.into_iter() {
             let mut guard = waiter.result.lock().unwrap();

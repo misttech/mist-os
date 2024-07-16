@@ -181,6 +181,7 @@ rustc_library("starnix_core") {
     "mm/vmex_resource.rs",
     "mm/vmsplice.rs",
     "mutable_state.rs",
+    "power/listener.rs",
     "power/manager.rs",
     "power/mod.rs",
     "power/state.rs",
