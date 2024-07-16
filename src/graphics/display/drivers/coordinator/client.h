@@ -172,7 +172,10 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   ~Client() override;
 
-  fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t> Init(
+  // Binds the `Client` to the server-side channel of the `Coordinator` protocol.
+  //
+  // Must be called exactly once in production code.
+  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Init(
       fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,

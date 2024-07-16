@@ -13,7 +13,6 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
-#include <lib/fpromise/result.h>
 #include <lib/image-format/image_format.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/stdcompat/span.h>
@@ -1495,8 +1494,8 @@ zx_koid_t GetKoid(zx_handle_t handle) {
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t>
-Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
+fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Init(
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
   running_ = true;
 
   fidl::OnUnboundFn<Client> cb = [](Client* client, fidl::UnbindInfo info,
@@ -1514,7 +1513,7 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_state_.SetBound(binding);
 
-  return fpromise::ok(binding);
+  return binding;
 }
 
 Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
@@ -1797,10 +1796,8 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
   mtx_init(&task_mtx_, mtx_plain);
   unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
   initial_cookie_ = VsyncAckCookie(rand_r(&seed));
-  auto result = handler_.Init(std::move(server_end));
-  if (result.is_error()) {
-    return result.error();
-  }
+  [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
+      handler_.Init(std::move(server_end));
   return ZX_OK;
 }
 
