@@ -9,6 +9,7 @@
 
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
+#include <stdio.h>
 
 #include <algorithm>
 #include <iterator>
@@ -211,6 +212,28 @@ constexpr void NormalizeRam(Ranges&& ranges, RangeCallback&& cb) {
       std::forward<Ranges>(ranges), std::forward<RangeCallback>(cb), [](Type type) {
         return IsRamType(type) ? std::make_optional(Type::kFreeRam) : std::nullopt;
       });
+}
+
+namespace internal {
+
+// These are the components of what PrintRanges does internally,
+// for use on different kinds of containers of memalloc::Range objects.
+void PrintRangeHeader(const char* prefix, FILE* f);
+void PrintOneRange(const Range& range, const char* prefix, FILE* f);
+
+}  // namespace internal
+
+// Pretty-prints the contents in a given Range container.
+template <class Ranges>
+inline void PrintRanges(Ranges&& ranges, const char* prefix, FILE* f = stdout) {
+  using iterator = typename std::decay_t<Ranges>::iterator;
+  using value_type = typename std::iterator_traits<iterator>::value_type;
+  static_assert(std::is_convertible_v<value_type, const Range&>);
+
+  internal::PrintRangeHeader(prefix, f);
+  for (const memalloc::Range& range : ranges) {
+    internal::PrintOneRange(range, prefix, f);
+  }
 }
 
 namespace internal {

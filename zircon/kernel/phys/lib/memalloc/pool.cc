@@ -4,7 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <inttypes.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/fit/result.h>
@@ -20,17 +19,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-#include <string_view>
 #include <utility>
 
 #include <fbl/algorithm.h>
-#include <pretty/cpp/sizes.h>
 
 #include "algorithm.h"
 
 namespace memalloc {
-
-using namespace std::string_view_literals;
 
 namespace {
 
@@ -47,12 +42,6 @@ constexpr std::optional<uint64_t> Align(uint64_t addr, uint64_t alignment) {
   }
   return (addr + alignment - 1) & ~(alignment - 1);
 }
-
-// Two hex `uint64_t`s, plus "[0x", ", 0x", and ")".
-constexpr int kRangeColWidth = 2 * 16 + 3 + 4 + 1;
-
-// A rough estimate: 4 digits, a decimal point, and a letter for a size.
-constexpr int kSizeColWidth = 7;
 
 // A shared routine for the const and mutable versions of
 // Pool::FindContainingRange() below.
@@ -786,26 +775,6 @@ Pool::Node* Pool::RemoveNodeAt(mutable_iterator it) {
   ZX_DEBUG_ASSERT(num_ranges_ > 0);
   --num_ranges_;
   return static_cast<Node*>(ranges_.erase(it));
-}
-
-void Pool::PrintMemoryRanges(const char* prefix, FILE* f) const {
-  PrintMemoryRangeHeader(prefix, f);
-  for (const memalloc::Range& range : *this) {
-    PrintOneMemoryRange(range, prefix, f);
-  }
-}
-
-void Pool::PrintMemoryRangeHeader(const char* prefix, FILE* f) {
-  fprintf(f, "%s: | %-*s | %-*s | Type\n", prefix, kRangeColWidth, "Physical memory range",
-          kSizeColWidth, "Size");
-}
-
-void Pool::PrintOneMemoryRange(const memalloc::Range& range, const char* prefix, FILE* f) {
-  pretty::FormattedBytes size(static_cast<size_t>(range.size));
-  std::string_view type = ToString(range.type);
-  fprintf(f, "%s: | [0x%016" PRIx64 ", 0x%016" PRIx64 ") | %*s | %-.*s\n",  //
-          prefix, range.addr, range.end(),                                  //
-          kSizeColWidth, size.c_str(), static_cast<int>(type.size()), type.data());
 }
 
 }  // namespace memalloc

@@ -266,12 +266,9 @@ class Pool {
   fit::result<fit::failed> CoalescePeripherals(cpp20::span<const size_t> alignments);
 
   // Pretty-prints the memory ranges contained in the pool.
-  void PrintMemoryRanges(const char* prefix, FILE* f = stdout) const;
-
-  // These are the components of what PrintMemoryRanges does internally,
-  // for use on different kinds of containers of memalloc::Range objects.
-  static void PrintMemoryRangeHeader(const char* prefix, FILE* f = stdout);
-  static void PrintOneMemoryRange(const Range& range, const char* prefix, FILE* f = stdout);
+  void PrintMemoryRanges(const char* prefix, FILE* f = stdout) const {
+    PrintRanges(*this, prefix, f);
+  }
 
  private:
   using mutable_iterator = typename List::iterator;

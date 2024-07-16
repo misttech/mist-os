@@ -22,6 +22,15 @@ library_headers("range.headers") {
   ]
 }
 
+static_library("range") {
+  public_deps = [ ":range.headers" ]
+  sources = [ "range.cc" ]
+  deps = [ "//zircon/system/ulib/pretty" ]
+  if (is_kernel) {
+    deps += [ "//zircon/kernel/lib/libc" ]
+  }
+}
+
 library_headers("headers") {
   headers = [
     "lib/memalloc/pool-mem-config.h",
@@ -49,14 +58,13 @@ source_set("memalloc") {
   sources = [
     "algorithm.cc",
     "pool.cc",
-    "range.cc",
   ]
 
   deps = [
+    ":range",
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/zx",
   ]
   if (is_kernel) {
