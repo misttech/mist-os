@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/component/config.gni")
 import("//build/components.gni")
 import("//build/zbi/kernel_cmdline.gni")
 import("//build/zbi/zbi.gni")
@@ -69,6 +70,17 @@ if (is_mistos) {
     manifest = "meta/archivist-pipelines.cml"
   }
 
+  component_config("component_manager_bootfs_config") {
+    sources = [
+      "//src/security/policy/component_manager_policy.json5",
+      "//src/security/policy/component_manager_policy_base.json5",
+      "//src/security/policy/component_manager_policy_build_type_base.json5",
+      "//src/security/policy/component_manager_policy_eng.json5",
+      "//src/sys/component_manager/configs/bootfs_config.mistos.json5",
+    ]
+    dest = "config/component_manager"
+  }
+
   zbi("mistos") {
     deps = [ "//zircon/kernel" ]
 
@@ -85,12 +97,12 @@ if (is_mistos) {
       ":virtcon_disable",
 
       ## Embeddable
+      ":component_manager_bootfs_config",
       "//build/info/bootfs:minimum_utc_stamp",
       "//src/bringup:bringup-config",
       "//src/bringup/bin/critical-services:component",
       "//src/power/shutdown-shim:component",
       "//src/sys/component_manager:bin",
-      "//src/sys/component_manager:component_manager_bootfs_config",
       "//src/sys/component_manager:elf_runner",
       "//src/sys/startup:component",
 

@@ -65,11 +65,6 @@ template("component_config") {
       "//src/security/policy/component_manager_policy_build_type_base.json5",
       "//src/sys/component_manager/configs/bootfs_config.json5",
     ]
-    if (is_mistos) {
-      _sources -= [ "//src/sys/component_manager/configs/bootfs_config.json5" ]
-      _sources +=
-          [ "//src/sys/component_manager/configs/bootfs_config.mistos.json5" ]
-    }
   }
 
   _product_configs = []
