@@ -39,6 +39,9 @@ namespace {
 
 constexpr char kTestHelper[] = "/pkg/bin/debugdata-test-helper";
 
+constexpr const char* kHelperPublishCommand = "publish_data";
+constexpr const char* kHelperPublishFailCommand = "publish_data_fail";
+
 struct Publisher : public fidl::WireServer<fuchsia_debugdata::Publisher> {
   std::unordered_map<std::string, zx::vmo> data;
 
@@ -114,7 +117,7 @@ TEST(DebugDataTests, PublishData) {
   Publisher svc;
   ASSERT_NO_FATAL_FAILURE(svc.Serve(loop.dispatcher(), &vfs, &client_end));
 
-  ASSERT_NO_FATAL_FAILURE(RunHelperWithSvc("publish_data", std::move(client_end), 0));
+  ASSERT_NO_FATAL_FAILURE(RunHelperWithSvc(kHelperPublishCommand, std::move(client_end), 0));
 
   ASSERT_OK(loop.RunUntilIdle());
 
@@ -130,7 +133,17 @@ TEST(DebugDataTests, PublishData) {
 }
 
 TEST(DebugDataTests, PublishDataWithoutSvc) {
-  ASSERT_NO_FATAL_FAILURE(RunHelperWithoutSvc("publish_data", 0));
+  ASSERT_NO_FATAL_FAILURE(RunHelperWithoutSvc(kHelperPublishFailCommand, 0));
+}
+
+TEST(DebugDataTests, PublishDataWithBadSvc) {
+  zx::channel client_channel_end, server_channel_end;
+  ASSERT_OK(zx::channel::create(0, &client_channel_end, &server_channel_end));
+  fidl::ClientEnd<fuchsia_io::Directory> client_end{
+      std::move(client_channel_end),
+  };
+  server_channel_end.reset();
+  ASSERT_NO_FATAL_FAILURE(RunHelperWithSvc(kHelperPublishFailCommand, std::move(client_end), 0));
 }
 
 // debugdata.cc cannot use LLCPP (because it allocates with new/delete) so
