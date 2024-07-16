@@ -6,12 +6,14 @@ pub(super) mod fs;
 
 use super::ProcAttr;
 
+use crate::vfs::NamespaceNode;
 use selinux::permission_check::PermissionCheck;
 use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
 use selinux_common::{ClassPermission, FilePermission, ObjectClass, Permission, ProcessPermission};
-use starnix_logging::log_debug;
+use starnix_logging::{log_debug, track_stub};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::{errno, error};
 use std::sync::Arc;
@@ -203,6 +205,21 @@ pub(super) fn task_prlimit(
         ),
         (false, false) => Ok(()),
     }
+}
+
+/// Checks if the task with `_source_sid` has the permission to mount at `_path` the object specified by
+/// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.
+pub(super) fn sb_mount(
+    _permission_check: &impl PermissionCheck,
+    _source_sid: SecurityId,
+    _dev_name: &bstr::BStr,
+    _path: &NamespaceNode,
+    _fs_type: &bstr::BStr,
+    _flags: MountFlags,
+    _data: &bstr::BStr,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/352507622"), "sb_mount: validate permission");
+    Ok(())
 }
 
 /// Checks if the task with `source_sid` is allowed to trace the task with `target_sid`.

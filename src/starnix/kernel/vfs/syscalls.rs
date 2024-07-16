@@ -4,6 +4,7 @@
 
 use crate::fs::fuchsia::TimerFile;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor, PAGE_SIZE};
+use crate::security;
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter,
 };
@@ -1772,6 +1773,8 @@ where
         %data,
         "do_mount_create",
     );
+
+    security::sb_mount(current_task, source, &target, fs_type, flags, data)?;
 
     let options = FileSystemOptions {
         source: source.into(),

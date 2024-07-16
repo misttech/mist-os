@@ -4,13 +4,14 @@
 
 use super::{selinux_hooks, ResolvedElfState, TaskState};
 use crate::task::{CurrentTask, Task};
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, ValueOrSize};
+use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode, ValueOrSize};
 
 use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
 use selinux_common::ProcessPermission;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
 use std::sync::Arc;
 
@@ -301,6 +302,31 @@ pub fn task_prlimit(
             target_sid,
             check_get_rlimit,
             check_set_rlimit,
+        )
+    })
+}
+
+/// Check permission before an object specified by `dev_name` is mounted on the mount point named by `path`.
+/// `type` contains the filesystem type. `flags` contains the mount flags. `data` contains the filesystem-specific data.
+/// Corresponds to the `security_sb_mount` hook.
+pub fn sb_mount(
+    source: &CurrentTask,
+    dev_name: &bstr::BStr,
+    path: &NamespaceNode,
+    fs_type: &bstr::BStr,
+    flags: MountFlags,
+    data: &bstr::BStr,
+) -> Result<(), Errno> {
+    check_if_selinux(source, |security_server| {
+        let source_sid = get_current_sid(&source);
+        selinux_hooks::sb_mount(
+            &security_server.as_permission_check(),
+            source_sid,
+            dev_name,
+            path,
+            fs_type,
+            flags,
+            data,
         )
     })
 }
