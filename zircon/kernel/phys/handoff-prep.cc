@@ -179,7 +179,7 @@ void HandoffPrep::SetMemory() {
     ++len;
     return true;
   };
-  pool.NormalizeRanges(count_ranges, normed_type);
+  memalloc::NormalizeRanges(pool, count_ranges, normed_type);
 
   fbl::AllocChecker ac;
   ktl::span handoff_ranges = New(handoff()->memory, ac, len);
@@ -190,7 +190,7 @@ void HandoffPrep::SetMemory() {
     *it++ = range;
     return true;
   };
-  pool.NormalizeRanges(record_ranges, normed_type);
+  memalloc::NormalizeRanges(pool, record_ranges, normed_type);
 }
 
 BootOptions& HandoffPrep::SetBootOptions(const BootOptions& boot_options) {

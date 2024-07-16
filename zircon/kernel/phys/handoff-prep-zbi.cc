@@ -230,13 +230,13 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         const uint64_t limit_mb = ktl::min(ktl::numeric_limits<uint64_t>::max() / kBytesPerMib,
                                            gBootOptions->memory_limit_mb);
         uint64_t limit_end = 0;
-        Allocation::GetPool().NormalizeRam(
-            [&limit_end, left = kBytesPerMib * limit_mb](const auto& range) mutable {
-              uint64_t keep = ktl::min(left, range.size);
-              left -= keep;
-              limit_end = range.addr + keep;
-              return left > 0;
-            });
+        auto seek_cutoff = [&limit_end, left = kBytesPerMib * limit_mb](const auto& range) mutable {
+          uint64_t keep = ktl::min(left, range.size);
+          left -= keep;
+          limit_end = range.addr + keep;
+          return left > 0;
+        };
+        memalloc::NormalizeRam(Allocation::GetPool(), seek_cutoff);
 
         // Perform the truncation in place.
         size_t w = 0;  // The write index, as opposed to `r`, the read index.

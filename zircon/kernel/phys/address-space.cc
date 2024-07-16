@@ -79,7 +79,7 @@ void AddressSpace::IdentityMapRam() {
   // range in the process. There should not be cases where both RAM and MMIO
   // appear within the same page.
   ktl::optional<uint64_t> last_aligned_end;
-  pool.NormalizeRam([&](const memalloc::Range& range) {
+  memalloc::NormalizeRam(pool, [&](const memalloc::Range& range) {
     constexpr uint64_t kPageSize = ZX_PAGE_SIZE;
 
     // If the end of the last page-aligned range overlaps with the current,

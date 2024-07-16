@@ -11,8 +11,10 @@
 #include <lib/zbi-format/memory.h>
 
 #include <algorithm>
+#include <iterator>
 #include <limits>
 #include <string_view>
+#include <type_traits>
 
 namespace memalloc {
 
@@ -157,6 +159,59 @@ struct Range {
 // which, layout-wise, corresponds to the upper half of Type - must be zeroed
 // out.
 cpp20::span<Range> AsRanges(cpp20::span<zbi_mem_range_t> ranges);
+
+// Gives a custom, normalized view of a container of ranges, `Ranges`.
+// `NormalizeTypeFn` is a callable with signature `std::optional<Type>(Type)`:
+// std::nullopt indicates that ranges of this type should not be passed to the
+// callback; otherwise, the returned type is indicates how the input type should
+// be normalized. Adjacent ranges of the same normalized type are merged before
+// being passed to the callback.
+//
+// The callback itself is expected to return a boolean indicating whether it
+// should continue to be called.
+template <class Ranges, typename RangeCallback, typename NormalizeTypeFn>
+constexpr void NormalizeRanges(Ranges&& ranges, RangeCallback&& cb,
+                               NormalizeTypeFn&& normalize_type) {
+  using iterator = typename std::decay_t<Ranges>::iterator;
+  using value_type = typename std::iterator_traits<iterator>::value_type;
+  static_assert(std::is_convertible_v<value_type, const Range&>);
+
+  static_assert(std::is_invocable_r_v<bool, RangeCallback, const Range&>);
+  static_assert(std::is_invocable_r_v<std::optional<Type>, NormalizeTypeFn, Type>);
+
+  std::optional<Range> prev;
+  for (const Range& range : ranges) {
+    std::optional<Type> normalized_type = normalize_type(range.type);
+    if (!normalized_type) {
+      continue;
+    }
+    Range normalized = range;
+    normalized.type = *normalized_type;
+    if (!prev) {
+      prev = normalized;
+    } else if (prev->end() == normalized.addr && prev->type == normalized.type) {
+      prev->size += normalized.size;
+    } else {
+      if (!cb(*prev)) {
+        return;
+      }
+      prev = normalized;
+    }
+  }
+  if (prev) {
+    cb(*prev);
+  }
+}
+
+// Provides a callback with a normalized view of RAM ranges alone, reducing
+// any allocated types as kFreeRam.
+template <class Ranges, typename RangeCallback>
+constexpr void NormalizeRam(Ranges&& ranges, RangeCallback&& cb) {
+  return NormalizeRanges(
+      std::forward<Ranges>(ranges), std::forward<RangeCallback>(cb), [](Type type) {
+        return IsRamType(type) ? std::make_optional(Type::kFreeRam) : std::nullopt;
+      });
+}
 
 namespace internal {
 

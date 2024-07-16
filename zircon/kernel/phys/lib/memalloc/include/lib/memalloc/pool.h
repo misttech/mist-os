@@ -249,53 +249,6 @@ class Pool {
   // that the pool does not track will not be used by any program.
   void RestrictTotalRam(uint64_t new_capacity_bytes);
 
-  // Gives a custom, normalized view of all tracked ranges. `NormalizeTypeFn`
-  // is a callable with signature `std::optional<Type>(Type)`: std::nullopt
-  // indicates that ranges of this type should not be passed to the callback;
-  // otherwise, the returned type is indicates how the input type should be
-  // normalized. Adjacent ranges of the same normalized type are merged before
-  // being passed to the callback.
-  //
-  // The callback itself is expected to return a boolean indicating whether it
-  // should continue to be called.
-  template <typename RangeCallback, typename NormalizeTypeFn>
-  void NormalizeRanges(RangeCallback&& cb, NormalizeTypeFn&& normalize_type) const {
-    static_assert(std::is_invocable_r_v<bool, RangeCallback, const Range&>);
-    static_assert(std::is_invocable_r_v<std::optional<Type>, NormalizeTypeFn, Type>);
-
-    std::optional<Range> prev;
-    for (const Range& range : *this) {
-      std::optional<Type> normalized_type = normalize_type(range.type);
-      if (!normalized_type) {
-        continue;
-      }
-      Range normalized = range;
-      normalized.type = *normalized_type;
-      if (!prev) {
-        prev = normalized;
-      } else if (prev->end() == normalized.addr && prev->type == normalized.type) {
-        prev->size += normalized.size;
-      } else {
-        if (!cb(*prev)) {
-          return;
-        }
-        prev = normalized;
-      }
-    }
-    if (prev) {
-      cb(*prev);
-    }
-  }
-
-  // Provides a callback with a normalized view of RAM ranges alone, reducing
-  // any allocated types as kFreeRam.
-  template <typename RangeCallback>
-  void NormalizeRam(RangeCallback&& cb) const {
-    return NormalizeRanges(std::forward<RangeCallback>(cb), [](Type type) {
-      return IsRamType(type) ? std::make_optional(Type::kFreeRam) : std::nullopt;
-    });
-  }
-
   // Returns `fit::success` if the provided range was succesully marked as peripheral. This requires
   // that `range.type` is `memalloc::Type::kPeripheral` and that there are no ranges of type
   // `memalloc::Type::kFreeRam` or allocated types overlapping in the range, otherwise `fit::failed`
