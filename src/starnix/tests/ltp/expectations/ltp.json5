@@ -243,6 +243,9 @@
 
                 // TODO(https://fxbug.dev/353535860) deflake and enable
                 "pidfd_open03",
+
+                // TODO(https://fxbug.dev/) fix upstream test and enable
+                "mmap04",
             ],
         },
     ],
