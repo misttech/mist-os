@@ -388,7 +388,7 @@ async def async_main(
 
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
-        if not flags.has_debugger():
+        if not flags.has_debugger() and not flags.host:
             recorder.emit_instruction_message(
                 "\nTo debug with zxdb: fx test {} --break-on-failure\n".format(
                     " ".join(sys.argv[1:])
@@ -896,6 +896,20 @@ async def run_all_tests(
         )
         recorder.emit_instruction_message(
             "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
+        )
+        return False
+
+    # This is an error since no tests that were selected involved the device, even if the --host
+    # flag was not specified on the command line. If a test selection includes _some_ device tests,
+    # those are allowed. The existence of host tests among device tests is not a problem for the
+    # debugger integration, but users may be confused if they try to debug host tests with
+    # automatic selection.
+    if not tests.has_device_test() and flags.has_debugger():
+        recorder.emit_warning_message(
+            "\n--break-on-failure and --breakpoint flags are not supported with host tests."
+        )
+        recorder.emit_instruction_message(
+            "\nRemove the --break-on-failure and --breakpoint flags to run these host-only tests."
         )
         return False
 
