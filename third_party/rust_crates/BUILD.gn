@@ -201,10 +201,6 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
-group("crypto-mac") {
-  public_deps = [ ":crypto-mac-v0_11_1" ]
-}
-
 group("csv") {
   public_deps = [ ":csv-v1_2_1" ]
 }
@@ -3891,39 +3887,6 @@ rust_library("crypto-common-v0_1_6") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":crypto-common-v0_1_6.license" ]
-}
-
-license("crypto-mac-v0_11_1.license") {
-  public_package_name = "crypto_mac"
-  license_files = [
-    "//third_party/rust_crates/vendor/crypto-mac-0.11.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/crypto-mac-0.11.1/LICENSE-MIT",
-  ]
-}
-
-rust_library("crypto-mac-v0_11_1") {
-  crate_name = "crypto_mac"
-  crate_root = "//third_party/rust_crates/vendor/crypto-mac-0.11.1/src/lib.rs"
-  output_name = "crypto_mac-c61aae76717eb909"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":generic-array-v0_14_5" ]
-  deps += [ ":subtle-v2_4_1" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=c61aae76717eb909",
-    "-Cextra-filename=-c61aae76717eb909",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":crypto-mac-v0_11_1.license" ]
 }
 
 license("cstr-v0_2_11.license") {

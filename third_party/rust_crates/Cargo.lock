@@ -785,16 +785,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crypto-mac"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1d1a86f49236c215f271d40892d5fc950490551400b02ef360692c29815c714"
-dependencies = [
- "generic-array",
- "subtle",
-]
-
-[[package]]
 name = "cstr"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1264,7 +1254,6 @@ dependencies = [
  "crossbeam",
  "crossbeam-utils",
  "crossterm",
- "crypto-mac",
  "csv",
  "darling",
  "data-encoding",
