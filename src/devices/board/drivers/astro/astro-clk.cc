@@ -7,7 +7,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <ddk/metadata/clock.h>
 #include <soc/aml-meson/g12a-clk.h>
@@ -74,9 +73,9 @@ zx_status_t Astro::ClkInit() {
   const fpbus::Node clk_dev = [&clock_metadata]() {
     fpbus::Node dev = {};
     dev.name() = "astro-clk";
-    dev.vid() = PDEV_VID_AMLOGIC;
-    dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-    dev.did() = PDEV_DID_AMLOGIC_G12A_CLK;
+    dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+    dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_G12A_CLK;
     dev.mmio() = clk_mmios;
     dev.metadata() = clock_metadata;
     return dev;

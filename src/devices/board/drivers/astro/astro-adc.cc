@@ -9,9 +9,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/platform-defs.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "src/devices/board/drivers/astro/astro.h"
@@ -48,8 +46,8 @@ static const fidl_metadata::adc::Channel kAdcChannels[] = {
 zx::result<> Astro::AdcInit() {
   fuchsia_hardware_platform_bus::Node node;
   node.name() = "adc";
-  node.vid() = PDEV_VID_AMLOGIC;
-  node.pid() = PDEV_PID_GENERIC;
+  node.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  node.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
   node.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_ADC;
   node.mmio() = saradc_mmios;
   node.irq() = saradc_irqs;

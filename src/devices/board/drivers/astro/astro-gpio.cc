@@ -7,7 +7,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <ddk/metadata/gpio.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
@@ -132,9 +131,9 @@ zx_status_t Astro::GpioInit() {
 
   fpbus::Node gpio_dev;
   gpio_dev.name() = "gpio";
-  gpio_dev.vid() = PDEV_VID_AMLOGIC;
-  gpio_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-  gpio_dev.did() = PDEV_DID_AMLOGIC_GPIO;
+  gpio_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  gpio_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+  gpio_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_GPIO;
   gpio_dev.mmio() = gpio_mmios;
   gpio_dev.irq() = gpio_irqs;
   gpio_dev.metadata() = gpio_metadata;
@@ -166,9 +165,9 @@ zx_status_t Astro::GpioInit() {
   fpbus::Node gpio_test_dev;
   fpbus::Node dev = {};
   dev.name() = "astro-gpio-test";
-  dev.vid() = PDEV_VID_GENERIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_GPIO_TEST;
+  dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_GPIO_TEST;
   dev.gpio() = gpio_test_gpios;
   return dev;
 }

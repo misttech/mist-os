@@ -8,11 +8,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -236,13 +234,13 @@ zx_status_t Astro::AudioInit() {
     };
 
     fpbus::Node tdm_dev;
-    tdm_dev.vid() = PDEV_VID_AMLOGIC;
-    tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
+    tdm_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    tdm_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = pcm_out_btis;
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.name() = "astro-pcm-dai-out";
-    tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_OUT;
+    tdm_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DAI_OUT;
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_out",
         kParentSpecInit,
@@ -277,8 +275,8 @@ zx_status_t Astro::AudioInit() {
 
     fpbus::Node dev;
     dev.name() = "audio_codec_tas27xx";
-    dev.vid() = PDEV_VID_TI;
-    dev.did() = PDEV_DID_TI_TAS2770;
+    dev.vid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
+    dev.did() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS2770;
     dev.metadata() = std::vector<fpbus::Metadata>{
         {{
             .type = DEVICE_METADATA_PRIVATE,
@@ -356,9 +354,9 @@ zx_status_t Astro::AudioInit() {
 
     fpbus::Node tdm_dev;
     tdm_dev.name() = "astro-i2s-audio-out";
-    tdm_dev.vid() = PDEV_VID_AMLOGIC;
-    tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-    tdm_dev.did() = PDEV_DID_AMLOGIC_TDM;
+    tdm_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    tdm_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+    tdm_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_TDM;
     tdm_dev.instance_id() = tdm_instance_id++;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = tdm_btis;
@@ -419,13 +417,13 @@ zx_status_t Astro::AudioInit() {
         }},
     };
     fpbus::Node tdm_dev;
-    tdm_dev.vid() = PDEV_VID_AMLOGIC;
-    tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
+    tdm_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    tdm_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = pcm_in_btis;
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.name() = "astro-pcm-dai-in";
-    tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_IN;
+    tdm_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DAI_IN;
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_in",
         kParentSpecInit,
@@ -482,9 +480,9 @@ zx_status_t Astro::AudioInit() {
 
     fpbus::Node dev_in;
     dev_in.name() = "astro-audio-pdm-in";
-    dev_in.vid() = PDEV_VID_AMLOGIC;
-    dev_in.pid() = PDEV_PID_AMLOGIC_S905D2;
-    dev_in.did() = PDEV_DID_AMLOGIC_PDM;
+    dev_in.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    dev_in.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+    dev_in.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_PDM;
     dev_in.mmio() = pdm_mmios;
     dev_in.bti() = pdm_btis;
     dev_in.irq() = toddr_b_irqs;

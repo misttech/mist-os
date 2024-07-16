@@ -7,7 +7,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -131,9 +130,9 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   fpbus::Node i2c_dev = {};
   i2c_dev.name() = name;
-  i2c_dev.vid() = PDEV_VID_AMLOGIC;
-  i2c_dev.pid() = PDEV_PID_GENERIC;
-  i2c_dev.did() = PDEV_DID_AMLOGIC_I2C;
+  i2c_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  i2c_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  i2c_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_I2C;
   i2c_dev.mmio() = mmios;
   i2c_dev.irq() = irqs;
   i2c_dev.metadata() = std::move(i2c_metadata);

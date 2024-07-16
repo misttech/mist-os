@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
 
 #include "astro.h"
 
@@ -24,8 +23,8 @@ static const std::vector<fpbus::Bti> sysmem_btis{
 static const std::vector<uint8_t> sysmem_metadata = [] {
   fuchsia_hardware_sysmem::Metadata metadata;
 
-  metadata.vid() = PDEV_VID_AMLOGIC;
-  metadata.pid() = PDEV_PID_AMLOGIC_S905D2;
+  metadata.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  metadata.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
   auto persist_result = fidl::Persist(metadata);
   // Given permitted values set above, we won't see failure here. OOM would fail before getting
   // here.
@@ -44,9 +43,9 @@ static const std::vector<fpbus::Metadata> sysmem_metadata_list{
 static const fpbus::Node sysmem_dev = []() {
   fpbus::Node ret = {};
   ret.name() = "sysmem";
-  ret.vid() = PDEV_VID_GENERIC;
-  ret.pid() = PDEV_PID_GENERIC;
-  ret.did() = PDEV_DID_SYSMEM;
+  ret.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  ret.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  ret.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_SYSMEM;
   ret.bti() = sysmem_btis;
   ret.metadata() = sysmem_metadata_list;
   return ret;

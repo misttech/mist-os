@@ -8,20 +8,17 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/align.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
 #include <bind/fuchsia/broadcom/platform/sdio/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/sdio/cpp/bind.h>
-#include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <bind/fuchsia/sdio/cpp/bind.h>
 #include <fbl/algorithm.h>

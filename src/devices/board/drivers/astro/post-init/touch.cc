@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/focaltech/focaltech.h>
@@ -18,6 +17,7 @@
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/board/drivers/astro/post-init/post-init.h"
 
@@ -113,9 +113,9 @@ zx::result<> AddFocaltechTouch(
 
   fpbus::Node dev;
   dev.name() = "focaltech_touch";
-  dev.vid() = PDEV_VID_GENERIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_FOCALTOUCH;
+  dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_FOCALTOUCH;
   dev.metadata() = std::vector<fpbus::Metadata>{
       {{
           .type = DEVICE_METADATA_PRIVATE,

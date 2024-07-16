@@ -8,7 +8,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <unistd.h>
@@ -107,9 +106,9 @@ static const std::vector<fpbus::BootMetadata> raw_nand_boot_metadata{
 static const fpbus::Node raw_nand_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "raw_nand";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_AMLOGIC_RAW_NAND;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_RAW_NAND;
   dev.mmio() = raw_nand_mmios;
   dev.irq() = raw_nand_irqs;
   dev.bti() = raw_nand_btis;

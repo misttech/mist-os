@@ -8,10 +8,10 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <unistd.h>
 
+#include <bind/fuchsia/broadcom/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
@@ -40,8 +40,8 @@ static const std::vector<fpbus::Irq> bt_uart_irqs{
 
 static const fuchsia_hardware_serial::wire::SerialPortInfo bt_uart_serial_info = {
     .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
-    .serial_vid = PDEV_VID_BROADCOM,
-    .serial_pid = PDEV_PID_BCM43458,
+    .serial_vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
+    .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
 };
 
 static const std::vector<fpbus::BootMetadata> bt_uart_boot_metadata{
@@ -118,9 +118,9 @@ zx_status_t Astro::BluetoothInit() {
   const fpbus::Node bt_uart_dev = [&]() {
     fpbus::Node dev = {};
     dev.name() = "bt-uart";
-    dev.vid() = PDEV_VID_AMLOGIC;
-    dev.pid() = PDEV_PID_GENERIC;
-    dev.did() = PDEV_DID_AMLOGIC_UART;
+    dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+    dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_UART;
     dev.mmio() = bt_uart_mmios;
     dev.irq() = bt_uart_irqs;
     dev.metadata() = bt_uart_metadata;

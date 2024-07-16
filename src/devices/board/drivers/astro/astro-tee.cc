@@ -8,7 +8,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/stdcompat/span.h>
@@ -17,7 +16,6 @@
 #include <cstdint>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "astro.h"
 #include "src/devices/lib/fidl-metadata/tee.h"

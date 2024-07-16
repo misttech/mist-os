@@ -9,7 +9,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -70,9 +69,9 @@ zx_status_t Astro::ButtonsInit() {
   fdf::Arena buttons_arena('BTTN');
 
   fpbus::Node dev = {{.name = "astro-buttons",
-                      .vid = PDEV_VID_GENERIC,
-                      .pid = PDEV_PID_GENERIC,
-                      .did = PDEV_DID_BUTTONS,
+                      .vid = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC,
+                      .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC,
+                      .did = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_BUTTONS,
                       .metadata = std::vector<fpbus::Metadata>{
                           {{.type = DEVICE_METADATA_BUTTONS_BUTTONS,
                             .data = std::vector<uint8_t>(

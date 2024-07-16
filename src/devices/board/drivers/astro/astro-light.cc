@@ -8,7 +8,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -46,9 +45,9 @@ zx_status_t Astro::LightInit() {
 
   fpbus::Node tcs3400_light_dev;
   tcs3400_light_dev.name() = "tcs3400_light";
-  tcs3400_light_dev.vid() = PDEV_VID_GENERIC;
-  tcs3400_light_dev.pid() = PDEV_PID_GENERIC;
-  tcs3400_light_dev.did() = PDEV_DID_TCS3400_LIGHT;
+  tcs3400_light_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  tcs3400_light_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  tcs3400_light_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_TCS3400_LIGHT;
   tcs3400_light_dev.metadata() = kTcs3400Metadata;
 
   const auto kI2cBindRules = std::vector{
@@ -136,9 +135,9 @@ zx_status_t Astro::LightInit() {
 
   fpbus::Node light_dev;
   light_dev.name() = "gpio-light";
-  light_dev.vid() = PDEV_VID_AMLOGIC;
-  light_dev.pid() = PDEV_PID_GENERIC;
-  light_dev.did() = PDEV_DID_GPIO_LIGHT;
+  light_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  light_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  light_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_GPIO_LIGHT;
   light_dev.metadata() = light_metadata;
 
   // Enable the Amber LED so it will be controlled by PWM.

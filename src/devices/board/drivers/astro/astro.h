@@ -13,6 +13,8 @@
 #include <lib/ddk/device.h>
 #include <threads.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <ddktl/device.h>
 #include <fbl/macros.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
