@@ -154,7 +154,7 @@ declare_args() {
 #     Default: true
 #
 #   remote_build: (optional)
-#     Set this to true to override the global default `enable_bazel_remote_rbe`
+#     Set this to false to override the global default `enable_bazel_remote_rbe`
 #     setting which controls whether the underlying bazel invocation
 #     will build remotely using RBE.
 #     Type: boolean
@@ -677,8 +677,12 @@ template("bazel_action") {
     }
 
     _remote_build = enable_bazel_remote_rbe
-    if (defined(invoker.remote_build)) {
-      _remote_build = invoker.remote_build
+    if (_remote_build) {
+      if (defined(invoker.remote_build)) {
+        _remote_build = invoker.remote_build
+      }
+    } else {
+      not_needed(invoker, [ "remote_build" ])
     }
     if (_remote_build) {
       if (bazel_rbe_exec_strategy == "remote") {
