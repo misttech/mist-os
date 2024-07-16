@@ -387,6 +387,10 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			String: "Got no package for fuchsia-pkg://",
 			Type:   swarmingOutputType,
 		},
+		&stringInLogCheck{
+			String: "Exceeded safe temperature range",
+			Type:   syslogType,
+		},
 	}
 
 	oopsExceptBlocks := []*logBlock{
