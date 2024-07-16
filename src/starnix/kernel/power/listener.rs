@@ -25,56 +25,17 @@ pub(super) fn init_listener(
             match stream {
                 Ok(req) => match req {
                     fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
-                        log_info!("Resuming from suspend");
-                        match power_manager.update_power_level(STARNIX_POWER_ON_LEVEL) {
-                            Ok(_) => {
-                                // The server is expected to respond once it has performed the
-                                // operations required to keep the system awake.
-                                if let Err(e) = responder.send() {
-                                    log_error!(
-                                        "OnResume server failed to send a respond to its
-                                            client: {}",
-                                        e
-                                    );
-                                }
-                            }
-                            Err(e) => log_error!("Failed to create a power-on lease: {}", e),
-                        }
-
-                        // Wake up a potentially blocked suspend.
-                        //
-                        // NB: We can't send this event on the `OnSuspend` listener event
-                        // since that event is emitted before suspension is actually
-                        // attempted.
-                        power_manager.notify_suspension(SuspendResult::Success);
+                        handle_on_resume(&power_manager, || responder.send())
                     }
                     fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                        log_info!("Attempting to transition to a low-power state");
+                        handle_on_suspend()
                     }
                     fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                        log_warn!("Failed to suspend");
-
-                        // We failed to suspend so bring us back to the power on level.
-                        match power_manager.update_power_level(STARNIX_POWER_ON_LEVEL) {
-                            Ok(()) => {}
-                            // What can we really do here?
-                            Err(e) => log_error!(
-                                "Failed to create a power-on lease after suspend failure: {e}"
-                            ),
-                        }
-
-                        // Wake up a potentially blocked suspend.
-                        power_manager.notify_suspension(SuspendResult::Failure);
-
-                        if let Err(e) = responder.send() {
-                            log_error!("Failed to send OnSuspendFail response: {e}");
-                        }
+                        handle_on_suspend_fail(&power_manager, || responder.send())
                     }
                     fsystem::ActivityGovernorListenerRequest::_UnknownMethod {
                         ordinal, ..
-                    } => {
-                        log_error!("Got unexpected method: {}", ordinal)
-                    }
+                    } => handle_unknown_method(ordinal),
                 },
                 Err(e) => {
                     log_error!("listener server got an error: {}", e);
@@ -94,4 +55,61 @@ pub(super) fn init_listener(
     ) {
         log_error!("failed to register listener in sag {}", err)
     }
+}
+
+fn handle_on_resume<F>(power_manager: &SuspendResumeManagerHandle, responder_func: F)
+where
+    F: FnOnce() -> Result<(), fidl::Error>,
+{
+    log_info!("Resuming from suspend");
+    match power_manager.update_power_level(STARNIX_POWER_ON_LEVEL) {
+        Ok(_) => {
+            // The server is expected to respond once it has performed the
+            // operations required to keep the system awake.
+            if let Err(e) = responder_func() {
+                log_error!(
+                    "OnResume server failed to send a respond to its
+                        client: {}",
+                    e
+                );
+            }
+        }
+        Err(e) => log_error!("Failed to create a power-on lease: {}", e),
+    }
+
+    // Wake up a potentially blocked suspend.
+    //
+    // NB: We can't send this event on the `OnSuspend` listener event
+    // since that event is emitted before suspension is actually
+    // attempted.
+    power_manager.notify_suspension(SuspendResult::Success);
+}
+
+fn handle_on_suspend() {
+    log_info!("Attempting to transition to a low-power state");
+}
+
+fn handle_on_suspend_fail<F>(power_manager: &SuspendResumeManagerHandle, responder_func: F)
+where
+    F: FnOnce() -> Result<(), fidl::Error>,
+{
+    log_warn!("Failed to suspend");
+
+    // We failed to suspend so bring us back to the power on level.
+    match power_manager.update_power_level(STARNIX_POWER_ON_LEVEL) {
+        Ok(()) => {}
+        // What can we really do here?
+        Err(e) => log_error!("Failed to create a power-on lease after suspend failure: {e}"),
+    }
+
+    // Wake up a potentially blocked suspend.
+    power_manager.notify_suspension(SuspendResult::Failure);
+
+    if let Err(e) = responder_func() {
+        log_error!("Failed to send OnSuspendFail response: {e}");
+    }
+}
+
+fn handle_unknown_method(ordinal: u64) {
+    log_error!("Got unexpected method: {}", ordinal)
 }
