@@ -8,8 +8,8 @@ import("//src/lib/vulkan/vulkan.gni")
 group("tests") {
   testonly = true
   public_deps = [
+    ":cpu-renderer-integration-test-root",
     ":display-integration-tests",
-    ":flatland-cpu-renderer-integration-test",
     ":flatland-integration-tests",
     ":flatland-null-renderer-integration-test",
     ":flatland-pixeltest-yuv",
@@ -45,11 +45,15 @@ source_set("common-deps-zxtest") {
   sources = [
     "utils/blocking_present.cc",
     "utils/blocking_present.h",
+    "utils/scenic_ctf_test_base.cc",
+    "utils/scenic_ctf_test_base.h",
     "utils/utils.cc",
     "utils/utils.h",
   ]
   public_deps = [
-    ":scenic-realm-builder",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_hlcpp",
+    "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/ui/testing/util:loop_fixture",
@@ -195,8 +199,11 @@ fuchsia_test_component("flatland-view-integration-test") {
   test_type = "vulkan"
 }
 
+############# cpu-renderer-integration-test #############
+
 executable("cpu-renderer-integration-test-bin") {
   testonly = true
+  output_name = "cpu-renderer-integration-test-validator"
 
   # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
   # riscv64.
@@ -204,7 +211,7 @@ executable("cpu-renderer-integration-test-bin") {
     sources = [ "flatland_integration_tests/cpu_renderer_integration_test.cc" ]
   }
   deps = [
-    ":common-deps-gtest",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
@@ -213,12 +220,41 @@ executable("cpu-renderer-integration-test-bin") {
   ]
 }
 
-fuchsia_test_component("cpu-renderer-integration-test") {
-  component_name = "cpu-renderer-integration-test"
-  manifest = "meta/cpu_renderer_integration_test.cml"
+fuchsia_component("cpu-renderer-integration-test-validator") {
+  testonly = true
+  manifest = "meta/cpu-renderer-integration-test-validator.cml"
   deps = [ ":cpu-renderer-integration-test-bin" ]
-  test_type = "system"
 }
+
+# ctf_fuchsia_package
+fuchsia_package("cpu-renderer-integration-test-suite") {
+  package_name = "cpu-renderer-integration-test-suite"
+  testonly = true
+  deps = [ ":cpu-renderer-integration-test-validator" ]
+}
+
+fuchsia_test_component("cpu-renderer-integration-test-component") {
+  testonly = true
+  component_name = "cpu-renderer-integration-test"
+  manifest = "meta/cpu-renderer-integration-test.cml"
+  test_type = "system"  # ctf
+}
+
+fuchsia_test_package("cpu-renderer-integration-test-root") {
+  test_components = [ ":cpu-renderer-integration-test-component" ]
+  subpackages = [
+    ":cpu-renderer-integration-test-suite",
+    "//src/ui/testing/scenic_realm_factory:pkg",
+  ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+############# null-renderer-integration-test #############
 
 executable("null-renderer-integration-test-bin") {
   testonly = true
@@ -469,16 +505,6 @@ fuchsia_test_package("flatland-pixeltest-yuv") {
   test_specs = {
     # TODO(https://fxbug.dev/42137913): Skip this test for AEMU as YUV Sysmem images are not supported yet.
     environments = magma_libvulkan_hardware_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-fuchsia_test_package("flatland-cpu-renderer-integration-test") {
-  test_components = [ ":cpu-renderer-integration-test" ]
-
-  test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
