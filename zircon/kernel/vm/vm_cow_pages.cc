@@ -583,13 +583,17 @@ zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOp
 
 void VmCowPages::ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) {
   canary_.Assert();
-  children_list_.replace(*old, new_child);
+
+  [[maybe_unused]] VmCowPages* replaced = children_list_.replace(*old, new_child);
+  DEBUG_ASSERT(replaced == old);
 }
 
 void VmCowPages::DropChildLocked(VmCowPages* child) {
   canary_.Assert();
+
+  [[maybe_unused]] VmCowPages* erased = children_list_.erase(*child);
+  DEBUG_ASSERT(erased == child);
   DEBUG_ASSERT(children_list_len_ > 0);
-  children_list_.erase(*child);
   --children_list_len_;
 }
 
