@@ -15,7 +15,6 @@ group("pkg") {
 group("tests") {
   testonly = true
   public_deps = [
-    ":host_tests($host_toolchain)",
     ":non_hermetic_tests($target_toolchain)",
     "bin:tests",
     "lib:tests",

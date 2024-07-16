@@ -41,6 +41,7 @@ group("no_e2e") {
     "//build/python:host_tests($host_toolchain)",
     "//src/lib/assembly:host_tests($host_toolchain)",
     "//src/security:host_tests($host_toolchain)",
+    "//src/sys/pkg:host_tests($host_toolchain)",
     "//src/tests/assembly:host_tests($host_toolchain)",
   ]
 }
