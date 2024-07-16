@@ -56,7 +56,7 @@ fx build final_fuchsia_idk.validation
 
 Due to technical limitations at the GN / Bazel boundary, the Fuchsia Bazel SDK
 is currently _not_ built from the Fuchsia "Core" IDK. For more details, see
-[//build/bazel_sdk/README.md](/build/bazel/sdk/README.md) and
+[//build/bazel_sdk/README.md](/build/bazel_sdk/README.md) and
 [//build/bazel/fuchsia_bazel_sdk.gni](/build/bazel/fuchsia_bazel_sdk.gni).
 
 
