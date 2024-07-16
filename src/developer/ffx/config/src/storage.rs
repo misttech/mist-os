@@ -4,6 +4,7 @@
 
 use crate::api::query::SelectMode;
 use crate::api::value::merge_map;
+use crate::api::ConfigError;
 use crate::environment::Environment;
 use crate::nested::{nested_get, nested_remove, nested_set};
 use crate::ConfigLevel;
@@ -199,7 +200,7 @@ impl ConfigFile {
 
     pub fn remove(&mut self, key: &str) -> Result<()> {
         let key_vec: Vec<&str> = key.split('.').collect();
-        let key = *key_vec.get(0).context("Can't remove empty key")?;
+        let key = *key_vec.get(0).context(ConfigError::KeyNotFound)?;
         self.dirty = true;
         nested_remove(&mut self.contents, key, &key_vec[1..])
     }

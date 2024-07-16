@@ -4,8 +4,10 @@
 
 use crate::api::value::{ConfigValue, ValueStrategy};
 use crate::api::{validate_type, ConfigError};
+use ::errors::ffx_bail;
 use analytics::{is_opted_in, set_opt_in_status};
 use anyhow::{anyhow, Context, Result};
+use core::fmt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -74,6 +76,19 @@ impl ConfigLevel {
             Some(Runtime) => Some(Build),
             None => Some(Runtime),
         }
+    }
+}
+impl fmt::Display for ConfigLevel {
+    // Required method
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let val = match self {
+            ConfigLevel::Default => "default",
+            ConfigLevel::Global => "global",
+            ConfigLevel::User => "user",
+            ConfigLevel::Build => "build",
+            ConfigLevel::Runtime => "runtime",
+        };
+        write!(f, "{}", val)
     }
 }
 
@@ -194,7 +209,7 @@ pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> 
 pub async fn get_log_dirs() -> Result<Vec<String>> {
     match query("log.dir").get() {
         Ok(log_dirs) => Ok(log_dirs),
-        Err(e) => errors::ffx_bail!("Failed to load host log directories from ffx config: {:?}", e),
+        Err(e) => ffx_bail!("Failed to load host log directories from ffx config: {:?}", e),
     }
 }
 

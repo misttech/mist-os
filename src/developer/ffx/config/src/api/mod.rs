@@ -15,11 +15,18 @@ pub use value::ConfigValue;
 
 #[derive(Debug, Error)]
 #[error("Configuration error")]
-pub struct ConfigError(#[from] anyhow::Error);
+pub enum ConfigError {
+    #[error("{}", .0)]
+    Error(#[from] anyhow::Error),
+    #[error("Config key not found")]
+    KeyNotFound,
+    #[error("Can't remove empty key")]
+    EmptyKey,
+}
 
 impl ConfigError {
     pub fn new(e: anyhow::Error) -> Self {
-        Self(e)
+        Self::Error(e)
     }
 }
 
