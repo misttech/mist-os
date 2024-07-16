@@ -1,9 +1,13 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use cm_types::{LongName, Name};
+#[cfg(not(mistos))]
 use fuchsia_url::AbsoluteComponentUrl;
+#[cfg(mistos)]
+use fuchsia_url::boot_url::BootUrl;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use moniker::Moniker;
@@ -77,7 +81,10 @@ pub async fn create_instance_in_collection(
     parent: &Moniker,
     collection: &Name,
     child_name: &LongName,
+    #[cfg(not(mistos))]
     url: &AbsoluteComponentUrl,
+    #[cfg(mistos)]
+    url: &BootUrl,
     config_overrides: Vec<fdecl::ConfigOverride>,
     child_args: Option<fcomponent::CreateChildArgs>,
 ) -> Result<(), CreateError> {

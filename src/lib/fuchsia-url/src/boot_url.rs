@@ -75,6 +75,15 @@ impl BootUrl {
     }
 }
 
+#[cfg(mistos)]
+impl std::str::FromStr for BootUrl {
+    type Err = ParseError;
+
+    fn from_str(url: &str) -> Result<Self, Self::Err> {
+        Self::parse(url)
+    }
+}
+
 impl std::fmt::Display for BootUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}://{}", SCHEME, self.path)?;
