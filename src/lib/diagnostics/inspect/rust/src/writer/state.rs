@@ -1106,11 +1106,14 @@ impl InnerState {
         value: &[u8],
     ) -> Result<(), Error> {
         self.free_extents(self.heap.container.block_at(block_index).property_extent_index()?)?;
-        let (extent_index, written) = self.write_extents(value)?;
+        let (result, (extent_index, written)) = match self.write_extents(value) {
+            Ok((e, w)) => (Ok(()), (e, w)),
+            Err(err) => (Err(err), (BlockIndex::ROOT, 0)),
+        };
         let mut block = self.heap.container.block_at_mut(block_index);
         block.set_total_length(written)?;
         block.set_property_extent_index(extent_index)?;
-        Ok(())
+        result
     }
 
     fn free_extents(&mut self, head_extent_index: BlockIndex) -> Result<(), Error> {
@@ -1176,6 +1179,7 @@ mod tests {
     use crate::reader::snapshot::{ScannedBlock, Snapshot};
     use crate::reader::PartialNodeHierarchy;
     use crate::writer::testing_utils::get_state;
+    use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use futures::prelude::*;
 
@@ -2445,5 +2449,62 @@ mod tests {
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
         assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+    }
+
+    #[fuchsia::test]
+    fn test_string_property_on_overflow_set() {
+        let core_state = get_state(4096);
+        let block_index = {
+            let mut state = core_state.try_lock().expect("lock state");
+
+            // Create string property with value.
+            let block_index = state
+                .create_property("test".into(), b"test-property", PropertyFormat::String, 0.into())
+                .unwrap();
+
+            // Fill the vmo.
+            for _ in 10..(4096 / constants::MIN_ORDER_SIZE).try_into().unwrap() {
+                state.inner_lock.heap.allocate_block(constants::MIN_ORDER_SIZE).unwrap();
+            }
+
+            // Set the value of the string to something very large that causes an overflow.
+            let values = ['a' as u8; 8096];
+            assert!(state.set_property(block_index, &values).is_err());
+
+            // We now expect the length of the payload, as well as the property extent index to be
+            // reset.
+            let block = state.get_block(block_index);
+            assert_eq!(block.block_type(), BlockType::BufferValue);
+            assert_eq!(*block.index(), 2);
+            assert_eq!(*block.parent_index().unwrap(), 0);
+            assert_eq!(*block.name_index().unwrap(), 3);
+            assert_eq!(block.total_length().unwrap(), 0);
+            assert_eq!(*block.property_extent_index().unwrap(), 0);
+            assert_eq!(block.property_format().unwrap(), PropertyFormat::String);
+
+            block_index
+        };
+
+        // We also expect no extents to be present.
+        let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
+        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        assert_eq!(blocks.len(), 251);
+        assert_eq!(blocks[0].block_type(), BlockType::Header);
+        assert_eq!(blocks[1].block_type(), BlockType::BufferValue);
+        assert_eq!(blocks[2].block_type(), BlockType::StringReference);
+        assert!(blocks[3..]
+            .iter()
+            .all(|b| b.block_type() == BlockType::Reserved || b.block_type() == BlockType::Free));
+
+        {
+            let mut state = core_state.try_lock().expect("lock state");
+            // Free property.
+            assert_matches!(state.free_property(block_index), Ok(()));
+        }
+        let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
+        let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
+        assert!(blocks[1..]
+            .iter()
+            .all(|b| b.block_type() == BlockType::Reserved || b.block_type() == BlockType::Free));
     }
 }

@@ -31,6 +31,7 @@ rustc_library("fuchsia-inspect") {
   test_deps = [
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:assert_matches",
   ]
 
   sources = [
