@@ -56,7 +56,7 @@ async fn escrow_inspect_data() {
     // Assert that we can read the escrowed data event after the component has stopped.
     let data = read_data(&realm_proxy, RetryConfig::always()).await.pop().unwrap();
     assert!(data.metadata.escrowed);
-    assert_eq!(data.metadata.name, Some(InspectHandleName::Name("test-escrow".into())));
+    assert_eq!(data.metadata.name, InspectHandleName::Name("test-escrow".into()));
     assert_data_tree!(data.payload.as_ref().unwrap(), root: {
         "fuchsia.inspect.Health": {
             status: "OK",
