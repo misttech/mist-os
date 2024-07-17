@@ -611,8 +611,9 @@ void JobScheduler::UpdatePowerManager() {
     if (slot)
       active = true;
   }
-  owner_->UpdateGpuActive(active);
-  if (HasRunnableWork()) {
+  bool has_pending_work = HasRunnableWork();
+  owner_->UpdateGpuActive(active, has_pending_work);
+  if (has_pending_work) {
     owner_->PowerOnGpuForRunnableAtoms();
   }
 }

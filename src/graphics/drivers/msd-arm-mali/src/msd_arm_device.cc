@@ -1012,7 +1012,9 @@ void MsdArmDevice::CancelAtoms(std::shared_ptr<MsdArmConnection> connection) {
 
 magma::PlatformPort* MsdArmDevice::GetPlatformPort() { return device_port_.get(); }
 
-void MsdArmDevice::UpdateGpuActive(bool active) { power_manager_->UpdateGpuActive(active); }
+void MsdArmDevice::UpdateGpuActive(bool active, bool has_pending_work) {
+  power_manager_->UpdateGpuActive(active, has_pending_work);
+}
 
 void MsdArmDevice::DumpRegisters(const GpuFeatures& features, mali::RegisterIo* io,
                                  DumpState* dump_state) {

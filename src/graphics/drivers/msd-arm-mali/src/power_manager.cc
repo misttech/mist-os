@@ -181,21 +181,22 @@ void PowerManager::UpdateReadyStatus() {
       registers::CoreReadyState::StatusType::kReady);
 }
 
-void PowerManager::UpdateGpuActive(bool active) {
+void PowerManager::UpdateGpuActive(bool active, bool has_pending_work) {
   TRACE_DURATION("magma:power", "PowerManager::UpdateGpuActive", "active", TA_BOOL(active));
   std::lock_guard<std::mutex> lock(active_time_mutex_);
-  UpdateGpuActiveLocked(active);
+  UpdateGpuActiveLocked(active, has_pending_work);
 }
 
-void PowerManager::UpdateGpuActiveLocked(bool active) {
+void PowerManager::UpdateGpuActiveLocked(bool active, bool has_pending_work) {
   TRACE_DURATION("magma:power", "PowerManager::UpdateGpuActiveLocked", "active", TA_BOOL(active));
-  if (!active && gpu_active_) {
+  has_pending_work_cached_ = has_pending_work;
+  if (active || has_pending_work) {
+    current_gpu_powerdown_timeout_ = Clock::time_point::max();
+  } else if (!active && current_gpu_powerdown_timeout_ == Clock::time_point::max()) {
     // Chosen to avoid performance regressions on benchmarks. 16ms caused 25th-percentile CPU
     // regressions.
     constexpr std::chrono::milliseconds kPowerDownTimeout{30};
     current_gpu_powerdown_timeout_ = Clock::now() + kPowerDownTimeout;
-  } else if (active) {
-    current_gpu_powerdown_timeout_ = Clock::time_point::max();
   }
   if (power_down_on_idle_ && !active) {
     PowerDownWhileIdle();
@@ -264,7 +265,7 @@ void PowerManager::UpdateGpuActiveLocked(bool active) {
 void PowerManager::GetGpuActiveInfo(std::chrono::steady_clock::duration* total_time_out,
                                     std::chrono::steady_clock::duration* active_time_out) {
   std::lock_guard<std::mutex> lock(active_time_mutex_);
-  UpdateGpuActiveLocked(gpu_active_);
+  UpdateGpuActiveLocked(gpu_active_, has_pending_work_cached_);
 
   std::chrono::steady_clock::duration total_time_accumulate(0);
   std::chrono::steady_clock::duration active_time_accumulate(0);
@@ -282,7 +283,7 @@ bool PowerManager::GetTotalTime(uint32_t* buffer_out) {
   {
     std::lock_guard<std::mutex> lock(active_time_mutex_);
     // Accumulate time since last update.
-    UpdateGpuActiveLocked(gpu_active_);
+    UpdateGpuActiveLocked(gpu_active_, has_pending_work_cached_);
     result.monotonic_time_ns =
         std::chrono::duration_cast<std::chrono::nanoseconds>(last_check_time_.time_since_epoch())
             .count();

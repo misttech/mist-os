@@ -167,7 +167,11 @@ TimeoutSource::Clock::duration FuchsiaPowerManager::GetCurrentTimeoutDuration() 
   if (!LeaseIsRequested()) {
     return Clock::duration::max();
   }
-  return owner_->GetPowerManager()->GetGpuPowerdownTimeout();
+  auto time_point = owner_->GetPowerManager()->GetGpuPowerdownTimeout();
+  if (time_point == Clock::time_point::max()) {
+    return Clock::duration::max();
+  }
+  return time_point - Clock::now();
 }
 
 bool FuchsiaPowerManager::EnablePower() {

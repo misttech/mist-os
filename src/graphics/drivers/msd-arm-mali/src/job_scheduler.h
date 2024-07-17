@@ -26,7 +26,7 @@ class JobScheduler : public TimeoutSource {
     virtual void SoftStopAtom(MsdArmAtom* atom) {}
     virtual void ReleaseMappingsForAtom(MsdArmAtom* atom) {}
     virtual magma::PlatformPort* GetPlatformPort() { return nullptr; }
-    virtual void UpdateGpuActive(bool active) {}
+    virtual void UpdateGpuActive(bool active, bool has_pending_work) {}
     virtual bool IsInProtectedMode() = 0;
     virtual void EnterProtectedMode() = 0;
     virtual bool ExitProtectedMode() = 0;

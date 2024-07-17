@@ -33,7 +33,10 @@ class TestOwner : public JobScheduler::Owner {
   void HardStopAtom(MsdArmAtom* atom) override { stopped_atoms_.push_back(atom); }
   void SoftStopAtom(MsdArmAtom* atom) override { soft_stopped_atoms_.push_back(atom); }
   magma::PlatformPort* GetPlatformPort() override { return platform_port_.get(); }
-  void UpdateGpuActive(bool active) override { gpu_active_ = active; }
+  void UpdateGpuActive(bool active, bool has_pending_work) override {
+    gpu_active_ = active;
+    has_pending_work_ = has_pending_work;
+  }
   bool IsInProtectedMode() override { return in_protected_mode_; }
   void EnterProtectedMode() override { in_protected_mode_ = true; }
   bool ExitProtectedMode() override {
@@ -54,6 +57,7 @@ class TestOwner : public JobScheduler::Owner {
   std::vector<MsdArmAtom*>& stopped_atoms() { return stopped_atoms_; }
   std::vector<MsdArmAtom*>& soft_stopped_atoms() { return soft_stopped_atoms_; }
   bool gpu_active() { return gpu_active_; }
+  bool has_pending_work() { return has_pending_work_; }
   uint32_t hang_message_output_count() const { return hang_message_output_count_; }
   uint32_t semaphore_hang_message_output_count() const {
     return semaphore_hang_message_output_count_;
@@ -67,6 +71,7 @@ class TestOwner : public JobScheduler::Owner {
   std::vector<MsdArmAtom*> soft_stopped_atoms_;
   std::unique_ptr<magma::PlatformPort> platform_port_;
   bool gpu_active_ = false;
+  bool has_pending_work_ = false;
   bool in_protected_mode_ = false;
   uint32_t hang_message_output_count_ = 0;
   uint32_t semaphore_hang_message_output_count_ = 0;
@@ -892,15 +897,18 @@ class TestJobScheduler {
 
     EXPECT_EQ(0u, owner.run_list().size());
     EXPECT_FALSE(owner.gpu_active());
+    EXPECT_TRUE(owner.has_pending_work());
 
     scheduler.SetSchedulingEnabled(true);
 
     EXPECT_EQ(1u, owner.run_list().size());
     EXPECT_EQ(atom1_ptr, owner.run_list()[0]);
     EXPECT_TRUE(owner.gpu_active());
+    EXPECT_TRUE(owner.has_pending_work());
 
     scheduler.JobCompleted(0, kArmMaliResultSuccess, 0u);
     EXPECT_FALSE(owner.gpu_active());
+    EXPECT_FALSE(owner.has_pending_work());
   }
 
   void TestSchedulingDisableSoftStop() {

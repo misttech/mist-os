@@ -115,9 +115,9 @@ class TestPowerManager {
     PowerManager power_manager(&power_owner, 1);
 
     for (int i = 0; i < 100; i++) {
-      power_manager.UpdateGpuActive(true);
+      power_manager.UpdateGpuActive(true, false);
       usleep(5000);
-      power_manager.UpdateGpuActive(false);
+      power_manager.UpdateGpuActive(false, false);
       usleep(5000);
     }
 
@@ -144,7 +144,7 @@ TEST(PowerManager, TimeAccumulation) {
   auto reg_io = std::make_unique<mali::RegisterIo>(MockMmio::Create(1024 * 1024));
   FakePowerOwner power_owner{reg_io.get()};
   PowerManager power_manager(&power_owner, 1);
-  power_manager.UpdateGpuActive(true);
+  power_manager.UpdateGpuActive(true, false);
   usleep(150 * 1000);
 
   std::chrono::steady_clock::duration total_time;
@@ -225,13 +225,14 @@ TEST(PowerManager, PowerDownOnIdle) {
   constexpr uint64_t kCoresEnabled = 2;
   reg_io->Write32(kCoresEnabled, kShaderReadyOffset);
 
-  power_manager->UpdateGpuActive(true);
+  power_manager->UpdateGpuActive(true, false);
   power_manager->PowerDownOnIdle();
   EXPECT_EQ(reg_io->Read32(kShaderPowerOffOffset), 0u);
   EXPECT_EQ(0u, power_owner.power_change_complete_count());
 
-  power_manager->UpdateGpuActive(false);
+  power_manager->UpdateGpuActive(false, true);
   EXPECT_EQ(reg_io->Read32(kShaderPowerOffOffset), kCoresEnabled);
+  EXPECT_EQ(power_manager->GetGpuPowerdownTimeout(), PowerManager::Clock::time_point::max());
 
   EXPECT_EQ(0u, power_owner.power_change_failure_count());
   EXPECT_EQ(1u, power_owner.power_change_complete_count());

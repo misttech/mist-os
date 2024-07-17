@@ -48,15 +48,10 @@ class PowerManager {
     return l2_ready_status_;
   }
 
-  Clock::duration GetGpuPowerdownTimeout() const {
-    if (current_gpu_powerdown_timeout_ == Clock::time_point::max()) {
-      return Clock::duration::max();
-    }
-    return current_gpu_powerdown_timeout_ - Clock::now();
-  }
+  Clock::time_point GetGpuPowerdownTimeout() const { return current_gpu_powerdown_timeout_; }
 
   // This is called whenever the GPU starts or stops processing work.
-  void UpdateGpuActive(bool active);
+  void UpdateGpuActive(bool active, bool has_pending_work);
 
   // Retrieves information on what fraction of time in the recent past (last
   // 100 ms or so) the GPU was actively processing commands.
@@ -85,7 +80,7 @@ class PowerManager {
   // Called if power_down_on_idle_ is true and the GPU is now idle.
   void PowerDownWhileIdle();
   // Called to update timekeeping and possible update the gpu activity info.
-  void UpdateGpuActiveLocked(bool active) FIT_REQUIRES(active_time_mutex_);
+  void UpdateGpuActiveLocked(bool active, bool has_pending_work) FIT_REQUIRES(active_time_mutex_);
   std::deque<TimePeriod>& time_periods() { return time_periods_; }
 
   Owner* owner_;
@@ -106,6 +101,7 @@ class PowerManager {
   FIT_GUARDED(active_time_mutex_) std::deque<TimePeriod> time_periods_;
   // |gpu_active_| is true if the GPU is currently processing work.
   FIT_GUARDED(active_time_mutex_) bool gpu_active_ = false;
+  FIT_GUARDED(active_time_mutex_) bool has_pending_work_cached_ = false;
   FIT_GUARDED(active_time_mutex_) std::chrono::steady_clock::time_point last_check_time_;
   FIT_GUARDED(active_time_mutex_) std::chrono::steady_clock::time_point last_trace_time_;
 
