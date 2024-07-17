@@ -99,6 +99,9 @@ TEST_F(RedactorTest, Check) {
             "v6_8_fields_colons: <REDACTED-IPV6: 25>::");
   EXPECT_EQ(Redact("obfuscated_gaia_id: 106986199446298680449"),
             "obfuscated_gaia_id: <REDACTED-OBFUSCATED-GAIA-ID: 26>");
+  EXPECT_EQ(
+      Redact("32_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 33_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+      "32_hex: <REDACTED-HEX: 27> 33_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 }
 
 TEST_F(RedactorTest, Canary) {

@@ -120,6 +120,44 @@ TEST_P(IdReplacerTest, ReplaceWithIdFormatString) {
   }
 }
 
+TEST(IdReplacerTests, ReplacementIsShorter) {
+  RedactionIdCache cache(inspect::UintProperty{});
+
+  std::string content =
+      R"([00050.219][forensics, feedback] INFO: [file_name.cc:80] ID:1234567890abcdefABCDEF0123456789
+[00050.220][forensics, feedback] INFO: [file_name.cc:80] ID:1234567890abcdefABCDEF0123456789
+[00050.221][forensics, feedback] INFO: [file_name.cc:80] ID:1234567890abcdefABCDEF0123456789)";
+
+  static constexpr std::string_view kExpectedContent =
+      R"([00050.219][forensics, feedback] INFO: [file_name.cc:80] ID:<REDACTED-HEX: 1>
+[00050.220][forensics, feedback] INFO: [file_name.cc:80] ID:<REDACTED-HEX: 1>
+[00050.221][forensics, feedback] INFO: [file_name.cc:80] ID:<REDACTED-HEX: 1>)";
+
+  Replacer replacer = ReplaceWithIdFormatString(R"((\b[0-9a-fA-F]{32}\b))", "<REDACTED-HEX: %d>");
+
+  ASSERT_NE(replacer, nullptr);
+  EXPECT_EQ(replacer(cache, content), kExpectedContent);
+}
+
+TEST(IdReplacerTests, ReplacementIsLonger) {
+  RedactionIdCache cache(inspect::UintProperty{});
+
+  std::string content =
+      R"([00050.219][forensics, feedback] INFO: [file_name.cc:80] ID:12345678
+[00050.220][forensics, feedback] INFO: [file_name.cc:80] ID:12345678
+[00050.221][forensics, feedback] INFO: [file_name.cc:80] ID:12345678)";
+
+  static constexpr std::string_view kExpectedContent =
+      R"([00050.219][forensics, feedback] INFO: [file_name.cc:80] ID:<REDACTED-HEX: 1>
+[00050.220][forensics, feedback] INFO: [file_name.cc:80] ID:<REDACTED-HEX: 1>
+[00050.221][forensics, feedback] INFO: [file_name.cc:80] ID:<REDACTED-HEX: 1>)";
+
+  Replacer replacer = ReplaceWithIdFormatString(R"((\b[0-9a-fA-F]{8}\b))", "<REDACTED-HEX: %d>");
+
+  ASSERT_NE(replacer, nullptr);
+  EXPECT_EQ(replacer(cache, content), kExpectedContent);
+}
+
 struct IpTestParam {
   std::string test_name;
   std::string text;
