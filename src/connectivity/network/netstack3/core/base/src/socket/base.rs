@@ -702,42 +702,6 @@ impl<'a, A: IpAddress, LI, RI> From<&'a ConnIpAddr<A, LI, RI>> for SocketAddrTyp
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/351850359)
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct SocketAddrTypeTag<S> {
-    pub(crate) has_device: bool,
-    pub(crate) addr_type: SocketAddrType,
-    pub(crate) sharing: S,
-}
-
-impl<'a, A: IpAddress, D, LI, S> From<(&'a ListenerAddr<ListenerIpAddr<A, LI>, D>, S)>
-    for SocketAddrTypeTag<S>
-{
-    fn from((addr, sharing): (&'a ListenerAddr<ListenerIpAddr<A, LI>, D>, S)) -> Self {
-        let ListenerAddr { ip: ListenerIpAddr { addr, identifier: _ }, device } = addr;
-        SocketAddrTypeTag {
-            has_device: device.is_some(),
-            addr_type: if addr.is_some() {
-                SocketAddrType::SpecificListener
-            } else {
-                SocketAddrType::AnyListener
-            },
-            sharing,
-        }
-    }
-}
-
-impl<'a, A, D, S> From<(&'a ConnAddr<A, D>, S)> for SocketAddrTypeTag<S> {
-    fn from((addr, sharing): (&'a ConnAddr<A, D>, S)) -> Self {
-        let ConnAddr { ip: _, device } = addr;
-        SocketAddrTypeTag {
-            has_device: device.is_some(),
-            addr_type: SocketAddrType::Connected,
-            sharing,
-        }
-    }
-}
-
 /// The result of attempting to remove a socket from a collection of sockets.
 pub enum RemoveResult {
     /// The value was removed successfully.

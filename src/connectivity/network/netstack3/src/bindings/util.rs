@@ -9,7 +9,6 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
-use explicit::UnreachableExt as _;
 use futures::task::AtomicWaker;
 use futures::{Future, FutureExt as _, Stream, StreamExt as _};
 use log::debug;
@@ -789,27 +788,6 @@ impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {
 
     fn try_into_core_with_ctx<X: ConversionContext>(self, ctx: &X) -> Result<C, Self::Error> {
         C::try_from_fidl_with_ctx(ctx, self)
-    }
-}
-
-#[allow(dead_code)] // TODO(https://fxbug.dev/351850359)
-pub(crate) struct UninstantiableFuture<O>(Never, std::marker::PhantomData<O>);
-
-impl<O: std::marker::Unpin> futures::Future for UninstantiableFuture<O> {
-    type Output = O;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut futures::task::Context<'_>,
-    ) -> futures::task::Poll<Self::Output> {
-        self.get_mut().uninstantiable_unreachable()
-    }
-}
-
-impl<O> AsRef<Never> for UninstantiableFuture<O> {
-    fn as_ref(&self) -> &Never {
-        let Self(never, _) = self;
-        never
     }
 }
 
