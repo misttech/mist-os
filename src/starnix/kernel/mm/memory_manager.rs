@@ -614,7 +614,7 @@ fn map_in_vmar(
     vmar: &zx::Vmar,
     vmar_info: &zx::VmarInfo,
     addr: DesiredAddress,
-    memory: &Arc<MemoryObject>,
+    memory: &MemoryObject,
     memory_offset: u64,
     length: usize,
     flags: MappingFlags,
@@ -684,7 +684,7 @@ impl MemoryManagerState {
     fn map_internal(
         &self,
         addr: DesiredAddress,
-        memory: &Arc<MemoryObject>,
+        memory: &MemoryObject,
         memory_offset: u64,
         length: usize,
         flags: MappingFlags,
@@ -2979,7 +2979,7 @@ impl MemoryManager {
         }
 
         fn snapshot_memory(
-            memory: &Arc<MemoryObject>,
+            memory: &MemoryObject,
             size: u64,
             rights: zx::Rights,
         ) -> Result<Arc<MemoryObject>, Errno> {
