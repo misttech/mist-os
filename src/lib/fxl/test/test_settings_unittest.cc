@@ -58,15 +58,5 @@ TEST_F(TestSettingsFixture, RandomSeed) {
   EXPECT_THAT(getenv("TEST_LOOP_RANDOM_SEED"), StrEq("2"));
 }
 
-TEST_F(TestSettingsFixture, LogLevel) {
-  EXPECT_TRUE(SetTestSettings(CommandLineFromInitializerList({"argv0", "--verbose=10"})));
-  EXPECT_EQ(fuchsia_logging::GetMinLogSeverity(), 0x26);  // INFO(0x30) - 10
-  // The value for --quiet needs to be smaller than LOG_FATAL because
-  // min_log_level is capped at LOG_FATAL.
-  const char *argv[] = {"argv0", "--quiet=2", nullptr};
-  EXPECT_TRUE(SetTestSettings(2, argv));
-  EXPECT_EQ(fuchsia_logging::GetMinLogSeverity(), fuchsia_logging::LOG_ERROR);
-}
-
 }  // namespace
 }  // namespace fxl

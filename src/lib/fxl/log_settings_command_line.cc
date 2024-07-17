@@ -47,24 +47,6 @@ bool ParseLogSettingsInternal(const fxl::CommandLine& command_line, T* out_setti
     settings.min_log_level = level;
   }
 
-  // --verbose=<level>
-  // (always parse this even if --quiet is present)
-  // Errors if --severity is present.
-  std::string verbosity;
-  if (command_line.GetOptionValue("verbose", &verbosity)) {
-    if (!severity.empty()) {
-      FX_LOGS(ERROR) << "Setting both --severity and --verbose is not allowed.";
-      return false;
-    }
-
-    uint8_t level = 1;
-    if (!verbosity.empty() && (!fxl::StringToNumberWithError(verbosity, &level) || level < 0)) {
-      FX_LOGS(ERROR) << "Error parsing --verbose option: " << verbosity;
-      return false;
-    }
-
-    settings.min_log_level = GetSeverityFromVerbosity(level);
-  }
 #ifndef __Fuchsia__
   // --log-file=<file>
   std::string file;
