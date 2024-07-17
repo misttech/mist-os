@@ -313,6 +313,9 @@
 //src/graphics/drivers/msd-virtio-gpu:msd-virtio-gpu-driver
 //src/graphics/drivers/msd-vsi-vip:msd_vsi-driver
 //src/graphics/drivers/msd-vsi-vip:msd_vsi_test-driver
+//src/lib/ddktl/tests/metadata-server-test/metadata-forwarder-test-driver:driver
+//src/lib/ddktl/tests/metadata-server-test/metadata-retriever-test-driver:driver
+//src/lib/ddktl/tests/metadata-server-test/metadata-sender-test-driver:driver
 //src/media/audio/drivers/codecs/alc5514:alc5514-driver
 //src/media/audio/drivers/codecs/alc5663:alc5663-driver
 //src/media/audio/drivers/codecs/da7219:driver

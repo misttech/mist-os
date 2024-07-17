@@ -14,7 +14,15 @@ bind_library("testlib_bind") {
 
 group("tests") {
   testonly = true
-  deps = [ ":ddktl-unittest-package" ]
+  deps = [
+    ":ddktl-unittest-package",
+    "metadata-server-test:tests",
+  ]
+}
+
+group("drivers") {
+  testonly = true
+  deps = [ "metadata-server-test:drivers" ]
 }
 
 test("ddktl-test") {

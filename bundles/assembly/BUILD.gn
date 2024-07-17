@@ -2446,6 +2446,11 @@ assembly_input_bundle("fshost_common") {
           source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
           destination = "lib/libunwind.so.1"
         },
+        {
+          label = "//sdk/lib/svc($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libsvc.so"
+          destination = "lib/libsvc.so"
+        },
       ]
       component_includes = [
         {
