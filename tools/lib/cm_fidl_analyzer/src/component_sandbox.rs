@@ -14,7 +14,7 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
 use moniker::ChildName;
 use router_error::RouterError;
-use sandbox::{Capability, Data, Dict, Request, Routable, Router};
+use sandbox::{Capability, Dict, Request, Routable, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
 use {
@@ -23,9 +23,8 @@ use {
 };
 
 fn new_debug_only_router(source: CapabilitySource<ComponentInstanceForAnalyzer>) -> Router {
-    let cap = Capability::Dictionary(
-        source.try_into().expect("failed to convert capability source to dictionary"),
-    );
+    let cap: Capability =
+        source.try_into().expect("failed to convert capability source to dictionary");
     Router::new(move |request: Request| {
         if !request.debug {
             future::ready(Err(RouterError::NotFound(Arc::new(
@@ -88,10 +87,15 @@ pub fn build_capability_sourced_capabilities_dictionary(
 }
 
 pub fn new_program_router(
-    _weak_component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
+    component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
     _relative_path: RelativePath,
+    capability: ComponentCapability,
 ) -> Router {
-    Router::new_ok(Data::String("TODO: this comes from a program".to_string()))
+    let capability_source = CapabilitySource::Component { capability, component };
+    Router::new_ok(
+        Capability::try_from(capability_source)
+            .expect("failed to convert capability source to dictionary"),
+    )
 }
 
 pub fn new_outgoing_dir_router(

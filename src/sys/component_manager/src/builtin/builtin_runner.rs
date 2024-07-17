@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::CapabilitySource;
+use crate::model::component::manager::ComponentManagerInstance;
+use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_config::SecurityPolicy;
+use cm_types::Name;
 use cm_util::TaskGroup;
 use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::NamespaceConnector;
@@ -29,7 +33,7 @@ use {
 };
 
 use crate::builtin::runner::BuiltinRunnerFactory;
-use crate::model::component::{WeakComponentInstance, WeakExtendedInstance};
+use crate::model::component::WeakComponentInstance;
 use crate::model::token::{InstanceRegistry, InstanceToken};
 use crate::sandbox_util;
 use crate::sandbox_util::LaunchTaskOnReceive;
@@ -51,6 +55,7 @@ pub struct BuiltinRunner {
     root_job: zx::Unowned<'static, zx::Job>,
     task_group: TaskGroup,
     elf_runner_resources: Arc<ElfRunnerResources>,
+    top_instance: Weak<ComponentManagerInstance>,
 }
 
 /// Pure data type holding some resources needed by the ELF runner.
@@ -104,9 +109,18 @@ impl From<BuiltinRunnerError> for zx::Status {
 impl BuiltinRunner {
     /// Creates a builtin runner with its required resources.
     /// - `task_group`: The tasks associated with the builtin runner.
-    pub fn new(task_group: TaskGroup, elf_runner_resources: ElfRunnerResources) -> Self {
+    pub fn new(
+        task_group: TaskGroup,
+        elf_runner_resources: ElfRunnerResources,
+        top_instance: Weak<ComponentManagerInstance>,
+    ) -> Self {
         let root_job = fuchsia_runtime::job_default();
-        BuiltinRunner { root_job, task_group, elf_runner_resources: Arc::new(elf_runner_resources) }
+        BuiltinRunner {
+            root_job,
+            task_group,
+            elf_runner_resources: Arc::new(elf_runner_resources),
+            top_instance,
+        }
     }
 
     /// Starts a builtin component.
@@ -130,6 +144,7 @@ impl BuiltinRunner {
                     job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                     namespace,
                     self.elf_runner_resources.clone(),
+                    self.top_instance.clone(),
                 );
                 program.serve_outgoing(outgoing_dir);
                 Ok((program, Box::pin(wait_for_job_termination(job))))
@@ -216,7 +231,12 @@ impl ElfRunnerProgram {
     /// Creates an ELF runner program.
     /// - `job`: Each ELF component run by this runner will live inside a job that is a
     ///   child of the provided job.
-    fn new(job: zx::Job, namespace: Namespace, resources: Arc<ElfRunnerResources>) -> Self {
+    fn new(
+        job: zx::Job,
+        namespace: Namespace,
+        resources: Arc<ElfRunnerResources>,
+        top_instance: Weak<ComponentManagerInstance>,
+    ) -> Self {
         let namespace = Arc::new(namespace);
         let connector = NamespaceConnector { namespace: namespace.clone() };
         let elf_runner = elf_runner::ElfRunner::new(
@@ -231,7 +251,10 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let elf_runner = Arc::new(LaunchTaskOnReceive::new(
-            WeakExtendedInstance::AboveRoot(Weak::new()),
+            CapabilitySource::Builtin {
+                capability: InternalCapability::Runner(Name::new("elf").unwrap()),
+                top_instance: top_instance.clone(),
+            },
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
             None,
@@ -247,7 +270,12 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
-            WeakExtendedInstance::AboveRoot(Weak::new()),
+            CapabilitySource::Builtin {
+                capability: InternalCapability::Protocol(
+                    Name::new(fattribution::ProviderMarker::PROTOCOL_NAME).unwrap(),
+                ),
+                top_instance: top_instance.clone(),
+            },
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,
             None,
@@ -393,7 +421,7 @@ mod tests {
             crash_records,
             instance_registry,
         };
-        Arc::new(BuiltinRunner::new(task_group, elf_runner_resources))
+        Arc::new(BuiltinRunner::new(task_group, elf_runner_resources, Weak::new()))
     }
 
     fn make_start_info(

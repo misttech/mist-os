@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::capability::CapabilitySource;
 use crate::model::component::{
     ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
 };
 use crate::model::routing::router_ext::{RouterExt, WeakInstanceTokenExt};
-use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
@@ -18,10 +18,7 @@ use fidl::AsyncChannel;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use router_error::RouterError;
-use sandbox::{
-    Capability, Connectable, Connector, DirEntry, Message, Request, Routable, Router,
-    WeakInstanceToken,
-};
+use sandbox::{Capability, Connectable, Connector, DirEntry, Message, Request, Routable, Router};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tracing::warn;
@@ -41,7 +38,7 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
 /// handle each new message from the receiver.
 pub struct LaunchTaskOnReceive {
-    source: WeakInstanceToken,
+    capability_source: CapabilitySource,
     task_to_launch: Arc<
         dyn Fn(zx::Channel, WeakComponentInstance) -> BoxFuture<'static, Result<(), anyhow::Error>>
             + Sync
@@ -52,7 +49,7 @@ pub struct LaunchTaskOnReceive {
     // same task group as we'll be launching tasks on then if we held a strong reference we would
     // inadvertently give the task group a strong reference to itself and make it un-droppable.
     task_group: WeakTaskGroup,
-    policy: Option<(GlobalPolicyChecker, CapabilitySource<ComponentInstance>)>,
+    policy: Option<GlobalPolicyChecker>,
     task_name: String,
 }
 
@@ -68,10 +65,10 @@ fn cm_unexpected() -> RouterError {
 
 impl LaunchTaskOnReceive {
     pub fn new(
-        source: WeakExtendedInstance,
+        capability_source: CapabilitySource,
         task_group: WeakTaskGroup,
         task_name: impl Into<String>,
-        policy: Option<(GlobalPolicyChecker, CapabilitySource<ComponentInstance>)>,
+        policy: Option<GlobalPolicyChecker>,
         task_to_launch: Arc<
             dyn Fn(
                     zx::Channel,
@@ -82,13 +79,7 @@ impl LaunchTaskOnReceive {
                 + 'static,
         >,
     ) -> Self {
-        Self {
-            source: WeakInstanceToken::new(source),
-            task_to_launch,
-            task_group,
-            policy,
-            task_name: task_name.into(),
-        }
+        Self { capability_source, task_to_launch, task_group, policy, task_name: task_name.into() }
     }
 
     pub fn into_sender(self: Arc<Self>, target: WeakComponentInstance) -> Connector {
@@ -123,7 +114,12 @@ impl LaunchTaskOnReceive {
                 if !request.debug {
                     Ok(cap)
                 } else {
-                    Ok(Capability::Instance(self.inner.source.clone()))
+                    Ok(self
+                        .inner
+                        .capability_source
+                        .clone()
+                        .try_into()
+                        .expect("failed to convert capability source to dictionary"))
                 }
             }
         }
@@ -131,9 +127,9 @@ impl LaunchTaskOnReceive {
     }
 
     fn launch_task(&self, channel: zx::Channel, instance: WeakComponentInstance) {
-        if let Some((policy_checker, capability_source)) = &self.policy {
+        if let Some(policy_checker) = &self.policy {
             if let Err(_e) =
-                policy_checker.can_route_capability(&capability_source, &instance.moniker)
+                policy_checker.can_route_capability(&self.capability_source, &instance.moniker)
             {
                 // The `can_route_capability` function above will log an error, so we don't
                 // have to.
@@ -156,14 +152,14 @@ impl LaunchTaskOnReceive {
     // open that.
     pub fn new_hook_launch_task(
         component: &Arc<ComponentInstance>,
-        capability_source: CapabilitySource<ComponentInstance>,
+        capability_source: CapabilitySource,
     ) -> LaunchTaskOnReceive {
         let weak_component = WeakComponentInstance::new(component);
         LaunchTaskOnReceive::new(
-            WeakExtendedInstance::Component(weak_component.clone()),
+            capability_source.clone(),
             component.nonblocking_task_group().as_weak(),
             "framework hook dispatcher",
-            Some((component.context.policy().clone(), capability_source.clone())),
+            Some(component.context.policy().clone()),
             Arc::new(move |channel, target| {
                 let weak_component = weak_component.clone();
                 let capability_source = capability_source.clone();

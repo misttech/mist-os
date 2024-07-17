@@ -26,7 +26,7 @@ use ::routing::bedrock::sandbox_construction::{
     self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
 };
 use ::routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
-use ::routing::capability_source::ComponentCapability;
+use ::routing::capability_source::{CapabilitySource, ComponentCapability};
 use ::routing::component_instance::{
     ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
 };
@@ -498,8 +498,12 @@ impl ResolvedInstanceState {
             CapabilityDecl::Protocol(_) => sandbox::Connector::new_sendable(dir_entry).into(),
             _ => dir_entry.into(),
         };
-        let hook =
-            CapabilityRequestedHook { source: component.as_weak(), name: name.clone(), capability };
+        let hook = CapabilityRequestedHook {
+            source: component.as_weak(),
+            name: name.clone(),
+            capability,
+            capability_decl: capability_decl.clone(),
+        };
         match capability_decl {
             CapabilityDecl::Protocol(p) => match p.delivery {
                 DeliveryType::Immediate => Router::new(hook),
@@ -1258,6 +1262,7 @@ struct CapabilityRequestedHook {
     source: WeakComponentInstance,
     name: Name,
     capability: Capability,
+    capability_decl: cm_rust::CapabilityDecl,
 }
 
 #[async_trait]
@@ -1289,30 +1294,39 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        let capability = if receiver.is_taken() {
+        let capability = if request.debug {
+            CapabilitySource::Component {
+                capability: self.capability_decl.clone().into(),
+                component: self.source.clone(),
+            }
+            .try_into()
+            .expect("failed to convert capability source to dictionary")
+        } else if receiver.is_taken() {
             sender.into()
         } else {
             self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable)?
         };
-        if !request.debug {
-            Ok(capability)
-        } else {
-            Ok(Capability::Instance(WeakInstanceToken::new_component(self.source.clone())))
-        }
+        Ok(capability)
     }
 }
 
 struct ProgramRouter {
     component: WeakComponentInstance,
     source_path: RelativePath,
+    capability: ComponentCapability,
 }
 
 #[async_trait]
 impl Routable for ProgramRouter {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
-            let source = WeakInstanceToken::new_component(self.component.clone());
-            return Ok(Capability::Instance(source));
+            let source = CapabilitySource::Component {
+                capability: self.capability.clone(),
+                component: self.component.clone(),
+            };
+            return Ok(source
+                .try_into()
+                .expect("failed to convert capability source to dictionary"));
         }
         fn open_error(e: OpenOutgoingDirError) -> OpenError {
             CapabilityProviderError::from(ComponentProviderError::from(e)).into()
@@ -1350,6 +1364,10 @@ impl Routable for ProgramRouter {
     }
 }
 
-fn new_program_router(component: WeakComponentInstance, source_path: RelativePath) -> Router {
-    Router::new(ProgramRouter { component: component, source_path: source_path })
+fn new_program_router(
+    component: WeakComponentInstance,
+    source_path: RelativePath,
+    capability: ComponentCapability,
+) -> Router {
+    Router::new(ProgramRouter { component: component, source_path: source_path, capability })
 }

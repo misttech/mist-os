@@ -33,7 +33,7 @@ use crate::framework::realm_query::RealmQuery;
 use crate::framework::route_validator::RouteValidatorFrameworkCapability;
 use crate::inspect_sink_provider::InspectSinkProvider;
 use crate::model::component::manager::ComponentManagerInstance;
-use crate::model::component::{WeakComponentInstance, WeakExtendedInstance};
+use crate::model::component::WeakComponentInstance;
 use crate::model::environment::Environment;
 use crate::model::event_logger::EventLogger;
 use crate::model::events::registry::{EventRegistry, EventSubscription};
@@ -198,14 +198,16 @@ impl BuiltinEnvironmentBuilder {
             .as_ref()
             .ok_or(format_err!("Runtime config should be set to add builtin runner."))?;
 
+        let top_instance = self.top_instance.clone().unwrap();
         let runner = Arc::new(BuiltinRunner::new(
-            self.top_instance.clone().unwrap().task_group(),
+            top_instance.task_group(),
             ElfRunnerResources {
                 security_policy: runtime_config.security_policy.clone(),
                 utc_clock: self.utc_clock.clone(),
                 crash_records: self.crash_records.clone(),
                 instance_registry: self.instance_registry.clone(),
             },
+            Arc::downgrade(&top_instance),
         ));
         Ok(self.add_runner("builtin".parse().unwrap(), runner))
     }
@@ -413,10 +415,10 @@ impl RootComponentInputBuilder {
         };
 
         let launch = LaunchTaskOnReceive::new(
-            WeakExtendedInstance::AboveRoot(top_instance),
+            capability_source,
             self.top_instance.task_group().as_weak(),
             name.clone(),
-            Some((self.policy_checker.clone(), capability_source)),
+            Some(self.policy_checker.clone()),
             Arc::new(move |server_end, _| {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
@@ -439,10 +441,10 @@ impl RootComponentInputBuilder {
             top_instance: top_instance.clone(),
         };
         let launch = LaunchTaskOnReceive::new(
-            WeakExtendedInstance::AboveRoot(top_instance),
+            capability_source,
             self.top_instance.task_group().as_weak(),
             "namespace capability dispatcher",
-            Some((self.policy_checker.clone(), capability_source)),
+            Some(self.policy_checker.clone()),
             Arc::new(move |server_end, _| {
                 let path = path.clone();
                 let fut = async move {
@@ -1450,10 +1452,10 @@ impl BuiltinEnvironment {
         };
 
         let launch = LaunchTaskOnReceive::new(
-            WeakExtendedInstance::AboveRoot(top_instance),
+            capability_source,
             self.model.top_instance().task_group().as_weak(),
             name.clone(),
-            Some((self.model.root().context.policy().clone(), capability_source)),
+            Some(self.model.root().context.policy().clone()),
             Arc::new(move |server_end, _| {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),

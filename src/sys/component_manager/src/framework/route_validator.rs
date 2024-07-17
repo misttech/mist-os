@@ -8,7 +8,6 @@ use crate::capability::{
 use crate::model::component::instance::ResolvedInstanceState;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::model::Model;
-use crate::model::routing::router_ext::WeakInstanceTokenExt;
 use crate::model::routing::service::AnonymizedServiceRoute;
 use crate::model::routing::{
     self, BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
@@ -373,11 +372,19 @@ impl RouteRequest {
         .await;
         let (router, request) = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
         router.route(request).await.map(|capability| {
-            if let sandbox::Capability::Instance(source) = capability {
-                (Some(source.moniker()), None)
-            } else {
-                warn!(target=%instance.moniker, "router did not return source info");
-                (None, None)
+            let capability_source = CapabilitySource::try_from(capability)
+                .expect("failed to convert capability to capability source");
+            match capability_source {
+                CapabilitySource::Component { component, .. }
+                | CapabilitySource::Framework { component, .. } => {
+                    (Some(ExtendedMoniker::ComponentInstance(component.moniker.clone())), None)
+                }
+                CapabilitySource::Builtin { .. } | CapabilitySource::Namespace { .. } => {
+                    (Some(ExtendedMoniker::ComponentManager), None)
+                }
+                _ => {
+                    return (None, None);
+                }
             }
         })
     }

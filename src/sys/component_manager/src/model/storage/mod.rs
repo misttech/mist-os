@@ -4,9 +4,7 @@
 
 pub mod admin_protocol;
 use crate::capability::CapabilitySource;
-use crate::model::component::{
-    ComponentInstance, StartReason, WeakComponentInstance, WeakExtendedInstance,
-};
+use crate::model::component::{ComponentInstance, StartReason, WeakComponentInstance};
 use crate::model::routing::{Route, RouteSource};
 use crate::model::start::Start;
 use crate::model::storage::admin_protocol::StorageAdmin;
@@ -402,10 +400,10 @@ pub fn build_storage_admin_dictionary(
             .insert(
                 storage_decl.name.clone(),
                 LaunchTaskOnReceive::new(
-                    WeakExtendedInstance::Component(weak_component.clone()),
+                    capability_source,
                     component.nonblocking_task_group().as_weak(),
                     "storage admin protocol",
-                    Some((component.context.policy().clone(), capability_source)),
+                    Some(component.context.policy().clone()),
                     Arc::new(move |channel, _target| {
                         let stream = ServerEnd::<fsys::StorageAdminMarker>::new(channel)
                             .into_stream()
