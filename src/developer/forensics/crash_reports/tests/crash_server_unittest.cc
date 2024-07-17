@@ -291,7 +291,7 @@ TEST_F(CrashServerTest, PreparesAnnotationsErrorSnapshot) {
                   Pair("key3", "value3.1"),
                   Pair("key4", "value4"),
                   Pair(feedback::kDebugReportUploadBootId, "some-value"),
-                  Pair(feedback::kDebugUploadUptime, "000d00h01m26s"),
+                  Pair(feedback::kDebugReportUploadUptime, "000d00h01m26s"),
               }));
 }
 
@@ -324,7 +324,7 @@ TEST_F(CrashServerTest, PreparesAnnotationsNoCurrentBootId) {
                   Pair("key2", "value2"),
                   Pair("key3", "value3.1"),
                   Pair("key4", "value4"),
-                  Pair(feedback::kDebugUploadUptime, "000d00h01m26s"),
+                  Pair(feedback::kDebugReportUploadUptime, "000d00h01m26s"),
               }));
 }
 
