@@ -217,8 +217,8 @@ impl RebootSnapshotProcessor {
     async fn process_single_payload(
         &mut self,
         hierarchy: DiagnosticsHierarchy<String>,
-        diagnostics_filename: &InspectHandleName,
-        moniker: &String,
+        diagnostics_filename: &Option<InspectHandleName>,
+        moniker: &str,
     ) {
         if let Some(project_indexes) = self.moniker_to_projects_map.get(moniker) {
             for index in project_indexes {
@@ -391,7 +391,7 @@ pub struct ProjectSampler {
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 struct MetricCacheKey {
-    handle_name: InspectHandleName,
+    handle_name: Option<InspectHandleName>,
     selector: String,
 }
 
@@ -649,8 +649,8 @@ impl ProjectSampler {
     async fn process_component_data(
         &mut self,
         payload: &DiagnosticsHierarchy,
-        diagnostics_filename: &InspectHandleName,
-        moniker: &String,
+        diagnostics_filename: &Option<InspectHandleName>,
+        moniker: &str,
     ) -> Result<(SnapshotOutcome, Vec<EventToLog>), Error> {
         let indexes_opt = &self.moniker_to_selector_map.get(moniker);
         let selector_indexes = match indexes_opt {
@@ -1249,7 +1249,7 @@ mod tests {
         sampler.rebuild_selector_data_structures();
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &Some(InspectHandleName::filename("a_filename")),
             &"my/component".to_string(),
         )) {
             // This selector will be found and removed from the map, resulting in a
@@ -1276,7 +1276,7 @@ mod tests {
         sampler.rebuild_selector_data_structures();
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &Some(InspectHandleName::filename("a_filename")),
             &"my/component".to_string(),
         )) {
             // This selector will be found and removed from the map, resulting in a
@@ -1302,7 +1302,7 @@ mod tests {
         sampler.rebuild_selector_data_structures();
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &Some(InspectHandleName::filename("a_filename")),
             &"my/component".to_string(),
         )) {
             // This selector will not be found and removed from the map, resulting in SelectorsUnchanged.
@@ -1318,7 +1318,7 @@ mod tests {
         let big_number = Property::Uint("foo".to_string(), 5);
         let small_number = Property::Uint("foo".to_string(), 2);
         let key = MetricCacheKey {
-            handle_name: InspectHandleName::filename("some_file"),
+            handle_name: Some(InspectHandleName::filename("some_file")),
             selector: "sel".to_string(),
         };
 
@@ -1387,7 +1387,7 @@ mod tests {
         // Both selectors should be found and removed from the map.
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &Some(InspectHandleName::filename("a_filename")),
             &"my/component".to_string(),
         )) {
             Ok((SnapshotOutcome::SelectorsChanged, _events)) => (),
@@ -1412,7 +1412,7 @@ mod tests {
 
     fn process_occurence_tester(params: EventCountTesterParams) {
         let data_source = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: Some(InspectHandleName::filename("foo.file")),
             selector: "test:root:count".to_string(),
         };
         let event_res = process_occurence(&params.new_val, params.old_val.as_ref(), &data_source);
@@ -1556,7 +1556,7 @@ mod tests {
 
     fn process_int_tester(params: IntTesterParams) {
         let data_source = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: Some(InspectHandleName::filename("foo.file")),
             selector: "test:root:count".to_string(),
         };
         let event_res = process_int(&params.new_val, &data_source);
@@ -1647,7 +1647,7 @@ mod tests {
 
     fn process_string_tester(params: StringTesterParams) {
         let metric_cache_key = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: Some(InspectHandleName::filename("foo.file")),
             selector: "test:root:string_val".to_string(),
         };
 
@@ -1771,7 +1771,7 @@ mod tests {
     }
     fn process_int_histogram_tester(params: IntHistogramTesterParams) {
         let data_source = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: Some(InspectHandleName::filename("foo.file")),
             selector: "test:root:count".to_string(),
         };
         let event_res =

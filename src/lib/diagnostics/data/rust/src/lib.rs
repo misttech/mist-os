@@ -11,7 +11,6 @@ use anyhow::format_err;
 use chrono::{Local, TimeZone, Utc};
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{DataType, Selector, Severity as FidlSeverity};
-use fidl_fuchsia_inspect as finspect;
 use flyweights::FlyStr;
 use itertools::Itertools;
 use moniker::{ExtendedMoniker, MonikerError};
@@ -39,9 +38,6 @@ pub use crate::logs_legacy::*;
 const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
 const ROOT_MONIKER_REPR: &str = "<root>";
-
-static DEFAULT_TREE_NAME: once_cell::sync::Lazy<FlyStr> =
-    once_cell::sync::Lazy::new(|| FlyStr::new(finspect::DEFAULT_TREE_NAME));
 
 /// The possible name for a handle to inspect data. It could be a filename (being deprecated) or a
 /// name published using `fuchsia.inspect.InspectSink`.
@@ -274,8 +270,9 @@ pub struct InspectMetadata {
     pub errors: Option<Vec<InspectError>>,
 
     /// Name of diagnostics source producing data.
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
-    pub name: InspectHandleName,
+    pub name: Option<InspectHandleName>,
 
     /// The url with which the component was launched.
     pub component_url: FlyStr,
@@ -578,8 +575,8 @@ pub type LogsProperty = Property<LogsField>;
 
 impl Data<Inspect> {
     /// Access the name or filename within `self.metadata`.
-    pub fn name(&self) -> &str {
-        self.metadata.name.as_ref()
+    pub fn name(&self) -> Option<&str> {
+        self.metadata.name.as_ref().map(InspectHandleName::as_ref)
     }
 }
 
@@ -601,7 +598,7 @@ impl InspectDataBuilder {
                 version: 1,
                 metadata: InspectMetadata {
                     errors: None,
-                    name: InspectHandleName::name(DEFAULT_TREE_NAME.clone()),
+                    name: None,
                     component_url: component_url.into(),
                     timestamp,
                     escrowed: false,
@@ -629,7 +626,7 @@ impl InspectDataBuilder {
     }
 
     pub fn with_name(mut self, name: InspectHandleName) -> Self {
-        self.data.metadata.name = name;
+        self.data.metadata.name = Some(name);
         self
     }
 

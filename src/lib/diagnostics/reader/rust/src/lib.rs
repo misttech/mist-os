@@ -853,12 +853,17 @@ mod tests {
             .expect("snapshotted");
 
         assert_matches!(
-            results.clone().into_iter().find(|v| v.metadata.name.as_ref() == "tree-1"),
+            results
+                .clone()
+                .into_iter()
+                .find(|v| v.metadata.name.as_ref().unwrap().as_name() == Some("tree-1")),
             None
         );
 
-        let should_have_data =
-            results.into_iter().find(|v| v.metadata.name.as_ref() == "tree-0").unwrap();
+        let should_have_data = results
+            .into_iter()
+            .find(|v| v.metadata.name.as_ref().unwrap().as_name() == Some("tree-0"))
+            .unwrap();
 
         assert_data_tree!(should_have_data.payload.unwrap(), root: {
             "tree-0": 0u64,

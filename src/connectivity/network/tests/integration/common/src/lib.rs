@@ -176,7 +176,7 @@ pub async fn get_inspect_data(
             .context("snapshot did not return any inspect data")?
             .into_iter()
             .filter_map(|inspect_data| {
-                if inspect_data.name().starts_with(file_prefix) {
+                if inspect_data.name().unwrap_or("").starts_with(file_prefix) {
                     Some(inspect_data.payload.ok_or_else(|| {
                         anyhow::anyhow!(
                             "empty inspect payload, metadata errors: {:?}",

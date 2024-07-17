@@ -3,7 +3,6 @@
         "data_source": "Inspect",
         "metadata": {
             "component_url": "puppet#meta/puppet.cm",
-            "name": "root",
             "timestamp": 0
         },
         "moniker": "puppet",
