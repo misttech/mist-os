@@ -487,7 +487,7 @@ struct PrivateAnonymousMemoryManager {
     backing: Arc<MemoryObject>,
 
     /// Memory object used to make address allocations for private, anonymous memory allocations in this address space.
-    allocation: Arc<MemoryObject>,
+    allocation: MemoryObject,
 }
 
 #[cfg(feature = "alternate_anon_allocs")]
@@ -500,9 +500,8 @@ impl PrivateAnonymousMemoryManager {
         // modified and the actual size does not matter. To allow creating mappings that might
         // fault (if permissions were to allow) this mapping has to be resizable. It will never be
         // resized.
-        let allocation = Arc::new(MemoryObject::from(
-            zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap(),
-        ));
+        let allocation =
+            MemoryObject::from(zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap());
 
         Self { backing, allocation }
     }
@@ -567,10 +566,10 @@ impl PrivateAnonymousMemoryManager {
                     .replace_as_executable(&VMEX_RESOURCE)
                     .map_err(impossible_error)?,
             ),
-            allocation: Arc::new(MemoryObject::from(
+            allocation: MemoryObject::from(
                 zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
                     .map_err(impossible_error)?,
-            )),
+            ),
         })
     }
 }
