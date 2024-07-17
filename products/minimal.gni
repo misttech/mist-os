@@ -32,12 +32,6 @@
 
 include_shell_commands_package = true
 
-# Use the product assembly config target to specify the product configuration.
-#
-# This should be overridden by products which inherit from minimal.
-fuchsia_product_assembly_config_label = "//products/minimal"
-zedboot_product_assembly_config_label = "//products/zedboot"
-
 bazel_product_bundle_prefix = "//products/minimal:product_bundle"
 
 # Packages to be published to universe that do not go through assembly.

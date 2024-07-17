@@ -23,11 +23,6 @@
 # but each entry needs a ticket assigned to the assembly team with an agreed
 # upon solution for how to address the tech-debt.
 
-# Use the product assembly config target to specify the product configuration.
-#
-fuchsia_product_assembly_config_label = "//products/microfuchsia"
-zedboot_product_assembly_config_label = "//products/zedboot"
-
 # Use Bazel-built images
 use_bazel_images_only = true
 bazel_product_bundle_prefix = "//products/microfuchsia:microfuchsia_eng"
