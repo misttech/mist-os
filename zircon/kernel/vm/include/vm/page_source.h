@@ -390,34 +390,14 @@ class PageSource final : public PageRequestInterface {
   void ResolveRequests(page_request_type type, uint64_t offset, uint64_t len)
       TA_EXCL(page_source_mtx_);
 
-  // Helper to perform early waking on a request and any overlapping requests. The provided range
-  // should be in local request space, and this method is only valid to be called if
-  // |request->wake_offset_ == req_start|.
-  void EarlyWakeRequestLocked(PageRequest* request, uint64_t req_start, uint64_t req_end)
-      TA_REQ(page_source_mtx_);
-
   // Removes |request| from any internal tracking. Called by a PageRequest if
   // it needs to abort itself.
   void CancelRequest(PageRequest* request) override TA_EXCL(page_source_mtx_);
-
-  void CancelRequestLocked(PageRequest* request) TA_REQ(page_source_mtx_);
 
   zx_status_t PopulateRequest(PageRequest* request, uint64_t offset, uint64_t len,
                               VmoDebugInfo vmo_debug_info, page_request_type type);
 
   zx_status_t WaitOnRequest(PageRequest* request) override;
-
-  // Helper that takes an existing request and a new request range and returns whether the new
-  // range is any kind of continuation of the existing request. This is used for a mixture of
-  // correctness validation and supporting early wake requests.
-  enum class ContinuationType {
-    NotContinuation,
-    SameRequest,
-    SameSource,
-  };
-  ContinuationType RequestContinuationTypeLocked(const PageRequest* request, uint64_t offset,
-                                                 uint64_t len, page_request_type type)
-      TA_REQ(page_source_mtx_);
 };
 
 // The PageRequest provides the ability to be in two difference linked list. One owned by the page
@@ -431,19 +411,11 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
                         fbl::TaggedDoublyLinkedListable<PageRequest*, PageSourceTag>,
                         fbl::TaggedDoublyLinkedListable<PageRequest*, PageProviderTag>> {
  public:
-  PageRequest() : PageRequest(false) {}
-  // If early_wake is true then the caller is asking to be woken up once some of the request is
-  // satisfied, potentially before all of it is satisfied. This is intended to allow users to
-  // process partial amounts of data as they come in before continuing to Wait for the rest with
-  // only a single PageRequest sent to the PageSource.
-  explicit PageRequest(bool early_wake) : early_wake_(early_wake) {}
+  PageRequest() = default;
   ~PageRequest();
 
   // Returns ZX_OK on success, or a permitted error code if the backing page provider explicitly
   // failed this page request. Returns ZX_ERR_INTERNAL_INTR_KILLED if the thread was killed.
-  // If this page requested is allowed to early wake then this can return success with the request
-  // still active and queued with a PageSource. In this case it is invalid to attempt to use this
-  // request with any other PageSource or for any other range without first doing CancelRequest.
   zx_status_t Wait();
 
   // If initialized, asks the underlying PageRequestInterface to abort this request, by calling
@@ -478,14 +450,6 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
 
   uint64_t GetKey() const { return GetEnd(); }
 
-  bool RangeOverlaps(uint64_t start, uint64_t end) const {
-    return end > offset_ && start < GetEnd();
-  }
-
-  // Converts a [start,end) range in provider (aka VMO) space to the sub range that overlaps with
-  // this request and returns it relative to this requests offset_.
-  ktl::pair<uint64_t, uint64_t> TrimRangeToRequestSpace(uint64_t start, uint64_t end) const;
-
   // The type of the page request.
   page_request_type type_;
 
@@ -496,22 +460,6 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   // modified again. The provider_owned_ bool is used for assertions to validate this flow, but
   // otherwise has no functional affect.
   bool provider_owned_ = false;
-
-  // Set on construction if the user of the PageRequest supports, and wants to be, woken early. If
-  // this is true then wake_offset_ will be set to zero when a request is initialized. Early waking
-  // is intended to allow for an optimization under the assumption that large requests will be
-  // filled sequentially, allowing for a single request to be made to the underlying page source,
-  // but processing being able to start before the entire request has been completed.
-  // When an early_wake_ request is signaled the user cannot assume that the request is fully
-  // complete, and as a consequence must not attempt to use the PageRequest in a new context without
-  // first cancelling it.
-  const bool early_wake_;
-
-  // The offset into the request at which the event_ should next be signaled. This is request
-  // relative, so a value of 0 indicates that it should be signaled when the page at offset_ is
-  // provided. After being triggered, the wake_offset_ increments by the amount provided so that it
-  // can potentially get triggered again.
-  uint64_t wake_offset_ = UINT64_MAX;
 
   // The page source this request is currently associated with.
   fbl::RefPtr<PageRequestInterface> src_;
@@ -555,10 +503,7 @@ inline uint64_t PageProvider::GetRequestLen(const PageRequest* request) {
 // will not be needed.
 class LazyPageRequest {
  public:
-  // Construct a page request that does not support early waking.
-  LazyPageRequest() : LazyPageRequest(false) {}
-  // Construct a page request that optionally supports early waking. See PageRequest constructor.
-  explicit LazyPageRequest(bool early_wake) : early_wake_(early_wake) {}
+  LazyPageRequest() = default;
   ~LazyPageRequest() = default;
 
   // Initialize and return the internal PageRequest.
@@ -571,8 +516,6 @@ class LazyPageRequest {
   bool is_initialized() const { return request_.has_value(); }
 
  private:
-  // Early wake parameter to be passed onto the PageRequest constructor.
-  bool early_wake_;
   ktl::optional<PageRequest> request_ = ktl::nullopt;
 };
 
@@ -586,9 +529,6 @@ class LazyPageRequest {
 // TODO(adanis): Implement an enforcement strategy.
 class MultiPageRequest {
  public:
-  MultiPageRequest() = default;
-  explicit MultiPageRequest(bool early_wake) : page_request_(early_wake) {}
-
   // Wait on the currently active page request.
   zx_status_t Wait();
 
