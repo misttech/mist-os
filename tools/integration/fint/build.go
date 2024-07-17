@@ -240,7 +240,9 @@ func buildImpl(
 	// Each ninja invocation produces a log file located in its build dir.
 	// Depending on the status of the build, not all sub-build logs are guaranteed to exist.
 	// TODO(b/349155983): Support ninja logs from multiple sub-builds
-	ninjaLogCandidates := []string{filepath.Join(buildDir, ninjaLogPath)}
+	topNinjaLog := filepath.Join(buildDir, ninjaLogPath)
+	artifacts.NinjaLogPath = topNinjaLog
+	ninjaLogCandidates := []string{topNinjaLog}
 
 	ninjaDebugFileSets := []*ninjaDebugFileSet{}
 	for _, ninjaLog := range ninjaLogCandidates {

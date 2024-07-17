@@ -658,6 +658,11 @@ func TestBuild(t *testing.T) {
 			if tc.expectedArtifacts == nil {
 				tc.expectedArtifacts = &fintpb.BuildArtifacts{}
 			}
+			if len(runner.commandsRun) > 0 {
+				// If preprocessing fails before we run any subprocesses, then
+				// NinjaLogPath will not be set.
+				tc.expectedArtifacts.NinjaLogPath = filepath.Join(buildDir, ninjaLogPath)
+			}
 			opts := cmp.Options{
 				protocmp.Transform(),
 				// Ordering of the repeated artifact fields doesn't matter.
