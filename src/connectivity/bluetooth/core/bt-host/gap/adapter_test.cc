@@ -1678,12 +1678,12 @@ void AdapterTest::GetSupportedDelayRangeHelper(
   InitializeAdapter([&](bool success) { init_success = success; });
   ASSERT_TRUE(init_success);
 
-  zx_status_t cb_status =
-      ZX_ERR_NO_MEMORY;  // Error code that should never be returned
+  pw::Status cb_status =
+      PW_STATUS_DATA_LOSS;  // Error code that should never be returned
   uint32_t min_delay_us = -1;
   uint32_t max_delay_us = -1;
   Adapter::GetSupportedDelayRangeCallback cb =
-      [&](zx_status_t status, uint32_t min_delay, uint32_t max_delay) {
+      [&](pw::Status status, uint32_t min_delay, uint32_t max_delay) {
         cb_status = status;
         min_delay_us = min_delay;
         max_delay_us = max_delay;
@@ -1704,9 +1704,9 @@ void AdapterTest::GetSupportedDelayRangeHelper(
       std::move(cb));
   RunUntilIdle();
   if (!supported) {
-    EXPECT_EQ(cb_status, ZX_ERR_NOT_SUPPORTED);
+    EXPECT_EQ(cb_status, PW_STATUS_UNIMPLEMENTED);
   } else {
-    EXPECT_EQ(cb_status, ZX_OK);
+    EXPECT_TRUE(cb_status.ok());
     EXPECT_LE(min_delay_us, max_delay_us);
     EXPECT_LE(max_delay_us, 0x3D0900u);
   }

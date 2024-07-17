@@ -759,14 +759,14 @@ void AdapterImpl::GetSupportedDelayRange(
     pw::bluetooth::emboss::LogicalTransportType logical_transport_type,
     pw::bluetooth::emboss::DataPathDirection direction,
     const std::optional<std::vector<uint8_t>>& codec_configuration,
-    fit::function<void(zx_status_t, uint32_t, uint32_t)> cb) {
+    GetSupportedDelayRangeCallback cb) {
   if (!state_.IsCommandSupported(
           /*octet=*/45,
           hci_spec::SupportedCommand::kReadLocalSupportedControllerDelay)) {
     bt_log(WARN,
            "gap",
            "read local supported controller delay command not supported");
-    cb(ZX_ERR_NOT_SUPPORTED, /*min=*/0, /*max=*/0);
+    cb(PW_STATUS_UNIMPLEMENTED, /*min=*/0, /*max=*/0);
     return;
   }
   bt_log(INFO, "gap", "retrieving controller codec delay");
@@ -805,11 +805,11 @@ void AdapterImpl::GetSupportedDelayRange(
                          WARN,
                          "gap",
                          "read local supported controller delay failed")) {
-          cb(ZX_ERR_INTERNAL, /*min=*/0, /*max=*/0);
+          cb(PW_STATUS_UNKNOWN, /*min=*/0, /*max=*/0);
           return;
         }
         bt_log(INFO, "gap", "controller delay read successfully");
-        cb(ZX_OK,
+        cb(PW_STATUS_OK,
            view.min_controller_delay().Read(),
            view.max_controller_delay().Read());
       });
