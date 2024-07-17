@@ -8,6 +8,9 @@
 
 namespace {
 
+// TODO(fxbug.dev/353616233): Investigate flaky timeouts when running asan variants.
+#if !__has_feature(address_sanitizer)
+
 class ZirconSmokeTest : public GuestTest<ZirconEnclosedGuest> {};
 
 TEST_F(ZirconSmokeTest, Boot) {
@@ -17,5 +20,7 @@ TEST_F(ZirconSmokeTest, Boot) {
   EXPECT_EQ(ZX_OK, status);
   EXPECT_EQ(result, "Boot Complete!\n");
 }
+
+#endif
 
 }  // namespace
