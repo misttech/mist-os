@@ -6,8 +6,6 @@
 group("build") {
   public_deps = [
     "//tools/artifactory($host_toolchain)",
-    "//tools/build/ninjago/buildstats($host_toolchain)",
-    "//tools/build/ninjago/ninjatrace($host_toolchain)",
 
     # The infrastructure uses a version of fint built using the Go toolchain,
     # rather than Ninja, so we technically don't need to include fint here. But

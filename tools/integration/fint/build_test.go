@@ -67,6 +67,19 @@ func TestBuild(t *testing.T) {
 
 	platform := "linux-x64"
 
+	failedBuildRunner := func(cmd []string, _ io.Writer) error {
+		// Make ninja build fail, but ninjatrace succeed.
+		prog := filepath.Base(cmd[0])
+		if prog == "ninjatrace" {
+			return nil
+		}
+		// prog == "ninja"
+		if contains(cmd, "-t") { // for compdb and graph
+			return nil
+		}
+		return fmt.Errorf("failed to run command: %s", cmd)
+	}
+
 	testCases := []struct {
 		name        string
 		staticSpec  *fintpb.Static
@@ -83,6 +96,8 @@ func TestBuild(t *testing.T) {
 		// "running" a command, allowing each test to fake the result and output
 		// of any subprocess.
 		runnerFunc func(cmd []string, stdout io.Writer) error
+		// Callback function that returns a list of ninja logs (including sub-ninja logs).
+		ninjaLogFinderFunc func() []string
 		// List of regex strings, where each string corresponds to a subprocess
 		// that must have been run by the runner.
 		mustRun []string
@@ -104,8 +119,8 @@ func TestBuild(t *testing.T) {
 				ArtifactDir: artifactDir,
 			},
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				NinjaCompdbPath: filepath.Join(artifactDir, "compile-commands.json"),
-				NinjaGraphPath:  filepath.Join(artifactDir, "ninja-graph.dot"),
+				NinjaCompdbPath: filepath.Join(buildDir, ninjaCompdbName),
+				NinjaGraphPath:  filepath.Join(buildDir, ninjaGraphName),
 			},
 			mustRun: []string{`ninja .*-t graph`, `ninja .*-t compdb`},
 		},
@@ -124,8 +139,8 @@ func TestBuild(t *testing.T) {
 				},
 			},
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				NinjaCompdbPath: filepath.Join(artifactDir, "compile-commands.json"),
-				NinjaGraphPath:  filepath.Join(artifactDir, "ninja-graph.dot"),
+				NinjaCompdbPath: filepath.Join(buildDir, ninjaCompdbName),
+				NinjaGraphPath:  filepath.Join(buildDir, ninjaGraphName),
 				LogFiles: map[string]string{
 					"ninja dry run output": filepath.Join(artifactDir, "ninja_dry_run_output"),
 				},
@@ -144,11 +159,11 @@ func TestBuild(t *testing.T) {
 				filepath.Join(clangCrashReportsDirName, "bar.sh"),
 				filepath.Join(clangCrashReportsDirName, "other.file"),
 			},
-			runnerFunc: func(cmd []string, _ io.Writer) error {
-				return fmt.Errorf("failed to run command: %s", cmd)
-			},
+			runnerFunc: failedBuildRunner,
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				FailureSummary: unrecognizedFailureMsg + "\n",
+				FailureSummary:  unrecognizedFailureMsg + "\n",
+				NinjaCompdbPath: filepath.Join(buildDir, ninjaCompdbName),
+				NinjaGraphPath:  filepath.Join(buildDir, ninjaGraphName),
 				DebugFiles: []*fintpb.DebugFile{
 					{
 						Path:       filepath.Join(buildDir, "clang-crashreports", "foo.tar"),
@@ -177,11 +192,11 @@ func TestBuild(t *testing.T) {
 				filepath.Join(comparisonDiagnosticsDirName, "dir", "foo.rlib.remote"),
 				filepath.Join("not", "in", "expected", "dir", "foo.rlib"),
 			},
-			runnerFunc: func(cmd []string, _ io.Writer) error {
-				return fmt.Errorf("failed to run command: %s", cmd)
-			},
+			runnerFunc: failedBuildRunner,
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				FailureSummary: unrecognizedFailureMsg + "\n",
+				FailureSummary:  unrecognizedFailureMsg + "\n",
+				NinjaCompdbPath: filepath.Join(buildDir, ninjaCompdbName),
+				NinjaGraphPath:  filepath.Join(buildDir, ninjaGraphName),
 				DebugFiles: []*fintpb.DebugFile{
 					{
 						Path:       filepath.Join(buildDir, comparisonDiagnosticsDirName, "dir", "foo.rlib.local"),
@@ -209,11 +224,11 @@ func TestBuild(t *testing.T) {
 				filepath.Join(".traces", "nested", "dir", "accesses_trace.txt"),
 				filepath.Join("not", "in", "expected", "dir", "accesses_trace.txt"),
 			},
-			runnerFunc: func(cmd []string, _ io.Writer) error {
-				return fmt.Errorf("failed to run command: %s", cmd)
-			},
+			runnerFunc: failedBuildRunner,
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				FailureSummary: unrecognizedFailureMsg + "\n",
+				FailureSummary:  unrecognizedFailureMsg + "\n",
+				NinjaCompdbPath: filepath.Join(buildDir, ninjaCompdbName),
+				NinjaGraphPath:  filepath.Join(buildDir, ninjaGraphName),
 				DebugFiles: []*fintpb.DebugFile{
 					{
 						Path:       filepath.Join(buildDir, ".traces", "accesses_trace.txt"),
@@ -244,8 +259,8 @@ func TestBuild(t *testing.T) {
 				ArtifactDir: artifactDir,
 			},
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				NinjaCompdbPath: filepath.Join(artifactDir, "compile-commands.json"),
-				NinjaGraphPath:  filepath.Join(artifactDir, "ninja-graph.dot"),
+				NinjaCompdbPath: filepath.Join(buildDir, ninjaCompdbName),
+				NinjaGraphPath:  filepath.Join(buildDir, ninjaGraphName),
 				LogFiles: map[string]string{
 					"explain_output.txt": filepath.Join(artifactDir, "explain_output.txt"),
 				},
@@ -255,12 +270,13 @@ func TestBuild(t *testing.T) {
 			name:           "failed ninja no-op check",
 			staticSpec:     &fintpb.Static{},
 			ninjaNoopCheck: true,
-			// We don't provide a runnerFunc, which causes the fake ninja no-op
-			// check command to not print any output, so the no-op check will
-			// fail because the "no work to do" string will not be present in
-			// the output.
-			runnerFunc: nil,
-			expectErr:  true,
+			// The fake ninja no-op check command succeeds, but does not print any
+			// output, so the no-op check will fail because the "no work to do"
+			// string will not be present in the output.
+			runnerFunc: func(cmd []string, _ io.Writer) error {
+				return nil
+			},
+			expectErr: true,
 			expectedArtifacts: &fintpb.BuildArtifacts{
 				FailureSummary: ninjaNoopFailureMessage(platform, ""),
 				DebugFiles: []*fintpb.DebugFile{
@@ -271,6 +287,14 @@ func TestBuild(t *testing.T) {
 					{
 						Path:       filepath.Join(buildDir, ninjaLogPath),
 						UploadDest: ninjaLogPath,
+					},
+					{
+						Path:       filepath.Join(buildDir, ninjatraceJSONName),
+						UploadDest: ninjatraceJSONName,
+					},
+					{
+						Path:       filepath.Join(buildDir, buildstatsJSONName),
+						UploadDest: buildstatsJSONName,
 					},
 				},
 			},
@@ -314,10 +338,8 @@ func TestBuild(t *testing.T) {
 				}
 				return nil
 			},
-			expectErr: true,
-			expectedArtifacts: &fintpb.BuildArtifacts{
-				NinjaGraphPath: filepath.Join(artifactDir, "ninja-graph.dot"),
-			},
+			expectErr:         true,
+			expectedArtifacts: &fintpb.BuildArtifacts{},
 		},
 		{
 			name:       "ninja graph and compdb fail after failed build",
@@ -350,7 +372,9 @@ func TestBuild(t *testing.T) {
 					},
 				},
 			},
-			mustRun: []string{`ninja .*-t graph`, `ninja .*-t compdb`},
+			// Trace generation stops on first error, so the last ninja command
+			// run is the graph command.
+			mustRun: []string{`ninja .*-t graph`},
 		},
 		{
 			name: "extra ad-hoc ninja targets",
@@ -602,15 +626,19 @@ func TestBuild(t *testing.T) {
 			proto.Merge(defaultContextSpec, tc.contextSpec)
 			tc.contextSpec = defaultContextSpec
 			runner := &fakeSubprocessRunner{run: tc.runnerFunc}
+
+			fileExists := func(_ string) bool { return true }
 			tc.modules.tools = append(tc.modules.tools, makeTools(
 				map[string][]string{
-					"gn":    {"linux", "mac"},
-					"ninja": {"linux", "mac"},
+					"gn":         {"linux", "mac"},
+					"ninja":      {"linux", "mac"},
+					"buildstats": {"linux", "mac"},
+					"ninjatrace": {"linux", "mac"},
 				},
 			)...)
 			ctx := context.Background()
 			artifacts, err := buildImpl(
-				ctx, runner, tc.staticSpec, tc.contextSpec, tc.modules, platform)
+				ctx, runner, fileExists, tc.staticSpec, tc.contextSpec, tc.modules, platform)
 			if err != nil {
 				if !tc.expectErr {
 					t.Fatalf("Got unexpected error: %s", err)
@@ -629,11 +657,6 @@ func TestBuild(t *testing.T) {
 
 			if tc.expectedArtifacts == nil {
 				tc.expectedArtifacts = &fintpb.BuildArtifacts{}
-			}
-			if len(runner.commandsRun) > 0 {
-				// If preprocessing fails before we run any subprocesses, then
-				// NinjaLogPath will not be set.
-				tc.expectedArtifacts.NinjaLogPath = filepath.Join(buildDir, ninjaLogPath)
 			}
 			opts := cmp.Options{
 				protocmp.Transform(),

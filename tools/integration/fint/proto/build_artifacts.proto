@@ -47,13 +47,13 @@ message BuildArtifacts {
   // maintain a copy of the images.json schema here.
   repeated google.protobuf.Struct built_archives = 3;
 
-  // Absolute path to the Ninja log file.
+  // Absolute path to the Ninja log file.  Deprecated: now used by fint
   string ninja_log_path = 4;
 
-  // Absolute path to a Ninja graph file.
+  // Absolute path to a Ninja graph file.  Deprecated: now used by fint
   string ninja_graph_path = 5;
 
-  // Absolute path to a Ninja compdb file.
+  // Absolute path to a Ninja compdb file.  Deprecated: now used by fint
   string ninja_compdb_path = 6;
 
   // The duration taken by the ninja build step.
@@ -83,4 +83,10 @@ message BuildArtifacts {
   // tests. This is determined by doing a build graph analysis of the files
   // reported in the `changed_files` context spec field.
   repeated string affected_tests = 12;
+
+  // Collection of ninjatrace files to upload.
+  repeated string ninjatrace_json_files = 13;
+
+  // Collection of buildstats files to upload.
+  repeated string buildstats_json_files = 14;
 }
