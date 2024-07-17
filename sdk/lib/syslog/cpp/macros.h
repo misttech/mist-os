@@ -383,11 +383,6 @@ bool ShouldCreateLogMessage(LogSeverity severity);
 
 // The VLOG macros log with translated verbosities
 
-// Get the severity corresponding to the given verbosity. Note that
-// verbosity relative to the default severity and can be thought of
-// as incrementally "more vebose than" the baseline.
-fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
-
 #ifndef NDEBUG
 #define FX_DLOGS(severity) FX_LOGS(severity)
 #define FX_DCHECK(condition) FX_CHECK(condition)

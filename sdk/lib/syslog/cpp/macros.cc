@@ -118,17 +118,3 @@ uint8_t GetVlogVerbosity() {
 bool ShouldCreateLogMessage(LogSeverity severity) { return severity >= GetMinLogSeverity(); }
 
 }  // namespace fuchsia_logging
-
-fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
-  // Clamp verbosity scale to the interstitial space between INFO and DEBUG
-  uint8_t max_verbosity = (fuchsia_logging::LOG_INFO - fuchsia_logging::LOG_DEBUG) /
-                          fuchsia_logging::LogVerbosityStepSize;
-  if (verbosity > max_verbosity) {
-    verbosity = max_verbosity;
-  }
-  int severity = fuchsia_logging::LOG_INFO - (verbosity * fuchsia_logging::LogVerbosityStepSize);
-  if (severity < fuchsia_logging::LOG_DEBUG + 1) {
-    return fuchsia_logging::LOG_DEBUG + 1;
-  }
-  return static_cast<fuchsia_logging::LogSeverity>(severity);
-}
