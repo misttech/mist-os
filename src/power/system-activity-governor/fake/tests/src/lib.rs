@@ -236,6 +236,11 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     );
     test_driver.current_level.update(1).await?.unwrap();
     assert_eq!(
+        LeaseStatus::Pending,
+        lease_control.watch_status(LeaseStatus::Unknown).await.unwrap()
+    );
+    test_driver_controller.current_level.update(1).await?.unwrap();
+    assert_eq!(
         LeaseStatus::Satisfied,
         lease_control.watch_status(LeaseStatus::Unknown).await.unwrap()
     );

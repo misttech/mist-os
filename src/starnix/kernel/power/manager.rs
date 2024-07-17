@@ -120,7 +120,7 @@ impl SuspendResumeManager {
             .kernel()
             .connect_to_protocol_at_container_svc::<fpower::HandoffMarker>()?
             .into_sync_proxy();
-        self.init_power_element(&activity_governor, &handoff)?;
+        self.init_power_element(&activity_governor, &handoff, system_task)?;
         listener::init_listener(self, &activity_governor, system_task);
         self.init_stats_watcher(system_task);
         Ok(())
@@ -130,6 +130,7 @@ impl SuspendResumeManager {
         self: &SuspendResumeManagerHandle,
         activity_governor: &fsystem::ActivityGovernorSynchronousProxy,
         handoff: &fpower::HandoffSynchronousProxy,
+        system_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
         let topology = connect_to_protocol_sync::<fbroker::TopologyMarker>()?;
 
@@ -148,7 +149,7 @@ impl SuspendResumeManager {
             let (lessor, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
             let (current_level, current_level_server_end) =
                 create_sync_proxy::<fbroker::CurrentLevelMarker>();
-            let (_, required_level_server_end) =
+            let (required_level, required_level_server_end) =
                 create_sync_proxy::<fbroker::RequiredLevelMarker>();
             let level_control_channels = fbroker::LevelControlChannels {
                 current: current_level_server_end,
@@ -158,7 +159,7 @@ impl SuspendResumeManager {
                 .add_element(
                     fbroker::ElementSchema {
                         element_name: Some("starnix-power-mode".into()),
-                        initial_current_level: Some(STARNIX_POWER_ON_LEVEL),
+                        initial_current_level: Some(0),
                         valid_levels: Some(power_levels),
                         dependencies: Some(vec![fbroker::LevelDependency {
                             dependency_type: fbroker::DependencyType::Assertive,
@@ -191,6 +192,23 @@ impl SuspendResumeManager {
                     level_proxy: Some(current_level),
                 })
                 .expect("Power Mode should be uninitialized");
+
+            let self_ref = self.clone();
+            system_task.kernel().kthreads.spawn(move |_, _| {
+                while let Ok(Ok(level)) = required_level.watch(zx::Time::INFINITE) {
+                    if let Err(e) = self_ref
+                        .power_mode()
+                        .expect("Starnix should have a power mode")
+                        .level_proxy
+                        .as_ref()
+                        .expect("Starnix power mode should have a current level proxy")
+                        .update(level, zx::Time::INFINITE)
+                    {
+                        log_warn!("Failed to update current level: {e:?}");
+                        break;
+                    }
+                }
+            });
 
             // We may not have a session manager to take a lease from in tests.
             match handoff.take(zx::Time::INFINITE) {

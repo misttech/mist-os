@@ -4,9 +4,14 @@
 
 use anyhow::{anyhow, Context};
 use fidl::endpoints::{ClientEnd, Proxy};
+use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem};
+use std::sync::Arc;
+use {
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
+    fuchsia_async as fasync,
+};
 
 /// A power element representing the session.
 ///
@@ -23,7 +28,7 @@ use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem}
 pub struct PowerElement {
     // Keeps the element alive.
     #[allow(dead_code)]
-    power_element: ClientEnd<fbroker::ElementControlMarker>,
+    power_element_context: Arc<PowerElementContext>,
 
     /// The first lease on the power element.
     lease: Option<ClientEnd<fbroker::LeaseControlMarker>>,
@@ -60,33 +65,43 @@ impl PowerElement {
 
         // TODO(https://fxbug.dev/316023943): also depend on execution_resume_latency after implemented.
         let power_levels: Vec<u8> = (0..=POWER_ON_LEVEL).collect();
-        let (lessor, lessor_server_end) = fidl::endpoints::create_proxy::<fbroker::LessorMarker>()?;
-        let (element_control, element_control_server_end) =
-            fidl::endpoints::create_endpoints::<fbroker::ElementControlMarker>();
         let random_string: String =
             rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
-        topology
-            .add_element(fbroker::ElementSchema {
-                element_name: Some(format!("session-manager-element-{random_string}")),
-                initial_current_level: Some(POWER_ON_LEVEL),
-                valid_levels: Some(power_levels),
-                dependencies: Some(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Assertive,
-                    dependent_level: POWER_ON_LEVEL,
-                    requires_token: application_activity_token,
-                    requires_level_by_preference: vec![
-                        fsystem::ApplicationActivityLevel::Active.into_primitive()
-                    ],
-                }]),
-                lessor_channel: Some(lessor_server_end),
-                element_control: Some(element_control_server_end),
-                ..Default::default()
-            })
-            .await?
-            .map_err(|e| anyhow!("PowerBroker::AddElementError({e:?})"))?;
+        let power_element_context = Arc::new(
+            PowerElementContext::builder(
+                &topology,
+                format!("session-manager-element-{random_string}").as_str(),
+                &power_levels,
+            )
+            .initial_current_level(POWER_ON_LEVEL)
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: POWER_ON_LEVEL,
+                requires_token: application_activity_token,
+                requires_level_by_preference: vec![
+                    fsystem::ApplicationActivityLevel::Active.into_primitive()
+                ],
+            }])
+            .build()
+            .await
+            .map_err(|e| anyhow!("PowerBroker::AddElementError({e:?}"))?,
+        );
+        let pe_context = power_element_context.clone();
+        fasync::Task::local(async move {
+            run_power_element(
+                pe_context.name(),
+                &pe_context.required_level,
+                POWER_ON_LEVEL, /* initial_level */
+                None,           /* inspect_node */
+                basic_update_fn_factory(&pe_context),
+            )
+            .await;
+        })
+        .detach();
 
         // Power on by holding a lease.
-        let lease = lessor
+        let lease = power_element_context
+            .lessor
             .lease(POWER_ON_LEVEL)
             .await?
             .map_err(|e| anyhow!("PowerBroker::LeaseError({e:?})"))?;
@@ -104,7 +119,7 @@ impl PowerElement {
             .into_client_end()
             .expect("Proxy should be in a valid state to convert into client end");
 
-        Ok(Self { power_element: element_control, lease: Some(lease) })
+        Ok(Self { power_element_context, lease: Some(lease) })
     }
 
     pub fn take_lease(&mut self) -> Option<ClientEnd<fbroker::LeaseControlMarker>> {

@@ -167,18 +167,34 @@ AmlHrtimerServer::LeaseWakeHandling() {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  fuchsia_power_broker::LeaseStatus lease_status = fuchsia_power_broker::LeaseStatus::kUnknown;
+  // TODO(b/342652874): When the direct leasing API or a direct wake handling lease
+  // can be requested from SystemActivityGovernor, this function should be updated
+  // to make use of them.
+  //
+  // We employ a workaround here where after grabbing the lease, we neither wait for
+  // the lease to be satisfied nor the required level of the consumer element to be
+  // raised, and instead immediately hand back the lease control as if the lease was
+  // acquired. This prevents a deadlock scenario where the following happens:
+  //
+  // 1) An interrupt arrives, this function requests a lease.
+  // 2) This function blocks synchronously waiting for the lease to satisfy.
+  // 3) Power Broker attempts to update the required level of the consumer element.
+  // 4) This process does not respond, as the dispatcher is blocked in this function.
+  // 5) Power Broker never considers the lease satisfied.
+  //
+  // By avoiding synchronizing on lease satisfication, we avoid this problem. During
+  // normal operation, this is not a significant concern. If the execution state is
+  // already active when the interrupt arrives, the broker will not power it down.
+  // If the execution state is not active, this represents a case where the interrupt
+  // arrives while the system is suspending, which isn't handled today. Not blocking
+  // here in that case means that NACK protection may expire before execution state
+  // is informed of the lease request, but this race exists regardless today.
+  //
+  // As this issue only occurs due to the existence of a consumer element being
+  // handled on the same dispatcher thread, direct leasing will eventually remove the
+  // need for this workaround.
   fidl::SyncClient<fuchsia_power_broker::LeaseControl> lease_control(
       std::move(result_lease->lease_control()));
-  do {
-    auto result = lease_control->WatchStatus(lease_status);
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Power WatchStatus returned error: %s",
-              result.error_value().FormatDescription().c_str());
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-    lease_status = result->status();
-  } while (lease_status != fuchsia_power_broker::LeaseStatus::kSatisfied);
   return zx::ok(lease_control.TakeClientEnd());
 }
 
