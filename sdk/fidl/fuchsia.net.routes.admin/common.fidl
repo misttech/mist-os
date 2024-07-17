@@ -135,4 +135,6 @@ type RuleSetError = flexible enum : uint32 {
     RULE_DOES_NOT_EXIST = 5;
     /// The selector is misconfigured because the base part is missing.
     BASE_SELECTOR_MISSING = 6;
+    /// The selector contains a non-existing interface.
+    BAD_INTERFACE_SELECTOR = 7;
 };

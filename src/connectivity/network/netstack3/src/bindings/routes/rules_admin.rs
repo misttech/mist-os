@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::btree_map::{Entry as BTreeEntry, OccupiedEntry as BTreeOccupiedEntry};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::convert::Infallible as Never;
 use std::num::NonZeroU64;
 use std::ops::ControlFlow;
@@ -11,7 +11,6 @@ use std::pin::pin;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
-use fidl_fuchsia_net_routes_admin::RuleSetError;
 use fnet_routes_ext::rules::{
     FidlRuleAdminIpExt, InstalledRule, MarkSelector, RuleAction, RuleIndex, RuleSelector,
     RuleSetPriority, RuleSetRequest, RuleTableRequest,
@@ -28,7 +27,7 @@ use {
 use crate::bindings::devices::BindingId;
 use crate::bindings::util::{
     ConversionContext, DeviceNotFoundError, IntoFidlWithContext as _, TaskWaitGroupSpawner,
-    TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
+    TryFromFidlWithContext, TryIntoFidlWithContext,
 };
 use crate::bindings::{routes, BindingsCtx, Ctx};
 
@@ -105,6 +104,10 @@ pub(super) enum RuleOp<I: Ip> {
     },
     RemoveSet {
         priority: RuleSetPriority,
+    },
+    AuthenticateForRouteTable {
+        table_id: routes::TableId<I>,
+        token: zx::Event,
     },
 }
 
@@ -214,10 +217,12 @@ impl<I: Ip> RuleTable<I> {
         }
     }
 }
+
 struct UserRuleSet<I: Ip> {
     ctx: Ctx,
     priority: RuleSetPriority,
     rule_work_sink: mpsc::UnboundedSender<RuleWorkItem<I>>,
+    route_table_authorization_set: HashSet<routes::TableId<I>>,
 }
 
 #[derive(Debug)]
@@ -252,8 +257,41 @@ impl ApplyRuleOpError {
 }
 
 impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
-    async fn handle_request(
+    async fn add_fidl_rule(
         &self,
+        priority: RuleSetPriority,
+        index: RuleIndex,
+        selector: RuleSelector<I>,
+        action: RuleAction,
+    ) -> Result<(), ApplyRuleOpError> {
+        let selector = AddableSelector::try_from_fidl_with_ctx(self.ctx.bindings_ctx(), selector)
+            .map_err(|DeviceNotFoundError| {
+            fnet_routes_admin::RuleSetError::BadInterfaceSelector
+        })?;
+        if let RuleAction::Lookup(table_id) = action {
+            let table_id = routes::TableId::new(table_id)
+                .ok_or(fnet_routes_admin::RuleSetError::Unauthenticated)?;
+            if !self.route_table_authorization_set.contains(&table_id) {
+                Err(fnet_routes_admin::RuleSetError::Unauthenticated)?;
+            }
+        }
+        self.apply_rule_op(RuleOp::Add { priority, index, selector, action }).await
+    }
+
+    async fn authenticate_for_route_table(
+        &mut self,
+        table: u32,
+        token: zx::Event,
+    ) -> Result<(), ApplyRuleOpError> {
+        let table_id = routes::TableId::new(table)
+            .ok_or(fnet_routes_admin::RuleSetError::BadAuthentication)?;
+        self.apply_rule_op(RuleOp::AuthenticateForRouteTable { table_id, token }).await?;
+        let _: bool = self.route_table_authorization_set.insert(table_id);
+        Ok(())
+    }
+
+    async fn handle_request(
+        &mut self,
         request: RuleSetRequest<I>,
     ) -> Result<ControlFlow<I::RuleSetControlHandle>, fidl::Error> {
         match request {
@@ -267,7 +305,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                             .map(ControlFlow::Continue);
                     }
                 };
-                let result = self.add_rule(index, selector, action).await;
+                let result = self.add_fidl_rule(self.priority, index, selector, action).await;
                 ApplyRuleOpError::respond_result_with(result, responder)
             }
             RuleSetRequest::RemoveRule { index, responder } => {
@@ -276,26 +314,12 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                 let result = self.apply_rule_op(RuleOp::Remove { priority, index }).await;
                 ApplyRuleOpError::respond_result_with(result, responder)
             }
-            RuleSetRequest::AuthenticateForRouteTable { table: _, token: _, responder } => {
-                // TODO(https://fxbug.dev/345315995): Implement authentication.
-                responder
-                    .send(Err(fnet_routes_admin::RuleSetError::BadAuthentication))
-                    .map(ControlFlow::Continue)
+            RuleSetRequest::AuthenticateForRouteTable { table, token, responder } => {
+                let result = self.authenticate_for_route_table(table, token).await;
+                ApplyRuleOpError::respond_result_with(result, responder)
             }
             RuleSetRequest::Close { control_handle } => Ok(ControlFlow::Break(control_handle)),
         }
-    }
-
-    async fn add_rule(
-        &self,
-        index: RuleIndex,
-        selector: RuleSelector<I>,
-        action: RuleAction,
-    ) -> Result<(), ApplyRuleOpError> {
-        let selector = selector
-            .try_into_core_with_ctx(self.ctx.bindings_ctx())
-            .map_err(|DeviceNotFoundError| RuleSetError::Unauthenticated)?;
-        self.apply_rule_op(RuleOp::Add { priority: self.priority, index, selector, action }).await
     }
 
     async fn apply_rule_op(&self, op: RuleOp<I>) -> Result<(), ApplyRuleOpError> {
@@ -312,7 +336,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
 
 async fn serve_rule_set<I: FidlRuleAdminIpExt>(
     stream: I::RuleSetRequestStream,
-    set: UserRuleSet<I>,
+    mut set: UserRuleSet<I>,
 ) {
     let mut stream = pin!(stream);
 
@@ -378,7 +402,12 @@ pub(crate) async fn serve_rule_table<I: FidlRuleAdminIpExt>(
                 match ctx.bindings_ctx().routes.new_rule_set(priority, receiver).await {
                     Ok(()) => {
                         let rule_set_request_stream = rule_set.into_stream()?;
-                        let rule_set = UserRuleSet { ctx: ctx.clone(), rule_work_sink, priority };
+                        let rule_set = UserRuleSet {
+                            ctx: ctx.clone(),
+                            rule_work_sink,
+                            priority,
+                            route_table_authorization_set: Default::default(),
+                        };
                         spawner.spawn(serve_rule_set::<I>(rule_set_request_stream, rule_set));
                     }
                     Err(err) => {

@@ -5,6 +5,7 @@
 use std::borrow::BorrowMut;
 use std::collections::HashSet;
 use std::pin::pin;
+use std::sync::Arc;
 
 use assert_matches::assert_matches;
 use async_utils::event::Event;
@@ -94,8 +95,8 @@ pub(crate) async fn serve_route_table_provider_v4(
                 control_handle,
             } => {
                 let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv4>().await {
-                    Ok((table_id, route_work_sink)) => {
-                        UserRouteTable::new(ctx.clone(), name, table_id, route_work_sink)
+                    Ok((table_id, route_work_sink, token)) => {
+                        UserRouteTable::new(ctx.clone(), token, name, table_id, route_work_sink)
                     }
                     Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
@@ -129,8 +130,8 @@ pub(crate) async fn serve_route_table_provider_v6(
                 control_handle,
             } => {
                 let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv6>().await {
-                    Ok((table_id, route_work_sink)) => {
-                        UserRouteTable::new(ctx.clone(), name, table_id, route_work_sink)
+                    Ok((table_id, route_work_sink, token)) => {
+                        UserRouteTable::new(ctx.clone(), token, name, table_id, route_work_sink)
                     }
                     Err(routes::TableIdOverflowsError) => {
                         control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
@@ -245,13 +246,11 @@ pub(crate) trait RouteTable<I: FidlRouteAdminIpExt + FidlRouteIpExt>: Send + Syn
 
 pub(crate) struct MainRouteTable {
     ctx: Ctx,
-    token: zx::Event,
 }
 
 impl MainRouteTable {
     pub(crate) fn new(ctx: Ctx) -> Self {
-        let token = zx::Event::create();
-        Self { ctx, token }
+        Self { ctx }
     }
 }
 
@@ -260,7 +259,10 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
         routes::main_table_id::<I>()
     }
     fn token(&self) -> zx::Event {
-        self.token
+        self.ctx
+            .bindings_ctx()
+            .routes
+            .main_table_token::<I>()
             .duplicate_handle(zx::Rights::TRANSFER | zx::Rights::DUPLICATE)
             .expect("failed to duplicate")
     }
@@ -268,7 +270,7 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
         Err(TableRemoveError::InvalidOp)
     }
     fn detach(&mut self) {
-        // Nothing to do - main table are always detached.
+        // Nothing to do - main tables are always detached.
     }
     fn detached(&self) -> bool {
         true
@@ -293,11 +295,11 @@ impl<I: FidlRouteAdminIpExt + FidlRouteIpExt> RouteTable<I> for MainRouteTable {
 
 pub(crate) struct UserRouteTable<I: Ip> {
     ctx: Ctx,
+    token: Arc<zx::Event>,
     // TODO(https://fxbug.dev/337868190): Use this method in the observational
     // API.
     _name: Option<String>,
     table_id: TableId<I>,
-    token: zx::Event,
     route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
     cancel_event: Event,
     detached: bool,
@@ -306,16 +308,16 @@ pub(crate) struct UserRouteTable<I: Ip> {
 impl<I: Ip> UserRouteTable<I> {
     fn new(
         ctx: Ctx,
+        token: Arc<zx::Event>,
         name: Option<String>,
         table_id: TableId<I>,
         route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
     ) -> Self {
-        let token = zx::Event::create();
         Self {
             ctx,
+            token,
             _name: name,
             table_id,
-            token,
             route_work_sink,
             cancel_event: Event::new(),
             detached: false,

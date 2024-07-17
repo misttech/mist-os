@@ -270,6 +270,7 @@ pub trait FidlRuleAdminIpExt: Ip {
     /// The responder for AuthenticateForRouteTable requests.
     type RuleSetAuthenticateForRouteTableResponder: Responder<
         Payload = Result<(), fnet_routes_admin::RuleSetError>,
+        ControlHandle = Self::RuleSetControlHandle,
     >;
     /// The control handle for RuleTable protocols.
     type RuleTableControlHandle: fidl::endpoints::ControlHandle + Send + Clone;
@@ -798,6 +799,33 @@ pub fn new_rule_set<I: Ip + FidlRuleAdminIpExt>(
 
     result.map_err(RuleSetCreationError::RuleSet)?;
     Ok(rule_set_proxy)
+}
+
+/// Dispatches `authenticate_for_route_table` on either the `RuleSetV4` or
+/// `RuleSetV6` proxy.
+pub async fn authenticate_for_route_table<I: Ip + FidlRuleAdminIpExt>(
+    rule_set: &<I::RuleSetMarker as ProtocolMarker>::Proxy,
+    table_id: u32,
+    token: fidl::Event,
+) -> Result<Result<(), fnet_routes_admin::RuleSetError>, fidl::Error> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct AuthenticateForRouteTableInput<'a, I: FidlRuleAdminIpExt> {
+        rule_set: &'a <I::RuleSetMarker as ProtocolMarker>::Proxy,
+        table_id: u32,
+        token: fidl::Event,
+    }
+
+    I::map_ip_in(
+        AuthenticateForRouteTableInput { rule_set, table_id, token },
+        |AuthenticateForRouteTableInput { rule_set, table_id, token }| {
+            Either::Left(rule_set.authenticate_for_route_table(table_id, token))
+        },
+        |AuthenticateForRouteTableInput { rule_set, table_id, token }| {
+            Either::Right(rule_set.authenticate_for_route_table(table_id, token))
+        },
+    )
+    .await
 }
 
 /// Dispatches `add_rule` on either the `RuleSetV4` or `RuleSetV6` proxy.
