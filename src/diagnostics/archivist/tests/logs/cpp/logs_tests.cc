@@ -121,7 +121,9 @@ TEST_F(LoggerIntegrationTest, ListenFiltered) {
   builder.WithMinLogSeverity(0).BuildAndInitializeWithTags({tag});
 
   for (auto severity : severities_in_use) {
-    FX_LOGS(LEVEL(severity)) << message;
+    // Manual expansion of FX_LOGS to support custom severity levels
+    (fuchsia_logging::LogMessage(severity, __FILE__, __LINE__, nullptr, nullptr).stream())
+        << message;
   }
 
   // Start the log listener and the logger, and wait for the log message to arrive.

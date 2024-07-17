@@ -26,8 +26,6 @@ constexpr LogSeverity DefaultLogLevel = LOG_INFO;
 constexpr uint8_t LogSeverityStepSize = 0x10;
 constexpr uint8_t LogVerbosityStepSize = 0x1;
 
-inline LogSeverity LOG_LEVEL(LogSeverity level) { return level; }
-
 }  // namespace fuchsia_logging
 
 #endif  // LIB_SYSLOG_CPP_LOG_LEVEL_H_
