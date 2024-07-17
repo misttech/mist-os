@@ -142,7 +142,7 @@ class VmObjectPaged final : public VmObject {
 
   void Unpin(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->UnpinLocked(offset, len, /*allow_gaps=*/false);
+    cow_pages_locked()->UnpinLocked(offset, len);
   }
 
   // See VmObject::DebugIsRangePinned

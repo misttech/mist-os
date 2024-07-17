@@ -425,7 +425,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t PinRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
   // See VmObject::Unpin
-  void UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) TA_REQ(lock());
+  void UnpinLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
   // See VmObject::DebugIsRangePinned
   bool DebugIsRangePinnedLocked(uint64_t offset, uint64_t len) TA_REQ(lock());

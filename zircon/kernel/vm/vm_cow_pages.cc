@@ -3037,7 +3037,7 @@ zx_status_t VmCowPages::PinRangeLocked(uint64_t offset, uint64_t len) {
   auto pin_cleanup = fit::defer([this, offset, &next_offset]() {
     if (next_offset > offset) {
       AssertHeld(*lock());
-      UnpinLocked(offset, next_offset - offset, /*allow_gaps=*/false);
+      UnpinLocked(offset, next_offset - offset);
     }
   });
 
@@ -4111,7 +4111,7 @@ void VmCowPages::ChangeHighPriorityCountLocked(int64_t delta) {
   }
 }
 
-void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
+void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len) {
   canary_.Assert();
 
   // verify that the range is within the object
@@ -4120,7 +4120,7 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
   ASSERT(len != 0);
 
   if (is_slice_locked()) {
-    return slice_parent_locked().UnpinLocked(offset + parent_offset_, len, allow_gaps);
+    return slice_parent_locked().UnpinLocked(offset + parent_offset_, len);
   }
 
   const uint64_t start_page_offset = ROUNDDOWN(offset, PAGE_SIZE);
@@ -4134,22 +4134,11 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
 #endif
 
   uint64_t unpin_count = 0;
-  bool found_page_or_gap = false;
   zx_status_t status = page_list_.ForEveryPageAndGapInRange(
       [&](const auto* page, uint64_t off) {
-        found_page_or_gap = true;
-        if (page->IsMarker()) {
-          // So far, allow_gaps is only used on contiguous VMOs which have no markers.  We'd need
-          // to decide if a marker counts as a gap to allow before removing this assert.
-          DEBUG_ASSERT(!allow_gaps);
-          return ZX_ERR_NOT_FOUND;
-        }
         AssertHeld(lock_ref());
-
-        // Reference content is not pinned by definition, and so we cannot unpin it.
-        ASSERT(!page->IsReference());
-        // Intervals are sparse ranges without any committed pages, so cannot be pinned/unpinned.
-        ASSERT(!page->IsInterval());
+        // Only real pages can be pinned.
+        ASSERT(page->IsPage());
 
         vm_page_t* p = page->Page();
         ASSERT(p->object.pin_count > 0);
@@ -4174,19 +4163,15 @@ void VmCowPages::UnpinLocked(uint64_t offset, uint64_t len, bool allow_gaps) {
         ++unpin_count;
         return ZX_ERR_NEXT;
       },
-      [allow_gaps, &found_page_or_gap](uint64_t gap_start, uint64_t gap_end) {
-        found_page_or_gap = true;
-        if (!allow_gaps) {
-          return ZX_ERR_NOT_FOUND;
-        }
-        return ZX_ERR_NEXT;
-      },
-      start_page_offset, end_page_offset);
-  ASSERT_MSG(status == ZX_OK, "Tried to unpin an uncommitted page with allow_gaps false");
+      [](uint64_t gap_start, uint64_t gap_end) { return ZX_ERR_NOT_FOUND; }, start_page_offset,
+      end_page_offset);
+  ASSERT_MSG(status == ZX_OK, "Tried to unpin an uncommitted page");
 
-  // If we did not find a page or a gap, we were entirely inside a sparse interval without any
-  // committed pages, so cannot be pinned/unpinned.
-  ASSERT(found_page_or_gap);
+  // Possible that we were entirely inside a spare interval without any committed pages, in which
+  // case neither the page nor gap callback would have triggered, and the assert above would
+  // succeed. This is still an error though and can catch this, and any other mistakes, by ensuring
+  // we found and decremented the pin counts from the exact expected number of pages.
+  ASSERT(unpin_count == (end_page_offset - start_page_offset) / PAGE_SIZE);
 
 #if (DEBUG_ASSERT_IMPLEMENTED)
   // Check any leftover range.

@@ -326,7 +326,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   if (!ac.check()) {
     if (options & kAlwaysPinned) {
       Guard<CriticalMutex> guard{cow_pages->lock()};
-      cow_pages->UnpinLocked(0, size, false);
+      cow_pages->UnpinLocked(0, size);
     }
     return ZX_ERR_NO_MEMORY;
   }
@@ -984,8 +984,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         // current range of the vmo. Additionally, as pinning a zero length range is invalid, so is
         // unpinning, and so we must avoid.
         if (pin && len > 0 && pinned_end_offset > original_offset) {
-          cow_pages_locked()->UnpinLocked(original_offset, pinned_end_offset - original_offset,
-                                          /*allow_gaps=*/false);
+          cow_pages_locked()->UnpinLocked(original_offset, pinned_end_offset - original_offset);
         } else if (write && offset > original_offset) {
           // Mark modified as we successfully committed pages for writing *and* we did not end up
           // undoing a partial pin (the if-block above).
