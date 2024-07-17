@@ -44,19 +44,21 @@ impl ConsumerControlsEvent {
         let pressed_buttons_node =
             node.create_string_array("pressed_buttons", self.pressed_buttons.len());
         self.pressed_buttons.iter().enumerate().for_each(|(i, &ref button)| {
-            pressed_buttons_node.set(
-                i,
-                match button {
-                    ConsumerControlButton::VolumeUp => "volume_up",
-                    ConsumerControlButton::VolumeDown => "volume_down",
-                    ConsumerControlButton::Pause => "pause",
-                    ConsumerControlButton::FactoryReset => "factory_reset",
-                    ConsumerControlButton::MicMute => "mic_mute",
-                    ConsumerControlButton::Reboot => "reboot",
-                    ConsumerControlButton::CameraDisable => "camera_disable",
-                    _ => "unknown",
-                },
-            );
+            let button_name: String = match button {
+                ConsumerControlButton::VolumeUp => "volume_up".into(),
+                ConsumerControlButton::VolumeDown => "volume_down".into(),
+                ConsumerControlButton::Pause => "pause".into(),
+                ConsumerControlButton::FactoryReset => "factory_reset".into(),
+                ConsumerControlButton::MicMute => "mic_mute".into(),
+                ConsumerControlButton::Reboot => "reboot".into(),
+                ConsumerControlButton::CameraDisable => "camera_disable".into(),
+                ConsumerControlButton::Power => "power".into(),
+                ConsumerControlButton::Function => "function".into(),
+                unknown_value => {
+                    format!("unknown({:?})", unknown_value)
+                }
+            };
+            pressed_buttons_node.set(i, &button_name);
         });
         node.record(pressed_buttons_node);
     }
