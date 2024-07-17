@@ -98,7 +98,9 @@ closed protocol BaseRuleSet {
     /// Authenticates for a route table that will be used in an action.
     strict AuthenticateForRouteTable(@generated_name("ProofOfRouteTableAuthorization") resource struct {
         table fuchsia.net.routes.TableId;
-        token zx.Handle:<EVENT>;
+        // TODO(https://fxbug.dev/42079239): We want to restrict the rights to None, but currently
+        // there are issues in FIDL or zither preventing us from naming the constant.
+        token zx.Handle:<EVENT, 0>;
     }) -> () error RuleSetError;
 
     /// Removes a rule from this rule set.

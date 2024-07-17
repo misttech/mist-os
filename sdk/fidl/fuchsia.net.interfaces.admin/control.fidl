@@ -127,10 +127,10 @@ type Configuration = table {
 type ProofOfInterfaceAuthorization = resource struct {
     /// The ID of the interface this credential is authenticating.
     interface_id fuchsia.net.InterfaceId;
-    /// The EVENT providing authentication over this interface. The token
-    /// only requires the `TRANSFER` right so that it can be sent to the
-    /// Netstack.
-    token zx.Handle:<EVENT, zx.Rights.TRANSFER>;
+    /// The EVENT providing authentication over this interface.
+    // TODO(https://fxbug.dev/42079239): We want to restrict the rights to None, but currently
+    // there are issues in FIDL or zither preventing us from naming the constant.
+    token zx.Handle:<EVENT, 0>;
 };
 
 /// Provides control over an interface.
