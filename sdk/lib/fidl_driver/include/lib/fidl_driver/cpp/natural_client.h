@@ -261,8 +261,8 @@ class Client {
 };
 
 template <typename Protocol, typename AsyncEventHandlerReference>
-Client(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*, AsyncEventHandlerReference&&)
-    -> Client<Protocol>;
+Client(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*,
+       AsyncEventHandlerReference&&) -> Client<Protocol>;
 
 template <typename Protocol>
 Client(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*) -> Client<Protocol>;
@@ -504,9 +504,9 @@ class SharedClient final {
   // Persisting this pointer to a local variable is discouraged, since that
   // results in unsafe borrows. Always prefer making calls directly via the
   // |Client| reference-counting type.
-  auto wire() const {
-    return fidl::internal::Arrow<fidl::internal::WireWeakAsyncClientImpl<Protocol>>{
-        &controller_.get()};
+  auto wire(const fdf::Arena& arena) const {
+    return fidl::internal::Arrow<fidl::internal::WireWeakAsyncBufferClientImpl<Protocol>>{
+        &controller_.get(), arena};
   }
 
  private:
@@ -528,8 +528,8 @@ SharedClient(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*, AsyncEventHandlerRefer
              fidl::AnyTeardownObserver) -> SharedClient<Protocol>;
 
 template <typename Protocol, typename AsyncEventHandlerReference>
-SharedClient(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*, AsyncEventHandlerReference&&)
-    -> SharedClient<Protocol>;
+SharedClient(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*,
+             AsyncEventHandlerReference&&) -> SharedClient<Protocol>;
 
 template <typename Protocol>
 SharedClient(fdf::ClientEnd<Protocol>, fdf_dispatcher_t*) -> SharedClient<Protocol>;
