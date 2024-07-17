@@ -105,40 +105,33 @@ message Static {
   // assumed to always exist.
   string default_test_durations_file = 22;
 
-  // Whether to use goma for running ninja. Will be ignored (and goma will not
-  // be used) when building with some experimental toolchain versions.
-  // *** Goma is deprecated, this variable will be removed. ***
-  // See b/340581192 and b/340582840.
-  bool use_goma = 23;
-
   // Whether to use a go cache when building.
-  bool enable_go_cache = 24;
+  bool enable_go_cache = 23;
 
   // Whether to use a rust cache when building.
-  bool enable_rust_cache = 25;
+  bool enable_rust_cache = 24;
 
   // Which IDE files to generate.
-  repeated string ide_files = 26;
+  repeated string ide_files = 25;
 
   // Passed to --json-ide-script GN flag; GN will execute each of these scripts
   // after regenerating the project.json IDE file.
-  repeated string json_ide_scripts = 27;
+  repeated string json_ide_scripts = 26;
 
   // Whether to set --export-rust-project GN flag.
-  bool export_rust_project = 28;
+  bool export_rust_project = 27;
 
   // If true, build Rust targets with RBE/reclient.
-  bool rust_rbe_enable = 29;
+  bool rust_rbe_enable = 28;
 
   // If true, build C++ targets with RBE/reclient.
-  // This takes precedence over `use_goma`.
-  bool cxx_rbe_enable = 30;
+  bool cxx_rbe_enable = 29;
 
   // Whether we're performing an incremental build.
-  bool incremental = 31;
+  bool incremental = 30;
 
   // Whether to include the the default ninja target.
-  bool include_default_ninja_target = 32;
+  bool include_default_ninja_target = 31;
 
   // If true, use a temporary directory for the Go cache rather than a
   // deterministic directory within the build directory. This is useful for
@@ -147,7 +140,7 @@ message Static {
   // between builds.
   //
   // Ignored if `enable_go_cache` is set.
-  bool use_temporary_go_cache = 33;
+  bool use_temporary_go_cache = 32;
 
   enum LintTargets {
     // Don't build any lint targets.
@@ -163,10 +156,10 @@ message Static {
   }
 
   // Which language-specific lint targets to include.
-  LintTargets include_lint_targets = 34;
+  LintTargets include_lint_targets = 33;
 
   // Extra args to pass to ninja.
-  repeated string ninja_args = 35;
+  repeated string ninja_args = 34;
 
   //
   // The following fields are used to control the addition of test
@@ -177,36 +170,36 @@ message Static {
   // Hermetic tests to add to the build configuration.  Only hermetic tests that
   // run on Fuchsia devices can be added here.  The build will validate that
   // any labels added here only contain hermetic tests.
-  repeated string hermetic_test_packages = 36;
+  repeated string hermetic_test_packages = 35;
 
   // Non-hermetic tests to add to the build configuration.  Only non-hermetic
   // tests that run on Fuchsia devices can be added here.  The build will
   // validate that any labels added here only contain non-hermetic tests.
-  repeated string test_packages = 37;
+  repeated string test_packages = 36;
 
   // End-to-end tests to add to the build configuration.  The build will
   // validate that any labels added here only contain e2e tests.
-  repeated string e2e_test_labels = 39;
+  repeated string e2e_test_labels = 37;
 
   // Host tests to add to the build configuration.  Host tests should _not_ be
   // added via the 'host_labels' field.
   // TODO(b/297926167): Enforce that no tests are found.
-  repeated string host_test_labels = 40;
+  repeated string host_test_labels = 38;
 
   // Any sort of test that is added by a developer.  These are not to be added
   // by infra, but only by 'fx set'.  If 'Set()' is called with 'skipLocalArgs'
   // true (it should be when called by infra), fint will assert that this is an
   // empty list.
-  repeated string developer_test_labels = 41;
+  repeated string developer_test_labels = 39;
 
   // Additional labels to add to the GN build graph, which are then built by the
   // :default ninja target, but are not added to the product, or any published
   // package sets.
-  repeated string build_only_labels = 42;
+  repeated string build_only_labels = 40;
 
   // If true, link C/C++ targets remotely with RBE/reclient.
-  bool link_rbe_enable = 43;
+  bool link_rbe_enable = 41;
 
   // If true, enable remote builds for bazel on RBE.
-  bool bazel_rbe_enable = 44;
+  bool bazel_rbe_enable = 42;
 }

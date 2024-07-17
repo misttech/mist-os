@@ -251,22 +251,15 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	vars["is_debug"] = staticSpec.Optimize == fintpb.Static_DEBUG
 
 	if contextSpec.ClangToolchainDir != "" {
-		if staticSpec.UseGoma {
-			return nil, fmt.Errorf("goma is not supported for builds using a custom clang toolchain")
-		}
 		vars["clang_prefix"] = filepath.Join(contextSpec.ClangToolchainDir, "bin")
 	}
 	if contextSpec.GccToolchainDir != "" {
-		if staticSpec.UseGoma {
-			return nil, fmt.Errorf("goma is not supported for builds using a custom gcc toolchain")
-		}
 		vars["gcc_tool_dir"] = filepath.Join(contextSpec.GccToolchainDir, "bin")
 	}
 	if contextSpec.RustToolchainDir != "" {
 		vars["rustc_prefix"] = filepath.Join(contextSpec.RustToolchainDir)
 	}
 
-	vars["use_goma"] = staticSpec.UseGoma
 	vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
 	vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
 	vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
