@@ -1577,6 +1577,53 @@ mod tests {
         );
     }
 
+    ///  component manager builtin
+    ///   |
+    ///   a
+    ///    \
+    ///     b
+    ///
+    /// a: offers builtin protocol foo from component manager as bar
+    /// b: uses protocol bar as /svc/hippo
+    #[fuchsia::test]
+    async fn route_map_offer_from_component_manager_builtin() {
+        let offer_decl = OfferBuilder::protocol()
+            .name("foo")
+            .target_name("bar")
+            .source(OfferSource::Parent)
+            .target(offer_target_static_child("b"))
+            .build();
+        let use_decl = UseBuilder::protocol().name("bar").path("/svc/hippo").build();
+        let capability_decl = CapabilityBuilder::protocol().name("foo").build();
+        let components = vec![
+            ("a", ComponentDeclBuilder::new().offer(offer_decl.clone()).child_default("b").build()),
+            ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
+        ];
+
+        let mut builder = RoutingTestBuilderForAnalyzer::new("a", components);
+        builder.set_builtin_capabilities(vec![capability_decl.clone()]);
+        let test = builder.build().await;
+
+        let b_component =
+            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let route_results = test.model.check_use_capability(&use_decl, &b_component);
+        assert_eq!(route_results.len(), 1);
+        let route_result = &route_results[0];
+        assert!(route_result.error.is_none());
+
+        assert_eq!(
+            route_result.route,
+            vec![
+                RouteSegment::UseBy {
+                    moniker: vec!["b"].try_into().unwrap(),
+                    capability: use_decl
+                },
+                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_decl },
+                RouteSegment::ProvideAsBuiltin { capability: capability_decl }
+            ]
+        );
+    }
+
     ///   a
     ///  / \
     /// b   c
