@@ -100,6 +100,11 @@ pub fn parse_unsigned_file<T: Into<u64> + std::str::FromStr>(buf: &[u8]) -> Resu
     std::str::from_utf8(&buf[..i]).unwrap().parse::<T>().map_err(|_| errno!(EINVAL))
 }
 
+pub fn serialize_u64_file(value: u64) -> Vec<u8> {
+    let string = format!("{}\n", value);
+    string.as_bytes().to_vec()
+}
+
 pub fn serialize_u32_file(value: u32) -> Vec<u8> {
     let string = format!("{}\n", value);
     string.as_bytes().to_vec()
