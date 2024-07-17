@@ -14,7 +14,6 @@
 #include <kernel/range_check.h>
 #include <ktl/move.h>
 #include <lk/init.h>
-#include <vm/anonymous_page_requester.h>
 #include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/fault.h>
@@ -190,7 +189,7 @@ class BatchPQRemove {
 
 // Allocates a new page and populates it with the data at |parent_paddr|.
 zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* alloc_list,
-                                         LazyPageRequest* request, vm_page_t** clone) {
+                                         AnonymousPageRequest* request, vm_page_t** clone) {
   DEBUG_ASSERT(request || !(pmm_alloc_flags_ & PMM_ALLOC_FLAG_CAN_WAIT));
   DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
 
@@ -227,17 +226,17 @@ zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* allo
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::AllocUninitializedPage(vm_page_t** page, LazyPageRequest* request) {
+zx_status_t VmCowPages::AllocUninitializedPage(vm_page_t** page, AnonymousPageRequest* request) {
   paddr_t paddr = 0;
   DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
   zx_status_t status = CacheAllocPage(pmm_alloc_flags_, page, &paddr);
   if (status == ZX_ERR_SHOULD_WAIT) {
-    status = AnonymousPageRequester::Get().FillRequest(request->get());
+    request->MakeActive();
   }
   return status;
 }
 
-zx_status_t VmCowPages::AllocPage(vm_page_t** page, LazyPageRequest* request) {
+zx_status_t VmCowPages::AllocPage(vm_page_t** page, AnonymousPageRequest* request) {
   zx_status_t status = AllocUninitializedPage(page, request);
   if (status == ZX_OK) {
     InitializeVmPage(*page);
@@ -299,7 +298,7 @@ void VmCowPages::CacheFree(vm_page_t* p) {
 }
 
 zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
-                                              LazyPageRequest* page_request) {
+                                              AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(page_or_mark->IsReference());
   VmCompression* compression = pmm_page_compression();
   DEBUG_ASSERT(compression);
@@ -315,7 +314,7 @@ zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
 
 zx_status_t VmCowPages::ReplaceReferenceWithPageLocked(VmPageOrMarkerRef page_or_mark,
                                                        uint64_t offset,
-                                                       LazyPageRequest* page_request) {
+                                                       AnonymousPageRequest* page_request) {
   // First replace the ref with a page.
   zx_status_t status = MakePageFromReference(page_or_mark, page_request);
   if (status != ZX_OK) {
@@ -1817,7 +1816,8 @@ bool VmCowPages::IsUniAccessibleLocked(vm_page_t* page, uint64_t offset) const {
 
 zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list,
                                            VmCowPages* page_owner, vm_page_t* page,
-                                           uint64_t owner_offset, LazyPageRequest* page_request,
+                                           uint64_t owner_offset,
+                                           AnonymousPageRequest* page_request,
                                            vm_page_t** out_page) {
   DEBUG_ASSERT(page != vm_get_zero_page());
   DEBUG_ASSERT(parent_);
@@ -2000,7 +2000,7 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
 zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                                  VmCowPages* page_owner, vm_page_t* page,
                                                  uint64_t owner_offset,
-                                                 LazyPageRequest* page_request) {
+                                                 AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(parent_);
 
   DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page, offset));
@@ -2495,7 +2495,7 @@ bool VmCowPages::LookupCursor::TargetZeroContentSupplyDirty(bool writing) const 
 
 zx::result<VmCowPages::LookupCursor::RequireResult>
 VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, DirtyState dirty_state,
-                                                         LazyPageRequest* page_request) {
+                                                         AnonymousPageRequest* page_request) {
   // The general pmm_alloc_flags_ are not allowed to contain the LOANED option, and this is relied
   // upon below to assume the page allocated cannot be loaned.
   DEBUG_ASSERT(!(target_->pmm_alloc_flags_ & PMM_ALLOC_FLAG_LOANED));
@@ -2585,14 +2585,14 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   return zx::ok(PageAsResultNoIncrement(out_page, true));
 }
 
-zx_status_t VmCowPages::LookupCursor::CursorReferenceToPage(LazyPageRequest* page_request) {
+zx_status_t VmCowPages::LookupCursor::CursorReferenceToPage(AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(CursorIsReference());
 
   return owner()->ReplaceReferenceWithPageLocked(owner_cursor_, owner_offset_, page_request);
 }
 
 zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
-                                                  LazyPageRequest* page_request) {
+                                                  PageRequest* page_request) {
   // The owner must have a page_source_ to be doing a read request.
   DEBUG_ASSERT(owner_->page_source_);
   // The cursor should be explicitly empty as read requests are only for complete content absence.
@@ -2645,8 +2645,8 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   }
   DEBUG_ASSERT(request_size >= PAGE_SIZE);
 
-  zx_status_t status = owner_->page_source_->GetPages(owner_offset_, request_size,
-                                                      page_request->get(), vmo_debug_info);
+  zx_status_t status =
+      owner_->page_source_->GetPages(owner_offset_, request_size, page_request, vmo_debug_info);
   // Pager page sources will never synchronously return a page.
   DEBUG_ASSERT(status != ZX_OK);
   return status;
@@ -2769,7 +2769,7 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
 }
 
 zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireOwnedPage(
-    bool will_write, uint max_request_pages, LazyPageRequest* page_request) {
+    bool will_write, uint max_request_pages, MultiPageRequest* page_request) {
   DEBUG_ASSERT(page_request);
 
   // Make sure the cursor is valid.
@@ -2778,7 +2778,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
   // Convert any references to pages.
   if (CursorIsReference()) {
     // Decompress in place.
-    zx_status_t status = CursorReferenceToPage(page_request);
+    zx_status_t status = CursorReferenceToPage(page_request->GetAnonymous());
     if (status != ZX_OK) {
       return zx::error(status);
     }
@@ -2800,8 +2800,9 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
       if (owner_cursor_->Page()->is_loaned()) {
         vm_page_t* res_page = nullptr;
         DEBUG_ASSERT(is_page_clean(owner_cursor_->Page()));
-        zx_status_t status = target_->ReplacePageLocked(
-            owner_cursor_->Page(), offset_, /*with_loaned=*/false, &res_page, page_request);
+        zx_status_t status =
+            target_->ReplacePageLocked(owner_cursor_->Page(), offset_, /*with_loaned=*/false,
+                                       &res_page, page_request->GetAnonymous());
         if (status != ZX_OK) {
           return zx::error(status);
         }
@@ -2813,8 +2814,11 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
       // If the page is not already dirty, then generate a dirty request. The dirty request code can
       // handle the page already being dirty, this is just a short circuit optimization.
       if (!is_page_dirty(owner_cursor_->Page())) {
-        zx_status_t status = DirtyRequest(max_request_pages, page_request);
+        zx_status_t status = DirtyRequest(max_request_pages, page_request->GetLazyDirtyRequest());
         if (status != ZX_OK) {
+          if (status == ZX_ERR_SHOULD_WAIT) {
+            page_request->MadeDirtyRequest();
+          }
           return zx::error(status);
         }
       }
@@ -2836,11 +2840,11 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     if (!owner()->is_hidden_locked()) {
       // Directly copying the page from the owner into the target.
       return TargetAllocateCopyPageAsResult(owner_cursor_->Page(), DirtyState::Untracked,
-                                            page_request);
+                                            page_request->GetAnonymous());
     }
     zx_status_t result =
         target_->CloneCowPageLocked(offset_, alloc_list_, owner_, owner_cursor_->Page(),
-                                    owner_offset_, page_request, &res_page);
+                                    owner_offset_, page_request->GetAnonymous(), &res_page);
     if (result != ZX_OK) {
       return zx::error(result);
     }
@@ -2866,26 +2870,29 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     // should not be trapped.
     const bool target_page_dirty = TargetZeroContentSupplyDirty(will_write);
     if (target_page_dirty && target_->page_source_->ShouldTrapDirtyTransitions()) {
-      zx_status_t status = DirtyRequest(max_request_pages, page_request);
+      zx_status_t status = DirtyRequest(max_request_pages, page_request->GetLazyDirtyRequest());
       // Since we know we have a page source that traps, and page sources will never succeed
       // synchronously, our dirty request must have 'failed'.
       DEBUG_ASSERT(status != ZX_OK);
+      if (status == ZX_ERR_SHOULD_WAIT) {
+        page_request->MadeDirtyRequest();
+      }
       return zx::error(status);
     }
     // Allocate the page and mark it dirty or clean as previously determined.
     return TargetAllocateCopyPageAsResult(vm_get_zero_page(),
                                           target_page_dirty ? DirtyState::Dirty : DirtyState::Clean,
-                                          page_request);
+                                          page_request->GetAnonymous());
   }
   DEBUG_ASSERT(CursorIsEmpty());
 
   // Generate a read request to populate the content in the owner. Even if this is a write, we still
   // populate content first, then perform any dirty transitions / requests.
-  return zx::error(ReadRequest(max_request_pages, page_request));
+  return zx::error(ReadRequest(max_request_pages, page_request->GetReadRequest()));
 }
 
 zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::RequireReadPage(
-    uint max_request_pages, LazyPageRequest* page_request) {
+    uint max_request_pages, MultiPageRequest* page_request) {
   DEBUG_ASSERT(page_request);
 
   // Make sure the cursor is valid.
@@ -2894,7 +2901,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
   // If there's a page or reference, return it.
   if (CursorIsPage() || CursorIsReference()) {
     if (CursorIsReference()) {
-      zx_status_t status = CursorReferenceToPage(page_request);
+      zx_status_t status = CursorReferenceToPage(page_request->GetAnonymous());
       if (status != ZX_OK) {
         return zx::error(status);
       }
@@ -2911,7 +2918,7 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
 
   // No available content, need to fetch it from the page source. ReadRequest performs all the
   // requisite asserts to ensure we are not doing this mistakenly.
-  return zx::error(ReadRequest(max_request_pages, page_request));
+  return zx::error(ReadRequest(max_request_pages, page_request->GetReadRequest()));
 }
 
 zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(uint64_t offset,
@@ -2943,7 +2950,7 @@ zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(uint64_t 
 }
 
 zx_status_t VmCowPages::CommitRangeLocked(uint64_t offset, uint64_t len, uint64_t* committed_len,
-                                          LazyPageRequest* page_request) {
+                                          MultiPageRequest* page_request) {
   canary_.Assert();
   LTRACEF("offset %#" PRIx64 ", len %#" PRIx64 "\n", offset, len);
 
@@ -3217,7 +3224,7 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
 }
 
 zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base,
-                                        LazyPageRequest* page_request, uint64_t* zeroed_len_out) {
+                                        MultiPageRequest* page_request, uint64_t* zeroed_len_out) {
   canary_.Assert();
 
   DEBUG_ASSERT(page_start_base <= page_end_base);
@@ -3594,7 +3601,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
         // Allocate a new page, it will be zeroed in the process.
         vm_page_t* p;
         // Do not pass our freed_list here as this takes an |alloc_list| list to allocate from.
-        zx_status_t status = AllocateCopyPage(vm_get_zero_page_paddr(), nullptr, page_request, &p);
+        zx_status_t status =
+            AllocateCopyPage(vm_get_zero_page_paddr(), nullptr, page_request->GetAnonymous(), &p);
         if (status != ZX_OK) {
           return status;
         }
@@ -3639,14 +3647,14 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       // it does not actually need to get converted.
       if (content.page_or_marker->IsReference()) {
         zx_status_t result = content.page_owner->ReplaceReferenceWithPageLocked(
-            content.page_or_marker, content.owner_offset, page_request);
+            content.page_or_marker, content.owner_offset, page_request->GetAnonymous());
         if (result != ZX_OK) {
           return result;
         }
       }
       zx_status_t result = CloneCowPageAsZeroLocked(
           offset, &ancestor_freed_list, content.page_owner, content.page_or_marker->Page(),
-          content.owner_offset, page_request);
+          content.owner_offset, page_request->GetAnonymous());
       if (result != ZX_OK) {
         return result;
       }
@@ -3941,7 +3949,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint6
   uint64_t cur_offset = ROUNDDOWN(offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(offset + len, PAGE_SIZE);
 
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
   __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
       GetLookupCursorLocked(cur_offset, end_offset - cur_offset);
   // Track the validity of the cursor as we would like to efficiently look up runs where possible,
@@ -3985,8 +3993,9 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint6
       if (page->is_loaned()) {
         DEBUG_ASSERT(is_page_clean(page));
         AssertHeld(owner->lock_ref());
-        status = owner->ReplacePageLocked(page, page->object.get_page_offset(),
-                                          /*with_loaned=*/false, &page, &page_request);
+        status =
+            owner->ReplacePageLocked(page, page->object.get_page_offset(),
+                                     /*with_loaned=*/false, &page, page_request.GetAnonymous());
         // Let the status fall through below to have success, waiting and errors handled.
       }
 
@@ -4006,7 +4015,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint6
     cursor_valid = false;
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard->CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
+      guard->CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
 
       // The size might have changed since we dropped the lock. Adjust the range if required.
       if (cur_offset >= size_locked()) {
@@ -4065,12 +4074,12 @@ zx_status_t VmCowPages::DecompressInRangeLocked(uint64_t offset, uint64_t len,
     if (!ref) {
       return ZX_OK;
     }
-    __UNINITIALIZED LazyPageRequest page_request;
+    __UNINITIALIZED AnonymousPageRequest page_request;
     zx_status_t status = ReplaceReferenceWithPageLocked(ref, ref_offset, &page_request);
     if (status == ZX_OK) {
       cur_offset = ref_offset + PAGE_SIZE;
     } else if (status == ZX_ERR_SHOULD_WAIT) {
-      guard->CallUnlocked([&page_request, &status]() { status = page_request->Wait(); });
+      guard->CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
       // With the lock dropped it's possible that our cur/end_offset are no longer within the range
       // of the VMO, but if this is the case we will immediately find no pages in the page_list_
       // for this range and return.
@@ -4843,7 +4852,7 @@ zx_status_t VmCowPages::LookupReadableLocked(uint64_t offset, uint64_t len,
 
 zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
                                                   VmPageSpliceList* pages, uint64_t* taken_len,
-                                                  LazyPageRequest* page_request) {
+                                                  MultiPageRequest* page_request) {
   DEBUG_ASSERT(parent_);
 
   // Set up a cursor that will help us take pages from the parent.
@@ -4876,7 +4885,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
     // that `ZeroPages` uses and insert markers, or generalizing the concept of intervals and using
     // those instead.
     vm_page_t* p;
-    status = AllocateCopyPage(vm_get_zero_page_paddr(), nullptr, page_request, &p);
+    status = AllocateCopyPage(vm_get_zero_page_paddr(), nullptr, page_request->GetAnonymous(), &p);
     if (status != ZX_OK) {
       break;
     }
@@ -4955,7 +4964,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
 }
 
 zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                                        uint64_t* taken_len, LazyPageRequest* page_request) {
+                                        uint64_t* taken_len, MultiPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
@@ -5036,7 +5045,7 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
 
 zx_status_t VmCowPages::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
                                     SupplyOptions options, uint64_t* supplied_len,
-                                    LazyPageRequest* page_request) {
+                                    MultiPageRequest* page_request) {
   canary_.Assert();
   Guard<CriticalMutex> guard{lock()};
   return SupplyPagesLocked(offset, len, pages, options, supplied_len, page_request);
@@ -5044,7 +5053,7 @@ zx_status_t VmCowPages::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceL
 
 zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
                                           SupplyOptions options, uint64_t* supplied_len,
-                                          LazyPageRequest* page_request) {
+                                          MultiPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
@@ -5128,7 +5137,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     // list is empty.
     if (src_page_ref) {
       DEBUG_ASSERT(src_page_ref->IsReference());
-      status = MakePageFromReference(src_page_ref, page_request);
+      status = MakePageFromReference(src_page_ref, page_request->GetAnonymous());
       if (status != ZX_OK) {
         break;
       }
@@ -5313,7 +5322,7 @@ zx_status_t VmCowPages::FailPageRequestsLocked(uint64_t offset, uint64_t len,
 }
 
 zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_node_t* alloc_list,
-                                         LazyPageRequest* page_request) {
+                                         AnonymousPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
@@ -6398,7 +6407,7 @@ void VmCowPages::SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t*
 }
 
 zx_status_t VmCowPages::ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_t len,
-                                                        LazyPageRequest* page_request,
+                                                        AnonymousPageRequest* page_request,
                                                         uint64_t* non_loaned_len) {
   canary_.Assert();
 
@@ -6470,7 +6479,8 @@ zx_status_t VmCowPages::ReplacePageWithLoaned(vm_page_t* before_page, uint64_t o
 }
 
 zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                                          vm_page_t** after_page, LazyPageRequest* page_request) {
+                                          vm_page_t** after_page,
+                                          AnonymousPageRequest* page_request) {
   // If not replacing with loaned it is required that a page_request be provided.
   DEBUG_ASSERT(with_loaned || page_request);
 

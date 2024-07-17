@@ -762,7 +762,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
         // However, should these assumptions ever get violated it's better to catch this gracefully
         // than have RequireOwnedPage error/crash internally, and it costs nothing to create and
         // pass in.
-        __UNINITIALIZED LazyPageRequest page_request;
+        __UNINITIALIZED MultiPageRequest page_request;
 
         VmMappingCoalescer<16> coalescer(this, base, mmu_flags,
                                          ignore_existing
@@ -922,7 +922,7 @@ zx_status_t VmMapping::DestroyLocked() {
 }
 
 zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
-                                       LazyPageRequest* page_request) {
+                                       MultiPageRequest* page_request) {
   VM_KTRACE_DURATION(
       2, "VmMapping::PageFault",
       ("user_id", KTRACE_ANNOTATED_VALUE(AssertHeld(lock_ref()), object_->user_id())),

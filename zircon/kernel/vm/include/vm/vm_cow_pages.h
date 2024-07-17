@@ -225,7 +225,7 @@ class VmCowPages final : public VmHierarchyBase,
   // |taken_len| is always filled with the amount of |len| that has been processed to allow for
   // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
   zx_status_t TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                              uint64_t* taken_len, LazyPageRequest* page_request) TA_REQ(lock());
+                              uint64_t* taken_len, MultiPageRequest* page_request) TA_REQ(lock());
 
   // See VmObject::SupplyPages
   //
@@ -236,11 +236,11 @@ class VmCowPages final : public VmHierarchyBase,
   // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
   zx_status_t SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
                                 SupplyOptions options, uint64_t* supplied_len,
-                                LazyPageRequest* page_request) TA_REQ(lock());
+                                MultiPageRequest* page_request) TA_REQ(lock());
 
   zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
                           SupplyOptions options, uint64_t* supplied_len,
-                          LazyPageRequest* page_request) TA_EXCL(lock());
+                          MultiPageRequest* page_request) TA_EXCL(lock());
 
   // See VmObject::FailPageRequests
   zx_status_t FailPageRequestsLocked(uint64_t offset, uint64_t len, zx_status_t error_status)
@@ -291,7 +291,7 @@ class VmCowPages final : public VmHierarchyBase,
   // any pages that were allocated but not used in case of delayed PMM allocations, so that it can
   // be reused across multiple successive calls whilst ensuring forward progress.
   zx_status_t DirtyPagesLocked(uint64_t offset, uint64_t len, list_node_t* alloc_list,
-                               LazyPageRequest* page_request) TA_REQ(lock());
+                               AnonymousPageRequest* page_request) TA_REQ(lock());
 
   using DirtyRangeEnumerateFunction = VmObject::DirtyRangeEnumerateFunction;
   // See VmObject::EnumerateDirtyRanges
@@ -401,7 +401,7 @@ class VmCowPages final : public VmHierarchyBase,
   //  can advance the start offset before retrying.
   //  Any other error code indicates a failure to zero a part of the range or the whole range.
   zx_status_t ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base,
-                              LazyPageRequest* page_request, uint64_t* zeroed_len_out)
+                              MultiPageRequest* page_request, uint64_t* zeroed_len_out)
       TA_REQ(lock());
 
   // Attempts to commit a range of pages. This has three kinds of return status
@@ -414,7 +414,7 @@ class VmCowPages final : public VmHierarchyBase,
   //  * => Any other error, the number of pages committed is undefined.
   // The |offset| and |len| are assumed to be page aligned and within the range of |size_|.
   zx_status_t CommitRangeLocked(uint64_t offset, uint64_t len, uint64_t* committed_len,
-                                LazyPageRequest* page_request) TA_REQ(lock());
+                                MultiPageRequest* page_request) TA_REQ(lock());
 
   // Increases the pin count of the range of pages given by |offset| and |len|. The full range must
   // already be committed and this either pins all pages in the range, or pins no pages and returns
@@ -475,7 +475,7 @@ class VmCowPages final : public VmHierarchyBase,
   // pages. |offset| and |len| must be page-aligned. In case of slices, replaces corresponding pages
   // in the parent.
   zx_status_t ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_t len,
-                                              LazyPageRequest* page_request,
+                                              AnonymousPageRequest* page_request,
                                               uint64_t* non_loaned_len) TA_REQ(lock());
 
   // If page is still at offset, replace it with a loaned page.
@@ -589,7 +589,8 @@ class VmCowPages final : public VmHierarchyBase,
   // Unlocked wrapper around ReplacePageLocked, exposed for the physical page provider to cancel
   // loans with.
   zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                          vm_page_t** after_page, LazyPageRequest* page_request) TA_EXCL(lock()) {
+                          vm_page_t** after_page, AnonymousPageRequest* page_request)
+      TA_EXCL(lock()) {
     Guard<CriticalMutex> guard{lock()};
     return ReplacePageLocked(before_page, offset, with_loaned, after_page, page_request);
   }
@@ -608,7 +609,7 @@ class VmCowPages final : public VmHierarchyBase,
   void MaybeDeadTransition() override;
 
   // Helper to allocate a new page for the VMO, filling out the page request if necessary.
-  zx_status_t AllocPage(vm_page_t** page, LazyPageRequest* page_request);
+  zx_status_t AllocPage(vm_page_t** page, AnonymousPageRequest* page_request);
 
   // Helper to free |pages| to the PMM. |freeing_owned_pages| is set to true to indicate that this
   // object had ownership of |pages|. This could either be true ownership, where the |pages| have
@@ -656,7 +657,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // A private helper that takes pages if this VmCowPages has a parent.
   zx_status_t TakePagesWithParentLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                                        uint64_t* taken_len, LazyPageRequest* page_request)
+                                        uint64_t* taken_len, MultiPageRequest* page_request)
       TA_REQ(lock());
 
   friend class fbl::RefPtr<VmCowPages>;
@@ -840,16 +841,17 @@ class VmCowPages final : public VmHierarchyBase,
   // the page_or_mark is not stack owned.
   // The |page_request| must be non-null if the |pmm_alloc_flags_| allow for delayed allocation, in
   // which case this may return ZX_ERR_SHOULD_WAIT if the page_request is filled out.
-  zx_status_t MakePageFromReference(VmPageOrMarkerRef page_or_mark, LazyPageRequest* page_request);
+  zx_status_t MakePageFromReference(VmPageOrMarkerRef page_or_mark,
+                                    AnonymousPageRequest* page_request);
 
   // Replaces the Reference in VmPageOrMarker owned by this page_list_ for a real vm_page_t.
   // Unlike MakePageFromReference this updates the page queues to track the newly added page. Use
   // of |page_request| and implications on return value are the same as |MakePageFromReference|.
   zx_status_t ReplaceReferenceWithPageLocked(VmPageOrMarkerRef page_or_mark, uint64_t offset,
-                                             LazyPageRequest* page_request) TA_REQ(lock());
+                                             AnonymousPageRequest* page_request) TA_REQ(lock());
 
   zx_status_t AllocateCopyPage(paddr_t parent_paddr, list_node_t* alloc_list,
-                               LazyPageRequest* request, vm_page_t** clone);
+                               AnonymousPageRequest* request, vm_page_t** clone);
 
   static zx_status_t CacheAllocPage(uint alloc_flags, vm_page_t** p, paddr_t* pa);
   static void CacheFree(list_node_t* list);
@@ -863,7 +865,7 @@ class VmCowPages final : public VmHierarchyBase,
   // InitializeVmPage must be called on it prior to use. Callers most likely want AllocPage instead,
   // with this method being useful in rare cases where you want to defer initialization till
   // AddNewPagesLocked or similar.
-  zx_status_t AllocUninitializedPage(vm_page_t** page, LazyPageRequest* page_request);
+  zx_status_t AllocUninitializedPage(vm_page_t** page, AnonymousPageRequest* page_request);
 
   // Add a page to the object at |offset|.
   //
@@ -955,7 +957,7 @@ class VmCowPages final : public VmHierarchyBase,
   // fork logic to reduce memory consumption in that case.
   zx_status_t CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list, VmCowPages* page_owner,
                                  vm_page_t* page, uint64_t owner_offset,
-                                 LazyPageRequest* page_request, vm_page_t** out_page)
+                                 AnonymousPageRequest* page_request, vm_page_t** out_page)
       TA_REQ(lock());
 
   // This is an optimized wrapper around CloneCowPageLocked for when an initial content page needs
@@ -967,7 +969,7 @@ class VmCowPages final : public VmHierarchyBase,
   // set the split bits in the parent page as if it had been forked.
   zx_status_t CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                        VmCowPages* page_owner, vm_page_t* page,
-                                       uint64_t owner_offset, LazyPageRequest* page_request)
+                                       uint64_t owner_offset, AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
   // Helper function for CreateCloneLocked. Performs bidirectional clone operation where this VMO
@@ -1160,7 +1162,7 @@ class VmCowPages final : public VmHierarchyBase,
   // with a loaned page.  If with_loaned is false, replace with a non-loaned page and a page_request
   // is required to be provided.
   zx_status_t ReplacePageLocked(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                                vm_page_t** after_page, LazyPageRequest* page_request)
+                                vm_page_t** after_page, AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
   void CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) TA_REQ(lock());
@@ -1383,15 +1385,15 @@ class VmCowPages::LookupCursor {
   // reference to the zero page. |will_write| indicates if this page needs to be writable or not,
   // which for an owned and allocated page just involves a potential dirty request / transition.
   zx::result<RequireResult> RequireOwnedPage(bool will_write, uint max_request_pages,
-                                             LazyPageRequest* page_request) TA_REQ(lock());
+                                             MultiPageRequest* page_request) TA_REQ(lock());
 
   // Returned page will only be read from. This can return zero pages or pages from a parent VMO.
-  zx::result<RequireResult> RequireReadPage(uint max_request_pages, LazyPageRequest* page_request)
+  zx::result<RequireResult> RequireReadPage(uint max_request_pages, MultiPageRequest* page_request)
       TA_REQ(lock());
 
   // Returned page will be readable or writable based on the |will_write| flag.
   zx::result<RequireResult> RequirePage(bool will_write, uint max_request_pages,
-                                        LazyPageRequest* page_request) TA_REQ(lock()) {
+                                        MultiPageRequest* page_request) TA_REQ(lock()) {
     // Being writable implies owning the page, so forward to the correct operation.
     if (will_write) {
       return RequireOwnedPage(true, max_request_pages, page_request);
@@ -1605,14 +1607,14 @@ class VmCowPages::LookupCursor {
   // page is inserted into target at the current offset_ and the cursor is incremented.
   zx::result<RequireResult> TargetAllocateCopyPageAsResult(vm_page_t* source,
                                                            DirtyState dirty_state,
-                                                           LazyPageRequest* page_request)
+                                                           AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
   // Attempts to turn the current cursor, which must be a reference, into a page.
-  zx_status_t CursorReferenceToPage(LazyPageRequest* page_request) TA_REQ(lock());
+  zx_status_t CursorReferenceToPage(AnonymousPageRequest* page_request) TA_REQ(lock());
 
   // Helpers for generating read or dirty requests for the given maximal range.
-  zx_status_t ReadRequest(uint max_request_pages, LazyPageRequest* page_request) TA_REQ(lock());
+  zx_status_t ReadRequest(uint max_request_pages, PageRequest* page_request) TA_REQ(lock());
   zx_status_t DirtyRequest(uint max_request_pages, LazyPageRequest* page_request) TA_REQ(lock());
 
   // If we held lock(), then since owner_ is from the same hierarchy as the target then we must also

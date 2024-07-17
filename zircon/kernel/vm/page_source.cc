@@ -431,10 +431,33 @@ void PageRequest::CancelRequest() {
 }
 
 PageRequest* LazyPageRequest::get() {
-  if (!request_.has_value()) {
+  if (!is_initialized()) {
     request_.emplace();
   }
   return &*request_;
+}
+
+zx_status_t MultiPageRequest::Wait() {
+  if (anonymous_.is_active()) {
+    DEBUG_ASSERT(!dirty_active_ && !read_active_);
+    return anonymous_.Wait();
+  }
+  // Exactly one of read and dirty should be considered active.
+  DEBUG_ASSERT(dirty_active_ ^ read_active_);
+  read_active_ = false;
+  dirty_active_ = false;
+  return page_request_->Wait();
+}
+
+void MultiPageRequest::CancelRequests() {
+  anonymous_.Cancel();
+  // In case a request is still initialized, despite being waited on, explicitly cancel regardless
+  // of active status.
+  if (page_request_.is_initialized()) {
+    page_request_->CancelRequest();
+  }
+  read_active_ = false;
+  dirty_active_ = false;
 }
 
 static int cmd_page_source(int argc, const cmd_args* argv, uint32_t flags) {

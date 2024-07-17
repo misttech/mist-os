@@ -229,11 +229,14 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
 
           // Check if we should attempt to replace the page to avoid eviction.
           if (pmm_physical_page_borrowing_config()->is_replace_on_unloan_enabled()) {
-            __UNINITIALIZED LazyPageRequest page_request;
+            __UNINITIALIZED AnonymousPageRequest page_request;
             zx_status_t replace_result = cow_container->ReplacePage(page, vmo_backlink.offset,
                                                                     false, nullptr, &page_request);
             // If replacement failed for any reason, fall back to eviction.
             needs_evict = replace_result != ZX_OK;
+            if (replace_result == ZX_ERR_SHOULD_WAIT) {
+              page_request.Cancel();
+            }
           }
 
           if (needs_evict) {

@@ -78,7 +78,7 @@ enum class VmAddressRegionEnumeratorType : bool;
 template <VmAddressRegionEnumeratorType>
 class VmAddressRegionEnumerator;
 
-class LazyPageRequest;
+class MultiPageRequest;
 
 // A VmAddressRegion represents a contiguous region of the virtual address
 // space.  It is partitioned by non-overlapping children of the following types:
@@ -1010,7 +1010,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // Page fault in an address within the mapping.
   // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
   // and try again.
-  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, LazyPageRequest* page_request)
+  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, MultiPageRequest* page_request)
       TA_REQ(lock());
 
   // Apis intended for use by VmObject

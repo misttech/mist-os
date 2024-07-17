@@ -9,7 +9,7 @@ import("//zircon/kernel/params.gni")
 
 zx_library("vm") {
   sources = [
-    "anonymous_page_requester.cc",
+    "anonymous_page_request.cc",
     "bootreserve.cc",
     "compression.cc",
     "compressor.cc",

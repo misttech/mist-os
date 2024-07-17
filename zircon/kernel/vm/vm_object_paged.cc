@@ -992,7 +992,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         }
       });
 
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
   // Convenience lambda to advance offset by processed_len, indicating that all pages in the range
   // [offset, offset + processed_len) have been processed, then potentially wait on the page_request
   // (if wait_on_page_request is set to true), and revalidate range checks after waiting.
@@ -1010,7 +1010,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       zx_status_t wait_status = ZX_OK;
       AssertHeld(lock_ref());
       guard.CallUnlocked(
-          [&page_request, &wait_status]() mutable { wait_status = page_request->Wait(); });
+          [&page_request, &wait_status]() mutable { wait_status = page_request.Wait(); });
       if (wait_status != ZX_OK) {
         if (wait_status == ZX_ERR_TIMED_OUT) {
           DumpLocked(0, false);
@@ -1099,11 +1099,14 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       // request too. At any time we'll only be able to wait on a single page request, and after the
       // wait the conditions that resulted in the previous request might have changed, so we can
       // just cancel and reuse the existing page_request.
-      page_request->CancelRequest();
+      // TODO: consider not canceling this and the other request below. The issue with not
+      // canceling is that without early wake support, i.e. being able to reinitialize an existing
+      // initialized request, I think this code will not work without canceling.
+      page_request.CancelRequests();
 
       uint64_t non_loaned_len = 0;
       zx_status_t replace_status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
-          offset, committed_len, &page_request, &non_loaned_len);
+          offset, committed_len, page_request.GetAnonymous(), &non_loaned_len);
       DEBUG_ASSERT(non_loaned_len <= committed_len);
       if (replace_status == ZX_OK) {
         DEBUG_ASSERT(non_loaned_len == committed_len);
@@ -1133,17 +1136,20 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       if (write && pinned_len > 0 && is_dirty_tracked_locked()) {
         // Prepare the committed range for writing. We need a page request for this too, so cancel
         // any existing one and reuse it.
-        page_request->CancelRequest();
+        page_request.CancelRequests();
 
         // We want to dirty the entire pinned range.
         uint64_t to_dirty_len = pinned_len;
         while (to_dirty_len > 0) {
           uint64_t dirty_len = 0;
           zx_status_t write_status = cow_pages_locked()->PrepareForWriteLocked(
-              offset, to_dirty_len, &page_request, &dirty_len);
+              offset, to_dirty_len, page_request.GetLazyDirtyRequest(), &dirty_len);
           DEBUG_ASSERT(dirty_len <= to_dirty_len);
           if (write_status != ZX_OK && write_status != ZX_ERR_SHOULD_WAIT) {
             return write_status;
+          }
+          if (write_status == ZX_ERR_SHOULD_WAIT) {
+            page_request.MadeDirtyRequest();
           }
           // Account for the pages that were dirtied during this attempt.
           to_dirty_len -= dirty_len;
@@ -1339,13 +1345,13 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
   });
 
   // We might need a page request if the VMO is backed by a page source.
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
   while (start < end) {
     uint64_t zeroed_len = 0;
     zx_status_t status =
         cow_pages_locked()->ZeroPagesLocked(start, end, &page_request, &zeroed_len);
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
+      guard.CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
       if (status != ZX_OK) {
         if (status == ZX_ERR_TIMED_OUT) {
           DumpLocked(0, false);
@@ -1459,7 +1465,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
   // The PageRequest is a non-trivial object so we declare it outside the loop to avoid having to
   // construct and deconstruct it each iteration. It is tolerant of being reused and will
   // reinitialize itself if needed.
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
   // Copy loop uses a custom status variant to track its state so that it easily create an
   // unambiguous distinction between no error and no error but the lock has been dropped.
   // Overloading one of the zx_status_t values (such as ZX_ERR_NEXT or ZX_ERR_SHOULD_WAIT) to mean
@@ -1516,7 +1522,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
         // RequirePage 'failed', but told us that it had filled out the page request, so we should
         // wait on it. Waiting on the page request must be done with the lock dropped.
         DEBUG_ASSERT(can_block_on_page_requests());
-        guard->CallUnlocked([&status, &page_request]() { status = page_request->Wait(); });
+        guard->CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
         if (likely(status == StatusType(ZX_OK))) {
           // page request waiting succeeded, but indicate that the lock has been dropped.
           status = LockDroppedTag{};
@@ -1845,7 +1851,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
   // Initialize the splice list to the right size.
   *pages = VmPageSpliceList(offset, len, 0);
 
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
   while (len > 0) {
     Guard<CriticalMutex> guard{lock()};
 
@@ -1868,7 +1874,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
     offset += taken_len;
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status] { status = page_request->Wait(); });
+      guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
       if (status != ZX_OK) {
         return status;
       }
@@ -1887,7 +1893,7 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
   while (len > 0) {
     Guard<CriticalMutex> guard{lock()};
 
@@ -1910,7 +1916,7 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
     len -= supply_len;
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status] { status = page_request->Wait(); });
+      guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
       if (status != ZX_OK) {
         return status;
       }
@@ -1923,7 +1929,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
   zx_status_t status;
   // It is possible to encounter delayed PMM allocations, which requires waiting on the
   // page_request.
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED AnonymousPageRequest page_request;
 
   Guard<CriticalMutex> guard{lock()};
   // Initialize a list of allocated pages that DirtyPagesLocked will allocate any new pages into
@@ -1944,7 +1950,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
     status = cow_pages_locked()->DirtyPagesLocked(offset, len, &alloc_list, &page_request);
     if (status == ZX_ERR_SHOULD_WAIT) {
       zx_status_t wait_status;
-      guard.CallUnlocked([&page_request, &wait_status]() { wait_status = page_request->Wait(); });
+      guard.CallUnlocked([&page_request, &wait_status]() { wait_status = page_request.Wait(); });
       if (wait_status != ZX_OK) {
         return wait_status;
       }
@@ -2089,7 +2095,7 @@ zx_status_t VmObjectPaged::UnlockRange(uint64_t offset, uint64_t len) {
 }
 
 zx_status_t VmObjectPaged::GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
-                                   LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
+                                   MultiPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
   Guard<CriticalMutex> guard{lock()};
   const bool write = pf_flags & VMM_PF_FLAG_WRITE;
   zx::result<VmCowPages::LookupCursor> cursor = GetLookupCursorLocked(offset, PAGE_SIZE);
