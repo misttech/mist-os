@@ -76,6 +76,12 @@ pub struct Context {
     inner: Rc<dyn DaemonProtocolProvider>,
 }
 
+impl std::fmt::Debug for Context {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "Context {{ Rc<dyn DaemonProtocolProvider> }}")
+    }
+}
+
 impl Context {
     pub fn new(t: impl DaemonProtocolProvider + 'static) -> Self {
         Self { inner: Rc::new(t) }

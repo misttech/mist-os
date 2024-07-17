@@ -456,7 +456,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                         );
                     }
                 };
-                let rcs = target_handle::wait_for_rcs(&target).await?;
+                let rcs = target_handle::wait_for_rcs(&target, &cx).await?;
                 match rcs {
                     Ok(mut rcs) => {
                         let (rcs_proxy, server) =
