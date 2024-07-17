@@ -389,11 +389,8 @@ async def async_main(
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
         if not flags.has_debugger() and not flags.host:
-            # Note: it is important that we put --break-on-failure before the rest of the command
-            # line arguments so that it is ensured that this fx test argument comes before any extra
-            # arguments are passed through to the test executable (e.g. after "--").
             recorder.emit_instruction_message(
-                "\nTo debug with zxdb: fx test --break-on-failure {}\n".format(
+                "\nTo debug with zxdb: fx test {} --break-on-failure\n".format(
                     " ".join(sys.argv[1:])
                 )
             )
