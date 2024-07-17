@@ -299,23 +299,18 @@ TEST_F(HidDeviceTest, BootMouseSendReportWithTime) {
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
   ASSERT_OK(device_->Bind());
 
-  // Regsiter a device listener
-  std::pair<sync_completion_t, zx_time_t> callback_data;
-  callback_data.second = 0xabcd;
+  SetupInstanceDriver();
 
-  hid_report_listener_protocol_ops_t listener_ops;
-  listener_ops.receive_report = [](void* ctx, const uint8_t* report_list, size_t report_count,
-                                   zx_time_t report_time) {
-    auto callback_data = static_cast<std::pair<sync_completion_t, zx_time_t>*>(ctx);
-    ASSERT_EQ(callback_data->second, report_time);
-    sync_completion_signal(&callback_data->first);
-  };
-  hid_report_listener_protocol_t listener = {&listener_ops, &callback_data};
-  device_->HidDeviceRegisterListener(&listener);
+  const zx_time_t kTimestamp = 0xabcd;
+  fake_hidbus_.SendReportWithTime(mouse_report, sizeof(mouse_report), kTimestamp);
+  RunSyncClientTask([&]() {
+    ASSERT_OK(report_event_.wait_one(DEV_STATE_READABLE, zx::time::infinite(), nullptr));
 
-  fake_hidbus_.SendReportWithTime(mouse_report, sizeof(mouse_report), callback_data.second);
-  RunSyncClientTask([&callback_data]() {
-    sync_completion_wait_deadline(&callback_data.first, zx::time::infinite().get());
+    auto result = sync_client_->ReadReport();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    ASSERT_TRUE(result.value()->report.has_timestamp());
+    ASSERT_EQ(result.value()->report.timestamp(), kTimestamp);
   });
   ASSERT_NO_FATAL_FAILURE();
 }
@@ -630,71 +625,22 @@ TEST_F(HidDeviceTest, SettingBootModeKbd) {
   }
 }
 
-TEST_F(HidDeviceTest, GetHidDeviceInfo) {
-  SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
-
-  hid_device_info_t info;
-  device_->HidDeviceGetHidDeviceInfo(&info);
-
-  auto hidbus_info = fake_hidbus_.Query();
-  ASSERT_EQ(hidbus_info.vendor_id(), info.vendor_id);
-  ASSERT_EQ(hidbus_info.product_id(), info.product_id);
-  ASSERT_EQ(hidbus_info.version(), info.version);
-}
-
 TEST_F(HidDeviceTest, GetDescriptor) {
   SetupBootMouseDevice();
   ASSERT_OK(device_->Bind());
 
-  size_t known_size;
-  const uint8_t* known_descriptor = get_boot_mouse_report_desc(&known_size);
+  SetupInstanceDriver();
 
-  uint8_t report_descriptor[HID_MAX_DESC_LEN];
-  size_t actual;
-  ASSERT_OK(device_->HidDeviceGetDescriptor(report_descriptor, sizeof(report_descriptor), &actual));
+  RunSyncClientTask([&]() {
+    size_t known_size;
+    const uint8_t* known_descriptor = get_boot_mouse_report_desc(&known_size);
 
-  ASSERT_EQ(known_size, actual);
-  ASSERT_BYTES_EQ(known_descriptor, report_descriptor, known_size);
-}
+    auto result = sync_client_->GetReportDesc();
+    ASSERT_TRUE(result.ok());
 
-TEST_F(HidDeviceTest, RegisterListenerSendReport) {
-  SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
-
-  uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-
-  struct ReportCtx {
-    sync_completion_t* completion;
-    uint8_t* known_report;
-  };
-
-  sync_completion_t seen_report;
-  ReportCtx ctx;
-  ctx.completion = &seen_report;
-  ctx.known_report = mouse_report;
-
-  hid_report_listener_protocol_ops_t ops;
-  ops.receive_report = [](void* ctx, const uint8_t* report_list, size_t report_count,
-                          zx_time_t time) {
-    ASSERT_EQ(sizeof(mouse_report), report_count);
-    auto report_ctx = reinterpret_cast<ReportCtx*>(ctx);
-    ASSERT_BYTES_EQ(report_ctx->known_report, report_list, report_count);
-    sync_completion_signal(report_ctx->completion);
-  };
-
-  hid_report_listener_protocol_t listener;
-  listener.ctx = &ctx;
-  listener.ops = &ops;
-
-  ASSERT_OK(device_->HidDeviceRegisterListener(&listener));
-
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-
-  RunSyncClientTask([&seen_report]() {
-    ASSERT_OK(sync_completion_wait(&seen_report, zx::time::infinite().get()));
+    ASSERT_EQ(known_size, result->desc.count());
+    ASSERT_BYTES_EQ(known_descriptor, result->desc.data(), known_size);
   });
-  device_->HidDeviceUnregisterListener();
 }
 
 TEST_F(HidDeviceTest, GetSetReport) {
@@ -714,6 +660,8 @@ TEST_F(HidDeviceTest, GetSetReport) {
 
   ASSERT_OK(device_->Bind());
 
+  SetupInstanceDriver();
+
   ambient_light_feature_rpt_t feature_report = {};
   feature_report.rpt_id = AMBIENT_LIGHT_RPT_ID_FEATURE;
   // Below value are chosen arbitrarily.
@@ -722,18 +670,24 @@ TEST_F(HidDeviceTest, GetSetReport) {
   feature_report.threshold_high = 40;
   feature_report.threshold_low = 10;
 
-  ASSERT_OK(device_->HidDeviceSetReport(HID_REPORT_TYPE_FEATURE, AMBIENT_LIGHT_RPT_ID_FEATURE,
-                                        reinterpret_cast<uint8_t*>(&feature_report),
-                                        sizeof(feature_report)));
+  RunSyncClientTask([&]() {
+    auto result = sync_client_->SetReport(
+        fhidbus::wire::ReportType::kFeature, AMBIENT_LIGHT_RPT_ID_FEATURE,
+        fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&feature_report),
+                                                sizeof(feature_report)));
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+  });
 
-  ambient_light_feature_rpt_t received_report = {};
-  size_t actual;
-  ASSERT_OK(device_->HidDeviceGetReport(HID_REPORT_TYPE_FEATURE, AMBIENT_LIGHT_RPT_ID_FEATURE,
-                                        reinterpret_cast<uint8_t*>(&received_report),
-                                        sizeof(received_report), &actual));
+  RunSyncClientTask([&]() {
+    auto result =
+        sync_client_->GetReport(fhidbus::wire::ReportType::kFeature, AMBIENT_LIGHT_RPT_ID_FEATURE);
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
 
-  ASSERT_EQ(sizeof(received_report), actual);
-  ASSERT_BYTES_EQ(&feature_report, &received_report, actual);
+    ASSERT_EQ(sizeof(feature_report), result->value()->report.count());
+    ASSERT_BYTES_EQ(&feature_report, result->value()->report.data(), sizeof(feature_report));
+  });
 }
 
 // Tests that a device with too large reports don't cause buffer overruns.
@@ -767,11 +721,14 @@ TEST_F(HidDeviceTest, GetReportBufferOverrun) {
 
   ASSERT_OK(device_->Bind());
 
-  std::vector<uint8_t> report(0xFF0000);
-  size_t actual;
-  ASSERT_EQ(
-      device_->HidDeviceGetReport(HID_REPORT_TYPE_INPUT, 0, report.data(), report.size(), &actual),
-      ZX_ERR_INTERNAL);
+  SetupInstanceDriver();
+
+  RunSyncClientTask([&]() {
+    auto result = sync_client_->GetReport(fhidbus::wire::ReportType::kInput, 0);
+    ASSERT_TRUE(result.ok());
+    ASSERT_FALSE(result->is_ok());
+    EXPECT_EQ(result->error_value(), ZX_ERR_INTERNAL);
+  });
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderSingleReport) {

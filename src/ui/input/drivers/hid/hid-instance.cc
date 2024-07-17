@@ -191,6 +191,12 @@ void HidInstance::GetReport(GetReportRequestView request, GetReportCompleter::Sy
     completer.ReplyError(ZX_ERR_NOT_FOUND);
     return;
   }
+  if (needed > fhidbus::kMaxReportLen) {
+    zxlogf(ERROR, "hid: GetReport: Report size 0x%lx larger than max size 0x%x", needed,
+           fhidbus::kMaxReportLen);
+    completer.ReplyError(ZX_ERR_INTERNAL);
+    return;
+  }
 
   auto& client = base_->GetHidbusProtocol();
   auto result = client.sync()->GetReport(request->type, request->id, needed);

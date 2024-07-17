@@ -332,6 +332,7 @@ source_set("ddktl") {
     "//src/ui/input/drivers/goldfish_sensor:*",
     "//src/ui/input/drivers/goodix:*",
     "//src/ui/input/drivers/gt6853:*",
+    "//src/ui/input/drivers/hid:*",
     "//src/ui/input/drivers/hid-input-report:*",
     "//src/ui/input/drivers/hidctl:*",
     "//src/ui/input/drivers/pc-ps2:*",

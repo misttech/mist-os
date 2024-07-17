@@ -28,7 +28,6 @@ fuchsia_driver("hid-driver") {
   ]
   deps = [
     ":hid_bind",
-    "//sdk/banjo/fuchsia.hardware.hiddevice:fuchsia.hardware.hiddevice_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
     "//sdk/lib/component/outgoing/cpp",
@@ -36,6 +35,7 @@ fuchsia_driver("hid-driver") {
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
+    "//src/lib/ddktl",
     "//src/lib/listnode",
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-parser",
@@ -72,7 +72,6 @@ test("hid-test") {
   ]
   deps = [
     ":hid_bind",
-    "//sdk/banjo/fuchsia.hardware.hiddevice:fuchsia.hardware.hiddevice_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
@@ -83,6 +82,7 @@ test("hid-test") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
+    "//src/lib/ddktl",
     "//src/lib/listnode",
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-parser",
