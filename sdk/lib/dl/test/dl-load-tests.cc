@@ -255,6 +255,13 @@ TYPED_TEST(DlTests, MissingSymbol) {
   }
 }
 
+// TODO(https://fxbug.dev/3313662773): Test simple case of transitive missing
+// symbol.
+// dlopen missing-transitive-symbol:
+//  - missing-transitive-sym
+//    - has-missing-sym is missing a()
+// call a() from missing-transitive-symbol, and expect symbol not found
+
 // Try to load a module that has a (direct) dependency that cannot be found.
 TYPED_TEST(DlTests, MissingDependency) {
   constexpr const char* kMissingDepFile = "missing-dep.module.so";
@@ -379,5 +386,62 @@ TYPED_TEST(DlTests, UniqueModules) {
   EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), kReturnValue17);
   EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), kReturnValue23);
 }
+
+// Test that you can dlopen a dependency from a previously loaded module.
+
+// TODO(https://fxbug.dev/338232267): These are test scenarios that test symbol
+// resolution from just the dependency graph, ie from the local scope of the
+// dlopen-ed module.
+
+// Test that dep ordering is preserved in the dependency graph.
+// dlopen multiple-foo-deps -> calls foo()
+//  - foo-v1 -> foo() returns 2
+//  - foo-v2 -> foo() returns 7
+// call foo() from multiple-foo-deps pointer and expect 2 from foo-v1.
+
+// Test that transitive dep ordering is preserved the dependency graph.
+// dlopen transitive-dep-order -> calls foo()
+//   - has-foo-v1:
+//     - foo-v1 -> foo() returns 2
+//   - foo-v2 -> foo() returns 7
+// call foo() from transitive-dep-order pointer and expect 7.
+
+// Test that dependency ordering is always preserved in the local symbol scope,
+// regardless if the dependency was already loaded.
+// dlopen foo-v2 -> foo() returns 7
+// dlopen multiple-foo-deps:
+//   - foo-v1 -> foo() returns 2
+//   - foo-v2 -> foo() returns 7
+// call foo() from multiple-foo-deps and expect 2 from foo-v1 because it is
+// first in multiple-foo-deps local scope.
+
+// TODO(https://fxbug.dev/338233824): These are test scenarios that test symbol
+// resolution with RTLD_GLOBAL.
+
+// Test that a previously loaded global module symbol won't affect relative
+// relocations in dlopen-ed module.
+// dlopen RTLD_GLOBAL foo-v1 -> foo() returns 2
+// dlopen relative-reloc-foo -> foo() returns 17
+// call foo() from relative-reloc-foo and expect 17.
+
+// Test that loaded global module will take precedence over dependency ordering.
+// dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
+// dlopen has-foo-v1:
+//    - foo-v1 -> foo() returns 2
+// call foo() from has-foo-v1 and expect foo() to return 7.
+
+// Test that RTLD_GLOBAL applies to deps and load order will take precedence in
+// subsequent symbol lookups:
+// dlopen RTLD_GLOBAL has-foo-v1:
+//   - foo-v1 -> foo() returns 2
+// dlopen RTLD_GLOBAL has-foo-v2:
+//   - foo-v2 -> foo() returns 7
+// call foo from has-foo-v2 and expect 2.
+
+// Test that missing dep will use global symbol if there's a loaded global
+// module with the same symbol
+// dlopen RTLD global foo-v1 -> foo() returns 2
+// dlopen missing-foo:
+// call foo() from missing-foo and expect 2.
 
 }  // namespace
