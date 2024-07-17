@@ -176,7 +176,6 @@ func NewFFXInstance(
 	configSettings := map[string]any{
 		"log.dir":                      filepath.Join(absOutputDir, "ffx_logs"),
 		"ffx.subtool-search-paths":     filepath.Dir(absFFXPath),
-		"target.default":               target,
 		"test.experimental_json_input": true,
 	}
 	if sshKey != "" {
@@ -314,12 +313,18 @@ func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
 
 // RunWithTarget runs ffx with the associated target.
 func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
 	args = append([]string{"--target", f.target}, args...)
 	return f.Run(ctx, args...)
 }
 
 // RunWithTargetAndTimeout runs ffx with the associated target and timeout.
 func (f *FFXInstance) RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
 	args = append([]string{"--target", f.target}, args...)
 	return f.RunWithTimeout(ctx, timeout, args...)
 }
