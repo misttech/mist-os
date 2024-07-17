@@ -35,6 +35,9 @@ def print_fences():
     print(
         "After fxr/973216, Bazel build complains about dangling symlinks, see http://b/319069000#comment4"
     )
+    print(
+        "After fxr/1081759, Bazel build is non-incremental, see http://b/353592055"
+    )
     pass
 
 

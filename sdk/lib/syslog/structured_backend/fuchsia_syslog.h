@@ -11,7 +11,7 @@
 
 __BEGIN_CDECLS
 
-typedef int8_t FuchsiaLogSeverity;
+typedef uint8_t FuchsiaLogSeverity;
 
 // Default log levels.
 #define FUCHSIA_LOG_TRACE ((FuchsiaLogSeverity)0x10)

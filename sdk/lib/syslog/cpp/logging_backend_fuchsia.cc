@@ -102,29 +102,6 @@ class GlobalStateLock {
 };
 namespace {
 
-fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::Severity severity) {
-  switch (severity) {
-    case fuchsia_diagnostics::Severity::kTrace:
-      return fuchsia_logging::LOG_TRACE;
-      break;
-    case fuchsia_diagnostics::Severity::kDebug:
-      return fuchsia_logging::LOG_DEBUG;
-      break;
-    case fuchsia_diagnostics::Severity::kInfo:
-      return fuchsia_logging::LOG_INFO;
-      break;
-    case fuchsia_diagnostics::Severity::kWarn:
-      return fuchsia_logging::LOG_WARNING;
-      break;
-    case fuchsia_diagnostics::Severity::kError:
-      return fuchsia_logging::LOG_ERROR;
-      break;
-    case fuchsia_diagnostics::Severity::kFatal:
-      return fuchsia_logging::LOG_FATAL;
-      break;
-  }
-}
-
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
   // We need to use _zx_object_get_info to avoid breaking the driver ABI.
@@ -230,7 +207,7 @@ void internal::LogState::HandleInterest(fuchsia_diagnostics::wire::Interest inte
   if (!interest.has_min_severity()) {
     min_severity_ = default_severity_;
   } else {
-    min_severity_ = IntoLogSeverity(interest.min_severity());
+    min_severity_ = static_cast<FuchsiaLogSeverity>(interest.min_severity());
   }
 }
 
