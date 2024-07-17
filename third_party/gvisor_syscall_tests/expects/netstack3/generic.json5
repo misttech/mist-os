@@ -63,17 +63,6 @@
                 "AllIPSockets/TcpUdpSocketPairTest.ShutdownWrFollowedBySendIsError/21",
                 "AllIPSockets/TcpUdpSocketPairTest.ShutdownWrFollowedBySendIsError/22",
                 "AllIPSockets/TcpUdpSocketPairTest.ShutdownWrFollowedBySendIsError/23",
-
-                // Skip TCP variants that would otherwise hang forever.
-                // TODO(b/245940107): Un-skip these.
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/2",
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/3",
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/4",
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/5",
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/8",
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/9",
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/10",
-                "BlockingIPSockets/BlockingSocketPairTest.RecvBlocks/11",
             ],
         },
     ],
