@@ -187,7 +187,7 @@ CommandChannel::TransactionId CommandChannel::SendCommand(
 }
 
 CommandChannel::TransactionId CommandChannel::SendLeAsyncCommand(
-    CommandPacketVariant command_packet,
+    EmbossCommandPacket command_packet,
     CommandCallback callback,
     hci_spec::EventCode le_meta_subevent_code) {
   return SendLeAsyncExclusiveCommand(
@@ -207,7 +207,7 @@ CommandChannel::TransactionId CommandChannel::SendExclusiveCommand(
 }
 
 CommandChannel::TransactionId CommandChannel::SendLeAsyncExclusiveCommand(
-    CommandPacketVariant command_packet,
+    EmbossCommandPacket command_packet,
     CommandCallback callback,
     std::optional<hci_spec::EventCode> le_meta_subevent_code,
     std::unordered_set<hci_spec::OpCode> exclusions) {

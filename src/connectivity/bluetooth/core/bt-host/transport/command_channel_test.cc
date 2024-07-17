@@ -1878,7 +1878,9 @@ TEST_F(CommandChannelTest, SendCommandWithLEMetaEventSubeventRsp) {
 
   EXPECT_CMD_PACKET_OUT(test_device(), cmd, &cmd_status_event);
 
-  auto cmd_packet = CommandPacket::New(kOpCode);
+  auto cmd_packet =
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode);
 
   size_t event_count = 0;
   auto event_cb = [&event_count](auto, const EventPacket& event) {
@@ -1929,22 +1931,26 @@ TEST_F(
                 kSubeventCode, [](const EmbossEventPacket&) {
                   return EventCallbackResult::kContinue;
                 }));
-  EXPECT_EQ(0u,
-            cmd_channel()->SendLeAsyncCommand(
-                CommandPacket::New(kOpCode),
-                [](auto, const auto&) {},
-                kSubeventCode));
+  EXPECT_EQ(
+      0u,
+      cmd_channel()->SendLeAsyncCommand(
+          EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+              kOpCode),
+          [](auto, const auto&) {},
+          kSubeventCode));
 
   auto cmd = StaticByteBuffer(LowerBits(kOpCode),
                               UpperBits(kOpCode),
                               // parameter total size (0 byte payload)
                               0x00);
   EXPECT_CMD_PACKET_OUT(test_device(), std::move(cmd), );
-  EXPECT_NE(0u,
-            cmd_channel()->SendLeAsyncCommand(
-                CommandPacket::New(kOpCode),
-                [](auto, const auto&) {},
-                kSubeventCode + 1));
+  EXPECT_NE(
+      0u,
+      cmd_channel()->SendLeAsyncCommand(
+          EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+              kOpCode),
+          [](auto, const auto&) {},
+          kSubeventCode + 1));
   RunUntilIdle();
 }
 
@@ -2012,7 +2018,10 @@ TEST_F(CommandChannelTest,
     event_count_0++;
   };
   auto id_0 = cmd_channel()->SendLeAsyncCommand(
-      CommandPacket::New(kOpCode0), std::move(event_cb_0), kSubeventCode);
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode0),
+      std::move(event_cb_0),
+      kSubeventCode);
   EXPECT_NE(0u, id_0);
 
   RunUntilIdle();
@@ -2038,7 +2047,10 @@ TEST_F(CommandChannelTest,
   // Command should be queued and not sent until after first complete event
   // received.
   auto id_1 = cmd_channel()->SendLeAsyncCommand(
-      CommandPacket::New(kOpCode1), std::move(event_cb_1), kSubeventCode);
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode1),
+      std::move(event_cb_1),
+      kSubeventCode);
   EXPECT_NE(0u, id_1);
   RunUntilIdle();
   EXPECT_EQ(0u, event_count_1);
@@ -2090,7 +2102,10 @@ TEST_F(
     event_count++;
   };
   auto id = cmd_channel()->SendLeAsyncCommand(
-      CommandPacket::New(kOpCode), std::move(event_cb), kSubeventCode);
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode),
+      std::move(event_cb),
+      kSubeventCode);
   EXPECT_NE(0u, id);
   RunUntilIdle();
   EXPECT_EQ(1u, event_count);
