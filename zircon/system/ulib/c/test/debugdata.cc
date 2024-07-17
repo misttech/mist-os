@@ -4,55 +4,90 @@
 
 #include "debugdata.h"
 
+#include <fidl/fuchsia.debugdata/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
-#include <lib/ld/testing/mock-debugdata.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
+#include <lib/zx/vmar.h>
+#include <lib/zx/vmo.h>
+#include <zircon/sanitizer.h>
 #include <zircon/status.h>
 
 #include <string>
+#include <unordered_map>
+#include <vector>
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include <fbl/string.h>
+#include <fbl/unique_fd.h>
+#include <fbl/vector.h>
+#include <zxtest/zxtest.h>
 
 #include "../sanitizers/fuchsia-io-constants.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 namespace {
-
-using ::testing::AllOf;
-using ::testing::Ne;
 
 constexpr char kTestHelper[] = "/pkg/bin/debugdata-test-helper";
 
 constexpr const char* kHelperPublishCommand = "publish_data";
 constexpr const char* kHelperPublishFailCommand = "publish_data_fail";
 
+struct Publisher : public fidl::WireServer<fuchsia_debugdata::Publisher> {
+  std::unordered_map<std::string, zx::vmo> data;
+
+  void Publish(PublishRequestView request, PublishCompleter::Sync&) override {
+    std::string name(request->data_sink.data(), request->data_sink.size());
+    data.emplace(name, std::move(request->data));
+  }
+
+  void Serve(async_dispatcher_t* dispatcher, std::unique_ptr<fs::SynchronousVfs>* vfs,
+             fidl::ClientEnd<fuchsia_io::Directory>* client_end) {
+    auto dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    auto node = fbl::MakeRefCounted<fs::Service>(
+        [dispatcher, this](fidl::ServerEnd<fuchsia_debugdata::Publisher> server_end) {
+          fidl::BindServer(dispatcher, std::move(server_end), this);
+          return ZX_OK;
+        });
+
+    dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>, node);
+
+    zx::result server_end = fidl::CreateEndpoints(client_end);
+    ASSERT_OK(server_end.status_value());
+
+    *vfs = std::make_unique<fs::SynchronousVfs>(dispatcher);
+    ASSERT_OK((*vfs)->ServeDirectory(std::move(dir), std::move(server_end.value()),
+                                     fs::Rights::ReadWrite()));
+  }
+};
+
 void RunHelper(const char* mode, const size_t action_count, const fdio_spawn_action_t* fdio_actions,
                int expected_return_code) {
   zx::job test_job;
-  zx_status_t status = zx::job::create(*zx::job::default_job(), 0, &test_job);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_OK(zx::job::create(*zx::job::default_job(), 0, &test_job));
   auto auto_call_kill_job = fit::defer([&test_job]() { test_job.kill(); });
 
   const char* args[] = {kTestHelper, mode, nullptr};
 
   zx::process process;
   char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
-  status = fdio_spawn_etc(test_job.get(), FDIO_SPAWN_CLONE_ALL & ~FDIO_SPAWN_CLONE_NAMESPACE,
-                          args[0], args, nullptr, action_count, fdio_actions,
-                          process.reset_and_get_address(), err_msg);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_OK(fdio_spawn_etc(test_job.get(), FDIO_SPAWN_CLONE_ALL & ~FDIO_SPAWN_CLONE_NAMESPACE,
+                           args[0], args, nullptr, action_count, fdio_actions,
+                           process.reset_and_get_address(), err_msg));
 
-  status = process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_OK(process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr));
 
   zx_info_process_t proc_info;
-  status = process.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_OK(process.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr));
   ASSERT_EQ(expected_return_code, proc_info.return_code);
 }
 
@@ -76,25 +111,25 @@ void RunHelperWithoutSvc(const char* mode, int expected_return_code) {
 }
 
 TEST(DebugDataTests, PublishData) {
-  auto mock = std::make_unique<::testing::StrictMock<ld::testing::MockDebugdata>>();
-  EXPECT_CALL(*mock,
-              Publish(kTestName,
-                      AllOf(ld::testing::ObjNameMatches(kTestName),
-                            ld::testing::VmoContentsMatch(std::string(
-                                reinterpret_cast<const char*>(kTestData), sizeof(kTestData)))),
-                      ld::testing::ObjKoidMatches(Ne(ZX_KOID_INVALID))));
+  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
+  std::unique_ptr<fs::SynchronousVfs> vfs;
+  fidl::ClientEnd<fuchsia_io::Directory> client_end;
+  Publisher svc;
+  ASSERT_NO_FATAL_FAILURE(svc.Serve(loop.dispatcher(), &vfs, &client_end));
 
-  ld::testing::MockSvcDirectory svc_dir;
-  ASSERT_NO_FATAL_FAILURE(svc_dir.Init());
-  ASSERT_NO_FATAL_FAILURE(svc_dir.AddEntry<fuchsia_debugdata::Publisher>(std::move(mock)));
+  ASSERT_NO_FATAL_FAILURE(RunHelperWithSvc(kHelperPublishCommand, std::move(client_end), 0));
 
-  fidl::ClientEnd<fuchsia_io::Directory> svc_client_end;
-  ASSERT_NO_FATAL_FAILURE(svc_dir.Serve(svc_client_end));
+  ASSERT_OK(loop.RunUntilIdle());
 
-  ASSERT_NO_FATAL_FAILURE(RunHelperWithSvc(kHelperPublishCommand, std::move(svc_client_end), 0));
+  loop.Shutdown();
+  vfs.reset();
 
-  zx_status_t status = svc_dir.loop().RunUntilIdle();
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  auto it = svc.data.find(kTestName);
+  ASSERT_TRUE(it != svc.data.end());
+
+  char content[sizeof(kTestData)];
+  ASSERT_OK(it->second.read(content, 0, sizeof(content)));
+  ASSERT_EQ(memcmp(content, kTestData, sizeof(kTestData)), 0);
 }
 
 TEST(DebugDataTests, PublishDataWithoutSvc) {
@@ -103,8 +138,7 @@ TEST(DebugDataTests, PublishDataWithoutSvc) {
 
 TEST(DebugDataTests, PublishDataWithBadSvc) {
   zx::channel client_channel_end, server_channel_end;
-  zx_status_t status = zx::channel::create(0, &client_channel_end, &server_channel_end);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+  ASSERT_OK(zx::channel::create(0, &client_channel_end, &server_channel_end));
   fidl::ClientEnd<fuchsia_io::Directory> client_end{
       std::move(client_channel_end),
   };
