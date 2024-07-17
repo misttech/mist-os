@@ -70,16 +70,19 @@ impl TTYState {
         self: &Arc<Self>,
         current_task: &CurrentTask,
     ) -> Result<Arc<Terminal>, Errno> {
-        let id = self.pts_ids_set.lock().get()?;
+        let id = self.pts_ids_set.lock().acquire()?;
         let terminal = Arc::new(Terminal::new(self.clone(), current_task.as_fscred(), id));
-        self.terminals.write().insert(id, Arc::downgrade(&terminal));
+        assert!(self.terminals.write().insert(id, Arc::downgrade(&terminal)).is_none());
         Ok(terminal)
     }
 
     /// Release the terminal identifier into the set of available identifier.
     pub fn release_terminal(&self, id: u32) -> Result<(), Errno> {
+        // We need to remove this terminal id from the set of terminals before we release the
+        // identifier. Otherwise, the id might be reused for a new terminal and we'll remove
+        // the *new* terminal with that identifier instead of the old one.
+        assert!(self.terminals.write().remove(&id).is_some());
         self.pts_ids_set.lock().release(id);
-        self.terminals.write().remove(&id);
         Ok(())
     }
 }
@@ -1226,15 +1229,15 @@ struct PtsIdsSet {
 }
 
 impl PtsIdsSet {
-    pub fn new(pts_count: u32) -> Self {
+    fn new(pts_count: u32) -> Self {
         Self { pts_count, next_id: 0, reclaimed_ids: BTreeSet::new() }
     }
 
-    pub fn release(&mut self, id: u32) {
+    fn release(&mut self, id: u32) {
         assert!(self.reclaimed_ids.insert(id))
     }
 
-    pub fn get(&mut self) -> Result<u32, Errno> {
+    fn acquire(&mut self) -> Result<u32, Errno> {
         match self.reclaimed_ids.iter().next() {
             Some(e) => {
                 let value = *e;

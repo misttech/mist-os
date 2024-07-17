@@ -20,9 +20,6 @@
 
                 // TODO(https://fxbug.dev/323209351): Re-enable flaky test.
                 "FdeventTest.timeout",
-
-                // TODO(https://fxbug.dev/353539087) deflake and enable
-                "ShellServiceTest.InteractivePtySubprocess",
             ],
         },
     ],
