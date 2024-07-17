@@ -238,8 +238,6 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
 template <typename Callback>
 bool Controller::FindDisplayInfo(DisplayId display_id, Callback callback) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-
   for (const DisplayInfo& display : displays_) {
     if (display.id == display_id) {
       callback(display);
