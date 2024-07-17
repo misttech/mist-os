@@ -105,6 +105,11 @@ constexpr bool OriginRectangleContains(const rect_u_t& outer, const rect_u_t& in
 // layers, so we limit the total number of layers to prevent blowing the stack.
 constexpr uint64_t kMaxLayers = 65536;
 
+// TODO(https://fxbug.dev/353627964): Make AssertHeld() a member function of fbl::Mutex.
+void AssertHeld(fbl::Mutex& mutex) __TA_ASSERT(mutex) {
+  ZX_DEBUG_ASSERT(mtx_trylock(mutex.GetInternal()) == thrd_busy);
+}
+
 }  // namespace
 
 namespace display {
@@ -733,7 +738,7 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
             !layer->waiting_images_.is_empty()) {
           {
             fbl::AutoLock lock(controller_->mtx());
-            controller_->AssertMtxAliasHeld(layer->displayed_image_->mtx());
+            controller_->AssertMtxAliasHeld(*layer->displayed_image_->mtx());
             layer->displayed_image_->StartRetire();
           }
           layer->displayed_image_ = nullptr;
@@ -1167,7 +1172,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
                                cpp20::span<const DisplayId> removed_display_ids) {
   ZX_DEBUG_ASSERT(controller_->IsRunningOnClientDispatcher());
 
-  controller_->AssertMtxAliasHeld(controller_->mtx());
+  controller_->AssertMtxAliasHeld(*controller_->mtx());
   for (DisplayId added_display_id : added_display_ids) {
     fbl::AllocChecker ac;
     auto config = fbl::make_unique_checked<DisplayConfig>(&ac);
@@ -1394,7 +1399,7 @@ bool Client::CleanUpAllImages() {
   {
     fbl::AutoLock lock(controller_->mtx());
     for (auto& image : images_) {
-      controller_->AssertMtxAliasHeld(image.mtx());
+      controller_->AssertMtxAliasHeld(*image.mtx());
       image.ResetFences();
     }
   }
@@ -1411,7 +1416,7 @@ bool Client::CleanUpImage(Image& image) {
   // Clean up any fences associated with the image
   {
     fbl::AutoLock lock(controller_->mtx());
-    controller_->AssertMtxAliasHeld(image.mtx());
+    controller_->AssertMtxAliasHeld(*image.mtx());
     image.ResetFences();
   }
 
@@ -1556,19 +1561,17 @@ void ClientProxy::SetOwnership(bool is_owner) {
       client_handler->SetOwnership(is_owner);
     }
     // update client_scheduled_tasks_
-    mtx_lock(&this->task_mtx_);
+    fbl::AutoLock task_lock(&task_mtx_);
     auto it = std::find_if(client_scheduled_tasks_.begin(), client_scheduled_tasks_.end(),
                            [&](std::unique_ptr<async::Task>& t) { return t.get() == task; });
     // Current task must have been added to the list.
     ZX_DEBUG_ASSERT(it != client_scheduled_tasks_.end());
     client_scheduled_tasks_.erase(it);
-    mtx_unlock(&this->task_mtx_);
   });
-  mtx_lock(&task_mtx_);
+  fbl::AutoLock task_lock(&task_mtx_);
   if (task->Post(controller_->client_dispatcher()->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
-  mtx_unlock(&task_mtx_);
 }
 
 void ClientProxy::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
@@ -1577,7 +1580,7 @@ void ClientProxy::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_i
 }
 
 void ClientProxy::ReapplySpecialConfigs() {
-  ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
+  AssertHeld(*controller_->mtx());
 
   zx::result<> result =
       controller_->engine_driver_client()->SetMinimumRgb(handler_.GetMinimumRgb());
@@ -1600,23 +1603,21 @@ void ClientProxy::ReapplyConfig() {
       client_handler->ApplyConfig();
     }
     // update client_scheduled_tasks_
-    mtx_lock(&this->task_mtx_);
+    fbl::AutoLock task_lock(&task_mtx_);
     auto it = std::find_if(client_scheduled_tasks_.begin(), client_scheduled_tasks_.end(),
                            [&](std::unique_ptr<async::Task>& t) { return t.get() == task; });
     // Current task must have been added to the list.
     ZX_DEBUG_ASSERT(it != client_scheduled_tasks_.end());
     client_scheduled_tasks_.erase(it);
-    mtx_unlock(&this->task_mtx_);
   });
-  mtx_lock(&task_mtx_);
+  fbl::AutoLock task_lock(&task_mtx_);
   if (task->Post(controller_->client_dispatcher()->async_dispatcher()) == ZX_OK) {
     client_scheduled_tasks_.push_back(std::move(task));
   }
-  mtx_unlock(&task_mtx_);
 }
 
 zx_status_t ClientProxy::OnCaptureComplete() {
-  ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
+  AssertHeld(*controller_->mtx());
   fbl::AutoLock l(&mtx_);
   if (enable_capture_) {
     handler_.CaptureCompleted();
@@ -1627,7 +1628,7 @@ zx_status_t ClientProxy::OnCaptureComplete() {
 
 zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestamp,
                                         ConfigStamp controller_stamp) {
-  ZX_DEBUG_ASSERT(mtx_trylock(controller_->mtx()) == thrd_busy);
+  AssertHeld(*controller_->mtx());
   fidl::Status event_sending_result = fidl::Status::Ok();
 
   ConfigStamp client_stamp = {};
@@ -1793,7 +1794,6 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
   node_.RecordString("priority", DebugStringFromClientPriority(handler_.priority()));
   is_owner_property_ = node_.CreateBool("is_owner", false);
 
-  mtx_init(&task_mtx_, mtx_plain);
   unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
   initial_cookie_ = VsyncAckCookie(rand_r(&seed));
   [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
@@ -1805,21 +1805,14 @@ ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority,
                          fit::function<void()> on_client_dead)
     : controller_(controller),
       handler_(controller_, this, client_priority, client_id),
-      on_client_dead_(std::move(on_client_dead)) {
-  mtx_init(&mtx_, mtx_plain);
-}
+      on_client_dead_(std::move(on_client_dead)) {}
 
 ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
                          fidl::ServerEnd<fhd::Coordinator> server_end)
     : controller_(controller),
-      handler_(controller_, this, client_priority, client_id, std::move(server_end)) {
-  mtx_init(&mtx_, mtx_plain);
-}
+      handler_(controller_, this, client_priority, client_id, std::move(server_end)) {}
 
-ClientProxy::~ClientProxy() {
-  mtx_destroy(&mtx_);
-  mtx_destroy(&task_mtx_);
-}
+ClientProxy::~ClientProxy() {}
 
 }  // namespace display
 

@@ -49,7 +49,7 @@ void Image::InitializeInspect(inspect::Node* parent_node) {
   retiring_property_ = node_.CreateBool("retiring", false);
 }
 
-mtx_t* Image::mtx() const { return controller_->mtx(); }
+fbl::Mutex* Image::mtx() const { return controller_->mtx(); }
 
 bool Image::InDoublyLinkedList() const { return doubly_linked_list_node_state_.InContainer(); }
 

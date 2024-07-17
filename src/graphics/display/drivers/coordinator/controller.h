@@ -29,6 +29,7 @@
 #include <memory>
 
 #include <fbl/array.h>
+#include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
@@ -155,8 +156,8 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
   // places where we believe a mutex aliases mtx()
-  void AssertMtxAliasHeld(mtx_t* m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(m == mtx()); }
-  mtx_t* mtx() const { return &mtx_; }
+  void AssertMtxAliasHeld(fbl::Mutex& m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(&m == mtx()); }
+  fbl::Mutex* mtx() const { return &mtx_; }
   const inspect::Inspector& inspector() const { return inspector_; }
 
   // Test helpers
@@ -196,7 +197,7 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   VsyncMonitor vsync_monitor_;
 
   // mtx_ is a global lock on state shared among clients.
-  mutable mtx_t mtx_;
+  mutable fbl::Mutex mtx_;
   bool unbinding_ __TA_GUARDED(mtx()) = false;
 
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());

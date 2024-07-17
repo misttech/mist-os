@@ -455,14 +455,14 @@ class ClientProxy {
  private:
   friend IntegrationTest;
 
-  mtx_t mtx_;
+  fbl::Mutex mtx_;
   Controller* const controller_;
 
   Client handler_;
   bool enable_vsync_ __TA_GUARDED(&mtx_) = false;
   bool enable_capture_ __TA_GUARDED(&mtx_) = false;
 
-  mtx_t task_mtx_;
+  fbl::Mutex task_mtx_;
   std::vector<std::unique_ptr<async::Task>> client_scheduled_tasks_ __TA_GUARDED(task_mtx_);
 
   // This variable is used to limit the number of errors logged in case of channel oom error

@@ -111,7 +111,7 @@ class Image : public fbl::RefCounted<Image>, public IdMappable<fbl::RefPtr<Image
   ConfigStamp latest_client_config_stamp() const { return latest_client_config_stamp_; }
 
   // Aliases controller_->mtx() for the purpose of thread-safety analysis.
-  mtx_t* mtx() const;
+  fbl::Mutex* mtx() const;
 
   // Checks if the Image is in a DoublyLinkedList container.
   bool InDoublyLinkedList() const __TA_REQUIRES(mtx());

@@ -214,7 +214,7 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
   }
 
   while (fbl::RefPtr<Image> image = removed_display->images.pop_front()) {
-    AssertMtxAliasHeld(image->mtx());
+    AssertMtxAliasHeld(*image->mtx());
     image->StartRetire();
     image->OnRetire();
   }
@@ -395,7 +395,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(
       if (should_retire) {
         fbl::RefPtr<Image> image_to_retire = info->images.erase(it++);
 
-        AssertMtxAliasHeld(image_to_retire->mtx());
+        AssertMtxAliasHeld(*image_to_retire->mtx());
         image_to_retire->OnRetire();
         // Older images may not be presented. Ending their flows here
         // ensures the correctness of traces.
@@ -557,7 +557,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
 
         // Set the image controller config stamp so vsync knows what config the
         // image was used at.
-        AssertMtxAliasHeld(image->mtx());
+        AssertMtxAliasHeld(*image->mtx());
         image->set_latest_controller_config_stamp(applied_config_stamp);
         image->StartPresent();
 
@@ -918,8 +918,6 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
       client_dispatcher_(std::move(client_dispatcher)),
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
-
-  mtx_init(&mtx_, mtx_plain);
 
   last_valid_apply_config_timestamp_ns_property_ =
       root_.CreateUint("last_valid_apply_config_timestamp_ns", 0);
