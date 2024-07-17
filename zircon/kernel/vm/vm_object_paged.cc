@@ -1002,6 +1002,10 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
     len -= processed_len;
 
     if (wait_on_page_request) {
+      // If the length is now zero we should not be waiting on a page request. This is both
+      // nonsensical, as we have already done all we needed, but also an error since if the wait
+      // were to fail we would error the commit, but not undo any potential pinning.
+      DEBUG_ASSERT(len > 0);
       DEBUG_ASSERT(can_block_on_page_requests());
       zx_status_t wait_status = ZX_OK;
       AssertHeld(lock_ref());
