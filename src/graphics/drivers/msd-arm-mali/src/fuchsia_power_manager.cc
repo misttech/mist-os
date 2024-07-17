@@ -163,15 +163,11 @@ void FuchsiaPowerManager::CheckRequiredLevel() {
       });
 }
 
-TimeoutSource::Clock::duration FuchsiaPowerManager::GetCurrentTimeoutDuration() {
+TimeoutSource::Clock::time_point FuchsiaPowerManager::GetCurrentTimeoutPoint() {
   if (!LeaseIsRequested()) {
-    return Clock::duration::max();
+    return Clock::time_point::max();
   }
-  auto time_point = owner_->GetPowerManager()->GetGpuPowerdownTimeout();
-  if (time_point == Clock::time_point::max()) {
-    return Clock::duration::max();
-  }
-  return time_point - Clock::now();
+  return owner_->GetPowerManager()->GetGpuPowerdownTimeout();
 }
 
 bool FuchsiaPowerManager::EnablePower() {

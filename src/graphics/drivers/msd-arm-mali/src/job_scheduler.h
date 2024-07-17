@@ -50,9 +50,9 @@ class JobScheduler : public TimeoutSource {
 
   size_t GetAtomListSize();
 
-  // Gets the duration until the earliest currently executing or waiting atom should time out, or
+  // Gets the time point when the earliest currently executing or waiting atom should time out, or
   // max if there's no timeout pending.
-  Clock::duration GetCurrentTimeoutDuration() override;
+  Clock::time_point GetCurrentTimeoutPoint() override;
   void TimeoutTriggered() override { HandleTimedOutAtoms(); }
   bool CheckForDeviceThreadDelay() override { return true; }
 

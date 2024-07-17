@@ -543,11 +543,12 @@ int MsdArmDevice::DeviceThreadLoop() {
 
   uint32_t timeout_count = 0;
   while (!device_thread_quit_flag_) {
-    auto timeout_duration = TimeoutSource::Clock::duration::max();
+    auto timeout_point = TimeoutSource::Clock::time_point::max();
     bool timeout_triggered = false;
+    auto current_time = TimeoutSource::Clock::now();
     for (TimeoutSource* source : timeout_sources_) {
-      auto duration = source->GetCurrentTimeoutDuration();
-      if (duration <= TimeoutSource::Clock::duration::zero()) {
+      auto timeout = source->GetCurrentTimeoutPoint();
+      if (timeout <= current_time) {
         if (source->CheckForDeviceThreadDelay()) {
           constexpr uint32_t kMaxConsecutiveTimeouts = 5;
           if (!device_request_semaphore_->WaitNoReset(0).ok() ||
@@ -564,7 +565,7 @@ int MsdArmDevice::DeviceThreadLoop() {
           timeout_triggered = true;
         }
       } else {
-        timeout_duration = std::min(timeout_duration, duration);
+        timeout_point = std::min(timeout_point, timeout);
       }
     }
     if (timeout_triggered) {
@@ -573,10 +574,13 @@ int MsdArmDevice::DeviceThreadLoop() {
     uint64_t key;
     uint64_t timestamp;
     magma::Status status(MAGMA_STATUS_OK);
-    if (timeout_duration < TimeoutSource::Clock::duration::max()) {
+    if (timeout_point < TimeoutSource::Clock::time_point::max()) {
       // Add 1 to avoid rounding time down and spinning with timeouts close to 0.
-      int64_t millisecond_timeout =
-          std::chrono::duration_cast<std::chrono::milliseconds>(timeout_duration).count() + 1;
+      // Get a new time since the loop could have taken some time.
+      int64_t millisecond_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        timeout_point - TimeoutSource::Clock::now())
+                                        .count() +
+                                    1;
       status = device_port_->Wait(&key, millisecond_timeout, &timestamp);
     } else {
       status = device_port_->Wait(&key, UINT64_MAX, &timestamp);

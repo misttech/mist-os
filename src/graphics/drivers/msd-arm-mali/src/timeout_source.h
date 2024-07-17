@@ -10,7 +10,7 @@ class TimeoutSource {
  public:
   using Clock = std::chrono::steady_clock;
 
-  virtual Clock::duration GetCurrentTimeoutDuration() = 0;
+  virtual Clock::time_point GetCurrentTimeoutPoint() = 0;
   virtual void TimeoutTriggered() = 0;
 
   // Returns true if the timeout shouldn't be triggered if the device thread has pending work (and

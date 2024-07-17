@@ -389,7 +389,7 @@ void JobScheduler::PlatformPortSignaled(uint64_t key) {
 
 size_t JobScheduler::GetAtomListSize() { return atoms_.size(); }
 
-JobScheduler::Clock::duration JobScheduler::GetCurrentTimeoutDuration() {
+JobScheduler::Clock::time_point JobScheduler::GetCurrentTimeoutPoint() {
   auto timeout_time = Clock::time_point::max();
   for (auto& atom : executing_atoms_) {
     if (!atom || atom->hard_stopped())
@@ -420,9 +420,7 @@ JobScheduler::Clock::duration JobScheduler::GetCurrentTimeoutDuration() {
       timeout_time = atom_timeout_time;
   }
 
-  if (timeout_time == Clock::time_point::max())
-    return Clock::duration::max();
-  return timeout_time - clock_callback_();
+  return timeout_time;
 }
 
 std::vector<msd::msd_client_id_t> JobScheduler::GetSignalingClients(uint64_t semaphore_koid) {

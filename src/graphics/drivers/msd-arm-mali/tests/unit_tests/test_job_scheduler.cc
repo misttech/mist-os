@@ -307,15 +307,13 @@ class TestJobScheduler {
     auto atom = std::make_shared<MsdArmAtom>(connection, 1, 0, 0, magma_arm_mali_user_data(), 0);
     MsdArmAtom* atom_ptr = atom.get();
     scheduler.EnqueueAtom(atom);
-    DASSERT(scheduler.GetCurrentTimeoutDuration() == JobScheduler::Clock::duration::max());
+    DASSERT(scheduler.GetCurrentTimeoutPoint() == JobScheduler::Clock::time_point::max());
 
     scheduler.TryToSchedule();
-    EXPECT_LE(scheduler.GetCurrentTimeoutDuration(), std::chrono::milliseconds(5000));
+    EXPECT_LE(scheduler.GetCurrentTimeoutPoint() - current_time, std::chrono::milliseconds(5000));
     EXPECT_EQ(0u, owner.hang_message_output_count());
-    while (scheduler.GetCurrentTimeoutDuration() > JobScheduler::Clock::duration::zero()) {
-      current_time +=
-          std::chrono::duration_cast<JobScheduler::Clock::duration>(std::chrono::milliseconds(1));
-    }
+    current_time = scheduler.GetCurrentTimeoutPoint();
+
     EXPECT_EQ(0u, owner.stopped_atoms().size());
     scheduler.HandleTimedOutAtoms();
     EXPECT_EQ(1u, owner.stopped_atoms().size());
@@ -325,13 +323,13 @@ class TestJobScheduler {
 
     // Second kill shouldn't do anything, since the atom has already been
     // stopped.
-    EXPECT_EQ(scheduler.GetCurrentTimeoutDuration(), JobScheduler::Clock::duration::max());
+    EXPECT_EQ(scheduler.GetCurrentTimeoutPoint(), JobScheduler::Clock::time_point::max());
     scheduler.HandleTimedOutAtoms();
     EXPECT_EQ(1u, owner.stopped_atoms().size());
 
     scheduler.JobCompleted(0, kArmMaliResultSuccess, 0u);
     EXPECT_EQ(nullptr, scheduler.executing_atom());
-    EXPECT_EQ(scheduler.GetCurrentTimeoutDuration(), JobScheduler::Clock::duration::max());
+    EXPECT_EQ(scheduler.GetCurrentTimeoutPoint(), JobScheduler::Clock::time_point::max());
   }
 
   void TestSemaphores(uint32_t semaphore_count = 1) {
@@ -487,7 +485,7 @@ class TestJobScheduler {
     auto atom = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphores, 0,
                                                  magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom);
-    DASSERT(scheduler.GetCurrentTimeoutDuration() == JobScheduler::Clock::duration::max());
+    ASSERT_EQ(scheduler.GetCurrentTimeoutPoint(), JobScheduler::Clock::time_point::max());
 
     auto atom2 = std::make_shared<MsdArmAtom>(connection, 0u, 0, 0, magma_arm_mali_user_data(), 0);
 
@@ -501,13 +499,11 @@ class TestJobScheduler {
     scheduler.EnqueueAtom(atom3);
 
     scheduler.TryToSchedule();
-    EXPECT_TRUE(scheduler.GetCurrentTimeoutDuration() <= std::chrono::milliseconds(5000));
+    EXPECT_TRUE(scheduler.GetCurrentTimeoutPoint() - current_time <=
+                std::chrono::milliseconds(5000));
     EXPECT_EQ(0u, owner.hang_message_output_count());
     EXPECT_EQ(0u, owner.semaphore_hang_message_output_count());
-    while (scheduler.GetCurrentTimeoutDuration() > JobScheduler::Clock::duration::zero()) {
-      current_time +=
-          std::chrono::duration_cast<JobScheduler::Clock::duration>(std::chrono::milliseconds(1));
-    }
+    current_time = scheduler.GetCurrentTimeoutPoint();
     scheduler.HandleTimedOutAtoms();
     EXPECT_EQ(kArmMaliResultSuccess, atom->result_code());
     EXPECT_EQ(kArmMaliResultSuccess, atom2->result_code());
@@ -515,7 +511,7 @@ class TestJobScheduler {
     EXPECT_EQ(1u, owner.semaphore_hang_message_output_count());
     EXPECT_EQ(1u, scheduler.found_signaler_atoms_for_testing_);
 
-    EXPECT_EQ(scheduler.GetCurrentTimeoutDuration(), JobScheduler::Clock::duration::max());
+    EXPECT_EQ(scheduler.GetCurrentTimeoutPoint(), JobScheduler::Clock::time_point::max());
     scheduler.HandleTimedOutAtoms();
     EXPECT_EQ(0u, owner.hang_message_output_count());
     EXPECT_EQ(1u, owner.semaphore_hang_message_output_count());
@@ -664,12 +660,14 @@ class TestJobScheduler {
       EXPECT_EQ(0u, owner.soft_stopped_atoms().size());
       current_time +=
           std::chrono::duration_cast<JobScheduler::Clock::duration>(std::chrono::milliseconds(100));
-      EXPECT_TRUE(scheduler.GetCurrentTimeoutDuration() <= JobScheduler::Clock::duration::zero());
+      EXPECT_TRUE(scheduler.GetCurrentTimeoutPoint() - current_time <=
+                  JobScheduler::Clock::duration::zero());
       scheduler.HandleTimedOutAtoms();
       EXPECT_EQ(0u, owner.hang_message_output_count());
       // The hard stop deadline should still be active, but not the tick deadline.
-      EXPECT_TRUE(scheduler.GetCurrentTimeoutDuration() > std::chrono::milliseconds(100));
-      EXPECT_TRUE(scheduler.GetCurrentTimeoutDuration() != JobScheduler::Clock::duration::max());
+      EXPECT_TRUE(scheduler.GetCurrentTimeoutPoint() - current_time >
+                  std::chrono::milliseconds(100));
+      EXPECT_TRUE(scheduler.GetCurrentTimeoutPoint() != JobScheduler::Clock::time_point::max());
     }
 
     EXPECT_EQ(1u, owner.soft_stopped_atoms().size());
