@@ -101,12 +101,9 @@ zx::result<> SoftmacIfcBridge::EthernetTx(eth::BorrowedOperation<>* op,
             fidl_request_persisted.error_value().status_string());
   }
 
-  // TODO(https://fxbug.dev/353547529): This copy could be removed if the message contained
-  // the eth::BorrowedOperation and there was an FFI to call Complete().
   auto result =
       zx::make_result(ethernet_tx_.transfer(ethernet_tx_.ctx, fidl_request_persisted.value().data(),
                                             fidl_request_persisted.value().size()));
-  op->Complete(result.status_value());
   return result;
 }
 
