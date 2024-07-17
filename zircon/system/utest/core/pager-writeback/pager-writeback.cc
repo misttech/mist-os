@@ -18,6 +18,9 @@
 
 namespace pager_tests {
 
+// This value corresponds to `VmObjectPaged::ReadWriteInternalLocked::kMaxWriteWaitPages`
+static constexpr uint64_t kMaxWriteWaitPages = 16;
+
 // Convenience macro for tests that want to create VMOs both with and without the ZX_VMO_TRAP_DIRTY
 // flag. |base_create_option| specifies the common create options to be used for both cases. The
 // test body must use the local variable |create_option| to create VMOs.
@@ -7660,6 +7663,53 @@ TEST(PagerWriteback, QueryEarlyTermination) {
   EXPECT_EQ(dirty_range.offset, 0);
   EXPECT_EQ(dirty_range.length, zx_system_get_page_size());
   EXPECT_EQ(actual, 2);
+}
+
+// Test that a large write absent pages generates correct requests.
+TEST(PagerWriteback, LargeWriteBatched) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr size_t kNumPages = 128;
+  constexpr size_t kPageSteps = 8;
+  static_assert(kNumPages % kPageSteps == 0);
+  static_assert(kPageSteps < kMaxWriteWaitPages);
+  static_assert(kMaxWriteWaitPages % kPageSteps == 0);
+  // Start the read at an offset to ensure there is a difference between the page requests VMO
+  // offset, and the offset from the start of the request.
+  constexpr size_t kStartOffset = 2;
+  constexpr size_t kVmoPages = kNumPages + kStartOffset;
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(kVmoPages, ZX_VMO_TRAP_DIRTY, &vmo));
+
+  std::vector<uint8_t> expected(kNumPages * zx_system_get_page_size(), 0);
+  vmo->GenerateBufferContents(expected.data(), kNumPages, kStartOffset);
+
+  TestThread t([&vmo, &expected] {
+    return vmo->vmo().write(expected.data(), kStartOffset * zx_system_get_page_size(),
+                            kNumPages * zx_system_get_page_size()) == ZX_OK;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  for (size_t i = 0; i < kNumPages; i += kMaxWriteWaitPages) {
+    // Expect to see a read request for the batch range.
+    ASSERT_TRUE(pager.WaitForPageRead(vmo, i + kStartOffset, kMaxWriteWaitPages, ZX_TIME_INFINITE));
+    // Supply the read request in pieces.
+    for (size_t j = 0; j < kMaxWriteWaitPages; j += kPageSteps) {
+      ASSERT_TRUE(pager.SupplyPages(vmo, i + j + kStartOffset, kPageSteps));
+    }
+    // Now there should be a dirty request for the batch range.
+    ASSERT_TRUE(
+        pager.WaitForPageDirty(vmo, i + kStartOffset, kMaxWriteWaitPages, ZX_TIME_INFINITE));
+    // Dirty the range in pieces.
+    for (size_t j = 0; j < kMaxWriteWaitPages; j += kPageSteps) {
+      ASSERT_TRUE(pager.DirtyPages(vmo, i + j + kStartOffset, kPageSteps));
+    }
+  }
+  ASSERT_TRUE(t.Wait());
+  ASSERT_TRUE(vmo->CheckVmo(kStartOffset, kNumPages));
 }
 
 TEST(PagerWriteback, Unbounded) {
