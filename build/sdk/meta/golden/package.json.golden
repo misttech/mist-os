@@ -27,8 +27,14 @@
                                 "description": "The target architecture for this package."
                             },
                             "api_level": {
-                                "description": "The API level this package is built against.",
-                                "type": "integer"
+                                "description": "The API level this package is built against. Either a positive integer less than 2147483648 (0x80000000) or the string name of a special API level.",
+                                "type": [
+                                    "integer",
+                                    "string"
+                                ],
+                                "minimum": 1,
+                                "maximum": 2147483647,
+                                "minLength": 3
                             },
                             "files": {
                                 "$ref": "#/definitions/fileGroup",
