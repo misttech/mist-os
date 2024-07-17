@@ -1860,6 +1860,20 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   // of the clone tree will still see |page|. As soon as we insert a new page, we'll need to
   // update all mappings at or below that level.
   bool skip_range_update = true;
+  // While inserting pages down the tree we attempt to avoid redundant range updates as much as
+  // possible by deferring range updates for the subtree we are going to modify again. We do
+  // eventually need to perform an update though, and this deferred method ensures that wherever we
+  // process to, be it to success or if we abort early due to an error, the subtree we had been
+  // deferring is updated.
+  auto complete_range_update = fit::defer([&]() {
+    DEBUG_ASSERT(cur);
+    if (!skip_range_update) {
+      AssertHeld(cur->lock_ref());
+      // We either successfully migrated/cloned the page all the way to our target, or we had an
+      // error part way along. Either way the subtree we reached needs an unmap done against it.
+      cur->RangeChangeUpdateLocked(cur_offset, PAGE_SIZE, RangeChangeOp::Unmap);
+    }
+  });
   do {
     // |target_page| is always located in |cur| at |cur_offset| at the start of the loop.
     VmCowPages* target_page_owner = cur;
@@ -1942,7 +1956,9 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       skip_range_update = false;
     }
 
-    // Skip the automatic range update so we can do it ourselves more efficiently.
+    // Skip the automatic range update so we can do it ourselves more efficiently. This gets handled
+    // either in the next code block below for the subtree we do not walk, or by the
+    // complete_range_update deferred method for our target subtree.
     VmPageOrMarker add_page = VmPageOrMarker::Page(target_page);
     zx_status_t status =
         cur->AddPageLocked(&add_page, cur_offset, CanOverwriteContent::Zero, nullptr, false);
@@ -1963,9 +1979,10 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
         other.RangeChangeUpdateFromParentLocked(cur_offset, PAGE_SIZE, &list);
         RangeChangeUpdateListLocked(&list, RangeChangeOp::Unmap);
       } else {
-        // In this case, cur is the last vmo being changed, so update its whole subtree.
+        // This is the last iteration of the loop and we need to unmap from this. As
+        // complete_range_update already handles this case we let it perform the update to avoid
+        // needing to reason about cancelling the deferred method.
         DEBUG_ASSERT(offset == cur_offset);
-        RangeChangeUpdateLocked(offset, PAGE_SIZE, RangeChangeOp::Unmap);
       }
     }
   } while (cur != this);
