@@ -43,6 +43,10 @@ zx_koid_t ExtractKoid(const fuchsia::ui::views::ViewRef& view_ref) {
   return fsl::GetKoid(view_ref.reference.get());
 }
 
+zx_koid_t ExtractKoid(const fuchsia_ui_views::ViewRef& view_ref) {
+  return fsl::GetKoid(view_ref.reference().get());
+}
+
 template <typename ZX_T>
 static auto CopyZxHandle(const ZX_T& handle) -> ZX_T {
   ZX_T handle_copy;
@@ -195,6 +199,19 @@ float GetOrientationAngle(fuchsia::ui::composition::Orientation orientation) {
     case Orientation::CCW_180_DEGREES:
       return -glm::pi<float>();
     case Orientation::CCW_270_DEGREES:
+      return -glm::three_over_two_pi<float>();
+  }
+}
+
+float GetOrientationAngle(fuchsia_ui_composition::Orientation orientation) {
+  switch (orientation) {
+    case fuchsia_ui_composition::Orientation::kCcw0Degrees:
+      return 0.f;
+    case fuchsia_ui_composition::Orientation::kCcw90Degrees:
+      return -glm::half_pi<float>();
+    case fuchsia_ui_composition::Orientation::kCcw180Degrees:
+      return -glm::pi<float>();
+    case fuchsia_ui_composition::Orientation::kCcw270Degrees:
       return -glm::three_over_two_pi<float>();
   }
 }

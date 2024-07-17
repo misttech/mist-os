@@ -5,8 +5,11 @@
 #ifndef SRC_UI_SCENIC_LIB_UTILS_HELPERS_H_
 #define SRC_UI_SCENIC_LIB_UTILS_HELPERS_H_
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
+#include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/zx/event.h>
 
 namespace utils {
@@ -26,6 +29,7 @@ fuchsia::ui::scenic::Present2Args CreatePresent2Args(zx_time_t requested_present
 
 // Helper for extracting the koid from a ViewRef.
 zx_koid_t ExtractKoid(const fuchsia::ui::views::ViewRef& view_ref);
+zx_koid_t ExtractKoid(const fuchsia_ui_views::ViewRef& view_ref);
 
 // Create an unsignalled zx::event.
 zx::event CreateEvent();
@@ -82,6 +86,7 @@ std::string GetArrayString(const std::string& name, const std::array<float, Dim>
 }
 
 float GetOrientationAngle(fuchsia::ui::composition::Orientation orientation);
+float GetOrientationAngle(fuchsia_ui_composition::Orientation orientation);
 
 uint32_t GetBytesPerPixel(const fuchsia::sysmem2::SingleBufferSettings& settings);
 uint32_t GetBytesPerPixel(const fuchsia::sysmem::SingleBufferSettings& settings);

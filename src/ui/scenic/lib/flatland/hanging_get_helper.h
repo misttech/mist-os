@@ -5,15 +5,23 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_HANGING_GET_HELPER_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_HANGING_GET_HELPER_H_
 
-#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/clone.h>
+#include <lib/fidl/cpp/comparison.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <mutex>
 
+// TODO(https://fxbug.dev/351845529): This is very strange.  Without this, there is a compilation
+// error in `hanging_get_helper_unittest.cc` even though:
+//   - the same file is included in `hanging_get_helper_unittest.cc`
+//   - none of these types are used in this file
+#include <fuchsia/ui/composition/cpp/fidl.h>
+
 namespace flatland {
+
 /// A helper class for managing [hanging get
 /// semantics](https://fuchsia.dev/fuchsia-src/development/api/fidl.md#delay-responses-using-hanging-gets).
 /// It responds with the most recently updated value.
@@ -29,6 +37,9 @@ namespace flatland {
 ///
 /// The templated Data parameter must be a FIDL type, one that supports both fidl::Clone and
 /// fidl::Equals.
+// TODO(https://fxbug.dev/351845529): the reliance on fidl::Clone and fidl::Equals is a roadblock
+// for completing the migration from HLCPP->Natural bindings; there are no analogous operations for
+// natural types.
 template <class Data>
 class HangingGetHelper {
  public:

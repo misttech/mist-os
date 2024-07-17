@@ -43,17 +43,15 @@ bool validate_eventpair(const zx::eventpair& a_object, zx_rights_t a_rights,
   return true;
 }
 
-bool validate_viewref(const fuchsia::ui::views::ViewRefControl& control_ref,
-                      const fuchsia::ui::views::ViewRef& view_ref) {
+static bool validate_viewref(const zx::eventpair& control_ref, const zx::eventpair& view_ref) {
   const zx_rights_t tight_rights = ZX_DEFAULT_EVENTPAIR_RIGHTS & (~ZX_RIGHT_DUPLICATE);
-  bool tight =
-      validate_eventpair(control_ref.reference, tight_rights, view_ref.reference, ZX_RIGHTS_BASIC);
+  bool tight = validate_eventpair(control_ref, tight_rights, view_ref, ZX_RIGHTS_BASIC);
   if (tight) {
     return true;
   }
 
-  bool loose = validate_eventpair(control_ref.reference, ZX_DEFAULT_EVENTPAIR_RIGHTS,
-                                  view_ref.reference, ZX_RIGHTS_BASIC);
+  bool loose =
+      validate_eventpair(control_ref, ZX_DEFAULT_EVENTPAIR_RIGHTS, view_ref, ZX_RIGHTS_BASIC);
   if (loose) {
     FX_LOGS(INFO) << "ViewRefControl is LOOSE.";
     return true;
@@ -61,6 +59,16 @@ bool validate_viewref(const fuchsia::ui::views::ViewRefControl& control_ref,
 
   FX_LOGS(INFO) << "ViewRefControl is invalid.";
   return false;
+}
+
+bool validate_viewref(const fuchsia::ui::views::ViewRefControl& control_ref,
+                      const fuchsia::ui::views::ViewRef& view_ref) {
+  return validate_viewref(control_ref.reference, view_ref.reference);
+}
+
+bool validate_viewref(const fuchsia_ui_views::ViewRefControl& control_ref,
+                      const fuchsia_ui_views::ViewRef& view_ref) {
+  return validate_viewref(control_ref.reference(), view_ref.reference());
 }
 
 }  // namespace utils

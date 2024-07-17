@@ -5,7 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_FLATLAND_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_FLATLAND_H_
 
-#include <fuchsia/ui/composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding.h>
@@ -18,6 +19,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "lib/zx/channel.h"
 #include "src/ui/lib/escher/flib/fence_queue.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_presenter.h"
@@ -37,41 +39,48 @@
 
 namespace flatland {
 
-// This is a WIP implementation of the 2D Layer API. It currently exists to run unit tests, and to
-// provide a platform for features to be iterated and implemented over time.
-// All methods following constructor run on |dispatcher_|.
-class Flatland : public fuchsia::ui::composition::Flatland,
+// Implements the `fuchsia.ui.composition.Flatland` protocol.  It is intended to run on its own
+// thread/dispatcher, and communicates with the main/render thread(s) via the UberStruct mechanism,
+// as well as other interfaces such as FlatlandPresenter.  Because `fuchsia.ui.composition.Flatland`
+// is a stateful protocol, each client is connected to a different Flatland object.
+class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
                  public std::enable_shared_from_this<Flatland> {
  public:
   using BufferCollectionId = uint64_t;
-  using ContentId = fuchsia::ui::composition::ContentId;
-  using FuturePresentationInfos = std::vector<fuchsia::scenic::scheduling::PresentationInfo>;
-  using TransformId = fuchsia::ui::composition::TransformId;
+  using ContentId = fuchsia_ui_composition::ContentId;
+  using FuturePresentationInfos = std::vector<fuchsia_scenic_scheduling::PresentationInfo>;
+  using TransformId = fuchsia_ui_composition::TransformId;
 
-  // Binds this Flatland object to serve |request| on |dispatcher|. The |destroy_instance_function|
-  // will be invoked from the Looper that owns |dispatcher| when this object is ready to be cleaned
-  // up (e.g. when the client closes their side of the channel or encounters makes an unrecoverable
-  // API call error).
+  // Instantiates a new Flatland object and binds it to serve the Flatland protocol over the
+  // `server_end` channel.  Method invocations received on this channel will be serviced on
+  // the thread managed by `dispatcher_holder`.
   //
-  // |flatland_presenter|, |link_system|, |uber_struct_queue|, and |buffer_collection_importers|
+  // The `destroy_instance_function` is called to notify the instance's manager that the instance
+  // should be destroyed.  This function is invoked on the thread owned by `dispatcher_holder`. When
+  // this function is invoked, the client FIDL connection has already been closed.  There are two
+  // situations that result in the invocation of `destroy_instance_function`:
+  //   - the client closes the FIDL channel
+  //   - the client makes illegal use of the API (or associated APIs like ChildViewWatcher)
+  //
+  // `flatland_presenter`, `link_system`, `uber_struct_queue`, and `buffer_collection_importers`
   // allow this Flatland object to access resources shared by all Flatland instances for actions
   // like frame scheduling, linking, buffer allocation, and presentation to the global scene graph.
   static std::shared_ptr<Flatland> New(
       std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
-      fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request,
+      fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end,
       scheduling::SessionId session_id, std::function<void()> destroy_instance_function,
       std::shared_ptr<FlatlandPresenter> flatland_presenter,
       std::shared_ptr<LinkSystem> link_system,
       std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
       const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
           buffer_collection_importers,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::Focuser>, zx_koid_t)>
+      fit::function<void(fidl::ServerEnd<fuchsia_ui_views::Focuser>, zx_koid_t)>
           register_view_focuser,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused>, zx_koid_t)>
+      fit::function<void(fidl::ServerEnd<fuchsia_ui_views::ViewRefFocused>, zx_koid_t)>
           register_view_ref_focused,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource>, zx_koid_t)>
+      fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::TouchSource>, zx_koid_t)>
           register_touch_source,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
+      fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::MouseSource>, zx_koid_t)>
           register_mouse_source);
 
   // Because this object captures its "this" pointer in internal closures, it is unsafe to copy or
@@ -83,91 +92,164 @@ class Flatland : public fuchsia::ui::composition::Flatland,
 
   ~Flatland() override;
 
-  // |fuchsia::ui::composition::Flatland|
-  void Present(fuchsia::ui::composition::PresentArgs args) override;
-  // |fuchsia::ui::composition::Flatland|
-  void CreateView(fuchsia::ui::views::ViewCreationToken token,
-                  fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
-                      parent_viewport_watcher) override;
-  void CreateView2(fuchsia::ui::views::ViewCreationToken token,
-                   fuchsia::ui::views::ViewIdentityOnCreation view_identity,
-                   fuchsia::ui::composition::ViewBoundProtocols protocols,
-                   fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
-                       parent_viewport_watcher) override;
-  // |fuchsia::ui::composition::Flatland|
+  // |fuchsia_ui_composition::Flatland|
+  void Present(PresentRequest& request, PresentCompleter::Sync& completer) override;
+  void Present(fuchsia_ui_composition::PresentArgs args);
+
+  // |fuchsia_ui_composition::Flatland|
+  void CreateView(CreateViewRequest& request, CreateViewCompleter::Sync& completer) override;
+  void CreateView(
+      fuchsia_ui_views::ViewCreationToken token,
+      fidl::ServerEnd<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher);
+  void CreateView2(CreateView2Request& request, CreateView2Completer::Sync& completer) override;
+  void CreateView2(
+      fuchsia_ui_views::ViewCreationToken token,
+      fuchsia_ui_views::ViewIdentityOnCreation view_identity,
+      fuchsia_ui_composition::ViewBoundProtocols protocols,
+      fidl::ServerEnd<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher);
+
+  // |fuchsia_ui_composition::Flatland|
   // TODO(https://fxbug.dev/42162046): Consider returning tokens for re-linking.
-  void ReleaseView() override;
-  // |fuchsia::ui::composition::Flatland|
-  void Clear() override;
-  // |fuchsia::ui::composition::Flatland|
-  void CreateTransform(TransformId transform_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetTranslation(TransformId transform_id, fuchsia::math::Vec translation) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetOrientation(TransformId transform_id,
-                      fuchsia::ui::composition::Orientation orientation) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetScale(TransformId transform_id, fuchsia::math::VecF scale) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetOpacity(TransformId transform_id, float value) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetClipBoundary(TransformId transform_id,
-                       std::unique_ptr<fuchsia::math::Rect> bounds) override;
-  // |fuchsia::ui::composition::Flatland|
-  void AddChild(TransformId parent_transform_id, TransformId child_transform_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void RemoveChild(TransformId parent_transform_id, TransformId child_transform_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetRootTransform(TransformId transform_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void CreateViewport(ContentId viewport_id, fuchsia::ui::views::ViewportCreationToken token,
-                      fuchsia::ui::composition::ViewportProperties properties,
-                      fidl::InterfaceRequest<fuchsia::ui::composition::ChildViewWatcher>
-                          child_view_watcher) override;
-  // |fuchsia::ui::composition::Flatland|
+  void ReleaseView(ReleaseViewCompleter::Sync& completer) override;
+  void ReleaseView();
+
+  // |fuchsia_ui_composition::Flatland|
+  void Clear(ClearCompleter::Sync& completer) override;
+  void Clear();
+
+  // |fuchsia_ui_composition::Flatland|
+  void CreateTransform(CreateTransformRequest& request,
+                       CreateTransformCompleter::Sync& completer) override;
+  void CreateTransform(TransformId transform_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetTranslation(SetTranslationRequest& request,
+                      SetTranslationCompleter::Sync& completer) override;
+  void SetTranslation(TransformId transform_id, fuchsia_math::Vec translation);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetOrientation(SetOrientationRequest& request,
+                      SetOrientationCompleter::Sync& completer) override;
+  void SetOrientation(TransformId transform_id, fuchsia_ui_composition::Orientation orientation);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetScale(SetScaleRequest& request, SetScaleCompleter::Sync& completer) override;
+  void SetScale(TransformId transform_id, fuchsia_math::VecF scale);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetOpacity(SetOpacityRequest& request, SetOpacityCompleter::Sync& completer) override;
+  void SetOpacity(TransformId transform_id, float value);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetClipBoundary(SetClipBoundaryRequest& request,
+                       SetClipBoundaryCompleter::Sync& completer) override;
+  void SetClipBoundary(TransformId transform_id, fidl::Box<fuchsia_math::Rect> bounds);
+
+  // |fuchsia_ui_composition::Flatland|
+  void AddChild(AddChildRequest& request, AddChildCompleter::Sync& completer) override;
+  void AddChild(TransformId parent_transform_id, TransformId child_transform_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void RemoveChild(RemoveChildRequest& request, RemoveChildCompleter::Sync& completer) override;
+  void RemoveChild(TransformId parent_transform_id, TransformId child_transform_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetRootTransform(SetRootTransformRequest& request,
+                        SetRootTransformCompleter::Sync& completer) override;
+  void SetRootTransform(TransformId transform_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void CreateViewport(CreateViewportRequest& request,
+                      CreateViewportCompleter::Sync& completer) override;
+  void CreateViewport(ContentId viewport_id, fuchsia_ui_views::ViewportCreationToken token,
+                      fuchsia_ui_composition::ViewportProperties properties,
+                      fidl::ServerEnd<fuchsia_ui_composition::ChildViewWatcher> child_view_watcher);
+
+  // |fuchsia_ui_composition::Flatland|
+  void CreateImage(CreateImageRequest& request, CreateImageCompleter::Sync& completer) override;
   void CreateImage(ContentId image_id,
-                   fuchsia::ui::composition::BufferCollectionImportToken import_token,
-                   uint32_t vmo_index,
-                   fuchsia::ui::composition::ImageProperties properties) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetImageSampleRegion(ContentId image_id, fuchsia::math::RectF rect) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetImageDestinationSize(ContentId image_id, fuchsia::math::SizeU size) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetImageBlendingFunction(ContentId image_id,
-                                fuchsia::ui::composition::BlendMode blend_mode) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetImageFlip(ContentId image_id, fuchsia::ui::composition::ImageFlip flip) override;
-  // |fuchsia::ui::composition::Flatland|
-  void CreateFilledRect(ContentId rect_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetSolidFill(ContentId rect_id, fuchsia::ui::composition::ColorRgba color,
-                    fuchsia::math::SizeU size) override;
-  // |fuchsia::ui::composition::Flatland|
-  void ReleaseFilledRect(ContentId rect_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetImageOpacity(ContentId image_id, float val) override;
-  // |fuchsia::ui::composition::Flatland|
+                   fuchsia_ui_composition::BufferCollectionImportToken import_token,
+                   uint32_t vmo_index, fuchsia_ui_composition::ImageProperties properties);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetImageSampleRegion(SetImageSampleRegionRequest& request,
+                            SetImageSampleRegionCompleter::Sync& completer) override;
+  void SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetImageDestinationSize(SetImageDestinationSizeRequest& request,
+                               SetImageDestinationSizeCompleter::Sync& completer) override;
+  void SetImageDestinationSize(ContentId image_id, fuchsia_math::SizeU size);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetImageBlendingFunction(SetImageBlendingFunctionRequest& request,
+                                SetImageBlendingFunctionCompleter::Sync& completer) override;
+  void SetImageBlendingFunction(ContentId image_id, fuchsia_ui_composition::BlendMode blend_mode);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetImageFlip(SetImageFlipRequest& request, SetImageFlipCompleter::Sync& completer) override;
+  void SetImageFlip(ContentId image_id, fuchsia_ui_composition::ImageFlip flip);
+
+  // |fuchsia_ui_composition::Flatland|
+  void CreateFilledRect(CreateFilledRectRequest& request,
+                        CreateFilledRectCompleter::Sync& completer) override;
+  void CreateFilledRect(ContentId rect_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetSolidFill(SetSolidFillRequest& request, SetSolidFillCompleter::Sync& completer) override;
+  void SetSolidFill(ContentId rect_id, fuchsia_ui_composition::ColorRgba color,
+                    fuchsia_math::SizeU size);
+
+  // |fuchsia_ui_composition::Flatland|
+  void ReleaseFilledRect(ReleaseFilledRectRequest& request,
+                         ReleaseFilledRectCompleter::Sync& completer) override;
+  void ReleaseFilledRect(ContentId rect_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetImageOpacity(SetImageOpacityRequest& request,
+                       SetImageOpacityCompleter::Sync& completer) override;
+  void SetImageOpacity(ContentId image_id, float opacity);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetHitRegions(SetHitRegionsRequest& request,
+                     SetHitRegionsCompleter::Sync& completer) override;
   void SetHitRegions(TransformId transform_id,
-                     std::vector<fuchsia::ui::composition::HitRegion> regions) override;
-  // |fuchsia::ui::composition::Flatland|
+                     std::vector<fuchsia_ui_composition::HitRegion> regions);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetInfiniteHitRegion(SetInfiniteHitRegionRequest& request,
+                            SetInfiniteHitRegionCompleter::Sync& completer) override;
   void SetInfiniteHitRegion(TransformId transform_id,
-                            fuchsia::ui::composition::HitTestInteraction hit_test) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetContent(TransformId transform_id, ContentId content_id) override;
-  // |fuchsia::ui::composition::Flatland|
+                            fuchsia_ui_composition::HitTestInteraction hit_test);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetContent(SetContentRequest& request, SetContentCompleter::Sync& completer) override;
+  void SetContent(TransformId transform_id, ContentId content_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetViewportProperties(SetViewportPropertiesRequest& request,
+                             SetViewportPropertiesCompleter::Sync& completer) override;
   void SetViewportProperties(ContentId viewport_id,
-                             fuchsia::ui::composition::ViewportProperties properties) override;
-  // |fuchsia::ui::composition::Flatland|
-  void ReleaseTransform(TransformId transform_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void ReleaseViewport(
-      ContentId viewport_id,
-      fuchsia::ui::composition::Flatland::ReleaseViewportCallback callback) override;
-  // |fuchsia::ui::composition::Flatland|
-  void ReleaseImage(ContentId image_id) override;
-  // |fuchsia::ui::composition::Flatland|
-  void SetDebugName(std::string name) override;
+                             fuchsia_ui_composition::ViewportProperties properties);
+
+  // |fuchsia_ui_composition::Flatland|
+  void ReleaseTransform(ReleaseTransformRequest& request,
+                        ReleaseTransformCompleter::Sync& completer) override;
+  void ReleaseTransform(TransformId transform_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void ReleaseViewport(ReleaseViewportRequest& request,
+                       ReleaseViewportCompleter::Sync& completer) override;
+  void ReleaseViewport(ContentId viewport_id,
+                       fit::function<void(fuchsia_ui_views::ViewportCreationToken)> completer);
+
+  // |fuchsia_ui_composition::Flatland|
+  void ReleaseImage(ReleaseImageRequest& request, ReleaseImageCompleter::Sync& completer) override;
+  void ReleaseImage(ContentId image_id);
+
+  // |fuchsia_ui_composition::Flatland|
+  void SetDebugName(SetDebugNameRequest& request, SetDebugNameCompleter::Sync& completer) override;
+  void SetDebugName(std::string name);
 
   // Called just before the FIDL client receives the event of the same name, indicating that this
   // Flatland instance should allow a |additional_present_credits| calls to Present().
@@ -200,45 +282,46 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   scheduling::SessionId GetSessionId() const;
 
  private:
-  Flatland(
-      std::shared_ptr<utils::DispatcherHolder> dispatcher_holder, scheduling::SessionId session_id,
-      std::function<void()> destroy_instance_function,
-      std::shared_ptr<FlatlandPresenter> flatland_presenter,
-      std::shared_ptr<LinkSystem> link_system,
-      std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
-      const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
-          buffer_collection_importers,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::Focuser>, zx_koid_t)>
-          register_view_focuser,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused>, zx_koid_t)>
-          register_view_ref_focused,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource>, zx_koid_t)>
-          register_touch_source,
-      fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
-          register_mouse_source);
+  Flatland(std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
+           scheduling::SessionId session_id, std::function<void()> destroy_instance_function,
+           std::shared_ptr<FlatlandPresenter> flatland_presenter,
+           std::shared_ptr<LinkSystem> link_system,
+           std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
+           const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
+               buffer_collection_importers,
+           fit::function<void(fidl::ServerEnd<fuchsia_ui_views::Focuser>, zx_koid_t)>
+               register_view_focuser,
+           fit::function<void(fidl::ServerEnd<fuchsia_ui_views::ViewRefFocused>, zx_koid_t)>
+               register_view_ref_focused,
+           fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::TouchSource>, zx_koid_t)>
+               register_touch_source,
+           fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::MouseSource>, zx_koid_t)>
+               register_mouse_source);
 
   // `Flatland::New()` dispatches a task to invoke this.
-  void Bind(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request);
+  void Bind(fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end);
+
+  void OnFidlClosed(fidl::UnbindInfo unbind_info);
 
   void ReportBadOperationError();
   void ReportLinkProtocolError(const std::string& error_log);
-  void CloseConnection(fuchsia::ui::composition::FlatlandError error);
+  void CloseConnection(fuchsia_ui_composition::FlatlandError error);
 
   // Note: Any new CreateView function must use this helper function for it to have the same
   // test coverage as its siblings.
-  void CreateViewHelper(fuchsia::ui::views::ViewCreationToken token,
-                        fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
-                            parent_viewport_watcher,
-                        std::optional<fuchsia::ui::views::ViewIdentityOnCreation> view_identity,
-                        std::optional<fuchsia::ui::composition::ViewBoundProtocols> protocols);
+  void CreateViewHelper(
+      fuchsia_ui_views::ViewCreationToken token,
+      fidl::ServerEnd<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher,
+      std::optional<fuchsia_ui_views::ViewIdentityOnCreation> view_identity,
+      std::optional<fuchsia_ui_composition::ViewBoundProtocols> protocols);
 
-  void RegisterViewBoundProtocols(fuchsia::ui::composition::ViewBoundProtocols protocols,
+  void RegisterViewBoundProtocols(fuchsia_ui_composition::ViewBoundProtocols protocols,
                                   zx_koid_t view_ref_koid);
 
   // Sets clip bounds on the provided transform handle. Takes in TransformHandle and not
   // TransformID as a parameter so that it can be applied to content transforms that do
   // not have an external ID that they are mapped to.
-  void SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Rect bounds);
+  void SetClipBoundaryInternal(TransformHandle handle, fuchsia_math::Rect bounds);
 
   // For each dead transform:
   //   1) remove the corresponding matrix
@@ -295,7 +378,7 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   // True if any function has failed since the previous call to Present(), false otherwise.
   bool failure_since_previous_present_ = false;
 
-  // True if there was errors in ParentViewportWatcher or ChildViewWatcher channel provided.
+  // True if there were errors in ParentViewportWatcher or ChildViewWatcher channels.
   bool link_protocol_error_ = false;
 
   // The number of Present() calls remaining before the client runs out. This value is potentially
@@ -341,7 +424,7 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   // Wraps a LinkSystem::LinkToChild and the properties currently associated with that link.
   struct LinkToChildData {
     LinkSystem::LinkToChild link;
-    fuchsia::ui::composition::ViewportProperties properties;
+    fuchsia_ui_composition::ViewportProperties properties;
   };
 
   // A mapping from Flatland-generated TransformHandle to the LinkToChildData it represents.
@@ -358,15 +441,15 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   // origin as defined by the translation), and scale (relative to the new rotated origin).
   class MatrixData {
    public:
-    void SetTranslation(fuchsia::math::Vec translation);
-    void SetOrientation(fuchsia::ui::composition::Orientation orientation);
-    void SetScale(fuchsia::math::VecF scale);
+    void SetTranslation(fuchsia_math::Vec translation);
+    void SetOrientation(fuchsia_ui_composition::Orientation orientation);
+    void SetScale(fuchsia_math::VecF scale);
 
     // Returns this geometric transformation as a single 3x3 matrix using the order of operations
     // above: translation, orientation, then scale.
     glm::mat3 GetMatrix() const;
 
-    static float GetOrientationAngle(fuchsia::ui::composition::Orientation orientation);
+    static float GetOrientationAngle(fuchsia_ui_composition::Orientation orientation);
 
    private:
     // Applies the translation, then orientation, then scale to the identity matrix.
@@ -422,38 +505,32 @@ class Flatland : public fuchsia::ui::composition::Flatland,
   std::shared_ptr<std::unordered_set<allocation::GlobalImageId>> images_to_release_;
 
   // Callbacks for registering View-bound protocols.
-  fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::Focuser>, zx_koid_t)>
-      register_view_focuser_;
-  fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused>, zx_koid_t)>
+  fit::function<void(fidl::ServerEnd<fuchsia_ui_views::Focuser>, zx_koid_t)> register_view_focuser_;
+  fit::function<void(fidl::ServerEnd<fuchsia_ui_views::ViewRefFocused>, zx_koid_t)>
       register_view_ref_focused_;
-  fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource>, zx_koid_t)>
+  fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::TouchSource>, zx_koid_t)>
       register_touch_source_;
-  fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
+  fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::MouseSource>, zx_koid_t)>
       register_mouse_source_;
 
   class BindingData {
    public:
     BindingData(Flatland* flatland, async_dispatcher_t* dispatcher,
-                fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request);
+                fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end);
 
     // Send `OnFramePresented` FIDL event to client.
-    void SendOnFramePresented(fuchsia::scenic::scheduling::FramePresentedInfo info);
+    void SendOnFramePresented(fuchsia_scenic_scheduling::FramePresentedInfo info);
 
     // Send `OnNextFrameBegin` FIDL event to client.
     void SendOnNextFrameBegin(uint32_t additional_present_credits,
                               FuturePresentationInfos presentation_infos);
 
-    void CloseConnection(fuchsia::ui::composition::FlatlandError error);
+    void CloseConnection(fuchsia_ui_composition::FlatlandError error);
 
    private:
     // The FIDL binding for this Flatland instance, which references |this| as the implementation
     // and run on |dispatcher_|.
-    fidl::Binding<fuchsia::ui::composition::Flatland> binding_;
-
-    // Waits for the invalidation of the bound channel, then triggers the destruction of this
-    // client. Uses WaitOnce since calling the handler will result in the destruction of this
-    // object.
-    async::WaitOnce peer_closed_waiter_;
+    fidl::ServerBinding<fuchsia_ui_composition::Flatland> binding_;
   };
 
   std::unique_ptr<BindingData> binding_data_;

@@ -4,14 +4,19 @@
 
 #include "src/ui/scenic/lib/flatland/flatland.h"
 
+#include <fidl/fuchsia.math/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/natural_ostream.h>
+#include <fidl/fuchsia.ui.composition/cpp/natural_types.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/zx/eventpair.h>
 #include <limits.h>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <sstream>
@@ -19,7 +24,6 @@
 #include <utility>
 #include <vector>
 
-#include "src/lib/fostr/fidl/fuchsia.math/amendments.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -33,21 +37,21 @@
 #include <glm/gtc/matrix_access.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-using fuchsia::math::RectF;
-using fuchsia::math::SizeU;
-using fuchsia::math::Vec;
-using fuchsia::math::VecF;
-using fuchsia::ui::composition::ChildViewStatus;
-using fuchsia::ui::composition::ChildViewWatcher;
-using fuchsia::ui::composition::FlatlandError;
-using fuchsia::ui::composition::HitRegion;
-using fuchsia::ui::composition::ImageProperties;
-using fuchsia::ui::composition::OnNextFrameBeginValues;
-using fuchsia::ui::composition::Orientation;
-using fuchsia::ui::composition::ParentViewportWatcher;
-using fuchsia::ui::composition::ViewportProperties;
-using fuchsia::ui::views::ViewCreationToken;
-using fuchsia::ui::views::ViewportCreationToken;
+using fuchsia_math::RectF;
+using fuchsia_math::SizeU;
+using fuchsia_math::Vec;
+using fuchsia_math::VecF;
+using fuchsia_ui_composition::ChildViewStatus;
+using fuchsia_ui_composition::ChildViewWatcher;
+using fuchsia_ui_composition::FlatlandError;
+using fuchsia_ui_composition::HitRegion;
+using fuchsia_ui_composition::ImageProperties;
+using fuchsia_ui_composition::OnNextFrameBeginValues;
+using fuchsia_ui_composition::Orientation;
+using fuchsia_ui_composition::ParentViewportWatcher;
+using fuchsia_ui_composition::ViewportProperties;
+using fuchsia_ui_views::ViewCreationToken;
+using fuchsia_ui_views::ViewportCreationToken;
 
 namespace {
 
@@ -59,22 +63,22 @@ void ClampIfNear(float* val, float difference) {
 }
 
 std::optional<std::string> ValidateViewportProperties(const ViewportProperties& properties) {
-  if (properties.has_logical_size()) {
-    const auto logical_size = properties.logical_size();
-    if (logical_size.width == 0 || logical_size.height == 0) {
+  if (properties.logical_size().has_value()) {
+    const auto& logical_size = properties.logical_size();
+    if (logical_size->width() == 0 || logical_size->height() == 0) {
       std::ostringstream stream;
-      stream << "Logical_size components must be positive, given (" << logical_size.width << ", "
-             << logical_size.height << ")";
+      stream << "Logical_size components must be positive, given (" << logical_size->width() << ", "
+             << logical_size->height() << ")";
       return stream.str();
     }
   }
 
-  if (properties.has_inset()) {
+  if (properties.inset().has_value()) {
     const auto inset = properties.inset();
-    if (inset.top < 0 || inset.right < 0 || inset.bottom < 0 || inset.left < 0) {
+    if (inset->top() < 0 || inset->right() < 0 || inset->bottom() < 0 || inset->left() < 0) {
       std::ostringstream stream;
-      stream << "Inset components must be >= 0, given (" << inset.top << ", " << inset.right << ", "
-             << inset.bottom << ", " << inset.left << ")";
+      stream << "Inset components must be >= 0, given (" << inset->top() << ", " << inset->right()
+             << ", " << inset->bottom() << ", " << inset->left() << ")";
       return stream.str();
     }
   }
@@ -83,13 +87,13 @@ std::optional<std::string> ValidateViewportProperties(const ViewportProperties& 
 }
 
 void SetViewportPropertiesMissingDefaults(ViewportProperties& properties,
-                                          const fuchsia::math::SizeU& logical_size,
-                                          const fuchsia::math::Inset& inset) {
-  if (!properties.has_logical_size()) {
-    properties.set_logical_size(logical_size);
+                                          const fuchsia_math::SizeU& logical_size,
+                                          const fuchsia_math::Inset& inset) {
+  if (!properties.logical_size().has_value()) {
+    properties.logical_size(logical_size);
   }
-  if (!properties.has_inset()) {
-    properties.set_inset(inset);
+  if (!properties.inset().has_value()) {
+    properties.inset(inset);
   }
 }
 
@@ -99,19 +103,19 @@ namespace flatland {
 
 std::shared_ptr<Flatland> Flatland::New(
     std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
-    fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request,
-    scheduling::SessionId session_id, std::function<void()> destroy_instance_function,
+    fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end, scheduling::SessionId session_id,
+    std::function<void()> destroy_instance_function,
     std::shared_ptr<FlatlandPresenter> flatland_presenter, std::shared_ptr<LinkSystem> link_system,
     std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
     const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
         buffer_collection_importers,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::Focuser>, zx_koid_t)>
+    fit::function<void(fidl::ServerEnd<fuchsia_ui_views::Focuser>, zx_koid_t)>
         register_view_focuser,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused>, zx_koid_t)>
+    fit::function<void(fidl::ServerEnd<fuchsia_ui_views::ViewRefFocused>, zx_koid_t)>
         register_view_ref_focused,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource>, zx_koid_t)>
+    fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::TouchSource>, zx_koid_t)>
         register_touch_source,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
+    fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::MouseSource>, zx_koid_t)>
         register_mouse_source) {
   // clang-format off
   auto flatland = std::shared_ptr<Flatland>(new Flatland(
@@ -129,33 +133,34 @@ std::shared_ptr<Flatland> Flatland::New(
   // clang-format on
 
   // Natural FIDL bindings must be created and deleted on the same thread that it handles messages.
-  async::PostTask(
-      dispatcher_holder->dispatcher(),
-      [flatland, request = std::move(request)]() mutable { flatland->Bind(std::move(request)); });
+  async::PostTask(dispatcher_holder->dispatcher(),
+                  [flatland, server_end = std::move(server_end)]() mutable {
+                    flatland->Bind(std::move(server_end));
+                  });
 
   return flatland;
 }
 
-Flatland::Flatland(
-    std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
-
-    scheduling::SessionId session_id, std::function<void()> destroy_instance_function,
-    std::shared_ptr<FlatlandPresenter> flatland_presenter, std::shared_ptr<LinkSystem> link_system,
-    std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
-    const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
-        buffer_collection_importers,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::Focuser>, zx_koid_t)>
-        register_view_focuser,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused>, zx_koid_t)>
-        register_view_ref_focused,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource>, zx_koid_t)>
-        register_touch_source,
-    fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
-        register_mouse_source)
+Flatland::Flatland(std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
+                   scheduling::SessionId session_id,
+                   std::function<void()> destroy_instance_function,
+                   std::shared_ptr<FlatlandPresenter> flatland_presenter,
+                   std::shared_ptr<LinkSystem> link_system,
+                   std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
+                   const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
+                       buffer_collection_importers,
+                   fit::function<void(fidl::ServerEnd<fuchsia_ui_views::Focuser>, zx_koid_t)>
+                       register_view_focuser,
+                   fit::function<void(fidl::ServerEnd<fuchsia_ui_views::ViewRefFocused>, zx_koid_t)>
+                       register_view_ref_focused,
+                   fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::TouchSource>, zx_koid_t)>
+                       register_touch_source,
+                   fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::MouseSource>, zx_koid_t)>
+                       register_mouse_source)
     : dispatcher_holder_(std::move(dispatcher_holder)),
       session_id_(session_id),
       destroy_instance_function_(std::move(destroy_instance_function)),
-      present2_helper_([this](fuchsia::scenic::scheduling::FramePresentedInfo info) {
+      present2_helper_([this](fuchsia_scenic_scheduling::FramePresentedInfo info) {
         // If this callback is invoked, we know that `Present()` must have been called, and
         // therefore also know that binding must have been completed, because otherwise `Present()`
         // wouldn't have been called.
@@ -183,45 +188,43 @@ Flatland::Flatland(
   FLATLAND_VERBOSE_LOG << "Flatland new with ID: " << session_id_;
 }
 
-void Flatland::Bind(fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request) {
+void Flatland::Bind(fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end) {
+  // Only called once, by the constructor.
   FX_DCHECK(!binding_data_);
   binding_data_ =
-      std::make_unique<BindingData>(this, dispatcher_holder_->dispatcher(), std::move(request));
+      std::make_unique<BindingData>(this, dispatcher_holder_->dispatcher(), std::move(server_end));
+
+  FLATLAND_VERBOSE_LOG << "Flatland with ID: " << session_id_ << "  bound to FIDL channel.";
 }
 
-Flatland::BindingData::BindingData(
-    Flatland* flatland, async_dispatcher_t* dispatcher,
-    fidl::InterfaceRequest<fuchsia::ui::composition::Flatland> request)
-    : binding_(flatland, std::move(request), dispatcher),
-      peer_closed_waiter_(binding_.channel().get(), ZX_CHANNEL_PEER_CLOSED) {
-  zx_status_t status = peer_closed_waiter_.Begin(
-      dispatcher, [flatland](async_dispatcher_t* dispatcher, async::WaitOnce* wait,
-                             zx_status_t status, const zx_packet_signal_t* signal) {
-        if (!flatland->destroy_instance_function_was_invoked_) {
-          flatland->destroy_instance_function_was_invoked_ = true;
-          flatland->destroy_instance_function_();
-        }
-      });
-  FX_DCHECK(status == ZX_OK) << "peer_closed_waiter_.Begin() failed with status: " << status;
-}
+Flatland::BindingData::BindingData(Flatland* flatland, async_dispatcher_t* dispatcher,
+                                   fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end)
+    : binding_(dispatcher, std::move(server_end), flatland, std::mem_fn(&Flatland::OnFidlClosed)) {}
 
 void Flatland::BindingData::SendOnFramePresented(
-    fuchsia::scenic::scheduling::FramePresentedInfo info) {
-  if (!binding_.is_bound()) {
-    return;
+    fuchsia_scenic_scheduling::FramePresentedInfo info) {
+  auto result = fidl::SendEvent(binding_)->OnFramePresented(
+      fuchsia_ui_composition::FlatlandOnFramePresentedRequest(std::move(info)));
+  if (result.is_error()) {
+    auto& error = result.error_value().error();
+    FX_LOGS(WARNING) << "SendOnFramePresented(): error while sending FIDL event: " << error.status()
+                     << " " << error.status_string();
   }
-  binding_.events().OnFramePresented(std::move(info));
 }
 
 void Flatland::BindingData::SendOnNextFrameBegin(uint32_t additional_present_credits,
                                                  FuturePresentationInfos presentation_infos) {
-  if (!binding_.is_bound()) {
-    return;
-  }
   OnNextFrameBeginValues values;
-  values.set_additional_present_credits(additional_present_credits);
-  values.set_future_presentation_infos(std::move(presentation_infos));
-  binding_.events().OnNextFrameBegin(std::move(values));
+  values.additional_present_credits(additional_present_credits);
+  values.future_presentation_infos(std::move(presentation_infos));
+
+  auto result = fidl::SendEvent(binding_)->OnNextFrameBegin(
+      fuchsia_ui_composition::FlatlandOnNextFrameBeginRequest(std::move(values)));
+  if (result.is_error()) {
+    auto& error = result.error_value().error();
+    FX_LOGS(WARNING) << "SendOnNextFrameBegin(): error while sending FIDL event: " << error.status()
+                     << " " << error.status_string();
+  }
 }
 
 void Flatland::BindingData::CloseConnection(FlatlandError error) {
@@ -230,10 +233,12 @@ void Flatland::BindingData::CloseConnection(FlatlandError error) {
   // destroy_instance_function_ has been or will be invoked).
 
   // Send the error to the client before closing the connection.
-  binding_.events().OnError(error);
-
-  // Cancel the async::Wait before closing the connection, or it will assert on destruction.
-  peer_closed_waiter_.Cancel();
+  auto result = fidl::SendEvent(binding_)->OnError(error);
+  if (result.is_error()) {
+    auto& error = result.error_value().error();
+    FX_LOGS(WARNING) << "CloseConnection(): error while sending FIDL event: " << error.status()
+                     << " " << error.status_string();
+  }
 
   // Immediately close the FIDL interface to prevent future requests.
   binding_.Close(ZX_ERR_BAD_STATE);
@@ -285,11 +290,16 @@ Flatland::~Flatland() {
   // This will signal the release fence (if any) that we pass to it, and therefore enable the wait
   // above to succeed.
   flatland_presenter_->RemoveSession(session_id_, std::move(image_release_fence));
+
+  FLATLAND_VERBOSE_LOG << "Flatland destructor ran for ID: " << session_id_;
 }
 
-void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
-  TRACE_DURATION("gfx", "Flatland::Present", "debug_name", TA_STRING(debug_name_.c_str()));
+void Flatland::Present(PresentRequest& request, PresentCompleter::Sync& completer) {
+  Present(std::move(request.args()));
+}
 
+void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
+  TRACE_DURATION("gfx", "Flatland::Present", "debug_name", TA_STRING(debug_name_.c_str()));
   std::string per_app_tracing_name = "Flatland::PerAppPresent[" + debug_name_ + "]";
   TRACE_DURATION("gfx", per_app_tracing_name.c_str());
   TRACE_FLOW_END("gfx", per_app_tracing_name.c_str(), present_count_);
@@ -302,30 +312,30 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
   // Close any clients that had invalid operations on link protocols.
   if (link_protocol_error_) {
     error_reporter_->ERROR() << "Link protocol error";
-    CloseConnection(FlatlandError::BAD_HANGING_GET);
+    CloseConnection(FlatlandError::kBadHangingGet);
     return;
   }
 
   // Close any clients that call Present() without any present tokens.
   if (present_credits_ == 0) {
     error_reporter_->ERROR() << "Out of present credits";
-    CloseConnection(FlatlandError::NO_PRESENTS_REMAINING);
+    CloseConnection(FlatlandError::kNoPresentsRemaining);
     return;
   }
   present_credits_--;
 
   // If any fields are missing, replace them with the default values.
-  if (!args.has_requested_presentation_time()) {
-    args.set_requested_presentation_time(0);
+  if (!args.requested_presentation_time().has_value()) {
+    args.requested_presentation_time(0);
   }
-  if (!args.has_release_fences()) {
-    args.set_release_fences({});
+  if (!args.release_fences().has_value()) {
+    args.release_fences(std::vector<zx::event>{});
   }
-  if (!args.has_acquire_fences()) {
-    args.set_acquire_fences({});
+  if (!args.acquire_fences().has_value()) {
+    args.acquire_fences(std::vector<zx::event>{});
   }
-  if (!args.has_unsquashable()) {
-    args.set_unsquashable(false);
+  if (!args.unsquashable().has_value()) {
+    args.unsquashable(false);
   }
 
   auto root_handle = GetRoot();
@@ -341,7 +351,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
   failure_since_previous_present_ |= !data.cyclical_edges.empty();
 
   if (failure_since_previous_present_) {
-    CloseConnection(FlatlandError::BAD_OPERATION);
+    CloseConnection(FlatlandError::kBadOperation);
     return;
   }
 
@@ -402,7 +412,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
     FX_DCHECK(status == ZX_OK) << "status is: " << status;
 
     // Push the new release fence into the user-provided list.
-    args.mutable_release_fences()->push_back(std::move(image_release_fence));
+    args.release_fences()->push_back(std::move(image_release_fence));
   }
 
   auto uber_struct = std::make_unique<UberStruct>();
@@ -459,10 +469,10 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
   // TODO(https://fxbug.dev/42156567): make the fences be the first arg, and the closure be the
   // second.
   fence_queue_->QueueTask(
-      [this, present_id, requested_presentation_time = args.requested_presentation_time(),
-       unsquashable = args.unsquashable(), uber_struct = std::move(uber_struct),
+      [this, present_id, requested_presentation_time = args.requested_presentation_time().value(),
+       unsquashable = args.unsquashable().value(), uber_struct = std::move(uber_struct),
        link_operations = std::move(pending_link_operations_),
-       release_fences = std::move(*args.mutable_release_fences())]() mutable {
+       release_fences = std::move(*args.release_fences())]() mutable {
         // NOTE: this name is important for benchmarking.  Do not remove or modify it
         // without also updating the "process_gfx_trace.go" script.
         TRACE_DURATION("gfx", "scenic_impl::Session::ScheduleNextPresent", "session_id",
@@ -483,7 +493,8 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
           operation();
         }
       },
-      std::move(*args.mutable_acquire_fences()));
+      std::move(*args.acquire_fences()));
+  pending_link_operations_.clear();
 
   // We exited early in this method if there was a failure, and none of the subsequent operations
   // are allowed to trigger a failure (all failure possibilities should be checked before the
@@ -491,36 +502,48 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
   FX_DCHECK(!failure_since_previous_present_);
 }
 
-void Flatland::CreateView(ViewCreationToken token,
-                          fidl::InterfaceRequest<ParentViewportWatcher> parent_viewport_watcher) {
+void Flatland::CreateView(CreateViewRequest& request, CreateViewCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Flatland::CreateView", "debug_name", TA_STRING(debug_name_.c_str()));
+  CreateView(std::move(request.token()), std::move(request.parent_viewport_watcher()));
+}
+
+void Flatland::CreateView(
+    fuchsia_ui_views::ViewCreationToken token,
+    fidl::ServerEnd<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher) {
   CreateViewHelper(std::move(token), std::move(parent_viewport_watcher), std::nullopt,
                    std::nullopt);
 }
 
-void Flatland::CreateView2(ViewCreationToken token,
-                           fuchsia::ui::views::ViewIdentityOnCreation view_identity,
-                           fuchsia::ui::composition::ViewBoundProtocols protocols,
-                           fidl::InterfaceRequest<ParentViewportWatcher> parent_viewport_watcher) {
+void Flatland::CreateView2(CreateView2Request& request, CreateView2Completer::Sync& completer) {
   TRACE_DURATION("gfx", "Flatland::CreateView2", "debug_name", TA_STRING(debug_name_.c_str()));
+  CreateView2(std::move(request.token()), std::move(request.view_identity()),
+              std::move(request.protocols()), std::move(request.parent_viewport_watcher()));
+}
+
+void Flatland::CreateView2(
+    fuchsia_ui_views::ViewCreationToken token,
+    fuchsia_ui_views::ViewIdentityOnCreation view_identity,
+    fuchsia_ui_composition::ViewBoundProtocols protocols,
+    fidl::ServerEnd<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher) {
   CreateViewHelper(std::move(token), std::move(parent_viewport_watcher), std::move(view_identity),
                    std::move(protocols));
 }
 
 void Flatland::CreateViewHelper(
-    ViewCreationToken token, fidl::InterfaceRequest<ParentViewportWatcher> parent_viewport_watcher,
-    std::optional<fuchsia::ui::views::ViewIdentityOnCreation> view_identity,
-    std::optional<fuchsia::ui::composition::ViewBoundProtocols> protocols) {
+    fuchsia_ui_views::ViewCreationToken token,
+    fidl::ServerEnd<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher,
+    std::optional<fuchsia_ui_views::ViewIdentityOnCreation> view_identity,
+    std::optional<fuchsia_ui_composition::ViewBoundProtocols> protocols) {
   // Attempting to link with an invalid token will never succeed, so its better to fail early and
   // immediately close the link connection.
-  if (!token.value.is_valid()) {
+  if (!token.value().is_valid()) {
     error_reporter_->ERROR() << "CreateView failed, ViewCreationToken was invalid";
     ReportBadOperationError();
     return;
   }
 
   if (view_identity.has_value() &&
-      !utils::validate_viewref(view_identity->view_ref_control, view_identity->view_ref)) {
+      !utils::validate_viewref(view_identity->view_ref_control(), view_identity->view_ref())) {
     error_reporter_->ERROR() << "CreateView failed, ViewIdentityOnCreation was invalid";
     ReportBadOperationError();
     return;
@@ -530,7 +553,8 @@ void Flatland::CreateViewHelper(
 
   if (protocols.has_value()) {
     FX_DCHECK(view_identity.has_value()) << "required for view-bound protocols";
-    RegisterViewBoundProtocols(std::move(*protocols), utils::ExtractKoid(view_identity->view_ref));
+    RegisterViewBoundProtocols(std::move(*protocols),
+                               utils::ExtractKoid(view_identity->view_ref()));
   }
   // This portion of the method is not feed forward. This makes it possible for clients to receive
   // layout information before this operation has been presented. By initializing the link
@@ -539,8 +563,10 @@ void Flatland::CreateViewHelper(
   auto child_transform_handle = transform_graph_.CreateTransform();
 
   LinkSystem::LinkToParent new_link_to_parent = link_system_->CreateLinkToParent(
-      dispatcher_holder_, std::move(token), std::move(view_identity),
-      std::move(parent_viewport_watcher), child_transform_handle,
+      dispatcher_holder_, fidl::NaturalToHLCPP(token),
+      view_identity.has_value() ? std::optional(fidl::NaturalToHLCPP(*view_identity))
+                                : std::nullopt,
+      fidl::NaturalToHLCPP(parent_viewport_watcher), child_transform_handle,
       [ref = weak_from_this(), weak_dispatcher_holder = std::weak_ptr<utils::DispatcherHolder>(
                                    dispatcher_holder_)](const std::string& error_log) {
         if (auto dispatcher_holder = weak_dispatcher_holder.lock()) {
@@ -581,29 +607,31 @@ void Flatland::CreateViewHelper(
   link_to_parent_ = std::move(new_link_to_parent);
 }
 
-void Flatland::RegisterViewBoundProtocols(fuchsia::ui::composition::ViewBoundProtocols protocols,
+void Flatland::RegisterViewBoundProtocols(fuchsia_ui_composition::ViewBoundProtocols protocols,
                                           const zx_koid_t view_ref_koid) {
   FX_DCHECK(register_view_focuser_);
   FX_DCHECK(register_view_ref_focused_);
   FX_DCHECK(register_touch_source_);
   FX_DCHECK(register_mouse_source_);
 
-  if (protocols.has_view_focuser()) {
-    register_view_focuser_(std::move(*protocols.mutable_view_focuser()), view_ref_koid);
+  if (protocols.view_focuser().has_value()) {
+    register_view_focuser_(std::move(*protocols.view_focuser()), view_ref_koid);
   }
 
-  if (protocols.has_view_ref_focused()) {
-    register_view_ref_focused_(std::move(*protocols.mutable_view_ref_focused()), view_ref_koid);
+  if (protocols.view_ref_focused().has_value()) {
+    register_view_ref_focused_(std::move(*protocols.view_ref_focused()), view_ref_koid);
   }
 
-  if (protocols.has_touch_source()) {
-    register_touch_source_(std::move(*protocols.mutable_touch_source()), view_ref_koid);
+  if (protocols.touch_source().has_value()) {
+    register_touch_source_(std::move(*protocols.touch_source()), view_ref_koid);
   }
 
-  if (protocols.has_mouse_source()) {
-    register_mouse_source_(std::move(*protocols.mutable_mouse_source()), view_ref_koid);
+  if (protocols.mouse_source().has_value()) {
+    register_mouse_source_(std::move(*protocols.mouse_source()), view_ref_koid);
   }
 }
+
+void Flatland::ReleaseView(ReleaseViewCompleter::Sync& completer) { ReleaseView(); }
 
 void Flatland::ReleaseView() {
   if (!link_to_parent_) {
@@ -631,6 +659,8 @@ void Flatland::ReleaseView() {
   // Delay the actual destruction of the Link until the next Present().
   pending_link_operations_.push_back([old_link_to_parent = std::move(old_link_to_parent)]() {});
 }
+
+void Flatland::Clear(ClearCompleter::Sync& completer) { Clear(); }
 
 void Flatland::Clear() {
   // Clear user-defined mappings and local matrices.
@@ -662,38 +692,52 @@ void Flatland::Clear() {
   debug_name_.clear();
 }
 
-void Flatland::CreateTransform(TransformId transform_id) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::CreateTransform(CreateTransformRequest& request,
+                               CreateTransformCompleter::Sync& completer) {
+  CreateTransform(request.transform_id());
+}
+
+void Flatland::CreateTransform(TransformId transform_identifier) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "CreateTransform called with transform_id 0";
     ReportBadOperationError();
     return;
   }
 
-  if (transforms_.count(transform_id.value)) {
+  if (transforms_.count(transform_id)) {
     error_reporter_->ERROR() << "CreateTransform called with pre-existing transform_id "
-                             << transform_id.value;
+                             << transform_id;
     ReportBadOperationError();
     return;
   }
 
   TransformHandle handle = transform_graph_.CreateTransform();
-  FLATLAND_VERBOSE_LOG << "Flatland::CreateTransform() client-id: " << transform_id.value
+  FLATLAND_VERBOSE_LOG << "Flatland::CreateTransform() client-id: " << transform_id
                        << "  handle: " << handle;
 
-  transforms_.insert({transform_id.value, handle});
+  transforms_.insert({transform_id, handle});
 }
 
-void Flatland::SetTranslation(TransformId transform_id, Vec translation) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetTranslation(SetTranslationRequest& request,
+                              SetTranslationCompleter::Sync& completer) {
+  SetTranslation(request.transform_id(), request.translation());
+}
+
+void Flatland::SetTranslation(TransformId transform_identifier, fuchsia_math::Vec translation) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetTranslation called with transform_id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetTranslation failed, transform_id " << transform_id.value
+    error_reporter_->ERROR() << "SetTranslation failed, transform_id " << transform_id
                              << " not found";
     ReportBadOperationError();
     return;
@@ -702,17 +746,25 @@ void Flatland::SetTranslation(TransformId transform_id, Vec translation) {
   matrices_[transform_kv->second].SetTranslation(translation);
 }
 
-void Flatland::SetOrientation(TransformId transform_id, Orientation orientation) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetOrientation(SetOrientationRequest& request,
+                              SetOrientationCompleter::Sync& completer) {
+  SetOrientation(request.transform_id(), request.orientation());
+}
+
+void Flatland::SetOrientation(TransformId transform_identifier,
+                              fuchsia_ui_composition::Orientation orientation) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetOrientation called with transform_id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetOrientation failed, transform_id " << transform_id.value
+    error_reporter_->ERROR() << "SetOrientation failed, transform_id " << transform_id
                              << " not found";
     ReportBadOperationError();
     return;
@@ -721,32 +773,39 @@ void Flatland::SetOrientation(TransformId transform_id, Orientation orientation)
   matrices_[transform_kv->second].SetOrientation(orientation);
 }
 
-void Flatland::SetScale(TransformId transform_id, VecF scale) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetScale(SetScaleRequest& request, SetScaleCompleter::Sync& completer) {
+  SetScale(request.transform_id(), request.scale());
+}
+
+void Flatland::SetScale(TransformId transform_identifier, fuchsia_math::VecF scale) {
+  const uint64_t transform_id = transform_identifier.value();
+  const float scale_x = scale.x();
+  const float scale_y = scale.y();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetScale called with transform_id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetScale failed, transform_id " << transform_id.value
-                             << " not found";
+    error_reporter_->ERROR() << "SetScale failed, transform_id " << transform_id << " not found";
     ReportBadOperationError();
     return;
   }
 
-  if (scale.x == 0.f || scale.y == 0.f) {
-    error_reporter_->ERROR() << "SetScale failed, zero values not allowed (" << scale.x << ", "
-                             << scale.y << " ).";
+  if (scale_x == 0.f || scale_y == 0.f) {
+    error_reporter_->ERROR() << "SetScale failed, zero values not allowed (" << scale_x << ", "
+                             << scale_y << " ).";
     ReportBadOperationError();
     return;
   }
 
-  if (isinf(scale.x) || isinf(scale.y) || isnan(scale.x) || isnan(scale.y)) {
-    error_reporter_->ERROR() << "SetScale failed, invalid scale values (" << scale.x << ", "
-                             << scale.y << " ).";
+  if (isinf(scale_x) || isinf(scale_y) || isnan(scale_x) || isnan(scale_y)) {
+    error_reporter_->ERROR() << "SetScale failed, invalid scale values (" << scale_x << ", "
+                             << scale_y << " ).";
     ReportBadOperationError();
     return;
   }
@@ -754,72 +813,84 @@ void Flatland::SetScale(TransformId transform_id, VecF scale) {
   matrices_[transform_kv->second].SetScale(scale);
 }
 
-void Flatland::SetOpacity(TransformId transform_id, float value) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetOpacity(SetOpacityRequest& request, SetOpacityCompleter::Sync& completer) {
+  SetOpacity(request.transform_id().value(), request.value());
+}
+
+void Flatland::SetOpacity(TransformId transform_identifier, float opacity) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetOpacity called with transform_id 0";
     ReportBadOperationError();
     return;
   }
 
-  if (isinf(value) || isnan(value)) {
-    error_reporter_->ERROR() << "SetOpacity failed, invalid opacity value " << value;
+  if (isinf(opacity) || isnan(opacity)) {
+    error_reporter_->ERROR() << "SetOpacity failed, invalid opacity value " << opacity;
     ReportBadOperationError();
     return;
   }
 
-  if (value < 0.f || value > 1.f) {
+  if (opacity < 0.f || opacity > 1.f) {
     error_reporter_->ERROR() << "Opacity value is not within valid range [0,1].";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetOpacity failed, transform_id " << transform_id.value
-                             << " not found";
+    error_reporter_->ERROR() << "SetOpacity failed, transform_id " << transform_id << " not found";
     ReportBadOperationError();
     return;
   }
 
   // Erase the value from the map since we store 1.f implicity.
-  if (value == 1.f) {
+  if (opacity == 1.f) {
     opacity_values_.erase(transform_kv->second);
   } else {
-    opacity_values_[transform_kv->second] = value;
+    opacity_values_[transform_kv->second] = opacity;
   }
 }
 
-void Flatland::SetClipBoundary(TransformId transform_id,
-                               std::unique_ptr<fuchsia::math::Rect> bounds_ptr) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetClipBoundary(SetClipBoundaryRequest& request,
+                               SetClipBoundaryCompleter::Sync& completer) {
+  SetClipBoundary(request.transform_id(), std::move(request.rect()));
+}
+
+void Flatland::SetClipBoundary(TransformId transform_identifier,
+                               fidl::Box<fuchsia_math::Rect> bounds) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetClipBoundary called with transform_id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetClipBoundary failed, transform_id " << transform_id.value
+    error_reporter_->ERROR() << "SetClipBoundary failed, transform_id " << transform_id
                              << " not found";
     ReportBadOperationError();
     return;
   }
 
   // If the optional bounds are empty, then remove them.
-  if (!bounds_ptr) {
+  if (!bounds) {
     clip_regions_.erase(transform_kv->second);
     return;
   }
 
-  SetClipBoundaryInternal(transform_kv->second, *bounds_ptr.get());
+  SetClipBoundaryInternal(transform_kv->second, *bounds);
 }
 
-void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Rect bounds) {
-  if (bounds.width <= 0 || bounds.height <= 0) {
+void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia_math::Rect bounds) {
+  if (bounds.width() <= 0 || bounds.height() <= 0) {
     error_reporter_->ERROR() << "SetClipBoundary failed, width/height must both be positive "
-                             << "(" << bounds.width << ", " << bounds.height << ")";
+                             << "(" << bounds.width() << ", " << bounds.height() << ")";
     ReportBadOperationError();
     return;
   }
@@ -827,21 +898,21 @@ void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia::math::Re
   // The following overflow checks are based on those described here:
   //    https://wiki.sei.cmu.edu/confluence/display/c/INT32-C.
   //    +Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
-  if (((bounds.x > 0) && (bounds.width > (INT_MAX - bounds.x))) ||
-      ((bounds.x < 0) && (bounds.width < (INT_MIN - bounds.x)))) {
+  if (((bounds.x() > 0) && (bounds.width() > (INT_MAX - bounds.x()))) ||
+      ((bounds.x() < 0) && (bounds.width() < (INT_MIN - bounds.x())))) {
     error_reporter_->ERROR() << "SetClipBoundary failed, integer overflow on the X-axis.";
     ReportBadOperationError();
     return;
   }
 
-  if (((bounds.y > 0) && (bounds.height > (INT_MAX - bounds.y))) ||
-      ((bounds.y < 0) && (bounds.height < (INT_MIN - bounds.y)))) {
+  if (((bounds.y() > 0) && (bounds.height() > (INT_MAX - bounds.y()))) ||
+      ((bounds.y() < 0) && (bounds.height() < (INT_MIN - bounds.y())))) {
     error_reporter_->ERROR() << "SetClipBoundary failed, integer overflow on the Y-axis.";
     ReportBadOperationError();
     return;
   }
 
-  clip_regions_[handle] = bounds;
+  clip_regions_[handle] = fidl::NaturalToHLCPP(bounds);
 }
 
 std::vector<allocation::GlobalImageId> Flatland::ProcessDeadTransforms(
@@ -861,8 +932,8 @@ std::vector<allocation::GlobalImageId> Flatland::ProcessDeadTransforms(
         continue;
 
       // Remember all dead images so that we can release them in the destructor if necessary.
-      // Typically this won't be necessary: we'll release them as soon as it is safe (roughly, when
-      // the next present takes effect).
+      // Typically this won't be necessary: we'll release them as soon as it is safe (roughly,
+      // when the next present takes effect).
       images_to_release_->insert(image_id);
 
       images_to_release.push_back(image_id);
@@ -872,25 +943,33 @@ std::vector<allocation::GlobalImageId> Flatland::ProcessDeadTransforms(
   return images_to_release;
 }
 
-void Flatland::AddChild(TransformId parent_transform_id, TransformId child_transform_id) {
-  if (parent_transform_id.value == kInvalidId || child_transform_id.value == kInvalidId) {
+void Flatland::AddChild(AddChildRequest& request, AddChildCompleter::Sync& completer) {
+  AddChild(request.parent_transform_id(), request.child_transform_id());
+}
+
+void Flatland::AddChild(TransformId parent_transform_identifier,
+                        TransformId child_transform_identifier) {
+  const uint64_t parent_transform_id = parent_transform_identifier.value();
+  const uint64_t child_transform_id = child_transform_identifier.value();
+
+  if (parent_transform_id == kInvalidId || child_transform_id == kInvalidId) {
     error_reporter_->ERROR() << "AddChild called with transform_id zero";
     ReportBadOperationError();
     return;
   }
 
-  auto parent_global_kv = transforms_.find(parent_transform_id.value);
-  auto child_global_kv = transforms_.find(child_transform_id.value);
+  auto parent_global_kv = transforms_.find(parent_transform_id);
+  auto child_global_kv = transforms_.find(child_transform_id);
 
   if (parent_global_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "AddChild failed, parent_transform_id " << parent_transform_id.value
+    error_reporter_->ERROR() << "AddChild failed, parent_transform_id " << parent_transform_id
                              << " not found";
     ReportBadOperationError();
     return;
   }
 
   if (child_global_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "AddChild failed, child_transform_id " << child_transform_id.value
+    error_reporter_->ERROR() << "AddChild failed, child_transform_id " << child_transform_id
                              << " not found";
     ReportBadOperationError();
     return;
@@ -900,33 +979,40 @@ void Flatland::AddChild(TransformId parent_transform_id, TransformId child_trans
 
   if (!added) {
     error_reporter_->ERROR() << "AddChild failed, connection already exists between parent "
-                             << parent_transform_id.value << " and child "
-                             << child_transform_id.value;
+                             << parent_transform_id << " and child " << child_transform_id;
     ReportBadOperationError();
   }
 }
 
-void Flatland::RemoveChild(TransformId parent_transform_id, TransformId child_transform_id) {
-  if (parent_transform_id.value == kInvalidId || child_transform_id.value == kInvalidId) {
-    error_reporter_->ERROR() << "RemoveChild failed, transform_id " << parent_transform_id.value
+void Flatland::RemoveChild(RemoveChildRequest& request, RemoveChildCompleter::Sync& completer) {
+  RemoveChild(request.parent_transform_id(), request.child_transform_id());
+}
+
+void Flatland::RemoveChild(TransformId parent_transform_identifier,
+                           TransformId child_transform_identifier) {
+  const uint64_t parent_transform_id = parent_transform_identifier.value();
+  const uint64_t child_transform_id = child_transform_identifier.value();
+
+  if (parent_transform_id == kInvalidId || child_transform_id == kInvalidId) {
+    error_reporter_->ERROR() << "RemoveChild failed, transform_id " << parent_transform_id
                              << " not found";
     ReportBadOperationError();
     return;
   }
 
-  auto parent_global_kv = transforms_.find(parent_transform_id.value);
-  auto child_global_kv = transforms_.find(child_transform_id.value);
+  auto parent_global_kv = transforms_.find(parent_transform_id);
+  auto child_global_kv = transforms_.find(child_transform_id);
 
   if (parent_global_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "RemoveChild failed, parent_transform_id "
-                             << parent_transform_id.value << " not found";
+    error_reporter_->ERROR() << "RemoveChild failed, parent_transform_id " << parent_transform_id
+                             << " not found";
     ReportBadOperationError();
     return;
   }
 
   if (child_global_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "RemoveChild failed, child_transform_id "
-                             << child_transform_id.value << " not found";
+    error_reporter_->ERROR() << "RemoveChild failed, child_transform_id " << child_transform_id
+                             << " not found";
     ReportBadOperationError();
     return;
   }
@@ -935,22 +1021,29 @@ void Flatland::RemoveChild(TransformId parent_transform_id, TransformId child_tr
 
   if (!removed) {
     error_reporter_->ERROR() << "RemoveChild failed, connection between parent "
-                             << parent_transform_id.value << " and child "
-                             << child_transform_id.value << " not found";
+                             << parent_transform_id << " and child " << child_transform_id
+                             << " not found";
     ReportBadOperationError();
   }
 }
 
-void Flatland::SetRootTransform(TransformId transform_id) {
+void Flatland::SetRootTransform(SetRootTransformRequest& request,
+                                SetRootTransformCompleter::Sync& completer) {
+  SetRootTransform(request.transform_id());
+}
+
+void Flatland::SetRootTransform(TransformId transform_identifier) {
+  const uint64_t transform_id = transform_identifier.value();
+
   // SetRootTransform(0) is special -- it only clears the existing root transform.
-  if (transform_id.value == kInvalidId) {
+  if (transform_id == kInvalidId) {
     transform_graph_.ClearChildren(local_root_);
     return;
   }
 
-  const auto global_kv = transforms_.find(transform_id.value);
+  const auto global_kv = transforms_.find(transform_id);
   if (global_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetRootTransform failed, transform_id " << transform_id.value
+    error_reporter_->ERROR() << "SetRootTransform failed, transform_id " << transform_id
                              << " not found";
     ReportBadOperationError();
     return;
@@ -964,20 +1057,29 @@ void Flatland::SetRootTransform(TransformId transform_id) {
   root_transform_ = global_kv->second;
 }
 
-void Flatland::CreateViewport(ContentId link_id, ViewportCreationToken token,
-                              ViewportProperties properties,
-                              fidl::InterfaceRequest<ChildViewWatcher> child_view_watcher) {
+void Flatland::CreateViewport(CreateViewportRequest& request,
+                              CreateViewportCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Flatland::CreateViewport", "debug_name", TA_STRING(debug_name_.c_str()));
+
+  CreateViewport(request.viewport_id(), std::move(request.token()), std::move(request.properties()),
+                 std::move(request.child_view_watcher()));
+}
+
+void Flatland::CreateViewport(
+    ContentId viewport_id, fuchsia_ui_views::ViewportCreationToken token,
+    fuchsia_ui_composition::ViewportProperties properties,
+    fidl::ServerEnd<fuchsia_ui_composition::ChildViewWatcher> child_view_watcher) {
+  const uint64_t link_id = viewport_id.value();
 
   // Attempting to link with an invalid token will never succeed, so its better to fail early and
   // immediately close the link connection.
-  if (!token.value.is_valid()) {
+  if (!token.value().is_valid()) {
     error_reporter_->ERROR() << "CreateViewport failed, ViewportCreationToken was invalid";
     ReportBadOperationError();
     return;
   }
 
-  if (!properties.has_logical_size()) {
+  if (!properties.logical_size().has_value()) {
     error_reporter_->ERROR()
         << "CreateViewport must be provided a ViewportProperties with a logical size";
     ReportBadOperationError();
@@ -990,17 +1092,17 @@ void Flatland::CreateViewport(ContentId link_id, ViewportCreationToken token,
     return;
   }
 
-  SetViewportPropertiesMissingDefaults(properties, properties.logical_size(),
+  SetViewportPropertiesMissingDefaults(properties, properties.logical_size().value(),
                                        /*inset*/ {0, 0, 0, 0});
 
-  if (link_id.value == kInvalidId) {
+  if (link_id == kInvalidId) {
     error_reporter_->ERROR() << "CreateViewport called with ContentId zero";
     ReportBadOperationError();
     return;
   }
 
-  if (content_handles_.count(link_id.value)) {
-    error_reporter_->ERROR() << "CreateViewport called with existing ContentId " << link_id.value;
+  if (content_handles_.count(link_id)) {
+    error_reporter_->ERROR() << "CreateViewport called with existing ContentId " << link_id;
     ReportBadOperationError();
     return;
   }
@@ -1011,11 +1113,11 @@ void Flatland::CreateViewport(ContentId link_id, ViewportCreationToken token,
   const auto parent_transform_handle = transform_graph_.CreateTransform();
 
   // We can initialize the Link importer immediately, since no state changes actually occur before
-  // the feed-forward portion of this method. We also forward the initial ViewportProperties through
-  // the LinkSystem immediately, so the child can receive them as soon as possible.
+  // the feed-forward portion of this method. We also forward the initial ViewportProperties
+  // through the LinkSystem immediately, so the child can receive them as soon as possible.
   LinkSystem::LinkToChild link_to_child = link_system_->CreateLinkToChild(
-      dispatcher_holder_, std::move(token), fidl::Clone(properties), std::move(child_view_watcher),
-      parent_transform_handle,
+      dispatcher_holder_, fidl::NaturalToHLCPP(token), fidl::NaturalToHLCPP(properties),
+      fidl::NaturalToHLCPP(child_view_watcher), parent_transform_handle,
       [ref = weak_from_this(), weak_dispatcher_holder = std::weak_ptr<utils::DispatcherHolder>(
                                    dispatcher_holder_)](const std::string& error_log) {
         if (auto dispatcher_holder = weak_dispatcher_holder.lock()) {
@@ -1041,37 +1143,45 @@ void Flatland::CreateViewport(ContentId link_id, ViewportCreationToken token,
 
   // Default the link size to the logical size, which is just an identity scale matrix, so
   // that future logical size changes will result in the correct scale matrix.
-  const SizeU size = properties.logical_size();
+  const SizeU size = *properties.logical_size();
 
-  content_handles_[link_id.value] = link_to_child.parent_transform_handle;
+  content_handles_[link_id] = link_to_child.parent_transform_handle;
   links_to_children_[link_to_child.parent_transform_handle] = {.link = std::move(link_to_child),
                                                                .properties = std::move(properties)};
 
   // Set clip bounds on the transform associated with the viewport content.
-  SetClipBoundaryInternal(parent_transform_handle, {.x = 0,
-                                                    .y = 0,
-                                                    .width = static_cast<int32_t>(size.width),
-                                                    .height = static_cast<int32_t>(size.height)});
+  SetClipBoundaryInternal(parent_transform_handle,
+                          fuchsia_math::Rect{}
+                              .x(0)
+                              .y(0)
+                              .width(static_cast<int32_t>(size.width()))
+                              .height(static_cast<int32_t>(size.height())));
+}
+
+void Flatland::CreateImage(CreateImageRequest& request, CreateImageCompleter::Sync& completer) {
+  TRACE_DURATION("gfx", "Flatland::CreateImage", "debug_name", TA_STRING(debug_name_.c_str()));
+
+  CreateImage(request.image_id(), std::move(request.import_token()), request.vmo_index(),
+              std::move(request.properties()));
 }
 
 void Flatland::CreateImage(ContentId image_id,
-                           fuchsia::ui::composition::BufferCollectionImportToken import_token,
-                           uint32_t vmo_index, ImageProperties properties) {
-  TRACE_DURATION("gfx", "Flatland::CreateImage", "debug_name", TA_STRING(debug_name_.c_str()));
-
-  if (image_id.value == kInvalidId) {
+                           fuchsia_ui_composition::BufferCollectionImportToken import_token,
+                           uint32_t vmo_index, fuchsia_ui_composition::ImageProperties properties) {
+  if (image_id.value() == kInvalidId) {
     error_reporter_->ERROR() << "CreateImage called with image_id 0";
     ReportBadOperationError();
     return;
   }
 
-  if (content_handles_.count(image_id.value)) {
-    error_reporter_->ERROR() << "CreateImage called with pre-existing image_id " << image_id.value;
+  if (content_handles_.count(image_id.value())) {
+    error_reporter_->ERROR() << "CreateImage called with pre-existing image_id "
+                             << image_id.value();
     ReportBadOperationError();
     return;
   }
 
-  const BufferCollectionId global_collection_id = fsl::GetRelatedKoid(import_token.value.get());
+  const BufferCollectionId global_collection_id = fsl::GetRelatedKoid(import_token.value().get());
 
   // Check if there is a valid peer.
   if (global_collection_id == ZX_KOID_INVALID) {
@@ -1080,19 +1190,19 @@ void Flatland::CreateImage(ContentId image_id,
     return;
   }
 
-  if (!properties.has_size()) {
+  if (!properties.size().has_value()) {
     error_reporter_->ERROR() << "CreateImage failed, ImageProperties did not specify size";
     ReportBadOperationError();
     return;
   }
 
-  if (!properties.size().width) {
+  if (!properties.size()->width()) {
     error_reporter_->ERROR() << "CreateImage failed, ImageProperties did not specify a width";
     ReportBadOperationError();
     return;
   }
 
-  if (!properties.size().height) {
+  if (!properties.size()->height()) {
     error_reporter_->ERROR() << "CreateImage failed, ImageProperties did not specify a height";
     ReportBadOperationError();
     return;
@@ -1102,8 +1212,8 @@ void Flatland::CreateImage(ContentId image_id,
   metadata.identifier = allocation::GenerateUniqueImageId();
   metadata.collection_id = global_collection_id;
   metadata.vmo_index = vmo_index;
-  metadata.width = properties.size().width;
-  metadata.height = properties.size().height;
+  metadata.width = properties.size()->width();
+  metadata.height = properties.size()->height();
   metadata.blend_mode = fuchsia::ui::composition::BlendMode::SRC;
 
   for (uint32_t i = 0; i < buffer_collection_importers_.size(); i++) {
@@ -1131,31 +1241,37 @@ void Flatland::CreateImage(ContentId image_id,
   // we can now create a handle for it in the transform graph, and add the metadata
   // to our map.
   auto handle = transform_graph_.CreateTransform();
-  content_handles_[image_id.value] = handle;
+  content_handles_[image_id.value()] = handle;
   image_metadatas_[handle] = metadata;
 
   // Set the default sample region of the image to be the full image.
-  SetImageSampleRegion(image_id, {0, 0, static_cast<float>(properties.size().width),
-                                  static_cast<float>(properties.size().height)});
+  SetImageSampleRegion(image_id, {0, 0, static_cast<float>(properties.size()->width()),
+                                  static_cast<float>(properties.size()->height())});
 
   // Set the default destination region of the image to be the full image.
-  SetImageDestinationSize(image_id, properties.size());
+  SetImageDestinationSize(image_id, properties.size().value());
 
   FLATLAND_VERBOSE_LOG << "Flatland::CreateImage" << handle << " for " << local_root_
-                       << " size:" << properties.size().width << "x" << properties.size().height;
+                       << " size:" << properties.size()->width() << "x"
+                       << properties.size()->height();
 }
 
-void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
-  if (image_id.value == kInvalidId) {
+void Flatland::SetImageSampleRegion(SetImageSampleRegionRequest& request,
+                                    SetImageSampleRegionCompleter::Sync& completer) {
+  SetImageSampleRegion(request.image_id(), request.rect());
+}
+
+void Flatland::SetImageSampleRegion(ContentId image_id, fuchsia_math::RectF rect) {
+  if ((image_id.value()) == kInvalidId) {
     error_reporter_->ERROR() << "SetImageSampleRegion called with content id 0";
     ReportBadOperationError();
     return;
   }
 
-  const auto content_kv = content_handles_.find(image_id.value);
+  const auto content_kv = content_handles_.find((image_id.value()));
   if (content_kv == content_handles_.end()) {
     error_reporter_->ERROR() << "SetImageSampleRegion called with non-existent image_id "
-                             << image_id.value;
+                             << (image_id.value());
     ReportBadOperationError();
     return;
   }
@@ -1172,17 +1288,17 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
     const auto& metadata = image_kv->second;
     const auto image_width = static_cast<float>(metadata.width);
     const auto image_height = static_cast<float>(metadata.height);
-    // This clamping is required in cases where (x+width>image_width) or (y+height>image_height) by
-    // a small epsilon. The downstream code expects these numbers to be within the (image_width,
-    // image_height) limits, so we only clamp the positive differences. The root cause is the
-    // precision errors in floating point arithmetic when a client tries to calculate floats within
-    // pixel space.
-    // TODO(https://fxbug.dev/42082599): Remove floating point precision error checks and use uints
-    // instead.
-    ClampIfNear(&rect.width, rect.x + rect.width - image_width);
-    ClampIfNear(&rect.height, rect.y + rect.height - image_height);
-    if (rect.x < 0.f || rect.width < 0.f || (rect.x + rect.width) > image_width || rect.y < 0.f ||
-        rect.height < 0.f || (rect.y + rect.height) > image_height) {
+    // This clamping is required in cases where (x+width>image_width) or (y+height>image_height)
+    // by a small epsilon. The downstream code expects these numbers to be within the
+    // (image_width, image_height) limits, so we only clamp the positive differences. The root
+    // cause is the precision errors in floating point arithmetic when a client tries to calculate
+    // floats within pixel space.
+    // TODO(https://fxbug.dev/42082599): Remove floating point precision error checks and use
+    // uints instead.
+    ClampIfNear(&rect.width(), rect.x() + rect.width() - image_width);
+    ClampIfNear(&rect.height(), rect.y() + rect.height() - image_height);
+    if (rect.x() < 0.f || rect.width() < 0.f || (rect.x() + rect.width()) > image_width ||
+        rect.y() < 0.f || rect.height() < 0.f || (rect.y() + rect.height()) > image_height) {
       error_reporter_->ERROR() << "SetImageSampleRegion rect " << rect
                                << " out of bounds for image (" << image_width << ", "
                                << image_height << ")";
@@ -1191,47 +1307,60 @@ void Flatland::SetImageSampleRegion(ContentId image_id, RectF rect) {
     }
   }
 
-  image_sample_regions_[content_kv->second] = rect;
+  image_sample_regions_[content_kv->second] = fidl::NaturalToHLCPP(rect);
 }
 
-void Flatland::SetImageDestinationSize(ContentId image_id, SizeU size) {
-  if (image_id.value == kInvalidId) {
+void Flatland::SetImageDestinationSize(SetImageDestinationSizeRequest& request,
+                                       SetImageDestinationSizeCompleter::Sync& completer) {
+  SetImageDestinationSize(request.image_id(), request.size());
+}
+
+void Flatland::SetImageDestinationSize(ContentId image_id, fuchsia_math::SizeU size) {
+  if (image_id.value() == kInvalidId) {
     error_reporter_->ERROR() << "SetImageSize called with image_id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(image_id.value);
+  auto content_kv = content_handles_.find(image_id.value());
 
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetImageSize called with non-existent image_id " << image_id.value;
+    error_reporter_->ERROR() << "SetImageSize called with non-existent image_id "
+                             << image_id.value();
     ReportBadOperationError();
     return;
   }
 
   auto image_kv = image_metadatas_.find(content_kv->second);
   if (image_kv == image_metadatas_.end()) {
-    error_reporter_->ERROR() << "SetImageSize called on non-image content  " << image_id.value;
+    error_reporter_->ERROR() << "SetImageSize called on non-image content  " << image_id.value();
     ReportBadOperationError();
     return;
   }
 
   matrices_[content_kv->second].SetScale(
-      {.x = static_cast<float>(size.width), .y = static_cast<float>(size.height)});
+      {static_cast<float>(size.width()), static_cast<float>(size.height())});
 }
 
-void Flatland::SetImageBlendingFunction(ContentId image_id,
-                                        fuchsia::ui::composition::BlendMode blend_mode) {
-  if (image_id.value == kInvalidId) {
+void Flatland::SetImageBlendingFunction(SetImageBlendingFunctionRequest& request,
+                                        SetImageBlendingFunctionCompleter::Sync& completer) {
+  SetImageBlendingFunction(request.image_id(), request.blend_mode());
+}
+
+void Flatland::SetImageBlendingFunction(ContentId image_identifier,
+                                        fuchsia_ui_composition::BlendMode blend_mode) {
+  const uint64_t image_id = image_identifier.value();
+
+  if (image_id == kInvalidId) {
     error_reporter_->ERROR() << "SetImageBlendingFunction called with content id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(image_id.value);
+  auto content_kv = content_handles_.find(image_id);
   if (content_kv == content_handles_.end()) {
     error_reporter_->ERROR() << "SetImageBlendingFunction called with non-existent image_id "
-                             << image_id.value;
+                             << image_id;
     ReportBadOperationError();
     return;
   }
@@ -1243,20 +1372,25 @@ void Flatland::SetImageBlendingFunction(ContentId image_id,
     return;
   }
 
-  image_kv->second.blend_mode = blend_mode;
+  image_kv->second.blend_mode = fidl::NaturalToHLCPP(blend_mode);
 }
 
-void Flatland::SetImageFlip(ContentId image_id, fuchsia::ui::composition::ImageFlip flip) {
-  if (image_id.value == kInvalidId) {
-    error_reporter_->ERROR() << "SetImageBlendingFunction called with content id 0";
+void Flatland::SetImageFlip(SetImageFlipRequest& request, SetImageFlipCompleter::Sync& completer) {
+  SetImageFlip(request.image_id(), request.flip());
+}
+
+void Flatland::SetImageFlip(ContentId image_identifier, fuchsia_ui_composition::ImageFlip flip) {
+  const uint64_t image_id = image_identifier.value();
+
+  if (image_id == kInvalidId) {
+    error_reporter_->ERROR() << "SetImageFlip called with content id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(image_id.value);
+  auto content_kv = content_handles_.find(image_id);
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetImageBlendingFunction called with non-existent image_id "
-                             << image_id.value;
+    error_reporter_->ERROR() << "SetImageFlip called with non-existent image_id " << image_id;
     ReportBadOperationError();
     return;
   }
@@ -1268,19 +1402,25 @@ void Flatland::SetImageFlip(ContentId image_id, fuchsia::ui::composition::ImageF
     return;
   }
 
-  image_kv->second.flip = flip;
+  image_kv->second.flip = fidl::NaturalToHLCPP(flip);
 }
 
-void Flatland::CreateFilledRect(ContentId rect_id) {
-  if (rect_id.value == kInvalidId) {
+void Flatland::CreateFilledRect(CreateFilledRectRequest& request,
+                                CreateFilledRectCompleter::Sync& completer) {
+  CreateFilledRect(request.rect_id());
+}
+
+void Flatland::CreateFilledRect(ContentId rect_identifier) {
+  const uint64_t rect_id = rect_identifier.value();
+
+  if (rect_id == kInvalidId) {
     error_reporter_->ERROR() << "CreateFilledRect called with rect_id 0";
     ReportBadOperationError();
     return;
   }
 
-  if (content_handles_.count(rect_id.value)) {
-    error_reporter_->ERROR() << "CreateFilledRect called with pre-existing content id "
-                             << rect_id.value;
+  if (content_handles_.count(rect_id)) {
+    error_reporter_->ERROR() << "CreateFilledRect called with pre-existing content id " << rect_id;
     ReportBadOperationError();
     return;
   }
@@ -1295,64 +1435,76 @@ void Flatland::CreateFilledRect(ContentId rect_id) {
   // we can now create a handle for it in the transform graph, and add the metadata
   // to our map.
   auto handle = transform_graph_.CreateTransform();
-  content_handles_[rect_id.value] = handle;
+  content_handles_[rect_id] = handle;
   image_metadatas_[handle] = metadata;
 }
 
-void Flatland::SetSolidFill(ContentId rect_id, fuchsia::ui::composition::ColorRgba color,
-                            fuchsia::math::SizeU size) {
-  if (rect_id.value == kInvalidId) {
+void Flatland::SetSolidFill(SetSolidFillRequest& request, SetSolidFillCompleter::Sync& completer) {
+  SetSolidFill(request.rect_id(), request.color(), request.size());
+}
+
+void Flatland::SetSolidFill(ContentId rect_identifier, fuchsia_ui_composition::ColorRgba color,
+                            fuchsia_math::SizeU size) {
+  const uint64_t rect_id = rect_identifier.value();
+
+  if (rect_id == kInvalidId) {
     error_reporter_->ERROR() << "SetSolidFill called with rect_id 0";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(rect_id.value);
+  auto content_kv = content_handles_.find(rect_id);
 
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetSolidFill called with non-existent rect_id " << rect_id.value;
+    error_reporter_->ERROR() << "SetSolidFill called with non-existent rect_id " << rect_id;
     ReportBadOperationError();
     return;
   }
 
   auto image_kv = image_metadatas_.find(content_kv->second);
   if (image_kv == image_metadatas_.end()) {
-    error_reporter_->ERROR() << "Missing metadada for rect with id  " << rect_id.value;
+    error_reporter_->ERROR() << "Missing metadada for rect with id  " << rect_id;
     ReportBadOperationError();
     return;
   }
 
-  if (color.red < 0.f || color.red > 1.f || isinf(color.red) || isnan(color.red) ||
-      color.green < 0.f || color.green > 1.f || isinf(color.green) || isnan(color.green) ||
-      color.blue < 0.f || color.blue > 1.f || isinf(color.blue) || isnan(color.blue) ||
-      color.alpha < 0.f || color.alpha > 1.f || isinf(color.alpha) || isnan(color.alpha)) {
-    error_reporter_->ERROR() << "Invalid color channel(s) (" << color.red << ", " << color.green
-                             << ", " << color.blue << ", " << color.alpha << ")";
+  if (color.red() < 0.f || color.red() > 1.f || isinf(color.red()) || isnan(color.red()) ||
+      color.green() < 0.f || color.green() > 1.f || isinf(color.green()) || isnan(color.green()) ||
+      color.blue() < 0.f || color.blue() > 1.f || isinf(color.blue()) || isnan(color.blue()) ||
+      color.alpha() < 0.f || color.alpha() > 1.f || isinf(color.alpha()) || isnan(color.alpha())) {
+    error_reporter_->ERROR() << "Invalid color channel(s) (" << color.red() << ", " << color.green()
+                             << ", " << color.blue() << ", " << color.alpha() << ")";
     ReportBadOperationError();
     return;
   }
 
-  image_kv->second.blend_mode = color.alpha < 1.f ? fuchsia::ui::composition::BlendMode::SRC_OVER
-                                                  : fuchsia::ui::composition::BlendMode::SRC;
+  image_kv->second.blend_mode = color.alpha() < 1.f ? fuchsia::ui::composition::BlendMode::SRC_OVER
+                                                    : fuchsia::ui::composition::BlendMode::SRC;
   image_kv->second.collection_id = allocation::kInvalidId;
   image_kv->second.identifier = allocation::kInvalidImageId;
-  image_kv->second.multiply_color = {color.red, color.green, color.blue, color.alpha};
+  image_kv->second.multiply_color = {color.red(), color.green(), color.blue(), color.alpha()};
   matrices_[content_kv->second].SetScale(
-      {.x = static_cast<float>(size.width), .y = static_cast<float>(size.height)});
+      {static_cast<float>(size.width()), static_cast<float>(size.height())});
 }
 
-void Flatland::ReleaseFilledRect(ContentId rect_id) {
-  if (rect_id.value == kInvalidId) {
+void Flatland::ReleaseFilledRect(ReleaseFilledRectRequest& request,
+                                 ReleaseFilledRectCompleter::Sync& completer) {
+  ReleaseFilledRect(request.rect_id());
+}
+
+void Flatland::ReleaseFilledRect(ContentId rect_identifier) {
+  const uint64_t rect_id = rect_identifier.value();
+
+  if (rect_id == kInvalidId) {
     error_reporter_->ERROR() << "ReleaseFilledRect called with rect_id zero";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(rect_id.value);
+  auto content_kv = content_handles_.find(rect_id);
 
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "ReleaseFilledRect failed, rect_id " << rect_id.value
-                             << " not found";
+    error_reporter_->ERROR() << "ReleaseFilledRect failed, rect_id " << rect_id << " not found";
     ReportBadOperationError();
     return;
   }
@@ -1360,7 +1512,7 @@ void Flatland::ReleaseFilledRect(ContentId rect_id) {
   auto image_kv = image_metadatas_.find(content_kv->second);
 
   if (image_kv == image_metadatas_.end()) {
-    error_reporter_->ERROR() << "ReleaseFilledRect failed, content_id " << rect_id.value
+    error_reporter_->ERROR() << "ReleaseFilledRect failed, content_id " << rect_id
                              << " has no metadata.";
     ReportBadOperationError();
     return;
@@ -1371,20 +1523,26 @@ void Flatland::ReleaseFilledRect(ContentId rect_id) {
 
   // Even though the handle is released, it may still be referenced by client Transforms. The
   // image_metadatas_ map preserves the entry until it shows up in the dead_transforms list.
-  content_handles_.erase(rect_id.value);
+  content_handles_.erase(rect_id);
 }
 
-void Flatland::SetImageOpacity(ContentId image_id, float val) {
-  if (image_id.value == kInvalidId) {
+void Flatland::SetImageOpacity(SetImageOpacityRequest& request,
+                               SetImageOpacityCompleter::Sync& completer) {
+  SetImageOpacity(request.image_id(), request.val());
+}
+
+void Flatland::SetImageOpacity(ContentId image_identifier, float opacity) {
+  const uint64_t image_id = image_identifier.value();
+
+  if (image_id == kInvalidId) {
     error_reporter_->ERROR() << "SetImageOpacity called with invalid image_id";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(image_id.value);
+  auto content_kv = content_handles_.find(image_id);
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetImageOpacity called with non-existent image_id "
-                             << image_id.value;
+    error_reporter_->ERROR() << "SetImageOpacity called with non-existent image_id " << image_id;
     ReportBadOperationError();
     return;
   }
@@ -1403,27 +1561,34 @@ void Flatland::SetImageOpacity(ContentId image_id, float val) {
     return;
   }
 
-  if (val < 0.f || val > 1.f) {
+  if (opacity < 0.f || opacity > 1.f) {
     error_reporter_->ERROR() << "Opacity value is not within valid range [0,1].";
     ReportBadOperationError();
     return;
   }
 
   // Opacity is stored as the alpha channel of the multiply color.
-  metadata.multiply_color[3] = val;
+  metadata.multiply_color[3] = opacity;
 }
 
-void Flatland::SetHitRegions(TransformId transform_id,
-                             std::vector<fuchsia::ui::composition::HitRegion> regions) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetHitRegions(SetHitRegionsRequest& request,
+                             SetHitRegionsCompleter::Sync& completer) {
+  SetHitRegions(request.transform_id(), std::move(request.regions()));
+}
+
+void Flatland::SetHitRegions(TransformId transform_identifier,
+                             std::vector<fuchsia_ui_composition::HitRegion> regions) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetHitRegions called with invalid transform ID";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetHitRegions failed, transform_id " << transform_id.value
+    error_reporter_->ERROR() << "SetHitRegions failed, transform_id " << transform_id
                              << " not found";
     ReportBadOperationError();
     return;
@@ -1431,11 +1596,11 @@ void Flatland::SetHitRegions(TransformId transform_id,
 
   // Validate |regions|.
   for (auto& region : regions) {
-    auto rect = region.region;
+    auto& rect = region.region();
 
-    if (rect.width < 0 || rect.height < 0) {
+    if (rect.width() < 0 || rect.height() < 0) {
       error_reporter_->ERROR() << "SetHitRegions failed, contains invalid (negative) dimensions: ("
-                               << rect.width << "," << rect.height << ")";
+                               << rect.width() << "," << rect.height() << ")";
       ReportBadOperationError();
       return;
     }
@@ -1444,58 +1609,72 @@ void Flatland::SetHitRegions(TransformId transform_id,
   // Reformat into internal type.
   std::vector<flatland::HitRegion> list;
   for (auto& region : regions) {
-    list.emplace_back(region.region, region.hit_test);
+    list.emplace_back(fidl::NaturalToHLCPP(region.region()),
+                      fidl::NaturalToHLCPP(region.hit_test()));
   }
   hit_regions_[transform_kv->second] = list;
 }
 
-void Flatland::SetInfiniteHitRegion(TransformId transform_id,
-                                    fuchsia::ui::composition::HitTestInteraction hit_test) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetInfiniteHitRegion(SetInfiniteHitRegionRequest& request,
+                                    SetInfiniteHitRegionCompleter::Sync& completer) {
+  SetInfiniteHitRegion(request.transform_id(), std::move(request.hit_test()));
+}
+
+void Flatland::SetInfiniteHitRegion(TransformId transform_identifier,
+                                    fuchsia_ui_composition::HitTestInteraction hit_test) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetHitRegions called with invalid transform ID";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetHitRegions failed, transform_id " << transform_id.value
+    error_reporter_->ERROR() << "SetHitRegions failed, transform_id " << transform_id
                              << " not found";
     ReportBadOperationError();
     return;
   }
 
-  hit_regions_[transform_kv->second] = {flatland::HitRegion::Infinite(hit_test)};
+  hit_regions_[transform_kv->second] = {
+      flatland::HitRegion::Infinite(fidl::NaturalToHLCPP(hit_test))};
 }
 
-void Flatland::SetContent(TransformId transform_id, ContentId content_id) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::SetContent(SetContentRequest& request, SetContentCompleter::Sync& completer) {
+  SetContent(request.transform_id(), request.content_id());
+}
+
+void Flatland::SetContent(TransformId transform_identifier, ContentId content_identifier) {
+  const uint64_t transform_id = transform_identifier.value();
+  const uint64_t content_id = content_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "SetContent called with transform_id zero";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "SetContent failed, transform_id " << transform_id.value
-                             << " not found";
+    error_reporter_->ERROR() << "SetContent failed, transform_id " << transform_id << " not found";
     ReportBadOperationError();
     return;
   }
 
-  if (content_id.value == kInvalidId) {
+  if (content_id == kInvalidId) {
     transform_graph_.ClearPriorityChild(transform_kv->second);
     FLATLAND_VERBOSE_LOG << "Flatland::SetContent() cleared content for transform: "
                          << transform_kv->second;
     return;
   }
 
-  auto handle_kv = content_handles_.find(content_id.value);
+  auto handle_kv = content_handles_.find(content_id);
 
   if (handle_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetContent failed, content_id " << content_id.value
-                             << " not found";
+    error_reporter_->ERROR() << "SetContent failed, content_id " << content_id << " not found";
     ReportBadOperationError();
     return;
   }
@@ -1506,17 +1685,24 @@ void Flatland::SetContent(TransformId transform_id, ContentId content_id) {
   transform_graph_.SetPriorityChild(transform_kv->second, handle_kv->second);
 }
 
-void Flatland::SetViewportProperties(ContentId link_id, ViewportProperties properties) {
-  if (link_id.value == kInvalidId) {
+void Flatland::SetViewportProperties(SetViewportPropertiesRequest& request,
+                                     SetViewportPropertiesCompleter::Sync& completer) {
+  SetViewportProperties(request.viewport_id(), std::move(request.properties()));
+}
+
+void Flatland::SetViewportProperties(ContentId viewport_id,
+                                     fuchsia_ui_composition::ViewportProperties properties) {
+  const uint64_t link_id = viewport_id.value();
+
+  if (link_id == kInvalidId) {
     error_reporter_->ERROR() << "SetViewportProperties called with link_id zero.";
     ReportBadOperationError();
     return;
   }
 
-  const auto content_kv = content_handles_.find(link_id.value);
+  const auto content_kv = content_handles_.find(link_id);
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "SetViewportProperties failed, link_id " << link_id.value
-                             << " not found";
+    error_reporter_->ERROR() << "SetViewportProperties failed, link_id " << link_id << " not found";
     ReportBadOperationError();
     return;
   }
@@ -1525,7 +1711,7 @@ void Flatland::SetViewportProperties(ContentId link_id, ViewportProperties prope
 
   auto link_kv = links_to_children_.find(viewport_handle);
   if (link_kv == links_to_children_.end()) {
-    error_reporter_->ERROR() << "SetViewportProperties failed, content_id " << link_id.value
+    error_reporter_->ERROR() << "SetViewportProperties failed, content_id " << link_id
                              << " is not a Link";
     ReportBadOperationError();
     return;
@@ -1533,9 +1719,9 @@ void Flatland::SetViewportProperties(ContentId link_id, ViewportProperties prope
 
   LinkToChildData& link_data = link_kv->second;
   if (!link_data.link.importer.valid()) {
-    // Other side of the Viewport has been invalidated and the Viewport should be released. Calling
-    // SetViewportProperties() must still be allowed since the client may not have gotten the
-    // destruction message yet.
+    // Other side of the Viewport has been invalidated and the Viewport should be released.
+    // Calling SetViewportProperties() must still be allowed since the client may not have gotten
+    // the destruction message yet.
     return;
   }
 
@@ -1545,31 +1731,41 @@ void Flatland::SetViewportProperties(ContentId link_id, ViewportProperties prope
     return;
   }
 
-  SetViewportPropertiesMissingDefaults(properties, link_data.properties.logical_size(),
-                                       link_data.properties.inset());
+  FX_DCHECK(link_data.properties.logical_size().has_value());
+  FX_DCHECK(link_data.properties.inset().has_value());
+  SetViewportPropertiesMissingDefaults(properties, *link_data.properties.logical_size(),
+                                       *link_data.properties.inset());
 
   // Update the clip boundaries when the properties change.
   SetClipBoundaryInternal(viewport_handle,
-                          {.x = 0,
-                           .y = 0,
-                           .width = static_cast<int32_t>(properties.logical_size().width),
-                           .height = static_cast<int32_t>(properties.logical_size().height)});
+                          fuchsia_math::Rect{}
+                              .x(0)
+                              .y(0)
+                              .width(static_cast<int32_t>(properties.logical_size()->width()))
+                              .height(static_cast<int32_t>(properties.logical_size()->height())));
 
-  link_data.properties = fidl::Clone(properties);
-  link_system_->UpdateViewportPropertiesFor(viewport_handle, std::move(properties));
+  link_data.properties = properties;
+  link_system_->UpdateViewportPropertiesFor(viewport_handle, fidl::NaturalToHLCPP(properties));
 }
 
-void Flatland::ReleaseTransform(TransformId transform_id) {
-  if (transform_id.value == kInvalidId) {
+void Flatland::ReleaseTransform(ReleaseTransformRequest& request,
+                                ReleaseTransformCompleter::Sync& completer) {
+  ReleaseTransform(request.transform_id());
+}
+
+void Flatland::ReleaseTransform(TransformId transform_identifier) {
+  const uint64_t transform_id = transform_identifier.value();
+
+  if (transform_id == kInvalidId) {
     error_reporter_->ERROR() << "ReleaseTransform called with transform_id zero";
     ReportBadOperationError();
     return;
   }
 
-  auto transform_kv = transforms_.find(transform_id.value);
+  auto transform_kv = transforms_.find(transform_id);
 
   if (transform_kv == transforms_.end()) {
-    error_reporter_->ERROR() << "ReleaseTransform failed, transform_id " << transform_id.value
+    error_reporter_->ERROR() << "ReleaseTransform failed, transform_id " << transform_id
                              << " not found";
     ReportBadOperationError();
     return;
@@ -1580,18 +1776,29 @@ void Flatland::ReleaseTransform(TransformId transform_id) {
   transforms_.erase(transform_kv);
 }
 
+void Flatland::ReleaseViewport(ReleaseViewportRequest& request,
+                               ReleaseViewportCompleter::Sync& completer) {
+  ReleaseViewport(
+      request.viewport_id(),
+      [completer = completer.ToAsync()](fuchsia_ui_views::ViewportCreationToken token) mutable {
+        completer.Reply(std::move(token));
+      });
+}
+
 void Flatland::ReleaseViewport(
-    ContentId link_id, fuchsia::ui::composition::Flatland::ReleaseViewportCallback callback) {
-  if (link_id.value == kInvalidId) {
+    ContentId viewport_id, fit::function<void(fuchsia_ui_views::ViewportCreationToken)> completer) {
+  const uint64_t link_id = viewport_id.value();
+
+  if (link_id == kInvalidId) {
     error_reporter_->ERROR() << "ReleaseViewport called with link_id zero";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(link_id.value);
+  auto content_kv = content_handles_.find(link_id);
 
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "ReleaseViewport failed, link_id " << link_id.value << " not found";
+    error_reporter_->ERROR() << "ReleaseViewport failed, link_id " << link_id << " not found";
     ReportBadOperationError();
     return;
   }
@@ -1599,7 +1806,7 @@ void Flatland::ReleaseViewport(
   auto link_kv = links_to_children_.find(content_kv->second);
 
   if (link_kv == links_to_children_.end()) {
-    error_reporter_->ERROR() << "ReleaseViewport failed, content_id " << link_id.value
+    error_reporter_->ERROR() << "ReleaseViewport failed, content_id " << link_id
                              << " is not a Link";
     ReportBadOperationError();
     return;
@@ -1626,35 +1833,41 @@ void Flatland::ReleaseViewport(
 
   // Delay the actual destruction of the link until the next Present().
   pending_link_operations_.push_back(
-      [link_to_child = std::move(link_to_child), callback = std::move(callback)]() mutable {
+      [link_to_child = std::move(link_to_child), completer = std::move(completer)]() mutable {
         ViewportCreationToken return_token;
 
         // If the link is still valid, return the original token. If not, create an orphaned
         // zx::channel and return it since the ObjectLinker does not retain the orphaned token.
         auto link_token = link_to_child.link.importer.ReleaseToken();
         if (link_token.has_value()) {
-          return_token.value = zx::channel(std::move(link_token.value()));
+          return_token.value(zx::channel(std::move(link_token.value())));
         } else {
           // |peer_token| immediately falls out of scope, orphaning |return_token|.
           zx::channel peer_token;
-          zx::channel::create(0, &return_token.value, &peer_token);
+          zx::channel::create(0, &return_token.value(), &peer_token);
         }
 
-        callback(std::move(return_token));
+        completer(std::move(return_token));
       });
 }
 
-void Flatland::ReleaseImage(ContentId image_id) {
-  if (image_id.value == kInvalidId) {
+void Flatland::ReleaseImage(ReleaseImageRequest& request, ReleaseImageCompleter::Sync& completer) {
+  ReleaseImage(request.image_id());
+}
+
+void Flatland::ReleaseImage(ContentId image_identifier) {
+  const uint64_t image_id = image_identifier.value();
+
+  if (image_id == kInvalidId) {
     error_reporter_->ERROR() << "ReleaseImage called with image_id zero";
     ReportBadOperationError();
     return;
   }
 
-  auto content_kv = content_handles_.find(image_id.value);
+  auto content_kv = content_handles_.find(image_id);
 
   if (content_kv == content_handles_.end()) {
-    error_reporter_->ERROR() << "ReleaseImage failed, image_id " << image_id.value << " not found";
+    error_reporter_->ERROR() << "ReleaseImage failed, image_id " << image_id << " not found";
     ReportBadOperationError();
     return;
   }
@@ -1662,7 +1875,7 @@ void Flatland::ReleaseImage(ContentId image_id) {
   auto image_kv = image_metadatas_.find(content_kv->second);
 
   if (image_kv == image_metadatas_.end()) {
-    error_reporter_->ERROR() << "ReleaseImage failed, content_id " << image_id.value
+    error_reporter_->ERROR() << "ReleaseImage failed, content_id " << image_id
                              << " is not an Image";
     ReportBadOperationError();
     return;
@@ -1675,13 +1888,19 @@ void Flatland::ReleaseImage(ContentId image_id) {
 
   // Even though the handle is released, it may still be referenced by client Transforms. The
   // image_metadatas_ map preserves the entry until it shows up in the dead_transforms list.
-  content_handles_.erase(image_id.value);
+  content_handles_.erase(image_id);
 }
 
-void Flatland::SetDebugName(std::string name) {
+void Flatland::SetDebugName(SetDebugNameRequest& request, SetDebugNameCompleter::Sync& completer) {
+  std::string name(std::move(request.name()));
+
   TRACE_INSTANT("gfx", "Flatland::SetDebugName()", TRACE_SCOPE_PROCESS, "name",
                 TA_STRING(name.c_str()));
 
+  SetDebugName(std::move(name));
+}
+
+void Flatland::SetDebugName(std::string name) {
   std::stringstream stream;
   if (!name.empty())
     stream << "Flatland client(" << name << "): ";
@@ -1721,7 +1940,7 @@ TransformHandle Flatland::GetRoot() const {
 }
 
 std::optional<TransformHandle> Flatland::GetContentHandle(ContentId content_id) const {
-  auto handle_kv = content_handles_.find(content_id.value);
+  auto handle_kv = content_handles_.find(content_id.value());
   if (handle_kv == content_handles_.end()) {
     return std::nullopt;
   }
@@ -1731,7 +1950,7 @@ std::optional<TransformHandle> Flatland::GetContentHandle(ContentId content_id) 
 // For validating properties associated with transforms in tests only. If |transform_id| does not
 // exist for this Flatland instance, returns std::nullopt.
 std::optional<TransformHandle> Flatland::GetTransformHandle(TransformId transform_id) const {
-  auto handle_kv = transforms_.find(transform_id.value);
+  auto handle_kv = transforms_.find(transform_id.value());
   if (handle_kv == transforms_.end()) {
     return std::nullopt;
   }
@@ -1743,6 +1962,17 @@ void Flatland::SetErrorReporter(std::unique_ptr<scenic_impl::ErrorReporter> erro
 }
 
 scheduling::SessionId Flatland::GetSessionId() const { return session_id_; }
+
+void Flatland::OnFidlClosed(fidl::UnbindInfo unbind_info) {
+  if (!unbind_info.is_user_initiated()) {
+    FX_LOGS(INFO) << "Flatland::OnFidlClosed() because: " << unbind_info.FormatDescription();
+  }
+
+  if (!destroy_instance_function_was_invoked_) {
+    destroy_instance_function_was_invoked_ = true;
+    destroy_instance_function_();
+  }
+}
 
 void Flatland::ReportBadOperationError() { failure_since_previous_present_ = true; }
 
@@ -1758,8 +1988,8 @@ void Flatland::CloseConnection(FlatlandError error) {
   // Trigger the destruction of this instance.
   //
   // NOTE: it would probably be OK to test |destroy_instance_function_was_invoked_| at the top of
-  // the function, exiting early if it was already invoked.  But this way makes it obvious that the
-  // cleanups above run at least once (and there's no downside if they are run a second time).
+  // the function, exiting early if it was already invoked.  But this way makes it obvious that
+  // the cleanups above run at least once (and there's no downside if they are run a second time).
   if (!destroy_instance_function_was_invoked_) {
     destroy_instance_function_was_invoked_ = true;
     destroy_instance_function_();
@@ -1769,38 +1999,38 @@ void Flatland::CloseConnection(FlatlandError error) {
 // MatrixData function implementations
 
 // static
-float Flatland::MatrixData::GetOrientationAngle(fuchsia::ui::composition::Orientation orientation) {
+float Flatland::MatrixData::GetOrientationAngle(fuchsia_ui_composition::Orientation orientation) {
   // The matrix is specified in view-space coordinates, in which the +y axis points downwards (not
-  // upwards). Rotations which are specified as counter-clockwise must actually occur in a clockwise
-  // fashion in this coordinate space (a vector on the +x axis rotates towards -y axis to give the
-  // appearance of a counter-clockwise rotation).
+  // upwards). Rotations which are specified as counter-clockwise must actually occur in a
+  // clockwise fashion in this coordinate space (a vector on the +x axis rotates towards -y axis
+  // to give the appearance of a counter-clockwise rotation).
   switch (orientation) {
-    case Orientation::CCW_0_DEGREES:
+    case Orientation::kCcw0Degrees:
       return 0.f;
-    case Orientation::CCW_90_DEGREES:
+    case Orientation::kCcw90Degrees:
       return -glm::half_pi<float>();
-    case Orientation::CCW_180_DEGREES:
+    case Orientation::kCcw180Degrees:
       return -glm::pi<float>();
-    case Orientation::CCW_270_DEGREES:
+    case Orientation::kCcw270Degrees:
       return -glm::three_over_two_pi<float>();
   }
 }
 
 void Flatland::MatrixData::SetTranslation(Vec translation) {
-  translation_.x = static_cast<float>(translation.x);
-  translation_.y = static_cast<float>(translation.y);
+  translation_.x = static_cast<float>(translation.x());
+  translation_.y = static_cast<float>(translation.y());
   RecomputeMatrix();
 }
 
-void Flatland::MatrixData::SetOrientation(fuchsia::ui::composition::Orientation orientation) {
+void Flatland::MatrixData::SetOrientation(fuchsia_ui_composition::Orientation orientation) {
   angle_ = GetOrientationAngle(orientation);
 
   RecomputeMatrix();
 }
 
 void Flatland::MatrixData::SetScale(VecF scale) {
-  scale_.x = scale.x;
-  scale_.y = scale.y;
+  scale_.x = scale.x();
+  scale_.y = scale.y();
   RecomputeMatrix();
 }
 

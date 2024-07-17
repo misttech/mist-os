@@ -14,10 +14,10 @@ namespace test {
 
 // Register three presents and see that they fire at the right time with the right arguments.
 TEST(Present2HelperTest, OnPresented_ShouldTriggerCallbacksCorrectly) {
-  std::optional<fuchsia::scenic::scheduling::FramePresentedInfo> presented_info;
+  std::optional<fuchsia_scenic_scheduling::FramePresentedInfo> presented_info;
   Present2Helper helper(
       /*on_frame_presented_event*/ [&presented_info](
-                                       fuchsia::scenic::scheduling::FramePresentedInfo info) {
+                                       fuchsia_scenic_scheduling::FramePresentedInfo info) {
         presented_info.emplace(std::move(info));
       });
 
@@ -39,13 +39,13 @@ TEST(Present2HelperTest, OnPresented_ShouldTriggerCallbacksCorrectly) {
     helper.OnPresented(latched_times, present_times, /*num_presents_allowed*/ 2);
     ASSERT_TRUE(presented_info);
     auto& info = presented_info.value();
-    EXPECT_EQ(info.actual_presentation_time, 9);
-    EXPECT_EQ(info.num_presents_allowed, 2u);
-    ASSERT_EQ(info.presentation_infos.size(), 2u);
-    EXPECT_EQ(info.presentation_infos[0].present_received_time(), 4);
-    EXPECT_EQ(info.presentation_infos[0].latched_time(), 7);
-    EXPECT_EQ(info.presentation_infos[1].present_received_time(), 5);
-    EXPECT_EQ(info.presentation_infos[1].latched_time(), 8);
+    EXPECT_EQ(info.actual_presentation_time(), 9);
+    EXPECT_EQ(info.num_presents_allowed(), 2u);
+    ASSERT_EQ(info.presentation_infos().size(), 2u);
+    EXPECT_EQ(info.presentation_infos()[0].present_received_time(), 4);
+    EXPECT_EQ(info.presentation_infos()[0].latched_time(), 7);
+    EXPECT_EQ(info.presentation_infos()[1].present_received_time(), 5);
+    EXPECT_EQ(info.presentation_infos()[1].latched_time(), 8);
   }
 
   {  // Trigger callback for 3.
@@ -58,11 +58,11 @@ TEST(Present2HelperTest, OnPresented_ShouldTriggerCallbacksCorrectly) {
 
     helper.OnPresented(latched_times, present_times, /*num_presents_allowed*/ 4);
     auto& info = presented_info.value();
-    EXPECT_EQ(info.actual_presentation_time, 111);
-    EXPECT_EQ(info.num_presents_allowed, 4u);
-    ASSERT_EQ(info.presentation_infos.size(), 1u);
-    EXPECT_EQ(info.presentation_infos[0].present_received_time(), 6);
-    EXPECT_EQ(info.presentation_infos[0].latched_time(), 55);
+    EXPECT_EQ(info.actual_presentation_time(), 111);
+    EXPECT_EQ(info.num_presents_allowed(), 4u);
+    ASSERT_EQ(info.presentation_infos().size(), 1u);
+    EXPECT_EQ(info.presentation_infos()[0].present_received_time(), 6);
+    EXPECT_EQ(info.presentation_infos()[0].latched_time(), 55);
   }
 }
 
