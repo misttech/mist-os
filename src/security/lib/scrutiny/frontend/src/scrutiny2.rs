@@ -17,6 +17,8 @@ use scrutiny_plugins::verify::controller::structured_config::{
     ExtractStructuredConfigController, ExtractStructuredConfigResponse,
 };
 use scrutiny_plugins::verify::CapabilityRouteResults;
+use scrutiny_plugins::zbi::Zbi;
+use scrutiny_utils::package::PackageIndexContents;
 use scrutiny_utils::url::from_pkg_url_parts;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -76,6 +78,25 @@ impl ScrutinyArtifacts {
             .into_iter()
             .map(|package| from_pkg_url_parts(package.name, package.variant, Some(package.merkle)))
             .collect::<Result<Vec<AbsolutePackageUrl>>>()?)
+    }
+
+    pub fn get_bootfs_files(&self) -> Result<Vec<String>> {
+        let mut files = self
+            .model
+            .get::<Zbi>()
+            .unwrap()
+            .bootfs_files
+            .bootfs_files
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>();
+        files.sort();
+        Ok(files)
+    }
+
+    // TODO: Why is this optional?
+    pub fn get_bootfs_packages(&self) -> Result<Option<PackageIndexContents>> {
+        Ok(self.model.get::<Zbi>().unwrap().bootfs_packages.bootfs_pkgs.clone())
     }
 
     pub fn extract_package(

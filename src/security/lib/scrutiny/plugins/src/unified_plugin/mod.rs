@@ -45,8 +45,6 @@ impl UnifiedPlugin {
                 "/verify/route_sources" => RouteSourcesController::default(),
                 "/verify/component_resolvers" => ComponentResolversController::default(),
                 "/verify/structured_config" => VerifyStructuredConfigController::default(),
-                "/zbi/bootfs" => BootFsFilesController::default(),
-                "/zbi/bootfs_packages" => BootFsPackagesController::default(),
                 "/zbi/cmdline" => ZbiCmdlineController::default(),
                 "/zbi/sections" => ZbiSectionsController::default(),
             },

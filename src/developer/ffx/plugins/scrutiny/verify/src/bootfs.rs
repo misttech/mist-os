@@ -4,10 +4,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use ffx_scrutiny_verify_args::bootfs::Command;
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
-use scrutiny_utils::bootfs::BootfsPackageIndex;
+use scrutiny_frontend::scrutiny2::Scrutiny;
 use scrutiny_utils::golden::{CompareResult, GoldenFile};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -26,17 +23,13 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         bail!("Must specify at least one --golden or --golden-packages");
     }
     let mut deps = HashSet::new();
-    let command = CommandBuilder::new("zbi.bootfs").build();
-    let model = if recovery {
-        ModelConfig::from_product_bundle_recovery(cmd.product_bundle.clone())
-    } else {
-        ModelConfig::from_product_bundle(cmd.product_bundle.clone())
-    }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).build();
-    config.runtime.logging.silent_mode = true;
 
-    let scrutiny_output =
-        launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
+    let artifacts = if recovery {
+        Scrutiny::from_product_bundle_recovery(&cmd.product_bundle)
+    } else {
+        Scrutiny::from_product_bundle(&cmd.product_bundle)
+    }?
+    .collect()?;
 
     let unscrutinized_dirs = std::collections::HashSet::from([
         // blob dir files are unscrutinized, because their presence is dictated
@@ -45,8 +38,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         Some(Path::new("blob")),
     ]);
 
-    let bootfs_file_names: Vec<String> = serde_json::from_str(&scrutiny_output)
-        .context(format!("Failed to deserialize scrutiny output: {}", scrutiny_output))?;
+    let bootfs_file_names = artifacts.get_bootfs_files()?;
     let total_bootfs_file_count = bootfs_file_names.len();
 
     let non_blob_files = bootfs_file_names
@@ -74,20 +66,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
 
     deps.extend(cmd.golden.clone());
 
-    // Collect the bootfs packages.
-    let command = CommandBuilder::new("zbi.bootfs_packages").build();
-    let model = if recovery {
-        ModelConfig::from_product_bundle_recovery(cmd.product_bundle.clone())
-    } else {
-        ModelConfig::from_product_bundle(cmd.product_bundle.clone())
-    }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).build();
-    config.runtime.logging.silent_mode = true;
-
-    let scrutiny_output =
-        launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
-    let bootfs_packages: BootfsPackageIndex = serde_json::from_str(&scrutiny_output)?;
-    let bootfs_packages = bootfs_packages.bootfs_pkgs;
+    let bootfs_packages = artifacts.get_bootfs_packages()?;
 
     // TODO(https://fxbug.dev/42179754) After the first bootfs package is migrated to a component, an
     // absence of a bootfs package index is an error.
