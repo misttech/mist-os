@@ -107,6 +107,17 @@ pub trait Directory: Node {
         _object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status>;
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        _path: Path,
+        _flags: fio::Flags,
+        _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
     /// Reads directory entries starting from `pos` by adding them to `sink`.
     /// Once finished, should return a sealed sink.
     // The lifetimes here are because of https://github.com/rust-lang/rust/issues/63033.

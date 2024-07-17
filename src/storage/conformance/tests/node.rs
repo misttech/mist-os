@@ -71,6 +71,16 @@ async fn test_open_node_on_file() {
         .await
         .unwrap_err();
     assert_eq!(error, zx::Status::NOT_DIR);
+
+    let error: zx::Status = test_dir
+        .open3_node::<fio::NodeMarker>(
+            "file",
+            fio::Flags::PROTOCOL_NODE | fio::Flags::PROTOCOL_SYMLINK,
+            None,
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(error, zx::Status::WRONG_TYPE);
 }
 
 #[fuchsia::test]

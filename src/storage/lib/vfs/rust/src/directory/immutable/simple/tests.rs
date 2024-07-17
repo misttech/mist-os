@@ -34,6 +34,9 @@ use static_assertions::assert_eq_size;
 use std::sync::{Arc, Mutex};
 use vfs_macros::pseudo_directory;
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use crate::test_utils::node::open3_get_proxy;
+
 // Redefine these constants as a u32 as in macos they are u16
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
 const S_IXUSR: u32 = libc::S_IXUSR as u32;
@@ -301,6 +304,39 @@ fn one_file_open2_missing_not_found_handler() {
                 }),
                 ..Default::default()
             }),
+            "bar",
+        );
+        assert_matches!(
+            file.take_event_stream().try_next().await,
+            Err(fidl::Error::ClientChannelClosed { status: Status::NOT_FOUND, .. })
+        );
+
+        assert_close!(proxy);
+        assert_eq!(Some("bar".to_string()), *last_handler_value.lock().unwrap())
+    });
+}
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+#[test]
+fn one_file_open3_missing_not_found_handler() {
+    let root = pseudo_directory! {
+        "foo" => file::read_only("Content"),
+    };
+
+    let last_handler_value = Arc::new(Mutex::new(None));
+
+    {
+        let last_handler_value = last_handler_value.clone();
+        root.clone().set_not_found_handler(Box::new(move |path| {
+            *last_handler_value.lock().unwrap() = Some(path.to_string());
+        }));
+    }
+
+    run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |proxy| async move {
+        let file = open3_get_proxy::<fio::FileMarker>(
+            &proxy,
+            fio::Flags::PROTOCOL_FILE,
+            &fio::Options::default(),
             "bar",
         );
         assert_matches!(

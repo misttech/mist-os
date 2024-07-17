@@ -25,8 +25,11 @@ pub struct ObjectRequest {
     // What should be sent first.
     what_to_send: ObjectRequestSend,
 
-    // Attributes requested in the open method.
+    // Attributes required in the open method.
     attributes: fio::NodeAttributesQuery,
+
+    // Creation attributes.
+    create_attributes: Option<Box<fio::MutableNodeAttributes>>,
 
     /// Truncate the object before use.
     pub truncate: bool,
@@ -37,10 +40,27 @@ impl ObjectRequest {
         object_request: fidl::Channel,
         what_to_send: ObjectRequestSend,
         attributes: fio::NodeAttributesQuery,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
         truncate: bool,
     ) -> Self {
         assert!(!object_request.is_invalid_handle());
-        Self { object_request, what_to_send, attributes, truncate }
+        let create_attributes = create_attributes.map(|a| Box::new(a.clone()));
+        Self { object_request, what_to_send, attributes, create_attributes, truncate }
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    pub fn new3(flags: fio::Flags, options: &fio::Options, object_request: fidl::Channel) -> Self {
+        ObjectRequest::new(
+            object_request,
+            if flags.get_representation() {
+                ObjectRequestSend::OnRepresentation
+            } else {
+                ObjectRequestSend::Nothing
+            },
+            options.attributes.unwrap_or(fio::NodeAttributesQuery::empty()),
+            options.create_attributes.as_ref(),
+            flags.is_truncate(),
+        )
     }
 
     pub(crate) fn what_to_send(&self) -> ObjectRequestSend {
@@ -49,6 +69,22 @@ impl ObjectRequest {
 
     pub(crate) fn attributes(&self) -> fio::NodeAttributesQuery {
         self.attributes
+    }
+
+    pub fn create_attributes(&self) -> Option<&fio::MutableNodeAttributes> {
+        self.create_attributes.as_deref()
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    pub(crate) fn options(&self) -> fio::Options {
+        fio::Options {
+            attributes: (!self.attributes.is_empty()).then_some(self.attributes),
+            create_attributes: self
+                .create_attributes
+                .as_ref()
+                .map(|a| fio::MutableNodeAttributes::clone(&a)),
+            ..Default::default()
+        }
     }
 
     /// Returns the request stream after sending requested information.
@@ -211,6 +247,7 @@ impl ObjectRequest {
             ),
             what_to_send: self.what_to_send,
             attributes: self.attributes,
+            create_attributes: self.create_attributes.take(),
             truncate: self.truncate,
         }
     }
@@ -283,6 +320,18 @@ pub trait ToObjectRequest: ProtocolsExt {
 
 impl ToObjectRequest for fio::ConnectionProtocols {
     fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest {
+        let attributes = match self {
+            fio::ConnectionProtocols::Node(fio::NodeOptions {
+                attributes: Some(query), ..
+            }) => *query,
+            _ => fio::NodeAttributesQuery::empty(),
+        };
+        let create_attributes = match self {
+            fio::ConnectionProtocols::Node(fio::NodeOptions { create_attributes: a, .. }) => {
+                a.as_ref()
+            }
+            _ => None,
+        };
         ObjectRequest::new(
             object_request.into().into(),
             if self.get_representation() {
@@ -290,7 +339,8 @@ impl ToObjectRequest for fio::ConnectionProtocols {
             } else {
                 ObjectRequestSend::Nothing
             },
-            self.attributes(),
+            attributes,
+            create_attributes,
             self.is_truncate(),
         )
     }
@@ -305,7 +355,8 @@ impl ToObjectRequest for fio::OpenFlags {
             } else {
                 ObjectRequestSend::Nothing
             },
-            self.attributes(),
+            fio::NodeAttributesQuery::empty(),
+            None,
             self.is_truncate(),
         )
     }

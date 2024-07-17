@@ -320,6 +320,29 @@ pub async fn open2_dir_checked(
     open2_dir(dir, protocols, path).await.expect("open2_dir failed")
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+pub async fn open3_dir(
+    dir: &fio::DirectoryProxy,
+    flags: fio::Flags,
+    options: &fio::Options,
+    path: &str,
+) -> Result<fio::DirectoryProxy, Error> {
+    let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
+    dir.open3(path, flags, options, server_end.into_channel())?;
+    let _: Vec<_> = proxy.query().await?;
+    Ok(proxy)
+}
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+pub async fn open3_dir_checked(
+    dir: &fio::DirectoryProxy,
+    flags: fio::Flags,
+    options: &fio::Options,
+    path: &str,
+) -> fio::DirectoryProxy {
+    open3_dir(dir, flags, options, path).await.expect("open3_dir failed")
+}
+
 /// Utility function to write to an `FxFile`.
 pub async fn write_at(file: &FxFile, offset: u64, content: &[u8]) -> Result<usize, Error> {
     let stream = zx::Stream::create(zx::StreamOptions::MODE_WRITE, file.vmo(), 0)

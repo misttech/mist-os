@@ -42,6 +42,24 @@ where
     new_proxy
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+pub fn open3_get_proxy<M>(
+    proxy: &fio::DirectoryProxy,
+    flags: fio::Flags,
+    options: &fio::Options,
+    path: &str,
+) -> M::Proxy
+where
+    M: ProtocolMarker,
+{
+    let (new_proxy, new_server_end) =
+        create_proxy::<M>().expect("Failed to create connection endpoints");
+
+    proxy.open3(path, flags, options, new_server_end.into_channel()).unwrap();
+
+    new_proxy
+}
+
 /// This trait repeats parts of the `NodeProxy` trait, and is implemented for `NodeProxy`,
 /// `FileProxy`, and `DirectoryProxy`, which all share the same API.  FIDL currently does not
 /// expose the API inheritance, so with this trait we have a workaround.  As soon as FIDL will

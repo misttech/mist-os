@@ -508,8 +508,8 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
 // There is a direct mapping between the POSIX `O_DIRECTORY` flag and
 // `fio::OpenFlags::DIRECTORY` (io1) or specifying some `DirectoryProtocolOptions` (io2). However,
 // there is no POSIX equivalent to `fio::OpenFlags::NOT_DIRECTORY` (io1) or
-// `FileProtocolFlags` (io2). To be able to open the node as a file, we need to default to open as
-// a file if no flags or protocols were specified.
+// `FileProtocolFlags` (io2) or `fio::Flags` (io3). To be able to open the node as a file, we need
+// to default to open as a file if no flags or protocols were specified.
 fn open_meta_as_file<'a>(flags_or_protocols: impl Into<FlagsOrProtocols<'a>>) -> bool {
     match flags_or_protocols.into() {
         FlagsOrProtocols::Flags(flags) => {
@@ -518,6 +518,11 @@ fn open_meta_as_file<'a>(flags_or_protocols: impl Into<FlagsOrProtocols<'a>>) ->
         FlagsOrProtocols::Protocols(protocols) => {
             // If no protocol was specified, default to opening as file.
             protocols.is_any_node_protocol_allowed() || protocols.is_file_allowed()
+        }
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        FlagsOrProtocols::Flags3(flags) => {
+            // If no protocol was specified, default to opening as file.
+            flags.is_any_node_protocol_allowed() || flags.is_file_allowed()
         }
     }
 }

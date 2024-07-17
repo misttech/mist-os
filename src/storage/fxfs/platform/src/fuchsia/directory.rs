@@ -34,7 +34,7 @@ use vfs::directory::watchers::event_producers::SingleNameEventProducer;
 use vfs::directory::watchers::Watchers;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
-use vfs::{attributes, symlink, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
+use vfs::{attributes, symlink, ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[derive(ToWeakNode)]
@@ -97,6 +97,7 @@ impl FxDirectory {
         self: &Arc<Self>,
         protocols: &dyn ProtocolsExt,
         mut path: Path,
+        request: &ObjectRequest,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
         if path.is_empty() {
             return Ok(OpenedNode::new(self.clone()));
@@ -210,7 +211,7 @@ impl FxDirectory {
                                 &mut transaction,
                                 name,
                                 protocols.create_directory(),
-                                protocols.create_attributes(),
+                                request.create_attributes(),
                             )
                             .await?;
                         let node = OpenedNode::new(new_node.clone());
@@ -758,7 +759,8 @@ impl VfsDirectory for FxDirectory {
         let scope = self.volume().scope().clone();
         flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
             Box::pin(async move {
-                let node = self.lookup(&flags, path).await.map_err(map_to_status)?;
+                let node =
+                    self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
                     object_request.create_connection(
                         scope,
@@ -817,7 +819,8 @@ impl VfsDirectory for FxDirectory {
         let scope = self.volume().scope().clone();
         object_request.take().spawn(&scope.clone(), move |object_request| {
             Box::pin(async move {
-                let node = self.lookup(&protocols, path).await.map_err(map_to_status)?;
+                let node =
+                    self.lookup(&protocols, path, &object_request).await.map_err(map_to_status)?;
                 if node.is::<FxDirectory>() {
                     object_request.create_connection(
                         scope,
@@ -836,6 +839,49 @@ impl VfsDirectory for FxDirectory {
                         protocols,
                         |scope, symlink, protocols, object_request| {
                             symlink::Connection::create(scope, symlink, &protocols, object_request)
+                        },
+                    )
+                } else {
+                    unreachable!();
+                }
+            })
+        });
+        Ok(())
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), zx::Status> {
+        // Ignore the provided scope which might be for the parent pseudo filesystem and use the
+        // volume's scope instead.
+        let scope = self.volume().scope().clone();
+        object_request.take().spawn(&scope.clone(), move |object_request| {
+            Box::pin(async move {
+                let node =
+                    self.lookup(&flags, path, object_request).await.map_err(map_to_status)?;
+                if node.is::<FxDirectory>() {
+                    object_request.create_connection(
+                        scope,
+                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
+                        flags,
+                        MutableConnection::create,
+                    )
+                } else if node.is::<FxFile>() {
+                    let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+                    FxFile::create_connection_async(node, scope, flags, object_request)
+                } else if node.is::<FxSymlink>() {
+                    let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
+                    object_request.create_connection(
+                        scope.clone(),
+                        node.take(),
+                        flags,
+                        |scope, symlink, flags, object_request| {
+                            symlink::Connection::create(scope, symlink, &flags, object_request)
                         },
                     )
                 } else {
@@ -989,7 +1035,11 @@ mod tests {
     use vfs::common::rights_to_posix_mode_bits;
     use vfs::node::Node;
     use vfs::path::Path;
+    use vfs::{ObjectRequest, ToObjectRequest};
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    use crate::fuchsia::testing::{open3_dir, open3_dir_checked};
 
     #[fuchsia::test]
     async fn test_open_root_dir() {
@@ -2099,6 +2149,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
             let mode = fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
@@ -2114,7 +2165,11 @@ mod tests {
                 ..Default::default()
             });
 
-            let dir = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+            let request = connection_protocols.to_object_request(server_end);
+            let dir = root_dir
+                .lookup(&connection_protocols, path, &request)
+                .await
+                .expect("lookup failed");
 
             let attrs = dir
                 .clone()
@@ -2149,12 +2204,14 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
             let flags = fio::OpenFlags::DIRECTORY
                 | fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::CREATE;
 
-            let dir = root_dir.lookup(&flags, path).await.expect("lookup failed");
+            let request = flags.to_object_request(server_end);
+            let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             // `get_attrs()` returns a `fio::NodeAttributes` which includes `mode`. Since dir was
             // not created with any mode bits, `get_attrs()` will return a `fio::NodeAttributes`
@@ -2183,6 +2240,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
             let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
@@ -2193,7 +2251,11 @@ mod tests {
                 ..Default::default()
             });
 
-            let dir = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+            let request = connection_protocols.to_object_request(server_end);
+            let dir = root_dir
+                .lookup(&connection_protocols, path, &request)
+                .await
+                .expect("lookup failed");
 
             let attrs = dir
                 .clone()
@@ -2217,6 +2279,57 @@ mod tests {
         fixture.close().await;
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fuchsia::test]
+    async fn test_create_dir_using_flags_and_options() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let mode = fio::MODE_TYPE_DIRECTORY
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
+            let options = fio::Options {
+                create_attributes: Some(fio::MutableNodeAttributes {
+                    mode: Some(mode),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            // Create directory node.
+            let request = ObjectRequest::new3(flags, &options, server_end.into());
+            let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
+
+            // Verify that the node was created with the attributes requested.
+            let attrs = dir
+                .clone()
+                .into_any()
+                .downcast::<FxDirectory>()
+                .expect("Not a directory")
+                .get_attributes(
+                    fio::NodeAttributesQuery::MODE
+                        | fio::NodeAttributesQuery::UID
+                        | fio::NodeAttributesQuery::ACCESS_TIME,
+                )
+                .await
+                .expect("FIDL call failed");
+            assert_eq!(attrs.mutable_attributes.mode.unwrap(), mode);
+            // Since the POSIX mode attribute was set, we expect default values for the other POSIX
+            // attributes.
+            assert_eq!(attrs.mutable_attributes.uid.unwrap(), 0);
+            // Expect these attributes to be None as they were not queried in `get_attributes(..)`
+            assert!(attrs.mutable_attributes.gid.is_none());
+            assert!(attrs.mutable_attributes.rdev.is_none());
+            assert!(attrs.mutable_attributes.access_time.is_some());
+        }
+        fixture.close().await;
+    }
+
     #[fuchsia::test]
     async fn test_create_file_with_mutable_node_attributes() {
         let fixture = TestFixture::new().await;
@@ -2226,6 +2339,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
+            let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
             let mode = fio::MODE_TYPE_FILE
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
             let uid = 1;
@@ -2249,7 +2363,11 @@ mod tests {
                 ..Default::default()
             });
 
-            let file = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+            let request = connection_protocols.to_object_request(server_end);
+            let file = root_dir
+                .lookup(&connection_protocols, path, &request)
+                .await
+                .expect("lookup failed");
 
             let attributes = file
                 .clone()
@@ -2287,12 +2405,14 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
+            let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
             let flags = fio::OpenFlags::CREATE
                 | fio::OpenFlags::NOT_DIRECTORY
                 | fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE;
 
-            let file = root_dir.lookup(&flags, path).await.expect("lookup failed");
+            let request = flags.to_object_request(server_end);
+            let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = file
                 .clone()
@@ -2318,6 +2438,7 @@ mod tests {
             let path_str = "foo";
             let path = Path::validate_and_split(path_str).unwrap();
 
+            let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
             let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),
@@ -2328,7 +2449,11 @@ mod tests {
                 ..Default::default()
             });
 
-            let file = root_dir.lookup(&connection_protocols, path).await.expect("lookup failed");
+            let request = connection_protocols.to_object_request(server_end);
+            let file = root_dir
+                .lookup(&connection_protocols, path, &request)
+                .await
+                .expect("lookup failed");
 
             let attrs = file
                 .clone()
@@ -2347,6 +2472,68 @@ mod tests {
             assert!(attrs.mutable_attributes.rdev.is_none());
             assert!(attrs.mutable_attributes.creation_time.is_none());
             assert!(attrs.mutable_attributes.modification_time.is_none());
+        }
+        fixture.close().await;
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fuchsia::test]
+    async fn test_create_file_using_flags_and_options() {
+        let fixture = TestFixture::new().await;
+        {
+            let root_dir = fixture.volume().root_dir();
+
+            let path_str = "foo";
+            let path = Path::validate_and_split(path_str).unwrap();
+
+            let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
+            let mode = fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
+            let uid = 1;
+            let gid = 2;
+            let rdev = 3;
+            let modification_time = Timestamp::now().as_nanos();
+            let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE;
+            let options = fio::Options {
+                create_attributes: Some(fio::MutableNodeAttributes {
+                    modification_time: Some(modification_time),
+                    mode: Some(mode),
+                    uid: Some(uid),
+                    gid: Some(gid),
+                    rdev: Some(rdev),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            // Create file node.
+            let request = ObjectRequest::new3(flags, &options, server_end.into());
+            let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
+
+            // Verify that the node was created with the attributes requested.
+            let attributes = file
+                .clone()
+                .into_any()
+                .downcast::<FxFile>()
+                .expect("Not a file")
+                .get_attributes(
+                    fio::NodeAttributesQuery::CREATION_TIME
+                        | fio::NodeAttributesQuery::MODIFICATION_TIME
+                        | fio::NodeAttributesQuery::CHANGE_TIME
+                        | fio::NodeAttributesQuery::MODE
+                        | fio::NodeAttributesQuery::UID
+                        | fio::NodeAttributesQuery::GID
+                        | fio::NodeAttributesQuery::RDEV,
+                )
+                .await
+                .expect("FIDL call failed");
+            assert_eq!(mode, attributes.mutable_attributes.mode.unwrap());
+            assert_eq!(uid, attributes.mutable_attributes.uid.unwrap());
+            assert_eq!(gid, attributes.mutable_attributes.gid.unwrap());
+            assert_eq!(rdev, attributes.mutable_attributes.rdev.unwrap());
+            assert_eq!(modification_time, attributes.mutable_attributes.modification_time.unwrap());
+            assert!(attributes.mutable_attributes.creation_time.is_some());
+            assert!(attributes.immutable_attributes.change_time.is_some());
         }
         fixture.close().await;
     }
@@ -2471,6 +2658,48 @@ mod tests {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 ..Default::default()
             }),
+            ".",
+        )
+        .await;
+
+        fixture.close().await;
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fuchsia::test]
+    async fn test_open3_deleted_self() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        const PATH: &str = "foo";
+
+        let dir =
+            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, PATH).await;
+
+        root.unlink(PATH, &fio::UnlinkOptions::default())
+            .await
+            .expect("FIDL call failed")
+            .expect("unlink failed");
+
+        assert_eq!(
+            open3_dir(
+                &root,
+                fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
+                &fio::Options::default(),
+                PATH
+            )
+            .await
+            .expect_err("Open3 succeeded unexpectedly")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
+            &zx::Status::NOT_FOUND,
+        );
+
+        open3_dir_checked(
+            &dir,
+            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
+            &fio::Options::default(),
             ".",
         )
         .await;

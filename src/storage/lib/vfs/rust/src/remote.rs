@@ -35,6 +35,17 @@ pub trait RemoteLike {
         Err(Status::NOT_SUPPORTED)
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        _path: Path,
+        _flags: fio::Flags,
+        _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
     /// Returns whether the remote should be opened lazily for the given path.  If true, the remote
     /// won't be opened until the channel in the request is readable.  This request will *not* be
     /// considered lazy if the request requires an event such as OnRepresentation, and this method
@@ -119,6 +130,25 @@ impl<T: GetRemoteDir> RemoteLike for T {
         let _ = self.get_remote_dir()?.open2(
             path.as_ref(),
             &protocols,
+            object_request.take().into_channel(),
+        );
+        Ok(())
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        // There is nowhere to propagate any errors since we take the `object_request`. This is okay
+        // as the channel will be dropped and closed if the wire call fails.
+        let _ = self.get_remote_dir()?.open3(
+            path.as_ref(),
+            flags,
+            &object_request.options(),
             object_request.take().into_channel(),
         );
         Ok(())

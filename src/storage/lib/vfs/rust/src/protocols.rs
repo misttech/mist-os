@@ -51,12 +51,6 @@ pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
     /// True if the file should be truncated.
     fn is_truncate(&self) -> bool;
 
-    /// The attributes requested in the REPRESENTATION event.
-    fn attributes(&self) -> fio::NodeAttributesQuery;
-
-    /// Attributes to set if an object is created.
-    fn create_attributes(&self) -> Option<&fio::MutableNodeAttributes>;
-
     /// If creating an object, Whether to create a directory.
     fn create_directory(&self) -> bool;
 
@@ -64,8 +58,6 @@ pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
     fn is_node(&self) -> bool;
 }
 
-// TODO(b/293947862): add function to check for illegal node protocol combinations for Open2, e.g.
-// where `directory` and `file` are set.
 impl ProtocolsExt for fio::ConnectionProtocols {
     fn is_dir_allowed(&self) -> bool {
         matches!(
@@ -118,7 +110,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
     }
 
     fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
-        if !self.is_node() && !self.is_dir_allowed() {
+        if !self.is_dir_allowed() {
             if self.is_file_allowed() && !self.is_symlink_allowed() {
                 return Err(Status::NOT_FILE);
             } else {
@@ -144,7 +136,7 @@ impl ProtocolsExt for fio::ConnectionProtocols {
     }
 
     fn to_symlink_options(&self) -> Result<SymlinkOptions, Status> {
-        if !self.is_node() && !self.is_symlink_allowed() {
+        if !self.is_symlink_allowed() {
             return Err(Status::WRONG_TYPE);
         }
         // If is_symlink_allowed() returned true, there must be rights.
@@ -185,24 +177,6 @@ impl ProtocolsExt for fio::ConnectionProtocols {
                 ..
             }) if flags.contains(fio::FileProtocolFlags::TRUNCATE)
         )
-    }
-
-    fn attributes(&self) -> fio::NodeAttributesQuery {
-        match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                attributes: Some(query), ..
-            }) => *query,
-            _ => fio::NodeAttributesQuery::empty(),
-        }
-    }
-
-    fn create_attributes(&self) -> Option<&fio::MutableNodeAttributes> {
-        match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions { create_attributes: a, .. }) => {
-                a.as_ref()
-            }
-            _ => None,
-        }
     }
 
     fn create_directory(&self) -> bool {
@@ -378,14 +352,6 @@ impl ProtocolsExt for fio::OpenFlags {
         self.contains(fio::OpenFlags::TRUNCATE)
     }
 
-    fn attributes(&self) -> fio::NodeAttributesQuery {
-        fio::NodeAttributesQuery::empty()
-    }
-
-    fn create_attributes(&self) -> Option<&fio::MutableNodeAttributes> {
-        None
-    }
-
     fn create_directory(&self) -> bool {
         self.contains(fio::OpenFlags::DIRECTORY)
     }
@@ -395,13 +361,118 @@ impl ProtocolsExt for fio::OpenFlags {
     }
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+impl ProtocolsExt for fio::Flags {
+    fn is_dir_allowed(&self) -> bool {
+        self.contains(fio::Flags::PROTOCOL_DIRECTORY) || self.is_any_node_protocol_allowed()
+    }
+
+    fn is_file_allowed(&self) -> bool {
+        self.contains(fio::Flags::PROTOCOL_FILE) || self.is_any_node_protocol_allowed()
+    }
+
+    fn is_symlink_allowed(&self) -> bool {
+        self.contains(fio::Flags::PROTOCOL_SYMLINK) || self.is_any_node_protocol_allowed()
+    }
+
+    fn is_any_node_protocol_allowed(&self) -> bool {
+        self.intersection(fio::MASK_KNOWN_PROTOCOLS).is_empty()
+            || self.contains(fio::Flags::PROTOCOL_NODE)
+    }
+
+    fn creation_mode(&self) -> CreationMode {
+        if self.contains(fio::Flags::FLAG_MUST_CREATE) {
+            CreationMode::Always
+        } else if self.contains(fio::Flags::FLAG_MAYBE_CREATE) {
+            CreationMode::AllowExisting
+        } else {
+            CreationMode::Never
+        }
+    }
+
+    fn rights(&self) -> Option<fio::Operations> {
+        Some(flags_to_rights(self))
+    }
+
+    fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
+        // Verify protocols.
+        if !self.is_dir_allowed() {
+            if self.is_file_allowed() && !self.is_symlink_allowed() {
+                return Err(Status::NOT_FILE);
+            } else {
+                return Err(Status::WRONG_TYPE);
+            }
+        }
+
+        // Expand the POSIX flags to their respective rights. This is done with the assumption that
+        // the POSIX flags would have been validated prior to calling this. E.g. in the vfs
+        // connection later.
+        let mut updated_flags = *self;
+        if updated_flags.contains(fio::Flags::PERM_INHERIT_WRITE) {
+            updated_flags |= operations_to_flags(fio::INHERITED_WRITE_PERMISSIONS);
+        }
+        if updated_flags.contains(fio::Flags::PERM_INHERIT_EXECUTE) {
+            updated_flags |= fio::Flags::PERM_EXECUTE;
+        }
+
+        // Verify that there are no file-related flags.
+        if updated_flags.intersects(fio::Flags::FILE_APPEND | fio::Flags::FILE_TRUNCATE) {
+            return Err(Status::INVALID_ARGS);
+        }
+
+        Ok(DirectoryOptions { rights: flags_to_rights(&updated_flags) })
+    }
+
+    fn to_symlink_options(&self) -> Result<SymlinkOptions, Status> {
+        if !self.is_symlink_allowed() {
+            return Err(Status::WRONG_TYPE);
+        }
+
+        // If is_symlink_allowed() returned true, there must be rights.
+        if !self.rights().unwrap().contains(fio::Operations::GET_ATTRIBUTES) {
+            return Err(Status::INVALID_ARGS);
+        }
+        Ok(SymlinkOptions)
+    }
+
+    fn to_service_options(&self) -> Result<ServiceOptions, Status> {
+        if !self.difference(fio::Flags::PROTOCOL_SERVICE).is_empty()
+            && !self.contains(fio::Flags::PROTOCOL_NODE)
+        {
+            return Err(Status::INVALID_ARGS);
+        }
+
+        Ok(ServiceOptions)
+    }
+
+    fn get_representation(&self) -> bool {
+        self.contains(fio::Flags::FLAG_SEND_REPRESENTATION)
+    }
+
+    fn is_append(&self) -> bool {
+        self.contains(fio::Flags::FILE_APPEND)
+    }
+
+    fn is_truncate(&self) -> bool {
+        self.contains(fio::Flags::FILE_TRUNCATE)
+    }
+
+    fn create_directory(&self) -> bool {
+        self.contains(fio::Flags::PROTOCOL_DIRECTORY)
+    }
+
+    fn is_node(&self) -> bool {
+        self.contains(fio::Flags::PROTOCOL_NODE)
+    }
+}
+
 pub trait ToFileOptions {
     fn to_file_options(&self) -> Result<FileOptions, Status>;
 }
 
 impl ToFileOptions for fio::ConnectionProtocols {
     fn to_file_options(&self) -> Result<FileOptions, Status> {
-        if !self.is_node() && !self.is_file_allowed() {
+        if !self.is_file_allowed() {
             if self.is_dir_allowed() && !self.is_symlink_allowed() {
                 return Err(Status::NOT_DIR);
             } else {
@@ -480,6 +551,30 @@ impl ToFileOptions for fio::OpenFlags {
     }
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+impl ToFileOptions for fio::Flags {
+    fn to_file_options(&self) -> Result<FileOptions, Status> {
+        // Verify protocols.
+        if !self.is_file_allowed() {
+            if self.is_dir_allowed() && !self.is_symlink_allowed() {
+                return Err(Status::NOT_DIR);
+            } else {
+                return Err(Status::WRONG_TYPE);
+            }
+        }
+
+        // Verify prohibited flags and disallow invalid flag combinations.
+        if self.contains(fio::Flags::FILE_TRUNCATE) && !self.contains(fio::Flags::PERM_WRITE) {
+            return Err(Status::INVALID_ARGS);
+        }
+
+        Ok(FileOptions {
+            rights: flags_to_rights(self),
+            is_append: self.contains(fio::Flags::FILE_APPEND),
+        })
+    }
+}
+
 impl ToFileOptions for FileOptions {
     fn to_file_options(&self) -> Result<FileOptions, Status> {
         Ok(*self)
@@ -526,8 +621,118 @@ impl ToNodeOptions for fio::OpenFlags {
     }
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+impl ToNodeOptions for fio::Flags {
+    fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status> {
+        // Strictly, we shouldn't allow rights to be specified with PROTOCOL_NODE, but there's a
+        // CTS pkgdir test that asserts these flags work and fixing that is painful so we preserve
+        // old behaviour (which permitted these flags).
+        const ALLOWED_FLAGS: fio::Flags = fio::Flags::FLAG_SEND_REPRESENTATION
+            .union(fio::MASK_KNOWN_PERMISSIONS)
+            .union(fio::MASK_KNOWN_PROTOCOLS);
+
+        if self.intersects(!ALLOWED_FLAGS) {
+            return Err(Status::INVALID_ARGS);
+        }
+
+        // If other `PROTOCOL_*` were were specified along with `PROTOCOL_NODE`, verify that the
+        // target node supports it.
+        if self.intersects(fio::MASK_KNOWN_PROTOCOLS.difference(fio::Flags::PROTOCOL_NODE)) {
+            if dirent_type == fio::DirentType::Directory {
+                if !self.intersects(fio::Flags::PROTOCOL_DIRECTORY) {
+                    if self.intersects(fio::Flags::PROTOCOL_FILE) {
+                        return Err(Status::NOT_FILE);
+                    } else {
+                        return Err(Status::WRONG_TYPE);
+                    }
+                }
+            } else if dirent_type == fio::DirentType::File {
+                if !self.intersects(fio::Flags::PROTOCOL_FILE) {
+                    if self.intersects(fio::Flags::PROTOCOL_DIRECTORY) {
+                        return Err(Status::NOT_DIR);
+                    } else {
+                        return Err(Status::WRONG_TYPE);
+                    }
+                }
+            } else if dirent_type == fio::DirentType::Symlink {
+                if !self.intersects(fio::Flags::PROTOCOL_SYMLINK) {
+                    return Err(Status::WRONG_TYPE);
+                }
+            }
+        }
+
+        Ok(NodeOptions { rights: fio::Operations::GET_ATTRIBUTES })
+    }
+}
+
 impl ToNodeOptions for NodeOptions {
     fn to_node_options(&self, _dirent_type: fio::DirentType) -> Result<NodeOptions, Status> {
         Ok(*self)
     }
+}
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+fn flags_to_rights(flags: &fio::Flags) -> fio::Rights {
+    let mut rights = fio::Rights::empty();
+    if flags.contains(fio::Flags::PERM_READ) {
+        rights |= fio::Rights::READ_BYTES;
+    }
+    if flags.contains(fio::Flags::PERM_WRITE) {
+        rights |= fio::Rights::WRITE_BYTES;
+    }
+    if flags.contains(fio::Flags::PERM_EXECUTE) {
+        rights |= fio::Rights::EXECUTE;
+    }
+    if flags.contains(fio::Flags::PERM_SET_ATTRIBUTES) {
+        rights |= fio::Rights::UPDATE_ATTRIBUTES;
+    }
+    if flags.contains(fio::Flags::PERM_ENUMERATE) {
+        rights |= fio::Rights::ENUMERATE;
+    }
+    if flags.contains(fio::Flags::PERM_MODIFY) {
+        rights |= fio::Rights::MODIFY_DIRECTORY;
+    }
+    if flags.contains(fio::Flags::PERM_CONNECT) {
+        rights |= fio::Rights::CONNECT;
+    }
+    if flags.contains(fio::Flags::PERM_GET_ATTRIBUTES) {
+        rights |= fio::Rights::GET_ATTRIBUTES;
+    }
+    if flags.contains(fio::Flags::PERM_TRAVERSE) {
+        rights |= fio::Rights::TRAVERSE;
+    }
+    rights
+}
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+fn operations_to_flags(operations: fio::Operations) -> fio::Flags {
+    let mut flags = fio::Flags::empty();
+    if operations.contains(fio::Operations::CONNECT) {
+        flags |= fio::Flags::PERM_CONNECT;
+    }
+    if operations.contains(fio::Operations::READ_BYTES) {
+        flags |= fio::Flags::PERM_READ;
+    }
+    if operations.contains(fio::Operations::WRITE_BYTES) {
+        flags |= fio::Flags::PERM_WRITE;
+    }
+    if operations.contains(fio::Operations::EXECUTE) {
+        flags |= fio::Flags::PERM_EXECUTE;
+    }
+    if operations.contains(fio::Operations::GET_ATTRIBUTES) {
+        flags |= fio::Flags::PERM_GET_ATTRIBUTES;
+    }
+    if operations.contains(fio::Operations::UPDATE_ATTRIBUTES) {
+        flags |= fio::Flags::PERM_SET_ATTRIBUTES;
+    }
+    if operations.contains(fio::Operations::ENUMERATE) {
+        flags |= fio::Flags::PERM_ENUMERATE;
+    }
+    if operations.contains(fio::Operations::TRAVERSE) {
+        flags |= fio::Flags::PERM_TRAVERSE;
+    }
+    if operations.contains(fio::Operations::MODIFY_DIRECTORY) {
+        flags |= fio::Flags::PERM_MODIFY;
+    }
+    flags
 }

@@ -14,13 +14,14 @@ use crate::path::Path;
 use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 
 use anyhow::Error;
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-use fidl::endpoints::ControlHandle as _;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
 use std::convert::TryInto as _;
 use storage_trace::{self as trace, TraceFutureExt};
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use crate::ObjectRequest;
 
 /// Return type for `BaseConnection::handle_request`.
 pub enum ConnectionState {
@@ -295,11 +296,29 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::DirectoryRequest::Open3 { object, .. } => {
-                let (_, control_handle) = ServerEnd::<fio::NodeMarker>::new(object)
-                    .into_stream_and_control_handle()
-                    .unwrap();
-                control_handle.shutdown_with_epitaph(Status::NOT_SUPPORTED);
+            fio::DirectoryRequest::Open3 {
+                path,
+                mut flags,
+                options,
+                object,
+                control_handle: _,
+            } => {
+                {
+                    trace::duration!(c"storage", c"Directory::Open3");
+                    // Remove POSIX flags when the respective rights are not available.
+                    if !self.options.rights.contains(fio::INHERITED_WRITE_PERMISSIONS) {
+                        flags &= !fio::Flags::PERM_INHERIT_WRITE;
+                    }
+                    if !self.options.rights.contains(fio::Rights::EXECUTE) {
+                        flags &= !fio::Flags::PERM_INHERIT_EXECUTE;
+                    }
+
+                    ObjectRequest::new3(flags, &options, object)
+                        .handle(|req| self.handle_open3(path, flags, req));
+                }
+                // Since open typically spawns a task, yield to the executor now to give that task a
+                // chance to run before we try and process the next request for this directory.
+                yield_to_executor().await;
             }
         }
         Ok(ConnectionState::Alive)
@@ -383,9 +402,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         }
 
         // If creating an object, it's not legal to specify more than one protocol.
-        //
-        // TODO(b/293947862): If we add an additional node type, we will need to update this. See if
-        // there is a more generic or robust way to check this so that we don't miss any node types.
         if protocols.creation_mode() != CreationMode::Never
             && ((protocols.is_file_allowed() && protocols.is_dir_allowed())
                 || protocols.is_symlink_allowed())
@@ -393,7 +409,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             return Err(Status::INVALID_ARGS);
         }
 
-        if protocols.create_attributes().is_some()
+        if object_request.create_attributes().is_some()
             && protocols.creation_mode() == CreationMode::Never
         {
             return Err(Status::INVALID_ARGS);
@@ -409,6 +425,70 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         }
 
         self.directory.clone().open2(self.scope.clone(), path, protocols, object_request)
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn handle_open3(
+        &self,
+        path: String,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        let path = Path::validate_and_split(path)?;
+
+        // Child connection must have stricter or same rights as the parent connection.
+        if let Some(rights) = flags.rights() {
+            if rights.intersects(!self.options.rights) {
+                return Err(Status::ACCESS_DENIED);
+            }
+        }
+
+        // If requesting attributes, check permission.
+        if !object_request.attributes().is_empty()
+            && !self.options.rights.contains(fio::Operations::GET_ATTRIBUTES)
+        {
+            return Err(Status::ACCESS_DENIED);
+        }
+
+        match flags.creation_mode() {
+            CreationMode::Never => {
+                if object_request.create_attributes().is_some() {
+                    return Err(Status::INVALID_ARGS);
+                }
+            }
+            CreationMode::AllowExisting | CreationMode::Always => {
+                // The parent connection must be able to modify directories if creating an object.
+                if !self.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
+                    return Err(Status::ACCESS_DENIED);
+                }
+
+                let protocol_flags = flags & fio::MASK_KNOWN_PROTOCOLS;
+                // If creating an object, exactly one protocol must be specified (the flags must be
+                // a power of two and non-zero).
+                if protocol_flags.is_empty()
+                    || (protocol_flags.bits() & (protocol_flags.bits() - 1)) != 0
+                {
+                    return Err(Status::INVALID_ARGS);
+                }
+                // Only a directory or file object can be created.
+                if !protocol_flags
+                    .intersects(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PROTOCOL_FILE)
+                {
+                    return Err(Status::NOT_SUPPORTED);
+                }
+            }
+        }
+
+        if path.is_dot() {
+            if !flags.is_dir_allowed() {
+                return Err(Status::INVALID_ARGS);
+            }
+            if flags.creation_mode() == CreationMode::Always {
+                return Err(Status::ALREADY_EXISTS);
+            }
+        }
+
+        self.directory.clone().open3(self.scope.clone(), path, flags, object_request)
     }
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (Status, Vec<u8>) {

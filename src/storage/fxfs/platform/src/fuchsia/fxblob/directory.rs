@@ -493,6 +493,32 @@ impl VfsDirectory for BlobDirectory {
         Ok(())
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        object_request.take().handle(|object_request| {
+            if path.is_empty() {
+                object_request.spawn_connection(
+                    scope,
+                    OpenedNode::new(self).take(),
+                    flags,
+                    MutableConnection::create,
+                )
+            } else {
+                tracing::error!(
+                    "Tried to open a blob via open(). Use the BlobCreator or BlobReader instead."
+                );
+                return Err(Status::NOT_SUPPORTED);
+            }
+        });
+        Ok(())
+    }
+
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,

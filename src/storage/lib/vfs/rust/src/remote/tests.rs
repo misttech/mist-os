@@ -13,7 +13,7 @@ use crate::directory::entry_container::Directory;
 use crate::directory::test_utils::{run_client, DirentsSameInodeBuilder};
 use crate::execution_scope::ExecutionScope;
 use crate::file;
-use crate::object_request::ToObjectRequest as _;
+use crate::object_request::{ObjectRequest, ToObjectRequest as _};
 use crate::path::Path;
 
 use fidl::endpoints::{create_proxy, ServerEnd};
@@ -76,8 +76,19 @@ fn remote_dir_construction_open_node_ref() {
             ..Default::default()
         });
         let object_request = protocols.to_object_request(server_end);
-        object_request.handle(|request| server.open2(scope, Path::dot(), protocols, request));
+        object_request
+            .handle(|request| server.clone().open2(scope.clone(), Path::dot(), protocols, request));
         assert_close!(proxy);
+
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        // Test open3.
+        {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+            let flags = fio::Flags::PROTOCOL_NODE;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+                .handle(|request| server.open3(scope, Path::dot(), flags, request));
+            assert_close!(proxy);
+        }
     })
 }
 
@@ -108,8 +119,19 @@ fn remote_dir_node_ref_with_path() {
             ..Default::default()
         });
         let object_request = protocols.to_object_request(server_end);
-        object_request.handle(|request| server.open2(scope, path, protocols, request));
+        object_request
+            .handle(|request| server.clone().open2(scope.clone(), path, protocols, request));
         assert_close!(proxy);
+
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        // Test open3.
+        {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+            let flags = fio::Flags::PROTOCOL_NODE;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+                .handle(|request| server.open3(scope, Path::dot(), flags, request));
+            assert_close!(proxy);
+        }
     })
 }
 
@@ -146,8 +168,9 @@ fn remote_dir_direct_connection() {
             ..Default::default()
         });
         let object_request = protocols.to_object_request(server_end);
-        object_request.handle(|request| server.open2(scope, Path::dot(), protocols, request));
-        let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
+        object_request
+            .handle(|request| server.clone().open2(scope.clone(), Path::dot(), protocols, request));
+        expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
         expected
             // (10 + 1) = 11
             .add(fio::DirentType::Directory, b".")
@@ -155,6 +178,24 @@ fn remote_dir_direct_connection() {
             .add(fio::DirentType::File, b"a");
         assert_read_dirents!(proxy, 22, expected.into_vec());
         assert_close!(proxy);
+
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        // Test open3.
+        {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+                .handle(|request| server.open3(scope, Path::dot(), flags, request));
+            expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
+            expected
+                // (10 + 1) = 11
+                .add(fio::DirentType::Directory, b".")
+                // 11 + (10 + 1) = 22
+                .add(fio::DirentType::File, b"a");
+            assert_read_dirents!(proxy, 22, expected.into_vec());
+            assert_close!(proxy);
+        }
     })
 }
 
@@ -186,9 +227,22 @@ fn remote_dir_direct_connection_dir_contents() {
             ..Default::default()
         });
         let object_request = protocols.to_object_request(server_end);
-        object_request.handle(|request| server.open2(scope, path, protocols, request));
+        object_request.handle(|request| {
+            server.clone().open2(scope.clone(), path.clone(), protocols, request)
+        });
         assert_read!(proxy, "a content");
         assert_close!(proxy);
+
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        // Test open3.
+        {
+            let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+            let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+                .handle(|request| server.open3(scope, path, flags, request));
+            assert_read!(proxy, "a content");
+            assert_close!(proxy);
+        }
     })
 }
 
