@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_sync::Mutex;
-use std::collections::HashMap;
-
 use crate::signals::{SignalEvent, SignalEventNotify, SignalEventValue};
 use crate::task::interval_timer::{IntervalTimer, IntervalTimerHandle};
 use crate::task::CurrentTask;
 use crate::timer::Timeline;
+use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::OwnedRef;
 use starnix_uapi::signals::SIGALRM;
 use starnix_uapi::{__kernel_timer_t, error, itimerspec, uapi, TIMER_ABSTIME};
+use std::collections::HashMap;
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style
 // timerfd's).
@@ -119,7 +119,7 @@ impl TimerTable {
             let is_absolute = flags == TIMER_ABSTIME as i32;
             itimer.arm(
                 &current_task.kernel(),
-                std::sync::Arc::downgrade(&current_task.thread_group),
+                OwnedRef::downgrade(&current_task.thread_group),
                 new_value,
                 is_absolute,
             )?;

@@ -25,7 +25,7 @@ use starnix_uapi::auth::{Credentials, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{TempRef, WeakRef};
+use starnix_uapi::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::time::duration_to_scheduler_clock;
 use starnix_uapi::user_address::UserAddress;
@@ -165,7 +165,7 @@ pub fn pid_directory(
     dir.entry(
         current_task,
         "task",
-        TaskListDirectory { thread_group: task.thread_group.clone() },
+        TaskListDirectory { thread_group: OwnedRef::downgrade(&task.thread_group) },
         mode!(IFDIR, 0o777),
     );
     TaskDirectory::new(current_task, fs, task, dir)
@@ -592,7 +592,13 @@ fn fds_to_directory_entries(fds: Vec<FdNumber>) -> Vec<VecDirectoryEntry> {
 
 /// Directory that lists the task IDs (tid) in a process. Located at `/proc/<pid>/task/`.
 struct TaskListDirectory {
-    thread_group: Arc<ThreadGroup>,
+    thread_group: WeakRef<ThreadGroup>,
+}
+
+impl TaskListDirectory {
+    fn thread_group(&self) -> Result<TempRef<'_, ThreadGroup>, Errno> {
+        self.thread_group.upgrade().ok_or_else(|| errno!(ESRCH))
+    }
 }
 
 impl FsNodeOps for TaskListDirectory {
@@ -606,7 +612,7 @@ impl FsNodeOps for TaskListDirectory {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(
-            self.thread_group
+            self.thread_group()?
                 .read()
                 .task_ids()
                 .map(|tid| VecDirectoryEntry {
@@ -624,15 +630,16 @@ impl FsNodeOps for TaskListDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
+        let thread_group = self.thread_group()?;
         let tid = std::str::from_utf8(name)
             .map_err(|_| errno!(ENOENT))?
             .parse::<pid_t>()
             .map_err(|_| errno!(ENOENT))?;
         // Make sure the tid belongs to this process.
-        if !self.thread_group.read().contains_task(tid) {
+        if !thread_group.read().contains_task(tid) {
             return error!(ENOENT);
         }
-        let pid_state = self.thread_group.kernel.pids.read();
+        let pid_state = thread_group.kernel.pids.read();
         let weak_task = pid_state.get_task(tid);
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
         Ok(tid_directory(current_task, &node.fs(), &task))
@@ -746,7 +753,7 @@ impl FileOps for CommFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let task = Task::from_weak(&self.task)?;
-        if !Arc::ptr_eq(&task.thread_group, &current_task.thread_group) {
+        if !OwnedRef::ptr_eq(&task.thread_group, &current_task.thread_group) {
             return error!(EINVAL);
         }
         // What happens if userspace writes to this file in multiple syscalls? We need more

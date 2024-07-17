@@ -15,7 +15,7 @@ use crate::signals::{
 use crate::task::{
     ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
     PtraceOptions, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState,
-    SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, Waiter,
+    SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
@@ -37,7 +37,9 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{release_on_error, OwnedRef, Releasable, TempRef, WeakRef};
+use starnix_uapi::ownership::{
+    release_on_error, OwnedRef, Releasable, ReleaseGuard, TempRef, WeakRef,
+};
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP};
 use starnix_uapi::user_address::{UserAddress, UserRef};
@@ -1193,8 +1195,8 @@ impl CurrentTask {
         {
             let mut init_writer = init_task.thread_group.write();
             let mut new_process_writer = task.thread_group.write();
-            new_process_writer.parent = Some(init_task.thread_group.clone());
-            init_writer.children.insert(task.id, Arc::downgrade(&task.thread_group));
+            new_process_writer.parent = Some(ThreadGroupParent::from(&init_task.thread_group));
+            init_writer.children.insert(task.id, OwnedRef::downgrade(&task.thread_group));
         }
         // A child process created via fork(2) inherits its parent's
         // resource limits.  Resource limits are preserved across execve(2).
@@ -1298,7 +1300,7 @@ impl CurrentTask {
                     process_group,
                     SignalActions::default(),
                 );
-                Ok(TaskInfo { thread: None, thread_group, memory_manager })
+                Ok(TaskInfo { thread: None, thread_group, memory_manager }.into())
             },
             security::task_alloc_for_kernel(),
         )?;
@@ -1314,7 +1316,11 @@ impl CurrentTask {
         security_state: security::TaskState,
     ) -> Result<TaskBuilder, Errno>
     where
-        F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+        F: FnOnce(
+            &mut Locked<'_, L>,
+            i32,
+            Arc<ProcessGroup>,
+        ) -> Result<ReleaseGuard<TaskInfo>, Errno>,
         L: LockBefore<TaskRelease>,
         L: LockBefore<ProcessGroupState>,
     {
@@ -1347,7 +1353,11 @@ impl CurrentTask {
         security_state: security::TaskState,
     ) -> Result<TaskBuilder, Errno>
     where
-        F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+        F: FnOnce(
+            &mut Locked<'_, L>,
+            i32,
+            Arc<ProcessGroup>,
+        ) -> Result<ReleaseGuard<TaskInfo>, Errno>,
         L: LockBefore<TaskRelease>,
         L: LockBefore<ProcessGroupState>,
     {
@@ -1357,7 +1367,7 @@ impl CurrentTask {
         pids.add_process_group(&process_group);
 
         let TaskInfo { thread, thread_group, memory_manager } =
-            task_info_factory(locked, pid, process_group.clone())?;
+            ReleaseGuard::take(task_info_factory(locked, pid, process_group.clone())?);
 
         process_group.insert(locked, &thread_group);
 
@@ -1439,7 +1449,7 @@ impl CurrentTask {
         let current_task: CurrentTask = TaskBuilder::new(Task::new(
             pid,
             initial_name,
-            Arc::clone(&system_task.thread_group),
+            OwnedRef::clone(&system_task.thread_group),
             None,
             FdTable::default(),
             Arc::clone(system_task.mm()),
@@ -1635,7 +1645,7 @@ impl CurrentTask {
                     self.thread_group.signal_actions.fork()
                 };
                 let process_group = thread_group_state.process_group.clone();
-                create_zircon_process(
+                ReleaseGuard::take(create_zircon_process(
                     locked,
                     kernel,
                     Some(thread_group_state),
@@ -1643,7 +1653,7 @@ impl CurrentTask {
                     process_group,
                     signal_actions,
                     command.as_bytes(),
-                )?
+                )?)
             }
         };
 
@@ -1746,7 +1756,7 @@ impl CurrentTask {
         if !stopped.is_in_progress() {
             let parent = self.thread_group.read().parent.clone();
             if let Some(parent) = parent {
-                parent.write().child_status_waiters.notify_all();
+                parent.upgrade().write().child_status_waiters.notify_all();
             }
         }
     }

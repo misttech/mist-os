@@ -225,6 +225,12 @@ impl<T> std::convert::AsRef<T> for OwnedRef<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq<TempRef<'_, T>> for OwnedRef<T> {
+    fn eq(&self, other: &TempRef<'_, T>) -> bool {
+        Arc::ptr_eq(Self::inner(self), &other.0)
+    }
+}
+
 impl<T: PartialEq> PartialEq for OwnedRef<T> {
     fn eq(&self, other: &OwnedRef<T>) -> bool {
         Arc::ptr_eq(Self::inner(self), Self::inner(other)) || **self == **other

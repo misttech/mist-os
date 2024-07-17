@@ -9,6 +9,7 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use starnix_sync::{Locked, Unlocked};
+use starnix_uapi::ownership::{OwnedRef, Releasable};
 use std::sync::Arc;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess};
 
@@ -51,10 +52,18 @@ pub struct TaskInfo {
     pub thread: Option<zx::Thread>,
 
     /// The thread group that the task should be added to.
-    pub thread_group: Arc<ThreadGroup>,
+    pub thread_group: OwnedRef<ThreadGroup>,
 
     /// The memory manager to use for the task.
     pub memory_manager: Arc<MemoryManager>,
+}
+
+impl Releasable for TaskInfo {
+    type Context<'a> = ();
+
+    fn release<'a>(self, context: Self::Context<'a>) {
+        self.thread_group.release(context);
+    }
 }
 
 /// Executes the provided `syscall` in `current_task`.

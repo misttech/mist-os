@@ -877,7 +877,7 @@ pub struct Task {
     ///
     /// The group of tasks in a thread group roughly corresponds to the userspace notion of a
     /// process.
-    pub thread_group: Arc<ThreadGroup>,
+    pub thread_group: OwnedRef<ThreadGroup>,
 
     /// A handle to the underlying Zircon thread object.
     ///
@@ -1042,7 +1042,7 @@ impl Task {
     pub fn new(
         id: pid_t,
         command: CString,
-        thread_group: Arc<ThreadGroup>,
+        thread_group: OwnedRef<ThreadGroup>,
         thread: Option<zx::Thread>,
         files: FdTable,
         mm: Arc<MemoryManager>,
@@ -1498,8 +1498,8 @@ impl Releasable for Task {
         let task = OwnedRef::take(&mut task).expect("task should not have been re-owned");
         let task: Self = ReleaseGuard::take(task);
 
-        // It is safe to drop the task, as it has been release by this method.
-        std::mem::drop(task);
+        // Release the ThreadGroup.
+        task.thread_group.release(());
     }
 }
 

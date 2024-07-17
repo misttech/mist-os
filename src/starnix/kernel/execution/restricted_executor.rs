@@ -27,7 +27,7 @@ use starnix_logging::{
 use starnix_sync::{LockBefore, Locked, ProcessGroupState, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::ownership::{ReleaseGuard, WeakRef};
 use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, from_status_like_fdio, pid_t};
 use std::os::unix::thread::JoinHandleExt;
@@ -428,7 +428,7 @@ pub fn create_zircon_process<L>(
     process_group: Arc<ProcessGroup>,
     signal_actions: Arc<SignalActions>,
     name: &[u8],
-) -> Result<TaskInfo, Errno>
+) -> Result<ReleaseGuard<TaskInfo>, Errno>
 where
     L: LockBefore<ProcessGroupState>,
 {
@@ -454,7 +454,7 @@ where
         signal_actions,
     );
 
-    Ok(TaskInfo { thread: None, thread_group, memory_manager })
+    Ok(TaskInfo { thread: None, thread_group, memory_manager }.into())
 }
 
 pub fn execute_task_with_prerun_result<F, R, G>(

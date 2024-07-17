@@ -537,6 +537,7 @@ mod test {
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
     use fuchsia_zircon::HandleBased;
+    use starnix_uapi::ownership::OwnedRef;
     use starnix_uapi::signals;
     use starnix_uapi::user_address::UserAddress;
     use test_util::{assert_geq, assert_leq};
@@ -626,7 +627,7 @@ mod test {
         // sleep starts, during the sleep, or after.
         let interruption_target = zx::Time::get_monotonic() + zx::Duration::from_seconds(1);
 
-        let thread_group = std::sync::Arc::downgrade(&current_task.thread_group);
+        let thread_group = OwnedRef::downgrade(&current_task.thread_group);
         let thread_join_handle = std::thread::Builder::new()
             .name("clock_nanosleep_interruptor".to_string())
             .spawn(move || {

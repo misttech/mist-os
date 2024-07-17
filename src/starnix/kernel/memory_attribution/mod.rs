@@ -105,22 +105,26 @@ impl MemoryAttributionManager {
             waiter.wait(MAXIMUM_RESCAN_INTERVAL);
 
             let Some(kernel) = kernel.upgrade() else { break };
-            let thread_groups = kernel.pids.read().get_thread_groups();
-            let mut updates = vec![];
 
-            // Find added processes.
-            for thread_group in &thread_groups {
-                let pid = thread_group.leader;
-                if !processes.contains(&pid) {
-                    let name = get_thread_group_identifier(&thread_group);
-                    let mut update = attribution_info_for_thread_group(name, &thread_group);
-                    processes.insert(pid);
-                    updates.append(&mut update);
+            let mut updates = vec![];
+            // Find removed processes.
+            let mut new_processes = HashSet::new();
+            {
+                let pids = kernel.pids.read();
+
+                // Find added processes.
+                for thread_group in pids.get_thread_groups() {
+                    let pid = thread_group.leader;
+                    new_processes.insert(pid);
+                    if !processes.contains(&pid) {
+                        let name = get_thread_group_identifier(&thread_group);
+                        let mut update = attribution_info_for_thread_group(name, &thread_group);
+                        processes.insert(pid);
+                        updates.append(&mut update);
+                    }
                 }
             }
 
-            // Find removed processes.
-            let new_processes: HashSet<pid_t> = thread_groups.iter().map(|tg| tg.leader).collect();
             for pid in processes.difference(&new_processes) {
                 updates.push(fattribution::AttributionUpdate::Remove(*pid as u64));
             }
@@ -149,7 +153,7 @@ fn get_thread_group_identifier(thread_group: &ThreadGroup) -> String {
 
 fn attribution_info_for_thread_group(
     name: String,
-    thread_group: &Arc<ThreadGroup>,
+    thread_group: &ThreadGroup,
 ) -> Vec<fattribution::AttributionUpdate> {
     let new = new_principal(thread_group.leader, name.clone());
     let updated = updated_principal(thread_group);
@@ -169,7 +173,7 @@ fn new_principal(pid: i32, name: String) -> fattribution::AttributionUpdate {
 }
 
 /// Builds an `UpdatedPrincipal` event. If the task has an invalid root VMAR, returns `None`.
-fn updated_principal(thread_group: &Arc<ThreadGroup>) -> Option<fattribution::AttributionUpdate> {
+fn updated_principal(thread_group: &ThreadGroup) -> Option<fattribution::AttributionUpdate> {
     let Some(process_koid) = thread_group.process.get_koid().ok() else { return None };
     let Some(mm) = get_mm(thread_group) else { return None };
     let Some(vmar_info) = mm.get_restricted_vmar_info() else { return None };
@@ -190,6 +194,6 @@ fn updated_principal(thread_group: &Arc<ThreadGroup>) -> Option<fattribution::At
 /// Get the memory manager shared by tasks in the thread group.
 ///
 /// If all tasks in the thread group has been killed, returns `None`.
-fn get_mm(thread_group: &Arc<ThreadGroup>) -> Option<Arc<MemoryManager>> {
+fn get_mm(thread_group: &ThreadGroup) -> Option<Arc<MemoryManager>> {
     thread_group.read().tasks().find_map(|task| Some(task.mm().clone()))
 }

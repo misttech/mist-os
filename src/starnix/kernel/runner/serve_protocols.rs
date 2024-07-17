@@ -21,6 +21,7 @@ use starnix_core::vfs::{FdFlags, FileHandle};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::ownership::TempRef;
 use starnix_uapi::uapi;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -169,7 +170,13 @@ pub async fn serve_container_controller(
                 }
                 fstarcontainer::ControllerRequest::GetVmoReferences { payload, responder } => {
                     if let Some(koid) = payload.koid {
-                        let thread_groups = system_task.kernel().pids.read().get_thread_groups();
+                        let thread_groups = system_task
+                            .kernel()
+                            .pids
+                            .read()
+                            .get_thread_groups()
+                            .map(TempRef::into_static)
+                            .collect::<Vec<_>>();
                         let mut results = vec![];
                         for thread_group in thread_groups {
                             if let Some(leader) =

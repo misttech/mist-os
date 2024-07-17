@@ -7,10 +7,11 @@ use crate::signals::SignalInfo;
 use crate::task::{Session, ThreadGroup};
 use macro_rules_attribute::apply;
 use starnix_sync::{LockBefore, Locked, OrderedRwLock, ProcessGroupState};
+use starnix_uapi::ownership::{TempRef, WeakRef};
 use starnix_uapi::pid_t;
 use starnix_uapi::signals::{Signal, SIGCONT, SIGHUP};
 use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct ProcessGroupMutableState {
@@ -19,7 +20,7 @@ pub struct ProcessGroupMutableState {
     /// The references to ThreadGroup is weak to prevent cycles as ThreadGroup have a Arc reference to their process group.
     /// It is still expected that these weak references are always valid, as thread groups must unregister
     /// themselves before they are deleted.
-    thread_groups: BTreeMap<pid_t, Weak<ThreadGroup>>,
+    thread_groups: BTreeMap<pid_t, WeakRef<ThreadGroup>>,
 
     /// Whether this process group is orphaned and already notified its members.
     orphaned: bool,
@@ -85,11 +86,13 @@ impl ProcessGroup {
 
     ordered_state_accessor!(ProcessGroup, mutable_state, ProcessGroupState);
 
-    pub fn insert<L>(&self, locked: &mut Locked<'_, L>, thread_group: &Arc<ThreadGroup>)
+    pub fn insert<L>(&self, locked: &mut Locked<'_, L>, thread_group: &ThreadGroup)
     where
         L: LockBefore<ProcessGroupState>,
     {
-        self.write(locked).thread_groups.insert(thread_group.leader, Arc::downgrade(thread_group));
+        self.write(locked)
+            .thread_groups
+            .insert(thread_group.leader, thread_group.weak_thread_group.clone());
     }
 
     /// Removes the thread group from the process group. Returns whether the process group is empty.
@@ -104,7 +107,8 @@ impl ProcessGroup {
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let thread_groups = self.read(locked).thread_groups().collect::<Vec<_>>();
+        let thread_groups =
+            self.read(locked).thread_groups().map(TempRef::into_static).collect::<Vec<_>>();
         Self::send_signals_to_thread_groups(signals, thread_groups);
     }
 
@@ -119,20 +123,18 @@ impl ProcessGroup {
             if state.orphaned {
                 return;
             }
-            state.thread_groups().collect::<Vec<_>>()
+            state.thread_groups().map(TempRef::into_static).collect::<Vec<_>>()
         };
         for tg in thread_groups {
-            let parent = tg.read().parent.clone();
-            match parent {
-                None => return,
-                Some(parent) => {
-                    let parent_state = parent.read();
-                    if parent_state.process_group.as_ref() != self
-                        && parent_state.process_group.session == self.session
-                    {
-                        return;
-                    }
-                }
+            let Some(parent) = tg.read().parent.clone() else {
+                return;
+            };
+            let parent = parent.upgrade();
+            let parent_state = parent.read();
+            if parent_state.process_group.as_ref() != self
+                && parent_state.process_group.session == self.session
+            {
+                return;
             }
         }
         let thread_groups = {
@@ -141,17 +143,20 @@ impl ProcessGroup {
                 return;
             }
             state.orphaned = true;
-            state.thread_groups().collect::<Vec<_>>()
+            state.thread_groups().map(TempRef::into_static).collect::<Vec<_>>()
         };
         if thread_groups.iter().any(|tg| tg.load_stopped().is_stopping_or_stopped()) {
             Self::send_signals_to_thread_groups(&[SIGHUP, SIGCONT], thread_groups);
         }
     }
 
-    fn send_signals_to_thread_groups(signals: &[Signal], thread_groups: Vec<Arc<ThreadGroup>>) {
-        for signal in signals.iter() {
-            for thread_group in &thread_groups {
-                thread_group.write().send_signal(SignalInfo::default(*signal));
+    fn send_signals_to_thread_groups(
+        signals: &[Signal],
+        thread_groups: impl IntoIterator<Item = impl AsRef<ThreadGroup>>,
+    ) {
+        for thread_group in thread_groups.into_iter() {
+            for signal in signals.iter() {
+                thread_group.as_ref().write().send_signal(SignalInfo::default(*signal));
             }
         }
     }
@@ -159,7 +164,7 @@ impl ProcessGroup {
 
 #[apply(state_implementation!)]
 impl ProcessGroupMutableState<Base = ProcessGroup> {
-    pub fn thread_groups(&self) -> Box<dyn Iterator<Item = Arc<ThreadGroup>> + '_> {
+    pub fn thread_groups(&self) -> Box<dyn Iterator<Item = TempRef<'_, ThreadGroup>> + '_> {
         Box::new(self.thread_groups.values().map(|t| {
             t.upgrade()
                 .expect("Weak references to thread_groups in ProcessGroup must always be valid")

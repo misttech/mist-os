@@ -40,7 +40,7 @@ use starnix_uapi::{
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 /// The mutable state of the ThreadGroup.
 pub struct ThreadGroupMutableState {
@@ -48,7 +48,7 @@ pub struct ThreadGroupMutableState {
     ///
     /// The value needs to be writable so that it can be re-parent to the correct subreaper if the
     /// parent ends before the child.
-    pub parent: Option<Arc<ThreadGroup>>,
+    pub parent: Option<ThreadGroupParent>,
 
     /// The tasks in the thread group.
     ///
@@ -64,7 +64,7 @@ pub struct ThreadGroupMutableState {
     /// to their parent.
     /// It is still expected that these weak references are always valid, as thread groups must unregister
     /// themselves before they are deleted.
-    pub children: BTreeMap<pid_t, Weak<ThreadGroup>>,
+    pub children: BTreeMap<pid_t, WeakRef<ThreadGroup>>,
 
     /// Child tasks that have exited, but not yet been waited for.
     pub zombie_children: Vec<OwnedRef<ZombieProcess>>,
@@ -139,6 +139,10 @@ pub struct ThreadGroupMutableState {
 ///
 /// Thread groups are destroyed when the last task in the group exits.
 pub struct ThreadGroup {
+    /// Weak reference to the `OwnedRef` of this `ThreadGroup`. This allows to retrieve the
+    /// `TempRef` from a raw `ThreadGroup`.
+    pub weak_thread_group: WeakRef<ThreadGroup>,
+
     /// The kernel to which this thread group belongs.
     pub kernel: Arc<Kernel>,
 
@@ -201,6 +205,48 @@ impl fmt::Debug for ThreadGroup {
 impl PartialEq for ThreadGroup {
     fn eq(&self, other: &Self) -> bool {
         self.leader == other.leader
+    }
+}
+
+impl Releasable for ThreadGroup {
+    type Context<'a> = ();
+
+    fn release<'a>(mut self, _context: Self::Context<'a>) {
+        let mut pids = self.kernel.pids.write();
+        let state = self.mutable_state.get_mut();
+
+        for zombie in state.zombie_children.drain(..) {
+            zombie.release(&mut pids);
+        }
+
+        state.zombie_ptracees.release(&mut pids);
+    }
+}
+
+/// A wrapper around a `WeakRef<ThreadGroup>` that expects the underlying `WeakRef` to always be
+/// valid. The wrapper will check this at runtime during creation and upgrade.
+pub struct ThreadGroupParent(WeakRef<ThreadGroup>);
+
+impl ThreadGroupParent {
+    pub fn new(t: WeakRef<ThreadGroup>) -> Self {
+        debug_assert!(t.upgrade().is_some());
+        Self(t)
+    }
+
+    pub fn upgrade<'a>(&'a self) -> TempRef<'a, ThreadGroup> {
+        self.0.upgrade().expect("ThreadGroupParent references must always be valid")
+    }
+}
+
+impl Clone for ThreadGroupParent {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<I: Into<WeakRef<ThreadGroup>>> From<I> for ThreadGroupParent {
+    fn from(r: I) -> Self {
+        Self::new(r.into())
     }
 }
 
@@ -363,64 +409,70 @@ impl ThreadGroup {
         leader: pid_t,
         process_group: Arc<ProcessGroup>,
         signal_actions: Arc<SignalActions>,
-    ) -> Arc<ThreadGroup>
+    ) -> OwnedRef<ThreadGroup>
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let timers = TimerTable::new();
-        let itimer_real_id = timers.create(Timeline::RealTime, None).unwrap();
+        OwnedRef::new_cyclic(|weak_thread_group| {
+            let timers = TimerTable::new();
+            let itimer_real_id = timers.create(Timeline::RealTime, None).unwrap();
+            let mut thread_group = ThreadGroup {
+                weak_thread_group: weak_thread_group.clone(),
+                kernel,
+                process,
+                leader,
+                signal_actions,
+                itimer_real_id,
+                drop_notifier: Default::default(),
+                // A child process created via fork(2) inherits its parent's
+                // resource limits.  Resource limits are preserved across execve(2).
+                limits: Mutex::new(
+                    parent
+                        .as_ref()
+                        .map(|p| p.base.limits.lock().clone())
+                        .unwrap_or(Default::default()),
+                ),
+                next_seccomp_filter_id: Default::default(),
+                ptracees: Default::default(),
+                stop_state: AtomicStopState::new(StopState::Awake),
+                pending_signals: Default::default(),
+                mutable_state: RwLock::new(ThreadGroupMutableState {
+                    parent: parent
+                        .as_ref()
+                        .map(|p| ThreadGroupParent::from(p.base.weak_thread_group.clone())),
+                    tasks: BTreeMap::new(),
+                    children: BTreeMap::new(),
+                    zombie_children: vec![],
+                    zombie_ptracees: ZombiePtraces::new(),
+                    deferred_zombie_ptracers: vec![],
+                    child_status_waiters: WaitQueue::default(),
+                    is_child_subreaper: false,
+                    process_group: Arc::clone(&process_group),
+                    timers,
+                    did_exec: false,
+                    stopped_waiters: WaitQueue::default(),
+                    last_signal: None,
+                    leader_exit_info: None,
+                    terminating: false,
+                    children_time_stats: Default::default(),
+                    personality: parent
+                        .as_ref()
+                        .map(|p| p.personality)
+                        .unwrap_or(Default::default()),
+                    allowed_ptracers: PtraceAllowedPtracers::None,
+                }),
+            };
 
-        let mut thread_group = ThreadGroup {
-            kernel,
-            process,
-            leader,
-            signal_actions,
-            itimer_real_id,
-            drop_notifier: Default::default(),
-            // A child process created via fork(2) inherits its parent's
-            // resource limits.  Resource limits are preserved across execve(2).
-            limits: Mutex::new(
-                parent.as_ref().map(|p| p.base.limits.lock().clone()).unwrap_or(Default::default()),
-            ),
-            next_seccomp_filter_id: Default::default(),
-            ptracees: Default::default(),
-            stop_state: AtomicStopState::new(StopState::Awake),
-            pending_signals: Default::default(),
-            mutable_state: RwLock::new(ThreadGroupMutableState {
-                parent: parent.as_ref().map(|p| Arc::clone(p.base)),
-                tasks: BTreeMap::new(),
-                children: BTreeMap::new(),
-                zombie_children: vec![],
-                zombie_ptracees: ZombiePtraces::new(),
-                deferred_zombie_ptracers: vec![],
-                child_status_waiters: WaitQueue::default(),
-                is_child_subreaper: false,
-                process_group: Arc::clone(&process_group),
-                timers,
-                did_exec: false,
-                stopped_waiters: WaitQueue::default(),
-                last_signal: None,
-                leader_exit_info: None,
-                terminating: false,
-                children_time_stats: Default::default(),
-                personality: parent.as_ref().map(|p| p.personality).unwrap_or(Default::default()),
-                allowed_ptracers: PtraceAllowedPtracers::None,
-            }),
-        };
-
-        let thread_group = if let Some(mut parent) = parent {
-            thread_group.next_seccomp_filter_id.reset(parent.base.next_seccomp_filter_id.get());
-            let thread_group = Arc::new(thread_group);
-            parent.children.insert(leader, Arc::downgrade(&thread_group));
-            process_group.insert(locked, &thread_group);
+            if let Some(mut parent) = parent {
+                thread_group.next_seccomp_filter_id.reset(parent.base.next_seccomp_filter_id.get());
+                parent.children.insert(leader, weak_thread_group);
+                process_group.insert(locked, &thread_group);
+            };
             thread_group
-        } else {
-            Arc::new(thread_group)
-        };
-        thread_group
+        })
     }
 
-    state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
+    state_accessor!(ThreadGroup, mutable_state);
 
     pub fn load_stopped(&self) -> StopState {
         self.stop_state.load(Ordering::Relaxed)
@@ -430,11 +482,7 @@ impl ThreadGroup {
     // that is part of the current thread group, the caller should pass
     // `current_task`.  If ownership issues prevent passing `current_task`, then
     // callers should use CurrentTask::thread_group_exit instead.
-    pub fn exit(
-        self: &Arc<Self>,
-        exit_status: ExitStatus,
-        mut current_task: Option<&mut CurrentTask>,
-    ) {
+    pub fn exit(&self, exit_status: ExitStatus, mut current_task: Option<&mut CurrentTask>) {
         if let Some(ref mut current_task) = current_task {
             current_task
                 .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
@@ -462,7 +510,7 @@ impl ThreadGroup {
         let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
         for tracee in tracees {
             if let Some(task_ref) = pids.get_task(tracee).clone().upgrade() {
-                let _ = ptrace_detach(self.clone(), task_ref.as_ref(), &UserAddress::NULL);
+                let _ = ptrace_detach(self, task_ref.as_ref(), &UserAddress::NULL);
             }
         }
 
@@ -472,7 +520,7 @@ impl ThreadGroup {
         }
     }
 
-    pub fn add(self: &Arc<Self>, task: &TempRef<'_, Task>) -> Result<(), Errno> {
+    pub fn add(&self, task: &TempRef<'_, Task>) -> Result<(), Errno> {
         let mut state = self.write();
         if state.terminating {
             return error!(EINVAL);
@@ -481,7 +529,7 @@ impl ThreadGroup {
         Ok(())
     }
 
-    pub fn remove<L>(self: &Arc<Self>, locked: &mut Locked<'_, L>, task: &Task)
+    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, task: &Task)
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -543,19 +591,21 @@ impl ThreadGroup {
 
             {
                 // Reparent the children.
-                if let Some(reaper_ref) = reaper {
-                    let mut reaper = reaper_ref.write();
-                    let mut state = self.write();
-                    for (_pid, child) in std::mem::take(&mut state.children) {
-                        if let Some(child) = child.upgrade() {
-                            child.write().parent = Some(Arc::clone(reaper.base));
-                            reaper.children.insert(child.leader, Arc::downgrade(&child));
+                if let Some(reaper) = reaper {
+                    let reaper = reaper.upgrade();
+                    {
+                        let mut reaper_state = reaper.write();
+                        let mut state = self.write();
+                        for (_pid, weak_child) in std::mem::take(&mut state.children) {
+                            if let Some(child) = weak_child.upgrade() {
+                                let mut child_state = child.write();
+                                child_state.parent = Some(ThreadGroupParent::from(&reaper));
+                                reaper_state.children.insert(child.leader, weak_child.clone());
+                            }
                         }
+                        reaper_state.zombie_children.append(&mut state.zombie_children);
                     }
-                    reaper.zombie_children.append(&mut state.zombie_children);
-                    drop(state);
-                    drop(reaper);
-                    ZombiePtraces::reparent(&pids, self, &reaper_ref);
+                    ZombiePtraces::reparent(&pids, self, &reaper);
                 } else {
                     // If we don't have a reaper then just drop the zombies.
                     let mut state = self.write();
@@ -566,6 +616,7 @@ impl ThreadGroup {
             }
 
             if let Some(ref parent) = parent {
+                let parent = parent.upgrade();
                 let mut tracer_pid = None;
                 if let Some(ref ptrace) = &task.read().ptrace {
                     tracer_pid = Some(ptrace.get_pid());
@@ -577,7 +628,7 @@ impl ThreadGroup {
                         maybe_zombie = tracer.thread_group.maybe_notify_tracer(
                             task,
                             &mut pids,
-                            parent,
+                            &parent,
                             maybe_zombie.unwrap(),
                         );
                     }
@@ -595,12 +646,13 @@ impl ThreadGroup {
             // Once the last zircon thread stops, the zircon process will also stop executing.
 
             if let Some(parent) = parent {
+                let parent = parent.upgrade();
                 parent.check_orphans(locked);
             }
         }
     }
 
-    pub fn do_zombie_notifications(self: &Arc<Self>, zombie: OwnedRef<ZombieProcess>) {
+    pub fn do_zombie_notifications(&self, zombie: OwnedRef<ZombieProcess>) {
         let mut state = self.write();
 
         state.children.remove(&zombie.pid);
@@ -623,14 +675,14 @@ impl ThreadGroup {
     /// needs to notify the parent, None otherwise.  The caller should probably
     /// invoke parent.do_zombie_notifications(zombie) on the result.
     fn maybe_notify_tracer(
-        self: &Arc<Self>,
+        &self,
         tracee: &Task,
         mut pids: &mut PidTable,
-        parent: &Arc<ThreadGroup>,
+        parent: &ThreadGroup,
         zombie: OwnedRef<ZombieProcess>,
     ) -> Option<OwnedRef<ZombieProcess>> {
         if self.read().zombie_ptracees.has_match(&ProcessSelector::Pid(tracee.id), &pids) {
-            if *self == *parent {
+            if self == parent {
                 // The tracer is the parent and has not consumed the
                 // notification.  Don't bother with the ptracee stuff, and just
                 // notify the parent.
@@ -647,11 +699,11 @@ impl ThreadGroup {
                 }
                 // Tell the tracer that there is a notification pending.
                 let mut state = self.write();
-                state.zombie_ptracees.set_parent_of(tracee.id, Some(zombie), parent.clone());
+                state.zombie_ptracees.set_parent_of(tracee.id, Some(zombie), parent);
                 tracee.write().notify_ptracers();
                 return None;
             }
-        } else if *self == *parent {
+        } else if self == parent {
             // The tracer is the parent and has already consumed the parent
             // notification.  No further action required.
             parent.write().children.remove(&tracee.id);
@@ -664,24 +716,25 @@ impl ThreadGroup {
     }
 
     /// Find the task which will adopt our children after we die.
-    fn find_reaper(self: &Arc<Self>) -> Option<Arc<Self>> {
-        let mut parent = Arc::clone(self.read().parent.as_ref()?);
+    fn find_reaper(&self) -> Option<ThreadGroupParent> {
+        let mut weak_parent = self.read().parent.clone()?;
         loop {
-            parent = {
+            weak_parent = {
+                let parent = weak_parent.upgrade();
                 let parent_state = parent.read();
                 if parent_state.is_child_subreaper {
                     break;
                 }
                 match parent_state.parent {
-                    Some(ref next_parent) => Arc::clone(next_parent),
+                    Some(ref next_parent) => next_parent.clone(),
                     None => break,
                 }
-            }
+            };
         }
-        Some(parent)
+        Some(weak_parent)
     }
 
-    pub fn setsid<L>(self: &Arc<Self>, locked: &mut Locked<'_, L>) -> Result<(), Errno>
+    pub fn setsid<L>(&self, locked: &mut Locked<'_, L>) -> Result<(), Errno>
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -700,7 +753,7 @@ impl ThreadGroup {
     }
 
     pub fn setpgid<L>(
-        self: &Arc<Self>,
+        &self,
         locked: &mut Locked<'_, L>,
         target: &Task,
         pgid: pid_t,
@@ -716,7 +769,8 @@ impl ThreadGroup {
             // The target process must be either the current process of a child of the current process
             let mut target_thread_group = target.thread_group.write();
             let is_target_current_process_child =
-                target_thread_group.parent.as_ref().map(|tg| tg.leader) == Some(self.leader);
+                target_thread_group.parent.as_ref().map(|tg| tg.upgrade().leader)
+                    == Some(self.leader);
             if target_thread_group.leader() != self.leader && !is_target_current_process_child {
                 return error!(ESRCH);
             }
@@ -770,11 +824,11 @@ impl ThreadGroup {
         Ok(())
     }
 
-    fn itimer_real(self: &Arc<Self>) -> IntervalTimerHandle {
+    fn itimer_real(&self) -> IntervalTimerHandle {
         self.write().timers.get_timer(self.itimer_real_id).expect("no ITIMER_REAL exists")
     }
 
-    pub fn set_itimer(self: &Arc<Self>, which: u32, value: itimerval) -> Result<itimerval, Errno> {
+    pub fn set_itimer(&self, which: u32, value: itimerval) -> Result<itimerval, Errno> {
         if which == ITIMER_PROF || which == ITIMER_VIRTUAL {
             // We don't support setting these timers.
             // The gvisor test suite clears ITIMER_PROF as part of its test setup logic, so we support
@@ -794,7 +848,7 @@ impl ThreadGroup {
         if value.it_value.tv_sec != 0 || value.it_value.tv_usec != 0 {
             itimer_real.arm(
                 &self.kernel,
-                Arc::downgrade(self),
+                self.weak_thread_group.clone(),
                 itimerspec_from_itimerval(value),
                 false,
             )?;
@@ -807,7 +861,7 @@ impl ThreadGroup {
         })
     }
 
-    pub fn get_itimer(self: &Arc<Self>, which: u32) -> Result<itimerval, Errno> {
+    pub fn get_itimer(&self, which: u32) -> Result<itimerval, Errno> {
         if which == ITIMER_PROF || which == ITIMER_VIRTUAL {
             // We don't support setting these timers, so we can accurately report that these are not set.
             return Ok(itimerval::default());
@@ -825,7 +879,7 @@ impl ThreadGroup {
     /// Check whether the stop state is compatible with `new_stopped`. If it is return it,
     /// otherwise, return None.
     fn check_stopped_state(
-        self: &Arc<Self>,
+        &self,
         new_stopped: StopState,
         finalize_only: bool,
     ) -> Option<StopState> {
@@ -848,7 +902,7 @@ impl ThreadGroup {
     ///
     /// Returns the latest stop state after any changes.
     pub fn set_stopped(
-        self: &Arc<Self>,
+        &self,
         new_stopped: StopState,
         siginfo: Option<SignalInfo>,
         finalize_only: bool,
@@ -877,10 +931,7 @@ impl ThreadGroup {
         error!(ENOTTY)
     }
 
-    pub fn get_foreground_process_group(
-        self: &Arc<Self>,
-        terminal: &Arc<Terminal>,
-    ) -> Result<pid_t, Errno> {
+    pub fn get_foreground_process_group(&self, terminal: &Arc<Terminal>) -> Result<pid_t, Errno> {
         let state = self.read();
         let process_group = &state.process_group;
         let terminal_state = terminal.read();
@@ -893,7 +944,7 @@ impl ThreadGroup {
     }
 
     pub fn set_foreground_process_group<L>(
-        self: &Arc<Self>,
+        &self,
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         terminal: &Arc<Terminal>,
@@ -944,7 +995,7 @@ impl ThreadGroup {
     }
 
     pub fn set_controlling_terminal(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         terminal: &Arc<Terminal>,
         is_main: bool,
@@ -996,7 +1047,7 @@ impl ThreadGroup {
     }
 
     pub fn release_controlling_terminal<L>(
-        self: &Arc<Self>,
+        &self,
         locked: &mut Locked<'_, L>,
         _current_task: &CurrentTask,
         terminal: &Arc<Terminal>,
@@ -1041,12 +1092,14 @@ impl ThreadGroup {
         Ok(())
     }
 
-    fn check_orphans<L>(self: &Arc<Self>, locked: &mut Locked<'_, L>)
+    fn check_orphans<L>(&self, locked: &mut Locked<'_, L>)
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let mut thread_groups = self.read().children().collect::<Vec<_>>();
-        thread_groups.push(Arc::clone(self));
+        let mut thread_groups =
+            self.read().children().map(TempRef::into_static).collect::<Vec<_>>();
+        let this = self.weak_thread_group.upgrade().unwrap();
+        thread_groups.push(this);
         let process_groups =
             thread_groups.iter().map(|tg| Arc::clone(&tg.read().process_group)).unique();
         for pg in process_groups {
@@ -1054,12 +1107,12 @@ impl ThreadGroup {
         }
     }
 
-    pub fn get_rlimit(self: &Arc<Self>, resource: Resource) -> u64 {
+    pub fn get_rlimit(&self, resource: Resource) -> u64 {
         self.limits.lock().get(resource).rlim_cur
     }
 
     pub fn adjust_rlimits(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
@@ -1075,7 +1128,7 @@ impl ThreadGroup {
             // stats from starnix process.
             assert_eq!(
                 self as *const ThreadGroup,
-                Arc::as_ptr(self.kernel.kthreads.system_thread_group()),
+                TempRef::as_ptr(&self.kernel.kthreads.system_thread_group())
             );
             &self.kernel.kthreads.starnix_process
         } else {
@@ -1121,7 +1174,7 @@ impl ThreadGroup {
     /// thread is deemed to have seen the tracee ptrace-stop for the purposes of
     /// PTRACE_LISTEN.
     pub fn get_waitable_ptracee(
-        self: &Arc<Self>,
+        &self,
         selector: ProcessSelector,
         options: &WaitingOptions,
         pids: &mut PidTable,
@@ -1132,17 +1185,19 @@ impl ThreadGroup {
             None => (),
             Some((zombie, None)) => return Some(zombie.to_wait_result()),
             Some((zombie, Some((tg, z)))) => {
-                if tg != *self {
-                    tg.do_zombie_notifications(z);
-                } else {
-                    {
-                        let mut state = tg.write();
-                        state.children.remove(&z.pid);
-                        state.deferred_zombie_ptracers.retain(|&(_, tracee)| tracee != z.pid);
-                    }
+                if let Some(tg) = tg.upgrade() {
+                    if TempRef::as_ptr(&tg) != self as *const Self {
+                        tg.do_zombie_notifications(z);
+                    } else {
+                        {
+                            let mut state = tg.write();
+                            state.children.remove(&z.pid);
+                            state.deferred_zombie_ptracers.retain(|&(_, tracee)| tracee != z.pid);
+                        }
 
-                    z.release(pids);
-                };
+                        z.release(pids);
+                    };
+                }
                 return Some(zombie.to_wait_result());
             }
         }
@@ -1299,7 +1354,7 @@ impl ThreadGroup {
     /// Returns Ok(()) if the signal was sent, or the permission checks passed with a 0 signal, otherwise
     /// the error that was encountered.
     pub fn send_signal_unchecked(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         unchecked_signal: UncheckedSignal,
     ) -> Result<(), Errno> {
@@ -1331,7 +1386,7 @@ impl ThreadGroup {
     /// Returns Ok(()) if the signal was sent, or the permission checks passed with a 0 signal, otherwise
     /// the error that was encountered.
     pub fn send_signal_unchecked_with_info(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         unchecked_signal: UncheckedSignal,
         siginfo_ref: UserAddress,
@@ -1358,7 +1413,7 @@ impl ThreadGroup {
     ///   userspace for permission checks.
     ///   - `Err(_)` if the permission checks failed.
     fn check_signal_access(
-        self: &Arc<Self>,
+        &self,
         current_task: &CurrentTask,
         unchecked_signal: UncheckedSignal,
     ) -> Result<Option<Signal>, Errno> {
@@ -1383,30 +1438,6 @@ impl ThreadGroup {
     }
 }
 
-// ThreadGroup can't easily go into an OwnedRef, so instead of using Releasable we have a
-// Drop impl that avoids recursive locking.
-impl Drop for ThreadGroup {
-    fn drop(&mut self) {
-        // We don't want to drop parent while we hold the PidTable lock.
-        let parent = {
-            let mut pids = self.kernel.pids.write();
-            let mut state = self.mutable_state.write();
-
-            for zombie in state.zombie_children.drain(..) {
-                zombie.release(&mut pids);
-            }
-
-            state.zombie_ptracees.release(&mut pids);
-
-            state.parent.take()
-        };
-
-        // Now that the PidTable lock has been released the parent can be dropped since it will
-        // acquire that same lock again.
-        std::mem::drop(parent);
-    }
-}
-
 pub enum WaitableChildResult {
     ReadyNow(WaitResult),
     ShouldWait,
@@ -1414,12 +1445,12 @@ pub enum WaitableChildResult {
 }
 
 #[apply(state_implementation!)]
-impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
+impl ThreadGroupMutableState<Base = ThreadGroup> {
     pub fn leader(&self) -> pid_t {
         self.base.leader
     }
 
-    pub fn children(&self) -> impl Iterator<Item = Arc<ThreadGroup>> + '_ {
+    pub fn children(&self) -> impl Iterator<Item = TempRef<'_, ThreadGroup>> + '_ {
         self.children.values().map(|v| {
             v.upgrade().expect("Weak references to processes in ThreadGroup must always be valid")
         })
@@ -1447,7 +1478,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
 
     pub fn get_ppid(&self) -> pid_t {
         match &self.parent {
-            Some(parent) => parent.leader,
+            Some(parent) => parent.upgrade().leader,
             None => self.leader(),
         }
     }
@@ -1546,7 +1577,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         pids: &PidTable,
     ) -> WaitableChildResult {
         // The children whose pid matches the pid selector queried.
-        let filter_children_by_pid_selector = |child: &Arc<ThreadGroup>| match selector {
+        let filter_children_by_pid_selector = |child: &ThreadGroup| match selector {
             ProcessSelector::Any => true,
             ProcessSelector::Pid(pid) => child.leader == pid,
             ProcessSelector::Pgid(pgid) => {
@@ -1555,7 +1586,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         };
 
         // The children whose exit signal matches the waiting options queried.
-        let filter_children_by_waiting_options = |child: &Arc<ThreadGroup>| {
+        let filter_children_by_waiting_options = |child: &ThreadGroup| {
             if options.wait_for_all {
                 return true;
             }
@@ -1585,8 +1616,8 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
             .children
             .values()
             .map(|t| t.upgrade().unwrap())
-            .filter(filter_children_by_pid_selector)
-            .filter(filter_children_by_waiting_options)
+            .filter(|tg| filter_children_by_pid_selector(&tg))
+            .filter(|tg| filter_children_by_waiting_options(&tg))
             .peekable();
         if selected_children.peek().is_none() {
             // There still might be a process that ptrace hasn't looked at yet.
@@ -1726,6 +1757,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
         // Drop the lock before locking the parent.
         std::mem::drop(self);
         if let Some(parent) = parent {
+            let parent = parent.upgrade();
             parent.write().child_status_waiters.notify_all();
         }
 
@@ -1848,7 +1880,7 @@ mod test {
         assert!(!old_process_group
             .read(&mut locked)
             .thread_groups()
-            .contains(&child_task.thread_group));
+            .contains(&OwnedRef::temp(&child_task.thread_group)));
     }
 
     #[::fuchsia::test]
@@ -1916,7 +1948,7 @@ mod test {
         assert!(!old_process_group
             .read(&mut locked)
             .thread_groups()
-            .contains(&child_task2.thread_group));
+            .contains(&OwnedRef::temp(&child_task2.thread_group)));
     }
 
     #[::fuchsia::test]

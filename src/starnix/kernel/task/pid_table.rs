@@ -14,7 +14,7 @@ use std::sync::{Arc, Weak};
 enum ProcessEntry {
     #[default]
     None,
-    ThreadGroup(Weak<ThreadGroup>),
+    ThreadGroup(WeakRef<ThreadGroup>),
     Zombie(WeakRef<ZombieProcess>),
 }
 
@@ -23,7 +23,7 @@ impl ProcessEntry {
         matches!(self, Self::None)
     }
 
-    fn thread_group(&self) -> Option<&Weak<ThreadGroup>> {
+    fn thread_group(&self) -> Option<&WeakRef<ThreadGroup>> {
         match self {
             Self::ThreadGroup(ref group) => Some(group),
             _ => None,
@@ -40,7 +40,7 @@ struct PidEntry {
 }
 
 pub enum ProcessEntryRef<'a> {
-    Process(Arc<ThreadGroup>),
+    Process(TempRef<'a, ThreadGroup>),
     Zombie(TempRef<'a, ZombieProcess>),
 }
 
@@ -133,18 +133,17 @@ impl PidTable {
         }
     }
 
-    pub fn get_thread_groups(&self) -> Vec<Arc<ThreadGroup>> {
+    pub fn get_thread_groups(&self) -> impl Iterator<Item = TempRef<'_, ThreadGroup>> + '_ {
         self.table
             .iter()
             .flat_map(|(_pid, entry)| entry.process.thread_group())
             .flat_map(|g| g.upgrade())
-            .collect()
     }
 
-    pub fn add_thread_group(&mut self, thread_group: &Arc<ThreadGroup>) {
+    pub fn add_thread_group(&mut self, thread_group: &ThreadGroup) {
         let entry = self.get_entry_mut(thread_group.leader);
         assert!(entry.process.is_none());
-        entry.process = ProcessEntry::ThreadGroup(Arc::downgrade(thread_group));
+        entry.process = ProcessEntry::ThreadGroup(thread_group.weak_thread_group.clone());
 
         // Notify thread group changes.
         if let Some(notifier) = &self.thread_group_notifier {
