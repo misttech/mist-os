@@ -461,7 +461,7 @@ mod tests {
         FailPrepareData, InstallationProgress, InstallerRequest, InstallerRequestStream,
         RebootControllerRequest, State, UpdateInfo,
     };
-    use fuchsia_async as fasync;
+    use fuchsia_async::{self as fasync, TestExecutor};
     use fuchsia_sync::Mutex;
     use futures::future::BoxFuture;
     use omaha_client::protocol::response::{App, Manifest, Package, Packages};
@@ -916,10 +916,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_reboot() {
-        let mut exec = fasync::TestExecutor::new();
-
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_reboot() {
         let mut installer = new_installer();
         let (reboot_controller, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<RebootControllerMarker>().unwrap();
@@ -927,17 +925,17 @@ mod tests {
 
         {
             let mut reboot_future = installer.perform_reboot();
-            assert_matches!(exec.run_until_stalled(&mut reboot_future), Poll::Pending);
-            assert_matches!(exec.wake_next_timer(), Some(_));
-            assert_matches!(exec.run_until_stalled(&mut reboot_future), Poll::Ready(Err(_)));
+            assert_matches!(
+                TestExecutor::poll_until_stalled(&mut reboot_future).await,
+                Poll::Pending
+            );
+            TestExecutor::advance_to(TestExecutor::next_timer().unwrap()).await;
+            assert_matches!(reboot_future.await, Err(_));
         }
 
         assert_matches!(installer.reboot_controller, None);
-        assert_matches!(
-            exec.run_singlethreaded(stream.next()),
-            Some(Ok(RebootControllerRequest::Unblock { .. }))
-        );
-        assert_matches!(exec.run_singlethreaded(stream.next()), None);
+        assert_matches!(stream.next().await, Some(Ok(RebootControllerRequest::Unblock { .. })));
+        assert_matches!(stream.next().await, None);
     }
 
     #[fasync::run_singlethreaded(test)]
