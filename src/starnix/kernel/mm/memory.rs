@@ -270,4 +270,17 @@ impl MemoryObject {
             }
         }
     }
+
+    pub fn memmove(
+        &self,
+        options: zx::TransferDataOptions,
+        dst_offset: u64,
+        src_offset: u64,
+        size: u64,
+    ) -> Result<(), zx::Status> {
+        match self {
+            Self::Vmo(vmo) => vmo.transfer_data(options, dst_offset, size, vmo, src_offset),
+            Self::RingBuf(_) => Err(zx::Status::NOT_SUPPORTED),
+        }
+    }
 }

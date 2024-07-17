@@ -487,7 +487,7 @@ struct PrivateAnonymousMemoryManager {
     backing: Arc<MemoryObject>,
 
     /// Memory object used to make address allocations for private, anonymous memory allocations in this address space.
-    allocation: MemoryObject,
+    allocation: Arc<MemoryObject>,
 }
 
 #[cfg(feature = "alternate_anon_allocs")]
@@ -500,8 +500,9 @@ impl PrivateAnonymousMemoryManager {
         // modified and the actual size does not matter. To allow creating mappings that might
         // fault (if permissions were to allow) this mapping has to be resizable. It will never be
         // resized.
-        let allocation =
-            MemoryObject::from(zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap());
+        let allocation = Arc::new(MemoryObject::from(
+            zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).unwrap(),
+        ));
 
         Self { backing, allocation }
     }
@@ -547,12 +548,11 @@ impl PrivateAnonymousMemoryManager {
         let dest_memory_offset = dest.ptr() as u64;
         let source_memory_offset = source.start.ptr() as u64;
         self.backing
-            .transfer_data(
+            .memmove(
                 fuchsia_zircon::TransferDataOptions::empty(),
                 dest_memory_offset,
-                length.try_into().unwrap(),
-                &self.backing,
                 source_memory_offset,
+                length.try_into().unwrap(),
             )
             .map_err(impossible_error)?;
         Ok(())
@@ -567,10 +567,10 @@ impl PrivateAnonymousMemoryManager {
                     .replace_as_executable(&VMEX_RESOURCE)
                     .map_err(impossible_error)?,
             ),
-            allocation: MemoryObject::from(
+            allocation: Arc::new(MemoryObject::from(
                 zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
                     .map_err(impossible_error)?,
-            ),
+            )),
         })
     }
 }
@@ -821,6 +821,7 @@ impl MemoryManagerState {
         #[cfg(feature = "alternate_anon_allocs")]
         if !options.contains(MappingOptions::SHARED) {
             return self.map_private_anonymous(
+                mm,
                 addr,
                 length,
                 prot_flags,
@@ -1142,6 +1143,7 @@ impl MemoryManagerState {
                     let growth_length = dst_length - src_length;
 
                     self.map_private_anonymous(
+                        mm,
                         DesiredAddress::FixedOverwrite(growth_start_addr),
                         growth_length,
                         src_mapping.flags.prot_flags(),
