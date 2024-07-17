@@ -103,6 +103,64 @@ async fn use_protocol_from_dictionary() {
 }
 
 #[fuchsia::test]
+async fn use_protocol_from_dictionary_not_used() {
+    // Create a dictionary with two protocols. `use` one of the protocols, but not the other.
+    // Only the protocol that is `use`d should be accessible.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol_default("foo")
+                .protocol_default("bar")
+                .dictionary_default("parent_dict")
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("foo")
+                        .target_name("A")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::protocol()
+                        .name("bar")
+                        .target_name("B")
+                        .source(OfferSource::Self_)
+                        .target(OfferTarget::Capability("parent_dict".parse().unwrap())),
+                )
+                .offer(
+                    OfferBuilder::dictionary()
+                        .name("parent_dict")
+                        .source(OfferSource::Self_)
+                        .target_static_child("leaf"),
+                )
+                .child_default("leaf")
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .use_(UseBuilder::protocol().name("A").from_dictionary("parent_dict"))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol { path: "/svc/A".parse().unwrap(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+    test.check_use(
+        "leaf".try_into().unwrap(),
+        CheckUse::Protocol {
+            path: "/svc/B".parse().unwrap(),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
 async fn use_protocol_from_dictionary_not_found() {
     // Test extracting a protocol from a dictionary, but the protocol is missing from the
     // dictionary.

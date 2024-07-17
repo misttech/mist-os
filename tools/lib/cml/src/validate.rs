@@ -7143,6 +7143,16 @@ mod tests {
             }),
             Ok(())
         ),
+        test_cml_use_dictionary_disallowed(
+            json!({
+                "use": [
+                    {
+                        "dictionary": "dict",
+                    },
+                ],
+            }),
+            Err(Error::Parse { err, .. }) if err.starts_with("unknown field `dictionary`")
+        ),
         test_cml_expose_dictionary_from_self(
             json!({
                 "expose": [
