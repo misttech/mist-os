@@ -38,7 +38,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::{
-    release_on_error, OwnedRef, Releasable, ReleaseGuard, TempRef, WeakRef,
+    release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
 };
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP};
@@ -1449,7 +1449,7 @@ impl CurrentTask {
         let current_task: CurrentTask = TaskBuilder::new(Task::new(
             pid,
             initial_name,
-            OwnedRef::clone(&system_task.thread_group),
+            OwnedRef::share(&system_task.thread_group),
             None,
             FdTable::default(),
             Arc::clone(system_task.mm()),
@@ -1631,7 +1631,7 @@ impl CurrentTask {
             };
 
             if clone_thread {
-                let thread_group = self.thread_group.clone();
+                let thread_group = OwnedRef::share(&self.thread_group);
                 let memory_manager = self.mm().clone();
                 TaskInfo { thread: None, thread_group, memory_manager }
             } else {

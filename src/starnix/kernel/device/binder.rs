@@ -46,7 +46,7 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::{
-    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, TempRef,
+    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, Share, TempRef,
     WeakRef,
 };
 use starnix_uapi::union::struct_with_union_into_bytes;
@@ -904,10 +904,10 @@ impl<'a> BinderProcessGuard<'a> {
     /// Return the `BinderThread` with the given `tid`, creating it if it doesn't exist.
     fn find_or_register_thread(&mut self, tid: pid_t) -> OwnedRef<BinderThread> {
         if let Some(thread) = self.thread_pool.0.get(&tid) {
-            return thread.clone();
+            return OwnedRef::share(thread);
         }
         let thread = BinderThread::new(self, tid);
-        self.thread_pool.0.insert(tid, OwnedRef::clone(&thread));
+        self.thread_pool.0.insert(tid, OwnedRef::share(&thread));
         thread
     }
 
@@ -3095,7 +3095,7 @@ impl Default for BinderDriver {
 
 impl BinderDriver {
     fn find_process(&self, identifier: u64) -> Result<OwnedRef<BinderProcess>, Errno> {
-        self.procs.read().get(&identifier).map(OwnedRef::clone).ok_or_else(|| errno!(ENOENT))
+        self.procs.read().get(&identifier).map(OwnedRef::share).ok_or_else(|| errno!(ENOENT))
     }
 
     /// Creates and register the binder process state to represent a local process with `pid`.
