@@ -73,7 +73,7 @@ impl Device {
 
     fn flatten_and_log_error<T>(
         method_name: impl Display,
-        result: Result<Result<T, zx::zx_status_t>, fidl::Error>,
+        result: Result<Result<T, zx::sys::zx_status_t>, fidl::Error>,
     ) -> Result<T, zx::Status> {
         result
             .map_err(|fidl_error| {

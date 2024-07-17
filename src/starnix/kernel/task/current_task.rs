@@ -1129,7 +1129,7 @@ impl CurrentTask {
             },
             zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => self.mm().handle_page_fault(
                 decode_page_fault_exception_report(report),
-                zx::Status::from_raw(report.context.synth_code as zx::zx_status_t),
+                zx::Status::from_raw(report.context.synth_code as zx::sys::zx_status_t),
             ),
             zx::sys::ZX_EXCP_UNDEFINED_INSTRUCTION => {
                 ExceptionResult::Signal(SignalInfo::default(SIGILL))

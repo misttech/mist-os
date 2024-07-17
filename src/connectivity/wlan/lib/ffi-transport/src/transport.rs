@@ -33,7 +33,7 @@ pub struct FfiEthernetRx {
         ctx: *mut FfiEthernetRxCtx,
         payload: *const u8,
         payload_len: usize,
-    ) -> zx::zx_status_t,
+    ) -> zx::sys::zx_status_t,
 }
 
 pub struct EthernetRx {
@@ -90,7 +90,7 @@ pub struct FfiWlanTx {
         ctx: *mut FfiWlanTxCtx,
         payload: *const u8,
         payload_len: usize,
-    ) -> zx::zx_status_t,
+    ) -> zx::sys::zx_status_t,
 }
 
 pub struct WlanTx {
@@ -142,7 +142,7 @@ pub struct FfiEthernetTx {
         ctx: *const FfiEthernetTxCtx,
         request: *const u8,
         request_size: usize,
-    ) -> zx::zx_status_t,
+    ) -> zx::sys::zx_status_t,
 }
 
 pub struct EthernetTx {
@@ -204,7 +204,7 @@ impl EthernetTx {
         ctx: *const FfiEthernetTxCtx,
         payload: *const u8,
         payload_len: usize,
-    ) -> zx::zx_status_t {
+    ) -> zx::sys::zx_status_t {
         wtrace::duration!(c"EthernetTx transfer");
 
         // Safety: This call is safe because the caller promises `payload` points to a persisted

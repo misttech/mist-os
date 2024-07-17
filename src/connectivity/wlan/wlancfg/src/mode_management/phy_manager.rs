@@ -1196,7 +1196,7 @@ mod tests {
     fn send_destroy_iface_response(
         exec: &mut TestExecutor,
         server: &mut fidl_service::DeviceMonitorRequestStream,
-        return_status: fuchsia_zircon::zx_status_t,
+        return_status: fuchsia_zircon::sys::zx_status_t,
     ) {
         assert_variant!(
             exec.run_until_stalled(&mut server.next()),

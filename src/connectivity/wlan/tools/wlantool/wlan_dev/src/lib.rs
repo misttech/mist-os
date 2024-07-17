@@ -668,7 +668,7 @@ async fn handle_connect_transaction(
     Ok(())
 }
 
-/// Constructs a `Result<(), Error>` from a `zx::zx_status_t` returned
+/// Constructs a `Result<(), Error>` from a `zx::sys::zx_status_t` returned
 /// from one of the `get_client_sme` or `get_ap_sme`
 /// functions. In particular, when `zx_status::Status::from_raw(raw_status)` does
 /// not match `zx_status::Status::OK`, this function will attach the appropriate

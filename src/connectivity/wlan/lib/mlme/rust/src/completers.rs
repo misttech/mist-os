@@ -10,14 +10,14 @@ use fuchsia_zircon as zx;
 /// dropping a `StartCompleter` indicates Start failed with a `zx::Status::BAD_STATE` status.
 pub struct StartCompleter<F>
 where
-    F: FnOnce(zx::zx_status_t),
+    F: FnOnce(zx::sys::zx_status_t),
 {
     completer: Option<F>,
 }
 
 impl<F> StartCompleter<F>
 where
-    F: FnOnce(zx::zx_status_t),
+    F: FnOnce(zx::sys::zx_status_t),
 {
     pub fn new(completer: F) -> Self {
         Self { completer: Some(completer) }
@@ -34,7 +34,7 @@ where
 
 impl<F> Drop for StartCompleter<F>
 where
-    F: FnOnce(zx::zx_status_t),
+    F: FnOnce(zx::sys::zx_status_t),
 {
     fn drop(&mut self) {
         if let Some(completer) = self.completer.take() {
@@ -50,7 +50,7 @@ mod tests {
 
     #[test]
     fn reply_with_ok() {
-        let (sender, mut receiver) = oneshot::channel::<zx::zx_status_t>();
+        let (sender, mut receiver) = oneshot::channel::<zx::sys::zx_status_t>();
         let start_completer = StartCompleter::new(move |status| {
             sender.send(status).expect("Failed to send result.");
         });
@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn reply_with_error() {
-        let (sender, mut receiver) = oneshot::channel::<zx::zx_status_t>();
+        let (sender, mut receiver) = oneshot::channel::<zx::sys::zx_status_t>();
         let start_completer = StartCompleter::new(move |status| {
             sender.send(status).expect("Failed to send result.");
         });
@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn reply_with_error_when_dropped() {
-        let (sender, mut receiver) = oneshot::channel::<zx::zx_status_t>();
+        let (sender, mut receiver) = oneshot::channel::<zx::sys::zx_status_t>();
         let start_completer = StartCompleter::new(move |status| {
             sender.send(status).expect("Failed to send result.");
         });

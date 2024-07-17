@@ -55,7 +55,7 @@ pub async fn start_and_serve<F, D: DeviceOps + 'static>(
     buffer_provider: BufferProvider,
 ) -> Result<(), zx::Status>
 where
-    F: FnOnce(zx::zx_status_t) + 'static,
+    F: FnOnce(zx::sys::zx_status_t) + 'static,
 {
     wtrace::duration_begin_scope!(c"rust_driver::start_and_serve");
     let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
@@ -1288,7 +1288,7 @@ mod tests {
     #[derive(Debug)]
     struct StartAndServeTestHarness<F> {
         pub start_and_serve_fut: F,
-        pub start_complete_receiver: oneshot::Receiver<zx::zx_status_t>,
+        pub start_complete_receiver: oneshot::Receiver<zx::sys::zx_status_t>,
         pub generic_sme_proxy: fidl_sme::GenericSmeProxy,
     }
 
@@ -1305,7 +1305,7 @@ mod tests {
     {
         let fake_buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (start_complete_sender, mut start_complete_receiver) =
-            oneshot::channel::<zx::zx_status_t>();
+            oneshot::channel::<zx::sys::zx_status_t>();
         let start_and_serve_fut = start_and_serve(
             StartCompleter::new(move |status| {
                 start_complete_sender.send(status).expect("Failed to signal start complete.")

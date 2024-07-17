@@ -8,7 +8,8 @@ use bind::compiler::symbol_table::{get_deprecated_key_identifier, get_deprecated
 use bind::compiler::Symbol;
 use bind::interpreter::decode_bind_rules::DecodedRules;
 use bind::interpreter::match_bind::{match_bind, DeviceProperties, MatchBindData, PropertyKey};
-use fuchsia_zircon::{zx_status_t, Status};
+use fuchsia_zircon::sys::zx_status_t;
+use fuchsia_zircon::Status;
 use regex::Regex;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use {fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi};

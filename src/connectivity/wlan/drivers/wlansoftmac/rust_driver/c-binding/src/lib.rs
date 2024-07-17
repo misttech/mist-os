@@ -53,7 +53,7 @@ pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
     start_completer: *mut c_void,
     run_start_completer: unsafe extern "C" fn(
         start_completer: *mut c_void,
-        status: zx::zx_status_t,
+        status: zx::sys::zx_status_t,
     ),
     ethernet_rx: FfiEthernetRx,
     wlan_tx: FfiWlanTx,
