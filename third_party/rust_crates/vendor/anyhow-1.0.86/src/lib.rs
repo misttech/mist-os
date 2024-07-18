@@ -17,7 +17,7 @@
 //!   the return type of any fallible function.
 //!
 //!   Within the function, use `?` to easily propagate any error that implements
-//!   the `std::error::Error` trait.
+//!   the [`std::error::Error`] trait.
 //!
 //!   ```
 //!   # pub trait Deserialize {}
@@ -192,8 +192,8 @@
 //!
 //! # No-std support
 //!
-//! In no_std mode, the same API is almost all available and works the same way.
-//! To depend on Anyhow in no_std mode, disable our default enabled "std"
+//! In no_std mode, almost all of the same API is available and works the same
+//! way. To depend on Anyhow in no_std mode, disable our default enabled "std"
 //! feature in Cargo.toml. A global allocator is required.
 //!
 //! ```toml
@@ -206,7 +206,7 @@
 //! will require an explicit `.map_err(Error::msg)` when working with a
 //! non-Anyhow error type inside a function that returns Anyhow's error type.
 
-#![doc(html_root_url = "https://docs.rs/anyhow/1.0.81")]
+#![doc(html_root_url = "https://docs.rs/anyhow/1.0.85")]
 #![cfg_attr(error_generic_member_access, feature(error_generic_member_access))]
 #![cfg_attr(doc_cfg, feature(doc_cfg))]
 #![no_std]
@@ -383,7 +383,7 @@ pub use anyhow as format_err;
 ///     # Ok(())
 /// }
 /// ```
-#[cfg_attr(not(doc), repr(transparent))]
+#[repr(transparent)]
 pub struct Error {
     inner: Own<ErrorImpl>,
 }
@@ -651,6 +651,7 @@ pub fn Ok<T>(t: T) -> Result<T> {
 // Not public API. Referenced by macro-generated code.
 #[doc(hidden)]
 pub mod __private {
+    use self::not::Bool;
     use crate::Error;
     use alloc::fmt;
     use core::fmt::Arguments;
@@ -698,5 +699,32 @@ pub mod __private {
     #[must_use]
     pub fn must_use(error: Error) -> Error {
         error
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn not(cond: impl Bool) -> bool {
+        cond.not()
+    }
+
+    mod not {
+        #[doc(hidden)]
+        pub trait Bool {
+            fn not(self) -> bool;
+        }
+
+        impl Bool for bool {
+            #[inline]
+            fn not(self) -> bool {
+                !self
+            }
+        }
+
+        impl Bool for &bool {
+            #[inline]
+            fn not(self) -> bool {
+                !*self
+            }
+        }
     }
 }

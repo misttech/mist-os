@@ -34,7 +34,7 @@ group("ansi_term") {
 }
 
 group("anyhow") {
-  public_deps = [ ":anyhow-v1_0_81" ]
+  public_deps = [ ":anyhow-v1_0_86" ]
 }
 
 group("arbitrary") {
@@ -1536,18 +1536,18 @@ rust_library("ansi_term-v0_12_1") {
   applicable_licenses = [ ":ansi_term-v0_12_1.license" ]
 }
 
-license("anyhow-v1_0_81.license") {
+license("anyhow-v1_0_86.license") {
   public_package_name = "anyhow"
   license_files = [
-    "//third_party/rust_crates/vendor/anyhow-1.0.81/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/anyhow-1.0.81/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/anyhow-1.0.86/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/anyhow-1.0.86/LICENSE-MIT",
   ]
 }
 
-rust_library("anyhow-v1_0_81") {
+rust_library("anyhow-v1_0_86") {
   crate_name = "anyhow"
-  crate_root = "//third_party/rust_crates/vendor/anyhow-1.0.81/src/lib.rs"
-  output_name = "anyhow-39cab3f893a61327"
+  crate_root = "//third_party/rust_crates/vendor/anyhow-1.0.86/src/lib.rs"
+  output_name = "anyhow-ce40222dbd651a02"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -1557,15 +1557,15 @@ rust_library("anyhow-v1_0_81") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=39cab3f893a61327",
-    "-Cextra-filename=-39cab3f893a61327",
+    "-Cmetadata=ce40222dbd651a02",
+    "-Cextra-filename=-ce40222dbd651a02",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":anyhow-v1_0_81.license" ]
+  applicable_licenses = [ ":anyhow-v1_0_86.license" ]
 }
 
 license("arbitrary-v1_0_3.license") {
@@ -8483,7 +8483,7 @@ rust_library("netlink-packet-core-v0_7_0") {
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
 
   rustenv = []
 
@@ -8517,7 +8517,7 @@ rust_library("netlink-packet-generic-v0_3_3") {
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":netlink-packet-core-v0_7_0" ]
   deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
 
   rustenv = []
 
@@ -8551,7 +8551,7 @@ rust_library("netlink-packet-route-v0_20_0") {
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":netlink-packet-core-v0_7_0" ]
   deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":bitflags-v2_4_1" ]
   deps += [ ":libc-v0_2_149" ]
   deps += [ ":log-v0_4_20" ]
@@ -8586,7 +8586,7 @@ rust_library("netlink-packet-sock-diag-v0_4_2") {
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":netlink-packet-core-v0_7_0" ]
   deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":libc-v0_2_149" ]
   deps += [ ":smallvec-v1_13_1" ]
@@ -8621,7 +8621,7 @@ rust_library("netlink-packet-utils-v0_5_2") {
 
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":thiserror-v1_0_57" ]
 
@@ -9346,7 +9346,7 @@ rust_library("omaha_client-v0_1_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":chrono-v0_4_34" ]
   deps += [ ":ecdsa-v0_14_8" ]
   deps += [ ":elliptic-curve-v0_12_3" ]
@@ -11224,7 +11224,7 @@ rust_proc_macro("prost-derive-v0_11_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":itertools-v0_10_1" ]
   deps += [ ":proc-macro2-v1_0_86" ]
   deps += [ ":quote-v1_0_35" ]
@@ -12585,7 +12585,7 @@ icu_rust_library("rust_icu_common-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
   deps += [ ":thiserror-v1_0_57" ]
 
@@ -12840,7 +12840,7 @@ icu_rust_library("rust_icu_uloc-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
@@ -12989,7 +12989,7 @@ rust_library("rustfix-v0_6_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":anyhow-v1_0_81" ]
+  deps += [ ":anyhow-v1_0_86" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":serde-v1_0_203" ]
   deps += [ ":serde_json-v1_0_87" ]

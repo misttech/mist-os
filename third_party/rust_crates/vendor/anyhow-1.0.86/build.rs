@@ -1,5 +1,6 @@
 use std::env;
 use std::ffi::OsString;
+use std::iter;
 use std::path::Path;
 use std::process::{self, Command, Stdio};
 use std::str;
@@ -64,6 +65,16 @@ fn main() {
         None => return,
     };
 
+    if rustc >= 80 {
+        println!("cargo:rustc-check-cfg=cfg(anyhow_nightly_testing)");
+        println!("cargo:rustc-check-cfg=cfg(anyhow_no_fmt_arguments_as_str)");
+        println!("cargo:rustc-check-cfg=cfg(anyhow_no_ptr_addr_of)");
+        println!("cargo:rustc-check-cfg=cfg(anyhow_no_unsafe_op_in_unsafe_fn_lint)");
+        println!("cargo:rustc-check-cfg=cfg(doc_cfg)");
+        println!("cargo:rustc-check-cfg=cfg(error_generic_member_access)");
+        println!("cargo:rustc-check-cfg=cfg(std_backtrace)");
+    }
+
     if rustc < 51 {
         // core::ptr::addr_of
         // https://blog.rust-lang.org/2021/03/25/Rust-1.51.0.html#stabilized-apis
@@ -103,15 +114,15 @@ fn compile_probe(rustc_bootstrap: bool) -> bool {
     let out_dir = cargo_env_var("OUT_DIR");
     let probefile = Path::new("build").join("probe.rs");
 
-    // Make sure to pick up Cargo rustc configuration.
-    let mut cmd = if let Some(wrapper) = env::var_os("RUSTC_WRAPPER") {
-        let mut cmd = Command::new(wrapper);
-        // The wrapper's first argument is supposed to be the path to rustc.
-        cmd.arg(rustc);
-        cmd
-    } else {
-        Command::new(rustc)
-    };
+    let rustc_wrapper = env::var_os("RUSTC_WRAPPER").filter(|wrapper| !wrapper.is_empty());
+    let rustc_workspace_wrapper =
+        env::var_os("RUSTC_WORKSPACE_WRAPPER").filter(|wrapper| !wrapper.is_empty());
+    let mut rustc = rustc_wrapper
+        .into_iter()
+        .chain(rustc_workspace_wrapper)
+        .chain(iter::once(rustc));
+    let mut cmd = Command::new(rustc.next().unwrap());
+    cmd.args(rustc);
 
     if !rustc_bootstrap {
         cmd.env_remove("RUSTC_BOOTSTRAP");
