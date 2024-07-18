@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 #include <lib/async/cpp/wait.h>
@@ -20,6 +21,7 @@
 
 namespace bt_hci_intel {
 namespace {
+namespace fhbt = fuchsia_hardware_bluetooth;
 
 // Firmware binaries are a sequence of HCI commands containing the firmware as payloads. For
 // testing, we use 1 HCI command with a 1 byte payload.
@@ -109,9 +111,18 @@ class FakeUsbServer : public ddk::UsbProtocol<FakeUsbServer> {
   usb_protocol_t proto() { return {.ops = &usb_protocol_ops_, .ctx = this}; }
 };
 
-class FakeBtHciServer : public ddk::BtHciProtocol<FakeBtHciServer> {
+class FakeBtHciServer : public ddk::BtHciProtocol<FakeBtHciServer>,
+                        public fidl::Server<fhbt::HciTransport> {
  public:
   FakeBtHciServer() = default;
+
+  fhbt::HciService::InstanceHandler GetHciInstanceHandler() {
+    return fhbt::HciService::InstanceHandler({
+        .hci_transport = hci_transport_binding_.CreateHandler(
+            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+    });
+  }
+
   zx_status_t BtHciOpenCommandChannel(zx::channel channel) {
     cmd_channel_ = std::move(channel);
     // Queue the two events that the driver needs during initialization. The driver will read them
@@ -139,11 +150,50 @@ class FakeBtHciServer : public ddk::BtHciProtocol<FakeBtHciServer> {
   zx_status_t BtHciOpenIsoDataChannel(zx::channel channel) { return ZX_OK; }
   zx_status_t BtHciOpenSnoopChannel(zx::channel channel) { return ZX_OK; }
 
+  // fhbt::HciTransport request handler implementations:
+  void Send(SendRequest& request, SendCompleter::Sync& completer) override {
+    std::vector<uint8_t> reply;
+    if (!reset_) {
+      reply = std::vector<uint8_t>(
+          kResetCommandCompleteEvent.data(),
+          kResetCommandCompleteEvent.data() + kResetCommandCompleteEvent.size());
+      reset_ = true;
+    } else {
+      reply = std::vector<uint8_t>(
+          kReadVersionTlvCompleteEvent.data(),
+          kReadVersionTlvCompleteEvent.data() + kReadVersionTlvCompleteEvent.size());
+    }
+
+    hci_transport_binding_.ForEachBinding(
+        [&](const fidl::ServerBinding<fhbt::HciTransport>& binding) {
+          auto received_packet = fhbt::ReceivedPacket::WithEvent(reply);
+          fit::result<fidl::OneWayError> result =
+              fidl::SendEvent(binding)->OnReceive(received_packet);
+          ASSERT_FALSE(result.is_error());
+        });
+
+    completer.Reply();
+  }
+
+  void AckReceive(AckReceiveCompleter::Sync& completer) override {}
+  void ConfigureSco(
+      fidl::Server<fhbt::HciTransport>::ConfigureScoRequest& request,
+      fidl::Server<fhbt::HciTransport>::ConfigureScoCompleter::Sync& completer) override {}
+  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override {}
+  void handle_unknown_method(::fidl::UnknownMethodMetadata<fhbt::HciTransport> metadata,
+                             ::fidl::UnknownMethodCompleter::Sync& completer) override {
+    ZX_PANIC("Unknown method in HciTransport requests");
+  }
+
   bt_hci_protocol_t proto() { return {.ops = &bt_hci_protocol_ops_, .ctx = this}; }
 
  private:
+  // Mark the state of driver initialization. |reset_| is true means that the driver has sent the
+  // reset command and |FakeBtHciServer| should expect a ReadVersionTlv command.
+  bool reset_{false};
   zx::channel cmd_channel_;
   zx::channel acl_channel_;
+  fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_;
 };
 
 class TestEnvironment : public fdf_testing::Environment {
@@ -180,6 +230,11 @@ class TestEnvironment : public fdf_testing::Environment {
       return compat::DeviceServer::GenericProtocol{.ops = usb_server_.proto().ops,
                                                    .ctx = usb_server_.proto().ctx};
     };
+
+    auto result =
+        to_driver_vfs.AddService<fhbt::HciService>(bt_hci_server_.GetHciInstanceHandler());
+    EXPECT_TRUE(result.is_ok());
+
     device_server_.Init(component::kDefaultInstance, {}, std::nullopt, std::move(banjo_config));
     return zx::make_result(
         device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));

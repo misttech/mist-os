@@ -36,6 +36,7 @@ source_set("common") {
     "device.h",
     "firmware_loader.cc",
     "firmware_loader.h",
+    "hci_event_handler.cc",
     "logging.h",
     "vendor_hci.cc",
     "vendor_hci.h",
@@ -54,6 +55,7 @@ source_set("common") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
   ]
 

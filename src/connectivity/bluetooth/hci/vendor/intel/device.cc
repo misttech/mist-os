@@ -21,6 +21,7 @@
 #include "logging.h"
 
 namespace bt_hci_intel {
+namespace fhbt = fuchsia_hardware_bluetooth;
 
 // USB Product IDs that use the "secure" firmware method.
 static constexpr uint16_t sfi_product_ids[] = {
@@ -86,11 +87,33 @@ void Device::Start(fdf::StartCompleter completer) {
   }
   hci_ = *hci_client;
 
+  auto dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
+  if (!dispatcher.is_ok()) {
+    errorf("Failed to create dispatcher: %s", dispatcher.status_string());
+    completer(zx::error(dispatcher.status_value()));
+    return;
+  }
+  hci_client_dispatcher_ = std::move(*dispatcher);
+
+  zx::result<fidl::ClientEnd<fhbt::HciTransport>> client_end =
+      incoming()->Connect<fhbt::HciService::HciTransport>();
+  if (client_end.is_error()) {
+    errorf("Connect to fhbt::HciTransport protocol failed: %s", client_end.status_string());
+    completer(zx::error(client_end.status_value()));
+    return;
+  }
+
+  hci_transport_client_ = fidl::SharedClient(
+      *std::move(client_end), hci_client_dispatcher_.async_dispatcher(), &hci_event_handler_);
+
   if (zx_status_t status = Init(secure_); status != ZX_OK) {
     errorf("Initialization failed: %s", zx_status_get_string(status));
     completer(zx::error(status));
     return;
   }
+
+  hci_transport_client_.AsyncTeardown();
 
   completer(zx::ok());
 }
@@ -156,27 +179,6 @@ zx_status_t Device::Init(bool secure) {
   // TODO(armansito): Track metrics for initialization failures.
 
   zx_status_t status;
-  zx::channel their_cmd, their_acl;
-  status = zx::channel::create(0, &cmd_, &their_cmd);
-  if (status != ZX_OK) {
-    return InitFailed(status, "failed to create command channel");
-  }
-  status = zx::channel::create(0, &acl_, &their_acl);
-  if (status != ZX_OK) {
-    return InitFailed(status, "failed to create ACL channel");
-  }
-
-  // Get the channels
-  status = BtHciOpenCommandChannel(std::move(their_cmd));
-  if (status != ZX_OK) {
-    return InitFailed(status, "failed to bind command channel");
-  }
-
-  status = BtHciOpenAclDataChannel(std::move(their_acl));
-  if (status != ZX_OK) {
-    return InitFailed(status, "failed to bind ACL channel");
-  }
-
   if (secure_) {
     status = LoadSecureFirmware();
   } else {
@@ -286,9 +288,8 @@ void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
   }
   completer.ReplySuccess();
 }
-void Device::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
+void Device::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hci> metadata,
+                                   fidl::UnknownMethodCompleter::Sync& completer) {
   errorf("Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
@@ -298,7 +299,7 @@ void Device::EncodeCommand(EncodeCommandRequestView request,
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 void Device::OpenHci(OpenHciCompleter::Sync& completer) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  auto endpoints = fidl::CreateEndpoints<fhbt::Hci>();
   if (endpoints.is_error()) {
     errorf("Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
     completer.ReplyError(endpoints.error_value());
@@ -309,36 +310,46 @@ void Device::OpenHci(OpenHciCompleter::Sync& completer) {
 
   completer.ReplySuccess(std::move(endpoints->client));
 }
-void Device::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
+
+void Device::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {
+  zx::result<fidl::ClientEnd<fhbt::HciTransport>> client_end =
+      incoming()->Connect<fhbt::HciService::HciTransport>();
+  if (client_end.is_error()) {
+    errorf("Connect to fhbt::HciTransport protocol failed: %s", client_end.status_string());
+    completer.ReplyError(client_end.status_value());
+    return;
+  }
+
+  completer.ReplySuccess(std::move(*client_end));
+}
+
+void Device::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Vendor> metadata,
+                                   fidl::UnknownMethodCompleter::Sync& completer) {
   errorf("Unknown method in Vendor request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-// driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor>
-void Device::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
+// driver_devfs::Connector<fhbt::Vendor>
+void Device::Connect(fidl::ServerEnd<fhbt::Vendor> request) {
   vendor_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    std::move(request), this, fidl::kIgnoreBindingClosure);
 
-  vendor_binding_group_.ForEachBinding(
-      [](const fidl::ServerBinding<fuchsia_hardware_bluetooth::Vendor>& binding) {
-        fidl::Arena arena;
-        auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
-        builder.acl_priority_command(false);
-        fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
+  vendor_binding_group_.ForEachBinding([](const fidl::ServerBinding<fhbt::Vendor>& binding) {
+    fidl::Arena arena;
+    auto builder = fhbt::wire::VendorFeatures::Builder(arena);
+    builder.acl_priority_command(false);
+    fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
 
-        if (status.status() != ZX_OK) {
-          errorf("Failed to send vendor features to bt-host: %s", status.status_string());
-        }
-      });
+    if (status.status() != ZX_OK) {
+      errorf("Failed to send vendor features to bt-host: %s", status.status_string());
+    }
+  });
 }
 
 zx_status_t Device::LoadSecureFirmware() {
-  ZX_DEBUG_ASSERT(cmd_.is_valid());
-  ZX_DEBUG_ASSERT(acl_.is_valid());
+  ZX_DEBUG_ASSERT(hci_transport_client_.is_valid());
 
-  VendorHci hci(&cmd_);
+  VendorHci hci(hci_transport_client_, hci_event_handler_);
 
   // Bring the controller to a well-defined default state.
   // Send an initial reset. If the controller sends a "command not supported"
@@ -351,11 +362,6 @@ zx_status_t Device::LoadSecureFirmware() {
     errorf("HCI_Reset failed (status: 0x%02hhx)", static_cast<unsigned char>(hci_status));
     return ZX_ERR_BAD_STATE;
   }
-
-  // Newer Intel controllers that use the "secure send" method can send HCI
-  // events over the bulk endpoint. Enable this before sending the initial
-  // ReadVersion command.
-  hci.enable_events_on_bulk(&acl_);
 
   bt_hci_intel::SecureBootEngineType engine_type = bt_hci_intel::SecureBootEngineType::kRSA;
 
@@ -412,7 +418,7 @@ zx_status_t Device::LoadSecureFirmware() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  FirmwareLoader loader(&cmd_, &acl_);
+  FirmwareLoader loader(hci_transport_client_, hci_event_handler_);
 
   // The boot addr differs for different firmware.  Save it for later.
   uint32_t boot_addr = 0x00000000;
@@ -431,10 +437,9 @@ zx_status_t Device::LoadSecureFirmware() {
 }
 
 zx_status_t Device::LoadLegacyFirmware() {
-  ZX_DEBUG_ASSERT(cmd_.is_valid());
-  ZX_DEBUG_ASSERT(acl_.is_valid());
+  ZX_DEBUG_ASSERT(hci_transport_client_.is_valid());
 
-  VendorHci hci(&cmd_);
+  VendorHci hci(hci_transport_client_, hci_event_handler_);
 
   // Bring the controller to a well-defined default state.
   auto hci_status = hci.SendHciReset();
@@ -477,7 +482,7 @@ zx_status_t Device::LoadLegacyFirmware() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  FirmwareLoader loader(&cmd_, &acl_);
+  FirmwareLoader loader(hci_transport_client_, hci_event_handler_);
   hci.EnterManufacturerMode();
   auto result = loader.LoadBseq(reinterpret_cast<void*>(fw_addr), fw_size);
   hci.ExitManufacturerMode(result == FirmwareLoader::LoadStatus::kPatched
