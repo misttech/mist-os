@@ -63,13 +63,24 @@ void ApplyRedactions(const std::vector<Redaction>& redactions, std::string& text
 // |build_redacted|.
 std::vector<Redaction> BuildRedactions(
     const std::string& text, const re2::RE2& regexp,
+    const std::vector<std::string>& ignore_prefixes,
     ::fit::function<std::string(const std::string& match)> build_redacted) {
   std::vector<Redaction> redactions;
   re2::StringPiece text_view(text);
   re2::StringPiece match;
 
   while (RE2::FindAndConsume(&text_view, regexp, &match)) {
-    if (!match.empty()) {
+    const bool has_prefix =
+        std::any_of(ignore_prefixes.begin(), ignore_prefixes.end(),
+                    [&text, &match](const std::string_view ignore_prefix) {
+                      const char* prefix_start = match.data() - ignore_prefix.size();
+
+                      // Don't access memory before the buffer that |text| owns.
+                      return prefix_start >= text.data() &&
+                             ignore_prefix == std::string_view(prefix_start, ignore_prefix.size());
+                    });
+
+    if (!match.empty() && !has_prefix) {
       const std::string replacement = build_redacted(std::string(match));
       redactions.push_back(Redaction{
           // We're working with pointers, but want a relative position within |text| so we need to
@@ -79,8 +90,6 @@ std::vector<Redaction> BuildRedactions(
           .offset = static_cast<int64_t>(replacement.size()) - static_cast<int64_t>(match.size()),
           .replacement = replacement,
       });
-    } else {
-      FX_LOGS(INFO) << "EMPTY MATCH";
     }
   }
 
@@ -88,11 +97,12 @@ std::vector<Redaction> BuildRedactions(
 }
 
 // Builds a Replacer that redacts instances of |pattern| with strings constructed by
-// |build_redacted|.
+// |build_redacted|. Does NOT replace if any strings from |ignore_prefixes| occur just before the
+// matching string begins.
 //
 // Returns nullptr if pattern produces a bad regexp.
 Replacer FunctionBasedReplacer(
-    const std::string_view pattern,
+    const std::string_view pattern, const std::vector<std::string>& ignore_prefixes,
     ::fit::function<std::string(RedactionIdCache& cache, const std::string& match)>
         build_redacted) {
   auto regexp = std::make_unique<re2::RE2>(pattern);
@@ -108,12 +118,12 @@ Replacer FunctionBasedReplacer(
     return nullptr;
   }
 
-  return [regexp = std::move(regexp), build_redacted = std::move(build_redacted)](
+  return [regexp = std::move(regexp), build_redacted = std::move(build_redacted), ignore_prefixes](
              RedactionIdCache& cache, std::string& text) mutable -> std::string& {
-    const auto redactions =
-        BuildRedactions(text, *regexp, [&cache, &build_redacted](const std::string& match) {
-          return build_redacted(cache, match);
-        });
+    const auto redactions = BuildRedactions(text, *regexp, ignore_prefixes,
+                                            [&cache, &build_redacted](const std::string& match) {
+                                              return build_redacted(cache, match);
+                                            });
     ApplyRedactions(redactions, text);
     return text;
   };
@@ -122,7 +132,8 @@ Replacer FunctionBasedReplacer(
 }  // namespace
 
 Replacer ReplaceWithIdFormatString(const std::string_view pattern,
-                                   const std::string_view format_str) {
+                                   const std::string_view format_str,
+                                   const std::vector<std::string>& ignore_prefixes) {
   bool specificier_found{false};
 
   for (size_t pos{0}; (pos = format_str.find("%d", pos)) != std::string::npos; ++pos) {
@@ -139,10 +150,11 @@ Replacer ReplaceWithIdFormatString(const std::string_view pattern,
     return nullptr;
   }
 
-  return FunctionBasedReplacer(pattern, [format = std::string(format_str)](
-                                            RedactionIdCache& cache, const std::string& match) {
-    return fxl::StringPrintf(format.c_str(), cache.GetId(match));
-  });
+  return FunctionBasedReplacer(
+      pattern, ignore_prefixes,
+      [format = std::string(format_str)](RedactionIdCache& cache, const std::string& match) {
+        return fxl::StringPrintf(format.c_str(), cache.GetId(match));
+      });
 }
 
 namespace {
@@ -174,7 +186,9 @@ std::string RedactIPv4(RedactionIdCache& cache, const std::string& match) {
 
 }  // namespace
 
-Replacer ReplaceIPv4() { return FunctionBasedReplacer(kIPv4Pattern, RedactIPv4); }
+Replacer ReplaceIPv4() {
+  return FunctionBasedReplacer(kIPv4Pattern, /*ignore_prefixes=*/{}, RedactIPv4);
+}
 
 namespace {
 
@@ -230,7 +244,9 @@ std::string RedactIPv6(RedactionIdCache& cache, const std::string& match) {
 
 }  // namespace
 
-Replacer ReplaceIPv6() { return FunctionBasedReplacer(kIPv6Pattern, RedactIPv6); }
+Replacer ReplaceIPv6() {
+  return FunctionBasedReplacer(kIPv6Pattern, /*ignore_prefixes=*/{}, RedactIPv6);
+}
 
 namespace mac_utils {
 
@@ -285,7 +301,9 @@ std::string RedactMac(RedactionIdCache& cache, const std::string& mac) {
 
 }  // namespace
 
-Replacer ReplaceMac() { return FunctionBasedReplacer(mac_utils::kMacPattern, RedactMac); }
+Replacer ReplaceMac() {
+  return FunctionBasedReplacer(mac_utils::kMacPattern, /*ignore_prefixes=*/{}, RedactMac);
+}
 
 namespace {
 
@@ -300,6 +318,8 @@ std::string RedactSsid(RedactionIdCache& cache, const std::string& match) {
 
 }  // namespace
 
-Replacer ReplaceSsid() { return FunctionBasedReplacer(kSsidPattern, RedactSsid); }
+Replacer ReplaceSsid() {
+  return FunctionBasedReplacer(kSsidPattern, /*ignore_prefixes=*/{}, RedactSsid);
+}
 
 }  // namespace forensics
