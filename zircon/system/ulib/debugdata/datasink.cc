@@ -188,13 +188,16 @@ bool ProfilesCompatible(const uint8_t* dst, const uint8_t* src) {
   const __llvm_profile_header* src_header = reinterpret_cast<const __llvm_profile_header*>(src);
   const __llvm_profile_header* dst_header = reinterpret_cast<const __llvm_profile_header*>(dst);
 
-  if (src_header->Magic != dst_header->Magic || src_header->Version != dst_header->Version)
+  const uint64_t src_header_version = src_header->Version & ~VARIANT_MASK_BYTE_COVERAGE;
+  const uint64_t dst_header_version = dst_header->Version & ~VARIANT_MASK_BYTE_COVERAGE;
+
+  if (src_header->Magic != dst_header->Magic || src_header_version != dst_header_version)
     return false;
 
   // Check that raw profiles use version 9 and above because older versions are not supported.
-  ZX_ASSERT(src_header->Version >= 9 && dst_header->Version >= 9);
+  ZX_ASSERT(src_header_version >= 9 && dst_header_version >= 9);
 
-  if (src_header->Version == 9 && dst_header->Version == 9)
+  if (src_header_version == 9 && dst_header_version == 9)
     return ProfilesCompatibleVersion9(dst, src);
 
   if (src_header->NumData != dst_header->NumData ||
@@ -225,14 +228,15 @@ bool ProfilesCompatible(const uint8_t* dst, const uint8_t* src) {
 
 // TODO(https://fxbug.dev/333945525): Remove this function after Rust toolchain switches to the
 // raw profile version 10 and above.
-uint8_t* MergeProfilesVersion9(uint8_t* dst, const uint8_t* src) {
+template <typename T, template <typename> class Op>
+uint8_t* MergeCountersVersion9(uint8_t* dst, const uint8_t* src) {
   const llvm_profile_header_v9* src_header = reinterpret_cast<const llvm_profile_header_v9*>(src);
   const llvm_profile_data_format_v9* src_data_start =
       reinterpret_cast<const llvm_profile_data_format_v9*>(src + sizeof(*src_header));
   src_data_start = reinterpret_cast<const llvm_profile_data_format_v9*>(
       reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
   const llvm_profile_data_format_v9* src_data_end = src_data_start + src_header->NumData;
-  const uint64_t* src_counters_start = reinterpret_cast<const uint64_t*>(src_data_end);
+  const T* src_counters_start = reinterpret_cast<const T*>(src_data_end);
   uintptr_t src_counters_delta = src_header->CountersDelta;
 
   llvm_profile_header_v9* dst_header = reinterpret_cast<llvm_profile_header_v9*>(dst);
@@ -241,21 +245,60 @@ uint8_t* MergeProfilesVersion9(uint8_t* dst, const uint8_t* src) {
   dst_data_start = reinterpret_cast<llvm_profile_data_format_v9*>(
       reinterpret_cast<uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
   llvm_profile_data_format_v9* dst_data_end = dst_data_start + dst_header->NumData;
-  uint64_t* dst_counters_start = reinterpret_cast<uint64_t*>(dst_data_end);
+  T* dst_counters_start = reinterpret_cast<T*>(dst_data_end);
   uintptr_t dst_counters_delta = dst_header->CountersDelta;
 
   const llvm_profile_data_format_v9* src_data = src_data_start;
   llvm_profile_data_format_v9* dst_data = dst_data_start;
 
+  constexpr Op<T> op;
   for (; src_data < src_data_end && dst_data < dst_data_end; src_data++, dst_data++) {
-    const uint64_t* src_counters =
-        src_counters_start + (src_data->CounterPtr - src_counters_delta) / sizeof(uint64_t);
+    const T* src_counters =
+        src_counters_start + (src_data->CounterPtr - src_counters_delta) / sizeof(T);
     src_counters_delta -= sizeof(*src_data);
-    uint64_t* dst_counters =
-        dst_counters_start + (dst_data->CounterPtr - dst_counters_delta) / sizeof(uint64_t);
+    T* dst_counters = dst_counters_start + (dst_data->CounterPtr - dst_counters_delta) / sizeof(T);
     dst_counters_delta -= sizeof(*dst_data);
     for (unsigned i = 0; i < src_data->NumCounters; i++) {
-      dst_counters[i] += src_counters[i];
+      dst_counters[i] = op(dst_counters[i], src_counters[i]);
+    }
+  }
+
+  return dst;
+}
+
+// Merges counters |src| and |dst| into |dst|.
+template <typename T, template <typename> class Op>
+uint8_t* MergeCounters(uint8_t* dst, const uint8_t* src) {
+  const __llvm_profile_header* src_header = reinterpret_cast<const __llvm_profile_header*>(src);
+  const __llvm_profile_data* src_data_start =
+      reinterpret_cast<const __llvm_profile_data*>(src + sizeof(*src_header));
+  src_data_start = reinterpret_cast<const __llvm_profile_data*>(
+      reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
+  const __llvm_profile_data* src_data_end = src_data_start + src_header->NumData;
+  const T* src_counters_start = reinterpret_cast<const T*>(src_data_end);
+  uintptr_t src_counters_delta = src_header->CountersDelta;
+
+  __llvm_profile_header* dst_header = reinterpret_cast<__llvm_profile_header*>(dst);
+  __llvm_profile_data* dst_data_start =
+      reinterpret_cast<__llvm_profile_data*>(dst + sizeof(*dst_header));
+  dst_data_start = reinterpret_cast<__llvm_profile_data*>(
+      reinterpret_cast<uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
+  __llvm_profile_data* dst_data_end = dst_data_start + dst_header->NumData;
+  T* dst_counters_start = reinterpret_cast<T*>(dst_data_end);
+  uintptr_t dst_counters_delta = dst_header->CountersDelta;
+
+  const __llvm_profile_data* src_data = src_data_start;
+  __llvm_profile_data* dst_data = dst_data_start;
+
+  constexpr Op<T> op;
+  for (; src_data < src_data_end && dst_data < dst_data_end; src_data++, dst_data++) {
+    const T* src_counters =
+        src_counters_start + (src_data->CounterPtr - src_counters_delta) / sizeof(T);
+    src_counters_delta -= sizeof(*src_data);
+    T* dst_counters = dst_counters_start + (dst_data->CounterPtr - dst_counters_delta) / sizeof(T);
+    dst_counters_delta -= sizeof(*dst_data);
+    for (unsigned i = 0; i < src_data->NumCounters; i++) {
+      dst_counters[i] = op(dst_counters[i], src_counters[i]);
     }
   }
 
@@ -267,41 +310,19 @@ uint8_t* MergeProfilesVersion9(uint8_t* dst, const uint8_t* src) {
 // Note that this function does not check whether the profiles are compatible.
 uint8_t* MergeProfiles(uint8_t* dst, const uint8_t* src) {
   const __llvm_profile_header* src_header = reinterpret_cast<const __llvm_profile_header*>(src);
-  if (src_header->Version == 9)
-    return MergeProfilesVersion9(dst, src);
+  const bool single_byte_counters = src_header->Version & VARIANT_MASK_BYTE_COVERAGE;
 
-  const __llvm_profile_data* src_data_start =
-      reinterpret_cast<const __llvm_profile_data*>(src + sizeof(*src_header));
-  src_data_start = reinterpret_cast<const __llvm_profile_data*>(
-      reinterpret_cast<const uint8_t*>(src_data_start) + src_header->BinaryIdsSize);
-  const __llvm_profile_data* src_data_end = src_data_start + src_header->NumData;
-  const uint64_t* src_counters_start = reinterpret_cast<const uint64_t*>(src_data_end);
-  uintptr_t src_counters_delta = src_header->CountersDelta;
-
-  __llvm_profile_header* dst_header = reinterpret_cast<__llvm_profile_header*>(dst);
-  __llvm_profile_data* dst_data_start =
-      reinterpret_cast<__llvm_profile_data*>(dst + sizeof(*dst_header));
-  dst_data_start = reinterpret_cast<__llvm_profile_data*>(
-      reinterpret_cast<uint8_t*>(dst_data_start) + dst_header->BinaryIdsSize);
-  __llvm_profile_data* dst_data_end = dst_data_start + dst_header->NumData;
-  uint64_t* dst_counters_start = reinterpret_cast<uint64_t*>(dst_data_end);
-  uintptr_t dst_counters_delta = dst_header->CountersDelta;
-
-  const __llvm_profile_data* src_data = src_data_start;
-  __llvm_profile_data* dst_data = dst_data_start;
-  for (; src_data < src_data_end && dst_data < dst_data_end; src_data++, dst_data++) {
-    const uint64_t* src_counters =
-        src_counters_start + (src_data->CounterPtr - src_counters_delta) / sizeof(uint64_t);
-    src_counters_delta -= sizeof(*src_data);
-    uint64_t* dst_counters =
-        dst_counters_start + (dst_data->CounterPtr - dst_counters_delta) / sizeof(uint64_t);
-    dst_counters_delta -= sizeof(*dst_data);
-    for (unsigned i = 0; i < src_data->NumCounters; i++) {
-      dst_counters[i] += src_counters[i];
-    }
+  if ((src_header->Version & ~VARIANT_MASK_BYTE_COVERAGE) == 9) {
+    if (single_byte_counters)
+      return MergeCountersVersion9<uint8_t, std::logical_and>(dst, src);
+    else
+      return MergeCountersVersion9<uint64_t, std::plus>(dst, src);
   }
 
-  return dst;
+  if (single_byte_counters)
+    return MergeCounters<uint8_t, std::logical_and>(dst, src);
+  else
+    return MergeCounters<uint64_t, std::plus>(dst, src);
 }
 
 // Process all data sink dumps and write to the disk.
