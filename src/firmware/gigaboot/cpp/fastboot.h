@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <string_view>
+#include <variant>
 
 #include "backends.h"
 #include "efi_variables.h"

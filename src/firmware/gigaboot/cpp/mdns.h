@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 #ifndef SRC_FIRMWARE_GIGABOOT_CPP_MDNS_H_
 #define SRC_FIRMWARE_GIGABOOT_CPP_MDNS_H_
+
+#include <type_traits>
+#include <variant>
+
 #include <fbl/vector.h>
 
 #include "network.h"
