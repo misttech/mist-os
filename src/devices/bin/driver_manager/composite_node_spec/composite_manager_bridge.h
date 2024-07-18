@@ -10,8 +10,7 @@
 namespace driver_manager {
 using AddToIndexCallback = fit::callback<void(zx::result<>)>;
 
-// Bridge class for the composite device handling in DFv1 and DFv2.
-// Implemented by the Coordinator in DFv1 and DriverRunner in DFv2.
+// Bridge class for the a driver manager to handle the composite nodes.
 class CompositeManagerBridge {
  public:
   virtual ~CompositeManagerBridge() = default;

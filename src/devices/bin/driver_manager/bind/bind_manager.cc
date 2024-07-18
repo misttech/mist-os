@@ -271,8 +271,7 @@ zx::result<CompositeParents> BindManager::BindNodeToSpec(fidl::AnyArena& arena, 
   }
 
   for (auto& composite : result.value().completed_node_and_drivers) {
-    auto weak_composite_node = std::get<std::weak_ptr<driver_manager::Node>>(composite.node);
-    std::shared_ptr composite_node = weak_composite_node.lock();
+    std::shared_ptr composite_node = composite.node.lock();
     ZX_ASSERT(composite_node);
     auto start_result = bridge_->StartDriver(*composite_node, composite.driver.driver_info());
     if (start_result.is_error()) {

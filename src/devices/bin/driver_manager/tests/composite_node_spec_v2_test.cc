@@ -25,7 +25,7 @@ class CompositeNodeSpecV2Test : public DriverManagerTestBase {
         dispatcher(), &node_manager);
   }
 
-  zx::result<std::optional<driver_manager::DeviceOrNode>> MatchAndBindParentSpec(
+  zx::result<std::optional<driver_manager::NodeWkPtr>> MatchAndBindParentSpec(
       driver_manager::CompositeNodeSpecV2& spec, std::weak_ptr<driver_manager::Node> parent_node,
       std::vector<std::string> parent_names, uint32_t node_index, uint32_t primary_index = 0) {
     fuchsia_driver_framework::CompositeParent matched_parent({
@@ -85,7 +85,7 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   ASSERT_TRUE(result.value());
 
   // Verify the parents and primary node.
-  auto composite_node = std::get<std::weak_ptr<driver_manager::Node>>(result.value().value());
+  auto composite_node = result.value().value();
   VerifyCompositeNode(composite_node, {"spec_parent_1", "spec_parent_2"}, 0);
 }
 

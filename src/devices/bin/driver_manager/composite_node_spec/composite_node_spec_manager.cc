@@ -51,7 +51,7 @@ void CompositeNodeSpecManager::AddSpec(
 
 zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
     fidl::AnyArena &arena, fidl::VectorView<fdfw::wire::CompositeParent> composite_parents,
-    const DeviceOrNode &device_or_node, bool enable_multibind) {
+    const NodeWkPtr &node_ptr, bool enable_multibind) {
   if (composite_parents.empty()) {
     LOGF(ERROR, "composite_parents needs to contain as least one composite parent.");
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -123,7 +123,7 @@ zx::result<BindSpecResult> CompositeNodeSpecManager::BindParentSpec(
     }
 
     auto &spec = specs_[name_val];
-    auto result = spec->BindParent(composite_parent, device_or_node);
+    auto result = spec->BindParent(composite_parent, node_ptr);
 
     if (result.is_error()) {
       if (result.error_value() != ZX_ERR_ALREADY_BOUND) {

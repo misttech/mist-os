@@ -18,7 +18,7 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
 
   ~CompositeNodeSpecV2() override = default;
 
-  std::optional<std::weak_ptr<driver_manager::Node>> completed_composite_node() {
+  std::optional<NodeWkPtr> completed_composite_node() {
     return parent_set_collector_ ? parent_set_collector_->completed_composite_node() : std::nullopt;
   }
 
@@ -26,9 +26,9 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
   bool has_parent_set_collector_for_testing() const { return parent_set_collector_.has_value(); }
 
  protected:
-  zx::result<std::optional<DeviceOrNode>> BindParentImpl(
+  zx::result<std::optional<NodeWkPtr>> BindParentImpl(
       fuchsia_driver_framework::wire::CompositeParent composite_parent,
-      const DeviceOrNode& device_or_node) override;
+      const NodeWkPtr& node_ptr) override;
 
  private:
   fuchsia_driver_development::wire::CompositeNodeInfo GetCompositeInfo(
