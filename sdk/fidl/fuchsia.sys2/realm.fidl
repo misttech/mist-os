@@ -229,7 +229,7 @@ closed protocol RealmQuery {
 
     // TODO(https://fxbug.dev/42077935) delete once no longer required for ffx compat window
     /// Prefer `GetResolvedDeclaration` if available for your target API level.
-    @available(added=11)
+    @available(added=11, deprecated=12, removed=22)
     strict GetManifest(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (resource struct {

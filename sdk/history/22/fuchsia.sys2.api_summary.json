@@ -763,16 +763,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.sys2/RealmQuery.GetManifest",
-        "strictness": "strict",
-        "ordinal": "7207845907369723335",
-        "direction": "two_way",
-        "request": "fuchsia.sys2/RealmQueryGetManifestRequest",
-        "response": "fuchsia.sys2/RealmQuery_GetManifest_Response",
-        "error": "fuchsia.sys2/GetDeclarationError"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.sys2/RealmQuery.GetResolvedDeclaration",
         "strictness": "strict",
         "ordinal": "3577146536416558111",
@@ -875,16 +865,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.sys2/RealmQueryGetInstanceRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQueryGetManifestRequest.moniker",
-        "ordinal": "1",
-        "type": "string:4096"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sys2/RealmQueryGetManifestRequest"
     },
     {
         "kind": "struct/member",
@@ -1000,17 +980,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.sys2/RealmQuery_GetInstance_Response"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQuery_GetManifest_Response.iterator",
-        "ordinal": "1",
-        "type": "client_end:fuchsia.sys2/ManifestBytesIterator"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sys2/RealmQuery_GetManifest_Response",
-        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
