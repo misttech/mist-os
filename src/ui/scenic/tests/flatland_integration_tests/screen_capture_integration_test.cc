@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
@@ -11,31 +10,20 @@
 #include <zircon/status.h>
 
 #include <cstdint>
-#include <iostream>
 #include <utility>
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include <zxtest/zxtest.h>
 
-#include "src/ui/lib/escher/geometry/types.h"
-#include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
-#include "src/ui/scenic/lib/allocation/mock_buffer_collection_importer.h"
-#include "src/ui/scenic/lib/flatland/buffers/util.h"
-#include "src/ui/scenic/lib/screen_capture/screen_capture.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
-#include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
-#include "zircon/system/ulib/fbl/include/fbl/algorithm.h"
+#include "src/ui/testing/util/zxtest_helpers.h"
+#include "zircon/errors.h"
 
 namespace integration_tests {
 
-using flatland::MapHostPointer;
-using fuchsia::math::SizeU;
-using fuchsia::math::Vec;
 using fuchsia::ui::composition::ChildViewWatcher;
 using fuchsia::ui::composition::ContentId;
 using fuchsia::ui::composition::Flatland;
@@ -43,7 +31,6 @@ using fuchsia::ui::composition::FlatlandDisplay;
 using fuchsia::ui::composition::FrameInfo;
 using fuchsia::ui::composition::GetNextFrameArgs;
 using fuchsia::ui::composition::ParentViewportWatcher;
-using fuchsia::ui::composition::RegisterBufferCollectionArgs;
 using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 using fuchsia::ui::composition::ScreenCapture;
 using fuchsia::ui::composition::ScreenCaptureConfig;
@@ -51,35 +38,17 @@ using fuchsia::ui::composition::ScreenCaptureError;
 using fuchsia::ui::composition::TransformId;
 using fuchsia::ui::composition::ViewportProperties;
 using fuchsia::ui::views::ViewRef;
-using RealmRoot = component_testing::RealmRoot;
 
-class ScreenCaptureIntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
+class ScreenCaptureIntegrationTest : public ScenicCtfTest {
  public:
-  ScreenCaptureIntegrationTest()
-      : realm_(ScenicRealmBuilder()
-                   .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::ScreenCapture::Name_)
-                   .Build()) {
-    auto context = sys::ComponentContext::Create();
-    context->svc()->Connect(sysmem_allocator_.NewRequest());
+  void SetUp() override {
+    ScenicCtfTest::SetUp();
 
-    flatland_display_ = realm_.component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to FlatlandDisplay: " << zx_status_get_string(status);
-    });
+    LocalServiceDirectory()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_allocator_ = realm_.component().ConnectSync<fuchsia::ui::composition::Allocator>();
-
-    // Set up root view.
-    root_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
-    root_session_.events().OnError = [](fuchsia::ui::composition::FlatlandError error) {
-      FAIL() << "Received FlatlandError: " << static_cast<int>(error);
-    };
-    root_session_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Flatland: " << zx_status_get_string(status);
-    });
+    flatland_display_ = ConnectSyncIntoRealm<fuchsia::ui::composition::FlatlandDisplay>();
+    flatland_allocator_ = ConnectSyncIntoRealm<fuchsia::ui::composition::Allocator>();
+    root_session_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
@@ -119,7 +88,7 @@ class ScreenCaptureIntegrationTest : public ui_testing::LoggingEventLoop, public
     BlockingPresent(this, root_session_);
 
     // Set up the child view.
-    child_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
+    child_session_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher2;
     auto identity = scenic::NewViewIdentityOnCreation();
     auto child_view_ref = fidl::Clone(identity.view_ref);
@@ -131,14 +100,12 @@ class ScreenCaptureIntegrationTest : public ui_testing::LoggingEventLoop, public
     BlockingPresent(this, child_session_);
 
     // Create ScreenCapture client.
-    screen_capture_ = realm_.component().Connect<fuchsia::ui::composition::ScreenCapture>();
-    screen_capture_.set_error_handler(
-        [](zx_status_t status) { FAIL() << "Lost connection to ScreenCapture"; });
+    screen_capture_ = ConnectSyncIntoRealm<fuchsia::ui::composition::ScreenCapture>();
   }
 
   // This function calls GetNextFrame().
   fpromise::result<FrameInfo, ScreenCaptureError> CaptureScreen(
-      fuchsia::ui::composition::ScreenCapturePtr& screencapturer) {
+      fuchsia::ui::composition::ScreenCaptureSyncPtr& screencapturer) {
     zx::event event;
     zx::event dup;
     zx_status_t status = zx::event::create(0, &event);
@@ -148,16 +115,11 @@ class ScreenCaptureIntegrationTest : public ui_testing::LoggingEventLoop, public
     GetNextFrameArgs gnf_args;
     gnf_args.set_event(std::move(dup));
 
-    fpromise::result<FrameInfo, ScreenCaptureError> response;
-    bool alloc_result = false;
-    screencapturer->GetNextFrame(
-        std::move(gnf_args),
-        [&response, &alloc_result](fpromise::result<FrameInfo, ScreenCaptureError> result) {
-          response = std::move(result);
-          alloc_result = true;
-        });
+    fuchsia::ui::composition::ScreenCapture_GetNextFrame_Result result;
+    status = screencapturer->GetNextFrame(std::move(gnf_args), &result);
+    EXPECT_EQ(status, ZX_OK);
 
-    RunLoopUntil([&alloc_result] { return alloc_result; });
+    fpromise::result<FrameInfo, ScreenCaptureError> response = std::move(result);
 
     if (response.is_ok()) {
       zx::duration kEventDelay = zx::msec(5000);
@@ -171,14 +133,12 @@ class ScreenCaptureIntegrationTest : public ui_testing::LoggingEventLoop, public
   const TransformId kChildRootTransform{.value = 1};
   static constexpr zx::duration kEventDelay = zx::msec(5000);
 
-  RealmRoot realm_;
-
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::AllocatorSyncPtr flatland_allocator_;
-  fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
   fuchsia::ui::composition::FlatlandPtr root_session_;
   fuchsia::ui::composition::FlatlandPtr child_session_;
-  fuchsia::ui::composition::ScreenCapturePtr screen_capture_;
+  fuchsia::ui::composition::ScreenCaptureSyncPtr screen_capture_;
   fuchsia::ui::views::ViewRef root_view_ref_;
 
   uint32_t display_width_ = 0;
@@ -210,14 +170,10 @@ TEST_F(ScreenCaptureIntegrationTest, EmptyScreenshot) {
   sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
   sc_args.set_size({render_target_width, render_target_height});
 
-  bool alloc_result = false;
-  screen_capture_->Configure(std::move(sc_args),
-                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                               EXPECT_FALSE(result.is_error());
-                               alloc_result = true;
-                             });
-
-  RunLoopUntil([&alloc_result] { return alloc_result; });
+  fuchsia::ui::composition::ScreenCapture_Configure_Result config_res;
+  auto state = screen_capture_->Configure(std::move(sc_args), &config_res);
+  ASSERT_EQ(ZX_OK, state);
+  ASSERT_FALSE(config_res.is_err());
 
   const auto& cs_result = CaptureScreen(screen_capture_);
   EXPECT_FALSE(cs_result.is_error());
@@ -282,14 +238,10 @@ TEST_F(ScreenCaptureIntegrationTest, SingleColorUnrotatedScreenshot) {
   sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
   sc_args.set_size({render_target_width, render_target_height});
 
-  bool alloc_result = false;
-  screen_capture_->Configure(std::move(sc_args),
-                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                               EXPECT_FALSE(result.is_error());
-                               alloc_result = true;
-                             });
-
-  RunLoopUntil([&alloc_result] { return alloc_result; });
+  fuchsia::ui::composition::ScreenCapture_Configure_Result config_res;
+  auto state = screen_capture_->Configure(std::move(sc_args), &config_res);
+  ASSERT_EQ(ZX_OK, state);
+  ASSERT_FALSE(config_res.is_err());
 
   // Take Screenshot!
   const auto& cs_result = CaptureScreen(screen_capture_);
@@ -377,14 +329,10 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor180DegreeRotationScreenshot) {
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_180_DEGREES);
 
-  bool alloc_result = false;
-  screen_capture_->Configure(std::move(sc_args),
-                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                               EXPECT_FALSE(result.is_error());
-                               alloc_result = true;
-                             });
-
-  RunLoopUntil([&alloc_result] { return alloc_result; });
+  fuchsia::ui::composition::ScreenCapture_Configure_Result config_res;
+  auto state = screen_capture_->Configure(std::move(sc_args), &config_res);
+  ASSERT_EQ(ZX_OK, state);
+  ASSERT_FALSE(config_res.is_err());
 
   // Take Screenshot!
   const auto& cs_result = CaptureScreen(screen_capture_);
@@ -516,14 +464,10 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor90DegreeRotationScreenshot) {
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_90_DEGREES);
 
-  bool alloc_result = false;
-  screen_capture_->Configure(std::move(sc_args),
-                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                               EXPECT_FALSE(result.is_error());
-                               alloc_result = true;
-                             });
-
-  RunLoopUntil([&alloc_result] { return alloc_result; });
+  fuchsia::ui::composition::ScreenCapture_Configure_Result config_res;
+  auto state = screen_capture_->Configure(std::move(sc_args), &config_res);
+  ASSERT_EQ(ZX_OK, state);
+  ASSERT_FALSE(config_res.is_err());
 
   // Take Screenshot!
   const auto& cs_result = CaptureScreen(screen_capture_);
@@ -676,14 +620,10 @@ TEST_F(ScreenCaptureIntegrationTest, MultiColor270DegreeRotationScreenshot) {
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_270_DEGREES);
 
-  bool alloc_result = false;
-  screen_capture_->Configure(std::move(sc_args),
-                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                               EXPECT_FALSE(result.is_error());
-                               alloc_result = true;
-                             });
-
-  RunLoopUntil([&alloc_result] { return alloc_result; });
+  fuchsia::ui::composition::ScreenCapture_Configure_Result config_res;
+  auto state = screen_capture_->Configure(std::move(sc_args), &config_res);
+  ASSERT_EQ(ZX_OK, state);
+  ASSERT_FALSE(config_res.is_err());
 
   // Take Screenshot!
   const auto& cs_result = CaptureScreen(screen_capture_);
@@ -775,14 +715,10 @@ TEST_F(ScreenCaptureIntegrationTest, FilledRectScreenshot) {
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
 
-  bool alloc_result = false;
-  screen_capture_->Configure(std::move(sc_args),
-                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                               EXPECT_FALSE(result.is_error());
-                               alloc_result = true;
-                             });
-
-  RunLoopUntil([&alloc_result] { return alloc_result; });
+  fuchsia::ui::composition::ScreenCapture_Configure_Result config_res;
+  auto state = screen_capture_->Configure(std::move(sc_args), &config_res);
+  ASSERT_EQ(ZX_OK, state);
+  ASSERT_FALSE(config_res.is_err());
 
   // Take Screenshot!
   const auto& cs_result = CaptureScreen(screen_capture_);
@@ -846,14 +782,10 @@ TEST_F(ScreenCaptureIntegrationTest, ChangeFilledRectScreenshots) {
   sc_args.set_size({render_target_width, render_target_height});
   sc_args.set_buffer_count(static_cast<uint32_t>(sc_buffer_collection_info.buffers().size()));
 
-  bool alloc_result = false;
-  screen_capture_->Configure(std::move(sc_args),
-                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                               EXPECT_FALSE(result.is_error());
-                               alloc_result = true;
-                             });
-
-  RunLoopUntil([&alloc_result] { return alloc_result; });
+  fuchsia::ui::composition::ScreenCapture_Configure_Result config_res;
+  auto state = screen_capture_->Configure(std::move(sc_args), &config_res);
+  ASSERT_EQ(ZX_OK, state);
+  ASSERT_FALSE(config_res.is_err());
 
   // Take Screenshot!
   const auto& cs_result = CaptureScreen(screen_capture_);

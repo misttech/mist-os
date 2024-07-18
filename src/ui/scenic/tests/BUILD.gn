@@ -14,6 +14,8 @@ group("tests") {
     ":flatland-protected-memory-integration-test",
     ":null-renderer-integration-test",
     ":observer-integration-tests",
+    ":screen-capture-integration-test",
+    ":screen-capture2-integration-test",
   ]
 
   # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
@@ -105,7 +107,7 @@ source_set("screen-capture-utils") {
     "utils/screen_capture_utils.h",
   ]
   public_deps = [
-    ":common-deps-gtest",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/flatland/engine",
@@ -375,32 +377,30 @@ fuchsia_test_component("protected-memory-integration-test") {
   test_type = "vulkan"
 }
 
-executable("screen-capture-integration-test-bin") {
-  testonly = true
+ctf_components_packages("screen-capture-integration-test") {
   sources = [ "flatland_integration_tests/screen_capture_integration_test.cc" ]
   deps = [
-    ":common-deps-gtest",
+    ":common-deps-zxtest",
     ":screen-capture-utils",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//src/ui/scenic/lib/allocation:allocation",
     "//src/ui/scenic/lib/screen_capture:screen_capture",
     "//src/ui/scenic/lib/utils:utils",
+    "//src/ui/testing/util:zxtest_helpers",
     "//zircon/system/ulib/fbl",
   ]
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
-fuchsia_test_component("screen-capture-integration-test") {
-  component_name = "screen-capture-integration-test"
-  manifest = "meta/screen_capture_integration_test.cml"
-  deps = [ ":screen-capture-integration-test-bin" ]
-  test_type = "vulkan"
-}
-
-executable("screen-capture2-integration-test-bin") {
-  testonly = true
+ctf_components_packages("screen-capture2-integration-test") {
   sources = [ "flatland_integration_tests/screen_capture2_integration_test.cc" ]
   deps = [
-    ":common-deps-gtest",
+    ":common-deps-zxtest",
     ":screen-capture-utils",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
@@ -412,13 +412,12 @@ executable("screen-capture2-integration-test-bin") {
     "//src/ui/scenic/lib/utils:utils",
     "//zircon/system/ulib/fbl",
   ]
-}
-
-fuchsia_test_component("screen-capture2-integration-test") {
-  component_name = "screen-capture2-integration-test"
-  manifest = "meta/screen_capture2_integration_test.cml"
-  deps = [ ":screen-capture2-integration-test-bin" ]
-  test_type = "vulkan"
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 executable("display-ownership-integration-test-bin") {
@@ -521,8 +520,6 @@ fuchsia_test_package("flatland-integration-tests") {
     ":flatland-touch-integration-test",
     ":flatland-view-ref-installed-integration-test",
     ":flatland-view-integration-test",
-    ":screen-capture-integration-test",
-    ":screen-capture2-integration-test",
   ]
   test_specs = {
     environments = vulkan_envs

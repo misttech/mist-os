@@ -14,6 +14,7 @@ rustc_binary("bin") {
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+    "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_rust",
     "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

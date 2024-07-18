@@ -4,24 +4,17 @@
 
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
 
-#include <lib/sys/component/cpp/testing/realm_builder.h>
-
 #include <fbl/algorithm.h>
-#include <gmock/gmock.h>
+#include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace integration_tests {
 using flatland::MapHostPointer;
-using RealmRoot = component_testing::RealmRoot;
-using fuchsia::ui::composition::ChildViewWatcher;
-using fuchsia::ui::composition::ContentId;
-using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::RegisterBufferCollectionArgs;
 using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 using fuchsia::ui::composition::TransformId;
-using fuchsia::ui::composition::ViewportProperties;
 
 bool PixelEquals(const uint8_t* a, const uint8_t* b) { return memcmp(a, b, kBytesPerPixel) == 0; }
 

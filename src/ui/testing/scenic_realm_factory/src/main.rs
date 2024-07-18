@@ -6,7 +6,10 @@ use anyhow::Error;
 use cm_rust::FidlIntoNative;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_media::ProfileProviderMarker;
-use fidl_fuchsia_ui_composition::{AllocatorMarker, FlatlandDisplayMarker, FlatlandMarker};
+use fidl_fuchsia_ui_composition::{
+    AllocatorMarker, FlatlandDisplayMarker, FlatlandMarker, ScreenCaptureMarker,
+};
+use fidl_fuchsia_ui_composition_internal::ScreenCaptureMarker as ScreenCaptureMarker2;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -183,6 +186,8 @@ async fn assemble_realm(
                 .capability(Capability::protocol::<FlatlandMarker>())
                 .capability(Capability::protocol::<FlatlandDisplayMarker>())
                 .capability(Capability::protocol::<AllocatorMarker>())
+                .capability(Capability::protocol::<ScreenCaptureMarker>())
+                .capability(Capability::protocol::<ScreenCaptureMarker2>())
                 .from(Ref::child(SCENIC))
                 .to(Ref::parent()),
         )
