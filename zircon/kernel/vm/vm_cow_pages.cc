@@ -371,8 +371,6 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
   // referencing us, and by extension our priority count must therefore be back to zero.
   DEBUG_ASSERT(high_priority_count_ == 0);
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-
   // If we're not a hidden vmo, then we need to remove ourself from our parent. This needs
   // to be done before emptying the page list so that a hidden parent can't merge into this
   // vmo and repopulate the page list.
@@ -452,13 +450,12 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
     }
   }
 
-  DEBUG_ASSERT(page_list_.IsEmpty());
+  DEBUG_ASSERT(page_list_.HasNoPageOrRef());
   // We must Close() after removing pages, so that all pages will be loaned by the time
   // PhysicalPageProvider::OnClose() calls pmm_delete_lender() on the whole physical range.
   if (page_source_) {
     page_source_->Close();
   }
-
   life_cycle_ = LifeCycle::Dead;
 }
 
@@ -636,9 +633,9 @@ void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t roo
 
 zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
                                                fbl::RefPtr<VmCowPages>* cow_slice) {
-  canary_.Assert();
-
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
+
+  canary_.Assert();
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
@@ -675,11 +672,7 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
 
   AddChildLocked(slice.get(), offset, root_parent_offset, size);
 
-  // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check the child's hierarchy, so check that independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(slice->DebugValidatePageSplitsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(slice->DebugValidateVmoPageBorrowingLocked());
 
   *cow_slice = slice;
@@ -687,8 +680,6 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
 }
 
 void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
-  canary_.Assert();
-
   AssertHeld(child->lock_ref());
   // This function is invalid to call if any pages are pinned as the unpin after we change the
   // backlink will not work.
@@ -730,8 +721,6 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                                  fbl::RefPtr<VmCowPages>* cow_child,
                                                  uint64_t new_root_parent_offset,
                                                  uint64_t child_parent_limit) {
-  canary_.Assert();
-
   // We need two new VmCowPages for our two children.
   fbl::AllocChecker ac;
   fbl::RefPtr<VmCowPages> left_child = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
@@ -760,18 +749,10 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
   DEBUG_ASSERT(children_list_len_ == 2);
 
-  // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check either child's hierarchies, so check those independently.
+  *cow_child = ktl::move(right_child);
+
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(right_child->DebugValidatePageSplitsLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(right_child->DebugValidateVmoPageBorrowingLocked());
-  if (left_child) {
-    VMO_VALIDATION_ASSERT(left_child->DebugValidatePageSplitsLocked());
-    VMO_FRUGAL_VALIDATION_ASSERT(left_child->DebugValidateVmoPageBorrowingLocked());
-  }
-
-  *cow_child = ktl::move(right_child);
   return ZX_OK;
 }
 
@@ -779,8 +760,6 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
                                                   fbl::RefPtr<VmCowPages>* cow_child,
                                                   uint64_t new_root_parent_offset,
                                                   uint64_t child_parent_limit) {
-  canary_.Assert();
-
   fbl::AllocChecker ac;
   auto cow_pages = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
       hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size, nullptr, nullptr));
@@ -810,32 +789,27 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
     offset += cur->parent_offset_;
     cur = cur->parent_.get();
   }
-
   new_root_parent_offset = CheckedAdd(offset, cur->root_parent_offset_);
   cur->AddChildLocked(cow_pages.get(), offset, new_root_parent_offset, child_parent_limit);
 
-  // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check the child's hierarchy, so check that independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(cur->DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_pages->DebugValidatePageSplitsLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(cow_pages->DebugValidateVmoPageBorrowingLocked());
-
   *cow_child = ktl::move(cow_pages);
+
+  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  AssertHeld((*cow_child)->lock_ref());
+  VMO_FRUGAL_VALIDATION_ASSERT((*cow_child)->DebugValidateVmoPageBorrowingLocked());
+
   return ZX_OK;
 }
 
 zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
                                           fbl::RefPtr<VmCowPages>* cow_child) {
-  canary_.Assert();
-
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, offset, size);
+
+  canary_.Assert();
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!is_hidden_locked());
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // Upgrade clone type, if possible.
@@ -940,14 +914,12 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   canary_.Assert();
 
   AssertHeld(removed->lock_ref());
+
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   if (!is_hidden_locked()) {
     DropChildLocked(removed);
-    // Things should be consistent after dropping the child.
-    VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-    VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
     return;
   }
 
@@ -1047,24 +1019,15 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   // correct invariants.
   parent_offset_ = parent_limit_ = parent_start_limit_ = 0;
 
-  // Things should be consistent after dropping one child and merging with the other.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_VALIDATION_ASSERT(child->DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
 }
 
 void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) {
-  canary_.Assert();
-
   DEBUG_ASSERT(children_list_len_ == 1);
   VmCowPages& child = children_list_.front();
   AssertHeld(child.lock_ref());
   AssertHeld(removed->lock_ref());
-  // We don't check the hierarchy because it is inconsistent at this point.
-  // It will be made consistent by the caller and checked then.
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(child.DebugValidateVmoPageBorrowingLocked());
 
   list_node freed_pages;
   list_initialize(&freed_pages);
@@ -1302,7 +1265,6 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
           }
         });
   }
-  DEBUG_ASSERT(page_list_.IsEmpty());
 
   page_remover.Flush();
   if (!list_is_empty(&freed_pages)) {
@@ -1312,10 +1274,6 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     DEBUG_ASSERT(!is_source_handling_free_locked());
     FreePagesLocked(&freed_pages, /*freeing_owned_pages=*/false);
   }
-
-  // We don't check the hierarchy because it is inconsistent at this point.
-  // It will be made consistent by the caller and checked then.
-  VMO_FRUGAL_VALIDATION_ASSERT(child.DebugValidateVmoPageBorrowingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 }
 
