@@ -8535,15 +8535,13 @@ rust_library("netlink-packet-generic-v0_3_3") {
 
 license("netlink-packet-route-v0_20_0.license") {
   public_package_name = "netlink_packet_route"
-  license_files = [
-    "//third_party/rust_crates/forks/netlink-packet-route-0.20.0/LICENSE-MIT",
-  ]
+  license_files =
+      [ "//third_party/rust_crates/forks/netlink-packet-route/LICENSE-MIT" ]
 }
 
 rust_library("netlink-packet-route-v0_20_0") {
   crate_name = "netlink_packet_route"
-  crate_root =
-      "//third_party/rust_crates/forks/netlink-packet-route-0.20.0/src/lib.rs"
+  crate_root = "//third_party/rust_crates/forks/netlink-packet-route/src/lib.rs"
   output_name = "netlink_packet_route-6a6f82783dbd978e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 

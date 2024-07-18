@@ -388,7 +388,7 @@ prettytable-rs = { path = "forks/prettytable-rs" }
 # tokio to 1.x.
 rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
-netlink-packet-route = { path="forks/netlink-packet-route-0.20.0" }
+netlink-packet-route = { path="forks/netlink-packet-route" }
 netlink-packet-utils = { path="forks/netlink-packet-utils-0.5.2" }
 netlink-packet-core = {path = "forks/netlink-packet-core-0.7.0"}
 netlink-packet-sock-diag = {path = "forks/netlink-packet-sock-diag-0.4.2"}
