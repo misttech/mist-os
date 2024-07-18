@@ -28,6 +28,8 @@ _OUTPUT_POLICY_DIRECTORY = (
     f"{_SCRIPT_DIRECTORY}/../testdata/composite_policies/compiled"
 )
 
+_INITIAL_SIDS_PATH = os.path.join(_SCRIPT_DIRECTORY, "initial_sids")
+
 _COMPOSITE_POLICY_PATHS = (
     (
         (
@@ -83,7 +85,9 @@ def compile_composite_policies(checkpolicy_executable):
             )
             output_path = f"{_OUTPUT_POLICY_DIRECTORY}/{output}"
             merged_path = f"{temporary_directory_name}/policy.conf"
-            merge_policies.merge_text_policies(input_paths, merged_path)
+            merge_policies.merge_text_policies(
+                _INITIAL_SIDS_PATH, input_paths, merged_path
+            )
             merge_policies.compile_text_policy_to_binary_policy(
                 checkpolicy_executable,
                 merged_path,
