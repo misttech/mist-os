@@ -115,6 +115,6 @@ uint8_t GetVlogVerbosity() {
   return 0;
 }
 
-bool ShouldCreateLogMessage(LogSeverity severity) { return severity >= GetMinLogSeverity(); }
+bool IsSeverityEnabled(LogSeverity severity) { return severity >= GetMinLogSeverity(); }
 
 }  // namespace fuchsia_logging

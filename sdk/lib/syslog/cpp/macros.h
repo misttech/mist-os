@@ -305,7 +305,10 @@ uint8_t GetVlogVerbosity();
 
 // Returns true if |severity| is at or above the current minimum log level.
 // LOG_FATAL and above is always true.
-bool ShouldCreateLogMessage(LogSeverity severity);
+bool IsSeverityEnabled(LogSeverity severity);
+
+// Deprecated, please use IsSeverityEnabled instead.
+inline bool ShouldCreateLogMessage(LogSeverity severity) { return IsSeverityEnabled(severity); }
 
 }  // namespace fuchsia_logging
 
@@ -330,7 +333,7 @@ bool ShouldCreateLogMessage(LogSeverity severity);
                 .stream()
 
 #define FX_LOG_IS_ON(severity) \
-  (::fuchsia_logging::ShouldCreateLogMessage(::fuchsia_logging::LOG_##severity))
+  (::fuchsia_logging::IsSeverityEnabled(::fuchsia_logging::LOG_##severity))
 
 #define FX_LOGS(severity) FX_LOGST(severity, nullptr)
 
@@ -410,11 +413,11 @@ void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, i
   buffer.Flush();
 }
 
-#define FX_SLOG_ETC(severity, args...)                         \
-  do {                                                         \
-    if (::fuchsia_logging::ShouldCreateLogMessage(severity)) { \
-      fx_slog_internal(severity, __FILE__, __LINE__, args);    \
-    }                                                          \
+#define FX_SLOG_ETC(severity, args...)                      \
+  do {                                                      \
+    if (::fuchsia_logging::IsSeverityEnabled(severity)) {   \
+      fx_slog_internal(severity, __FILE__, __LINE__, args); \
+    }                                                       \
   } while (0)
 
 #define FX_SLOG(severity, msg...) FX_SLOG_ETC(::fuchsia_logging::LOG_##severity, msg)
