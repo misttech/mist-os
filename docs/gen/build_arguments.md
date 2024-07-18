@@ -14,7 +14,7 @@ From //zircon/system/ulib/acpica/acpica.gni:7
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:114
+From //build/images/args.gni:118
 
 ### add_qemu_to_build_archives
 
@@ -23,7 +23,7 @@ archives.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:120
+From //build/images/args.gni:124
 
 ### additional_boot_args
 
@@ -43,7 +43,7 @@ with specific boards, due to driver and hardware challenges.
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:126
+From //build/images/args.gni:130
 
 ### additional_default_targets
 
@@ -105,7 +105,7 @@ Build boot images that prefer Zedboot over local boot (only for EFI).
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:141
+From //build/images/args.gni:145
 
 ### amlogic_decoder_firmware_path
 
@@ -163,7 +163,7 @@ suitable for flashing through fastboot for eMMC devices.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:149
+From //build/images/args.gni:153
 
 ### assembly_generate_fvm_nand
 
@@ -175,7 +175,7 @@ room to initialize on boot.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:156
+From //build/images/args.gni:160
 
 ### assembly_partitions_configs
 
@@ -354,7 +354,7 @@ From //boards/arm64.gni:44
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:205
+From //build/images/args.gni:209
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
@@ -362,13 +362,13 @@ From //boards/x64.gni:31
 
 **Overridden from the default:** `false`
 
-From //build/images/args.gni:205
+From //build/images/args.gni:209
 
 ### bazel_product_bundle_prefix
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:204
+From //build/images/args.gni:208
 
 ### bazel_product_bundle_root
 
@@ -395,7 +395,7 @@ The actual bazel_product_bundle used for Bazel assembly is:
 
 **Current value (from the default):** `"//"`
 
-From //build/images/args.gni:203
+From //build/images/args.gni:207
 
 ### bazel_quiet
 
@@ -742,7 +742,7 @@ Each entry in the list is a scope containing:
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:79
+From //build/images/args.gni:83
 
 ### build_all_vp9_file_decoder_conformance_tests
 
@@ -870,7 +870,7 @@ See https://fuchsia.dev/fuchsia-src/development/hardware/installer
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:35
+From //build/images/args.gni:39
 
 ### bump_api_level
 
@@ -969,7 +969,7 @@ non-production GN labels. Build will fail if such dependency is found.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:132
+From //build/images/args.gni:136
 
 ### check_repeatability
 
@@ -989,7 +989,7 @@ This is primarily meant to be used by the clang canary builders.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:95
+From //build/images/args.gni:99
 
 ### chromium_build_dir
 
@@ -1447,7 +1447,7 @@ This arg is for local developer only, products should not set this arg.
 
 **Current value (from the default):** `1`
 
-From //build/images/args.gni:138
+From //build/images/args.gni:142
 
 ### deny_warnings
 
@@ -2959,7 +2959,7 @@ You can still build //build/images:netboot explicitly even if enable_netboot is 
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:89
+From //build/images/args.gni:93
 
 ### enable_netstack2_tracing
 
@@ -3283,7 +3283,7 @@ useful for including verification and other Bazel assembly specific targets.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:209
+From //build/images/args.gni:213
 
 ### extra_gn_labels_for_bazel_inputs
 
@@ -3375,7 +3375,7 @@ From //build/images/vbmeta.gni:40
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:115
+From //build/images/args.gni:119
 
 ### fat_lto_objects
 
@@ -3421,7 +3421,7 @@ Each entry in the list is a scope containing:
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:60
+From //build/images/args.gni:64
 
 ### firmware_prebuilts_path_suffix
 
@@ -3432,7 +3432,7 @@ that users can easily switch revisions using a single arg.
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:66
+From //build/images/args.gni:70
 
 ### flatland_verbose_logging
 
@@ -3536,7 +3536,7 @@ From //zircon/kernel/params.gni:74
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:112
+From //build/images/args.gni:116
 
 ### fxfs_blob
 
@@ -3552,7 +3552,7 @@ From //src/storage/fshost/generated_fshost_config.gni:17
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:113
+From //build/images/args.gni:117
 
 ### gcc_tool_dir
 
@@ -3669,7 +3669,7 @@ Typically useful for initially flashing a device from zero-state.
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:84
+From //build/images/args.gni:88
 
 ### graphics_compute_generate_debug_shaders
 
@@ -4049,7 +4049,7 @@ Include an account partition in the FVM image if set to true.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:144
+From //build/images/args.gni:148
 
 ### include_clippy
 
@@ -4076,7 +4076,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:174
+From //build/images/args.gni:178
 
 ### include_zxdb_large_tests
 
@@ -5614,7 +5614,7 @@ From //src/devices/bus/drivers/pci/pci.gni:10
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:116
+From //build/images/args.gni:120
 
 ### prebuilt_dart_sdk
 
@@ -5686,6 +5686,15 @@ A list of binary host tool labels to also build.
 **Current value (from the default):** `[]`
 
 From //build/product.gni:11
+
+### product_skip_uefi_disk
+
+Skip generating a UEFI disk for a product whose board defines
+`build_uefi_disk`
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:34
 
 ### profile_source_files
 
@@ -7147,7 +7156,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:165
+From //build/images/args.gni:169
 
 ### recovery_logo_path
 
@@ -8338,7 +8347,7 @@ package.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:41
+From //build/images/args.gni:45
 
 ### update_package_size_creep_limit
 
@@ -8363,7 +8372,7 @@ epoch increased.
 
 **Current value (from the default):** `0`
 
-From //build/images/args.gni:52
+From //build/images/args.gni:56
 
 ### use_bazel_images_only
 
@@ -8375,7 +8384,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:181
+From //build/images/args.gni:185
 
 ### use_blink
 
@@ -8630,19 +8639,19 @@ From //build/fuchsia/sdk.gni:8
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:109
+From //build/images/args.gni:113
 
 ### vbmeta_b_partition
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:110
+From //build/images/args.gni:114
 
 ### vbmeta_r_partition
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:111
+From //build/images/args.gni:115
 
 ### vboot_keys
 
@@ -8669,7 +8678,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:170
+From //build/images/args.gni:174
 
 ### verify_depfile
 
@@ -8880,7 +8889,7 @@ doesn't require the FVM or SSH keys.
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:106
+From //build/images/args.gni:110
 
 ### zircon_asserts
 
@@ -8892,7 +8901,7 @@ From //build/config/fuchsia/BUILD.gn:178
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:107
+From //build/images/args.gni:111
 
 ### zircon_kernel_disable_asserts
 
@@ -8922,7 +8931,7 @@ From //build/config/zircon/levels.gni:22
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:108
+From //build/images/args.gni:112
 
 ### zircon_toolchain
 
