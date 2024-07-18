@@ -1719,7 +1719,7 @@ fn dispatch_address_state_provider_request(
             responder,
         } => {
             if preferred_lifetime_info.is_some() {
-                warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/42056194)");
+                warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/42058290)");
             }
             let device_id =
                 ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
