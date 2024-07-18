@@ -15,6 +15,7 @@ use futures::{stream, StreamExt};
 
 use archivist_lib::constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET;
 use archivist_lib::formatter::{JsonPacketSerializer, SerializedVmo};
+use std::convert::TryInto;
 use std::time::Duration;
 
 fn bench_serialization(b: &mut criterion::Bencher, n: usize, m: usize, format: Format) {
@@ -26,11 +27,14 @@ fn bench_serialization(b: &mut criterion::Bencher, n: usize, m: usize, format: F
         }
         children.push(DiagnosticsHierarchy::new(i.to_string(), properties, vec![]));
     }
-    let data =
-        InspectDataBuilder::new("bench", "fuchsia-pkg://fuchsia.com/testing#meta/bench.cm", 1)
-            .with_hierarchy(DiagnosticsHierarchy::new("root", vec![], children))
-            .with_name(InspectHandleName::filename("fuchsia.inspect.Tree"))
-            .build();
+    let data = InspectDataBuilder::new(
+        "bench".try_into().unwrap(),
+        "fuchsia-pkg://fuchsia.com/testing#meta/bench.cm",
+        1,
+    )
+    .with_hierarchy(DiagnosticsHierarchy::new("root", vec![], children))
+    .with_name(InspectHandleName::filename("fuchsia.inspect.Tree"))
+    .build();
     b.iter(|| {
         let _ = criterion::black_box(SerializedVmo::serialize(&data, DataType::Inspect, format));
     });
@@ -43,7 +47,7 @@ fn bench_json_packet_serializer(b: &mut criterion::Bencher, total_logs: u64) {
                 component_url: Some(
                     format!("fuchsia-pkg://fuchsia.com/testing#meta/bench-{}.cm", i).into(),
                 ),
-                moniker: format!("moniker-{}", i),
+                moniker: format!("moniker-{i}").as_str().try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: (i as i64).into(),
             })

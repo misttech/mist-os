@@ -213,7 +213,7 @@ mod tests {
         diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: timestamp.into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
-            moniker: TEST_IDENTITY.to_string(),
+            moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,
         })
         .set_pid(123)

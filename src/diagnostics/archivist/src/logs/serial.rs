@@ -229,7 +229,7 @@ mod tests {
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(1).into(),
             component_url: Some("url".into()),
-            moniker: "core/foo".to_string(),
+            moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
         })
         .add_tag("denied-tag")
@@ -250,7 +250,7 @@ mod tests {
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(123456789).into(),
             component_url: Some("url".into()),
-            moniker: "core/foo".to_string(),
+            moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
         })
         .add_tag("bar")
@@ -277,7 +277,7 @@ mod tests {
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(123456789).into(),
             component_url: Some("url".into()),
-            moniker: "core/foo".to_string(),
+            moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
         })
         .set_message("my msg")

@@ -131,7 +131,7 @@ mod tests {
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: zx::Time::from_nanos(packet.metadata.time).into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
-            moniker: TEST_IDENTITY.to_string(),
+            moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Info,
         })
         .set_pid(packet.metadata.pid)
@@ -172,7 +172,7 @@ mod tests {
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: timestamp.into(),
             component_url: Some(TEST_IDENTITY.url.clone()),
-            moniker: TEST_IDENTITY.to_string(),
+            moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Fatal,
         })
         .add_tag("tag-a")

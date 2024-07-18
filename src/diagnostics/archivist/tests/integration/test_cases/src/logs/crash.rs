@@ -49,7 +49,7 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     // Check for the log message.
     while let Some(Ok(logs_data)) = logs.next().await {
         log_buf.push(logs_data.msg().unwrap().to_string().clone());
-        if logs_data.moniker == PUPPET_NAME
+        if logs_data.moniker.to_string() == PUPPET_NAME
             && logs_data.msg().unwrap() == LOG_MESSAGE
             && logs_data.metadata.severity == Severity::Info
         {
@@ -72,7 +72,7 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     while let Some(Ok(logs_data)) = logs.next().await {
         log_buf.push(logs_data.msg().unwrap().to_string().clone());
         let payload = logs_data.payload.clone().unwrap();
-        if logs_data.moniker == PUPPET_NAME
+        if logs_data.moniker.to_string() == PUPPET_NAME
             && logs_data.msg().unwrap() == "PANIC"
             && payload
                 .get_property_by_path(&["keys", "info"])

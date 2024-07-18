@@ -775,7 +775,7 @@ mod tests {
             data: LogData::TargetLog(
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(timestamp),
                 })

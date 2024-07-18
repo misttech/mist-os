@@ -29,7 +29,7 @@ async fn test_isolated_diagnostics_can_be_read_by_the_test() {
         .await
         .expect("got inspect data");
     assert_eq!(data.len(), 1);
-    assert_eq!(data[0].moniker, format!(r#"coll:{}"#, instance.child_name()));
+    assert_eq!(data[0].moniker.to_string(), format!(r#"coll:{}"#, instance.child_name()));
     assert_data_tree!(data[0].payload.as_ref().unwrap(), root: {
         "fuchsia.inspect.Health": {
             status: "OK",

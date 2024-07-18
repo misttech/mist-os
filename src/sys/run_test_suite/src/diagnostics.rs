@@ -8,6 +8,7 @@ use diagnostics_data::{LogTextDisplayOptions, LogTextPresenter, LogsData, Severi
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use fidl_fuchsia_test_manager::LogsIteratorOption;
 use futures::{Stream, TryStreamExt};
+use selectors::SelectorExt;
 use std::io::Write;
 
 /// Configuration for display of text-based (unstructured)
@@ -48,13 +49,8 @@ impl LogCollectionOptions {
             let Some(min_severity) = interest.min_severity.as_ref() else {
                 continue;
             };
-            if selectors::match_moniker_against_component_selector(
-                log.moniker.split('/'),
-                &selector,
-            )
             // The selector should already be validated so in practice this will never happen.
-            .unwrap_or(false)
-            {
+            if log.moniker.matches_component_selector(&selector).unwrap_or(false) {
                 found_matching_selector = true;
                 if log.severity() >= *min_severity {
                     return true;
@@ -129,12 +125,13 @@ pub fn get_type() -> LogsIteratorOption {
 mod test {
     use super::*;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder};
+    use moniker::Moniker;
 
     #[fuchsia::test]
     async fn filter_low_severity() {
         let input_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>".into(),
+                moniker: Moniker::root().into(),
                 timestamp_nanos: 0i64.into(),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
@@ -142,7 +139,7 @@ mod test {
             .set_message("my info log")
             .build(),
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "child".into(),
+                moniker: "child".try_into().unwrap(),
                 timestamp_nanos: 1000i64.into(),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
@@ -151,7 +148,7 @@ mod test {
             .build(),
         ];
         let displayed_logs = vec![LogsDataBuilder::new(BuilderArgs {
-            moniker: "child".into(),
+            moniker: "child".try_into().unwrap(),
             timestamp_nanos: 1000i64.into(),
             component_url: Some("test-child-url".into()),
             severity: Severity::Warn,
@@ -190,7 +187,7 @@ mod test {
     #[fuchsia::test]
     async fn filter_log_severity_by_component() {
         let a_info_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "a".into(),
+            moniker: "a".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
@@ -198,7 +195,7 @@ mod test {
         .set_message("A's info log")
         .build();
         let a_warn_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "a".into(),
+            moniker: "a".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
@@ -206,7 +203,7 @@ mod test {
         .set_message("A's warn log")
         .build();
         let b_info_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "b".into(),
+            moniker: "b".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
@@ -214,7 +211,7 @@ mod test {
         .set_message("B's info log")
         .build();
         let b_warn_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "b".into(),
+            moniker: "b".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
@@ -222,7 +219,7 @@ mod test {
         .set_message("B's warn log")
         .build();
         let c_info_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "c".into(),
+            moniker: "c".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
@@ -271,7 +268,7 @@ mod test {
     #[fuchsia::test]
     async fn filter_log_severity_by_component_multiple_matches() {
         let a_info_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "a".into(),
+            moniker: "a".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
@@ -279,7 +276,7 @@ mod test {
         .set_message("A's info log")
         .build();
         let a_warn_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "a".into(),
+            moniker: "a".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Warn,
@@ -287,7 +284,7 @@ mod test {
         .set_message("A's warn log")
         .build();
         let b_info_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "b".into(),
+            moniker: "b".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Info,
@@ -295,7 +292,7 @@ mod test {
         .set_message("B's info log")
         .build();
         let b_fatal_log = LogsDataBuilder::new(BuilderArgs {
-            moniker: "b".into(),
+            moniker: "b".try_into().unwrap(),
             timestamp_nanos: 0i64.into(),
             component_url: Some("test-root-url".into()),
             severity: Severity::Fatal,
@@ -339,7 +336,7 @@ mod test {
     async fn filter_log_moniker() {
         let unaltered_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>".into(),
+                moniker: Moniker::root().into(),
                 timestamp_nanos: 0i64.into(),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
@@ -347,7 +344,7 @@ mod test {
             .set_message("my info log")
             .build(),
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>/child/a".into(),
+                moniker: "child/a".try_into().unwrap(),
                 timestamp_nanos: 1000i64.into(),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
@@ -357,7 +354,7 @@ mod test {
         ];
         let altered_moniker_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>".into(),
+                moniker: Moniker::root().into(),
                 timestamp_nanos: 0i64.into(),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
@@ -365,7 +362,7 @@ mod test {
             .set_message("my info log")
             .build(),
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "a".into(),
+                moniker: "a".try_into().unwrap(),
                 timestamp_nanos: 1000i64.into(),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
@@ -408,7 +405,7 @@ mod test {
     async fn no_filter_log_moniker() {
         let unaltered_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>".into(),
+                moniker: ".".try_into().unwrap(),
                 timestamp_nanos: 0i64.into(),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
@@ -416,7 +413,7 @@ mod test {
             .set_message("my info log")
             .build(),
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "child/a".into(),
+                moniker: "child/a".try_into().unwrap(),
                 timestamp_nanos: 1000i64.into(),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
@@ -426,7 +423,7 @@ mod test {
         ];
         let altered_moniker_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>".into(),
+                moniker: ".".try_into().unwrap(),
                 timestamp_nanos: 0i64.into(),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
@@ -434,7 +431,7 @@ mod test {
             .set_message("my info log")
             .build(),
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "child/a".into(),
+                moniker: "child/a".try_into().unwrap(),
                 timestamp_nanos: 1000i64.into(),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Warn,
@@ -477,7 +474,7 @@ mod test {
     async fn display_restricted_logs() {
         let input_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>".into(),
+                moniker: Moniker::root().into(),
                 timestamp_nanos: 0i64.into(),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
@@ -485,7 +482,7 @@ mod test {
             .set_message("my info log")
             .build(),
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "child".into(),
+                moniker: "child".try_into().unwrap(),
                 timestamp_nanos: 1000i64.into(),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Error,
@@ -495,7 +492,7 @@ mod test {
         ];
         let displayed_logs = vec![
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "<root>".into(),
+                moniker: Moniker::root().into(),
                 timestamp_nanos: 0i64.into(),
                 component_url: Some("test-root-url".into()),
                 severity: Severity::Info,
@@ -503,7 +500,7 @@ mod test {
             .set_message("my info log")
             .build(),
             LogsDataBuilder::new(BuilderArgs {
-                moniker: "child".into(),
+                moniker: "child".try_into().unwrap(),
                 timestamp_nanos: 1000i64.into(),
                 component_url: Some("test-child-url".into()),
                 severity: Severity::Error,

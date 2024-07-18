@@ -118,7 +118,7 @@ mod fuchsia {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::{Severity, Timestamp};
+    use diagnostics_data::{ExtendedMoniker, Severity, Timestamp};
     use fuchsia_async as fasync;
 
     #[cfg(target_os = "fuchsia")]
@@ -290,7 +290,7 @@ mod tests {
         let data = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: Timestamp::from(0).into(),
             component_url: Some("fake-url".into()),
-            moniker: String::from("test/moniker"),
+            moniker: ExtendedMoniker::parse_str("test/moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_message(value.to_string())

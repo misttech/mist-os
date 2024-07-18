@@ -520,7 +520,7 @@ mod test {
         let symbolizer = NoOpSymbolizer {};
         let mut formatter = FakeFormatter::new();
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -551,7 +551,7 @@ mod test {
         let mut formatter = FakeFormatter::new();
         let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
         let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -561,7 +561,7 @@ mod test {
         .set_tid(2)
         .build();
         let target_log_1 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(1),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -613,7 +613,7 @@ mod test {
 
         let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
         let target_log_0 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -621,7 +621,7 @@ mod test {
         .set_message("Hello world!")
         .build();
         let target_log_1 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(1),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -629,7 +629,7 @@ mod test {
         .set_message("Hello world 2!")
         .build();
         let target_log_2 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(2),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -639,7 +639,7 @@ mod test {
         .set_message("Hello world 3!")
         .build();
         let target_log_3 = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(3),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -678,7 +678,7 @@ mod test {
 
     fn make_log_with_timestamp(timestamp: i32) -> LogsData {
         LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(timestamp),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -741,7 +741,7 @@ mod test {
         diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: Timestamp::from(default_ts().as_nanos() as i64),
             component_url: Some("component_url".into()),
-            moniker: "some/moniker".to_string(),
+            moniker: "some/moniker".try_into().unwrap(),
             severity: diagnostics_data::Severity::Warn,
         })
         .set_pid(1)
@@ -815,7 +815,7 @@ mod test {
         timestamp_nanos: i32,
     ) -> Data<Logs> {
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(timestamp_nanos),
             component_url: Some("ffx".into()),
             severity: Severity::Info,
@@ -873,7 +873,7 @@ mod test {
         );
         formatter.set_boot_timestamp(0);
         let target_log = LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            moniker: "ffx".into(),
+            moniker: "ffx".try_into().unwrap(),
             timestamp_nanos: Timestamp::from(0),
             component_url: Some("ffx".into()),
             severity: Severity::Info,

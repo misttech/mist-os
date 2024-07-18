@@ -139,7 +139,7 @@ async fn launch_and_test_sample_test() {
         "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/sample_inspect_tests.cm";
 
     let fake_data = vec![
-        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
             .with_hierarchy(hierarchy! {
                 root: {
                     version: "1.0",
@@ -147,7 +147,7 @@ async fn launch_and_test_sample_test() {
             })
             .with_name(InspectHandleName::filename("fake-file-name"))
             .build(),
-        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
             .with_hierarchy(hierarchy! {
                 root: {
                     events: {
@@ -160,13 +160,13 @@ async fn launch_and_test_sample_test() {
             .with_name(InspectHandleName::filename("fake-file-name"))
             .build(),
         // Inject one that is missing data to ensure we retry correctly.
-        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
             .with_hierarchy(hierarchy! {
                 root: {}
             })
             .with_name(InspectHandleName::filename("fake-file-name"))
             .build(),
-        InspectDataBuilder::new("bootstrap/archivist", "no-url", 0)
+        InspectDataBuilder::new("bootstrap/archivist".try_into().unwrap(), "no-url", 0)
             .with_hierarchy(hierarchy! {
                 root: {
                     events: {
@@ -249,7 +249,7 @@ fn create_example_data(opts: ExampleDataOpts) -> Data<diagnostics_data::Inspect>
     .into_iter()
     .filter_map(|v| v)
     .collect();
-    InspectDataBuilder::new("example", "no-url", 0)
+    InspectDataBuilder::new("example".try_into().unwrap(), "no-url", 0)
         .with_hierarchy(DiagnosticsHierarchy::new("root", properties, vec![]))
         .with_name(InspectHandleName::filename("fake-file-name"))
         .build()

@@ -4,7 +4,7 @@
 
 //! Analyze output from fuchsia_inspect_contrib's self profiling feature.
 
-use diagnostics_data::{DiagnosticsHierarchy, InspectData, Property};
+use diagnostics_data::{DiagnosticsHierarchy, ExtendedMoniker, InspectData, Property};
 use std::collections::BTreeMap;
 
 /// If a duration used less than 0.5% of its parent's CPU time, it's probably not that interesting.
@@ -40,9 +40,12 @@ impl SelfProfilesReport {
         None
     }
 
-    fn from_node(name: &str, node: &DiagnosticsHierarchy) -> Result<Self, AnalysisError> {
+    fn from_node(
+        name: &ExtendedMoniker,
+        node: &DiagnosticsHierarchy,
+    ) -> Result<Self, AnalysisError> {
         let root_summary = DurationSummaryBuilder::from_inspect(node)?.build();
-        Ok(Self { name: name.to_owned(), root_summary })
+        Ok(Self { name: name.to_string(), root_summary })
     }
 
     pub fn name(&self) -> &str {

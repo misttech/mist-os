@@ -27,7 +27,6 @@ rustc_library("lib") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:libc",
-    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
   ]
 

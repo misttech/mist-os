@@ -12,6 +12,7 @@ use fidl_fuchsia_test_manager::{
 use futures::channel::mpsc;
 use futures::prelude::*;
 use linked_hash_map::LinkedHashMap;
+use moniker::ExtendedMoniker;
 use std::collections::HashMap;
 use std::sync::Arc;
 use test_diagnostics::{collect_and_send_string_output, LogStream};
@@ -37,7 +38,7 @@ pub fn default_run_suite_options() -> ftest_manager::RunSuiteOptions {
 #[derive(Debug, Eq, PartialEq)]
 pub struct AttributedLog {
     pub log: String,
-    pub moniker: String,
+    pub moniker: ExtendedMoniker,
 }
 
 pub async fn collect_suite_events(
@@ -93,10 +94,8 @@ pub async fn collect_suite_events(
         let logs = t.await;
         for log_result in logs {
             let log = log_result?;
-            collected_logs.push(AttributedLog {
-                log: log.msg().unwrap().to_string(),
-                moniker: log.moniker.clone(),
-            });
+            collected_logs
+                .push(AttributedLog { log: log.msg().unwrap().to_string(), moniker: log.moniker });
         }
     }
 
@@ -158,10 +157,8 @@ pub async fn collect_suite_events_with_watch(
         let logs = t.await;
         for log_result in logs {
             let log = log_result?;
-            collected_logs.push(AttributedLog {
-                log: log.msg().unwrap().to_string(),
-                moniker: log.moniker.clone(),
-            });
+            collected_logs
+                .push(AttributedLog { log: log.msg().unwrap().to_string(), moniker: log.moniker });
         }
     }
 

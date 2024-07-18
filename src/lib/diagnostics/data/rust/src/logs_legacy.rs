@@ -219,7 +219,7 @@ mod test {
             let mut msg = LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: 0i64.into(),
                 component_url: Some(TEST_URL.into()),
-                moniker: TEST_MONIKER.to_string(),
+                moniker: moniker::ExtendedMoniker::parse_str(TEST_MONIKER).unwrap(),
                 severity,
             })
             .build();

@@ -324,7 +324,7 @@ async fn get_test_cases(rid: RequestId) -> Result<Vec<ftest::Case>, Error> {
     {
         if names_seen.insert(value.moniker.clone()) {
             ret.push(ftest::Case {
-                name: Some(value.moniker),
+                name: Some(value.moniker.to_string()),
                 enabled: Some(true),
                 ..Default::default()
             });

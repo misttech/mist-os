@@ -6,17 +6,20 @@ use crate::assert::assert_logs_sequence;
 use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
 use crate::utils::LogSettingsExt;
+use diagnostics_data::ExtendedMoniker;
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, Severity};
+use once_cell::sync::Lazy;
+
+const PUPPET_NAME: &str = "puppet";
+static PUPPET_MONIKER: Lazy<ExtendedMoniker> = Lazy::new(|| PUPPET_NAME.try_into().unwrap());
 
 // This test verifies that a component only emits messages at or above its
 // current interest severity level, even when the interest changes while the
 // component is running.
 #[fuchsia::test]
 async fn set_interest() {
-    const PUPPET_NAME: &str = "puppet";
     const REALM_NAME: &str = "set_interest";
-    const PUPPET_MONIKER: &str = PUPPET_NAME;
 
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         realm_name: Some(REALM_NAME.to_string()),
@@ -51,7 +54,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        PUPPET_MONIKER,
+        &*PUPPET_MONIKER,
         vec![
             (Severity::Info, "A1"),
             (Severity::Info, "C1"),
@@ -81,7 +84,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        PUPPET_MONIKER,
+        &*PUPPET_MONIKER,
         vec![
             (Severity::Debug, "A2"),
             (Severity::Info, "B2"),
@@ -106,7 +109,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        PUPPET_MONIKER,
+        &*PUPPET_MONIKER,
         vec![(Severity::Warn, "C3"), (Severity::Error, "D3")],
     )
     .await;
@@ -124,7 +127,7 @@ async fn set_interest() {
         ])
         .await;
 
-    assert_logs_sequence(&mut logs, PUPPET_MONIKER, vec![(Severity::Error, "D4")]).await;
+    assert_logs_sequence(&mut logs, &*PUPPET_MONIKER, vec![(Severity::Error, "D4")]).await;
 
     // Disconnecting the protocol, brings back an EMPTY interest, which defaults to Severity::Info.
     drop(log_settings);
@@ -145,7 +148,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        PUPPET_MONIKER,
+        &*PUPPET_MONIKER,
         vec![
             (Severity::Info, "B5"),
             (Severity::Info, "C5"),
@@ -161,9 +164,7 @@ async fn set_interest() {
 // parent realm, having been configured before the component was launched.
 #[fuchsia::test]
 async fn set_interest_before_startup() {
-    const PUPPET_NAME: &str = "puppet";
     const REALM_NAME: &str = "set_interest_before_startup";
-    const PUPPET_MONIKER: &str = PUPPET_NAME;
 
     // Create the test realm.
     // We won't connect to the puppet until after we've configured logging interest.
@@ -199,7 +200,7 @@ async fn set_interest_before_startup() {
 
     assert_logs_sequence(
         &mut logs,
-        PUPPET_MONIKER,
+        &*PUPPET_MONIKER,
         vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
     )
     .await;

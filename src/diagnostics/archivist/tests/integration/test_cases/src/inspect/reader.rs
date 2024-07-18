@@ -135,7 +135,7 @@ async fn read_components_single_selector() -> Result<(), Error> {
             start_timestamp_nanos: AnyProperty,
         }
     });
-    assert_eq!(data[0].moniker, "child_a");
+    assert_eq!(data[0].moniker.to_string(), "child_a");
 
     Ok(())
 }

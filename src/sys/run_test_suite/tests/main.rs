@@ -423,7 +423,7 @@ async fn experimental_parallel_execution_integ_test(
         .snapshot::<Inspect>()
         .await
         .expect("got inspect data");
-    assert_eq!(data[0].moniker, "test_manager");
+    assert_eq!(data[0].moniker.to_string(), "test_manager");
 
     // Manually look through all of the children in DiagnosticsHierarchy to find one
     // where parallel executor was used.

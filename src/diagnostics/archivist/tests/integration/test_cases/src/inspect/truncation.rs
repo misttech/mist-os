@@ -83,7 +83,7 @@ async fn accessor_truncation_test() {
 fn count_dropped_schemas_per_moniker(data: &[Data<Inspect>], moniker: &str) -> i64 {
     let mut dropped_schema_count = 0;
     for data_entry in data {
-        if !data_entry.moniker.contains(moniker) {
+        if !data_entry.moniker.to_string().contains(moniker) {
             continue;
         }
         if let Some(errors) = &data_entry.metadata.errors {

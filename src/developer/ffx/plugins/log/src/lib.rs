@@ -437,7 +437,7 @@ mod tests {
                 data: LogData::TargetLog(
                     LogsDataBuilder::new(BuilderArgs {
                         component_url: Some("ffx".into()),
-                        moniker: "ffx".into(),
+                        moniker: "ffx".try_into().unwrap(),
                         severity: Severity::Info,
                         timestamp_nanos: Timestamp::from(0),
                     })
@@ -724,7 +724,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(1),
             })
@@ -778,7 +778,7 @@ ffx log --force-select.
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(0),
                 })
@@ -788,7 +788,7 @@ ffx log --force-select.
                 .build(),
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Error,
                     timestamp_nanos: Timestamp::from(3000000000i64),
                 })
@@ -798,7 +798,7 @@ ffx log --force-select.
                 .build(),
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(6000000000i64),
                 })
@@ -863,7 +863,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(
                     parse_time("1980-01-01T00:00:03")
@@ -950,7 +950,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(
                     parse_time("1980-01-01T00:00:03")
@@ -1046,7 +1046,7 @@ ffx log --force-select.
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(
                         parse_time("1980-01-01T00:00:00")
@@ -1063,7 +1063,7 @@ ffx log --force-select.
                 .build(),
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(
                         parse_time("1980-01-01T00:00:03")
@@ -1080,7 +1080,7 @@ ffx log --force-select.
                 .build(),
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(
                         parse_time("1980-01-01T00:00:06")
@@ -1143,7 +1143,7 @@ ffx log --force-select.
             messages: vec![
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(0),
                 })
@@ -1153,7 +1153,7 @@ ffx log --force-select.
                 .build(),
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(3000000000i64),
                 })
@@ -1163,7 +1163,7 @@ ffx log --force-select.
                 .build(),
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
-                    moniker: "ffx".into(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(6000000000i64),
                 })
@@ -1216,7 +1216,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(1),
             })
@@ -1270,7 +1270,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(0),
             })
@@ -1322,7 +1322,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "host/ffx".into(),
+                moniker: "host/ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(0),
             })
@@ -1375,7 +1375,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "host/ffx".into(),
+                moniker: "host/ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(0),
             })
@@ -1428,7 +1428,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(0),
             })
@@ -1522,7 +1522,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(0),
             })
@@ -1578,7 +1578,7 @@ ffx log --force-select.
         let mut manager = Manager::new_with_config(Rc::new(Configuration {
             messages: vec![LogsDataBuilder::new(BuilderArgs {
                 component_url: Some("ffx".into()),
-                moniker: "ffx".into(),
+                moniker: "ffx".try_into().unwrap(),
                 severity: Severity::Info,
                 timestamp_nanos: Timestamp::from(0),
             })

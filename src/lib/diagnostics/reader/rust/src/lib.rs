@@ -658,7 +658,7 @@ mod tests {
 
         assert_eq!(response.len(), 1);
 
-        assert_eq!(response[0].moniker, moniker);
+        assert_eq!(response[0].moniker.to_string(), moniker);
 
         assert_data_tree!(response[0].payload.as_ref().unwrap(), root: {
             int: 3u64,

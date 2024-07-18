@@ -51,6 +51,21 @@ impl ExtendedMoniker {
     }
 }
 
+impl TryFrom<&str> for ExtendedMoniker {
+    type Error = MonikerError;
+
+    fn try_from(input: &str) -> Result<Self, MonikerError> {
+        Self::parse_str(input)
+    }
+}
+
+impl std::str::FromStr for ExtendedMoniker {
+    type Err = MonikerError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse_str(s)
+    }
+}
+
 impl fmt::Display for ExtendedMoniker {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

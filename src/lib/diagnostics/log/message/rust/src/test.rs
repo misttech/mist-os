@@ -18,7 +18,7 @@ use std::sync::Arc;
 lazy_static! {
     static ref TEST_IDENTITY: Arc<MonikerWithUrl> = {
         Arc::new(MonikerWithUrl {
-            moniker: "fake-test-env/test-component".to_string(),
+            moniker: "fake-test-env/test-component".try_into().unwrap(),
             url: "fuchsia-pkg://fuchsia.com/testing123#test-component.cm".into(),
         })
     };

@@ -283,8 +283,6 @@ impl ReaderServer {
         // and filtering it using the provided selector regular expressions. Each filtered
         // inspect hierarchy is then added to an accumulator as a HierarchyData to be converted
         // into a JSON string and returned.
-        let moniker = pumped_inspect_data.identity.moniker.to_string();
-
         if let Some(configured_selectors) = &self.selectors {
             client_selectors = {
                 let matching_selectors = pumped_inspect_data
@@ -328,7 +326,7 @@ impl ReaderServer {
             parent_trace_id,
         )?;
         let mut builder = InspectDataBuilder::new(
-            moniker,
+            pumped_inspect_data.identity.moniker.clone(),
             identity.url.clone(),
             hierarchy_data.timestamp.into_nanos(),
         );

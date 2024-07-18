@@ -25,8 +25,8 @@ async fn read_components_recursive_glob() {
 
     // Only inspect from descendants of child_a should be reported
     let expected_monikers = HashSet::from_iter(vec![
-        "child_a/nested_one".to_string(),
-        "child_a/nested_two".to_string(),
+        "child_a/nested_one".try_into().unwrap(),
+        "child_a/nested_two".try_into().unwrap(),
     ]);
 
     let puppet_a = test_topology::connect_to_puppet(&realm_proxy, "child_a").await.unwrap();
@@ -57,7 +57,7 @@ async fn read_components_recursive_glob() {
                 start_timestamp_nanos: AnyProperty,
             }
         });
-        found_monikers.replace(data.moniker);
+        found_monikers.insert(data.moniker);
     }
     assert_eq!(expected_monikers, found_monikers);
 }
@@ -86,9 +86,9 @@ async fn read_components_subtree_with_recursive_glob() {
 
     // Only inspect from test_app_a, and descendants of test_app_a should be reported
     let expected_monikers = HashSet::from_iter(vec![
-        "child_a".to_string(),
-        "child_a/nested_one".to_string(),
-        "child_a/nested_two".to_string(),
+        "child_a".try_into().unwrap(),
+        "child_a/nested_one".try_into().unwrap(),
+        "child_a/nested_two".try_into().unwrap(),
     ]);
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();

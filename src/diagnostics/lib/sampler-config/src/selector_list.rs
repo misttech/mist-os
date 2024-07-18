@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics::StringSelector;
+use moniker::{ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 use selectors::FastError;
 use serde::de::Unexpected;
 use serde::{Deserialize, Deserializer};
@@ -55,7 +56,7 @@ pub struct ParsedSelector {
     /// The parsed selector, needed to fetch the value out of the returned hierarchy
     pub selector: fidl_fuchsia_diagnostics::Selector,
     /// The moniker of the selector, to find which hierarchy may contain the data
-    pub moniker: String,
+    pub moniker: ExtendedMoniker,
     /// How many times this selector has found and uploaded data
     upload_count: Arc<AtomicU64>,
 }
@@ -101,11 +102,20 @@ where
                 Unexpected::Str(selector_str),
                 &"component monikers cannot contain wildcards",
             )),
-            StringSelector::ExactMatch(text) => Ok(text),
+            StringSelector::ExactMatch(text) => Ok(text.as_ref()),
             _ => Err(E::invalid_value(Unexpected::Str(selector_str), &"Unexpected moniker type")),
         })
         .collect::<Result<Vec<_>, _>>()?;
-    let moniker = moniker_strings.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("/");
+    let moniker = if moniker_strings.len() == 1
+        && moniker_strings[0] == EXTENDED_MONIKER_COMPONENT_MANAGER_STR
+    {
+        ExtendedMoniker::ComponentManager
+    } else {
+        ExtendedMoniker::ComponentInstance(
+            Moniker::try_from(moniker_strings)
+                .or(Err(E::invalid_value(Unexpected::Str(selector_str), &"invalid moniker")))?,
+        )
+    };
     Ok(ParsedSelector {
         selector,
         selector_string: selector_str.to_string(),
@@ -184,7 +194,7 @@ mod tests {
         let ParsedSelector { selector_string, selector, moniker, .. } =
             selectors[0].as_ref().unwrap();
         assert_eq!(selector_string, "core/foo:root/branch:leaf");
-        assert_eq!(moniker, "core/foo");
+        assert_eq!(moniker.to_string(), "core/foo");
         let moniker =
             selector.component_selector.as_ref().unwrap().moniker_segments.as_ref().unwrap();
         require_strings(moniker, vec!["core", "foo"]);
@@ -206,7 +216,7 @@ mod tests {
         let ParsedSelector { selector_string, selector, moniker, .. } =
             selectors[0].as_ref().unwrap();
         assert_eq!(selector_string, "core/foo:root/branch:leaf");
-        assert_eq!(moniker, "core/foo");
+        assert_eq!(moniker.to_string(), "core/foo");
         let moniker =
             selector.component_selector.as_ref().unwrap().moniker_segments.as_ref().unwrap();
         require_strings(moniker, vec!["core", "foo"]);
@@ -220,7 +230,7 @@ mod tests {
         let ParsedSelector { selector_string, selector, moniker, .. } =
             selectors[1].as_ref().unwrap();
         assert_eq!(selector_string, "core/bar:root/twig:leaf");
-        assert_eq!(moniker, "core/bar");
+        assert_eq!(moniker.to_string(), "core/bar");
         let moniker =
             selector.component_selector.as_ref().unwrap().moniker_segments.as_ref().unwrap();
         require_strings(moniker, vec!["core", "bar"]);

@@ -80,11 +80,12 @@ async fn test_budget() {
     assert_eq!(log.rolled_out_logs(), Some(8946));
     let mut observed_logs = log_reader.snapshot::<Logs>().await.unwrap().into_iter();
     let msg_b = observed_logs.next().unwrap();
-    assert!(!msg_b.moniker.contains("puppet-victim"));
+    assert!(!msg_b.moniker.to_string().contains("puppet-victim"));
 
     // Vicitm logs should have been rolled out.
-    let messages =
-        observed_logs.filter(|log| log.moniker.contains("puppet-victim")).collect::<Vec<_>>();
+    let messages = observed_logs
+        .filter(|log| log.moniker.to_string().contains("puppet-victim"))
+        .collect::<Vec<_>>();
     assert!(messages.is_empty());
     assert_ne!(msg_a.msg().unwrap(), msg_b.msg().unwrap());
 }

@@ -13,7 +13,7 @@ pub extern "C" fn fuchsia_decode_log_message_to_json(msg: *const u8, size: usize
         managed_ptr = std::slice::from_raw_parts(msg, size);
     }
     let data = &message::from_structured(
-        MonikerWithUrl { moniker: "<test_moniker>".to_string(), url: "".into() },
+        MonikerWithUrl { moniker: "test_moniker".try_into().unwrap(), url: "".into() },
         managed_ptr,
     )
     .unwrap();

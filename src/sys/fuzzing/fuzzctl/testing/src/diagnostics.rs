@@ -20,7 +20,7 @@ pub async fn send_log_entry<S: AsRef<str>>(socket: &mut fidl::AsyncSocket, msg: 
     let builder_args = BuilderArgs {
         timestamp_nanos: 0.into(),
         component_url: Some("".into()),
-        moniker: "moniker".to_string(),
+        moniker: "moniker".try_into().unwrap(),
         severity: Severity::Info,
     };
     let builder = LogsDataBuilder::new(builder_args);

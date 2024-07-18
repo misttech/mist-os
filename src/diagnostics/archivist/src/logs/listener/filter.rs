@@ -85,7 +85,7 @@ impl MessageFilter {
         let reject_tags = if self.tags.is_empty() {
             false
         } else if log_message.tags().map(|t| t.is_empty()).unwrap_or(true) {
-            !self.tags.contains(log_message.component_name())
+            !self.tags.contains(log_message.component_name().as_ref())
         } else {
             !log_message
                 .tags()
@@ -126,7 +126,7 @@ mod tests {
         let mut builder = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: fuchsia_zircon::Time::from_nanos(1).into(),
             component_url: Some(identity.url.clone()),
-            moniker: identity.to_string(),
+            moniker: identity.moniker.clone(),
             severity: Severity::Info,
         });
         if let Some(tag) = tag {

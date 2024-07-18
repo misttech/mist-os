@@ -94,7 +94,7 @@
 
 use crate::diagnostics::*;
 use anyhow::{format_err, Context, Error};
-use diagnostics_data::{Data, InspectHandleName};
+use diagnostics_data::{Data, ExtendedMoniker, InspectHandleName};
 use diagnostics_hierarchy::{
     ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
 };
@@ -151,7 +151,7 @@ impl TaskCancellation {
 
         // Maps a selector to the indices of the project_samplers vec which contain configurations
         // that transform the property defined by the selector.
-        let mut moniker_to_projects_map: HashMap<String, HashSet<usize>> = HashMap::new();
+        let mut moniker_to_projects_map: HashMap<ExtendedMoniker, HashSet<usize>> = HashMap::new();
         // Set of all selectors from all projects
         let mut mondo_selectors_set = Vec::new();
 
@@ -161,7 +161,7 @@ impl TaskCancellation {
                     if let Some(selector) = selector_opt {
                         if moniker_to_projects_map.get(&selector.moniker).is_none() {
                             moniker_to_projects_map
-                                .insert(selector.moniker.to_string(), HashSet::new());
+                                .insert(selector.moniker.clone(), HashSet::new());
                         }
                         moniker_to_projects_map.get_mut(&selector.moniker).unwrap().insert(index);
                         mondo_selectors_set.push(selector.selector_string.clone());
@@ -194,7 +194,7 @@ struct RebootSnapshotProcessor {
     /// Mapping from a moniker to a vector of indices into
     /// the project_samplers, where each indexed [`ProjectSampler`] has
     /// at least one selector that uses that moniker.
-    moniker_to_projects_map: HashMap<String, HashSet<usize>>,
+    moniker_to_projects_map: HashMap<ExtendedMoniker, HashSet<usize>>,
 }
 
 impl RebootSnapshotProcessor {
@@ -218,7 +218,7 @@ impl RebootSnapshotProcessor {
         &mut self,
         hierarchy: DiagnosticsHierarchy<String>,
         diagnostics_filename: &Option<InspectHandleName>,
-        moniker: &str,
+        moniker: &ExtendedMoniker,
     ) {
         if let Some(project_indexes) = self.moniker_to_projects_map.get(moniker) {
             for index in project_indexes {
@@ -376,7 +376,7 @@ pub struct ProjectSampler {
     /// have to be created for unit tests; it will always be Some() outside unit tests.
     metric_loggers: HashMap<u32, MetricEventLoggerProxy>,
     /// Map from moniker to relevant selectors.
-    moniker_to_selector_map: HashMap<String, Vec<SelectorIndexes>>,
+    moniker_to_selector_map: HashMap<ExtendedMoniker, Vec<SelectorIndexes>>,
     /// The frequency with which we snapshot Inspect properties
     /// for this project.
     poll_rate_sec: i64,
@@ -650,7 +650,7 @@ impl ProjectSampler {
         &mut self,
         payload: &DiagnosticsHierarchy,
         diagnostics_filename: &Option<InspectHandleName>,
-        moniker: &str,
+        moniker: &ExtendedMoniker,
     ) -> Result<(SnapshotOutcome, Vec<EventToLog>), Error> {
         let indexes_opt = &self.moniker_to_selector_map.get(moniker);
         let selector_indexes = match indexes_opt {
@@ -1191,7 +1191,10 @@ fn compute_event_count_diff(
     }
 }
 
-fn process_schema_errors(errors: &Option<Vec<diagnostics_data::InspectError>>, moniker: &str) {
+fn process_schema_errors(
+    errors: &Option<Vec<diagnostics_data::InspectError>>,
+    moniker: &ExtendedMoniker,
+) {
     match errors {
         Some(errors) => {
             for error in errors {
@@ -1250,7 +1253,7 @@ mod tests {
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
             &Some(InspectHandleName::filename("a_filename")),
-            &"my/component".to_string(),
+            &"my/component".try_into().unwrap(),
         )) {
             // This selector will be found and removed from the map, resulting in a
             // SelectorsChanged response.
@@ -1277,7 +1280,7 @@ mod tests {
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
             &Some(InspectHandleName::filename("a_filename")),
-            &"my/component".to_string(),
+            &"my/component".try_into().unwrap(),
         )) {
             // This selector will be found and removed from the map, resulting in a
             // SelectorsChanged response.
@@ -1303,7 +1306,7 @@ mod tests {
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
             &Some(InspectHandleName::filename("a_filename")),
-            &"my/component".to_string(),
+            &"my/component".try_into().unwrap(),
         )) {
             // This selector will not be found and removed from the map, resulting in SelectorsUnchanged.
             Ok((SnapshotOutcome::SelectorsUnchanged, _events)) => (),
@@ -1388,13 +1391,14 @@ mod tests {
         match executor::block_on(sampler.process_component_data(
             &hierarchy,
             &Some(InspectHandleName::filename("a_filename")),
-            &"my/component".to_string(),
+            &"my/component".try_into().unwrap(),
         )) {
             Ok((SnapshotOutcome::SelectorsChanged, _events)) => (),
             _ => panic!("Expecting SelectorsChanged from process_component_data."),
         }
 
-        let selector_indices = sampler.moniker_to_selector_map.get("my/component").unwrap();
+        let selector_indices =
+            sampler.moniker_to_selector_map.get(&"my/component".try_into().unwrap()).unwrap();
         for index_info in selector_indices {
             let metric = &sampler.metrics[index_info.metric_index];
             let selector = &metric.selectors[index_info.selector_index];
@@ -1982,26 +1986,38 @@ mod tests {
         });
         sampler.rebuild_selector_data_structures();
 
-        let file1_value4 =
-            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
-                .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
-                .with_name(InspectHandleName::filename("file1"))
-                .build()];
-        let file2_value3 =
-            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
-                .with_hierarchy(hierarchy! { root: {branch: {leaf: 3i32}}})
-                .with_name(InspectHandleName::filename("file2"))
-                .build()];
-        let file1_value6 =
-            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
-                .with_hierarchy(hierarchy! { root: {branch: {leaf: 6i32}}})
-                .with_name(InspectHandleName::filename("file1"))
-                .build()];
-        let file2_value8 =
-            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
-                .with_hierarchy(hierarchy! { root: {branch: {leaf: 8i32}}})
-                .with_name(InspectHandleName::filename("file2"))
-                .build()];
+        let file1_value4 = vec![InspectDataBuilder::new(
+            "my/component".try_into().unwrap(),
+            "component-url",
+            0, /* timestamp */
+        )
+        .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
+        .with_name(InspectHandleName::filename("file1"))
+        .build()];
+        let file2_value3 = vec![InspectDataBuilder::new(
+            "my/component".try_into().unwrap(),
+            "component-url",
+            0, /* timestamp */
+        )
+        .with_hierarchy(hierarchy! { root: {branch: {leaf: 3i32}}})
+        .with_name(InspectHandleName::filename("file2"))
+        .build()];
+        let file1_value6 = vec![InspectDataBuilder::new(
+            "my/component".try_into().unwrap(),
+            "component-url",
+            0, /* timestamp */
+        )
+        .with_hierarchy(hierarchy! { root: {branch: {leaf: 6i32}}})
+        .with_name(InspectHandleName::filename("file1"))
+        .build()];
+        let file2_value8 = vec![InspectDataBuilder::new(
+            "my/component".try_into().unwrap(),
+            "component-url",
+            0, /* timestamp */
+        )
+        .with_hierarchy(hierarchy! { root: {branch: {leaf: 8i32}}})
+        .with_name(InspectHandleName::filename("file2"))
+        .build()];
 
         fn expect_one_metric_event_value(
             events: Result<Vec<EventToLog>, Error>,
@@ -2056,11 +2072,14 @@ mod tests {
         });
         sampler.rebuild_selector_data_structures();
 
-        let value =
-            vec![InspectDataBuilder::new("my/component", "component-url", 0 /* timestamp */)
-                .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
-                .with_name(InspectHandleName::filename("file1"))
-                .build()];
+        let value = vec![InspectDataBuilder::new(
+            "my/component".try_into().unwrap(),
+            "component-url",
+            0, /* timestamp */
+        )
+        .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
+        .with_name(InspectHandleName::filename("file1"))
+        .build()];
 
         let events = sampler.process_snapshot(value).await.expect("processed snapshot");
         assert_eq!(events.len(), 1);
