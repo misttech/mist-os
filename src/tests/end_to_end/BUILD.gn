@@ -77,7 +77,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
     "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
-    "//src/storage/blackout/host:blackout_vim3_unstable",
+    "//src/storage/blackout/host:blackout_vim3_stable",
     "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
