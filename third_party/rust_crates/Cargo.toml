@@ -29,7 +29,7 @@ aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
 ahash = { version = "0.8.6", default-features = false, features = [ "runtime-rng" ] }
 ansi_term = "0.12.0"
-anyhow = "1.0.75"
+anyhow = "1.0.81"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 argh = "0.1.12"
 arrayref = "0.3.5"
@@ -460,7 +460,7 @@ rustflags = [ "--cfg=aes_armv8" ]
 [gn.package.ahash."0.8.6".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 
-[gn.package.anyhow."1.0.75"]
+[gn.package.anyhow."1.0.81"]
 # TODO(https://github.com/rust-lang/rust/pull/99301): uncomment when generic member access is stable
 #rustflags = ["--cfg=backtrace"]
 
