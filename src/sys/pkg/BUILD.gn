@@ -16,7 +16,6 @@ group("tests") {
   testonly = true
   public_deps = [
     ":non_hermetic_tests($target_toolchain)",
-    "bin:tests",
     "lib:tests",
     "scripts:tests",
     "testing:tests",
@@ -29,19 +28,19 @@ group("tests") {
 if (is_fuchsia) {
   group("hermetic_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "bin:hermetic_tests" ]
   }
 
   group("non_hermetic_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "bin:non_hermetic_tests" ]
   }
 }
 
 if (is_host) {
   group("host_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "bin:host_tests" ]
   }
 }
 

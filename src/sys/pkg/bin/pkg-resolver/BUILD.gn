@@ -233,7 +233,7 @@ fuchsia_structured_config_values("eng_config_values_from_gn") {
   values = structured_config_values
 }
 
-group("tests") {
+group("non_hermetic_tests") {
   testonly = true
   public_deps = [ ":unit-tests-package" ]
 }

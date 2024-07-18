@@ -25,7 +25,7 @@ fuchsia_unittest_package("multi-universal-tool-tests") {
   deps = [ ":multi-universal-tool_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":multi-universal-tool-tests" ]
 }

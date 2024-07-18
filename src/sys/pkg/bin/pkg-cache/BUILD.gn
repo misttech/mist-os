@@ -233,7 +233,7 @@ fuchsia_test_package("pkg-cache-tests") {
   deps = [ "//src/storage/testing:storage_driver_test_realm" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":pkg-cache-tests" ]
 }

@@ -45,8 +45,3 @@ install_host_tools("host") {
   deps = [ ":pm_bin" ]
   outputs = [ "pm" ]
 }
-
-group("tests") {
-  testonly = true
-  public_deps = [ ":host_tests($host_toolchain)" ]
-}

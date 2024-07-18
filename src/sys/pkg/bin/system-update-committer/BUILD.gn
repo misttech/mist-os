@@ -95,7 +95,7 @@ system_update_committer_config("disable") {
   enable = false
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":system-update-committer-tests" ]
 }

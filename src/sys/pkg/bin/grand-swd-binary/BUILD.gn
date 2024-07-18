@@ -27,7 +27,7 @@ fuchsia_unittest_package("grand-swd-binary-tests") {
   deps = [ ":grand-swd-binary_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":grand-swd-binary-tests" ]
 }

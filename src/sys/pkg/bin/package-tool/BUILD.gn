@@ -33,7 +33,7 @@ if (is_host) {
     outputs = [ "package-tool" ]
   }
 
-  group("tests") {
+  group("host_tests") {
     testonly = true
     deps = [ ":package-tool_test($host_toolchain)" ]
   }
@@ -46,8 +46,8 @@ if (is_host) {
     deps = [ ":host($host_toolchain)" ]
   }
 
-  group("tests") {
+  group("host_tests") {
     testonly = true
-    deps = [ ":tests($host_toolchain)" ]
+    deps = [ ":host_tests($host_toolchain)" ]
   }
 }

@@ -161,7 +161,7 @@ resource("omaha-client-channels-test-config") {
   sources = [ "test_data/test_channel_config.json" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [
     ":omaha-client-channels-test-config",

@@ -15,28 +15,49 @@ group("bin") {
   ]
 }
 
-group("tests") {
+group("all_tests") {
   testonly = true
   public_deps = [
-    "fake-system-update-committer:tests",
-    "grand-swd-binary:tests",
-    "multi-universal-tool:tests",
-    "package-tool:tests",
-    "pkg-cache:tests",
-    "pkg-resolver:tests",
-    "pkgctl:tests",
-    "pm:tests",
-    "system-update-checker:tests",
-    "system-update-committer:tests",
-    "system-update-configurator:tests",
-    "system-updater:tests",
-    "update:tests",
+    ":hermetic_tests($target_toolchain)",
+    ":hon-hermetic_tests($target_toolchain)",
+    ":host_tests($host_toolchain)",
   ]
+}
 
-  if (current_cpu == "riscv64") {
-    public_deps -= [
-      # TODO(https://fxbug.dev/300170314): Remove after removing Go dependencies on RISC-V.
-      "pm:tests",
+if (is_fuchsia) {
+  group("hermetic_tests") {
+    testonly = true
+    public_deps = [
+      "fake-system-update-committer:hermetic_tests",
+      "grand-swd-binary:hermetic_tests",
+      "multi-universal-tool:hermetic_tests",
+      "omaha-client:hermetic_tests",
+      "pkg-cache:hermetic_tests",
+      "pkgctl:hermetic_tests",
+      "system-update-checker:hermetic_tests",
+      "system-update-committer:hermetic_tests",
+      "system-update-configurator:hermetic_tests",
+      "system-updater:hermetic_tests",
+      "update:hermetic_tests",
+    ]
+  }
+
+  group("non_hermetic_tests") {
+    testonly = true
+    public_deps = [
+      "pkg-resolver:non_hermetic_tests",
+      "system-update-configurator:non_hermetic_tests",
+    ]
+  }
+}
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    public_deps = [
+      "package-tool:host_tests",
+      "pm:host_tests",
+      "system-updater:host_tests",
     ]
   }
 }
