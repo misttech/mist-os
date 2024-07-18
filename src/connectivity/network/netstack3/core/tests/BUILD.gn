@@ -12,6 +12,7 @@ rustc_test("netstack3_core_threading_test") {
   edition = "2021"
   source_root = "threading/lib.rs"
   sources = [
+    "threading/device_socket.rs",
     "threading/lib.rs",
     "threading/tcp.rs",
   ]

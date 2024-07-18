@@ -73,7 +73,7 @@ pub mod device_socket {
     pub use netstack3_device::socket::{
         DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
         EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SentFrame, SocketId,
-        SocketInfo, TargetDevice,
+        SocketInfo, TargetDevice, WeakDeviceSocketId,
     };
 }
 

@@ -13,9 +13,10 @@ use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ethernet::Mac;
 use net_types::ip::IpVersion;
-use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc};
+use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, SendFrameContext,
+    AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, ReferenceNotifiers,
+    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, SendFrameContext,
     SendFrameErrorReason, StrongDeviceIdentifier as _, WeakDeviceIdentifier as _,
 };
 use packet::{BufferMut, ParsablePacket as _, Serializer};
@@ -88,16 +89,6 @@ impl<D, BT: DeviceSocketTypes> PrimaryDeviceSocketId<D, BT> {
         Self(PrimaryRc::new(SocketState { external_state, target: Default::default() }))
     }
 
-    /// Drops this primary reference returning the internal state.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there are strong [`DeviceSocketId`] clones alive.
-    fn unwrap(self) -> SocketState<D, BT> {
-        let Self(rc) = self;
-        PrimaryRc::unwrap(rc)
-    }
-
     /// Clones the primary's underlying reference and returns as a strong id.
     fn clone_strong(&self) -> DeviceSocketId<D, BT> {
         let PrimaryDeviceSocketId(rc) = self;
@@ -125,6 +116,21 @@ impl<D, BT: DeviceSocketTypes> OrderedLockAccess<Target<D>> for DeviceSocketId<D
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         let Self(rc) = self;
         OrderedLockRef::new(&rc.target)
+    }
+}
+
+/// A weak reference to socket state.
+///
+/// The existence of a [`WeakSocketDeviceId`] does not attest to the liveness of
+/// the backing socket.
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
+pub struct WeakDeviceSocketId<D, BT: DeviceSocketTypes>(WeakRc<SocketState<D, BT>>);
+
+impl<D, BT: DeviceSocketTypes> Debug for WeakDeviceSocketId<D, BT> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("WeakDeviceSocketId").field(&WeakRc::debug_id(rc)).finish()
     }
 }
 
@@ -373,8 +379,9 @@ impl<C> DeviceSocketApi<C>
 where
     C: ContextPair,
     C::CoreContext: DeviceSocketContext<C::BindingsContext>,
-    C::BindingsContext:
-        DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    C::BindingsContext: DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
+        + ReferenceNotifiers
+        + 'static,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair) = self;
@@ -441,12 +448,13 @@ where
     }
 
     /// Removes a bound socket.
-    ///
-    /// # Panics
-    ///
-    /// If the provided `id` is not the last instance for a socket, this
-    /// method will panic.
-    pub fn remove(&mut self, id: ApiSocketId<C>) {
+    pub fn remove(
+        &mut self,
+        id: ApiSocketId<C>,
+    ) -> RemoveResourceResultWithContext<
+        <C::BindingsContext as DeviceSocketTypes>::SocketState,
+        C::BindingsContext,
+    > {
         let core_ctx = self.core_ctx();
         core_ctx.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), core_ctx| {
             let old_device = core_ctx.with_socket_state_mut(&id, |_external_state, target| {
@@ -477,8 +485,12 @@ where
             // ID.
             drop(id);
 
-            let SocketState { external_state: _, target: _ } = primary.unwrap();
-        });
+            let PrimaryDeviceSocketId(primary) = primary;
+            C::BindingsContext::unwrap_or_notify_with_new_reference_notifier(
+                primary,
+                |SocketState { external_state, target: _ }| external_state,
+            )
+        })
     }
 
     /// Sends a frame for the specified socket.
@@ -541,6 +553,12 @@ impl<D, BT: DeviceSocketTypes> DeviceSocketId<D, BT> {
         let Self(strong) = self;
         let SocketState { external_state, target: _ } = &**strong;
         external_state
+    }
+
+    /// Obtain a [`WeakDeviceSocketId`] from this [`DeviceSocketId`].
+    pub fn downgrade(&self) -> WeakDeviceSocketId<D, BT> {
+        let Self(inner) = self;
+        WeakDeviceSocketId(StrongRc::downgrade(inner))
     }
 }
 
@@ -844,7 +862,9 @@ mod tests {
     use core::marker::PhantomData;
 
     use const_unwrap::const_unwrap_option;
+    use core::convert::Infallible as Never;
     use derivative::Derivative;
+    use netstack3_base::sync::DynDebugReferences;
     use netstack3_base::testutil::{
         FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
     };
@@ -926,6 +946,18 @@ mod tests {
                 frame: frame.cloned(),
                 raw: raw_frame.into(),
             })
+        }
+    }
+
+    impl<D> ReferenceNotifiers for FakeBindingsCtx<D> {
+        type ReferenceReceiver<T: 'static> = Never;
+
+        type ReferenceNotifier<T: Send + 'static> = Never;
+
+        fn new_reference_notifier<T: Send + 'static>(
+            debug_references: DynDebugReferences,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            panic!("device socket removal unexpectedly deferred in test: {debug_references:?}");
         }
     }
 
@@ -1212,7 +1244,7 @@ mod tests {
             SocketInfo { device: TargetDevice::AnyDevice, protocol: None }
         );
 
-        api.remove(bound);
+        let ExternalSocketState(_received_frames) = api.remove(bound).into_removed();
     }
 
     #[test_case(TargetDevice::AnyDevice)]
@@ -1300,7 +1332,7 @@ mod tests {
         }
 
         for socket in sockets {
-            api.remove(socket)
+            let ExternalSocketState(_received_frames) = api.remove(socket).into_removed();
         }
     }
 
@@ -1580,10 +1612,11 @@ mod tests {
             device_sockets: _,
         } = core_ctx.into_state();
         let primary = all_sockets.remove(&socket).unwrap();
+        let PrimaryDeviceSocketId(primary) = primary;
         assert!(all_sockets.is_empty());
         drop(socket);
         let SocketState { external_state: ExternalSocketState(received), target: _ } =
-            primary.unwrap();
+            PrimaryRc::unwrap(primary);
         assert_eq!(
             received.into_inner(),
             vec![

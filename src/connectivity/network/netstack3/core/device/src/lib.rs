@@ -73,7 +73,7 @@ pub mod socket {
         DeviceSocketTypes, DeviceSockets, EthernetFrame, EthernetHeaderParams, Frame,
         HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError, PrimaryDeviceSocketId,
         Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo, SocketState, SocketStateAccessor,
-        Target, TargetDevice,
+        Target, TargetDevice, WeakDeviceSocketId,
     };
 }
 

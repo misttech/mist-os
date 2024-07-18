@@ -34,8 +34,8 @@ use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
 use crate::bindings::socket::{IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 use crate::bindings::util::{
-    DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryFromFidl,
-    TryIntoCoreWithContext as _, TryIntoFidlWithContext,
+    DeviceNotFoundError, IntoCore as _, IntoFidl as _, RemoveResourceResultExt as _,
+    ResultExt as _, TryFromFidl, TryIntoCoreWithContext as _, TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingsCtx, Ctx};
 
@@ -254,7 +254,14 @@ impl worker::SocketWorkerHandler for BindingData {
 
     async fn close(self, ctx: &mut Ctx) {
         let Self { peer_event: _, id } = self;
-        ctx.api().device_socket().remove(id)
+        let weak = id.downgrade();
+        let SocketState { queue: _, kind: _ } = ctx
+            .api()
+            .device_socket()
+            .remove(id)
+            .map_deferred(|d| d.into_future("packet socket", &weak))
+            .into_future()
+            .await;
     }
 }
 
