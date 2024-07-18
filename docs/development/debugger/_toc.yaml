@@ -18,7 +18,7 @@ toc:
   path: /docs/development/debugger/tests.md
 - title: "Evaluate expressions"
   path: /docs/development/debugger/expressions.md
-- title: "Inspecting memory"
+- title: "Inspect memory"
   path: /docs/development/debugger/memory.md
 - title: "Working with assembly language"
   path: /docs/development/debugger/assembly.md
