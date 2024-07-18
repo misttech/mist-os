@@ -64,16 +64,15 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         for level in api_levels
         if api_levels[level]["status"] == "supported"
     ]
-    # TODO(https://fxbug.dev/326277078): Remove this when transitioning to NEXT.
+    # In-development API level 22 is temporarily supported alongside "NEXT".
+    # TODO(https://fxbug.dev/326277078): Remove 22 and this block.
     in_development_api_levels: list[int] = [
         int(level)
         for level in api_levels
         if api_levels[level]["status"] == "in-development"
     ]
-
-    assert (
-        len(in_development_api_levels) < 2
-    ), f"Should be at most one in-development API level. Found: {in_development_api_levels}"
+    assert len(in_development_api_levels) == 1
+    assert api_levels["22"]["status"] == "in-development"
 
     assert len(api_levels) == (
         len(retired_api_levels)
@@ -83,25 +82,21 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
     ), '"api_levels" contains a level with an unexpected "status".'
 
     # Special API levels are added below.
-    idk_buildable_api_levels = supported_api_levels + in_development_api_levels
-    runtime_supported_api_levels = sunset_api_levels + idk_buildable_api_levels
+    runtime_supported_api_levels = sunset_api_levels + supported_api_levels
+    idk_buildable_api_levels = supported_api_levels.copy()
 
-    # Temporarily do not support the numbered in-development API level, which
-    # will soon be replaced with NEXT, in the IDK since so IDK consumers do not
-    # start using it.
-    # TODO(https://fxbug.dev/326277078): Remove this when transitioning to NEXT.
-    for level in in_development_api_levels:
-        idk_buildable_api_levels.remove(level)
+    # In-development API level 22 is temporarily still supported alongside
+    # "NEXT", but it was never in the IDK.
+    # TODO(https://fxbug.dev/326277078): Remove API level 22 and this line.
+    runtime_supported_api_levels += in_development_api_levels
 
     # Explicitly add concrete special API levels.
     # "HEAD" is not supported in the IDK - see https://fxbug.dev/334936990.
-    # TODO(https://fxbug.dev/326277078): Add "NEXT" to both lines below and
-    # expected_special_levels.
-    runtime_supported_api_levels += ["HEAD"]
-    idk_buildable_api_levels += []
+    runtime_supported_api_levels += ["NEXT", "HEAD"]
+    idk_buildable_api_levels += ["NEXT"]
 
     # Validate the JSON data, including the specific levels and their status.
-    expected_special_levels = ["HEAD", "PLATFORM"]
+    expected_special_levels = ["NEXT", "HEAD", "PLATFORM"]
     special_api_levels = data["data"]["special_api_levels"]
     assert len(special_api_levels) == len(expected_special_levels)
     for level in special_api_levels:
