@@ -183,14 +183,14 @@ First, you must implement your mock component.
     signature:
 
     ```rust
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/lib/fuchsia-component-test/src/mock.rs" region_tag="mock_interface_rust" adjust_indentation="auto" %}
+    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/lib/fuchsia-component-test/src/mock.rs" region_tag="mock_interface_rust" adjust_indentation="auto" fail_with="Missing code example" %}
     ```
 
     `MockHandles` is a struct containing handles to the component's incoming
     and outgoing capabilities:
 
     ```rust
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/lib/fuchsia-component-test/src/mock.rs" region_tag="mock_handles_rust" adjust_indentation="auto" %}
+    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/lib/fuchsia-component-test/src/mock.rs" region_tag="mock_handles_rust" adjust_indentation="auto" fail_with="Missing code example" %}
     ```
 
     An implementation for a mock component would look like:
