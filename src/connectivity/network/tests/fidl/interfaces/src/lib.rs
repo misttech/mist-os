@@ -1291,7 +1291,6 @@ async fn addresses_while_offline<N: Netstack>(
     .expect("failed to wait for address to be present");
 }
 
-// TODO(https://fxbug.dev/42063946): Split this test up.
 /// Test interface changes are reported through the interface watcher.
 #[netstack_test]
 #[variant(N, Netstack)]
