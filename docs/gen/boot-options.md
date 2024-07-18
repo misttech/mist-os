@@ -255,7 +255,7 @@ Refer to `kernel.oom.outofmemory-mb`, `kernel.oom.critical-mb`,
 memory pressure state transitions.
 
 The current memory availability state can be queried with the command
-`k mem mem_avail_state info`.
+`k mem dump`.
 
 ### kernel.oom.outofmemory-mb=\<uint64_t>
 

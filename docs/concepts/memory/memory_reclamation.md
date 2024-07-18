@@ -284,20 +284,19 @@ pmm drop_user_pt                             : drop all user hardware page table
 
 ### Observing and generating memory pressure
 
-Use the `k mem mem_avail_state` command to generate memory pressure on the
+Use the `k mem avail_state` command to generate memory pressure on the
 system, by allocating memory to reach the specified memory pressure level. This
 is useful for testing system-wide response to memory pressure:
 
 ```posix-terminal
 k mem avail_state
-mem avail_state info                     : dump memory availability state info
 mem avail_state [step] <state> [<nsecs>] : allocate memory to go to memstate <state>, hold the state for <nsecs> (10s by default). Only works if going to <state> from current state requires allocating memory, can't free up pre-allocated memory. In optional [step] mode, allocation pauses for 1 second at each intermediate memory availability state until <state> is reached.
 ```
 
-`k mem mem_avail_state info` dumps the current memory pressure state.
+`k mem dump` dumps the current memory pressure state.
 
 ```posix-terminal
-k mem avail_state info
+k mem dump
 watermarks: [50M, 60M, 150M, 300M]
 debounce: 1M
 current state: 4
