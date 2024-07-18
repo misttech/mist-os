@@ -11,7 +11,7 @@ rustc_library("lib") {
 
   deps = [
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//src/lib/versioning/version-history/rust:version-history",
+    "//src/lib/versioning/version-history/rust",
   ]
 
   sources = [ "src/lib.rs" ]

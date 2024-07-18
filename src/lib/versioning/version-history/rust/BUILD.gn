@@ -5,7 +5,8 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("version-history") {
+rustc_library("rust") {
+  name = "version_history"
   edition = "2021"
   with_unit_tests = true
 
@@ -22,7 +23,7 @@ rustc_library("version-history") {
 group("tests") {
   testonly = true
   deps = [
-    ":version-history_test($host_toolchain)",
+    ":rust_test($host_toolchain)",
     "proc-macro:tests",
     "shared:tests",
   ]
