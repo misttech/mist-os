@@ -33,6 +33,8 @@ class DlSystemTests : public DlSystemLoadTestsBase {
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 
+  static fit::result<Error> DlClose(void* module);
+
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
 
  private:

@@ -120,6 +120,8 @@ TYPED_TEST(DlTests, Basic) {
   ASSERT_TRUE(sym_result.value());
 
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
 }
 
 // Load a file that performs relative relocations against itself. The TestStart
@@ -139,6 +141,8 @@ TYPED_TEST(DlTests, Relative) {
   ASSERT_TRUE(sym_result.value());
 
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
 }
 
 // Load a file that performs symbolic relocations against itself. The TestStart
@@ -158,6 +162,8 @@ TYPED_TEST(DlTests, Symbolic) {
   ASSERT_TRUE(sym_result.value());
 
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
 }
 
 // Load a module that depends on a symbol provided directly by a dependency.
@@ -178,6 +184,8 @@ TYPED_TEST(DlTests, BasicDep) {
   ASSERT_TRUE(sym_result.value());
 
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
 }
 
 // Load a module that depends on a symbols provided directly and transitively by
@@ -201,6 +209,8 @@ TYPED_TEST(DlTests, IndirectDeps) {
   ASSERT_TRUE(sym_result.value());
 
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
 }
 
 // Load a module that depends on symbols provided directly and transitively by
@@ -230,6 +240,8 @@ TYPED_TEST(DlTests, ManyDeps) {
   ASSERT_TRUE(sym_result.value());
 
   EXPECT_EQ(RunFunction<int64_t>(sym_result.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
 }
 
 // TODO(https://fxbug.dev/339028040): Test missing symbol in transitive dep.
@@ -291,12 +303,12 @@ TYPED_TEST(DlTests, MissingDependency) {
 // Try to load a module where the dependency of its direct dependency (i.e. a
 // transitive dependency of the root module) cannot be found.
 TYPED_TEST(DlTests, MissingTransitiveDependency) {
-  constexpr const char* kMissingDepFile = "missing-transitive-dep.module.so";
+  constexpr const char* kMissingTransitiveDepFile = "missing-transitive-dep.module.so";
 
-  this->ExpectRootModule(kMissingDepFile);
+  this->ExpectRootModule(kMissingTransitiveDepFile);
   this->Needed({Found("libhas-missing-dep.so"), NotFound("libmissing-dep-dep.so")});
 
-  auto result = this->DlOpen(kMissingDepFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kMissingTransitiveDepFile, RTLD_NOW | RTLD_LOCAL);
   // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
   // between implementations.
   // Expect that the dependency lib to libhas-missing-dep.so cannot be found.
@@ -345,6 +357,9 @@ TYPED_TEST(DlTests, BasicModuleReuse) {
   EXPECT_TRUE(sym2_ptr);
 
   EXPECT_EQ(sym1_ptr, sym2_ptr);
+
+  ASSERT_TRUE(this->DlClose(ptr1).is_ok());
+  ASSERT_TRUE(this->DlClose(ptr2).is_ok());
 }
 
 // Test that different mutually-exclusive files that were dlopen-ed do not share
@@ -385,6 +400,9 @@ TYPED_TEST(DlTests, UniqueModules) {
 
   EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), kReturnValue17);
   EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), kReturnValue23);
+
+  ASSERT_TRUE(this->DlClose(ret17_ptr).is_ok());
+  ASSERT_TRUE(this->DlClose(ret23_ptr).is_ok());
 }
 
 // Test that you can dlopen a dependency from a previously loaded module.

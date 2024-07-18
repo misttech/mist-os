@@ -32,6 +32,15 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
   return fit::ok(result);
 }
 
+// TODO(https://fxbug.dev/342483491): Have the test fixture automatically track
+// dlopen-ed files so they can be dlclosed and unmapped at test teardown.
+fit::result<Error> DlSystemTests::DlClose(void* module) {
+  if (dlclose(module)) {
+    return TakeError();
+  }
+  return fit::ok();
+}
+
 fit::result<Error, void*> DlSystemTests::DlSym(void* module, const char* ref) {
   void* result = dlsym(module, ref);
   if (!result) {

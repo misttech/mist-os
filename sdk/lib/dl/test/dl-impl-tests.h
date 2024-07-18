@@ -35,6 +35,18 @@ class DlImplTests : public Base {
         file, mode, cpp20::bind_front(&Base::RetrieveFile, this));
   }
 
+  // TODO(https://fxbug.dev/342483491): Have the test fixture automatically track
+  // dlopen-ed files so they can be dlclosed and unmapped at test teardown.
+  // TODO(https://fxbug.dev/342028933): Implement dlclose.
+  fit::result<Error> DlClose(void* module) {
+    // At minimum check that a valid handle was passed and present in the
+    // dynamic linker's list of modules.
+    if (auto* m = static_cast<ModuleHandle*>(module); dynamic_linker_.FindModule(m->name())) {
+      return fit::ok();
+    }
+    return fit::error<Error>{"Invalid library handle %p", module};
+  }
+
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
     return dynamic_linker_.LookupSymbol(static_cast<ModuleHandle*>(module), ref);
   }
