@@ -436,8 +436,6 @@ enum CacheTimerAction<A: IpAddress> {
     CancelExistingTimer(FragmentCacheKey<A>),
 }
 
-// TODO(https://fxbug.dev/42174372): Make these operate on a context trait rather
-// than `&self` and `&mut self`.
 impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
     /// Attempts to process a packet fragment.
     ///
