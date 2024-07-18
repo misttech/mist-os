@@ -18,6 +18,7 @@ use starnix_uapi::file_mode::Access;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
+use std::fmt::Display;
 use std::sync::{Arc, Weak};
 
 pub struct SimpleFileNode<F, O>
@@ -100,16 +101,6 @@ pub fn parse_unsigned_file<T: Into<u64> + std::str::FromStr>(buf: &[u8]) -> Resu
     std::str::from_utf8(&buf[..i]).unwrap().parse::<T>().map_err(|_| errno!(EINVAL))
 }
 
-pub fn serialize_u64_file(value: u64) -> Vec<u8> {
-    let string = format!("{}\n", value);
-    string.as_bytes().to_vec()
-}
-
-pub fn serialize_u32_file(value: u32) -> Vec<u8> {
-    let string = format!("{}\n", value);
-    string.as_bytes().to_vec()
-}
-
 pub fn parse_i32_file(buf: &[u8]) -> Result<i32, Errno> {
     let i = buf
         .iter()
@@ -121,9 +112,9 @@ pub fn parse_i32_file(buf: &[u8]) -> Result<i32, Errno> {
     std::str::from_utf8(&buf[..i]).unwrap().parse::<i32>().map_err(|_| errno!(EINVAL))
 }
 
-pub fn serialize_i32_file(value: i32) -> Vec<u8> {
+pub fn serialize_for_file<T: Display>(value: T) -> Vec<u8> {
     let string = format!("{}\n", value);
-    string.as_bytes().to_vec()
+    string.into_bytes()
 }
 
 pub struct BytesFile<Ops>(Arc<Ops>);

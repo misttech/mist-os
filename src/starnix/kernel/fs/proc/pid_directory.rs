@@ -8,7 +8,7 @@ use crate::task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGr
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, serialize_i32_file,
+    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, serialize_for_file,
     BytesFile, BytesFileOps, CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile,
     DynamicFileBuf, DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode,
     FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile,
@@ -1192,7 +1192,7 @@ impl BytesFileOps for OomScoreFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let _task = Task::from_weak(&self.0)?;
         track_stub!(TODO("https://fxbug.dev/322873459"), "/proc/pid/oom_score");
-        Ok(serialize_i32_file(0).into())
+        Ok(serialize_for_file(0).into())
     }
 }
 
@@ -1237,7 +1237,7 @@ impl BytesFileOps for OomAdjFile {
                 (oom_score_adj - OOM_SCORE_ADJ_MIN) / (OOM_SCORE_ADJ_MAX - OOM_SCORE_ADJ_MIN);
             fraction * (OOM_ADJUST_MAX - OOM_ADJUST_MIN) + OOM_ADJUST_MIN
         };
-        Ok(serialize_i32_file(oom_adj).into())
+        Ok(serialize_for_file(oom_adj).into())
     }
 }
 
@@ -1266,6 +1266,6 @@ impl BytesFileOps for OomScoreAdjFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let task = Task::from_weak(&self.0)?;
         let oom_score_adj = task.read().oom_score_adj;
-        Ok(serialize_i32_file(oom_score_adj).into())
+        Ok(serialize_for_file(oom_score_adj).into())
     }
 }
