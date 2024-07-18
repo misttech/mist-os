@@ -28,7 +28,7 @@ constexpr std::string_view kUrlPattern = R"(https?://[^"',!<> ]*)";
 // Hex strings
 constexpr std::string_view k16HexPattern = R"((\b[0-9a-fA-F]{16}\b))";
 constexpr std::string_view k32HexPattern = R"((\b[0-9a-fA-F]{32}\b))";
-const auto* kHexIgnorePrefixes = new std::vector<std::string>({"elf:"});
+const auto* kHexIgnorePrefixes = new std::vector<std::string>({"elf:", "build_id: '"});
 
 // Obfuscated gaia ids
 constexpr std::string_view kGaiaPattern = R"((\b1[0-9]{20}\b))";

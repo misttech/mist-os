@@ -106,6 +106,8 @@ TEST_F(RedactorTest, Check) {
   EXPECT_EQ(Redact("456 elf:1234567890abcdef 789"), "456 elf:1234567890abcdef 789");
   EXPECT_EQ(Redact("456 elf:1234567890abcdefABCDEF0123456789 789"),
             "456 elf:1234567890abcdefABCDEF0123456789 789");
+  EXPECT_EQ(Redact("456 build_id: '5f2c0ede0fa479b9b997c4fce6d4cf24' 789"),
+            "456 build_id: '5f2c0ede0fa479b9b997c4fce6d4cf24' 789");
 }
 
 TEST_F(RedactorTest, Canary) {
