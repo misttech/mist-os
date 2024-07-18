@@ -55,9 +55,7 @@ impl<Meta, Buffer> Queue<Meta, Buffer> {
             DequeueResult::MoreStillQueued
         }
     }
-}
 
-impl<Meta, Buffer> Queue<Meta, Buffer> {
     /// Attempts to add the RX frame to the queue.
     pub(super) fn queue_rx_frame(
         &mut self,
@@ -79,9 +77,7 @@ impl<Meta, Buffer> Queue<Meta, Buffer> {
             EnqueueResult::QueuePreviouslyWasOccupied
         })
     }
-}
 
-impl<Meta, Buffer> Queue<Meta, Buffer> {
     /// Attempts to add the tx frame to the queue.
     ///
     /// The returned `QueueTxInserter` can insert a single entry into the queue.
@@ -89,6 +85,11 @@ impl<Meta, Buffer> Queue<Meta, Buffer> {
         let Self { items } = self;
         let len = items.len();
         (len < MAX_TX_QUEUED_LEN).then(|| QueueTxInserter { queue: self, len })
+    }
+
+    pub(super) fn len(&self) -> usize {
+        let Self { items } = self;
+        items.len()
     }
 }
 

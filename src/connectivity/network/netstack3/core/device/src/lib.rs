@@ -89,7 +89,7 @@ pub mod queue {
         TransmitQueueCommon, TransmitQueueConfiguration, TransmitQueueContext,
         TransmitQueueHandler, TransmitQueueState,
     };
-    pub use crate::internal::queue::{DequeueState, ReceiveQueueFullError};
+    pub use crate::internal::queue::{BatchSize, DequeueState, ReceiveQueueFullError};
 }
 
 pub use internal::api::{DeviceAnyApi, DeviceApi};

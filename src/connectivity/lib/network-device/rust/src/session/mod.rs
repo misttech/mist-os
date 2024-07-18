@@ -24,10 +24,10 @@ use {fidl_fuchsia_hardware_network as netdev, fuchsia_async as fasync, fuchsia_z
 
 use crate::error::{Error, Result};
 use buffer::pool::Pool;
-pub use buffer::Buffer;
 use buffer::{
-    AllocKind, DescId, Rx, Tx, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
+    AllocKind, DescId, NETWORK_DEVICE_DESCRIPTOR_LENGTH, NETWORK_DEVICE_DESCRIPTOR_VERSION,
 };
+pub use buffer::{Buffer, Rx, Tx};
 
 /// A session between network device client and driver.
 #[derive(Clone)]

@@ -57,7 +57,8 @@ pub mod device {
         PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
     pub use netstack3_device::queue::{
-        ReceiveQueueBindingsContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
+        BatchSize, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
+        TransmitQueueConfiguration,
     };
     pub use netstack3_device::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceClassMatcher, DeviceConfiguration,

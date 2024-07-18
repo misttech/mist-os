@@ -20,6 +20,10 @@ const MAX_MULTICAST_FILTERS uint32 = 64;
 // on memory consumption for a `Device` instance.
 const MAX_PENDING_OPERATIONS uint32 = 32;
 
+/// The TX and RX FIFO Depths used by tun devices.
+// Chosen arbitrarly to match some real driver's depth.
+const FIFO_DEPTH uint16 = 128;
+
 /// Signals set in the `eventpair` returned by
 /// [`fuchsia.net.tun/Device.GetSignals`].
 type Signals = strict bits : uint32 {

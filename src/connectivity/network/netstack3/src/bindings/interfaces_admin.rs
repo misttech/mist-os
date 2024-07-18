@@ -58,13 +58,14 @@ use netstack3_core::ip::{
     Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
     UpdateIpConfigurationError,
 };
+
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_async as fasync,
 };
 
-use crate::bindings::devices::{self, EthernetInfo, StaticCommonInfo};
+use crate::bindings::devices::{self, EthernetInfo, StaticCommonInfo, TxTask, TxTaskError};
 use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
 use crate::bindings::util::{
@@ -158,7 +159,7 @@ async fn run_device_control(
                     options,
                     control_handle: _,
                 } => {
-                    if let Some(interface_tasks) = create_interface(
+                    if let Some(interface_task) = create_interface(
                         port,
                         control,
                         options,
@@ -168,7 +169,7 @@ async fn run_device_control(
                     )
                     .await
                     {
-                        tasks.extend(interface_tasks);
+                        tasks.push(interface_task);
                     }
                 }
                 fnet_interfaces_admin::DeviceControlRequest::Detach { control_handle: _ } => {
@@ -262,7 +263,7 @@ async fn create_interface(
     ns: &mut Netstack,
     handler: &netdevice_worker::DeviceHandler,
     device_stopped_fut: async_utils::event::EventWaitResult,
-) -> Option<[fuchsia_async::Task<()>; 2]> {
+) -> Option<fuchsia_async::Task<()>> {
     debug!("creating interface from {:?} with {:?}", port, options);
     let fnet_interfaces_admin::Options { name, metric, .. } = options;
     let (control_sender, mut control_receiver) =
@@ -278,8 +279,9 @@ async fn create_interface(
                 status_stream,
                 device_stopped_fut,
                 control_receiver,
+                tx_task,
             ));
-            Some([interface_control_task, tx_task])
+            Some(interface_control_task)
         }
         Err(e) => {
             warn!("failed to add port {:?} to device: {:?}", port, e);
@@ -355,6 +357,7 @@ async fn run_netdevice_interface_control<
     status_stream: S,
     mut device_stopped_fut: async_utils::event::EventWaitResult,
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
+    tx_task: TxTask,
 ) {
     let status_stream = status_stream.scan((), |(), status| {
         futures::future::ready(match status {
@@ -379,6 +382,21 @@ async fn run_netdevice_interface_control<
     let (interface_control_stop_sender, interface_control_stop_receiver) =
         futures::channel::oneshot::channel();
 
+    let (tx_task, tx_task_cancel) = tx_task.into_future_and_cancellation();
+    let mut tx_task = tx_task.map(|r| match r {
+        // Return a termination reason if tx task finishing should cause the
+        // interface to be removed.
+        Ok(()) | Err(TxTaskError::Aborted) => None,
+        Err(TxTaskError::Netdevice(e)) => {
+            // We expect all netdevice errors that can happen when driving the
+            // tx task are problems fulfilling buffer layouts, so we can't
+            // continue driving the interface. Log a loud message and we''ll
+            // close the channel with PortClosed.
+            error!("netdevice error operating tx task: {e:?} for {id}");
+            Some(fnet_interfaces_admin::InterfaceRemovedReason::BadPort)
+        }
+    });
+
     // Device-backed interfaces are always removable.
     let removable = true;
     let interface_control_fut = run_interface_control(
@@ -388,22 +406,46 @@ async fn run_netdevice_interface_control<
         control_receiver,
         removable,
         status_stream,
+        move || {
+            // Abort the tx task when the interface is being removed.
+            tx_task_cancel.abort();
+        },
     )
     .fuse();
     let mut interface_control_fut = pin!(interface_control_fut);
-    futures::select! {
-        o = device_stopped_fut => {
-            o.expect("event was orphaned");
-        },
-        () = interface_control_fut => (),
+    let remove_reason = loop {
+        futures::select! {
+            o = device_stopped_fut => {
+                o.expect("event was orphaned");
+                break Some(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed);
+            },
+            r = tx_task => {
+                // Remove the interface if we're given a reason.
+                 if r.is_some() {
+                    break r;
+                 }
+            },
+            () = interface_control_fut => {
+                break None;
+            },
+        };
     };
-    if !interface_control_fut.is_terminated() {
-        // Cancel interface control and drive it to completion, allowing it to terminate each
-        // control handle.
-        interface_control_stop_sender
-            .send(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed)
-            .expect("failed to cancel interface control");
-        interface_control_fut.await
+
+    if let Some(remove_reason) = remove_reason {
+        if !interface_control_fut.is_terminated() {
+            // Cancel interface control and drive it to completion, allowing it to terminate each
+            // control handle.
+            interface_control_stop_sender
+                .send(remove_reason)
+                .expect("failed to cancel interface control");
+            interface_control_fut.await
+        }
+    }
+
+    if !tx_task.is_terminated() {
+        // Drive the task to the end, but we don't have a use for the
+        // termination reason.
+        let _: Option<_> = tx_task.await;
     }
 }
 
@@ -413,7 +455,7 @@ pub(crate) struct DeviceState {
 
 /// Runs a worker to serve incoming `fuchsia.net.interfaces.admin/Control`
 /// handles.
-pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>>(
+pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>, F: FnOnce()>(
     ctx: Ctx,
     id: BindingId,
     mut stop_receiver: futures::channel::oneshot::Receiver<
@@ -422,6 +464,7 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
     removable: bool,
     device_state: S,
+    shutting_down: F,
 ) {
     // An event indicating that the individual control request streams should stop.
     let cancel_request_streams = async_utils::event::Event::new();
@@ -597,6 +640,9 @@ pub(crate) async fn run_interface_control<S: futures::Stream<Item = DeviceState>
         })
     };
     address_state_providers.collect::<()>().await;
+
+    // Notify any interested parties that we're removing the interface.
+    shutting_down();
 
     // Nothing else should be borrowing ctx by now. Moving to a mutable bind
     // proves this.

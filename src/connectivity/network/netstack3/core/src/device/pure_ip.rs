@@ -82,6 +82,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
     type Meta = PureIpDeviceTxQueueFrameMetadata;
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
+    type DequeueContext = BC::DequeueContext;
 
     fn parse_outgoing_frame<'a, 'b>(
         buf: &'a [u8],
@@ -111,15 +112,35 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceTxQueu
         cb(&mut x)
     }
 
+    fn with_transmit_queue<
+        O,
+        F: FnOnce(&TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        let mut state = integration::device_state(self, device_id);
+        let x = state.lock::<crate::lock_ordering::PureIpDeviceTxQueue>();
+        cb(&x)
+    }
+
     fn send_frame(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
+        dequeue_context: Option<&mut BC::DequeueContext>,
         meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError> {
         let PureIpDeviceTxQueueFrameMetadata { ip_version } = meta;
-        DeviceLayerEventDispatcher::send_ip_packet(bindings_ctx, device_id, buf, ip_version)
+        DeviceLayerEventDispatcher::send_ip_packet(
+            bindings_ctx,
+            device_id,
+            buf,
+            ip_version,
+            dequeue_context,
+        )
     }
 }
 

@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
 use futures::task::AtomicWaker;
-use futures::{Future, FutureExt as _, Stream, StreamExt as _};
+use futures::{Future, FutureExt as _, Stream};
 use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{
@@ -29,7 +29,6 @@ use netstack3_core::socket::{
     self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
 };
 use netstack3_core::sync::RemoveResourceResult;
-use netstack3_core::types::WorkQueueReport;
 use packet_formats::utils::NonZeroDuration;
 use {
     fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces as fnet_interfaces,
@@ -241,32 +240,6 @@ impl TaskWaitGroupSpawner {
             std::mem::drop(spawner);
         }))
         .detach();
-    }
-}
-
-/// Extracts common bounded work operations performed on [`NeedsDataWatcher`].
-///
-/// Runs the watcher loop until `watcher` is finished or `f` returns `None`.
-pub(crate) async fn yielding_data_notifier_loop<F: FnMut() -> Option<WorkQueueReport>>(
-    mut watcher: NeedsDataWatcher,
-    mut f: F,
-) {
-    let mut yield_fut = futures::future::OptionFuture::default();
-    loop {
-        // Loop while we are woken up to handle enqueued RX packets.
-        let r = futures::select! {
-            w = watcher.next().fuse() => w,
-            y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
-        };
-
-        match r.and_then(|()| f()) {
-            Some(WorkQueueReport::AllDone) => (),
-            Some(WorkQueueReport::Pending) => {
-                // Yield the task to the executor once.
-                yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
-            }
-            None => break,
-        }
     }
 }
 

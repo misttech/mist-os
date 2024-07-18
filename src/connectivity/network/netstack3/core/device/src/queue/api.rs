@@ -16,10 +16,10 @@ use crate::internal::queue::rx::{
     ReceiveQueueContext as _, ReceiveQueueState,
 };
 use crate::internal::queue::tx::{
-    self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
-    TransmitQueueContext as _, TransmitQueueState,
+    self, TransmitDequeueContext, TransmitQueueBindingsContext, TransmitQueueCommon,
+    TransmitQueueConfiguration, TransmitQueueContext as _, TransmitQueueState,
 };
-use crate::internal::queue::{fifo, DequeueResult, DequeueState, MAX_BATCH_SIZE};
+use crate::internal::queue::{fifo, BatchSize, DequeueResult, DequeueState};
 use crate::internal::socket::DeviceSocketHandler;
 use crate::DeviceCounters;
 use log::debug;
@@ -50,10 +50,24 @@ where
         pair.contexts()
     }
 
+    fn core_ctx(&mut self) -> &mut C::CoreContext {
+        self.contexts().0
+    }
+
     /// Transmits any queued frames.
+    ///
+    /// Up to `batch_size` frames will attempt to be dequeued and sent in this
+    /// call.
+    ///
+    /// `dequeue_context` is directly given to the context to operate on each
+    /// individual frame.
     pub fn transmit_queued_frames(
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
+        batch_size: BatchSize,
+        dequeue_context: &mut <
+            C::CoreContext as TransmitQueueCommon<D, C::BindingsContext>
+        >::DequeueContext,
     ) -> Result<WorkQueueReport, DeviceSendFrameError> {
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_dequed_packets_and_tx_queue_ctx(
@@ -67,7 +81,7 @@ where
                 let ret = tx_queue_ctx.with_transmit_queue_mut(
                     device_id,
                     |TransmitQueueState { allocator: _, queue }| {
-                        queue.as_mut().map(|q| q.dequeue_into(dequed_packets, MAX_BATCH_SIZE))
+                        queue.as_mut().map(|q| q.dequeue_into(dequed_packets, batch_size.into()))
                     },
                 );
 
@@ -78,7 +92,13 @@ where
                 while let Some((meta, p)) = dequed_packets.pop_front() {
                     tx::deliver_to_device_sockets(tx_queue_ctx, bindings_ctx, device_id, &p, &meta);
 
-                    match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
+                    match tx_queue_ctx.send_frame(
+                        bindings_ctx,
+                        device_id,
+                        Some(dequeue_context),
+                        meta,
+                        p,
+                    ) {
                         Ok(()) => {}
                         Err(e) => {
                             tx_queue_ctx.increment(device_id, |c| &c.send_dropped_dequeue);
@@ -100,6 +120,18 @@ where
                 Ok(ret.into())
             },
         )
+    }
+
+    /// Returns the number of frames in `device_id`'s TX queue.
+    ///
+    /// Returns `None` if the device doesn't have a queue configured.
+    pub fn count(
+        &mut self,
+        device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
+    ) -> Option<usize> {
+        self.core_ctx().with_transmit_queue(device_id, |TransmitQueueState { queue, .. }| {
+            queue.as_ref().map(|q| q.len())
+        })
     }
 
     /// Sets the queue configuration for the device.
@@ -140,7 +172,7 @@ where
                 let Some(mut prev_queue) = prev_queue else { return };
 
                 loop {
-                    let ret = prev_queue.dequeue_into(dequed_packets, MAX_BATCH_SIZE);
+                    let ret = prev_queue.dequeue_into(dequed_packets, BatchSize::MAX);
 
                     while let Some((meta, p)) = dequed_packets.pop_front() {
                         tx::deliver_to_device_sockets(
@@ -150,7 +182,7 @@ where
                             &p,
                             &meta,
                         );
-                        match tx_queue_ctx.send_frame(bindings_ctx, device_id, meta, p) {
+                        match tx_queue_ctx.send_frame(bindings_ctx, device_id, None, meta, p) {
                             Ok(()) => {}
                             Err(err) => {
                                 // We swapped to no-queue and device cannot send
@@ -216,7 +248,7 @@ where
                 let ret = rx_queue_ctx.with_receive_queue_mut(
                     device_id,
                     |ReceiveQueueState { queue }| {
-                        queue.dequeue_into(dequeued_frames, MAX_BATCH_SIZE)
+                        queue.dequeue_into(dequeued_frames, BatchSize::MAX)
                     },
                 );
 

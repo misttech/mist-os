@@ -14,4 +14,9 @@ pub mod session;
 pub use client::{Client, DevicePortEvent, PortStatus};
 pub use error::{Error, Result};
 pub use port_slab::PortSlab;
-pub use session::{Buffer, Config, DeviceInfo, Port, Session, Task};
+pub use session::{Buffer, Config, DeviceInfo, Port, Rx, Session, Task, Tx};
+
+/// Alias for receive buffer.
+pub type RxBuffer = Buffer<Rx>;
+/// Alias for transmit buffer.
+pub type TxBuffer = Buffer<Tx>;
