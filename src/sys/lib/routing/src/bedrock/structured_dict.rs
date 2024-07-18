@@ -49,7 +49,7 @@ impl<T: StructuredDict> StructuredDict for StructuredDictMap<T> {
 
 #[allow(private_bounds)]
 impl<T: StructuredDict> StructuredDictMap<T> {
-    pub fn insert(&self, key: Name, value: T) -> Result<(), fsandbox::DictionaryError> {
+    pub fn insert(&self, key: Name, value: T) -> Result<(), fsandbox::CapabilityStoreError> {
         let dict: Dict = value.into();
         self.inner.insert(key, dict.into())
     }
@@ -161,7 +161,7 @@ impl ComponentInput {
         &self,
         path: &impl IterablePath,
         capability: Capability,
-    ) -> Result<(), fsandbox::DictionaryError> {
+    ) -> Result<(), fsandbox::CapabilityStoreError> {
         self.capabilities().insert_capability(path, capability.into())
     }
 }

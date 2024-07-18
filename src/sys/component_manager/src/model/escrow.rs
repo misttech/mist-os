@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use fasync::{Task, TaskGroup};
-use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
+use fidl::endpoints::{create_proxy, ServerEnd};
 use futures::channel::{mpsc, oneshot};
 use futures::{select, FutureExt, StreamExt};
 use std::sync::Mutex;
@@ -25,7 +25,7 @@ use errors::ActionError;
 
 pub struct EscrowedState {
     pub outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-    pub escrowed_dictionary: Option<ClientEnd<fsandbox::DictionaryMarker>>,
+    pub escrowed_dictionary: Option<fsandbox::DictionaryRef>,
 }
 
 impl EscrowedState {
@@ -49,7 +49,7 @@ impl Debug for EscrowedState {
             .field("outgoing", &self.outgoing_dir.basic_info().unwrap().koid)
             .field(
                 "escrowed_dictionary",
-                &self.escrowed_dictionary.as_ref().map(|v| v.basic_info().unwrap().koid),
+                &self.escrowed_dictionary.as_ref().map(|v| v.token.basic_info().unwrap().koid),
             )
             .finish()
     }

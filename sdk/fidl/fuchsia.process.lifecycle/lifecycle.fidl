@@ -52,6 +52,6 @@ closed protocol Lifecycle {
         /// the result of some expensive calculation. It can create a
         /// dictionary, put the event pair inside with an appropriate key
         /// (e.g. `"my_event_pair"`), then check for that entry on startup.
-        2: escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary;
+        2: escrowed_dictionary fuchsia.component.sandbox.DictionaryRef;
     });
 };

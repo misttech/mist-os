@@ -16,9 +16,11 @@
         },
     ],
     use: [
-        // Needed to create a Dictionary at runtime
         {
-            protocol: "fuchsia.component.sandbox.Factory",
+            protocol: [
+                "fuchsia.component.sandbox.CapabilityStore",
+                "fuchsia.component.sandbox.Factory",
+            ],
             from: "framework",
         },
     ],

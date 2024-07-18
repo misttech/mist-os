@@ -153,6 +153,7 @@ rustc_binary("bin") {
     "src/capability.rs",
     "src/constants.rs",
     "src/framework/binder.rs",
+    "src/framework/capability_store.rs",
     "src/framework/controller.rs",
     "src/framework/factory.rs",
     "src/framework/introspector.rs",

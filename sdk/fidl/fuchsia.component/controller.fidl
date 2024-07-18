@@ -48,9 +48,9 @@ open protocol Controller {
 
     /// Returns the dictionary containing the component's exposed capabilities.
     @available(added=HEAD)
-    flexible GetExposedDictionary(resource struct {
-        dictionary server_end:fuchsia.component.sandbox.Dictionary;
-    }) -> () error Error;
+    flexible GetExposedDictionary() -> (resource struct {
+        dictionary fuchsia.component.sandbox.DictionaryRef;
+    }) error Error;
 
     /// Destroys this component. When this method returns, either:
     ///

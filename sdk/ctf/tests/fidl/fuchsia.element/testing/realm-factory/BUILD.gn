@@ -12,6 +12,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
   deps = [
     "../fidl:fuchsia.element.test_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//src/lib/fidl/rust/fidl",

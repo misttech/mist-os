@@ -5,13 +5,11 @@
 use anyhow::{bail, Error, Result};
 use blobfs_ramdisk::BlobfsRamdisk;
 use fidl::endpoints::{self, ServerEnd};
-use fidl::Rights;
 use fidl_fuchsia_pkg_test::*;
 use fidl_fuchsia_testing_harness::{OperationError, RealmProxy_RequestStream};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder};
-use fuchsia_zircon::HandleBased;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use realm_proxy::service::serve_with_proxy;
 use tracing::{error, info};
@@ -84,8 +82,8 @@ async fn serve_factory(
     directory: fio::DirectoryProxy,
     mut stream: RealmFactoryRequestStream,
 ) -> Result<(), crate::Error> {
-    let factory = connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
-    let mut dictionaries = vec![];
+    let store = connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let mut dict_id = 1;
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             RealmFactoryRequest::CreateRealm { options, responder } => {
@@ -104,13 +102,10 @@ async fn serve_factory(
                     continue;
                 }
 
-                let dictionary_ref = factory.create_dictionary().await?;
-                let dictionary_token =
-                    dictionary_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+                store.dictionary_create(dict_id).await?.unwrap();
                 let (my_dictionary, server) = endpoints::create_endpoints();
-                factory.open_dictionary(dictionary_ref, server).unwrap();
-                // Hold onto the dictionary token to keep the dictionary alive.
-                dictionaries.push(dictionary_token);
+                store.dictionary_open(dict_id, server).unwrap();
+                dict_id += 1;
 
                 responder.send(Ok(my_dictionary))?;
             }

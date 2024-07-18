@@ -7,11 +7,15 @@ use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_element::ManagerMarker;
 use fidl_fuchsia_element_test::*;
 use fidl_fuchsia_testing_harness::RealmProxy_RequestStream;
+use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{StreamExt, TryStreamExt};
 use tracing::error;
-use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
+use {
+    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
+    fuchsia_zircon_status as zx_status,
+};
 
 enum IncomingService {
     RealmFactory(RealmFactoryRequestStream),
@@ -50,7 +54,8 @@ async fn serve_realm_factory(service: IncomingService) {
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut task_group = fasync::TaskGroup::new();
     let mut realms = vec![];
-
+    let mut dict_id = 1;
+    let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
@@ -63,7 +68,14 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
             }
             RealmFactoryRequest::CreateRealm2 { options, dictionary, responder } => {
                 let realm = create_realm(options).await?;
-                realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
+                let dict_ref = realm.root.controller().get_exposed_dictionary().await?.unwrap();
+                store
+                    .import(dict_id, fsandbox::Capability::Dictionary(dict_ref))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                store.dictionary_open(dict_id, dictionary).unwrap();
+                dict_id += 1;
                 realms.push(realm);
                 responder.send(Ok(()))?;
             }

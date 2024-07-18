@@ -17,6 +17,12 @@
             protocol: [ "fuchsia.testing.harness.RealmProxy" ],
         },
     ],
+    use: [
+        {
+            protocol: "fuchsia.component.sandbox.CapabilityStore",
+            from: "framework",
+        },
+    ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",

@@ -6,6 +6,7 @@ use anyhow::{Context, Error, Result};
 use fidl::endpoints::{ClientEnd, ControlHandle, ServerEnd};
 use fidl_fuchsia_driver_testing::*;
 use fidl_fuchsia_testing_harness::OperationError;
+use fuchsia_component::client;
 use fuchsia_component::directory::AsRefDirectory;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
@@ -14,7 +15,10 @@ use fuchsia_component_test::{
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::*;
-use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
@@ -34,6 +38,8 @@ async fn serve_realm_factory(stream: RealmFactoryRequestStream) {
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut task_group = fasync::TaskGroup::new();
     let mut realms = vec![];
+    let mut dict_id = 1;
+    let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     loop {
         match stream.try_next().await {
             Ok(Some(request)) => match request {
@@ -58,12 +64,15 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
                     let realm_result = create_realm(options).await;
                     match realm_result {
                         Ok(realm) => {
-                            realm
-                                .root
-                                .controller()
-                                .get_exposed_dictionary(dictionary)
-                                .await?
+                            let dict_ref =
+                                realm.root.controller().get_exposed_dictionary().await?.unwrap();
+                            store
+                                .import(dict_id, fsandbox::Capability::Dictionary(dict_ref))
+                                .await
+                                .unwrap()
                                 .unwrap();
+                            store.dictionary_open(dict_id, dictionary).unwrap();
+                            dict_id += 1;
                             realms.push(realm);
                             responder.send(Ok(()))?;
                         }

@@ -6,7 +6,7 @@
 //! manner (Trigger-c), and one from a dynamic dictionary that is exposed using the Router
 //! protocol. This lets us test a dictionary that is a composite of dynamic and static routes.
 
-use fidl::{endpoints, HandleBased, Rights};
+use fidl::endpoints;
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
@@ -25,22 +25,28 @@ enum IncomingRequest {
 async fn main() {
     info!("trigger.cm started");
     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
-    let dict_ref = factory.create_dictionary().await.unwrap();
-    let (dict, server) = endpoints::create_proxy().unwrap();
-    let dict_token = dict_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
-    factory.open_dictionary(dict_ref, server).unwrap();
+    let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let dict_id = 1;
+    store.dictionary_create(dict_id).await.unwrap().unwrap();
 
     // Dynamically add trigger-d to the dictionary
     let (trigger_receiver_client, trigger_receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
     let trigger_sender_client = factory.create_connector(trigger_receiver_client).await.unwrap();
-    dict.insert(
-        "fidl.test.components.Trigger-d",
-        fsandbox::Capability::Connector(trigger_sender_client),
-    )
-    .await
-    .unwrap()
-    .unwrap();
+    let value = 100;
+    store
+        .import(value, fsandbox::Capability::Connector(trigger_sender_client))
+        .await
+        .unwrap()
+        .unwrap();
+    store
+        .dictionary_insert(
+            dict_id,
+            &fsandbox::DictionaryItem { key: "fidl.test.components.Trigger-d".into(), value },
+        )
+        .await
+        .unwrap()
+        .unwrap();
     info!("trigger.cm populated the dictionary");
 
     let _receiver_task =
@@ -51,7 +57,7 @@ async fn main() {
     fs.dir("svc").add_fidl_service(IncomingRequest::Router);
     fs.take_and_serve_directory_handle().expect("failed to serve outgoing directory");
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
-        let dict_token = dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+        let store = store.clone();
         async move {
             match request {
                 IncomingRequest::Trigger(stream) => {
@@ -61,12 +67,9 @@ async fn main() {
                     while let Ok(Some(request)) = stream.try_next().await {
                         match request {
                             fsandbox::RouterRequest::Route { payload: _, responder } => {
-                                let dict_ref = fsandbox::DictionaryRef {
-                                    token: dict_token
-                                        .duplicate_handle(Rights::SAME_RIGHTS)
-                                        .unwrap(),
-                                };
-                                let capability = fsandbox::Capability::Dictionary(dict_ref);
+                                let dup_dict_id = dict_id + 1;
+                                store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
+                                let capability = store.export(dup_dict_id).await.unwrap().unwrap();
                                 let _ = responder.send(Ok(capability));
                             }
                             fsandbox::RouterRequest::_UnknownMethod { .. } => unimplemented!(),

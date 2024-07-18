@@ -23,6 +23,7 @@ use crate::builtin::system_controller::SystemController;
 use crate::builtin::time::{create_utc_clock, UtcTimeMaintainer};
 use crate::capability::{self, BuiltinCapability, CapabilitySource, FrameworkCapability};
 use crate::framework::binder::BinderFrameworkCapability;
+use crate::framework::capability_store::CapabilityStore;
 use crate::framework::factory::Factory;
 use crate::framework::introspector::IntrospectorFrameworkCapability;
 use crate::framework::lifecycle_controller::LifecycleController;
@@ -1128,6 +1129,7 @@ impl BuiltinEnvironment {
             }),
             Box::new(BinderFrameworkCapability::new()),
             Box::new(factory.clone()),
+            Box::new(CapabilityStore::new()),
             Box::new(Namespace::new()),
             Box::new(PkgDirectoryFrameworkCapability::new()),
             Box::new(EventSourceFactoryCapability::new(event_source_factory.clone())),

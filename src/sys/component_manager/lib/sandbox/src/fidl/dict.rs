@@ -31,72 +31,11 @@ impl Dict {
     ) -> Result<(), fidl::Error> {
         while let Some(request) = stream.try_next().await? {
             match request {
-                fsandbox::DictionaryRequest::Insert { key, value, responder, .. } => {
-                    let result = (|| {
-                        let key = key.parse().map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
-                        let cap = Capability::try_from(value)
-                            .map_err(|_| fsandbox::DictionaryError::BadCapability)?;
-                        self.insert(key, cap)
-                    })();
-                    responder.send(result)?;
-                }
-                fsandbox::DictionaryRequest::Get { key, responder } => {
-                    let result = (|| {
-                        let key =
-                            Key::new(key).map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
-                        match self.get(&key) {
-                            Ok(Some(cap)) => Ok(cap.into()),
-                            Ok(None) => {
-                                (self.lock().not_found)(key.as_str());
-                                Err(fsandbox::DictionaryError::NotFound)
-                            }
-                            Err(()) => Err(fsandbox::DictionaryError::NotCloneable),
-                        }
-                    })();
-                    responder.send(result)?;
-                }
-                fsandbox::DictionaryRequest::Remove { key, responder } => {
-                    let result = (|| {
-                        let key =
-                            Key::new(key).map_err(|_| fsandbox::DictionaryError::InvalidKey)?;
-                        match self.remove(&key) {
-                            Some(cap) => Ok(cap.into()),
-                            None => {
-                                (self.lock().not_found)(key.as_str());
-                                Err(fsandbox::DictionaryError::NotFound)
-                            }
-                        }
-                    })();
-                    responder.send(result)?;
-                }
-                fsandbox::DictionaryRequest::Copy { responder } => {
-                    let result = self
-                        .shallow_copy()
-                        .map(fsandbox::DictionaryRef::from)
-                        .map_err(|_| fsandbox::DictionaryError::NotCloneable);
-                    responder.send(result)?;
-                }
                 fsandbox::DictionaryRequest::Enumerate { iterator: server_end, .. } => {
                     let items = self.enumerate();
                     let stream = server_end.into_stream().unwrap();
                     let mut this = self.lock();
                     this.tasks().spawn(serve_enumerate_iterator(items, stream));
-                }
-                fsandbox::DictionaryRequest::Keys { iterator: server_end, .. } => {
-                    let keys = self.keys().collect();
-                    let stream = server_end.into_stream().unwrap();
-                    let mut this = self.lock();
-                    this.tasks().spawn(serve_keys_iterator(keys, stream));
-                }
-                fsandbox::DictionaryRequest::Drain { iterator: server_end, .. } => {
-                    // Take out entries, replacing with an empty BTreeMap.
-                    // They are dropped if the caller does not request an iterator.
-                    if let Some(server_end) = server_end {
-                        let items = self.drain();
-                        let stream = server_end.into_stream().unwrap();
-                        let mut this = self.lock();
-                        this.tasks().spawn(serve_drain_iterator(items, stream));
-                    }
                 }
                 fsandbox::DictionaryRequest::_UnknownMethod { ordinal, .. } => {
                     warn!("Received unknown Dict request with ordinal {ordinal}");
@@ -193,39 +132,10 @@ async fn serve_enumerate_iterator(
     }
 }
 
-async fn serve_drain_iterator(
-    mut items: impl Iterator<Item = (Key, Capability)>,
-    mut stream: fsandbox::DictionaryDrainIteratorRequestStream,
-) {
-    while let Ok(Some(request)) = stream.try_next().await {
-        match request {
-            fsandbox::DictionaryDrainIteratorRequest::GetNext { responder } => {
-                let mut chunk = vec![];
-                for _ in 0..fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
-                    match items.next() {
-                        Some((key, value)) => {
-                            chunk.push(fsandbox::DictionaryItem {
-                                key: key.into(),
-                                value: value.into(),
-                            });
-                        }
-                        None => break,
-                    }
-                }
-                let _ = responder.send(chunk);
-            }
-            fsandbox::DictionaryDrainIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryDrainIterator request");
-            }
-        }
-    }
-}
-
-async fn serve_keys_iterator(
-    keys: Vec<Key>,
+pub(super) async fn serve_keys_iterator(
+    mut keys: impl Iterator<Item = Key>,
     mut stream: fsandbox::DictionaryKeysIteratorRequestStream,
 ) {
-    let mut keys = keys.into_iter();
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             fsandbox::DictionaryKeysIteratorRequest::GetNext { responder } => {
@@ -246,12 +156,12 @@ async fn serve_keys_iterator(
         }
     }
 }
-
 // These tests only run on target because the vfs library is not generally available on host.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Data, Dict, DirEntry, Directory, Handle, Unit};
+    use crate::dict::Key;
+    use crate::{serve_capability_store, Data, Dict, DirEntry, Directory, Handle, Unit};
     use anyhow::{Error, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{
@@ -259,7 +169,6 @@ mod tests {
     };
     use fidl::handle::{Channel, HandleBased, Status};
     use fuchsia_fs::directory;
-    use futures::try_join;
     use lazy_static::lazy_static;
     use test_util::Counter;
     use vfs::directory::entry::{
@@ -277,26 +186,50 @@ mod tests {
         static ref CAP_KEY: Key = "cap".parse().unwrap();
     }
 
+    #[fuchsia::test]
+    async fn create_and_open_dictionary() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let dict_id = 42;
+        assert_matches!(store.dictionary_create(dict_id).await.unwrap(), Ok(()));
+        assert_matches!(
+            store.dictionary_create(dict_id).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+        let (dict, server) = create_proxy().unwrap();
+        store.dictionary_open(dict_id, server).unwrap();
+
+        // The dictionary is empty.
+        let (iterator, server_end) = create_proxy().unwrap();
+        dict.enumerate(server_end).unwrap();
+        let items = iterator.get_next().await.unwrap();
+        assert_eq!(items.len(), 0);
+    }
+
     /// Tests that the `Dict` contains an entry for a capability inserted via `Dict.Insert`,
     /// and that the value is the same capability.
     #[fuchsia::test]
     async fn serve_insert() -> Result<()> {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
-        let server = dict.do_serve(dict_stream);
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let client = async move {
-            let value = Unit::default().into();
-            dict_proxy
-                .insert(CAP_KEY.as_str(), value)
-                .await
-                .expect("failed to call Insert")
-                .expect("failed to insert");
-            Ok(())
-        };
-
-        try_join!(client, server).unwrap();
+        let unit = Unit::default().into();
+        let value = 2;
+        store.import(value, unit).await.unwrap().unwrap();
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
+            )
+            .await
+            .unwrap()
+            .unwrap();
 
         let mut dict = dict.lock();
 
@@ -315,29 +248,31 @@ mod tests {
     /// that was previously inserted.
     #[fuchsia::test]
     async fn serve_remove() -> Result<(), Error> {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
 
         // Insert a Unit into the Dict.
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
         assert_eq!(dict.lock().entries.len(), 1);
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
-        let server = dict.do_serve(dict_stream);
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let client = async move {
-            let cap = dict_proxy
-                .remove(CAP_KEY.as_str())
-                .await
-                .expect("failed to call Remove")
-                .expect("failed to remove");
-
-            // The value should be the same one that was previously inserted.
-            assert_eq!(cap, Unit::default().into());
-
-            Ok(())
-        };
-
-        try_join!(client, server).unwrap();
+        let dest_id = 2;
+        store
+            .dictionary_remove(
+                dict_id,
+                CAP_KEY.as_str(),
+                Some(&fsandbox::WrappedNewCapabilityId { value: dest_id }),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let cap = store.export(dest_id).await.unwrap().unwrap();
+        // The value should be the same one that was previously inserted.
+        assert_eq!(cap, Unit::default().into());
 
         // Removing the entry with Remove should remove it from `entries`.
         assert!(dict.lock().entries.is_empty());
@@ -348,7 +283,7 @@ mod tests {
     /// Tests that `Dict.Get` yields the same capability that was previously inserted.
     #[fuchsia::test]
     async fn serve_get() {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
 
         // Insert a Unit and a Handle into the Dict.
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
@@ -357,26 +292,24 @@ mod tests {
         let handle = Handle::from(ch.into_handle());
         dict.insert("h".parse().unwrap(), Capability::Handle(handle)).unwrap();
 
-        let (dict_proxy, dict_stream) =
-            create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-        let server = dict.do_serve(dict_stream);
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let client = async move {
-            let cap = dict_proxy.get(CAP_KEY.as_str()).await.unwrap().unwrap();
+        let dest_id = 2;
+        store.dictionary_get(dict_id, CAP_KEY.as_str(), dest_id).await.unwrap().unwrap();
+        let cap = store.export(dest_id).await.unwrap().unwrap();
+        // The value should be the same one that was previously inserted.
+        assert_eq!(cap, Unit::default().into());
 
-            // The value should be the same one that was previously inserted.
-            assert_eq!(cap, Unit::default().into());
-
-            // Trying to get the handle capability should return NOT_CLONEABLE.
-            assert_matches!(
-                dict_proxy.get("h").await.unwrap(),
-                Err(fsandbox::DictionaryError::NotCloneable)
-            );
-
-            Ok(())
-        };
-
-        try_join!(client, server).unwrap();
+        // Trying to get the handle capability should return NOT_CLONEABLE.
+        let dest_id = 3;
+        assert_matches!(
+            store.dictionary_get(dict_id, "h", dest_id).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::NotDuplicatable)
+        );
 
         // The capability should remain in the Dict.
         assert_eq!(dict.lock().entries.len(), 2);
@@ -386,50 +319,66 @@ mod tests {
     /// the same key.
     #[fuchsia::test]
     async fn insert_already_exists() -> Result<(), Error> {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
-        let server = dict.do_serve(dict_stream);
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let client = async move {
-            // Insert an entry.
-            dict_proxy
-                .insert(CAP_KEY.as_str(), Unit::default().into())
-                .await
-                .expect("failed to call Insert")
-                .expect("failed to insert");
+        // Insert an entry.
+        let unit = Unit::default().into();
+        let value = 2;
+        store.import(value, unit).await.unwrap().unwrap();
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
+            )
+            .await
+            .unwrap()
+            .unwrap();
 
-            // Inserting again should return an error.
-            let result = dict_proxy
-                .insert(CAP_KEY.as_str(), Unit::default().into())
-                .await
-                .expect("failed to call Insert");
-            assert_matches!(result, Err(fsandbox::DictionaryError::AlreadyExists));
+        // Inserting again should return an error.
+        let unit = Unit::default().into();
+        let value = 3;
+        store.import(value, unit).await.unwrap().unwrap();
+        let result = store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
+            )
+            .await
+            .unwrap();
+        assert_matches!(result, Err(fsandbox::CapabilityStoreError::ItemAlreadyExists));
 
-            Ok(())
-        };
-
-        try_join!(client, server).unwrap();
         Ok(())
     }
 
     /// Tests that the `Dict.Remove` returns `NOT_FOUND` when there is no item with the given key.
     #[fuchsia::test]
     async fn remove_not_found() -> Result<(), Error> {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
-        let server = dict.do_serve(dict_stream);
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let client = async move {
-            // Removing an item from an empty dict should fail.
-            let result = dict_proxy.remove(CAP_KEY.as_str()).await.expect("failed to call Remove");
-            assert_matches!(result, Err(fsandbox::DictionaryError::NotFound));
+        // Removing an item from an empty dict should fail.
+        let dest_id = 2;
+        let result = store
+            .dictionary_remove(
+                dict_id,
+                CAP_KEY.as_str(),
+                Some(&fsandbox::WrappedCapabilityId { value: dest_id }),
+            )
+            .await
+            .unwrap();
+        assert_matches!(result, Err(fsandbox::CapabilityStoreError::ItemNotFound));
 
-            Ok(())
-        };
-
-        try_join!(client, server).unwrap();
         Ok(())
     }
 
@@ -479,68 +428,61 @@ mod tests {
         Ok(())
     }
 
-    /// Tests basic functionality of Enumerate and Keys APIs.
+    /// Tests basic functionality of Keys APIs.
     #[fuchsia::test]
     async fn read() {
         let dict = Dict::new();
 
-        let (dict_proxy, dict_stream) =
-            create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-        dict.serve(dict_stream);
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
         // Create two Data capabilities.
-        let mut data_caps: Vec<_> = (1..3).map(|i| Data::Int64(i)).collect();
+        let mut data_caps = vec![];
+        for i in 1..3 {
+            let value = 10 + i;
+            store.import(value, Data::Int64(i.try_into().unwrap()).into()).await.unwrap().unwrap();
+            data_caps.push(value);
+        }
 
         // Add the Data capabilities to the dict.
-        dict_proxy.insert("cap1", data_caps.remove(0).into()).await.unwrap().unwrap();
-        dict_proxy.insert("cap2", data_caps.remove(0).into()).await.unwrap().unwrap();
-        // This item is not cloneable so only the key will appear in the results.
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: "cap1".into(), value: data_caps.remove(0) },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: "cap2".into(), value: data_caps.remove(0) },
+            )
+            .await
+            .unwrap()
+            .unwrap();
         let (ch, _) = fidl::Channel::create();
         let handle = ch.into_handle();
-        dict_proxy.insert("cap3", fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
+        let value = 20;
+        store.import(value, fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
+        store
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "cap3".into(), value })
+            .await
+            .unwrap()
+            .unwrap();
 
         // Now read the entries back.
         let (iterator, server_end) = create_proxy().unwrap();
-        dict_proxy.enumerate(server_end).unwrap();
-        let mut items = iterator.get_next().await.unwrap();
-        assert!(iterator.get_next().await.unwrap().is_empty());
-        assert_eq!(items.len(), 3);
-        assert_matches!(
-            items.remove(0),
-            fsandbox::DictionaryFallibleItem {
-                key,
-                value: fsandbox::DictionaryValueResult::Ok(value),
-            }
-            if key == "cap1" &&
-            value == fsandbox::Capability::Data(fsandbox::Data::Int64(1))
-        );
-        assert_matches!(
-            items.remove(0),
-            fsandbox::DictionaryFallibleItem {
-                key,
-                value: fsandbox::DictionaryValueResult::Ok(value),
-            }
-            if key == "cap2" &&
-            value == fsandbox::Capability::Data(fsandbox::Data::Int64(2))
-        );
-        assert_matches!(
-            items.remove(0),
-            fsandbox::DictionaryFallibleItem {
-                key,
-                value: fsandbox::DictionaryValueResult::Error(e),
-            }
-            if key == "cap3" &&
-            e == fsandbox::DictionaryError::NotCloneable
-        );
-
-        let (iterator, server_end) = create_proxy().unwrap();
-        dict_proxy.keys(server_end).unwrap();
+        store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
         let keys = iterator.get_next().await.unwrap();
         assert!(iterator.get_next().await.unwrap().is_empty());
         assert_eq!(keys, ["cap1", "cap2", "cap3"]);
     }
 
-    /// Tests batching for Enumerate and Keys iterators.
+    /// Tests batching for Keys iterator.
     #[fuchsia::test]
     async fn read_batches() {
         // Number of entries in the Dict that will be enumerated.
@@ -559,32 +501,27 @@ mod tests {
                 .unwrap();
         }
 
-        let (dict_proxy, stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-        dict.serve(stream);
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        let (item_iterator, server_end) = create_proxy().unwrap();
-        dict_proxy.enumerate(server_end).unwrap();
         let (key_iterator, server_end) = create_proxy().unwrap();
-        dict_proxy.keys(server_end).unwrap();
+        store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
 
         // Get all the entries from the Dict with `GetNext`.
         let mut num_got_items: u32 = 0;
         for expected_len in EXPECTED_CHUNK_LENGTHS {
-            let items = item_iterator.get_next().await.unwrap();
             let keys = key_iterator.get_next().await.unwrap();
-            if items.is_empty() && keys.is_empty() {
+            if keys.is_empty() {
                 break;
             }
-            assert_eq!(*expected_len, items.len() as u32);
             assert_eq!(*expected_len, keys.len() as u32);
-            num_got_items += items.len() as u32;
-            for item in items {
-                assert_eq!(item.value, fsandbox::DictionaryValueResult::Ok(Unit::default().into()));
-            }
+            num_got_items += keys.len() as u32;
         }
 
         // GetNext should return no items once all items have been returned.
-        assert!(item_iterator.get_next().await.unwrap().is_empty());
         assert!(key_iterator.get_next().await.unwrap().is_empty());
 
         assert_eq!(num_got_items, NUM_ENTRIES);

@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
+use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_examples::EchoMarker;
 use fidl_test_example::{RealmFactoryRequest, RealmFactoryRequestStream, RealmOptions};
+use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{StreamExt, TryStreamExt};
@@ -20,14 +22,23 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
+    let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     let mut realms = vec![];
+    let mut dict_id = 1;
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 RealmFactoryRequest::_UnknownMethod { .. } => unimplemented!(),
                 RealmFactoryRequest::CreateRealm { options, dictionary, responder } => {
                     let realm = create_realm(options).await?;
-                    realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
+                    let dict_ref = realm.root.controller().get_exposed_dictionary().await?.unwrap();
+                    store
+                        .import(dict_id, fsandbox::Capability::Dictionary(dict_ref))
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    store.dictionary_open(dict_id, dictionary).unwrap();
+                    dict_id += 1;
                     realms.push(realm);
                     responder.send(Ok(()))?;
                 }

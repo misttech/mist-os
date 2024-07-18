@@ -7,7 +7,7 @@ use crate::model::token::InstanceToken;
 use crate::runner::RemoteRunner;
 use errors::{StartError, StopError};
 use fidl::endpoints;
-use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl::endpoints::ServerEnd;
 use futures::channel::oneshot;
 use futures::future::{BoxFuture, Either};
 use futures::FutureExt;
@@ -343,7 +343,7 @@ pub struct EscrowRequest {
     /// Escrow some user defined state. Whenever the component is started,
     /// the framework will return these handles via
     /// `ComponentStartInfo.escrowed_dictionary`.
-    pub escrowed_dictionary: Option<ClientEnd<fsandbox::DictionaryMarker>>,
+    pub escrowed_dictionary: Option<fsandbox::DictionaryRef>,
 }
 
 impl From<fcrunner::ComponentControllerOnEscrowRequest> for EscrowRequest {

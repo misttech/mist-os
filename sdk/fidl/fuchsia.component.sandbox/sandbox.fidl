@@ -64,14 +64,7 @@ alias DictionaryKey = string:MAX_NAME_LENGTH;
 
 /// A key-value pair in a [`Dictionary`].
 @available(added=HEAD)
-type DictionaryItem = resource struct {
-    key DictionaryKey;
-    value Capability;
-};
-
-/// A key-value pair in a [`Dictionary`].
-@available(added=HEAD)
-type DictionaryItem2 = struct {
+type DictionaryItem = struct {
     key DictionaryKey;
     value CapabilityId;
 };
@@ -115,48 +108,6 @@ type DictionaryError = flexible enum {
 @discoverable
 @available(added=20)
 open protocol Dictionary {
-    /// Inserts a key-value pair into the dictionary.
-    ///
-    /// * error `DictionaryError.ALREADY_EXISTS` if the dictionary already contains an
-    /// item with the same key.
-    @available(added=HEAD)
-    flexible Insert(DictionaryItem) -> () error DictionaryError;
-
-    /// Get a clone of a capability from this dictionary.
-    ///
-    /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
-    /// * error `DictionaryError.NOT_CLONEABLE` if the capability could not be cloned.
-    @available(added=HEAD)
-    flexible Get(struct {
-        key DictionaryKey;
-    }) -> (resource struct {
-        capability Capability;
-    }) error DictionaryError;
-
-    /// Removes a key from the dictionary, returning the [`Capability`] value.
-    ///
-    /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
-    @available(added=HEAD)
-    flexible Remove(struct {
-        key DictionaryKey;
-    }) -> (resource struct {
-        capability Capability;
-    }) error DictionaryError;
-
-    /// Create a new dictionary that contains a clone of all the entries in
-    /// this dictionary.
-    ///
-    /// For example, if this dictionary contains nested dictionaries, the newly
-    /// created dictionary will contain references to those same nested
-    /// dictionaries because the entries are cloned rather than copied.
-    ///
-    /// * error `DictionaryError.NOT_CLONEABLE` if one of the capabilities in the
-    ///   dictionary could not be cloned.
-    @available(added=HEAD)
-    flexible Copy() -> (resource struct {
-        dictionary DictionaryRef;
-    }) error DictionaryError;
-
     /// Enumerates the items in this dictionary.
     ///
     /// Creates a clone of each item during enumeration. If a capability was not cloneable,
@@ -164,22 +115,6 @@ open protocol Dictionary {
     @available(added=HEAD)
     flexible Enumerate(resource struct {
         iterator server_end:DictionaryEnumerateIterator;
-    });
-
-    /// Enumerates the keys in this dictionary.
-    @available(added=HEAD)
-    flexible Keys(resource struct {
-        iterator server_end:DictionaryKeysIterator;
-    });
-
-
-    /// Removes all the entries in this dictionary.
-    ///
-    /// If `contents` is not provided, all the items are discarded without
-    /// enumerating them.
-    @available(added=HEAD)
-    flexible Drain(resource struct {
-        iterator server_end:<DictionaryDrainIterator, optional>;
     });
 };
 
@@ -196,16 +131,15 @@ alias CapabilityId = uint64;
 @available(added=HEAD)
 alias NewCapabilityId = CapabilityId;
 
-
-/// A [CapabilityId] that is optional. This is its own type because FIDL does not allow
-/// `optional` on integral types.
+/// A [CapabilityId] wrapped in a struct. This is useful for putting a [CapabilityId] in a `box<>`,
+/// which FIDL does not allow for pure integral types.
 @available(added=HEAD)
-type OptionalCapabilityId = struct {
+type WrappedCapabilityId = struct {
     value CapabilityId;
 };
 
 @available(added=HEAD)
-alias OptionalNewCapabilityId = OptionalCapabilityId;
+alias WrappedNewCapabilityId = WrappedCapabilityId;
 
 /// Protocol that represents the concept of a "capability store", a repository
 /// for [Capability]s that are held by the component framework runtime.
@@ -306,7 +240,7 @@ open protocol CapabilityStore {
     /// - `ITEM_ALREADY_EXISTS` if the dictionary already contains an item with `item.key`.
     flexible DictionaryInsert(struct {
         id CapabilityId;
-        item DictionaryItem2;
+        item DictionaryItem;
     }) -> () error CapabilityStoreError;
 
     /// Get a duplicate of a capability from the dictionary with `id`, which is
@@ -339,7 +273,7 @@ open protocol CapabilityStore {
     flexible DictionaryRemove(struct {
         id CapabilityId;
         key DictionaryKey;
-        dest_id box<OptionalNewCapabilityId>;
+        dest_id box<WrappedNewCapabilityId>;
     }) -> () error CapabilityStoreError;
 
     /// Create a new dictionary that contains a duplicate of all the entries in
@@ -416,13 +350,6 @@ open protocol DictionaryEnumerateIterator {
 open protocol DictionaryKeysIterator {
     flexible GetNext() -> (resource struct {
         keys vector<DictionaryKey>:MAX_DICTIONARY_ITERATOR_CHUNK;
-    });
-};
-
-@available(added=HEAD)
-open protocol DictionaryDrainIterator {
-    flexible GetNext() -> (resource struct {
-        items vector<DictionaryItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
     });
 };
 
@@ -508,17 +435,5 @@ open protocol Factory {
         receiver client_end:Receiver;
     }) -> (resource struct {
         capability Connector;
-    });
-
-    /// Creates a new empty [`Dictionary`].
-    flexible CreateDictionary() -> (resource struct {
-        dictionary DictionaryRef;
-    });
-
-    /// Binds a fuchsia.component.sandbox/Dictionary channel to a `dictionary`
-    /// token.
-    flexible OpenDictionary(resource struct {
-        dictionary DictionaryRef;
-        server_end server_end:Dictionary;
     });
 };

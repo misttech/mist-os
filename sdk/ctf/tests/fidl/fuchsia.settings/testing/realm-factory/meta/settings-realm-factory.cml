@@ -4,6 +4,7 @@
 {
     include: [
         "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "//src/testing/realm_proxy/service/meta/realm_proxy.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],

@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::{self, ClientEnd, Proxy, RequestStream, ServerEnd};
+use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_fidl_test_components::{TriggerMarker, TriggerRequestStream};
+use fuchsia_component::client;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::{StreamExt, TryStreamExt};
@@ -20,6 +21,8 @@ use {
 #[fuchsia::main]
 pub async fn main() {
     struct Trigger(TriggerRequestStream);
+    let dict_store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let mut dict_id = 1;
 
     // If there is no `EscrowedDictionary` processargs, initialize the counter to 0.
     let counter = match fuchsia_runtime::take_startup_handle(HandleInfo::new(
@@ -27,7 +30,11 @@ pub async fn main() {
         0,
     )) {
         Some(dictionary) => {
-            read_counter_from_dictionary(zx::Channel::from(dictionary).into()).await
+            let dictionary = fsandbox::Capability::Dictionary(fsandbox::DictionaryRef {
+                token: dictionary.into(),
+            });
+            dict_store.import(dict_id, dictionary).await.unwrap().unwrap();
+            read_counter_from_dictionary(&dict_store, dict_id).await
         }
         None => 0,
     };
@@ -38,12 +45,17 @@ pub async fn main() {
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle().unwrap();
     let request = fs.next().await.unwrap();
     let counter = handle_trigger(counter, request.0).await;
-    escrow_counter_then_stop(counter).await;
+    dict_id += 1;
+    escrow_counter_then_stop(&dict_store, dict_id, counter).await;
 }
 
-async fn read_counter_from_dictionary(dictionary: ClientEnd<fsandbox::DictionaryMarker>) -> u64 {
-    let dictionary = dictionary.into_proxy().unwrap();
-    let capability = dictionary.get("counter").await.unwrap().unwrap();
+async fn read_counter_from_dictionary(
+    dict_store: &fsandbox::CapabilityStoreProxy,
+    dict_id: u64,
+) -> u64 {
+    let dest_id = 100;
+    dict_store.dictionary_get(dict_id, "counter", dest_id).await.unwrap().unwrap();
+    let capability = dict_store.export(dest_id).await.unwrap().unwrap();
     match capability {
         fsandbox::Capability::Data(data) => match data {
             fsandbox::Data::Uint64(counter) => counter,
@@ -75,22 +87,33 @@ async fn handle_trigger(mut counter: u64, stream: TriggerRequestStream) -> u64 {
     counter
 }
 
-async fn escrow_counter_then_stop(counter: u64) {
+async fn escrow_counter_then_stop(
+    store: &fsandbox::CapabilityStoreProxy,
+    dict_id: u64,
+    counter: u64,
+) {
     // Create a new dictionary.
-    let factory =
-        fuchsia_component::client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
-    let dictionary_ref = factory.create_dictionary().await.unwrap();
-    let (dictionary, server) = endpoints::create_proxy().unwrap();
-    factory.open_dictionary(dictionary_ref, server).unwrap();
+    store.dictionary_create(dict_id).await.unwrap().unwrap();
 
     // Add the counter into the dictionary.
-    dictionary
-        .insert("counter", fsandbox::Capability::Data(fsandbox::Data::Uint64(counter)))
+    let value = 10;
+    store
+        .import(value, fsandbox::Capability::Data(fsandbox::Data::Uint64(counter)))
+        .await
+        .unwrap()
+        .unwrap();
+    store
+        .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "counter".into(), value })
         .await
         .unwrap()
         .unwrap();
 
     // Send the dictionary away.
+    let fsandbox::Capability::Dictionary(dictionary_ref) =
+        store.export(dict_id).await.unwrap().unwrap()
+    else {
+        unreachable!("capability is not Dictionary?");
+    };
     let lifecycle =
         fuchsia_runtime::take_startup_handle(HandleInfo::new(HandleType::Lifecycle, 0)).unwrap();
     let lifecycle = zx::Channel::from(lifecycle);
@@ -100,7 +123,7 @@ async fn escrow_counter_then_stop(counter: u64) {
         .unwrap()
         .control_handle()
         .send_on_escrow(flifecycle::LifecycleOnEscrowRequest {
-            escrowed_dictionary: Some(dictionary.into_channel().unwrap().into_zx_channel().into()),
+            escrowed_dictionary: Some(dictionary_ref),
             ..Default::default()
         })
         .unwrap();

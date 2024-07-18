@@ -5,13 +5,14 @@
 mod capability;
 mod connector;
 mod data;
-mod dict;
+pub(crate) mod dict;
 mod dir_entry;
 mod directory;
 mod handle;
 mod instance_token;
-pub mod registry;
+pub(crate) mod registry;
 mod router;
+pub(crate) mod store;
 mod unit;
 
 use crate::ConversionError;

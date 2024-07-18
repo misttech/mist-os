@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 use crate::capability;
+use crate::framework::capability_store::CapabilityStore;
 use crate::framework::factory::Factory;
 use crate::model::testing::out_dir::OutDir;
 use crate::model::testing::routing_test_helpers::*;
 use cm_rust::*;
 use cm_rust_testing::*;
 use fidl::endpoints::{self, ServerEnd};
-use fidl::Rights;
 use fidl_fidl_examples_routing_echo::EchoMarker;
-use fuchsia_zircon::HandleBased;
 use futures::TryStreamExt;
 use moniker::Moniker;
 use routing_test_helpers::RoutingTestModel;
@@ -1417,15 +1416,26 @@ async fn extend_from_program() {
     let (factory, server) = endpoints::create_proxy::<fsandbox::FactoryMarker>().unwrap();
     capability::open_framework(&factory_host, test.model.root(), server.into()).await.unwrap();
 
+    let host = CapabilityStore::new();
+    let (store, server) = endpoints::create_proxy::<fsandbox::CapabilityStoreMarker>().unwrap();
+    capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
+
     // Create a dictionary with a Sender at "A" for the Echo protocol.
-    let dict_ref = factory.create_dictionary().await.unwrap();
-    let dict_token = dict_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
-    let (dict_proxy, server) = endpoints::create_proxy::<fsandbox::DictionaryMarker>().unwrap();
-    factory.open_dictionary(dict_ref, server).unwrap();
+    let dict_id = 1;
+    store.dictionary_create(dict_id).await.unwrap().unwrap();
     let (receiver_client, mut receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
     let connector = factory.create_connector(receiver_client).await.unwrap();
-    dict_proxy.insert("A", fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
+    let connector_id = 10;
+    store.import(connector_id, fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
+    store
+        .dictionary_insert(
+            dict_id,
+            &fsandbox::DictionaryItem { key: "A".into(), value: connector_id },
+        )
+        .await
+        .unwrap()
+        .unwrap();
 
     // Serve the Echo protocol from the Receiver.
     let _receiver_task = fasync::Task::spawn(async move {
@@ -1446,20 +1456,20 @@ async fn extend_from_program() {
     // Serve the Router protocol from the root's out dir. Its implementation calls Dictionary/Clone
     // and returns the handle.
     let mut root_out_dir = OutDir::new();
+    let dict_store2 = store.clone();
     root_out_dir.add_entry(
         format!("/{ROUTER_PATH}").parse().unwrap(),
         vfs::service::endpoint(move |scope, channel| {
             let server_end: ServerEnd<fsandbox::RouterMarker> = channel.into_zx_channel().into();
             let mut stream = server_end.into_stream().unwrap();
-            let dict_token = dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
+            let store = dict_store2.clone();
             scope.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {
                     match request {
                         fsandbox::RouterRequest::Route { payload: _, responder } => {
-                            let dict_ref = fsandbox::DictionaryRef {
-                                token: dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap(),
-                            };
-                            let capability = fsandbox::Capability::Dictionary(dict_ref);
+                            let dup_dict_id = dict_id + 1;
+                            store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
+                            let capability = store.export(dup_dict_id).await.unwrap().unwrap();
                             let _ = responder.send(Ok(capability));
                         }
                         fsandbox::RouterRequest::_UnknownMethod { .. } => {
@@ -1485,7 +1495,12 @@ async fn extend_from_program() {
     }
 
     // Now, remove "A" from the dictionary. Using "A" this time should fail.
-    let _ = dict_proxy.remove("A").await.unwrap().unwrap();
+    let dest_id = 100;
+    store
+        .dictionary_remove(dict_id, "A", Some(&fsandbox::WrappedNewCapabilityId { value: dest_id }))
+        .await
+        .unwrap()
+        .unwrap();
     test.check_use(
         "leaf".try_into().unwrap(),
         CheckUse::Protocol {
