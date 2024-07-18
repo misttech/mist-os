@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_action.gni")
-import("//build/packages/prebuilt_package.gni")
 
 # Build several Bazel targets with a single GN > Bazel boundary
 # transition. This can be considerably faster than building
@@ -217,19 +216,6 @@ template("bazel_build_group") {
       foreach(entry, subtarget.package_outputs) {
         if (defined(entry.archive)) {
           _files += [ entry.archive ]
-          if (defined(entry.generate_prebuilt) && entry.generate_prebuilt) {
-            _prebuilt_target = "${subtarget.gn_target_name}.${entry.archive}"
-            prebuilt_package(_prebuilt_target) {
-              archive = "$target_out_dir/${_group_output_dir}/${entry.archive}"
-              deps = [ ":${_build_group_target}" ]
-
-              forward_variables_from(invoker,
-                                     [
-                                       "testonly",
-                                       "visibility",
-                                     ])
-            }
-          }
         }
         if (defined(entry.manifest)) {
           _files += [ entry.manifest ]
