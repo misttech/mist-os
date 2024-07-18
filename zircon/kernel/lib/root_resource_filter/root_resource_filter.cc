@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/counters.h>
+#include <lib/memalloc/range.h>
 #include <lib/root_resource_filter.h>
 #include <lib/root_resource_filter_internal.h>
 #include <stdio.h>
@@ -30,31 +31,17 @@ RootResourceFilter g_root_resource_filter;
 }  // namespace
 
 void RootResourceFilter::Finalize() {
-  // Add the PMM arenas as regions we may not allocate from.
-  for (size_t i = 0, arena_count = pmm_num_arenas(); i < arena_count; ++i) {
-    pmm_arena_info_t info;
-
-    // There is no  reason for this to ever fail.
-    zx_status_t res = pmm_get_arena_info(1, i, &info, sizeof(info));
-    ASSERT(res == ZX_OK);
-
-    // Add the arena to the set of regions to deny, permitting it to merge with
-    // any pre-existing regions already in the set (shouldn't happen, but if it
-    // does, we want the union). If we cannot add the arena to our set of
-    // regions to deny, it can only be because we failed a heap allocation which
-    // should be impossible at this point. If it does happen, panic. We cannot
-    // run if we cannot enforce the deny list.
-    res = mmio_deny_.AddRegion({.base = info.base, .size = info.size},
-                               RegionAllocator::AllowOverlap::Yes);
-    ASSERT(res == ZX_OK);
-  }
-
-  for (const zbi_mem_range_t& mem_range : gPhysHandoff->mem_config.get()) {
-    if (mem_range.type == ZBI_MEM_TYPE_RESERVED) {
-      mmio_deny_.SubtractRegion({.base = mem_range.paddr, .size = mem_range.length},
-                                RegionAllocator::AllowIncomplete::Yes);
-    }
-  }
+  // Add all (normalized) RAM ranges to the set of regions to deny,
+  memalloc::NormalizeRam(gPhysHandoff->memory.get(), [this](const memalloc::Range& range) {
+    // If we cannot add the range to our set of regions to deny, it can only be
+    // because we failed a heap allocation which should be impossible at this
+    // point. If it does happen, panic. We cannot run if we cannot enforce the
+    // deny list.
+    zx_status_t status = mmio_deny_.AddRegion({.base = range.addr, .size = range.size},
+                                              RegionAllocator::AllowOverlap::No);
+    ASSERT(status == ZX_OK);
+    return true;
+  });
 
   // Dump the deny list at spew level for debugging purposes.
   if (DPRINTF_ENABLED_FOR_LEVEL(SPEW)) {

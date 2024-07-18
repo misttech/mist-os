@@ -148,6 +148,10 @@ void HandoffPrep::SetMemory() {
   // remain.
   auto normed_type = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
     switch (type) {
+      // We pretend that our reserved 'test' RAM isn't RAM at all.
+      case memalloc::Type::kTestRamReserve:
+        return ktl::nullopt;
+
       case memalloc::Type::kPeripheral:
         [[fallthrough]];
 
