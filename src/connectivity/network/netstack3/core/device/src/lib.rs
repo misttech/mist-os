@@ -69,11 +69,11 @@ pub mod pure_ip {
 pub mod socket {
     pub use crate::internal::socket::{
         AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketApi,
-        DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketContextTypes, DeviceSocketId,
-        DeviceSocketMetadata, DeviceSocketTypes, DeviceSockets, EthernetFrame,
-        EthernetHeaderParams, Frame, HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError,
-        PrimaryDeviceSocketId, Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo,
-        SocketState, SocketStateAccessor, Target, TargetDevice,
+        DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketId, DeviceSocketMetadata,
+        DeviceSocketTypes, DeviceSockets, EthernetFrame, EthernetHeaderParams, Frame,
+        HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError, PrimaryDeviceSocketId,
+        Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo, SocketState, SocketStateAccessor,
+        Target, TargetDevice,
     };
 }
 

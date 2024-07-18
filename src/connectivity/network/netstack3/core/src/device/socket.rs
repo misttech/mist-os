@@ -8,9 +8,8 @@
 use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
 use netstack3_device::socket::{
-    AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext,
-    DeviceSocketContextTypes, DeviceSocketId, DeviceSockets, HeldSockets, PrimaryDeviceSocketId,
-    SocketStateAccessor, Target,
+    AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketContext, DeviceSocketId,
+    DeviceSockets, HeldSockets, SocketStateAccessor, Target,
 };
 use netstack3_device::{for_any_device_id, DeviceId, WeakDeviceId};
 
@@ -19,27 +18,13 @@ use crate::context::WrapLockLevel;
 use crate::device::integration;
 use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
-impl<BT: BindingsTypes, L> DeviceSocketContextTypes<BT> for CoreCtx<'_, BT, L> {
-    type SocketId = DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>;
-    fn new_primary(
-        external_state: BT::SocketState,
-    ) -> PrimaryDeviceSocketId<BT::SocketState, WeakDeviceId<BT>> {
-        PrimaryDeviceSocketId::new(external_state)
-    }
-    fn unwrap_primary(
-        primary: PrimaryDeviceSocketId<BT::SocketState, WeakDeviceId<BT>>,
-    ) -> BT::SocketState {
-        primary.unwrap().external_state
-    }
-}
-
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     DeviceSocketContext<BC> for CoreCtx<'_, BC, L>
 {
     type SocketTablesCoreCtx<'a> =
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::AnyDeviceSockets>>;
 
-    fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::SocketId>) -> R, R>(
+    fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::WeakDeviceId, BC>) -> R, R>(
         &mut self,
         cb: F,
     ) -> R {
@@ -48,7 +33,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     }
 
     fn with_any_device_sockets<
-        F: FnOnce(&AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+        F: FnOnce(&AnyDeviceSockets<Self::WeakDeviceId, BC>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
         R,
     >(
         &mut self,
@@ -59,7 +44,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     }
 
     fn with_any_device_sockets_mut<
-        F: FnOnce(&mut AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+        F: FnOnce(
+            &mut AnyDeviceSockets<Self::WeakDeviceId, BC>,
+            &mut Self::SocketTablesCoreCtx<'_>,
+        ) -> R,
         R,
     >(
         &mut self,
@@ -76,7 +64,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
 {
     fn with_socket_state<F: FnOnce(&BC::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
         &mut self,
-        id: &Self::SocketId,
+        id: &DeviceSocketId<Self::WeakDeviceId, BC>,
         cb: F,
     ) -> R {
         let external_state = id.socket_state();
@@ -90,7 +78,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
         R,
     >(
         &mut self,
-        id: &Self::SocketId,
+        id: &DeviceSocketId<Self::WeakDeviceId, BC>,
         cb: F,
     ) -> R {
         let external_state = id.socket_state();
@@ -108,7 +96,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::DeviceSockets>>;
 
     fn with_device_sockets<
-        F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
+        F: FnOnce(&DeviceSockets<Self::WeakDeviceId, BC>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
         R,
     >(
         &mut self,
@@ -131,7 +119,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
     }
 
     fn with_device_sockets_mut<
-        F: FnOnce(&mut DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
+        F: FnOnce(&mut DeviceSockets<Self::WeakDeviceId, BC>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
         R,
     >(
         &mut self,
@@ -154,8 +142,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
     }
 }
 
-impl<BT: BindingsTypes>
-    DelegatedOrderedLockAccess<AnyDeviceSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>>
+impl<BT: BindingsTypes> DelegatedOrderedLockAccess<AnyDeviceSockets<WeakDeviceId<BT>, BT>>
     for StackState<BT>
 {
     type Inner = HeldSockets<BT>;
@@ -164,8 +151,7 @@ impl<BT: BindingsTypes>
     }
 }
 
-impl<BT: BindingsTypes>
-    DelegatedOrderedLockAccess<AllSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>>
+impl<BT: BindingsTypes> DelegatedOrderedLockAccess<AllSockets<WeakDeviceId<BT>, BT>>
     for StackState<BT>
 {
     type Inner = HeldSockets<BT>;
@@ -175,14 +161,14 @@ impl<BT: BindingsTypes>
 }
 
 impl<BT: BindingsTypes> LockLevelFor<StackState<BT>> for crate::lock_ordering::AnyDeviceSockets {
-    type Data = AnyDeviceSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>;
+    type Data = AnyDeviceSockets<WeakDeviceId<BT>, BT>;
 }
 
 impl<BT: BindingsTypes> LockLevelFor<StackState<BT>> for crate::lock_ordering::AllDeviceSockets {
-    type Data = AllSockets<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>;
+    type Data = AllSockets<WeakDeviceId<BT>, BT>;
 }
 
-impl<BT: BindingsTypes> LockLevelFor<DeviceSocketId<BT::SocketState, WeakDeviceId<BT>>>
+impl<BT: BindingsTypes> LockLevelFor<DeviceSocketId<WeakDeviceId<BT>, BT>>
     for crate::lock_ordering::DeviceSocketState
 {
     type Data = Target<WeakDeviceId<BT>>;
