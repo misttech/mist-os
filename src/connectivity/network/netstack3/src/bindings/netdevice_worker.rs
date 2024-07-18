@@ -102,8 +102,6 @@ pub(crate) enum Error {
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
 
-// TODO(https://fxbug.dev/42052114): Decorate *all* logging with human-readable
-// device debug information to disambiguate.
 impl NetdeviceWorker {
     pub(crate) async fn new(
         ctx: Ctx,
