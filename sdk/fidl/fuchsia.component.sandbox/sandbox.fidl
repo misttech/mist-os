@@ -7,10 +7,12 @@ using zx;
 using fuchsia.io;
 
 /// Maximum number of bytes in a [Data].
+@available(added=HEAD)
 const MAX_DATA_LENGTH uint32 = 8192;
 
 /// A token represents a bedrock object. Tokens are reference counted, dropping
 /// all counts of the token removes the object.
+@available(added=HEAD)
 alias Token = zx.Handle:EVENTPAIR;
 
 /// Maximum number of items returned by dictionary iterator.
