@@ -265,7 +265,6 @@ void Device::StartScan(const wlan_fullmac_impl_start_scan_request_t* req) {
 }
 
 void Device::Connect(const wlan_fullmac_impl_connect_request_t* req) {
-  OnLinkStateChanged(false);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
@@ -328,7 +327,6 @@ void Device::AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp)
 }
 
 void Device::Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req) {
-  OnLinkStateChanged(false);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
@@ -371,7 +369,6 @@ void Device::AssociateResp(const wlan_fullmac_impl_assoc_resp_request_t* resp) {
 }
 
 void Device::Disassociate(const wlan_fullmac_impl_disassoc_request_t* req) {
-  OnLinkStateChanged(false);
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
@@ -393,8 +390,6 @@ void Device::Disassociate(const wlan_fullmac_impl_disassoc_request_t* req) {
 }
 
 void Device::Reset(const wlan_fullmac_impl_reset_request_t* req) {
-  OnLinkStateChanged(false);
-
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Arena creation failed: %s", arena.status_string());
@@ -691,16 +686,12 @@ zx_status_t Device::GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t*
 }
 
 void Device::OnLinkStateChanged(bool online) {
-  // TODO(https://fxbug.dev/42128153): Let SME handle these changes.
-  if (online != device_online_) {
-    device_online_ = online;
     auto result = client_.sync()->OnLinkStateChanged(online);
 
     if (!result.ok()) {
       FDF_LOGL(ERROR, *logger_, "OnLinkStateChanged failed FIDL error: %s", result.status_string());
       return;
     }
-  }
 }
 
 void Device::SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {

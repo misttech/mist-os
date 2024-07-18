@@ -393,30 +393,6 @@ TEST_F(WlanifDeviceTest, EthDataPlaneNotSupported) {
   ASSERT_EQ(driver()->Bind(), ZX_ERR_NOT_SUPPORTED);
 }
 
-TEST_F(WlanifDeviceTest, OnLinkStateChangedOnlyCalledWhenStateChanges) {
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetExpectedOnline, true);
-  driver()->OnLinkStateChanged(true);
-  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::GetLinkStateChanged));
-
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetLinkStateChanged, false);
-  driver()->OnLinkStateChanged(true);
-  EXPECT_FALSE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::GetLinkStateChanged));
-
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetLinkStateChanged, false);
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetExpectedOnline, false);
-  driver()->OnLinkStateChanged(false);
-  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::GetLinkStateChanged));
-
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetLinkStateChanged, false);
-  driver()->OnLinkStateChanged(false);
-  EXPECT_FALSE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::GetLinkStateChanged));
-
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetLinkStateChanged, false);
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetExpectedOnline, true);
-  driver()->OnLinkStateChanged(true);
-  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::GetLinkStateChanged));
-}
-
 TEST_F(WlanifDeviceTest, StartScan) {
   const uint8_t chan_list[1] = {0x9};
   const wlan_fullmac_impl_start_scan_request_t req = {.scan_type = WLAN_SCAN_TYPE_ACTIVE,

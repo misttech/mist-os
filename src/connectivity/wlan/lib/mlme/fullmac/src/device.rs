@@ -332,7 +332,7 @@ pub trait DeviceOps {
     fn sae_handshake_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp);
     fn sae_frame_tx(&mut self, frame: banjo_wlan_fullmac::WlanFullmacSaeFrame);
     fn wmm_status_req(&mut self);
-    fn set_link_state(&mut self, controlled_port_state: fidl_mlme::ControlledPortState);
+    fn on_link_state_changed(&mut self, online: bool);
 }
 
 /// A `FullmacDeviceInterface` allows transmitting frames and MLME messages.
@@ -597,11 +597,7 @@ impl DeviceOps for FullmacDevice {
     fn wmm_status_req(&mut self) {
         (self.raw_device.wmm_status_req)(self.raw_device.device)
     }
-    fn set_link_state(&mut self, controlled_port_state: fidl_mlme::ControlledPortState) {
-        let online = match controlled_port_state {
-            fidl_mlme::ControlledPortState::Open => true,
-            fidl_mlme::ControlledPortState::Closed => false,
-        };
+    fn on_link_state_changed(&mut self, online: bool) {
         (self.raw_device.on_link_state_changed)(self.raw_device.device, online)
     }
 }
@@ -916,11 +912,7 @@ pub mod test_utils {
         fn wmm_status_req(&mut self) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::WmmStatusReq);
         }
-        fn set_link_state(&mut self, controlled_port_state: fidl_mlme::ControlledPortState) {
-            let online = match controlled_port_state {
-                fidl_mlme::ControlledPortState::Open => true,
-                fidl_mlme::ControlledPortState::Closed => false,
-            };
+        fn on_link_state_changed(&mut self, online: bool) {
             self.mocks
                 .lock()
                 .unwrap()
