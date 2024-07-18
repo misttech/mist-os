@@ -20,6 +20,7 @@
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zbitl/items/graphics.h>
+#include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmar.h>
@@ -133,9 +134,9 @@ struct FramebufferInfo {
 // ZBI_TYPE_FRAMEBUFFER entry. We assume this information to be valid and unmodified by an
 // unauthorized call to zx_framebuffer_set_range(), however this is potentially an issue.
 // See https://fxbug.dev/42157524.
-zx::result<FramebufferInfo> GetFramebufferInfo(zx_device_t* parent) {
+zx::result<FramebufferInfo> GetFramebufferInfo(const zx::unowned_resource& framebuffer_resource) {
   FramebufferInfo info;
-  zx_status_t status = zx_framebuffer_get_info(get_framebuffer_resource(parent), &info.format,
+  zx_status_t status = zx_framebuffer_get_info(framebuffer_resource->get(), &info.format,
                                                &info.width, &info.height, &info.stride);
   if (status != ZX_OK) {
     return zx::error(status);
@@ -383,7 +384,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   constexpr uint16_t kSequencerData = 0x3c5;
   constexpr uint8_t kClockingModeIdx = 1;
   constexpr uint8_t kClockingModeScreenOff = (1 << 5);
-  zx_status_t status = zx_ioports_request(get_ioport_resource(parent_), kSequencerIdx, 2);
+  zx_status_t status = zx_ioports_request(resources_.ioport_resource->get(), kSequencerIdx, 2);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map vga ports");
     return false;
@@ -2134,7 +2135,7 @@ void Controller::PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer) {
 void Controller::PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
   if (suspend_reason == DEVICE_SUSPEND_REASON_MEXEC) {
-    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(parent_);
+    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(resources_.framebuffer_resource);
     if (fb_status.is_error()) {
       completer(zx::ok());
       return;
@@ -2200,12 +2201,6 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
-  zx::result client = ddk::Device<void>::DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>(parent_);
-  if (client.is_error()) {
-    zxlogf(ERROR, "could not get SYSMEM protocol: %s", client.status_string());
-    return client.status_value();
-  }
-  sysmem_.Bind(std::move(*client));
   auto pid = GetKoid(zx_process_self());
   std::string debug_name = fxl::StringPrintf("intel-i915[%lu]", pid);
   fidl::Arena arena;
@@ -2219,16 +2214,11 @@ zx_status_t Controller::Init() {
     return set_debug_status.status();
   }
 
-  pci_ = ddk::Pci(parent_, "pci");
-  if (!pci_.is_valid()) {
-    zxlogf(ERROR, "Could not get Display PCI protocol");
-    return ZX_ERR_INTERNAL;
-  }
-
+  ZX_DEBUG_ASSERT(pci_.is_valid());
   pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
   zxlogf(TRACE, "Device id %x", device_id_);
 
-  zx::unowned_resource driver_mmio_resource(get_mmio_resource(parent_));
+  const zx::unowned_resource& driver_mmio_resource = resources_.mmio_resource;
   if (!driver_mmio_resource->is_valid()) {
     zxlogf(WARNING, "Failed to get driver MMIO resource. VBT initialization skipped.");
   } else {
@@ -2299,7 +2289,7 @@ zx_status_t Controller::Init() {
     // Prevent clients from allocating memory in this region by telling |gtt_| to exclude it from
     // the region allocator.
     uint32_t offset = 0u;
-    auto fb = GetFramebufferInfo(parent_);
+    auto fb = GetFramebufferInfo(resources_.framebuffer_resource);
     if (fb.is_error()) {
       zxlogf(INFO, "Failed to obtain framebuffer size (%s)", fb.status_string());
       // It is possible for zx_framebuffer_get_info to fail in a headless system as the bootloader
@@ -2361,8 +2351,15 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-Controller::Controller(zx_device_t* parent, inspect::Inspector inspector)
-    : parent_(parent), inspector_(std::move(inspector)) {}
+Controller::Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
+                       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
+                       ControllerResources resources, inspect::Inspector inspector)
+    : resources_(std::move(resources)),
+      sysmem_(std::move(sysmem)),
+      pci_(std::move(pci)),
+      inspector_(std::move(inspector)) {}
+
+Controller::Controller(inspect::Inspector inspector) : inspector_(std::move(inspector)) {}
 
 Controller::~Controller() {
   interrupts_.Destroy();
@@ -2375,11 +2372,14 @@ Controller::~Controller() {
 }
 
 // static
-zx::result<std::unique_ptr<Controller>> Controller::Create(zx_device_t* parent,
-                                                           inspect::Inspector inspector) {
+zx::result<std::unique_ptr<Controller>> Controller::Create(
+    fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
+    fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
+    inspect::Inspector inspector) {
   fbl::AllocChecker alloc_checker;
   auto controller =
-      fbl::make_unique_checked<Controller>(&alloc_checker, parent, std::move(inspector));
+      fbl::make_unique_checked<Controller>(&alloc_checker, std::move(sysmem), std::move(pci),
+                                           std::move(resources), std::move(inspector));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);

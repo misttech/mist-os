@@ -54,18 +54,44 @@ typedef struct buffer_allocation {
   uint16_t end;
 } buffer_allocation_t;
 
+struct ControllerResources {
+  // Must be of type `ZX_RSRC_KIND_SYSTEM` with base
+  // `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`.
+  zx::unowned_resource framebuffer_resource;
+
+  // Must be of type `ZX_RSRC_KIND_MMIO` with access to all valid ranges.
+  zx::unowned_resource mmio_resource;
+
+  // Must be of type `ZX_RSRC_KIND_IOPORT` with access to all valid ranges.
+  zx::unowned_resource ioport_resource;
+};
+
 class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                    public ddk::IntelGpuCoreProtocol<Controller> {
  public:
-  explicit Controller(zx_device_t* parent, inspect::Inspector inspector);
-  ~Controller();
-
   // Creates a `Controller` instance and performs short-running initialization
   // of all subcomponents.
   //
   // Long-running initialization is performed in the Start() hook.
-  static zx::result<std::unique_ptr<Controller>> Create(zx_device_t* parent,
-                                                        inspect::Inspector inspector);
+  //
+  // `sysmem` must be non-null.
+  // `pci` must be non-null.
+  // `resources` must outlive the Controller instance.
+  static zx::result<std::unique_ptr<Controller>> Create(
+      fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
+      fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
+      inspect::Inspector inspector);
+
+  // Prefer to use the `Create()` factory function in production code.
+  explicit Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
+                      fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
+                      ControllerResources resources, inspect::Inspector inspector);
+
+  // Creates a Controller with no valid FIDL clients and no resources for
+  // testing purpose only.
+  explicit Controller(inspect::Inspector inspector);
+
+  ~Controller();
 
   // Corresponds to DFv1 `DdkInit()` and DFv2 `Start()`.
   void Start(fdf::StartCompleter completer);
@@ -214,7 +240,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
   // Disables the PCU (power controller)'s automated voltage adjustments.
   void DisableSystemAgentGeyserville();
 
-  zx_device_t* const parent_;
+  ControllerResources resources_;
 
   std::unique_ptr<DisplayDevice> QueryDisplay(DdiId ddi_id, display::DisplayId display_id)
       __TA_REQUIRES(display_lock_);

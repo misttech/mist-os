@@ -135,7 +135,7 @@ class TestDdiPhysicalLayer final : public DdiPhysicalLayer {
 class DpDisplayTest : public ::testing::Test {
  protected:
   DpDisplayTest()
-      : controller_(nullptr, inspect::Inspector{}),
+      : controller_(inspect::Inspector{}),
         mmio_buffer_({
             .vaddr = FakeMmioPtr(buffer_),
             .offset = 0,

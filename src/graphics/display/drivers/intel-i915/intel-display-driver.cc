@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/intel-i915/intel-display-driver.h"
 
+#include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -57,6 +59,14 @@ constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
     .release = [](void* ctx) {},
 };
 
+ControllerResources GetControllerResources(zx_device_t* parent) {
+  return {
+      .framebuffer_resource = zx::unowned_resource(get_framebuffer_resource(parent)),
+      .mmio_resource = zx::unowned_resource(get_mmio_resource(parent)),
+      .ioport_resource = zx::unowned_resource(get_ioport_resource(parent)),
+  };
+}
+
 }  // namespace
 
 IntelDisplayDriver::IntelDisplayDriver(zx_device_t* parent, std::unique_ptr<Controller> controller)
@@ -66,8 +76,27 @@ IntelDisplayDriver::~IntelDisplayDriver() = default;
 
 // static
 zx::result<> IntelDisplayDriver::Create(zx_device_t* parent) {
-  zx::result<std::unique_ptr<Controller>> controller_result =
-      Controller::Create(parent, inspect::Inspector{});
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_result =
+      ddk::Device<void>::DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>(parent);
+  if (sysmem_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to sysmem protocol: %s", sysmem_result.status_string());
+    return sysmem_result.take_error();
+  }
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem = std::move(sysmem_result).value();
+
+  zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_pci::Service::Device>(
+          parent, "pci");
+  if (pci_result.is_error()) {
+    zxlogf(ERROR, "Failed to connect to pci protocol: %s", pci_result.status_string());
+    return pci_result.take_error();
+  }
+  fidl::ClientEnd<fuchsia_hardware_pci::Device> pci = std::move(pci_result).value();
+
+  ControllerResources resources = GetControllerResources(parent);
+
+  zx::result<std::unique_ptr<Controller>> controller_result = Controller::Create(
+      std::move(sysmem), std::move(pci), std::move(resources), inspect::Inspector{});
   if (controller_result.is_error()) {
     return controller_result.take_error();
   }
