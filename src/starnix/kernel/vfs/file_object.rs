@@ -1540,8 +1540,7 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
-        if prot_flags.intersects(ProtectionFlags::READ | ProtectionFlags::WRITE) && !self.can_read()
-        {
+        if !self.can_read() {
             return error!(EACCES);
         }
         if prot_flags.contains(ProtectionFlags::WRITE)

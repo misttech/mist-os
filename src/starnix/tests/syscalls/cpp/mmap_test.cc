@@ -174,6 +174,38 @@ TEST(MMapTest, MapFixedUnalignedFails) {
   EXPECT_EQ(errno, EINVAL);
 }
 
+TEST(MmapTest, FileCreatedWithLessPermsPrivate) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+  std::string path = dir + "/test_mmap_file_without_perms_for_private";
+
+  int fd = SAFE_SYSCALL(creat(path.c_str(), 0));
+
+  void* addr = mmap(nullptr, page_size, PROT_NONE, MAP_PRIVATE, fd, 0);
+  EXPECT_EQ(addr, MAP_FAILED);
+  EXPECT_EQ(errno, EACCES);
+
+  SAFE_SYSCALL(close(fd));
+  SAFE_SYSCALL(unlink(path.c_str()));
+}
+
+TEST(MmapTest, FileCreatedWithLessPermsShared) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+  std::string path = dir + "/test_mmap_file_without_perms_for_shared";
+
+  int fd = SAFE_SYSCALL(creat(path.c_str(), 0));
+
+  void* addr = mmap(nullptr, page_size, PROT_NONE, MAP_SHARED, fd, 0);
+  EXPECT_EQ(addr, MAP_FAILED);
+  EXPECT_EQ(errno, EACCES);
+
+  SAFE_SYSCALL(close(fd));
+  SAFE_SYSCALL(unlink(path.c_str()));
+}
+
 class MMapProcTest : public ProcTestBase {};
 
 TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
