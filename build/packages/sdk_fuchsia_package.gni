@@ -109,11 +109,11 @@ template("sdk_fuchsia_package") {
   } else {
     # Build the package for supported API levels.
     package_in_target_api_level =
-        invoker.api_level_added <= current_build_target_api_level
+        invoker.api_level_added <= current_build_target_api_level_as_integer
 
     if (package_in_target_api_level && defined(invoker.api_level_removed)) {
       package_in_target_api_level =
-          current_build_target_api_level < invoker.api_level_removed
+          current_build_target_api_level_as_integer < invoker.api_level_removed
     }
 
     _api_level_arg_for_manifest_script = current_build_target_api_level

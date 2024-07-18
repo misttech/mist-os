@@ -307,10 +307,10 @@ def main():
 
     args_gn_content += "sdk_inside_sub_build = true\n"
 
-    # PLATFORM should be passed to GN as a string, numeric API levels are passed
-    # as ints.
-    if api_level == "PLATFORM":
-        gn_api_level = '"PLATFORM"'
+    # Special API levels are passed to GN as a string; numeric API levels are
+    # passed as ints.
+    if api_level == "NEXT" or api_level == "HEAD" or api_level == "PLATFORM":
+        gn_api_level = f'"{api_level}"'
     else:
         gn_api_level = str(int(api_level))
 

@@ -118,7 +118,9 @@ def main():
         variant = {
             "constraints": {
                 "arch": args.arch,
-                "api_level": int(args.api_level),
+                "api_level": int(args.api_level)
+                if args.api_level.isdecimal()
+                else args.api_level,
             },
             "values": {},
         }
