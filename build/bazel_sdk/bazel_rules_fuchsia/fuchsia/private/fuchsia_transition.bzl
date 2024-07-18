@@ -32,6 +32,13 @@ CPU_MAP = {
 
 _REPO_DEFAULT_API_LEVEL_TARGET_NAME = "//fuchsia:repository_default_fuchsia_api_level"
 
+def _name_for_error(attr):
+    return (
+        getattr(attr, "package_name", None)
+    ) or (
+        getattr(attr, "name", None)
+    ) or "NAME NOT FOUND"
+
 def _update_fuchsia_api_level(settings, attr):
     # The logic for determining what API level to use.
     # The effective precedence is specified below:
@@ -51,7 +58,7 @@ def _update_fuchsia_api_level(settings, attr):
         target_specified_api_level
     ) or (
         repo_default_api_level
-    ) or fail_missing_api_level(attr.package_name)
+    ) or fail_missing_api_level(_name_for_error(attr))
 
 def _package_supplied_platform(attr):
     # We should be pulling the platform off of the package but we need to clean
