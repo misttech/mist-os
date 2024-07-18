@@ -19,7 +19,6 @@ use fuchsia_zircon::Status;
 
 use futures::future::{BoxFuture, FutureExt};
 use futures::task::{waker_ref, ArcWake};
-use futures::{SinkExt, StreamExt};
 
 pub trait ShutdownObserverFn: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
 impl<T> ShutdownObserverFn for T where T: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
@@ -371,13 +370,12 @@ impl ShutdownObserver {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use core::ffi::c_void;
+    use core::ffi::{c_char, c_void};
     use core::ptr::null_mut;
-
-    use core::ffi::c_char;
     use std::sync::{mpsc, Once};
 
     use futures::channel::mpsc as async_mpsc;
+    use futures::{SinkExt, StreamExt};
 
     use super::*;
 
