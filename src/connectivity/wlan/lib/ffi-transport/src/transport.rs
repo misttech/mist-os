@@ -36,6 +36,10 @@ pub struct FfiEthernetRx {
     ) -> zx::sys::zx_status_t,
 }
 
+// Safety: The FFI provided by FfiEthernetRx is thread-safe. In particular, the wlansoftmac
+// driver synchronizes all of its ddk::EthernetIfcProtocolClient calls.
+unsafe impl Send for FfiEthernetRx {}
+
 pub struct EthernetRx {
     ffi: FfiEthernetRx,
 }
@@ -92,6 +96,11 @@ pub struct FfiWlanTx {
         payload_len: usize,
     ) -> zx::sys::zx_status_t,
 }
+
+// Safety: The FFI provided by FfiWlanTx is thread-safe. In particular, the wlansoftmac
+// driver synchronizes all of its fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>
+// calls.
+unsafe impl Send for FfiWlanTx {}
 
 pub struct WlanTx {
     ffi: FfiWlanTx,

@@ -57,8 +57,8 @@ SoftmacBridge::~SoftmacBridge() { WLAN_TRACE_DURATION(); }
 // driver to stop if `wlansoftmac_c::start_and_run_bridged_wlansoftmac` returns an error because
 // this driver is in a defunct state without a bridged driver.
 zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
-    fidl::SharedClient<fuchsia_driver_framework::Node> node_client, fdf::StartCompleter completer,
-    fit::callback<void(zx_status_t)> sta_shutdown_handler,
+    fidl::SharedClient<fuchsia_driver_framework::Node> node_client,
+    fdf::StartCompleter start_completer, fit::callback<void(zx_status_t)> shutdown_completer,
     fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
     std::shared_ptr<std::mutex> ethernet_proxy_lock, ddk::EthernetIfcProtocolClient* ethernet_proxy,
     std::optional<uint32_t>* cached_ethernet_status) {
@@ -71,7 +71,7 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   if (softmac_bridge_endpoints.is_error()) {
     FDF_LOG(ERROR, "Failed to create WlanSoftmacBridge endpoints: %s",
             softmac_bridge_endpoints.status_string());
-    completer(zx::error(softmac_bridge_endpoints.error_value()));
+    start_completer(zx::error(softmac_bridge_endpoints.error_value()));
     return softmac_bridge_endpoints.take_error();
   }
 
@@ -98,73 +98,65 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
             });
   }
 
-  auto start_completer = std::make_unique<fit::callback<void(zx_status_t)>>(
-      [completer = std::move(completer)](zx_status_t status) mutable {
+  auto bridged_start_completer = std::make_unique<fit::callback<void(zx_status_t)>>(
+      [start_completer = std::move(start_completer)](zx_status_t status) mutable {
         WLAN_LAMBDA_TRACE_DURATION("bridged_start_completer");
-        completer(zx::make_result(status));
+        start_completer(zx::make_result(status));
+      });
+
+  auto bridged_shutdown_completer = std::make_unique<fit::callback<void(zx_status_t)>>(
+      [shutdown_completer = std::move(shutdown_completer)](zx_status_t status) mutable {
+        WLAN_LAMBDA_TRACE_DURATION("bridged_shutdown_completer");
+        shutdown_completer(status);
       });
 
   FDF_LOG(INFO, "Starting up Rust WlanSoftmac...");
-  auto rust_dispatcher = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "bridged-wlansoftmac",
-      [](fdf_dispatcher_t* rust_dispatcher) {
-        WLAN_LAMBDA_TRACE_DURATION("bridged-wlansoftmac dispatcher shutdown_handler");
-        FDF_LOG(INFO, "Completed bridged-wlansoftmac dispatcher shutdown");
-      });
 
-  if (rust_dispatcher.is_error()) {
-    FDF_LOG(ERROR, "Failed to create dispatcher for MLME: %s", rust_dispatcher.status_string());
-    completer(zx::error(rust_dispatcher.error_value()));
-    return rust_dispatcher.take_error();
+  auto start_result = start_bridged_wlansoftmac(
+      bridged_start_completer.release(),
+      [](void* start_completer, zx_status_t status) {
+        WLAN_LAMBDA_TRACE_DURATION("start_completer");
+        ZX_ASSERT_MSG(start_completer != nullptr, "Received NULL start_completer.");
+        // Safety: `start_completer` is now owned by this function, so it's safe
+        // to cast it to a non-const pointer.
+        auto bridged_start_completer =
+            static_cast<fit::callback<void(zx_status_t)>*>(start_completer);
+        // Skip the check for whether completer has already been
+        // called.  This is the only location where completer is
+        // called, and its deallocated immediately after. Thus, such a
+        // check would be a use-after-free violation.
+        (*bridged_start_completer)(status);
+        delete bridged_start_completer;
+      },
+      bridged_shutdown_completer.release(),
+      [](void* shutdown_completer, zx_status_t status) {
+        WLAN_LAMBDA_TRACE_DURATION("shutdown_completer");
+        ZX_ASSERT_MSG(shutdown_completer != nullptr, "Received NULL shutdown_completer.");
+        // Safety: `shutdown_completer` is now owned by this function, so it's safe
+        // to cast it to a non-const pointer.
+        auto bridged_shutdown_completer =
+            static_cast<fit::callback<void(zx_status_t)>*>(shutdown_completer);
+        // Skip the check for whether completer has already been
+        // called.  This is the only location where completer is
+        // called, and its deallocated immediately after. Thus, such a
+        // check would be a use-after-free violation.
+        (*bridged_shutdown_completer)(status);
+        delete bridged_shutdown_completer;
+      },
+      ethernet_rx_t{
+          .ctx = softmac_bridge.get(),
+          .transfer = &SoftmacBridge::EthernetRx,
+      },
+      wlan_tx_t{
+          .ctx = softmac_bridge.get(),
+          .transfer = &SoftmacBridge::WlanTx,
+      },
+      softmac_bridge->rust_buffer_provider,
+      softmac_bridge_endpoints->client.TakeHandle().release());
+
+  if (start_result != ZX_OK) {
+    return fit::error(start_result);
   }
-
-  // Release the dispatcher to defer destruction until driver shutdown. The framework will shutdown
-  // the dispatcher despite its release here because the framework tagged this driver as the owner
-  // of the dispatcher upon creation. The framework always automatically shuts down all dispatchers
-  // owned by a driver during the driver's shut down.
-  //
-  // A reference to the dispatcher is kept for the purpose of posting a single task to run the
-  // bridged driver.
-  auto unowned_rust_dispatcher = rust_dispatcher->borrow();
-  rust_dispatcher->release();
-
-  async::PostTask(unowned_rust_dispatcher->async_dispatcher(),
-                  [sta_shutdown_handler = std::move(sta_shutdown_handler),
-                   start_completer = std::move(start_completer),
-                   ethernet_rx =
-                       ethernet_rx_t{
-                           .ctx = softmac_bridge.get(),
-                           .transfer = &SoftmacBridge::EthernetRx,
-                       },
-                   wlan_tx =
-                       wlan_tx_t{
-                           .ctx = softmac_bridge.get(),
-                           .transfer = &SoftmacBridge::WlanTx,
-                       },
-                   rust_buffer_provider = softmac_bridge->rust_buffer_provider,
-                   softmac_bridge_client_end =
-                       softmac_bridge_endpoints->client.TakeHandle().release()]() mutable {
-                    WLAN_LAMBDA_TRACE_DURATION("Rust MLME dispatcher");
-                    sta_shutdown_handler(start_and_run_bridged_wlansoftmac(
-                        start_completer.release(),
-                        [](void* start_completer, zx_status_t status) {
-                          WLAN_LAMBDA_TRACE_DURATION("start_completer");
-                          ZX_ASSERT_MSG(start_completer != nullptr,
-                                        "Received NULL start_completer.");
-                          // Safety: `start_completer` is now owned by this function, so it's safe
-                          // to cast it to a non-const pointer.
-                          auto start_completer_cb =
-                              static_cast<fit::callback<void(zx_status_t)>*>(start_completer);
-                          // Skip the check for whether completer has already been
-                          // called.  This is the only location where completer is
-                          // called, and its deallocated immediately after. Thus, such a
-                          // check would be a use-after-free violation.
-                          (*start_completer_cb)(status);
-                          delete start_completer_cb;
-                        },
-                        ethernet_rx, wlan_tx, rust_buffer_provider, softmac_bridge_client_end));
-                  });
-
   return fit::success(std::move(softmac_bridge));
 }
 

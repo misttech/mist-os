@@ -4,22 +4,31 @@
 
 use fuchsia_zircon as zx;
 
-/// Type that wraps a closure for completing a DFv2 Start operation.
+/// Type that wraps a closure for completing an operation.
 ///
-/// Calling `StartCompleter::reply()` forwards the status to the wrapped closure. Otherwise,
-/// dropping a `StartCompleter` indicates Start failed with a `zx::Status::BAD_STATE` status.
-pub struct StartCompleter<F>
+/// Calling `Completer::reply()` forwards the status to the wrapped closure. Otherwise,
+/// dropping a `Completer` indicates failure with a `zx::Status::BAD_STATE` status.
+pub struct Completer<F>
 where
     F: FnOnce(zx::sys::zx_status_t),
 {
     completer: Option<F>,
 }
 
-impl<F> StartCompleter<F>
+// SAFETY: It's safe to use Completer on any thread because the caller of the constructor
+// promises the inner completer is safe to send to another thread.
+unsafe impl<F> Send for Completer<F> where F: FnOnce(zx::sys::zx_status_t) {}
+
+impl<F> Completer<F>
 where
     F: FnOnce(zx::sys::zx_status_t),
 {
-    pub fn new(completer: F) -> Self {
+    /// # Safety
+    ///
+    /// Caller promises the provided completer is safe to send to another thread.
+    /// In some cases, providing a completer that implements Send is difficult.
+    /// For example, a closure that captures a pointer does not implement Send.
+    pub unsafe fn new_unchecked(completer: F) -> Self {
         Self { completer: Some(completer) }
     }
 
@@ -32,7 +41,16 @@ where
     }
 }
 
-impl<F> Drop for StartCompleter<F>
+impl<F> Completer<F>
+where
+    F: FnOnce(zx::sys::zx_status_t) + Send,
+{
+    pub fn new(completer: F) -> Self {
+        Self { completer: Some(completer) }
+    }
+}
+
+impl<F> Drop for Completer<F>
 where
     F: FnOnce(zx::sys::zx_status_t),
 {
@@ -51,30 +69,30 @@ mod tests {
     #[test]
     fn reply_with_ok() {
         let (sender, mut receiver) = oneshot::channel::<zx::sys::zx_status_t>();
-        let start_completer = StartCompleter::new(move |status| {
+        let completer = Completer::new(move |status| {
             sender.send(status).expect("Failed to send result.");
         });
-        start_completer.reply(Ok(()));
+        completer.reply(Ok(()));
         assert_eq!(Ok(Some(zx::Status::OK.into_raw())), receiver.try_recv());
     }
 
     #[test]
     fn reply_with_error() {
         let (sender, mut receiver) = oneshot::channel::<zx::sys::zx_status_t>();
-        let start_completer = StartCompleter::new(move |status| {
+        let completer = Completer::new(move |status| {
             sender.send(status).expect("Failed to send result.");
         });
-        start_completer.reply(Err(zx::Status::NO_RESOURCES));
+        completer.reply(Err(zx::Status::NO_RESOURCES));
         assert_eq!(Ok(Some(zx::Status::NO_RESOURCES.into_raw())), receiver.try_recv());
     }
 
     #[test]
     fn reply_with_error_when_dropped() {
         let (sender, mut receiver) = oneshot::channel::<zx::sys::zx_status_t>();
-        let start_completer = StartCompleter::new(move |status| {
+        let completer = Completer::new(move |status| {
             sender.send(status).expect("Failed to send result.");
         });
-        drop(start_completer);
+        drop(completer);
         assert_eq!(Ok(Some(zx::Status::BAD_STATE.into_raw())), receiver.try_recv());
     }
 }

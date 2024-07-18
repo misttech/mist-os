@@ -30,8 +30,8 @@ using InitCompleter = fit::callback<void(zx_status_t status)>;
 class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridge> {
  public:
   static zx::result<std::unique_ptr<SoftmacBridge>> New(
-      fidl::SharedClient<fuchsia_driver_framework::Node> node_client, fdf::StartCompleter completer,
-      fit::callback<void(zx_status_t)> sta_shutdown_handler,
+      fidl::SharedClient<fuchsia_driver_framework::Node> node_client,
+      fdf::StartCompleter start_completer, fit::callback<void(zx_status_t)> shutdown_completer,
       fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>&& softmac_client,
       std::shared_ptr<std::mutex> ethernet_proxy_lock,
       ddk::EthernetIfcProtocolClient* ethernet_proxy,

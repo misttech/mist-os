@@ -123,6 +123,9 @@ typedef struct {
  *   - This function cannot guarantee `run_start_completer` is thread-safe.
  *   - This function cannot guarantee `start_completer` points to a valid object when
  *     `run_start_completer` is called.
+ *   - This function cannot guarantee `run_shutdown_completer` is thread-safe.
+ *   - This function cannot guarantee `shutdown_completer` points to a valid object when
+ *     `run_shutdown_completer` is called.
  *   - This function cannot guarantee `wlan_softmac_bridge_client_handle` is a valid handle.
  *
  * By calling this function, the caller promises the following:
@@ -130,10 +133,15 @@ typedef struct {
  *   - The `run_start_completer` function is thread-safe.
  *   - The `start_completer` pointer will point to a valid object at least until
  *     `run_start_completer` is called.
+ *   - The `run_shutdown_completer` function is thread-safe.
+ *   - The `shutdown_completer` pointer will point to a valid object at least until
+ *     `run_shutdown_completer` is called.
  *   - The `wlan_softmac_bridge_client_handle` is a valid handle.
  */
-extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
+extern "C" zx_status_t start_bridged_wlansoftmac(
     void *start_completer, void (*run_start_completer)(void *start_completer, zx_status_t status),
+    void *shutdown_completer,
+    void (*run_shutdown_completer)(void *shutdown_completer, zx_status_t status),
     ethernet_rx_t ethernet_rx, wlan_tx_t wlan_tx, wlansoftmac_buffer_provider_ops_t buffer_provider,
     zx_handle_t wlan_softmac_bridge_client_handle);
 

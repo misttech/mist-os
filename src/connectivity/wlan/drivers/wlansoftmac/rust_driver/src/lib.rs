@@ -14,7 +14,7 @@ use std::pin::Pin;
 use tracing::{error, info, warn};
 use wlan_ffi_transport::{BufferProvider, EthernetTx, WlanRx};
 use wlan_fidl_ext::{ResponderExt, SendResultExt, WithName};
-use wlan_mlme::completers::StartCompleter;
+use wlan_mlme::completers::Completer;
 use wlan_mlme::device::DeviceOps;
 use wlan_mlme::{DriverEvent, DriverEventSink};
 use wlan_sme::serve::create_sme;
@@ -50,7 +50,7 @@ const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 /// If an error occurs during the bridge driver's initialization, `start_completer()` will not be
 /// called.
 pub async fn start_and_serve<F, D: DeviceOps + 'static>(
-    start_completer: StartCompleter<F>,
+    start_completer: Completer<F>,
     device: D,
     buffer_provider: BufferProvider,
 ) -> Result<(), zx::Status>
@@ -1307,7 +1307,7 @@ mod tests {
         let (start_complete_sender, mut start_complete_receiver) =
             oneshot::channel::<zx::sys::zx_status_t>();
         let start_and_serve_fut = start_and_serve(
-            StartCompleter::new(move |status| {
+            Completer::new(move |status| {
                 start_complete_sender.send(status).expect("Failed to signal start complete.")
             }),
             fake_device.clone(),

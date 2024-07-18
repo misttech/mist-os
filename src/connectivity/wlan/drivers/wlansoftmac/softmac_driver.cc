@@ -144,7 +144,8 @@ void SoftmacDriver::Start(fdf::StartCompleter completer) {
 
               FDF_LOG(INFO, "Successfully added ethernet device child.");
 
-              fit::callback<void(zx_status_t)> sta_shutdown_handler =
+              auto start_completer = std::move(completer);
+              fit::callback<void(zx_status_t)> shutdown_completer =
                   [node_client = node_client_.Clone()](zx_status_t status) mutable {
                     WLAN_LAMBDA_TRACE_DURATION("sta_shutdown_handler on Rust dispatcher");
                     if (status != ZX_OK) {
@@ -164,7 +165,7 @@ void SoftmacDriver::Start(fdf::StartCompleter completer) {
               {
                 std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
                 auto softmac_bridge = SoftmacBridge::New(
-                    node_client_.Clone(), std::move(completer), std::move(sta_shutdown_handler),
+                    node_client_.Clone(), std::move(start_completer), std::move(shutdown_completer),
                     softmac_client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_,
                     &cached_ethernet_status_);
                 if (softmac_bridge.is_error()) {
