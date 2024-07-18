@@ -132,9 +132,13 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     }
                 })?,
             ),
-            NDTA_PARMS => Self::Parms(
-                VecNeighbourTableParameter::parse(&NlaBuffer::new(payload))?.0,
-            ),
+            NDTA_PARMS => {
+                Self::Parms(
+                    VecNeighbourTableParameter::parse(
+                        &NlaBuffer::new_checked(payload)?,
+                    )?.0
+                )
+            },
             NDTA_GC_INTERVAL => {
                 Self::GcInterval(parse_u64(payload).map_err(|error| {
                     NeighbourTableError::InvalidValue {

@@ -63,7 +63,7 @@ impl<T: AsRef<[u8]>> RouteNextHopBuffer<T> {
             return Err(DecodeError::InvalidBufferLength {
                 name: "RouteNextHopBuffer",
                 len,
-                buffer_len: (8 + self.length()) as usize,
+                buffer_len: self.length() as usize,
             });
         }
         Ok(())
