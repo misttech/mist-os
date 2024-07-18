@@ -5,11 +5,14 @@
 use itertools::Itertools;
 
 use crate::task::CurrentTask;
-use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
+use crate::vfs::{
+    fileops_impl_noop_sync, fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer,
+    OutputBuffer, SimpleFileNode,
+};
 use fidl_fuchsia_power_broker::PowerLevel;
+use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
-use std::borrow::Cow;
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SuspendState {
@@ -74,13 +77,25 @@ pub struct PowerStateFile;
 
 impl PowerStateFile {
     pub fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self {})
+        SimpleFileNode::new(move || Ok(Self {}))
     }
 }
 
-impl BytesFileOps for PowerStateFile {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
+impl FileOps for PowerStateFile {
+    fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, WriteOps>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
+        let bytes = data.read_all()?;
+        let state_str = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
         let clean_state_str = state_str.split('\n').next().unwrap_or("");
         let state: SuspendState = clean_state_str.try_into()?;
 
@@ -90,12 +105,20 @@ impl BytesFileOps for PowerStateFile {
             return error!(EINVAL);
         }
         power_manager.suspend(state)?;
-        Ok(())
+
+        Ok(bytes.len())
     }
 
-    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
         let states = current_task.kernel().suspend_resume_manager.suspend_states();
         let content = states.iter().map(SuspendState::to_str).join(" ") + "\n";
-        Ok(content.as_bytes().to_owned().into())
+        data.write(content.get(offset..).ok_or_else(|| errno!(EINVAL))?.as_bytes())
     }
 }

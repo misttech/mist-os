@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::{parse_unsigned_file, serialize_for_file, BytesFile, BytesFileOps, FsNodeOps};
-use starnix_uapi::error;
+use crate::vfs::{
+    fileops_impl_noop_sync, fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer,
+    OutputBuffer, SimpleFileNode,
+};
+use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::errors::Errno;
-use std::borrow::Cow;
+use starnix_uapi::{errno, error};
 
 /// This file allows user space to put the system into a sleep state while taking into account the
 /// concurrent arrival of wakeup events.
@@ -19,23 +22,48 @@ pub struct PowerWakeupCountFile;
 
 impl PowerWakeupCountFile {
     pub fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self {})
+        SimpleFileNode::new(move || Ok(Self {}))
     }
 }
 
-impl BytesFileOps for PowerWakeupCountFile {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let expected_count: u64 = parse_unsigned_file(&data)?;
+impl FileOps for PowerWakeupCountFile {
+    fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, WriteOps>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        debug_assert!(offset == 0);
+        let bytes = data.read_all()?;
+        let expected_count = std::str::from_utf8(&bytes)
+            .map_err(|_| errno!(EINVAL))?
+            .trim()
+            .parse::<u64>()
+            .map_err(|_| errno!(EINVAL))?;
         let real_count = current_task.kernel().suspend_resume_manager.suspend_stats().wakeup_count;
         if expected_count != real_count {
             return error!(EINVAL);
         }
-        Ok(())
+
+        Ok(bytes.len())
     }
 
-    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
         let wakeup_count =
             current_task.kernel().suspend_resume_manager.suspend_stats().wakeup_count;
-        Ok(serialize_for_file(wakeup_count).into())
+        let content = format!("{}\n", wakeup_count);
+        data.write(content.get(offset..).ok_or_else(|| errno!(EINVAL))?.as_bytes())
     }
 }

@@ -32,7 +32,7 @@ void VerifyReadOutOfBound(const std::string& path) {
   };
   int fd = openat(AT_FDCWD, path.c_str(), O_RDONLY);
   EXPECT_NE(-1, fd);
-  EXPECT_EQ(0, preadv(fd, iov, std::size(iov), kOffset));
+  EXPECT_EQ(-1, preadv(fd, iov, std::size(iov), kOffset));
 }
 
 }  // namespace
