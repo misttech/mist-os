@@ -518,3 +518,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0250_power_topology.md
   - title: "RFC-0251: No Root Access"
     path: /docs/contribute/governance/rfcs/0251_no_root_access.md
+  - title: "RFC-0252: No Phys VMO CacheOps"
+    path: /docs/contribute/governance/rfcs/0252_no_phys_vmo_cacheops.md

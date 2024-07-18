@@ -3283,3 +3283,16 @@
   reviewers: ['pesk@google.com', 'surajmalhotra@google.com', 'geb@google.com', 'maniscalco@google.com', 'cja@google.com']
   submitted: '2023-11-20'
   reviewed: '2024-06-05'
+
+- name: 'RFC-0252'
+  title: 'No Physical VMO CacheOps'
+  short_description: 'Remove cache operations on physical VMOs.'
+  authors: ['adanis@google.com']
+  file: '0252_no_phys_vmo_cacheops.md'
+  area: ['Kernel']
+  issue: ['']
+  gerrit_change_id: ['1064852']
+  status: 'Accepted'
+  reviewers: ['jbauman@google.com', 'mcgrathr@google.com', 'hansens@google.com']
+  submitted: '2024-06-12'
+  reviewed: '2024-07-18'
