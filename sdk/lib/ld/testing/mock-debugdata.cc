@@ -29,10 +29,8 @@ class MockSvcDirectory::Impl {
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
   }
 
-  void Serve(fidl::ClientEnd<fuchsia_io::Directory>& client_end) {
-    zx::result server_end = fidl::CreateEndpoints(&client_end);
-    ASSERT_TRUE(server_end.is_ok()) << server_end.status_string();
-    zx_status_t status = vfs_.ServeDirectory(dir_, *std::move(server_end), fs::Rights::ReadWrite());
+  void Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+    zx_status_t status = vfs_.ServeDirectory(dir_, std::move(server_end), fs::Rights::ReadWrite());
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
   }
 
@@ -61,11 +59,20 @@ void MockSvcDirectory::Init() {
 }
 
 void MockSvcDirectory::AddEntry(std::string_view name, MetaConnector metaconnector) {
+  ASSERT_TRUE(impl_) << "ld::testing::MockSvcDirectory::Init() not called";
   impl_->AddEntry(name, std::move(metaconnector));
 }
 
+void MockSvcDirectory::Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  ASSERT_TRUE(impl_) << "ld::testing::MockSvcDirectory::Init() not called";
+  impl_->Serve(std::move(server_end));
+}
+
 void MockSvcDirectory::Serve(fidl::ClientEnd<fuchsia_io::Directory>& client_end) {
-  impl_->Serve(client_end);
+  ASSERT_TRUE(impl_) << "ld::testing::MockSvcDirectory::Init() not called";
+  zx::result server_end = fidl::CreateEndpoints(&client_end);
+  ASSERT_TRUE(server_end.is_ok()) << server_end.status_string();
+  impl_->Serve(*std::move(server_end));
 }
 
 async::Loop& MockSvcDirectory::loop() { return impl_->loop(); }

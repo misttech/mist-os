@@ -5,18 +5,26 @@
 #include <fidl/fuchsia.debugdata/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ld/testing/mock-debugdata.h>
-#include <lib/zx/eventpair.h>
-#include <lib/zx/vmo.h>
 #include <zircon/status.h>
 
 #include <string_view>
 
 #include <gtest/gtest.h>
 
+#include "debugdata-tests.h"
+
 namespace {
 
 using ::testing::AllOf;
 using ::testing::Not;
+
+using ld::testing::GetKoid;
+using ld::testing::kNotIt;
+using ld::testing::kSinkName;
+using ld::testing::kVmoContents;
+using ld::testing::kVmoName;
+using ld::testing::MakeEventPair;
+using ld::testing::MakeTestVmo;
 
 class LdMockDebugdataTests : public ::testing::Test {
  public:
@@ -33,32 +41,6 @@ class LdMockDebugdataTests : public ::testing::Test {
   zx::eventpair test_eventpair_client_, test_eventpair_server_;
   zx_koid_t test_vmo_koid_, test_eventpair_server_koid_;
 };
-
-constexpr std::string_view kSinkName = "test-sink";
-constexpr std::string_view kVmoName = "test-vmo";
-constexpr std::string_view kVmoContents = "test-vmo contents";
-constexpr std::string_view kNotIt = "not it";
-
-void GetKoid(const zx::object_base& obj, zx_koid_t& koid) {
-  zx_info_handle_basic_t info;
-  zx_status_t status = obj.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-  koid = info.koid;
-}
-
-void MakeEventPair(zx::eventpair& eventpair0, zx::eventpair& eventpair1) {
-  zx_status_t status = zx::eventpair::create(0, &eventpair0, &eventpair1);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-}
-
-void MakeTestVmo(zx::vmo& vmo) {
-  zx_status_t status = zx::vmo::create(kVmoContents.size(), 0, &vmo);
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-  status = vmo.set_property(ZX_PROP_NAME, kVmoName.data(), kVmoName.size());
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-  status = vmo.write(kVmoContents.data(), 0, kVmoContents.size());
-  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
-}
 
 void LdMockDebugdataTests::SetUp() {
   ASSERT_NO_FATAL_FAILURE(MakeTestVmo(test_vmo_));
@@ -122,7 +104,6 @@ TEST_F(LdMockDebugdataTests, MockSvcDirectory) {
   ASSERT_NO_FATAL_FAILURE(svc_dir.Serve(svc_client_end));
   fidl::SyncClient svc_client(std::move(svc_client_end));
   auto open_result = svc_client->Open({{
-      .flags{fuchsia_io::OpenFlags::kDescribe},
       .path{fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>},
       .object{fidl::ServerEnd<fuchsia_io::Node>(debugdata_server_end->TakeChannel())},
   }});

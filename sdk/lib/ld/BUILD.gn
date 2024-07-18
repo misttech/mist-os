@@ -334,6 +334,7 @@ shared_library("ld-startup") {
       "zircon-startup.cc",
     ]
     deps += [
+      ":fuchsia-debugdata",
       ":zircon",
       "//sdk/lib/stdcompat",
       "//src/lib/llvm-profdata",
@@ -439,6 +440,22 @@ source_set("linux-syscalls") {
   sources = [ "linux-syscalls.cc" ]
   include_dirs = [ "//third_party/linux-syscall-support/src" ]
   deps = [ "//zircon/system/ulib/c/stdio:snprintf" ]
+}
+
+library_headers("fuchsia-debugdata.headers") {
+  headers = [ "lib/ld/fuchsia-debugdata.h" ]
+}
+
+static_library("fuchsia-debugdata") {
+  public_deps = [ ":fuchsia-debugdata.headers" ]
+  sources = [
+    "fuchsia-debugdata-forward.cc",
+    "fuchsia-debugdata.cc",
+  ]
+  deps = [
+    "//sdk/lib/fidl_base",
+    "//zircon/system/ulib/zx",
+  ]
 }
 
 # The TLSDESC runtime assembly code is provided in library form as needed for

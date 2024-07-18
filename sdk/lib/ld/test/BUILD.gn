@@ -38,9 +38,12 @@ test("ld-unittests") {
   }
   if (is_fuchsia) {
     sources += [
+      "debugdata-tests.h",
+      "fuchsia-debugdata-tests.cc",
       "mock-debugdata-tests.cc",
       "mock-loader-service-tests.cc",
     ]
+    deps += [ "..:fuchsia-debugdata" ]
   }
 }
 

@@ -127,6 +127,9 @@ class MockSvcDirectory {
     AddEntry(fidl::DiscoverableProtocolName<Protocol>, std::move(metaconnector));
   }
 
+  // This consumes the server end, serving the mock directory FIDL protocol.
+  void Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+
   // This mints a fresh client end to the mock directory FIDL protocol.
   void Serve(fidl::ClientEnd<fuchsia_io::Directory>& client_end);
 
