@@ -102,6 +102,10 @@ TEST_F(RedactorTest, Check) {
   EXPECT_EQ(
       Redact("32_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 33_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
       "32_hex: <REDACTED-HEX: 27> 33_hex: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  EXPECT_EQ(Redact("456 1234567890abcdef 789"), "456 <REDACTED-HEX: 28> 789");
+  EXPECT_EQ(Redact("456 elf:1234567890abcdef 789"), "456 elf:1234567890abcdef 789");
+  EXPECT_EQ(Redact("456 elf:1234567890abcdefABCDEF0123456789 789"),
+            "456 elf:1234567890abcdefABCDEF0123456789 789");
 }
 
 TEST_F(RedactorTest, Canary) {
