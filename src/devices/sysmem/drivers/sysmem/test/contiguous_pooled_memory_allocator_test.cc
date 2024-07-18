@@ -249,8 +249,8 @@ TEST_F(ContiguousPooledSystem, GuardPages) {
                              /*unused_guard_pattern_period_bytes=*/-1, kUnusedPageCheckCyclePeriod,
                              /*internal_guard_regions=*/true,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
-  allocator_.SetupUnusedPages();
   allocator_.set_ready();
+  allocator_.SetupUnusedPages();
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
@@ -292,8 +292,8 @@ TEST_F(ContiguousPooledSystem, ExternalGuardPages) {
                              /*unused_guard_pattern_period_bytes=*/-1, kUnusedPageCheckCyclePeriod,
                              /*internal_guard_regions=*/false,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
-  allocator_.SetupUnusedPages();
   allocator_.set_ready();
+  allocator_.SetupUnusedPages();
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
@@ -349,8 +349,8 @@ TEST_F(ContiguousPooledSystem, UnusedGuardPages) {
                              /*unused_guard_pattern_period_bytes=*/-1,
                              unused_page_check_cycle_period, /*internal_guard_regions=*/false,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
-  allocator_.SetupUnusedPages();
   allocator_.set_ready();
+  allocator_.SetupUnusedPages();
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
