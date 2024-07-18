@@ -875,13 +875,11 @@ From //build/images/args.gni:35
 ### bump_api_level
 
 If true, generate golden files for API level N+1, where N is
-platform_version.deprecated_highest_numbered_api_level.
-TODO(https://fxbug.dev/326277078): Update this comment and potentially
-redefine these args when switching the in-development level to "NEXT".
+max(platform_version.frozen_api_levels).
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:27
+From //build/config/fuchsia/platform_version.gni:25
 
 ### cache_package_labels
 
@@ -3489,7 +3487,7 @@ From //src/fonts/build/font_args.gni:12
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:29
+From //build/config/fuchsia/platform_version.gni:27
 
 ### fuchsia_async_trace_level_logging
 
@@ -5403,7 +5401,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:51
+From //build/config/fuchsia/platform_version.gni:49
 
 ### override_idk_target_cpus
 
