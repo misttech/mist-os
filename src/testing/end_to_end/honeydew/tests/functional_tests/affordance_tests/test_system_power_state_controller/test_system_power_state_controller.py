@@ -35,7 +35,6 @@ class SystemPowerStateControllerAffordanceTests(
             with asserts.assert_raises(errors.NotSupportedError):
                 self.device.system_power_state_controller.idle_suspend_timer_based_resume(
                     duration=3,
-                    verify=self.user_params["verify_suspend_resume"],
                 )
 
 

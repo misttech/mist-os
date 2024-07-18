@@ -11,16 +11,19 @@ import os
 import pty
 import re
 import subprocess
-import time
 import typing
 from collections.abc import Generator
+from typing import Any
+
+import fuchsia_inspect
 
 from honeydew import errors
+from honeydew.interfaces.affordances import inspect as inspect_affordance
 from honeydew.interfaces.affordances import (
     system_power_state_controller as system_power_state_controller_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx as ffx_transport
+from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.typing import custom_types
 from honeydew.utils import decorators
 
@@ -107,7 +110,10 @@ class SystemPowerStateController(
 
     Args:
         device_name: Device name returned by `ffx target list`.
-        ffx: FFX transport.
+        ffx: interfaces.transports.FFX implementation.
+        device_logger: interfaces.device_classes.affordances_capable.FuchsiaDeviceLogger
+            implementation.
+        inspect: interfaces.affordances.inspect.Inspect implementation.
 
     Raises:
         errors.NotSupportedError: If Fuchsia device does not support Starnix.
@@ -118,12 +124,14 @@ class SystemPowerStateController(
         device_name: str,
         ffx: ffx_transport.FFX,
         device_logger: affordances_capable.FuchsiaDeviceLogger,
+        inspect: inspect_affordance.Inspect,
     ) -> None:
         self._device_name: str = device_name
         self._ffx: ffx_transport.FFX = ffx
         self._device_logger: affordances_capable.FuchsiaDeviceLogger = (
             device_logger
         )
+        self._insect: inspect_affordance.Inspect = inspect
 
         _LOGGER.debug(
             "Checking if %s supports %s affordance...",
@@ -134,7 +142,7 @@ class SystemPowerStateController(
             cmd=_StarnixCmds.IS_STARNIX_SUPPORTED
         )
         _LOGGER.debug(
-            "%s does support %s affordance...",
+            "%s supports %s affordance...",
             self._device_name,
             self.__class__.__name__,
         )
@@ -144,7 +152,6 @@ class SystemPowerStateController(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
-        verify: bool = True,
     ) -> None:
         """Perform suspend-resume operation on the device.
 
@@ -154,10 +161,6 @@ class SystemPowerStateController(
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True. Note that
-                this raises SystemPowerStateControllerError if verification
-                fails.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
@@ -170,7 +173,8 @@ class SystemPowerStateController(
             resume_mode=resume_mode,
         )
 
-        logs_start_time: float = time.time()
+        suspend_resume_count_before: int = self._get_suspend_resume_count()
+
         log_message: str = (
             f"Performing '{suspend_state}' followed by '{resume_mode}' "
             f"operations on '{self._device_name}'..."
@@ -181,46 +185,36 @@ class SystemPowerStateController(
             level=custom_types.LEVEL.INFO,
         )
 
-        suspend_resume_start_time: float = time.time()
-
         with self._set_resume_mode(resume_mode=resume_mode):
             self._suspend(suspend_state=suspend_state)
 
-        suspend_resume_end_time: float = time.time()
-        suspend_resume_execution_time: float = (
-            suspend_resume_end_time - suspend_resume_start_time
-        )
-
         log_message = (
             f"Completed '{suspend_state}' followed by '{resume_mode}' "
-            f"operations on '{self._device_name}' in {suspend_resume_execution_time} "
-            f"seconds."
+            f"operations on '{self._device_name}'."
         )
         self._device_logger.log_message_to_device(
             message=log_message,
             level=custom_types.LEVEL.INFO,
         )
         _LOGGER.info(log_message)
-        logs_end_time: float = time.time()
-        logs_duration: float = logs_end_time - logs_start_time
 
-        if verify:
-            self._verify_suspend_resume(
-                suspend_state=suspend_state,
-                resume_mode=resume_mode,
-                suspend_resume_execution_time=suspend_resume_execution_time,
-                logs_duration=logs_duration,
+        suspend_resume_count_after: int = self._get_suspend_resume_count()
+
+        if suspend_resume_count_after != suspend_resume_count_before + 1:
+            raise errors.SystemPowerStateControllerError(
+                f"Based on SAG inspect data, '{suspend_state}' followed "
+                f"by '{resume_mode}' operation didn't succeed on "
+                f"'{self._device_name}'. "
             )
 
     def idle_suspend_timer_based_resume(
-        self, duration: int, verify: bool = True
+        self,
+        duration: int,
     ) -> None:
         """Perform idle-suspend and timer-based-resume operation on the device.
 
         Args:
             duration: Resume timer duration in seconds.
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
@@ -231,7 +225,6 @@ class SystemPowerStateController(
             resume_mode=system_power_state_controller_interface.TimerResume(
                 duration=duration,
             ),
-            verify=verify,
         )
 
     # List all the private methods
@@ -521,165 +514,96 @@ class SystemPowerStateController(
                 "logs for command output)"
             )
 
-    def _verify_suspend_resume(
-        self,
-        suspend_state: system_power_state_controller_interface.SuspendState,
-        resume_mode: system_power_state_controller_interface.ResumeMode,
-        suspend_resume_execution_time: float,
-        logs_duration: float,
-    ) -> None:
-        """Verifies suspend resume operation has been indeed performed
-        correctly.
+    # TODO (https://fxbug.dev/335494603): Update this logic, once fxr/1072776 lands
+    # pylint: disable=missing-raises-doc
+    def _get_suspend_resume_count(self) -> int:
+        """Returns suspend-resume count by reading the SAG inspect data.
 
-        Args:
-            suspend_state: Which state to suspend the Fuchsia device into.
-            resume_mode: Information about how to resume the device.
-            suspend_resume_execution_time: How long suspend-resume operation
-                took.
-            logs_duration: How many seconds of logs need to be captured for
-                the log analysis.
-        Raises:
-            errors.SystemPowerStateControllerError: In case of verification
-                failure.
-        """
-        _LOGGER.info(
-            "Verifying the '%s' followed by '%s' operations that were "
-            "performed on '%s'...",
-            suspend_state,
-            resume_mode,
-            self._device_name,
-        )
-
-        self._verify_suspend_resume_using_duration(
-            suspend_state=suspend_state,
-            resume_mode=resume_mode,
-            suspend_resume_duration=suspend_resume_execution_time,
-            max_buffer_duration=3,
-        )
-
-        # TODO (https://fxbug.dev/335494603): Use inspect based verification
-        self._verify_suspend_resume_using_log_analysis(
-            suspend_state=suspend_state,
-            resume_mode=resume_mode,
-            logs_duration=logs_duration,
-        )
-
-        _LOGGER.info(
-            "Successfully verified the '%s' followed by '%s' operations that "
-            "were performed on '%s'",
-            suspend_state,
-            resume_mode,
-            self._device_name,
-        )
-
-    def _verify_suspend_resume_using_duration(
-        self,
-        suspend_state: system_power_state_controller_interface.SuspendState,
-        resume_mode: system_power_state_controller_interface.ResumeMode,
-        suspend_resume_duration: float,
-        max_buffer_duration: float,
-    ) -> None:
-        """Verify that suspend-resume operation was indeed triggered by checking
-        the duration it took to perform suspend-resume operation.
-
-        Args:
-            suspend_state: Which state to suspend the Fuchsia device into.
-            resume_mode: Information about how to resume the device.
-            suspend_resume_duration: How long suspend-resume operation took.
-            max_buffer_duration: How much maximum buffer time to consider while
-                verifying the duration.
+        Returns:
+            suspend-resume count if available, otherwise None.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of verification
-                failure.
+            errors.SystemPowerStateControllerError: Failed to read SAG inspect data.
         """
-        if isinstance(
-            resume_mode,
-            (system_power_state_controller_interface.TimerResume,),
-        ):
-            max_expected_duration: float = (
-                resume_mode.duration + max_buffer_duration
+        # Sample SAG inspect data:
+        # [
+        #     {
+        #         "data_source": "Inspect",
+        #         "metadata": {
+        #             "component_url": "fuchsia-boot:///system-activity-governor#meta/system-activity-governor.cm",
+        #             "timestamp": 372140515750,
+        #         },
+        #         "moniker": "bootstrap/system-activity-governor",
+        #         "payload": {
+        #             "root": {
+        #                 "booting": False,
+        #                 "power_elements": {
+        #                     "execution_resume_latency": {
+        #                         "resume_latencies": [0],
+        #                         "resume_latency": 0,
+        #                         "power_level": 0,
+        #                     },
+        #                     "wake_handling": {"power_level": 0},
+        #                     "full_wake_handling": {"power_level": 0},
+        #                     "application_activity": {"power_level": 1},
+        #                     "execution_state": {"power_level": 2},
+        #                 },
+        #                 "suspend_events": {},
+        #                 "suspend_stats": {
+        #                     "success_count": 0,
+        #                     "fail_count": 0,
+        #                     "last_failed_error": 0,
+        #                     "last_time_in_suspend": -1,
+        #                     "last_time_in_suspend_operations": -1,
+        #                 },
+        #                 "fuchsia.inspect.Health": {
+        #                     "start_timestamp_nanos": 892116500,
+        #                     "status": "OK",
+        #                 },
+        #             }
+        #         },
+        #         "version": 1,
+        #     }
+        # ]
+        try:
+            inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+                self._insect.get_data(
+                    selectors=["/bootstrap/system-activity-governor"],
+                )
+            )
+            _LOGGER.debug(
+                "SAG Inspect data associated with '%s' is: %s",
+                self._device_name,
+                inspect_data_collection,
             )
 
-            if suspend_resume_duration > max_expected_duration:
-                raise errors.SystemPowerStateControllerError(
-                    f"'{suspend_state}' followed by '{resume_mode}' operation "
-                    f"took {suspend_resume_duration} seconds on "
-                    f"'{self._device_name}'. Expected it to not take more than "
-                    f"{max_expected_duration} seconds.",
+            if len(inspect_data_collection.data) == 0:
+                raise errors.InspectError(
+                    f"SAG inspect data associated with {self._device_name} is empty"
                 )
 
-    def _verify_suspend_resume_using_log_analysis(
-        self,
-        suspend_state: system_power_state_controller_interface.SuspendState,
-        resume_mode: system_power_state_controller_interface.ResumeMode,
-        logs_duration: float,
-    ) -> None:
-        """Verify that suspend resume operation was indeed triggered using log
-        analysis.
-
-        Args:
-            suspend_state: Which state to suspend the Fuchsia device into.
-            resume_mode: Information about how to resume the device.
-            logs_duration: How many seconds of logs need to be captured for
-                the log analysis.
-        """
-        duration: int = round(logs_duration) + 1
-        suspend_resume_logs_cmd: list[str] = [
-            "log",
-            "--symbolize",
-            "off",  # Turn off symbolize to run this cmd in infra
-            "--filter",
-            "remote-control",  # Lacewing logs
-            "--filter",
-            "system-activity-governor",  # suspend-resume logs
-            "--since",
-            f"{duration}s ago",
-            "dump",
-        ]
-
-        suspend_resume_logs: list[str] = self._ffx.run(
-            suspend_resume_logs_cmd,
-        ).split("\n")
-
-        suspend_time: float = 0
-        resume_time: float = 0
-
-        expected_patterns: list[
-            re.Pattern[str]
-        ] = _RegExPatterns.SUSPEND_RESUME_PATTERNS.copy()
-        for suspend_resume_log in suspend_resume_logs:
-            reg_ex: re.Pattern[str] = expected_patterns[0]
-            match: re.Match[str] | None = reg_ex.search(suspend_resume_log)
-            if match:
-                if reg_ex == _RegExPatterns.SUSPEND_OPERATION:
-                    suspend_time = float(match.group(1))
-                elif reg_ex == _RegExPatterns.RESUME_OPERATION:
-                    resume_time = float(match.group(1))
-                expected_patterns.remove(reg_ex)
-                if not expected_patterns:
-                    break
-                reg_ex = expected_patterns[0]
-
-        if expected_patterns:
-            raise errors.SystemPowerStateControllerError(
-                f"Log analysis for '{suspend_state}' followed by "
-                f"'{resume_mode}' operation failed on '{self._device_name}'. "
-                f"Following patterns were not found: {expected_patterns}"
+            sag_inspect_data: fuchsia_inspect.InspectData = (
+                inspect_data_collection.data[0]
             )
 
-        suspend_resume_duration: float = round(resume_time - suspend_time, 2)
-        _LOGGER.info(
-            "'%s' followed by '%s' operations on '%s' took %s seconds as per "
-            "device logs.",
-            suspend_state,
-            resume_mode,
-            self._device_name,
-            suspend_resume_duration,
-        )
-        self._verify_suspend_resume_using_duration(
-            suspend_state=suspend_state,
-            resume_mode=resume_mode,
-            suspend_resume_duration=suspend_resume_duration,
-            max_buffer_duration=0.5,
-        )
+            if sag_inspect_data.payload is None:
+                raise errors.InspectError(
+                    f"SAG inspect data associated with {self._device_name} does "
+                    f"not have a valid payload"
+                )
+
+            sag_inspect_root_data: dict[str, Any] = sag_inspect_data.payload[
+                "root"
+            ]
+            suspend_stats: dict[str, Any] = sag_inspect_root_data[
+                "suspend_stats"
+            ]
+            suspend_resume_count: int = suspend_stats["success_count"]
+
+            return suspend_resume_count
+        except (errors.InspectError,) as err:  # pylint: disable=broad-except
+            raise errors.SystemPowerStateControllerError(
+                f"Failed to read SAG inspect data from {self._device_name}"
+            ) from err
+
+    # pylint: enable=missing-raises-doc

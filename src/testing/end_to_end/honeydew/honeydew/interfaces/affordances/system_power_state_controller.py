@@ -54,15 +54,12 @@ class SystemPowerStateController(abc.ABC):
         self,
         suspend_state: SuspendState,
         resume_mode: ResumeMode,
-        verify: bool = True,
     ) -> None:
         """Perform suspend-resume operation on the device.
 
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
@@ -74,14 +71,11 @@ class SystemPowerStateController(abc.ABC):
     def idle_suspend_timer_based_resume(
         self,
         duration: int,
-        verify: bool = True,
     ) -> None:
         """Perform idle-suspend and timer-based-resume operation on the device.
 
         Args:
             duration: Resume timer duration in seconds.
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure

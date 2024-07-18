@@ -342,6 +342,7 @@ class FuchsiaDevice(
         return system_power_state_controller_starnix.SystemPowerStateController(
             device_name=self.device_name,
             ffx=self.ffx,
+            inspect=self.inspect,
             device_logger=self,
         )
 
