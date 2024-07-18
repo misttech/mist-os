@@ -150,6 +150,7 @@ metadata to the driver's outgoing directory by calling its
 `fdf_metadata::MetadataServer::Serve()` method:
 
 ```cpp
+{% verbatim %}
 // Make sure to include the metadata library that specializes the
 // `fdf_metadata::ObjectDetails` class. It is needed by
 // `fdf_metadata::MetadataServer`.
@@ -174,6 +175,7 @@ class Sender : public fdf::DriverBase {
   // Responsible for serving metadata.
   fdf_metadata::MetadataServer<fuchsia_examples_metadata::Metadata> metadata_server_;
 };
+{% endverbatim %}
 ```
 
 `fdf_metadata::MetadataServer::SetMetadata()` can be called multiple times,
@@ -256,6 +258,7 @@ FUCHSIA_DRIVER_EXPORT(Retriever);
 ```
 
 It's component manifest is the following:
+
 ```
 {
     include: [
@@ -271,6 +274,7 @@ It's component manifest is the following:
 ```
 
 It's build targets are defined as follows:
+
 ```
 fuchsia_driver("driver") {
   testonly = true
@@ -374,6 +378,7 @@ FUCHSIA_DRIVER_EXPORT(Forwarder);
 ```
 
 It's component manifest is the following:
+
 ```
 {
     include: [
@@ -389,6 +394,7 @@ It's component manifest is the following:
 ```
 
 It's build targets are defined as follows:
+
 ```
 fuchsia_driver("driver") {
   testonly = true
@@ -412,6 +418,7 @@ fuchsia_driver_component("component") {
   info = "forward.json" # Info not specified in this tutorial.
 }
 ```
+
 ### Forward process
 In order for the driver to forward metadata from its parent driver to its child
 drivers, it will need an instance of the
@@ -454,6 +461,7 @@ will have to call `fdf_metadata::MetadataServer::ForwardMetadata()` again in
 order to incorporate the change.
 
 The `driver` build target will need to be updated:
+
 ```
 fuchsia_driver("driver") {
   testonly = true
@@ -471,6 +479,7 @@ fuchsia_driver("driver") {
 ### Exposing and using the metadata service
 Finally, the driver will need to declare, use, and expose the
 `fuchsia.examples.metadata.Metadata` FIDL service in its component manifest:
+
 ```
 {
     include: [
