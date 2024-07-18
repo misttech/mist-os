@@ -12,14 +12,7 @@
         {
             type: "expect_pass_with_err_logs",
             matchers: [
-                "dhcpv4_client_restarts_after_delay",
-
-                // TODO(https://fxbug.dev/333528428): Remove filtering
-                // tests once `use_out_of_stack_dhcp_client` is aligned
-                // with NS2/NS3.
-                "test_filtering_udp_netcfg_*_ns3::*",
-                "test_oir_interface_name_conflict_uninstall_existing_netcfg_advanced_ns3",
-                "test_oir_interface_name_conflict_uninstall_existing_netcfg_basic_ns3",
+                // NB: Netcfg logs an error when rejecting an interface name.
                 "test_oir_interface_name_conflict_reject_netcfg_basic_ns2::*",
                 "test_oir_interface_name_conflict_reject_netcfg_basic_ns3::*",
                 "test_oir_interface_name_conflict_reject_netcfg_advanced_ns2::*",
@@ -28,20 +21,9 @@
                 "test_oir_interface_name_conflict_reject_not_netcfg_managed_netcfg_basic_ns3",
                 "test_oir_interface_name_conflict_reject_not_netcfg_managed_netcfg_advanced_ns2",
                 "test_oir_interface_name_conflict_reject_not_netcfg_managed_netcfg_advanced_ns3",
-                "test_oir_netcfg_advanced_ns3::*",
-                "test_oir_netcfg_basic_ns3::*",
-                "test_prefix_provider_config_error_netcfg_advanced_ns3*",
-                "test_prefix_provider_config_error_netcfg_basic_ns3*",
-                "test_prefix_provider_double_watch_netcfg_basic_ns3",
-                "test_prefix_provider_double_watch_netcfg_advanced_ns3",
-                "test_prefix_provider_not_supported_netcfg_advanced_ns3",
-                "test_prefix_provider_not_supported_netcfg_basic_ns3",
-                "test_prefix_provider_already_acquiring_netcfg_basic_ns3",
-                "test_prefix_provider_already_acquiring_netcfg_advanced_ns3",
-                "test_prefix_provider_full_integration_netcfg_advanced_ns3",
-                "test_prefix_provider_full_integration_netcfg_basic_ns3",
-                "test_forwarding_netcfg_advanced_ns3",
-                "test_forwarding_netcfg_basic_ns3",
+
+                // NB: Netcfg logs an error when the DHCPv4 client exits.
+                "dhcpv4_client_restarts_after_delay",
             ],
         },
         {

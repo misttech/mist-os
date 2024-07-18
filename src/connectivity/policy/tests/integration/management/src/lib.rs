@@ -42,7 +42,7 @@ use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::nud::apply_nud_flake_workaround;
 use netstack_testing_common::realms::{
     KnownServiceProvider, ManagementAgent, Manager, ManagerConfig, NetCfgBasic, NetCfgVersion,
-    Netstack, Netstack3, TestRealmExt as _, TestSandboxExt,
+    Netstack, Netstack3, NetstackVersion, TestRealmExt as _, TestSandboxExt,
 };
 use netstack_testing_common::{
     dhcpv4 as dhcpv4_helper, try_all, try_any, wait_for_component_stopped,
@@ -93,7 +93,14 @@ async fn with_netcfg_owned_device<
                 KnownServiceProvider::FakeClock,
             ]
             .into_iter()
-            .chain(extra_known_service_providers),
+            .chain(extra_known_service_providers)
+            // If the client requested an out of stack DHCP client, add it to
+            // the list of service providers.
+            .chain(
+                use_out_of_stack_dhcp_client
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
 
@@ -136,6 +143,18 @@ async fn with_netcfg_owned_device<
     if_name
 }
 
+/// An extension trait for [`Netstack`].
+trait NetstackExt {
+    const USE_OUT_OF_STACK_DHCP_CLIENT: bool;
+}
+
+impl<N: Netstack> NetstackExt for N {
+    const USE_OUT_OF_STACK_DHCP_CLIENT: bool = match Self::VERSION {
+        NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => true,
+        NetstackVersion::Netstack2 { .. } | NetstackVersion::ProdNetstack2 => false,
+    };
+}
+
 /// Test that NetCfg discovers a newly added device and it adds the device
 /// to the Netstack.
 #[netstack_test]
@@ -147,7 +166,7 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, pr
     let if_name = with_netcfg_owned_device::<M, N, _>(
         name,
         config,
-        false, /* use_out_of_stack_dhcp_client */
+        N::USE_OUT_OF_STACK_DHCP_CLIENT,
         [],
         |_if_id: u64,
          _: &netemul::TestNetwork<'_>,
@@ -336,11 +355,11 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
     let sender_realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             format!("{name}-sender_realm"),
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     use_dhcp_server: true,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                     config: realm1_manager,
                 },
                 // Include the DHCP server because we bring up a WLAN_AP device
@@ -348,7 +367,13 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
                 KnownServiceProvider::DhcpServer { persistent: false },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("failed to create sender realm");
     let (_sender_ep, sender_ep_addr) = setup_filtering_iface::<M, N>(
@@ -363,11 +388,11 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
     let receiver_realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             format!("{name}-receiver_realm"),
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     use_dhcp_server: true,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                     config: realm2_manager,
                 },
                 // Include the DHCP server because we bring up a WLAN_AP device
@@ -375,7 +400,13 @@ async fn test_filtering_udp<M: Manager, N: Netstack>(
                 KnownServiceProvider::DhcpServer { persistent: false },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("failed to create receiver realm");
     let (_receiver_ep, receiver_ep_addr) = setup_filtering_iface::<M, N>(
@@ -450,7 +481,7 @@ async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) 
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::AllDelegated,
-        false, /* use_out_of_stack_dhcp_client */
+        N::USE_OUT_OF_STACK_DHCP_CLIENT,
         [KnownServiceProvider::Dhcpv6Client],
         |_if_id: u64,
          network: &netemul::TestNetwork<'_>,
@@ -571,16 +602,22 @@ async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Nets
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Empty,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
 
@@ -712,16 +749,22 @@ async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::DuplicateNames,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
 
@@ -1133,18 +1176,24 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Empty,
                     use_dhcp_server: true,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::DhcpServer { persistent: false },
                 KnownServiceProvider::FakeClock,
                 KnownServiceProvider::SecureStash,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
     let wait_for_netmgr =
@@ -1180,16 +1229,22 @@ async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Empty,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
     let mut event_stream = events::EventStream::open_at_path("/events/started_stopped")
@@ -1231,7 +1286,7 @@ async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Forwarding,
-        false, /* use_out_of_stack_dhcp_client */
+        N::USE_OUT_OF_STACK_DHCP_CLIENT,
         [],
         |if_id,
          _: &netemul::TestNetwork<'_>,
@@ -1274,16 +1329,22 @@ async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str)
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Empty,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
 
@@ -1319,17 +1380,23 @@ async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Dhcpv6,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
                 KnownServiceProvider::Dhcpv6Client,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
 
@@ -1425,17 +1492,23 @@ async fn test_prefix_provider_config_error<M: Manager, N: Netstack>(
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Dhcpv6,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
                 KnownServiceProvider::Dhcpv6Client,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
 
@@ -1463,17 +1536,23 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
             name,
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     config: ManagerConfig::Dhcpv6,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
                 KnownServiceProvider::Dhcpv6Client,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create netstack realm");
 
@@ -1690,7 +1769,7 @@ async fn test_prefix_provider_full_integration<M: Manager, N: Netstack>(name: &s
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Dhcpv6,
-        false, /* use_out_of_stack_dhcp_client */
+        N::USE_OUT_OF_STACK_DHCP_CLIENT,
         [KnownServiceProvider::Dhcpv6Client],
         |if_id, network, interface_state, realm, _sandbox| {
             async move {
@@ -1816,8 +1895,8 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
         ManagerConfig::Dhcpv6,
-        true, /* use_out_of_stack_dhcp_client */
-        [KnownServiceProvider::Dhcpv6Client, KnownServiceProvider::DhcpClient],
+        N::USE_OUT_OF_STACK_DHCP_CLIENT,
+        [KnownServiceProvider::Dhcpv6Client],
         |if_id, network, interface_state, realm, _sandbox| {
             async move {
                 // Fake endpoint to inject server packets and intercept client packets.
@@ -2015,16 +2094,22 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
     let router = sandbox
         .create_netstack_realm_with::<N, _, _>(
             format!("{name}_router"),
-            &[
+            [
                 KnownServiceProvider::Manager {
                     agent: ManagementAgent::NetCfg(NetCfgVersion::Advanced),
                     config: ManagerConfig::Empty,
                     use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
+                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
                 },
                 KnownServiceProvider::DnsResolver,
                 KnownServiceProvider::FakeClock,
-            ],
+            ]
+            .into_iter()
+            .chain(
+                N::USE_OUT_OF_STACK_DHCP_CLIENT
+                    .then_some(KnownServiceProvider::DhcpClient)
+                    .into_iter(),
+            ),
         )
         .expect("create host netstack realm");
 
@@ -2168,7 +2253,7 @@ async fn dhcpv4_client_restarts_after_delay() {
         "dhcpv4_client_restarts_after_delay",
         ManagerConfig::Empty,
         true, /* use_out_of_stack_dhcp_client */
-        [KnownServiceProvider::DhcpClient],
+        [],
         |client_interface_id, network, client_state, client_realm, sandbox| {
             async move {
                 let server_realm: netemul::TestRealm<'_> = sandbox

@@ -301,7 +301,7 @@ impl PacketSocketProvider for PacketSocketProviderImpl {
 
         socket.bind(&sockaddr_ll.into_sockaddr()).map_err(translate_io_error)?;
         let socket = fasync::net::DatagramSocket::new_from_socket(socket)
-            .expect("failed to wrap into fuchsia-async DatagramSocket");
+            .map_err(dhcp_client_core::deps::SocketError::Other)?;
         Ok(PacketSocket { interface_id: *interface_id, inner: socket })
     }
 }

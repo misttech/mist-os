@@ -117,7 +117,7 @@ pub(crate) async fn serve_client_provider(
                     let mac = match provider.get_mac().await {
                         Ok(mac) => mac,
                         Err(e) => {
-                            tracing::error!("error while getting MAC address: {:?}", e);
+                            tracing::warn!("error while getting MAC address: {:?}", e);
                             control_handle
                                 .send_on_exit({
                                     match e {
@@ -170,7 +170,7 @@ pub(crate) async fn serve_client_provider(
                             }
                         }
                         crate::client::Error::Core(e) => {
-                            tracing::error!("error while serving client: {:?}", e);
+                            tracing::warn!("error while serving client: {:?}", e);
                         }
                     });
                     Ok(())
