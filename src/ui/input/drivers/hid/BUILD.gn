@@ -14,39 +14,41 @@ driver_bind_rules("hid_bind") {
   deps = [ "//src/devices/bind/fuchsia.hid" ]
 }
 
-fuchsia_driver("hid-driver") {
-  output_name = "hid"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+source_set("driver-internals") {
   sources = [
     "device-report-reader.cc",
     "hid-fifo.c",
     "hid-instance.cc",
     "hid.cc",
   ]
-  deps = [
+  public_deps = [
     ":hid_bind",
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
-    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
     "//src/devices/bind/fuchsia.hid:fuchsia.hid_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//src/lib/listnode",
     "//src/ui/input/lib/hid",
     "//src/ui/input/lib/hid-parser",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/trace",
+  ]
+}
+
+fuchsia_driver("hid-driver") {
+  output_name = "hid"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
   ]
 
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
+
+  deps = [
+    ":driver-internals",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
 }
 
 fuchsia_driver_component("hid") {
@@ -63,34 +65,14 @@ fuchsia_driver_package("package") {
 }
 
 test("hid-test") {
-  sources = [
-    "device-report-reader.cc",
-    "hid-fifo.c",
-    "hid-instance.cc",
-    "hid-test.cc",
-    "hid.cc",
-  ]
+  sources = [ "hid-test.cc" ]
   deps = [
+    ":driver-internals",
     ":hid_bind",
-    "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp",
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp_testing",
-    "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime/testing/cpp",
-    "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bind/fuchsia.hid:fuchsia.hid_cpp",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//src/lib/listnode",
-    "//src/ui/input/lib/hid",
-    "//src/ui/input/lib/hid-parser",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/zxtest",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 

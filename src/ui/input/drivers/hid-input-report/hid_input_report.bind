@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+using fuchsia.hardware.input;
 using fuchsia.hid;
 
-fuchsia.BIND_PROTOCOL == fuchsia.hid.BIND_PROTOCOL.DEVICE;
+fuchsia.hardware.input.Service == fuchsia.hardware.input.Service.ZirconTransport;
 if fuchsia.hid.CONSUMER__CONSUMER_CONTROL == true {
     true;
 } else if fuchsia.hid.DIGITIZER__TOUCH_PAD == true {

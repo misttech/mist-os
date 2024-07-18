@@ -11,7 +11,10 @@ driver_bind_rules("hid_input_report_bind") {
   rules = "hid_input_report.bind"
   bind_output = "hid-input-report.bindbc"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hid" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_bindlib",
+    "//src/devices/bind/fuchsia.hid",
+  ]
 }
 
 group("tests") {

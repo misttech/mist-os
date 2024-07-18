@@ -4,7 +4,7 @@
 
 #include "device-report-reader.h"
 
-#include <lib/ddk/trace/event.h>
+#include <lib/trace/event.h>
 
 #include "hid.h"
 
@@ -25,7 +25,7 @@ zx_status_t DeviceReportsReader::ReadReportFromFifo(uint8_t* buf, size_t buf_siz
 
   size_t report_size = base_->GetReportSizeById(report_id, fhidbus::ReportType::kInput);
   if (report_size == 0) {
-    zxlogf(ERROR, "error reading hid device: unknown report id (%u)!", report_id);
+    FDF_LOG(ERROR, "error reading hid device: unknown report id (%u)!", report_id);
     return ZX_ERR_BAD_STATE;
   }
 
@@ -55,7 +55,6 @@ zx_status_t DeviceReportsReader::ReadReportFromFifo(uint8_t* buf, size_t buf_siz
 }
 
 void DeviceReportsReader::ReadReports(ReadReportsCompleter::Sync& completer) {
-  fbl::AutoLock lock(&reader_lock_);
   if (waiting_read_) {
     completer.ReplyError(ZX_ERR_ALREADY_BOUND);
     return;
@@ -65,7 +64,7 @@ void DeviceReportsReader::ReadReports(ReadReportsCompleter::Sync& completer) {
 
   zx_status_t status = SendReports();
   if ((status != ZX_OK) && (status != ZX_ERR_SHOULD_WAIT)) {
-    zxlogf(ERROR, "ReadReports SendReports failed %d\n", status);
+    FDF_LOG(ERROR, "ReadReports SendReports failed %d\n", status);
   }
 }
 
@@ -122,8 +121,6 @@ zx_status_t DeviceReportsReader::SendReports() {
 
 zx_status_t DeviceReportsReader::WriteToFifo(const uint8_t* report, size_t report_len,
                                              zx_time_t time) {
-  fbl::AutoLock lock(&reader_lock_);
-
   if (timestamps_.full()) {
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
@@ -141,7 +138,7 @@ zx_status_t DeviceReportsReader::WriteToFifo(const uint8_t* report, size_t repor
   if (waiting_read_) {
     zx_status_t status = SendReports();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "WriteToFifo SendReports failed %d\n", status);
+      FDF_LOG(ERROR, "WriteToFifo SendReports failed %d\n", status);
       return status;
     }
   }
