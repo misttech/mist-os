@@ -12,6 +12,7 @@
 #include <limits>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 #ifndef LIB_IOB_BLOB_ID_ALLOCATOR_H_
 #define LIB_IOB_BLOB_ID_ALLOCATOR_H_
