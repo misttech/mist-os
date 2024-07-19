@@ -179,9 +179,12 @@ class ProcessFixture : public zxtest::Test {
     }
   }
 
-  // Returns a process singleton. ZX_INFO_PROCESS_MAPS can't run on the current
-  // process, so tests should use this instead.
+  // Returns the process singleton to be used for ZX_INFO_PROCESS_MAPS.
   const zx::process& GetProcess() const { return process_; }
+
+  // Returns the vmar singleton to be used for ZX_INFO_VMAR_MAPS.  This vmar contains the one
+  // described by |GetInfo|.
+  const zx::vmar& GetVmar() const { return vmar_; }
 
   // Return the MappingInfo for the process institated for this fixture.
   const MappingInfo& GetInfo() const { return info_; }

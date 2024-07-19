@@ -59,6 +59,7 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_KMEM_STATS_COMPRESSION      ((zx_object_info_topic_t) 33u) // zx_info_kmem_stats_compression_t[1]
 #define ZX_INFO_IOB                         ((zx_object_info_topic_t) 34u) // zx_info_iob_t[1]
 #define ZX_INFO_IOB_REGIONS                 ((zx_object_info_topic_t) 35u) // zx_iob_region_info_t[n]
+#define ZX_INFO_VMAR_MAPS                   ((zx_object_info_topic_t) 36u) // zx_info_maps_t[n]
 
 // Return codes set when a task is killed.
 #define ZX_TASK_RETCODE_SYSCALL_KILL            ((int64_t) -1024)   // via zx_task_kill().
