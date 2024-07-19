@@ -289,17 +289,16 @@ class TestFixtureEnvironment : fdf_testing::Environment {
 };
 
 struct TestFixtureConfig {
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = e1000::Driver;
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class E1000Test : public fdf_testing::DriverTestFixture<TestFixtureConfig>, public ::testing::Test {
+class E1000Test : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
+                  public ::testing::Test {
  public:
   void SetUp() override {
+    zx::result<> start_result = StartDriver();
+    ASSERT_EQ(ZX_OK, start_result.status_value());
     zx::result netdev_impl = Connect<netdriver::Service::NetworkDeviceImpl>();
     ASSERT_OK(netdev_impl.status_value());
 

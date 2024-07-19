@@ -177,16 +177,17 @@ class InputReportTestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = InputReportDriver;
   using EnvironmentType = InputReportTestEnvironment;
 };
 
-class HidDevTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
+class HidDevTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
+                   public ::testing::Test {
  public:
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> GetSyncClient() {
     auto connect_result =
         RunInNodeContext<zx::result<zx::channel>>([](fdf_testing::TestNode& node) {
@@ -243,17 +244,7 @@ TEST_F(HidDevTest, HidLifetimeTest) {
   ASSERT_TRUE(StartDriver().is_ok());
 }
 
-class UnregisterFixtureConfig final {
- public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = false;
-
-  using DriverType = InputReportDriver;
-  using EnvironmentType = InputReportTestEnvironment;
-};
-
-class UnregisterHidDevTest : public fdf_testing::DriverTestFixture<UnregisterFixtureConfig>,
+class UnregisterHidDevTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
                              public ::testing::Test {};
 
 TEST_F(UnregisterHidDevTest, InputReportUnregisterTest) {

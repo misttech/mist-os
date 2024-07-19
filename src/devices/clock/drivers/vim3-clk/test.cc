@@ -131,20 +131,24 @@ class TestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = Vim3Clock;
   using EnvironmentType = TestEnvironment;
 };
 
-class DriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
+class DriverTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
+                   public ::testing::Test {
  protected:
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     zx::result device_result = Connect<fuchsia_hardware_clockimpl::Service::Device>();
     ASSERT_EQ(device_result.status_value(), ZX_OK);
     client_.Bind(std::move(device_result.value()));
+  }
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> client_;

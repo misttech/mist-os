@@ -32,16 +32,22 @@ class AmlSpiBtiPaddrEnvironment : public BaseTestEnvironment {
 
 class AmlSpiBtiPaddrFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiBtiPaddrEnvironment;
 };
 
-class AmlSpiBtiPaddrTest : public fdf_testing::DriverTestFixture<AmlSpiBtiPaddrFixtureConfig>,
-                           public ::testing::Test {};
+class AmlSpiBtiPaddrTest
+    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiBtiPaddrFixtureConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   constexpr uint8_t kTxData[24] = {
@@ -148,16 +154,22 @@ class AmlSpiBtiEmptyEnvironment : public BaseTestEnvironment {
 
 class AmlSpiBtiEmptyFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiBtiPaddrEnvironment;
 };
 
-class AmlSpiBtiEmptyTest : public fdf_testing::DriverTestFixture<AmlSpiBtiEmptyFixtureConfig>,
-                           public ::testing::Test {};
+class AmlSpiBtiEmptyTest
+    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiBtiEmptyFixtureConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   constexpr uint8_t kTxData[15] = {
@@ -243,17 +255,22 @@ class AmlSpiExchangeDmaClientReversesBufferEnvironment : public AmlSpiBtiPaddrEn
 
 class AmlSpiExchangeDmaClientReversesBufferConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiExchangeDmaClientReversesBufferEnvironment;
 };
 
 class AmlSpiExchangeDmaClientReversesBufferTest
-    : public fdf_testing::DriverTestFixture<AmlSpiExchangeDmaClientReversesBufferConfig>,
-      public ::testing::Test {};
+    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiExchangeDmaClientReversesBufferConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   constexpr uint8_t kTxData[24] = {

@@ -80,23 +80,25 @@ class TestEnvironmentWrapper : public fdf_testing::Environment {
 
 class AmlSuspendTestConfiguration {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = AmlSuspendTest;
   using EnvironmentType = TestEnvironmentWrapper;
 };
 
-class AmlSuspendTestFixture : public fdf_testing::DriverTestFixture<AmlSuspendTestConfiguration>,
-                              public ::testing::Test {
+class AmlSuspendTestFixture
+    : public fdf_testing::BackgroundDriverTestFixture<AmlSuspendTestConfiguration>,
+      public ::testing::Test {
  protected:
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     zx::result connect_result = Connect<fuchsia_hardware_suspend::SuspendService::Suspender>();
     EXPECT_EQ(ZX_OK, connect_result.status_value());
     client_.Bind(std::move(connect_result.value()));
   }
-
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
   fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender>& client() { return client_; }
 
  private:

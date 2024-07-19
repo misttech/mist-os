@@ -23,16 +23,21 @@ class SimpleDriverTestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = template_driver::TemplateDriver;
   using EnvironmentType = SimpleDriverTestEnvironment;
 };
 
-class SimpleDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
-                         public ::testing::Test {};
+class SimpleDriverTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
+                         public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(SimpleDriverTest, VerifyChildNode) {
   RunInNodeContext([](fdf_testing::TestNode& node) {

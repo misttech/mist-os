@@ -7,8 +7,9 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "driver_testing_cpp_fixture",
     hdrs = [
+        "include/lib/driver/testing/cpp/fixture/driver_test.h",
         "include/lib/driver/testing/cpp/fixture/driver_test_fixture.h",
-        "include/lib/driver/testing/cpp/fixture/internal/fixture_internals.h",
+        "include/lib/driver/testing/cpp/fixture/internal/internals.h",
     ],
     strip_include_prefix = "include",
     target_compatible_with = ["@platforms//os:fuchsia"],

@@ -147,15 +147,12 @@ class GpioTestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = GpioRootDevice;
   using EnvironmentType = GpioTestEnvironment;
 };
 
-class GpioTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
+class GpioTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
+                 public ::testing::Test {
  protected:
   MockGpioImpl::PinState pin_state(uint32_t index) {
     return RunInEnvironmentTypeContext<MockGpioImpl::PinState>(

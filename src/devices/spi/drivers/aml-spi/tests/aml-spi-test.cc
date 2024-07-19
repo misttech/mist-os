@@ -74,16 +74,21 @@ zx::result<fuchsia_scheduler::RoleName> GetSchedulerRoleName(
 
 class AmlSpiTestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = BaseTestEnvironment;
 };
 
-class AmlSpiTest : public fdf_testing::DriverTestFixture<AmlSpiTestConfig>,
-                   public ::testing::Test {};
+class AmlSpiTest : public fdf_testing::ForegroundDriverTestFixture<AmlSpiTestConfig>,
+                   public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiTest, DdkLifecycle) {
   RunInNodeContext([](fdf_testing::TestNode& node) {
@@ -950,17 +955,22 @@ class AmlSpiNoResetFragmentEnvironment : public BaseTestEnvironment {
 
 class AmlSpiNoResetFragmentConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiNoResetFragmentEnvironment;
 };
 
 class AmlSpiNoResetFragmentTest
-    : public fdf_testing::DriverTestFixture<AmlSpiNoResetFragmentConfig>,
-      public ::testing::Test {};
+    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiNoResetFragmentConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
@@ -1060,16 +1070,17 @@ class AmlSpiNoIrqEnvironment : public BaseTestEnvironment {
 
 class AmlSpiNoIrqConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiNoIrqEnvironment;
 };
 
-class AmlSpiNoIrqTest : public fdf_testing::DriverTestFixture<AmlSpiNoIrqConfig>,
-                        public ::testing::Test {};
+class AmlSpiNoIrqTest : public fdf_testing::ForegroundDriverTestFixture<AmlSpiNoIrqConfig>,
+                        public ::testing::Test {
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiNoIrqTest, InterruptRequired) {
   // Bind should fail if no interrupt was provided.
@@ -1116,17 +1127,22 @@ class AmlSpiForwardRoleMetadataEnvironment : public BaseTestEnvironment {
 
 class AmlSpiForwardRoleMetadataConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiForwardRoleMetadataEnvironment;
 };
 
 class AmlSpiForwardRoleMetadataTest
-    : public fdf_testing::DriverTestFixture<AmlSpiForwardRoleMetadataConfig>,
-      public ::testing::Test {};
+    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiForwardRoleMetadataConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiForwardRoleMetadataTest, Test) {
   zx::result compat_client_end = Connect<fuchsia_driver_compat::Service::Device>();

@@ -365,15 +365,12 @@ class TestEnvironment : public fdf_testing::Environment {
 
 struct FixtureConfig {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = SpiDevice;
   using EnvironmentType = TestEnvironment;
 };
 
-class SpiDeviceTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
+class SpiDeviceTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
+                      public ::testing::Test {
  protected:
   void CreateSpiDevice(uint32_t channel_count) {
     RunInEnvironmentTypeContext([channel_count](TestEnvironment& environment) {
@@ -412,6 +409,11 @@ class SpiDeviceTest : public fdf_testing::DriverTestFixture<FixtureConfig>, publ
       environment.fake_spi_impl().vmos_released_since_last_call_ = false;
       return value;
     });
+  }
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 };
 

@@ -67,12 +67,8 @@ class FixtureBasedTestEnvironment : public fdf_testing::Environment {
   compat::DeviceServer device_server_;
 };
 
-class BackgroundFixtureConfig final {
+class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestDriver;
   using EnvironmentType = FixtureBasedTestEnvironment;
 };
@@ -80,8 +76,18 @@ class BackgroundFixtureConfig final {
 // Demonstrates a test fixture that puts the driver on a background context. Using the driver
 // requires going through |RunInDriverContext()| but sync client tasks can be ran directly on the
 // main test thread.
-class FixtureBasedTestBackground : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig>,
-                                   public ::testing::Test {};
+class FixtureBasedTestBackground : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
+                                   public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(FixtureBasedTestBackground, GetNameFromEnv) {
   RunInEnvironmentTypeContext([](FixtureBasedTestEnvironment& env) {
@@ -152,18 +158,18 @@ TEST_F(FixtureBasedTestBackground, ConnectWithDriverService) {
 // Demonstrates a test fixture that puts the driver on the foreground context. Using the driver
 // is simply done using the |driver()| getter but sync client tasks must be ran in the background
 // using |RunInBackground()|.
-class FixtureConfig final {
+class FixtureBasedTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
+                         public ::testing::Test {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
-  using DriverType = TestDriver;
-  using EnvironmentType = FixtureBasedTestEnvironment;
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 };
-
-class FixtureBasedTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
-                         public ::testing::Test {};
 
 TEST_F(FixtureBasedTest, GetNameFromEnv) {
   RunInEnvironmentTypeContext([](FixtureBasedTestEnvironment& env) {
@@ -234,42 +240,45 @@ TEST_F(FixtureBasedTest, ConnectWithDriverService) {
   ASSERT_EQ(ZX_OK, run_result.status_value());
 }
 
-class ManualStopFixtureConfig final {
- public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
-  using DriverType = TestDriver;
-  using EnvironmentType = FixtureBasedTestEnvironment;
-};
-
 // Demonstrates a test fixture that tests out the manual stop and shutdown feature. Validates by
 // checking the a global that gets set in the driver header.
-class FixtureBasedTestManualStop : public fdf_testing::DriverTestFixture<ManualStopFixtureConfig>,
-                                   public ::testing::Test {};
+class FixtureBasedTestManualStop : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
+                                   public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(FixtureBasedTestManualStop, ShutdownAndCheckLogger) {
   ASSERT_EQ(false, g_driver_stopped);
   ASSERT_EQ(ZX_OK, StopDriver().status_value());
   ASSERT_EQ(false, g_driver_stopped);
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
   ASSERT_EQ(true, g_driver_stopped);
 }
 
 class AddChildFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestDriver;
   using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
 // Checks that adding a child and then managing it by the driver works.
-class FixtureBasedTestAddChild : public fdf_testing::DriverTestFixture<AddChildFixtureConfig>,
-                                 public ::testing::Test {};
+class FixtureBasedTestAddChild
+    : public fdf_testing::ForegroundDriverTestFixture<AddChildFixtureConfig>,
+      public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(FixtureBasedTestAddChild, AddChild) {
   EXPECT_EQ(ZX_OK, driver()->InitSyncCompat().status_value());
@@ -280,45 +289,32 @@ TEST_F(FixtureBasedTestAddChild, AddChild) {
 // Fixture config for testing start failure scenarios.
 class FailStartFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = StartFailTestDriver;
   using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
-class FixtureBasedTestFailStart : public fdf_testing::DriverTestFixture<FailStartFixtureConfig>,
-                                  public ::testing::Test {};
+class FixtureBasedTestFailStart
+    : public fdf_testing::ForegroundDriverTestFixture<FailStartFixtureConfig>,
+      public ::testing::Test {};
 
 TEST_F(FixtureBasedTestFailStart, FailStart) {
   auto start_result = StartDriver();
   EXPECT_EQ(ZX_ERR_INTERNAL, start_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
   start_result = StartDriver();
   EXPECT_EQ(ZX_ERR_INTERNAL, start_result.status_value());
   // calling StopDriver is optional and a no-op if start failed. Returns zx::ok in this case.
   auto stop_result = StopDriver();
   EXPECT_EQ(ZX_OK, stop_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
   start_result = StartDriver();
   EXPECT_EQ(ZX_ERR_INTERNAL, start_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
 }
 
 // Tests that require manual start and stop calls. With the driver on the background.
-class ManualBackgroundFixtureConfig final {
- public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = false;
-
-  using DriverType = TestDriver;
-  using EnvironmentType = FixtureBasedTestEnvironment;
-};
-
 class FixtureBasedTestManualBackground
-    : public fdf_testing::DriverTestFixture<ManualBackgroundFixtureConfig>,
+    : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
       public ::testing::Test {};
 
 TEST_F(FixtureBasedTestManualBackground, MultiStart) {
@@ -326,32 +322,22 @@ TEST_F(FixtureBasedTestManualBackground, MultiStart) {
   EXPECT_EQ(ZX_OK, start_result.status_value());
   auto stop_result = StopDriver();
   EXPECT_EQ(ZX_OK, stop_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
   start_result = StartDriver();
   EXPECT_EQ(ZX_OK, start_result.status_value());
   stop_result = StopDriver();
   EXPECT_EQ(ZX_OK, stop_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
   start_result = StartDriver();
   EXPECT_EQ(ZX_OK, start_result.status_value());
   stop_result = StopDriver();
   EXPECT_EQ(ZX_OK, stop_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
 }
 
 // Tests that require manual start and stop calls. With the driver on the foreground.
-class ManualForegroundFixtureConfig final {
- public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = false;
-
-  using DriverType = TestDriver;
-  using EnvironmentType = FixtureBasedTestEnvironment;
-};
-
 class FixtureBasedTestManualForeground
-    : public fdf_testing::DriverTestFixture<ManualForegroundFixtureConfig>,
+    : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
       public ::testing::Test {};
 
 TEST_F(FixtureBasedTestManualForeground, MultiStartAndValidateIncoming) {
@@ -361,19 +347,19 @@ TEST_F(FixtureBasedTestManualForeground, MultiStartAndValidateIncoming) {
   ASSERT_EQ(ZX_OK, validate_result.status_value());
   auto stop_result = StopDriver();
   EXPECT_EQ(ZX_OK, stop_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
   start_result = StartDriver();
   EXPECT_EQ(ZX_OK, start_result.status_value());
   validate_result = driver()->ValidateIncomingZirconService();
   ASSERT_EQ(ZX_OK, validate_result.status_value());
   stop_result = StopDriver();
   EXPECT_EQ(ZX_OK, stop_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
   start_result = StartDriver();
   EXPECT_EQ(ZX_OK, start_result.status_value());
   validate_result = driver()->ValidateIncomingDriverService();
   ASSERT_EQ(ZX_OK, validate_result.status_value());
   stop_result = StopDriver();
   EXPECT_EQ(ZX_OK, stop_result.status_value());
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
 }

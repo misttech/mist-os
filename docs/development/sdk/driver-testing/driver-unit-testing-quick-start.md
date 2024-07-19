@@ -5,35 +5,39 @@ Follow this quick start to write a driver unit test based on the
 
 ## Include library dependencies
 
-Include this library dependency:
+Include this library dependency, as well as the gtest dependency:
 
 ```cpp
 #include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+
+#include <gtest/gtest.h>
 ```
 
-The [DriverTestFixture](#drivertestfixture-configuration-arguments)
-is a base class that driver unit test fixture classes can inherit from.
-Tests define a configuration class to pass into the fixture
-through a template parameter.
-The fixture takes care of setting up the test environment and driver
-on the correct dispatchers, starting and stoping the driver as requested.
+The library provides two base classes that can be inherited by the test
+fixture. In the example we use `ForegroundDriverTestFixture`, but there is also
+a `BackgroundDriverTestFixture` available.
+See [Foreground vs. Background](#foreground-vs-background) below for details.
+
+Tests can also use the `ForegroundDriverTest` and `BackgroundDriverTest`
+classes in `lib/driver/testing/cpp/fixture/driver_test.h` if they prefer an
+encapsulation + RAII-style approach rather than inheritance.
 
 ## Create fixture configuration class
 
-The `DriverTestFixture` base class takes in a configuration class
+Tests define a configuration class to pass into the fixture
 through a template parameter.
-This configuration class must be provided with certain values
-that dictate how the test should run.
+The fixture takes care of managing the individual parts of the unit test,
+making sure they are run in the correct dispatcher context.
 
-Here is an example of a configuration class:
+This configuration class must define two types, one for the driver, the other
+for the environment dependencies of the driver which we show in the next
+section.
+
+Here is an example of a configuration class from the example:
 
 ```cpp
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = simple::SimpleDriver;
   using EnvironmentType = SimpleDriverTestEnvironment;
 };
@@ -45,32 +49,47 @@ The `EnvironmentType` must be an isolated class
 that provides your driver’s custom dependencies.
 It does not need to provide framework dependencies (except for `compat::DeviceServer`),
 as the fixture does that already.
-If no extra dependencies are needed, use `fdf_testing::MinimalCompatEnvironment`
-which provides a default `compat::DeviceServer`.
 
-Here's an example of a basic test with the minimal environment:
+If no extra dependencies are needed, use `fdf_testing::MinimalCompatEnvironment`
+which provides a default `compat::DeviceServer` (note this is only available
+in-tree as the compat protocol is not in the SDK).
+
+Here is our environment from the example:
 
 ```cpp
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
-#include <lib/driver/testing/cpp/fixture/minimal_compat_environment.h>
-
-#include <gtest/gtest.h>
-
-class FixtureConfig final {
+class SimpleDriverTestEnvironment : public fdf_testing::Environment {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    // Perform any additional initialization here, such as setting up compat device servers
+    // and FIDL servers.
+    return zx::ok();
+  }
+};
+```
 
-  using DriverType = MyDriverType;
-  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
+## Define the fixture and test
+
+Now we can put it all together and make our test. Here is what that looks like
+in our example:
+
+```cpp
+class SimpleDriverTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
+                         public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 };
 
-class MyFixture : public fdf_testing::DriverTestFixture<FixtureConfiguration>,
-                  public ::testing::Test {};
-
-TEST_F(MyFixture, MyTest) {
-  driver().DoSomething();
+TEST_F(SimpleDriverTest, VerifyChildNode) {
+  RunInNodeContext([](fdf_testing::TestNode& node) {
+    EXPECT_EQ(1u, node.children().size());
+    EXPECT_TRUE(node.children().count("simple_child"));
+  });
 }
 ```
 
@@ -84,25 +103,25 @@ for the iwlwifi driver:
 tools/bazel test third_party/iwlwifi/test:iwlwifi_test_pkg
 ```
 
-## DriverTestFixture configuration arguments
+## Configuration arguments
 
 ### DriverType
 
-The type of the driver under test. This must be an inheritor of `fdf::DriverBase`.
+The type of the driver under test that will be provided back through the
+`driver()` and `RunInDriverContext()` functions.
 
-Use `DriverType` to define the reference type for only the fixture's functions
-(for example, `driver()` and `RunInDriverContext()`).
-Use the driver registration symbol (created by the `FUCHSIA_DRIVER_EXPORT` macro)
-for the driver lifecycle management.
-When using a custom driver type,
-ensure the custom `DriverType` contains a public static function
-with the signature shown below:
+By default this is *NOT* used for driver lifecycle management
+(ie. starting/stopping the driver).
+That happens through the driver registration symbol
+created by the `FUCHSIA_DRIVER_EXPORT` macro call from the driver.
+
+When using a custom test-specific driver in `DriverType` (for example to
+provide test-specific functions), add a static `GetDriverRegistration`
+function as shown below. This will override the global registration symbol.
 
 ```cpp
 static DriverRegistration GetDriverRegistration()
 ```
-
-The test uses this registration instead to manage the driver lifecycle.
 
 ### EnvironmentType
 A class that contains custom dependencies for the driver under test.
@@ -113,13 +132,14 @@ and override the following function:
 `zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override;`
 
 The function is called automatically on the background environment dispatcher
-during initialization.
-It must add its components into the provided `fdf::OutgoingDirectory object`,
+when starting the driver-under-test.
+It must add its parts to the provided `fdf::OutgoingDirectory object`,
 generally done through the `AddService` method.
 The `OutgoingDirectory` backs the driver's incoming namespace, hence its name,
 `to_driver_vfs`.
 
-Example custom environment:
+Here is what a custom environment that provides the compat protocol and a
+custom test-defined FIDL server looks like:
 
 ```cpp
 class MyFidlServer : public fidl::WireServer<fuchsia_examples_gizmo::Proto> {...};
@@ -139,36 +159,51 @@ class CustomEnvironment : public fdf_testing::Environment {
 
  private:
   compat::DeviceServer device_server_;
- MyFidlServer custom_server_;
+  MyFidlServer custom_server_;
 };
 ```
 
-### kDriverOnForeground (prefer = true)
+## Foreground vs. Background
 
-Whether to have the driver under test run on the foreground dispatcher,
-or to run it on a dedicated background dispatcher.
+The choice between foreground and background driver tests lies in how the test plans to
+communicate with the driver-under-test. If the test will be calling public methods on the driver
+a lot, the foreground driver test should be chosen. If the test will be calling through the
+driver's exposed FIDL more often, then the background driver test should be chosen.
 
-When this is true, the test can access the driver under test
-using the `driver()` method and directly make calls into it,
-but sync client tasks must go through `RunInBackground()`.
+When using the foreground version, the test can access the driver under test
+using a `driver()` method and directly make calls into it,
+but sync client tasks send to driver-provided FIDL must go through a
+`RunInBackground()`.
 
-When this is false, the test can run tasks on the driver context
-using the `RunInDriverContext()` methods,
-but sync client tasks can be run directly.
+When using the background version the test can make sync FIDL calls into
+driver-provided FIDL, but must go through a `RunInDriverContext()` when
+accessing the driver instance.
 
-### kAutoStartDriver (prefer = true)
+## Methods available on foreground tests
 
-If true, the test will automatically start the driver
-on construction of `DriverTestFixture`, and expect a successful start.
+### driver
 
-### kAutoStopDriver (prefer = true)
+This can be used to access the driver directly from the test.
+Since the driver is on the foreground it is safe to access this
+on the main test thread.
 
-If true, the test will automatically stop the driver
-on destruction of `DriverTestFixture`, and expect a successful stop.
+### RunInBackground
 
-## Methods available to the test under all configs
+Runs a task on a background dispatcher, separate from the driver.
+This is done to avoid deadlocking with the driver when making sync client calls
+into a driver that is on the foreground.
 
-The following methods are available to the test under all configurations.
+## Methods available on background tests
+
+### RunInDriverContext
+
+This can be used to run a callback on the driver under test.
+The callback input will have a reference to the driver.
+All accesses to the driver must go through this as it is unsafe to touch the driver
+on the main test thread when it is on the background.
+
+
+## Methods available on both
 
 ### runtime
 
@@ -176,7 +211,32 @@ Access the driver runtime object.
 This can be used to create new background dispatchers or
 to run the foreground dispatcher.
 The user does not need to explicitly create dispatchers for the environment or
-the driver as the fixture has already done that.
+the driver as the library takes care of that.
+
+### StartDriver
+
+This can be used to start the driver under test. Waits for the start to
+complete before returning the result.
+
+### StartDriverCustomized
+
+Same as StartDriver but can modify the driver start arguments before sending
+it to the driver.
+
+### StopDriver
+
+Stops the driver under test. This calls PrepareStop on the DriverBase
+implementation and waits for the completion. This must be called if StartDriver
+succeeded. It can also be called if StartDriver failed, but to match the
+behavior of the driver host, it will be a no-op.
+
+### ShutdownAndDestroyDriver
+
+Shuts down the driver dispatchers belonging to the driver-under-test, and then
+call the driver's destroy hook. This happens automatically on the destruction
+of the fixture, but can also be called manually by a test if it needs to happen
+earlier for some validation or to
+[start the driver again](#starting-the-driver-multiple-times-in-a-single-test)
 
 ### Connect
 
@@ -199,43 +259,15 @@ Runs a task on the `fdf_testing::TestNode` instance that the test is using.
 This can be used to validate the driver’s interactions with the driver framework node
 (like checking how many children have been added).
 
-## Methods Available to the Test With config-based restrictions
+## Starting the driver multiple times in a single test
 
-The following methods are available to the test
-with certain config-based restrictions (in parentheses).
+To start/stop the driver multiple times in a test without changing the
+environment, ensure to go through all 3 steps:
+ - StartDriver/StartDriverCustomized
+ - StopDriver
+ - ShutdownAndDestroyDriver
 
-### StartDriver and StartDriverCustomized (kAutoStartDriver = false)
-
-This can be used to manually start the driver under test.
-Should only be used if `kAutoStartDriver` is false.
-The customized variant can be used to modify the start arguments
-that the driver is given.
-
-### StopDriver (kAutoStopDriver = false)
-
-This can be used to manually stop the driver under test.
-Should only be used if `kAutoStopDriver` is false.
-
-### RunInDriverContext (kDriverOnForeground = false)
-
-This can be used to run a callback on the driver under test.
-The callback input will have a reference to the driver.
-All accesses to the driver must go through this as it is unsafe to touch the driver
-on the main test thread under this configuration.
-
-### driver (kDriverOnForeground = true)
-
-This can be used to access the driver directly from the test.
-Since the driver is on the foreground it is safe to access this
-on the main test thread.
-
-### RunInBackground (kDriverOnForeground = true)
-
-Runs a task on a background dispatcher, separate from the driver.
-This is done to avoid deadlocking with the driver when making sync client calls
-with the `kDriverOnForeground` configuration.
-
-### Run* functions warning
+## Run* functions warning
 
 Be careful when using the Run* functions
 (`RunInDriverContext`, `RunInBackground`, `RunInEnvironmentTypeContext`, `RunInNodeContext`).

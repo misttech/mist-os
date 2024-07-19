@@ -176,20 +176,19 @@ class FixtureBasedTestEnvironment : fdf_testing::Environment {
 
 class BackgroundFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = BtTransportUart;
   using EnvironmentType = FixtureBasedTestEnvironment;
 };
 
-class BtTransportUartTest : public fdf_testing::DriverTestFixture<BackgroundFixtureConfig>,
-                            public ::testing::Test {
+class BtTransportUartTest
+    : public fdf_testing::BackgroundDriverTestFixture<BackgroundFixtureConfig>,
+      public ::testing::Test {
  public:
   BtTransportUartTest() = default;
 
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     EXPECT_TRUE(RunInEnvironmentTypeContext<bool>(
         [](FixtureBasedTestEnvironment& env) { return env.serial_device_.enabled(); }));
   }

@@ -39,19 +39,17 @@ class TestNetworkPortInterface : public NetworkPort::Callbacks {
 };
 
 struct TestFixtureConfig {
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = wlan::drivers::components::test::TestDriver;
   using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
-struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
+struct NetworkPortTest : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
                          public ::testing::Test {
   static constexpr uint8_t kPortId = 13;
 
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     auto client_end = netdev_ifc_.Bind(runtime().StartBackgroundDispatcher()->get());
     ASSERT_OK(client_end.status_value());
     ifc_client_.Bind(std::move(*client_end), runtime().StartBackgroundDispatcher()->get());

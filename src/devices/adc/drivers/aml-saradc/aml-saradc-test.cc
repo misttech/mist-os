@@ -77,23 +77,26 @@ class AmlSaradcTestEnvironment : fdf_testing::Environment {
 
 class AmlSaradcTestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = aml_saradc::AmlSaradc;
   using EnvironmentType = AmlSaradcTestEnvironment;
 };
 
-class AmlSaradcTest : public fdf_testing::DriverTestFixture<AmlSaradcTestConfig>,
+class AmlSaradcTest : public fdf_testing::BackgroundDriverTestFixture<AmlSaradcTestConfig>,
                       public ::testing::Test {
  public:
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     auto connect_result =
         Connect<fuchsia_hardware_adcimpl::Service::Device>(component::kDefaultInstance);
     ASSERT_TRUE(connect_result.is_ok());
     adc_.Bind(std::move(connect_result.value()));
     ASSERT_TRUE(adc_.is_valid());
+  }
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   fdf::WireSyncClient<fuchsia_hardware_adcimpl::Device>& adc() { return adc_; }

@@ -376,17 +376,21 @@ class TestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = AmlHrtimer;
   using EnvironmentType = TestEnvironment;
 };
 
-class DriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
+class DriverTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
+                   public ::testing::Test {
  protected:
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));
@@ -909,20 +913,12 @@ TEST_F(DriverTest, WaitStop) {
   }
 }
 
-class FixtureConfigNoAutoStop final {
- public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
-  using DriverType = AmlHrtimer;
-  using EnvironmentType = TestEnvironment;
-};
-
-class DriverTestNoAutoStop : public fdf_testing::DriverTestFixture<FixtureConfigNoAutoStop>,
+class DriverTestNoAutoStop : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
                              public ::testing::Test {
  protected:
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));
@@ -1029,18 +1025,21 @@ class TestEnvironmentNoPower : public fdf_testing::Environment {
 
 class FixtureConfigNoPower final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = AmlHrtimer;
   using EnvironmentType = TestEnvironmentNoPower;
 };
 
-class DriverTestNoPower : public fdf_testing::DriverTestFixture<FixtureConfigNoPower>,
+class DriverTestNoPower : public fdf_testing::BackgroundDriverTestFixture<FixtureConfigNoPower>,
                           public ::testing::Test {
  protected:
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));

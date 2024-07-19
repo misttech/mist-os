@@ -249,18 +249,23 @@ class TestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = Device;
   using EnvironmentType = TestEnvironment;
 };
 
-class BtHciIntelTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+class BtHciIntelTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
                        public ::testing::Test {
  public:
   BtHciIntelTest() = default;
+
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 };
 
 TEST_F(BtHciIntelTest, LifecycleTest) {}

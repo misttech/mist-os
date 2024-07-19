@@ -8,16 +8,17 @@ namespace spi {
 
 class AmlSpiShutdownConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = BaseTestEnvironment;
 };
 
-class AmlSpiShutdownTest : public fdf_testing::DriverTestFixture<AmlSpiShutdownConfig>,
-                           public ::testing::Test {};
+class AmlSpiShutdownTest : public fdf_testing::ForegroundDriverTestFixture<AmlSpiShutdownConfig>,
+                           public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiShutdownTest, Shutdown) {
   // Must outlive AmlSpi device.
@@ -59,7 +60,7 @@ TEST_F(AmlSpiShutdownTest, Shutdown) {
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
 
-  ShutdownDispatchersAndDestroyDriver();
+  ShutdownAndDestroyDriver();
 
   EXPECT_TRUE(dmareg_cleared);
   EXPECT_TRUE(conreg_cleared);

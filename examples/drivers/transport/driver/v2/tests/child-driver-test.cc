@@ -48,16 +48,22 @@ class DriverTransportTestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = driver_transport::ChildDriverTransportDriver;
   using EnvironmentType = DriverTransportTestEnvironment;
 };
 
-class ChildDriverTransportDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
-                                       public ::testing::Test {};
+class ChildDriverTransportDriverTest
+    : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(ChildDriverTransportDriverTest, VerifyQueryValues) {
   // Verify that the queried values match the fake parent driver server.

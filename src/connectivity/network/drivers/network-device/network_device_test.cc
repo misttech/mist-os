@@ -41,19 +41,20 @@ struct TestFixtureEnvironment : public fdf_testing::Environment {
 };
 
 struct TestFixtureConfig {
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = network::NetworkDevice;
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class NetDeviceDriverTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
+class NetDeviceDriverTest : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
                             public ::testing::Test {
  public:
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;
+
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 
   void TearDown() override {
     ShutdownDriver();

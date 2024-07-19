@@ -91,18 +91,21 @@ class TestEnv : public fdf_testing::Environment {
 
 class TestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = adc_buttons::AdcButtons;
   using EnvironmentType = TestEnv;
 };
 
-class AdcButtonsDeviceTest : public fdf_testing::DriverTestFixture<TestConfig>,
+class AdcButtonsDeviceTest : public fdf_testing::BackgroundDriverTestFixture<TestConfig>,
                              public ::testing::Test {
  public:
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     // Connect to InputDevice.
     auto connect_result =
         RunInNodeContext<zx::result<zx::channel>>([](fdf_testing::TestNode& node) {

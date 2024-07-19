@@ -41,19 +41,21 @@ struct BanjoTestFixtureEnvironment : public fdf_testing::Environment {
 };
 
 struct BanjoTestFixtureConfig {
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = network::NetworkDevice;
   using EnvironmentType = BanjoTestFixtureEnvironment;
 };
 
-class BanjoNetDeviceDriverTest : public fdf_testing::DriverTestFixture<BanjoTestFixtureConfig>,
-                                 public ::testing::Test {
+class BanjoNetDeviceDriverTest
+    : public fdf_testing::BackgroundDriverTestFixture<BanjoTestFixtureConfig>,
+      public ::testing::Test {
  protected:
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;
+
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 
   void TearDown() override { ShutdownDriver(); }
 

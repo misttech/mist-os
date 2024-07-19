@@ -143,16 +143,18 @@ class HidDriverTestEnvironment : fdf_testing::Environment {
 
 class TestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = hid_driver::HidDriver;
   using EnvironmentType = HidDriverTestEnvironment;
 };
 
-class HidDeviceTest : public fdf_testing::DriverTestFixture<TestConfig>, public ::testing::Test {
+class HidDeviceTest : public fdf_testing::ForegroundDriverTestFixture<TestConfig>,
+                      public ::testing::Test {
  public:
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   void SetupBootMouseDevice() {
     RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
       size_t desc_size;

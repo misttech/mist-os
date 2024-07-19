@@ -133,17 +133,15 @@ class TestFixtureEnvironment : fdf_testing::Environment {
 };
 
 struct TestFixtureConfig {
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = TestDriver;
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-struct BasicNetworkDeviceTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
+struct BasicNetworkDeviceTest : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
                                 public ::testing::Test {
   void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     RunInDriverContext([&](TestDriver& driver) {
       parent_.Bind(std::move(driver.node()), fdf::Dispatcher::GetCurrent()->async_dispatcher());
       ASSERT_TRUE(parent_.is_valid());

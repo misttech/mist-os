@@ -22,10 +22,6 @@ namespace {
 template <typename Environment>
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = SoftmacDriver;
   using EnvironmentType = Environment;
 };
@@ -39,9 +35,14 @@ class BadStartWlanSoftmacServer : public UnimplementedWlanSoftmacServer {
   }
 };
 
-class BadStartSoftmacDriverTest : public fdf_testing::DriverTestFixture<
+class BadStartSoftmacDriverTest : public fdf_testing::BackgroundDriverTestFixture<
                                       FixtureConfig<CustomEnvironment<BadStartWlanSoftmacServer>>>,
-                                  public ::testing::Test {};
+                                  public ::testing::Test {
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 // Verify that a WlanSoftmac.Start failure during Start causes Start to fail.
 TEST_F(BadStartSoftmacDriverTest, StartFails) {
@@ -59,7 +60,7 @@ class BadQueryWlanSoftmacServer : public BasicWlanSoftmacServer {
   }
 };
 
-class BadQuerySoftmacDriverTest : public fdf_testing::DriverTestFixture<
+class BadQuerySoftmacDriverTest : public fdf_testing::BackgroundDriverTestFixture<
                                       FixtureConfig<CustomEnvironment<BadQueryWlanSoftmacServer>>>,
                                   public ::testing::Test {};
 
@@ -95,7 +96,7 @@ class BadBootstrapWlanSoftmacServer : public BasicWlanSoftmacServer {
 };
 
 class BadBootstrapSoftmacDriverTest
-    : public fdf_testing::DriverTestFixture<
+    : public fdf_testing::BackgroundDriverTestFixture<
           FixtureConfig<CustomEnvironment<BadBootstrapWlanSoftmacServer>>>,
       public ::testing::Test {};
 
@@ -115,9 +116,14 @@ class FragileSoftmacDriverEnvironment : public CustomEnvironment<BasicWlanSoftma
   void DropGenericSmeClient() { this->GetServer().DropGenericSmeClient(); }
 };
 
-class FragileSoftmacDriverTest
-    : public fdf_testing::DriverTestFixture<FixtureConfig<FragileSoftmacDriverEnvironment>>,
-      public ::testing::Test {};
+class FragileSoftmacDriverTest : public fdf_testing::BackgroundDriverTestFixture<
+                                     FixtureConfig<FragileSoftmacDriverEnvironment>>,
+                                 public ::testing::Test {
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 // Verify dropping the WlanSoftmacIfc client end causes wlansoftmac to exit.
 TEST_F(FragileSoftmacDriverTest, WlanSoftmacIfcClientDropped) {

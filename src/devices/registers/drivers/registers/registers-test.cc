@@ -80,16 +80,13 @@ class RegistersDeviceTestEnvironment : fdf_testing::Environment {
 
 class RegistersDeviceTestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestRegistersDevice;
   using EnvironmentType = RegistersDeviceTestEnvironment;
 };
 
-class RegistersDeviceTest : public fdf_testing::DriverTestFixture<RegistersDeviceTestConfig>,
-                            public ::testing::Test {
+class RegistersDeviceTest
+    : public fdf_testing::BackgroundDriverTestFixture<RegistersDeviceTestConfig>,
+      public ::testing::Test {
  public:
   template <typename T>
   void Init(std::vector<fidl_metadata::registers::Register<T>>&& kRegisters) {
@@ -102,6 +99,11 @@ class RegistersDeviceTest : public fdf_testing::DriverTestFixture<RegistersDevic
     auto result = Connect<fuchsia_hardware_registers::Service::Device>(name);
     EXPECT_EQ(ZX_OK, result.status_value());
     return std::move(result.value());
+  }
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 };
 

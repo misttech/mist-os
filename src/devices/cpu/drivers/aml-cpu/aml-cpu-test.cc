@@ -254,15 +254,11 @@ class AmlCpuEnvironment : public fdf_testing::Environment {
 
 class AmlCpuBindingConfiguration final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = AmlCpuDriver;
   using EnvironmentType = AmlCpuEnvironment;
 };
 
-class AmlCpuTest : public fdf_testing::DriverTestFixture<AmlCpuBindingConfiguration>,
+class AmlCpuTest : public fdf_testing::BackgroundDriverTestFixture<AmlCpuBindingConfiguration>,
                    public ::testing::Test {
  public:
   void StartWithMetadata(const std::vector<perf_domain_t>& perf_domains,
@@ -304,6 +300,11 @@ class AmlCpuTest : public fdf_testing::DriverTestFixture<AmlCpuBindingConfigurat
     auto device = ConnectThroughDevfs<fuchsia_hardware_cpu_ctrl::Device>(perf_domain.name);
     EXPECT_OK(device.status_value());
     cpu_ctrl_.Bind(std::move(device.value()));
+  }
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   CpuCtrlClient cpu_ctrl_;

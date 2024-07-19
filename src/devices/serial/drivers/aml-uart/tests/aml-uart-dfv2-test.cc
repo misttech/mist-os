@@ -262,25 +262,11 @@ class Environment : public fdf_testing::Environment {
 
 class AmlUartTestConfig {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = serial::AmlUartV2;
   using EnvironmentType = Environment;
 };
 
-class AmlUartAsyncTestConfig {
- public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
-  using DriverType = serial::AmlUartV2;
-  using EnvironmentType = Environment;
-};
-
-class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig>,
+class AmlUartHarness : public fdf_testing::BackgroundDriverTestFixture<AmlUartTestConfig>,
                        public ::testing::Test {
  public:
   void SetUp() override {
@@ -290,6 +276,11 @@ class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig>,
       args.config(fake_config.ToVmo());
     });
 
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
@@ -303,7 +294,7 @@ class AmlUartHarness : public fdf_testing::DriverTestFixture<AmlUartTestConfig>,
   }
 };
 
-class AmlUartAsyncHarness : public fdf_testing::DriverTestFixture<AmlUartAsyncTestConfig>,
+class AmlUartAsyncHarness : public fdf_testing::ForegroundDriverTestFixture<AmlUartTestConfig>,
                             public ::testing::Test {
  public:
   void SetUp() override {
@@ -324,6 +315,11 @@ class AmlUartAsyncHarness : public fdf_testing::DriverTestFixture<AmlUartAsyncTe
     }
     return fdf::WireClient(std::move(driver_connect_result.value()),
                            fdf::Dispatcher::GetCurrent()->get());
+  }
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   serial::AmlUart& Device() { return driver()->aml_uart_for_testing(); }

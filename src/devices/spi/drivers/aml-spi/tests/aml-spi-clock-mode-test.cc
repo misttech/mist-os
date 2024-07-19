@@ -22,17 +22,22 @@ class AmlSpiNormalClockModeTestEnvironment : public BaseTestEnvironment {
 
 class AmlSpiNormalClockModeFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiNormalClockModeTestEnvironment;
 };
 
 class AmlSpiNormalClockModeTest
-    : public fdf_testing::DriverTestFixture<AmlSpiNormalClockModeFixtureConfig>,
-      public ::testing::Test {};
+    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiNormalClockModeFixtureConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiNormalClockModeTest, Test) {
   auto conreg = ConReg::Get().FromValue(driver()->conreg());
@@ -70,17 +75,22 @@ class AmlSpiEnhancedClockModeEnvironment : public BaseTestEnvironment {
 
 class AmlSpiEnhancedClockModeFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiEnhancedClockModeEnvironment;
 };
 
 class AmlSpiEnhancedClockModeTest
-    : public fdf_testing::DriverTestFixture<AmlSpiEnhancedClockModeFixtureConfig>,
-      public ::testing::Test {};
+    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiEnhancedClockModeFixtureConfig>,
+      public ::testing::Test {
+  void SetUp() override {
+    zx::result<> result = StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiEnhancedClockModeTest, Test) {
   auto conreg = ConReg::Get().FromValue(driver()->conreg());
@@ -124,17 +134,19 @@ class AmlSpiNormalClockModeInvalidDividerEnvironment : public BaseTestEnvironmen
 
 class AmlSpiNormalClockModeInvalidDividerFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiNormalClockModeInvalidDividerEnvironment;
 };
 
 class AmlSpiNormalClockModeInvalidDividerTest
-    : public fdf_testing::DriverTestFixture<AmlSpiNormalClockModeInvalidDividerFixtureConfig>,
-      public ::testing::Test {};
+    : public fdf_testing::ForegroundDriverTestFixture<
+          AmlSpiNormalClockModeInvalidDividerFixtureConfig>,
+      public ::testing::Test {
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiNormalClockModeInvalidDividerTest, Test) { EXPECT_TRUE(StartDriver().is_error()); }
 
@@ -155,17 +167,19 @@ class AmlSpiEnhancedClockModeInvalidDividerEnvironment : public BaseTestEnvironm
 
 class AmlSpiEnhancedClockModeInvalidDividerFixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiEnhancedClockModeInvalidDividerEnvironment;
 };
 
 class AmlSpiEnhancedClockModeInvalidDividerTest
-    : public fdf_testing::DriverTestFixture<AmlSpiEnhancedClockModeInvalidDividerFixtureConfig>,
-      public ::testing::Test {};
+    : public fdf_testing::ForegroundDriverTestFixture<
+          AmlSpiEnhancedClockModeInvalidDividerFixtureConfig>,
+      public ::testing::Test {
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+};
 
 TEST_F(AmlSpiEnhancedClockModeInvalidDividerTest, Test) { EXPECT_TRUE(StartDriver().is_error()); }
 

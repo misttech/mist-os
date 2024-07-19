@@ -95,16 +95,18 @@ class AdcTestEnvironment : fdf_testing::Environment {
 
 class AdcTestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = adc::Adc;
   using EnvironmentType = AdcTestEnvironment;
 };
 
-class AdcTest : public fdf_testing::DriverTestFixture<AdcTestConfig>, public ::testing::Test {
+class AdcTest : public fdf_testing::BackgroundDriverTestFixture<AdcTestConfig>,
+                public ::testing::Test {
  public:
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   zx::result<> Init(const std::vector<fidl_metadata::adc::Channel>& kAdcChannels) {
     RunInEnvironmentTypeContext(
         [kAdcChannels](AdcTestEnvironment& env) { env.Init(kAdcChannels); });

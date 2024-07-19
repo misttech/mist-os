@@ -229,18 +229,19 @@ class TestEnvironment : fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = BtHciBroadcom;
   using EnvironmentType = TestEnvironment;
 };
 
-class BtHciBroadcomTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
+class BtHciBroadcomTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
                           public ::testing::Test {
  public:
   BtHciBroadcomTest() = default;
+
+  void TearDown() override {
+    zx::result<> result = StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 
  protected:
   void SetFirmware(const std::vector<uint8_t> firmware = kFirmware) {
