@@ -15,12 +15,3 @@ mod package_test_utils;
 
 pub mod component_model;
 pub mod unified_collector;
-
-use anyhow::Result;
-use scrutiny_collection::model::DataModel;
-use std::sync::Arc;
-
-/// The `DataCollector` trait is responsible for populating the `DataModel.`
-pub trait DataCollector: Send + Sync {
-    fn collect(&self, model: Arc<DataModel>) -> Result<()>;
-}

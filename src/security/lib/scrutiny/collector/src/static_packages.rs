@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::DataCollector;
 use anyhow::{Context, Result};
 use fuchsia_archive::Utf8Reader as FarReader;
 use fuchsia_hash::Hash;
@@ -211,8 +210,8 @@ fn collect_static_pkgs(
 #[derive(Default)]
 pub struct StaticPkgsCollector;
 
-impl DataCollector for StaticPkgsCollector {
-    fn collect(&self, model: Arc<DataModel>) -> Result<()> {
+impl StaticPkgsCollector {
+    pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
         let additional_boot_args_data: Result<Arc<AdditionalBootConfigCollection>> = model.get();
         if let Err(err) = additional_boot_args_data {
@@ -275,7 +274,6 @@ mod tests {
         collect_static_pkgs, ErrorWithDeps, StaticPkgsCollector, META_FAR_CONTENTS_LISTING_PATH,
         STATIC_PKGS_LISTING_PATH,
     };
-    use crate::DataCollector;
     use anyhow::{anyhow, Context, Result};
     use fuchsia_archive::write as far_write;
     use fuchsia_merkle::{Hash, HASH_SIZE};

@@ -7,7 +7,6 @@ use crate::component_model::V2ComponentModelDataCollector;
 use crate::package::PackageDataCollector;
 use crate::static_packages::StaticPkgsCollector;
 use crate::zbi::ZbiCollector;
-use crate::DataCollector;
 use scrutiny_collection::model::DataModel;
 
 use anyhow::Result;
@@ -22,8 +21,8 @@ pub struct UnifiedCollector {
     components: V2ComponentModelDataCollector,
 }
 
-impl DataCollector for UnifiedCollector {
-    fn collect(&self, model: Arc<DataModel>) -> Result<()> {
+impl UnifiedCollector {
+    pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         // These must be ordered in this way, because they depend on each other
         // through the model.
         self.zbi.collect(model.clone())?;

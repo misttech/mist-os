@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::DataCollector;
 use anyhow::{Context, Result};
 use scrutiny_collection::additional_boot_args::{
     AdditionalBootConfigCollection, AdditionalBootConfigContents, AdditionalBootConfigError,
@@ -115,8 +114,8 @@ fn parse_additional_boot_args_contents(
 #[derive(Default)]
 pub struct AdditionalBootConfigCollector;
 
-impl DataCollector for AdditionalBootConfigCollector {
-    fn collect(&self, model: Arc<DataModel>) -> Result<()> {
+impl AdditionalBootConfigCollector {
+    pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
         let update_package_path = model_config.update_package_path();
         let additional_boot_args_path = model_config.additional_boot_args_path();

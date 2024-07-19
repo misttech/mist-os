@@ -5,7 +5,6 @@
 use crate::scrutiny_artifacts::ScrutinyArtifacts;
 
 use scrutiny_collector::unified_collector::UnifiedCollector;
-use scrutiny_collector::DataCollector;
 
 use anyhow::Result;
 use scrutiny_collection::model::DataModel;

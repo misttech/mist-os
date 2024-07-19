@@ -7,7 +7,6 @@ use crate::package_reader::{
 };
 use crate::package_types::{ComponentManifest, PackageDefinition};
 use crate::package_utils::is_cf_v2_manifest;
-use crate::DataCollector;
 use anyhow::{anyhow, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
@@ -504,12 +503,10 @@ impl PackageDataCollector {
 
         Ok(())
     }
-}
 
-impl DataCollector for PackageDataCollector {
     /// Collects and builds a DAG of component nodes (with manifests) and routes that
     /// connect the nodes.
-    fn collect(&self, model: Arc<DataModel>) -> Result<()> {
+    pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
         let blobs_directory = &model_config.blobs_directory();
         let artifact_reader_for_artifact_reader =

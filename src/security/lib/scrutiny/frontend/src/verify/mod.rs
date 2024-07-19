@@ -169,7 +169,6 @@ mod tests {
     use scrutiny_collector::component_model::{
         V2ComponentModelDataCollector, DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL,
     };
-    use scrutiny_collector::DataCollector;
     use scrutiny_testing::fake::*;
     use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex};
     use serde_json::json;

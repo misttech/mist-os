@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::package::ROOT_RESOURCE;
-use crate::DataCollector;
 use anyhow::{anyhow, Context, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
@@ -222,10 +221,8 @@ impl V2ComponentModelDataCollector {
         }
         Ok(dynamic_components)
     }
-}
 
-impl DataCollector for V2ComponentModelDataCollector {
-    fn collect(&self, model: Arc<DataModel>) -> Result<()> {
+    pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let builder = ModelBuilderForAnalyzer::new(DEFAULT_ROOT_URL.clone());
 
         let decls_by_url = self.get_decls(&model)?;

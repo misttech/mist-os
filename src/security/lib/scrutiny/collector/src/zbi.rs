@@ -4,7 +4,6 @@
 
 use crate::package_reader::{PackageReader, PackagesFromUpdateReader};
 use crate::package_types::PartialPackageDefinition;
-use crate::DataCollector;
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use fuchsia_hash::Hash;
 use fuchsia_url::{AbsolutePackageUrl, PackageName, PackageVariant};
@@ -33,8 +32,8 @@ const IMAGES_JSON_ORIG_PATH: &str = "images.json.orig";
 #[derive(Default)]
 pub struct ZbiCollector;
 
-impl DataCollector for ZbiCollector {
-    fn collect(&self, model: Arc<DataModel>) -> Result<()> {
+impl ZbiCollector {
+    pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
         let blobs_directory = &model_config.blobs_directory();
         let artifact_reader = FileArtifactReader::new(&PathBuf::new(), blobs_directory);
@@ -187,7 +186,6 @@ fn lookup_zbi_hash_in_images_json(
 #[cfg(test)]
 mod tests {
     use super::ZbiCollector;
-    use crate::DataCollector;
     use scrutiny_collection::model::DataModel;
     use scrutiny_collection::model_config::ModelConfig;
     use scrutiny_collection::zbi::Zbi;
