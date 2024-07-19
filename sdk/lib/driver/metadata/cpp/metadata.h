@@ -46,36 +46,67 @@ struct ObjectDetails {
   inline static const char* Name;
 };
 
-// Retrieves metadata from |incoming| found at instance |instance_name|.
-// The metadata is expected to be served by `fdf_metadata::MetadataServer<|FidlType|>`.
-// `fdf_metadata::ObjectDetails<|FidlType|>::Name` must be defined. Make sure that the component
-// manifest specifies that it uses the `fdf_metadata::ObjectDetails<|FidlType|>::Name` service.
-template <typename FidlType, typename = std::enable_if_t<fidl::IsFidlObject<FidlType>::value>>
-zx::result<FidlType> GetMetadata(
+// Connects to the fuchsia.driver.metadata/Metadata FIDL protocol found within the |incoming|
+// incoming namespace at FIDL service `ddk::ObjectDetails<|FidlType|>::Name` and instance
+// |instance_name|.
+template <typename FidlType>
+zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadataProtocol(
     const std::shared_ptr<fdf::Namespace>& incoming,
     std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
-  const std::string_view kServiceName = ObjectDetails<FidlType>::Name;
+  static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
 
-  // The metadata protocol is found within the `kServiceName` service directory and not the
-  // `fuchsia_driver_metadata::Service::Name` directory because that is where `fdf::MetadataServer`
-  // is expected to serve the fuchsia.driver.metadata/Metadata protocol.
-  auto path = std::string{kServiceName}
+  static const char* kFidlServiceName = ObjectDetails<FidlType>::Name;
+
+  // The metadata protocol is found within the `kFidlServiceName` service directory and not the
+  // `fuchsia_driver_metadata::Service::Name` directory because that is where
+  // `fdf_metadata::MetadataServer` is expected to serve the fuchsia.driver.metadata/Metadata'
+  // protocol.
+  auto path = std::string{kFidlServiceName}
                   .append("/")
                   .append(instance_name)
                   .append("/")
                   .append(fuchsia_driver_metadata::Service::Metadata::Name);
+
   zx::result result =
       component::ConnectAt<fuchsia_driver_metadata::Metadata>(incoming->svc_dir(), path);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to connect to metadata protocol.",
-             KV("status", result.status_string()));
+    FDF_SLOG(ERROR, "Failed to connect to metadata protocol.", KV("status", result.status_string()),
+             KV("path", path));
     return result.take_error();
   }
-  fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{std::move(result.value())};
+
+  return zx::ok(std::move(result.value()));
+}
+
+// Retrieves metadata from the fuchsia.driver.metadata/Metadata FIDL protocol within the |incoming|
+// incoming namespace found at FIDL service `fdf_metadata::ObjectDetails<|FidlType|>::Name` and
+// instance |instance_name|.
+//
+// Make sure that the component manifest specifies that it uses the
+// `fdf_metadata::ObjectDetails<|FidlType|>::Name` FIDL service.
+template <typename FidlType>
+zx::result<FidlType> GetMetadata(
+    const std::shared_ptr<fdf::Namespace>& incoming,
+    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+  static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
+  static_assert(!fidl::IsResource<FidlType>::value,
+                "|FidlType| cannot be a resource type. Resources cannot be persisted.");
+
+  fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
+  {
+    zx::result result = ConnectToMetadataProtocol<FidlType>(incoming, instance_name);
+    if (result.is_error()) {
+      FDF_SLOG(ERROR, "Failed to connect to metadata server.",
+               KV("status", result.status_string()));
+      return result.take_error();
+    }
+    client.Bind(std::move(result.value()));
+  }
+
   fidl::WireResult metadata_bytes = client->GetMetadata();
   if (!metadata_bytes.ok()) {
     FDF_SLOG(ERROR, "Failed to send GetMetadata request.",
-             KV("status", metadata_bytes.status_string()), KV("service_path", path));
+             KV("status", metadata_bytes.status_string()));
     return zx::error(metadata_bytes.status());
   }
   if (metadata_bytes->is_error()) {

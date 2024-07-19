@@ -67,7 +67,7 @@ namespace fdf_metadata {
 //   ],
 //
 // See `fdf_metadata::ObjectDetails` for more details about the name of the service.
-template <typename FidlType, typename = std::enable_if_t<fidl::IsFidlObject<FidlType>::value>>
+template <typename FidlType>
 class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Metadata> {
  public:
   // Make sure that the component manifest specifies `MetadataServer::kServiceName` as a service
@@ -78,35 +78,56 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
 
   // Set the metadata to be served to |metadata|. |metadata| must be persistable.
   zx_status_t SetMetadata(const FidlType& metadata) {
+    static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
+    static_assert(!fidl::IsResource<FidlType>::value,
+                  "|FidlType| cannot be a resource type. Resources cannot be persisted.");
+
     fit::result data = fidl::Persist(metadata);
     if (data.is_error()) {
       FDF_SLOG(ERROR, "Failed to persist metadata.",
                KV("status", data.error_value().status_string()));
       return data.error_value().status();
     }
-    metadata_.emplace(data.value());
+    encoded_metadata_.emplace(data.value());
 
     return ZX_OK;
   }
 
   // Sets the metadata to be served to the metadata found in |incoming|.
-  // If the metadata found in |incoming| changes after this function is called then those changes
-  // will not be reflected in the metadata to be served. Make sure that the component
-  // manifest specifies that is uses the `fdf_metadata::ObjectDetails<|FidlType|>::Name` service
+  //
+  // If the metadata found in |incoming| changes after this function has been called then those
+  // changes will not be reflected in the metadata to be served.
+  //
+  // Make sure that the component manifest specifies that is uses the
+  // `fdf_metadata::ObjectDetails<|FidlType|>::Name` FIDL service
   zx_status_t ForwardMetadata(
       const std::shared_ptr<fdf::Namespace>& incoming,
       std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
-    zx::result metadata = fdf_metadata::GetMetadata<FidlType>(incoming, instance_name);
-    if (metadata.is_error()) {
-      FDF_SLOG(ERROR, "Failed to get metadata.", KV("status", metadata.error_value()));
-      return metadata.status_value();
+    fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
+    {
+      zx::result result = ConnectToMetadataProtocol<FidlType>(incoming, instance_name);
+      if (result.is_error()) {
+        FDF_SLOG(ERROR, "Failed to connect to metadata server.",
+                 KV("status", result.status_string()));
+        return result.status_value();
+      }
+      client.Bind(std::move(result.value()));
     }
 
-    zx_status_t status = SetMetadata(metadata.value());
-    if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
-      return status;
+    fidl::WireResult result = client->GetMetadata();
+    if (!result.ok()) {
+      FDF_SLOG(ERROR, "Failed to send GetMetadata request.", KV("status", result.status_string()));
+      return result.status();
     }
+    if (result->is_error()) {
+      FDF_SLOG(ERROR, "Failed to get metadata.",
+               KV("status", zx_status_get_string(result->error_value())));
+      return result->error_value();
+    }
+    cpp20::span<uint8_t> metadata = result.value()->metadata.get();
+    std::vector<uint8_t> copy;
+    copy.insert(copy.begin(), metadata.begin(), metadata.end());
+    encoded_metadata_.emplace(std::move(copy));
 
     return ZX_OK;
   }
@@ -146,19 +167,19 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
 
   // fuchsia.driver.metadata/Metadata protocol implementation.
   void GetMetadata(GetMetadataCompleter::Sync& completer) override {
-    if (!metadata_.has_value()) {
-      FDF_LOG(ERROR, "Metadata not set.");
+    if (!encoded_metadata_.has_value()) {
+      FDF_LOG(ERROR, "Metadata not set. Set metadata with SetMetadata() or ForwardMetadata()");
       completer.ReplyError(ZX_ERR_BAD_STATE);
       return;
     }
-    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata_.value()));
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(encoded_metadata_.value()));
   }
 
   fidl::ServerBindingGroup<fuchsia_driver_metadata::Metadata> bindings_;
 
-  // Serialized version of the metadata that will be served in this instance's
-  // fuchsia.driver.metadata/Metadata protocol.
-  std::optional<std::vector<uint8_t>> metadata_;
+  // Encoded metadata that will be served in this instance's fuchsia.driver.metadata/Metadata
+  // protocol.
+  std::optional<std::vector<uint8_t>> encoded_metadata_;
 
   // Name of the instance directory that will serve this instance's fuchsia.driver.metadata/Service
   // service.
