@@ -16,6 +16,7 @@ use scrutiny_plugins::verify::controller::capability_routing::{
 use scrutiny_plugins::verify::controller::component_resolvers::{
     ComponentResolverRequest, ComponentResolverResponse, ComponentResolversController,
 };
+use scrutiny_plugins::verify::controller::pre_signing::{PreSigningController, PreSigningResponse};
 use scrutiny_plugins::verify::controller::structured_config::{
     ExtractStructuredConfigController, ExtractStructuredConfigResponse,
 };
@@ -134,5 +135,13 @@ impl ScrutinyArtifacts {
         response_level: &ResponseLevel,
     ) -> Result<CapabilityRouteResults> {
         CapabilityRouteController::get_results(self.model.clone(), capability_types, response_level)
+    }
+
+    pub fn collect_presigning_errors(
+        &self,
+        policy_path: String,
+        golden_files_dir: String,
+    ) -> Result<PreSigningResponse> {
+        PreSigningController::collect_errors(self.model.clone(), policy_path, golden_files_dir)
     }
 }

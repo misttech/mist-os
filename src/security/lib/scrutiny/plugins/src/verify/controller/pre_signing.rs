@@ -6,28 +6,14 @@ use crate::additional_boot_args::AdditionalBootConfigCollection;
 use crate::static_pkgs::StaticPkgsCollection;
 use crate::zbi::Zbi;
 use anyhow::{anyhow, Context, Result};
-use scrutiny::model::controller::DataController;
 use scrutiny::model::model::*;
 use scrutiny_utils::artifact::{ArtifactReader, FileArtifactReader};
 use scrutiny_utils::build_checks;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use serde_json::value::Value;
 use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
-
-/// The input to the PreSigningController is the policy to validate against.
-/// The data to validate will be implicitly collected by inclusion of plugins and accessed by
-/// querying the DataModel for the relevant DataCollection.
-#[derive(Deserialize, Serialize)]
-pub struct PreSigningRequest {
-    /// Path to policy file with contents deserializable into build_checks::BuildCheckSpec.
-    pub policy_path: String,
-    /// Path to directory containing golden files for policy to consume.
-    pub golden_files_dir: String,
-}
 
 /// The output of the PreSigningController is a set of errors found if any of the checks fail.
 #[derive(Deserialize, Serialize)]
@@ -35,20 +21,18 @@ pub struct PreSigningResponse {
     pub errors: Vec<build_checks::ValidationError>,
 }
 
-#[derive(Default)]
 pub struct PreSigningController;
 
-impl DataController for PreSigningController {
-    fn query(&self, model: Arc<DataModel>, request: Value) -> Result<Value> {
-        let pre_signing_request: PreSigningRequest =
-            serde_json::from_value(request).context("Failed to parse PreSigningRequest")?;
-        let policy_str = read_to_string(&pre_signing_request.policy_path).context(format!(
-            "Failed to read policy file from {:?}",
-            &pre_signing_request.policy_path
-        ))?;
-        let policy: build_checks::BuildCheckSpec = serde_json5::from_str(&policy_str).context(
-            format!("Failed to parse policy file from {:?}", &pre_signing_request.policy_path),
-        )?;
+impl PreSigningController {
+    pub fn collect_errors(
+        model: Arc<DataModel>,
+        policy_path: String,
+        golden_files_dir: String,
+    ) -> Result<PreSigningResponse> {
+        let policy_str = read_to_string(&policy_path)
+            .context(format!("Failed to read policy file from {:?}", &policy_path))?;
+        let policy: build_checks::BuildCheckSpec = serde_json5::from_str(&policy_str)
+            .context(format!("Failed to parse policy file from {:?}", &policy_path))?;
 
         let boot_config_model = model
             .get::<AdditionalBootConfigCollection>()
@@ -89,14 +73,10 @@ impl DataController for PreSigningController {
             bootfs_files,
             static_pkgs_map,
             &mut blobs_artifact_reader,
-            &pre_signing_request.golden_files_dir,
+            &golden_files_dir,
         )
         .context("Failed to run validation checks")?;
 
-        Ok(json!(PreSigningResponse { errors: validation_errors }))
-    }
-
-    fn description(&self) -> String {
-        "Runs a set of checks to verify builds for signing".to_string()
+        Ok(PreSigningResponse { errors: validation_errors })
     }
 }

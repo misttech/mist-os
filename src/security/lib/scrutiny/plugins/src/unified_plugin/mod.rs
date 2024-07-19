@@ -14,7 +14,6 @@ use crate::search::controller::packages::*;
 use crate::static_pkgs::controller::*;
 use crate::verify::controller::build::*;
 use crate::verify::controller::capability_routing::*;
-use crate::verify::controller::pre_signing::*;
 use crate::verify::controller::route_sources::*;
 use crate::verify::controller::structured_config::*;
 use crate::zbi::controller::*;
@@ -40,7 +39,6 @@ impl UnifiedPlugin {
                 "/static/pkgs" => ExtractStaticPkgsController::default(),
                 "/verify/build" => VerifyBuildController::default(),
                 "/verify/v2_component_model" => V2ComponentModelMappingController::default(),
-                "/verify/pre_signing" => PreSigningController::default(),
                 "/verify/route_sources" => RouteSourcesController::default(),
                 "/verify/structured_config" => VerifyStructuredConfigController::default(),
                 "/zbi/sections" => ZbiSectionsController::default(),
