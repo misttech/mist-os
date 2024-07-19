@@ -557,6 +557,19 @@ zx_status_t VmAddressRegion::EnumerateChildrenInternalLocked(vaddr_t min_addr, v
   return ZX_OK;
 }
 
+zx_status_t VmAddressRegion::EnumerateChildren(VmEnumerator* ve) {
+  canary_.Assert();
+  DEBUG_ASSERT(ve != nullptr);
+  Guard<CriticalMutex> guard{lock()};
+  if (state_ != LifeCycleState::ALIVE) {
+    return ZX_ERR_BAD_STATE;
+  }
+  if (!ve->OnVmAddressRegion(this, 0)) {
+    return ZX_ERR_CANCELED;
+  }
+  return EnumerateChildrenLocked(ve);
+}
+
 zx_status_t VmAddressRegion::EnumerateChildrenLocked(VmEnumerator* ve) {
   canary_.Assert();
   DEBUG_ASSERT(ve != nullptr);

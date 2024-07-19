@@ -796,7 +796,7 @@ class RestartableVmEnumerator {
   // max-FirstEntry entries.
   RestartableVmEnumerator(size_t max) : max_(max) {}
 
-  zx_status_t Enumerate(VmAspace* target) {
+  zx_status_t Enumerate(VmAddressRegion* target) {
     nelem_ = FirstEntry;
     available_ = FirstEntry;
     start_ = 0;
@@ -957,22 +957,30 @@ class RestartableVmEnumerator {
   size_t visited_ = 0;
 };
 
-// Builds a description of an apsace/vmar/mapping hierarchy. Entries start at 1 as the user must
-// write an entry for the root VmAspace at index 0.
-class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapBuilder, true,
-                                                          MappingEnumeration::Protection, 1> {
+// Builds a description of an apsace/vmar/mapping hierarchy.
+//
+// Entries start at FirstEntry.  Typical values are 0, if enumerating a vmar, or 1 if enumerating an
+// aspace (in order to leave room for a VmAspace record).
+//
+// FirstNodeDepth is the depth to assign to the first node, the node from which enumerations begins.
+template <size_t FirstEntryIndex, size_t FirstNodeDepth>
+class MapBuilder final
+    : public RestartableVmEnumerator<zx_info_maps_t, MapBuilder<FirstEntryIndex, FirstNodeDepth>,
+                                     true, MappingEnumeration::Protection, FirstEntryIndex> {
  public:
   // NOTE: Code outside of the syscall layer should not typically know about
   // user_ptrs; do not use this pattern as an example.
-  VmMapBuilder(VmarMapsInfoWriter& maps, size_t max)
-      : RestartableVmEnumerator(max), entries_(maps) {}
+  MapBuilder(VmarMapsInfoWriter& maps, size_t max)
+      : RestartableVmEnumerator<zx_info_maps_t, MapBuilder<FirstEntryIndex, FirstNodeDepth>, true,
+                                MappingEnumeration::Protection, FirstEntryIndex>(max),
+        entries_(maps) {}
 
   static void MakeVmarEntry(const VmAddressRegion* vmar, uint depth, zx_info_maps_t* entry) {
     *entry = {};
     strlcpy(entry->name, vmar->name(), sizeof(entry->name));
     entry->base = vmar->base();
     entry->size = vmar->size();
-    entry->depth = depth + 1;  // The root aspace is depth 0.
+    entry->depth = depth + FirstNodeDepth;
     entry->type = ZX_INFO_MAPS_TYPE_VMAR;
   }
 
@@ -986,7 +994,7 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
     vmo->get_name(entry->name, sizeof(entry->name));
     entry->base = region_base;
     entry->size = region_size;
-    entry->depth = depth + 1;  // The root aspace is depth 0.
+    entry->depth = depth + FirstNodeDepth;
     entry->type = ZX_INFO_MAPS_TYPE_MAPPING;
     zx_info_maps_mapping_t* u = &entry->u.mapping;
     u->mmu_flags = arch_mmu_flags_to_vm_flags(region_mmu_flags), u->vmo_koid = vmo->user_id();
@@ -1008,6 +1016,8 @@ class VmMapBuilder final : public RestartableVmEnumerator<zx_info_maps_t, VmMapB
   }
   VmarMapsInfoWriter& entries_;
 };
+using AspaceMapBuilder = MapBuilder<1, 1>;
+using VmarMapBuilder = MapBuilder<0, 0>;
 
 }  // namespace
 
@@ -1018,9 +1028,11 @@ zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, VmarMapsInfoWriter& maps, s
   DEBUG_ASSERT(target_aspace != nullptr);
   *actual = 0;
   *available = 0;
+
   if (target_aspace->is_destroyed()) {
     return ZX_ERR_BAD_STATE;
   }
+
   if (max > 0) {
     zx_info_maps_t entry = {};
     strlcpy(entry.name, target_aspace->name(), sizeof(entry.name));
@@ -1033,9 +1045,34 @@ zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, VmarMapsInfoWriter& maps, s
     }
   }
 
-  VmMapBuilder b(maps, max);
+  const fbl::RefPtr<VmAddressRegion> root_vmar = target_aspace->RootVmar();
+  if (!root_vmar) {
+    return ZX_ERR_BAD_STATE;
+  }
 
-  zx_status_t status = b.Enumerate(target_aspace);
+  AspaceMapBuilder b(maps, max);
+
+  zx_status_t status = b.Enumerate(root_vmar.get());
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  *actual = max > 0 ? b.nelem() : 0;
+  *available = b.available();
+  return ZX_OK;
+}
+
+// NOTE: Code outside of the syscall layer should not typically know about
+// user_ptrs; do not use this pattern as an example.
+zx_status_t GetVmarMaps(VmAddressRegion* target_vmar, VmarMapsInfoWriter& maps, size_t max,
+                        size_t* actual, size_t* available) {
+  DEBUG_ASSERT(target_vmar != nullptr);
+  *actual = 0;
+  *available = 0;
+
+  VmarMapBuilder b(maps, max);
+
+  zx_status_t status = b.Enumerate(target_vmar);
   if (status != ZX_OK) {
     return status;
   }
@@ -1091,9 +1128,14 @@ zx_status_t GetVmAspaceVmos(VmAspace* target_aspace, VmoInfoWriter& vmos, size_t
     return ZX_ERR_BAD_STATE;
   }
 
+  const fbl::RefPtr<VmAddressRegion> root_vmar = target_aspace->RootVmar();
+  if (!root_vmar) {
+    return ZX_ERR_BAD_STATE;
+  }
+
   AspaceVmoEnumerator ave(vmos, max);
 
-  zx_status_t status = ave.Enumerate(target_aspace);
+  zx_status_t status = ave.Enumerate(root_vmar.get());
   if (status != ZX_OK) {
     return status;
   }

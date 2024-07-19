@@ -61,7 +61,7 @@ class VmAddressRegionDispatcher final
  private:
   explicit VmAddressRegionDispatcher(fbl::RefPtr<VmAddressRegion> vmar, uint base_arch_mmu_flags);
 
-  fbl::RefPtr<VmAddressRegion> vmar_;
+  const fbl::RefPtr<VmAddressRegion> vmar_;
   const uint base_arch_mmu_flags_;
 };
 

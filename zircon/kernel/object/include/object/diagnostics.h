@@ -61,6 +61,16 @@ class VmarMapsInfoWriter {
 zx_status_t GetVmAspaceMaps(VmAspace* target_aspace, VmarMapsInfoWriter& maps, size_t max,
                             size_t* actual, size_t* available);
 
+// Walks the VmAddressRegion and writes entries that describe it into |maps|, which
+// must point to enough memory for |max| entries. The number of entries
+// written is returned via |actual|, and the number entries that could have
+// been written is returned via |available|.
+// NOTE: Code outside of the syscall layer should not typically know about
+// user_ptrs; do not use this pattern as an example.
+// |target_aspace| is the aspace that is to be enumerated.
+zx_status_t GetVmarMaps(VmAddressRegion* target_vmar, VmarMapsInfoWriter& maps, size_t max,
+                        size_t* actual, size_t* available);
+
 // Walks the VmAspace and writes entries that describe its mapped VMOs into
 // |vmos|, which must point to enough memory for |max| entries. The number of
 // entries written is returned via |actual|, and the number entries that could

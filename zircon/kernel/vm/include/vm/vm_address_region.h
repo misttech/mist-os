@@ -716,6 +716,12 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
     return base >= base_ && offset < size_ && size_ - offset >= size;
   }
 
+  // Traverses this vmar (and any sub-vmars) starting at this node, in depth-first pre-order. If any
+  // methods of |ve| return false, the traversal stops and this method returns ZX_ERR_CANCELED. If
+  // this vmar is not alive (in the LifeCycleState sense) or otherwise not enumerable this returns
+  // ZX_ERR_BAD_STATE, otherwise ZX_OK is returned if traversal completes successfully.
+  zx_status_t EnumerateChildren(VmEnumerator* ve) TA_EXCL(lock());
+
  protected:
   friend class VmAspace;
   friend void vm_init_preheap_vmars();
@@ -726,7 +732,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   // Count the allocated pages, caller must be holding the aspace lock
   AttributionCounts GetAttributedMemoryLocked() TA_REQ(lock()) override;
 
-  // Used to implement VmAspace::EnumerateChildren.
+  // Used to implement VmAspace::EnumerateChildren and VmAddressRegion::EnumerateChildren.
   // |aspace_->lock()| must be held.
   zx_status_t EnumerateChildrenLocked(VmEnumerator* ve) TA_REQ(lock());
 
