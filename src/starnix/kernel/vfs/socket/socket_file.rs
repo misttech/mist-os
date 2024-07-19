@@ -13,7 +13,7 @@ use crate::vfs::socket::{
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileHandle, FileObject, FileOps,
 };
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -63,7 +63,7 @@ impl FileOps for SocketFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -133,7 +133,7 @@ impl SocketFile {
         flags: SocketMessageFlags,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         debug_assert!(data.bytes_read() == 0);
 

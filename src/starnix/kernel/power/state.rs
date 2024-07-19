@@ -10,7 +10,7 @@ use crate::vfs::{
     OutputBuffer, SimpleFileNode,
 };
 use fidl_fuchsia_power_broker::PowerLevel;
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 
@@ -87,7 +87,7 @@ impl FileOps for PowerStateFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

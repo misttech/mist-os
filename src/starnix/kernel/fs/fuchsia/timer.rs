@@ -14,7 +14,7 @@ use crate::vfs::{
 };
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::{
@@ -207,7 +207,7 @@ impl FileOps for TimerFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

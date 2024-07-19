@@ -8,7 +8,7 @@ use crate::vfs::{
     default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps,
     FsNodeOps, SeekTarget, SimpleFileNode,
 };
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error, off_t};
 use std::collections::VecDeque;
@@ -160,7 +160,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -321,7 +321,7 @@ impl FileOps for ConstFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

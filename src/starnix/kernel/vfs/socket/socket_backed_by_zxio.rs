@@ -11,7 +11,7 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::{Errno, ENOTSUP};
 use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::vfs::FdEvents;
@@ -326,7 +326,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,

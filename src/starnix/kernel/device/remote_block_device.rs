@@ -13,7 +13,7 @@ use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsStr
 use anyhow::Error;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, REMOTE_BLOCK_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -144,7 +144,7 @@ impl FileOps for RemoteBlockDeviceFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         mut offset: usize,

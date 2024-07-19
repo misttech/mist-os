@@ -20,7 +20,7 @@ use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -361,7 +361,7 @@ impl FileOps for AccessFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

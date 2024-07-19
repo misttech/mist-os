@@ -11,7 +11,7 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
 };
 use starnix_logging::{log_error, log_info};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -124,7 +124,7 @@ impl FileOps for TouchPowerPolicyFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

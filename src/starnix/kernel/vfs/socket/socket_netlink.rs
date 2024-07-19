@@ -16,7 +16,7 @@ use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::RouteNetlinkMessage;
 use netlink_packet_sock_diag::message::SockDiagMessage;
 use netlink_packet_utils::{DecodeError, Emitable as _};
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -452,7 +452,7 @@ impl SocketOps for BaseNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -626,7 +626,7 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _data: &mut dyn InputBuffer,
@@ -897,7 +897,7 @@ impl SocketOps for RouteNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -1061,7 +1061,7 @@ impl SocketOps for DiagnosticNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -1226,7 +1226,7 @@ impl SocketOps for GenericNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,

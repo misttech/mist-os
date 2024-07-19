@@ -26,7 +26,7 @@ use once_cell::sync::OnceCell;
 use starnix_logging::{impossible_error, log_warn, trace_duration, CATEGORY_STARNIX_MM};
 use starnix_sync::{
     FileOpsCore, FileOpsToHandle, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    Unlocked, WriteOps,
+    Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::auth::FsCred;
@@ -1448,7 +1448,7 @@ impl FileOps for RemoteFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1573,7 +1573,7 @@ impl FileOps for RemotePipeObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

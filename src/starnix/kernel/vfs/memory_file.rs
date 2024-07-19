@@ -361,7 +361,7 @@ macro_rules! fileops_impl_memory {
 
         fn write(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             current_task: &$crate::task::CurrentTask,
             offset: usize,

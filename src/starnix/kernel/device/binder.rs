@@ -35,7 +35,7 @@ use starnix_logging::{
 };
 use starnix_sync::{
     DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex, MutexGuard,
-    ResourceAccessorAddFile, RwLock, Unlocked, WriteOps,
+    ResourceAccessorAddFile, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::arc_key::ArcKey;
@@ -302,7 +302,7 @@ impl FileOps for BinderConnection {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

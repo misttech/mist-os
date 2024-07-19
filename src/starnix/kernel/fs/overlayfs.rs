@@ -18,7 +18,7 @@ use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
-    Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
+    Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -277,7 +277,6 @@ impl OverlayNode {
         current_task: &CurrentTask,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<WriteOps>,
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.ensure_upper_maybe_copy(locked, current_task, UpperCopyMode::CopyAll)
@@ -291,7 +290,6 @@ impl OverlayNode {
         copy_mode: UpperCopyMode,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<WriteOps>,
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.upper.get_or_try_init(|| {
@@ -384,7 +382,6 @@ impl OverlayNode {
     ) -> Result<ActiveEntry, Errno>
     where
         F: Fn(&mut Locked<'_, L>, &ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
-        L: LockBefore<WriteOps>,
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let upper = self.ensure_upper(locked, current_task)?;
@@ -908,7 +905,7 @@ impl FileOps for OverlayFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1161,7 +1158,6 @@ fn copy_file_content<L>(
 ) -> Result<(), Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
-    L: LockBefore<WriteOps>,
 {
     let from_file = from.entry().open_anonymous(locked, current_task, OpenFlags::RDONLY)?;
     let to_file = to.entry().open_anonymous(locked, current_task, OpenFlags::WRONLY)?;

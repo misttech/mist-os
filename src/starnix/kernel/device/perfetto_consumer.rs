@@ -18,7 +18,7 @@ use perfetto_consumer_proto::perfetto::protos::{
 };
 use prost::Message;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -172,7 +172,7 @@ impl PerfettoConnection {
         msg: ipc_frame::Msg,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let request_id = self.request_id;
         let frame =
@@ -214,7 +214,7 @@ impl PerfettoConnection {
         req: EnableTracingRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let method_id = self.method_id("EnableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -239,7 +239,7 @@ impl PerfettoConnection {
         req: DisableTracingRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let method_id = self.method_id("DisableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -264,7 +264,7 @@ impl PerfettoConnection {
         req: ReadBuffersRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let method_id = self.method_id("ReadBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -289,7 +289,7 @@ impl PerfettoConnection {
         req: FreeBuffersRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let method_id = self.method_id("FreeBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());

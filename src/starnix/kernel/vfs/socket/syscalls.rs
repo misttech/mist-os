@@ -15,7 +15,7 @@ use crate::vfs::socket::{
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{Errno, EEXIST, EINPROGRESS};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::math::round_up_to_increment;
@@ -632,7 +632,7 @@ fn sendmsg_internal<L>(
     flags: u32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<WriteOps>,
+    L: LockBefore<FileOpsCore>,
 {
     let message_header = current_task.read_object(user_message_header)?;
 

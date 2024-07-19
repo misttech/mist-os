@@ -10,7 +10,7 @@ use crate::vfs::{
     BytesFile, BytesFileOps, DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser,
     FsNodeOps, FsStr, FsString, WdNumber,
 };
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::auth::CAP_SYS_ADMIN;
@@ -197,7 +197,7 @@ impl FileOps for InotifyFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

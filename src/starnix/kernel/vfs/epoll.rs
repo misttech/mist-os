@@ -15,7 +15,7 @@ use crate::vfs::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_logging::log_warn;
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::{Errno, EBADF, EINTR, ETIMEDOUT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::{EpollEvent, FdEvents};
@@ -477,7 +477,7 @@ impl FileOps for EpollFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

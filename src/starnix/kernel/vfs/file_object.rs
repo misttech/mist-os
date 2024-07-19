@@ -24,7 +24,7 @@ use starnix_logging::{
 };
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, FileOpsToHandle, LockBefore, LockEqualOrBefore, Locked, Mutex,
-    Unlocked, WriteOps,
+    Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
@@ -155,7 +155,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the number of bytes written.
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -419,7 +419,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -720,7 +720,7 @@ macro_rules! fileops_impl_dataless {
     () => {
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -764,7 +764,7 @@ macro_rules! fileops_impl_directory {
 
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -907,7 +907,7 @@ impl FileOps for OPathOps {
     }
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -1029,7 +1029,7 @@ impl FileOps for ProxyFileOps {
     }
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1372,7 +1372,7 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // We need to cap the size of `data` to prevent us from growing the file too large,
         // according to <https://man7.org/linux/man-pages/man2/write.2.html>:
@@ -1381,7 +1381,7 @@ impl FileObject {
         //   insufficient space on the underlying physical medium, or the RLIMIT_FSIZE resource
         //   limit is encountered (see setrlimit(2)),
         checked_add_offset_and_length(offset, data.available())?;
-        let mut locked = locked.cast_locked::<WriteOps>();
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().write(&mut locked, self, current_task, offset, data)
     }
 
@@ -1393,7 +1393,7 @@ impl FileObject {
         write: W,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
         W: FnOnce(&mut Locked<'_, L>) -> Result<usize, Errno>,
     {
         if !self.can_write() {
@@ -1417,14 +1417,14 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.write_fn(locked, current_task, |locked| {
             if !self.ops().has_persistent_offsets() {
                 return self.write_common(locked, current_task, 0, data);
             }
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
-            // but WriteOps must be after FsNodeAppend
+            // but FileOpsCore must be after FsNodeAppend
             let mut locked = Unlocked::new();
             let mut offset = self.offset.lock();
             let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
@@ -1450,14 +1450,14 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
         self.write_fn(locked, current_task, |_locked| {
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
-            // but WriteOps must be after FsNodeAppend
+            // but FileOpsCore must be after FsNodeAppend
             let mut locked = Unlocked::new();
             let (_guard, mut locked) =
                 self.node().append_lock.read_and(&mut locked, current_task)?;

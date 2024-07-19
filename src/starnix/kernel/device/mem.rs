@@ -19,9 +19,7 @@ use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
 use starnix_logging::{log_info, track_stub};
-use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsToHandle, LockBefore, Locked, Mutex, Unlocked, WriteOps,
-};
+use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsToHandle, LockBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
@@ -50,7 +48,7 @@ impl FileOps for DevNull {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -148,7 +146,7 @@ impl FileOps for DevZero {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -177,7 +175,7 @@ impl FileOps for DevFull {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -209,7 +207,7 @@ impl FileOps for DevRandom {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -367,7 +365,7 @@ impl FileOps for DevKmsg {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

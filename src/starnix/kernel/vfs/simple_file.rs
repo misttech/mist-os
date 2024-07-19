@@ -10,7 +10,7 @@ use crate::vfs::{
 };
 
 use crate::vfs::fileops_impl_noop_sync;
-use starnix_sync::{FileOpsCore, Locked, RwLock, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, RwLock};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::Capabilities;
 use starnix_uapi::errors::Errno;
@@ -158,7 +158,7 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

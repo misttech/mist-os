@@ -12,7 +12,7 @@ use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::zx_ticks_t;
 use starnix_logging::CATEGORY_ATRACE;
-use starnix_sync::{Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -48,7 +48,7 @@ impl FileOps for TraceMarkerFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

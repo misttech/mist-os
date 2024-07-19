@@ -9,7 +9,7 @@ use crate::vfs::socket::{
     SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
 };
 use crate::vfs::FileHandle;
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
@@ -161,7 +161,7 @@ impl SocketOps for VsockSocket {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,

@@ -18,7 +18,7 @@ use crate::vfs::{
     FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNodeInfo, FsStr, SpecialNode,
 };
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, MutexGuard, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, MutexGuard, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::CAP_SYS_RESOURCE;
 use starnix_uapi::errors::Errno;
@@ -448,7 +448,7 @@ impl FileOps for PipeFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -856,7 +856,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(to.downcast_file::<PipeFileObject>().is_none());

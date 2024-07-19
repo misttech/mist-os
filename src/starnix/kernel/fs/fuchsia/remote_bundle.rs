@@ -21,7 +21,7 @@ use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::{Errno, SourceContext};
 use starnix_uapi::file_mode::FileMode;
@@ -274,7 +274,7 @@ impl FileOps for MemoryFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
