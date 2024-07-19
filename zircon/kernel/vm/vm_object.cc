@@ -15,7 +15,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>

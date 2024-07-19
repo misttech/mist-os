@@ -24,7 +24,6 @@
 #include <zircon/types.h>
 
 #include <arch/arch_ops.h>
-#include <fbl/auto_lock.h>
 #include <fbl/inline_array.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/algorithm.h>

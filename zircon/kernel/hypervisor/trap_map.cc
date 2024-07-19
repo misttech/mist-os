@@ -10,7 +10,6 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <hypervisor/ktrace.h>
 #include <hypervisor/trap_map.h>
 #include <kernel/range_check.h>

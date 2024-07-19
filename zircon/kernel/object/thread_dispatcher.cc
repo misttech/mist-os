@@ -23,7 +23,6 @@
 #include <arch/vm.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <kernel/thread.h>
 #include <object/exception_dispatcher.h>
 #include <object/handle.h>

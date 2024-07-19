@@ -18,7 +18,6 @@
 
 #include <arch/defines.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/thread.h>
 #include <object/diagnostics.h>

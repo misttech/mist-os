@@ -24,7 +24,6 @@
 
 #include <new>
 
-#include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>

@@ -12,7 +12,6 @@
 
 #include <dev/interrupt.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <kernel/auto_lock.h>
 #include <kernel/mutex.h>
 

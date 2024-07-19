@@ -9,7 +9,6 @@
 #include <arch/arm64/mmu.h>
 #include <arch/hypervisor.h>
 #include <dev/interrupt.h>
-#include <fbl/auto_lock.h>
 #include <hypervisor/cpu.h>
 #include <kernel/cpu.h>
 #include <kernel/mutex.h>

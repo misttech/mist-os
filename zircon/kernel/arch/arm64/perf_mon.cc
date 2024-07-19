@@ -29,7 +29,6 @@
 #include <dev/interrupt/arm_gic_common.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/align.h>
 #include <kernel/cpu.h>

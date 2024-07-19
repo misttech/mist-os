@@ -17,7 +17,6 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <object/handle.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>

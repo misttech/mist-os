@@ -15,7 +15,6 @@
 #include <zircon/types.h>
 
 #include <arch/defines.h>
-#include <fbl/auto_lock.h>
 #include <kernel/deadline.h>
 #include <ktl/span.h>
 #include <object/handle.h>

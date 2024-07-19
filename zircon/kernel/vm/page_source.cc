@@ -7,7 +7,6 @@
 #include <lib/console.h>
 #include <trace.h>
 
-#include <fbl/auto_lock.h>
 #include <kernel/lockdep.h>
 #include <ktl/move.h>
 #include <vm/page_source.h>

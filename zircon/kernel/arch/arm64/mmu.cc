@@ -29,7 +29,6 @@
 
 #include <arch/arm64/hypervisor/el2_state.h>
 #include <arch/aspace.h>
-#include <fbl/auto_lock.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
