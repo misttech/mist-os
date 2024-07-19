@@ -50,11 +50,9 @@ message Context {
   // Whether to build for the purposes of collecting coverage.
   bool collect_coverage = 11;
 
-  // Use this many jobs if building with Goma (ignored otherwise).
-  // Note: Goma is deprecated, but this variable still applies to other remote
-  // build enabled work environments.
-  // TODO(b/340581192): rename this
-  int32 goma_job_count = 12;
+  // Build with this many job slots if remote building is enabled.
+  // Remote build actions consume negligible local resources.
+  int32 job_count = 12;
 
   // If true, skip doing a Ninja no-op check even if the static spec indicates
   // that we should do the check. This is to let the caller skip doing the check
@@ -64,4 +62,8 @@ message Context {
 
   // Absolute path to PGO profile data file.
   string pgo_profile_path = 14;
+
+  // Deprecated: renamed to 'job_count' above.
+  // TODO(b/340581192): delete this
+  int32 goma_job_count = 15;
 }
