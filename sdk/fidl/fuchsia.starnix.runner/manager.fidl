@@ -7,7 +7,8 @@ library fuchsia.starnix.runner;
 @discoverable
 open protocol Manager {
     /// Suspends all the running Starnix kernels.
-    flexible Suspend(table {});
+    /// Returns after all processes have been suspended.
+    flexible Suspend(table {}) -> ();
 
     /// Resumes all suspended Starnix kernels.
     flexible Resume(table {});

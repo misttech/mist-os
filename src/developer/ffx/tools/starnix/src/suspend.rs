@@ -43,6 +43,7 @@ pub async fn starnix_suspend(
 
     let _result = manager_proxy
         .suspend(&fstarrunner::ManagerSuspendRequest { ..Default::default() })
+        .await
         .context("suspending kernel")?;
 
     writeln!(writer, "Suspended kernel.").map_err(|e| Error::Unexpected(e.into()))?;
