@@ -27,6 +27,15 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             }
         }
 
+        // Include bt-transport-uart driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::bt_transport_uart") {
+            if *context.feature_set_level == FeatureSupportLevel::Standard
+                || *context.feature_set_level == FeatureSupportLevel::Utility
+            {
+                builder.platform_bundle("bt_transport_uart_driver");
+            }
+        }
+
         let BluetoothConfig::Standard { profiles, .. } = config else {
             return Ok(());
         };
@@ -54,11 +63,6 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             && *context.build_type == BuildType::Eng
         {
             builder.platform_bundle("bluetooth_pandora");
-        }
-
-        // Include bt-transport-uart driver through a platform AIB.
-        if context.board_info.provides_feature("fuchsia::bt_transport_uart") {
-            builder.platform_bundle("bt_transport_uart_driver");
         }
 
         Ok(())
