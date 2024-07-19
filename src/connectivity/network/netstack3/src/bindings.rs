@@ -102,6 +102,7 @@ pub(crate) use inspect::InspectPublisher;
 
 mod ctx {
     use super::*;
+    use thiserror::Error;
 
     /// Provides an implementation of [`BindingsContext`].
     pub(crate) struct BindingsCtx(Arc<BindingsCtxInner>);
@@ -125,19 +126,15 @@ mod ctx {
         core_ctx: Arc<StackState<BindingsCtx>>,
     }
 
-    #[derive(Debug)]
     /// Error observed while attempting to destroy the last remaining clone of `Ctx`.
+    #[derive(Debug, Error)]
     pub enum DestructionError {
-        /// Another clone of `BindingsCtx` still exists.
-        BindingsCtxStillCloned(
-            // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] usize,
-        ),
-        /// Another clone of `CoreCtx` still exists.
-        CoreCtxStillCloned(
-            // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] usize,
-        ),
+        /// Another reference of `BindingsCtx` still exists.
+        #[error("bindings ctx still has {0} references")]
+        BindingsCtxStillCloned(usize),
+        /// Another reference of `CoreCtx` still exists.
+        #[error("core ctx still has {0} references")]
+        CoreCtxStillCloned(usize),
     }
 
     impl Ctx {
