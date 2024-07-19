@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/lib/gzip/gzip.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
@@ -451,6 +452,13 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  if (is_asan) {
+    # At least for ASan, remote execution requires machine with more memory.
+    _concurrent_jobs = concurrent_jobs.rust_highmem
+    test_configs = _concurrent_jobs.configs
+    test_vars = _concurrent_jobs.vars
+  }
 }
 
 rustc_library("starnix_kernel_runner") {
