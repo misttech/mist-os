@@ -24,6 +24,20 @@ using Duration = sched::Duration;
 using FlexibleWeight = sched::FlexibleWeight;
 using Time = sched::Time;
 
+enum class Action : uint8_t {
+  // Allocate and queue a new thread.
+  kQueueNewThread,
+
+  // If there is a thread currently running, set it as blocked.
+  kBlockCurrentThread,
+
+  // Unblock the last blocked thread, if any.
+  kUnblockThread,
+
+  // Mandated by FuzzedDataProvider::ConsumeEnum.
+  kMaxValue,
+};
+
 Time ConsumeTime(FuzzedDataProvider& provider) {
   return Time{provider.ConsumeIntegral<zx_time_t>()};
 }
@@ -62,12 +76,29 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   FuzzedDataProvider provider(data, size);
 
   std::vector<std::unique_ptr<TestThread>> threads;
+  std::vector<TestThread*> blocked;
   Time now = ConsumeTime(provider);
   TestThread* current = nullptr;
   sched::RunQueue<TestThread> queue;
   while (now < Time::Max() && provider.remaining_bytes() > 0) {
-    if (provider.ConsumeBool()) {
-      queue.Queue(*AllocateNewThread(provider, threads), now);
+    switch (provider.ConsumeEnum<Action>()) {
+      case Action::kQueueNewThread:
+        queue.Queue(*AllocateNewThread(provider, threads), now);
+        break;
+      case Action::kBlockCurrentThread:
+        if (current) {
+          current->set_state(sched::ThreadState::kBlocked);
+          blocked.push_back(current);
+        }
+        break;
+      case Action::kUnblockThread:
+        if (!blocked.empty()) {
+          queue.Queue(*blocked.back(), now);
+          blocked.pop_back();
+        }
+        break;
+      case Action::kMaxValue:
+        break;
     }
 
     ZX_ASSERT(current == queue.current_thread());

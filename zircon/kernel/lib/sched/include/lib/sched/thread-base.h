@@ -67,6 +67,9 @@ enum class ThreadState : uint8_t {
 
   // The thread is currently running (or selected to be run).
   kRunning,
+
+  // The thread is blocked.
+  kBlocked,
 };
 
 // The base thread class from which we expect schedulable thread types to
@@ -133,7 +136,7 @@ class ThreadBase {
   constexpr void Tick(Duration elapsed) { time_slice_used_ += elapsed; }
 
   // Whether the thread is currently queued to be scheduled (in a RunQueue).
-  constexpr bool IsQueued() const { return run_queue_.node.InContainer(); }
+  constexpr bool IsQueued() const { return run_queue_.ready.InContainer(); }
 
  private:
   // For access to `run_queue_` alone.
@@ -149,7 +152,12 @@ class ThreadBase {
 
   // Encapsulates the state specific to the run queue.
   struct RunQueueState {
-    fbl::WAVLTreeNodeState<Thread*> node;
+    // State relating to the tree of ready threads.
+    fbl::WAVLTreeNodeState<Thread*> ready;
+
+    // State relating to the tree of threads that are both blocked and in their
+    // current activation period.
+    fbl::WAVLTreeNodeState<Thread*> actively_blocked;
 
     // Minimum finish time of all the descendants of this node in the run queue.
     // See RunQueue<Thread>::SubtreeMinFinishObserverTraits for the management
