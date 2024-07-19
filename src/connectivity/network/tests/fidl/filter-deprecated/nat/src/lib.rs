@@ -14,6 +14,7 @@ use futures::FutureExt as _;
 use net_declare::fidl_subnet;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netfilter::FidlReturn as _;
+use netstack_testing_common::interfaces::TestInterfaceExt as _;
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
 use netstack_testing_common::{ping as ping_helper, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
 use netstack_testing_macros::netstack_test;
@@ -113,6 +114,7 @@ pub async fn setup_masquerade_nat_network<'a>(
             )
             .await
             .expect("router failed to join network");
+        router_ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
         router_ep.add_address_and_subnet_route(router_addr).await.expect("configure address");
 
         let gen_forwarding_config = |forwarding| finterfaces_admin::Configuration {
