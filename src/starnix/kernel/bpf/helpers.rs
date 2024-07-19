@@ -53,7 +53,6 @@ fn bpf_map_lookup_elem(
     let key =
         unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
 
-    let key = key.to_owned();
     map.get_raw(context.locked, &key).map(BpfValue::from).unwrap_or_else(BpfValue::default)
 }
 

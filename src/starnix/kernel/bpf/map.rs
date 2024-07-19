@@ -60,7 +60,7 @@ impl Map {
         Ok(Self { id, schema, flags, entries: OrderedMutex::new(store) })
     }
 
-    pub fn get_raw<L>(&self, locked: &mut Locked<'_, L>, key: &Vec<u8>) -> Option<*mut u8>
+    pub fn get_raw<L>(&self, locked: &mut Locked<'_, L>, key: &[u8]) -> Option<*mut u8>
     where
         L: LockBefore<BpfMapEntries>,
     {
@@ -72,7 +72,7 @@ impl Map {
         &self,
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
-        key: &Vec<u8>,
+        key: &[u8],
         user_value: UserAddress,
     ) -> Result<(), Errno>
     where
@@ -117,7 +117,7 @@ impl Map {
         Ok(())
     }
 
-    pub fn delete<L>(&self, locked: &mut Locked<'_, L>, key: &Vec<u8>) -> Result<(), Errno>
+    pub fn delete<L>(&self, locked: &mut Locked<'_, L>, key: &[u8]) -> Result<(), Errno>
     where
         L: LockBefore<BpfMapEntries>,
     {
@@ -174,11 +174,7 @@ impl Map {
         Ok(())
     }
 
-    fn get<'a>(
-        entries: &'a mut MapStore,
-        schema: &MapSchema,
-        key: &Vec<u8>,
-    ) -> Option<&'a mut [u8]> {
+    fn get<'a>(entries: &'a mut MapStore, schema: &MapSchema, key: &[u8]) -> Option<&'a mut [u8]> {
         match entries {
             MapStore::Hash(ref mut entries) => entries.get(&schema, key),
             MapStore::Array(ref mut entries) => {
@@ -408,11 +404,11 @@ impl HashStorage {
         self.index_map.len()
     }
 
-    fn contains_key(&self, key: &Vec<u8>) -> bool {
+    fn contains_key(&self, key: &[u8]) -> bool {
         self.index_map.contains_key(key)
     }
 
-    fn get(&mut self, schema: &MapSchema, key: &Vec<u8>) -> Option<&'_ mut [u8]> {
+    fn get(&mut self, schema: &MapSchema, key: &[u8]) -> Option<&'_ mut [u8]> {
         if let Some(index) = self.index_map.get(key) {
             Some(&mut self.data[array_range_for_index(schema.value_size, *index as u32)])
         } else {
@@ -431,7 +427,7 @@ impl HashStorage {
         self.index_map.iter().map(|(k, _)| k)
     }
 
-    fn remove(&mut self, key: &Vec<u8>) -> bool {
+    fn remove(&mut self, key: &[u8]) -> bool {
         if let Some(index) = self.index_map.remove(key) {
             self.free_list.remove(index);
             true
