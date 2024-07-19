@@ -1304,8 +1304,6 @@ async fn ping(
     netstack: fntr::Netstack,
     expected_result: Result<(), fntr::Error>,
 ) {
-    // TODO(https://fxbug.dev/42177465): Destructure these types in the parameter
-    // definition.
     let PingAddressConfig { source_subnet, target_subnet } = address_config;
     let PingOptions { interface_name, payload_length, timeout, disable_target_interface } = options;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -1649,8 +1647,7 @@ async fn join_multicast_group(
     name: &str,
     case_name: &str,
     netstack: fntr::Netstack,
-    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
-    #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
+    multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -1725,9 +1722,8 @@ async fn join_multicast_group(
 async fn join_multicast_group_after_stop(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
-    #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
-    #[allow(unused_mut)] mut second_multicast_address: fnet::IpAddress,
+    multicast_address: fnet::IpAddress,
+    second_multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
     netstack: fntr::Netstack,
 ) {
@@ -1828,8 +1824,7 @@ async fn join_multicast_group_after_stop(
 async fn leave_multicast_group(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
-    #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
+    multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
     netstack: fntr::Netstack,
 ) {
@@ -2036,8 +2031,7 @@ async fn join_multicast_group_with_non_multicast_address(
 async fn join_same_multicast_group_multiple_times(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
-    #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
+    multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
     netstack: fntr::Netstack,
 ) {
@@ -2202,8 +2196,7 @@ async fn leave_multicast_group_with_non_multicast_address(
 async fn leave_unjoined_multicast_group(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
-    #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
+    multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
     netstack: fntr::Netstack,
 ) {
