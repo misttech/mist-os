@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::TEST_REPO_URL;
 use fuchsia_merkle::HASH_SIZE;
-use fuchsia_url::{AbsolutePackageUrl, PackageName, UnpinnedAbsolutePackageUrl};
 use scrutiny_collection::core::ComponentSource;
 use scrutiny_collection::model::DataModel;
 use scrutiny_collection::model_config::ModelConfig;
-use std::str::FromStr;
 use std::sync::Arc;
 use tempfile::tempdir;
 
@@ -19,18 +16,9 @@ pub fn fake_model_config() -> ModelConfig {
     let update_package_path = dir_path.join("update.far");
     let blobs_directory = dir_path.join("blobs");
     ModelConfig {
-        uri: "{memory}".to_string(),
         update_package_path,
         blobs_directory,
-        config_data_package_url: AbsolutePackageUrl::Unpinned(UnpinnedAbsolutePackageUrl::new(
-            TEST_REPO_URL.clone(),
-            PackageName::from_str("config-data").unwrap(),
-            None,
-        )),
-        additional_boot_args_path: "config/additional_boot_args".into(),
         component_tree_config_path: None,
-        tmp_dir_path: None,
-        is_empty: false,
         is_recovery: false,
     }
 }

@@ -136,8 +136,7 @@ pub fn create_test_package_with_contents(
     }
 }
 
-pub fn create_model() -> (String, Arc<DataModel>) {
+pub fn create_model() -> Arc<DataModel> {
     let config = fake_model_config();
-    let uri_clone = config.uri();
-    (uri_clone, Arc::new(DataModel::new(config).unwrap()))
+    Arc::new(DataModel::new(config).unwrap())
 }

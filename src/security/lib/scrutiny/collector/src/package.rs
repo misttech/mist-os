@@ -666,7 +666,7 @@ pub mod tests {
         ]);
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
         let served = vec![pkg];
-        let (_, model) = create_model();
+        let model = create_model();
         model
             .set(Zbi {
                 deps: HashSet::default(),
@@ -691,7 +691,7 @@ pub mod tests {
         let cms = create_test_cm_map(vec![(PathBuf::from("meta/foo.cm"), vec![])]);
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
         let served = vec![pkg];
-        let (_, model) = create_model();
+        let model = create_model();
         model
             .set(Zbi {
                 deps: HashSet::default(),
@@ -712,7 +712,7 @@ pub mod tests {
     #[fuchsia::test]
     fn test_collect_clears_data_model_before_adding_new() {
         let mut mock_pkg_reader = Box::new(MockPackageReader::new());
-        let (_, model) = create_model();
+        let model = create_model();
         // Put some "previous" content into the model.
         {
             let mut comps = vec![];
@@ -772,7 +772,7 @@ pub mod tests {
             contents,
         );
         let served = vec![pkg];
-        let (_, model) = create_model();
+        let model = create_model();
         model
             .set(Zbi {
                 deps: HashSet::default(),
@@ -789,7 +789,7 @@ pub mod tests {
     #[fuchsia::test]
     fn test_packages_sorted() {
         let mut mock_pkg_reader = Box::new(MockPackageReader::new());
-        let (_, model) = create_model();
+        let model = create_model();
 
         let cms_0 = create_test_cm_map(vec![(PathBuf::from("meta/foo.cm"), vec![])]);
         let pkg_0 =
@@ -827,7 +827,7 @@ pub mod tests {
     #[fuchsia::test]
     fn test_deps() {
         let mut mock_pkg_reader = Box::new(MockPackageReader::new());
-        let (_, model) = create_model();
+        let model = create_model();
 
         let merkle_one = Hash::from([1u8; HASH_SIZE]);
         let merkle_two = Hash::from([2u8; HASH_SIZE]);

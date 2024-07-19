@@ -118,7 +118,7 @@ impl AdditionalBootConfigCollector {
     pub fn collect(&self, model: Arc<DataModel>) -> Result<()> {
         let model_config = model.config();
         let update_package_path = model_config.update_package_path();
-        let additional_boot_args_path = model_config.additional_boot_args_path();
+        let additional_boot_args_path = "config/additional_boot_args".to_string();
 
         // Execute query using deps-tracking artifact reader.
         let result = load_additional_boot_args(
