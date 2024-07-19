@@ -19,22 +19,13 @@ if (is_host) {
       "//src/sys/lib/cm_rust",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:simplelog",
-      "//third_party/rust_crates:thiserror",
-      "//third_party/rust_crates:tracing",
     ]
 
     non_rust_deps = [ "//src/lib/chunked-compression" ]
 
     sources = [
-      "src/command_builder.rs",
-      "src/launcher.rs",
       "src/lib.rs",
-      "src/scrutiny.rs",
       "src/scrutiny2.rs",
-      "src/shell/args.rs",
-      "src/shell/error.rs",
-      "src/shell/mod.rs",
     ]
   }
 }

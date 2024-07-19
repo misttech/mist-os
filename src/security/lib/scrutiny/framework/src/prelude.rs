@@ -3,14 +3,8 @@
 // found in the LICENSE file.
 
 #[doc(no_inline)]
-pub use crate::controllers;
-#[doc(no_inline)]
-pub use crate::engine::hook::PluginHooks;
-#[doc(no_inline)]
 pub use crate::model::collection::DataCollection;
 #[doc(no_inline)]
 pub use crate::model::collector::DataCollector;
-#[doc(no_inline)]
-pub use crate::model::controller::DataController;
 #[doc(no_inline)]
 pub use crate::model::model::DataModel;

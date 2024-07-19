@@ -150,9 +150,7 @@ mod tests {
     use crate::verify::collector::component_model::{
         V2ComponentModelDataCollector, DEFAULT_CONFIG_PATH, DEFAULT_ROOT_URL,
     };
-    use crate::verify::controller::capability_routing::{
-        CapabilityRouteController, ResponseLevel, V2ComponentModelMappingController,
-    };
+    use crate::verify::controller::capability_routing::{CapabilityRouteController, ResponseLevel};
     use crate::verify::controller::component_resolvers::{
         ComponentResolverRequest, ComponentResolverResponse, ComponentResolversController,
     };
@@ -318,60 +316,6 @@ mod tests {
         model.set(Manifests::new(vec![root_manifest]))?;
         model
             .set(Zbi { ..zbi(root_component_url, component_id_index_path, component_id_index) })?;
-        model.set(CoreDataDeps { deps })?;
-        Ok(model)
-    }
-
-    // Creates a data model with a ZBI containing 4 component manifests and a default component id index.
-    // The structure of the component instance tree is:
-    //
-    //        root
-    //       /    \
-    //     foo    bar
-    //     /
-    //   baz
-    //
-    fn multi_v2_component_model() -> Result<Arc<DataModel>> {
-        let model = data_model();
-        let root_id = 0;
-        let foo_id = 1;
-        let bar_id = 2;
-        let baz_id = 3;
-
-        let root_url = DEFAULT_ROOT_URL.as_str();
-        let foo_url = "fuchsia-boot:///#meta/foo.cm";
-        let bar_url = "fuchsia-boot:///#meta/bar.cm";
-        let baz_url = "fuchsia-boot:///#meta/baz.cm";
-
-        let root_component = make_v2_component(root_id, root_url);
-        let foo_component = make_v2_component(foo_id, foo_url);
-        let bar_component = make_v2_component(bar_id, bar_url);
-        let baz_component = make_v2_component(baz_id, baz_url);
-
-        let root_decl = new_component_decl(vec![
-            new_child_decl("foo", foo_url),
-            new_child_decl("bar", bar_url),
-        ]);
-        let foo_decl = new_component_decl(vec![new_child_decl("baz", baz_url)]);
-        let bar_decl = new_component_decl(vec![]);
-        let baz_decl = new_component_decl(vec![]);
-
-        let root_manifest = make_v2_manifest(root_id, root_decl)?;
-        let foo_manifest = make_v2_manifest(foo_id, foo_decl)?;
-        let bar_manifest = make_v2_manifest(bar_id, bar_decl)?;
-        let baz_manifest = make_v2_manifest(baz_id, baz_decl)?;
-
-        let deps = hashset! { CORE_DEP_STR.to_string().into() };
-
-        model.set(Components::new(vec![
-            root_component,
-            foo_component,
-            bar_component,
-            baz_component,
-        ]))?;
-
-        model.set(Manifests::new(vec![root_manifest, foo_manifest, bar_manifest, baz_manifest]))?;
-        model.set(Zbi { ..zbi(None, None, component_id_index::Index::default()) })?;
         model.set(CoreDataDeps { deps })?;
         Ok(model)
     }
@@ -1041,57 +985,6 @@ mod tests {
                 monikers: vec!["core/resolved-from-custom".into()],
             },
         );
-        Ok(())
-    }
-
-    #[test]
-    fn test_map_tree_single_node_default_url() -> Result<()> {
-        let model = single_v2_component_model(None, None, component_id_index::Index::default())?;
-        V2ComponentModelDataCollector::new().collect(model.clone())?;
-
-        let controller = V2ComponentModelMappingController::default();
-        let response = controller.query(model.clone(), json!("{}"))?;
-        assert_json_eq(
-            response,
-            json!({"instances":  [{ "instance": ".", "url": DEFAULT_ROOT_URL.to_string() }]}),
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_map_tree_single_node_custom_url() -> Result<()> {
-        let root_url = "fuchsia-boot:///#meta/foo.cm";
-        let model =
-            single_v2_component_model(Some(root_url), None, component_id_index::Index::default())?;
-        V2ComponentModelDataCollector::new().collect(model.clone())?;
-
-        let controller = V2ComponentModelMappingController::default();
-        let response = controller.query(model.clone(), json!("{}"))?;
-        assert_json_eq(response, json!({"instances": [ {"instance": ".", "url": root_url }]}));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_map_component_model_multi_instance() -> Result<()> {
-        let model = multi_v2_component_model()?;
-        V2ComponentModelDataCollector::new().collect(model.clone())?;
-
-        let controller = V2ComponentModelMappingController::default();
-        let response = controller.query(model.clone(), json!("{}"))?;
-        assert!(
-            (response
-                == json!({"instances": [{"instance": ".", "url": DEFAULT_ROOT_URL.to_string()},
-                                 {"instance": "foo","url": "fuchsia-boot:///#meta/foo.cm"},
-                                 {"instance": "bar", "url": "fuchsia-boot:///#meta/bar.cm"},
-                                 {"instance": "foo/baz", "url": "fuchsia-boot:///#meta/baz.cm"}]}))
-                | (response
-                    == json!({"instances": [{"instance": ".", "url": DEFAULT_ROOT_URL.to_string()},
-                                 {"instance": "bar","url": "fuchsia-boot:///#meta/bar.cm"},
-                                 {"instance": "foo", "url": "fuchsia-boot:///#meta/foo.cm"},
-                                 {"instance": "foo/baz", "url": "fuchsia-boot:///#meta/baz.cm"}]}))
-        );
-
         Ok(())
     }
 

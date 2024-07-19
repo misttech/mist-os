@@ -15,19 +15,13 @@ if (is_host) {
       "//src/security/lib/scrutiny/config",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:serde",
-      "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:thiserror",
     ]
     non_rust_deps = [ "//src/lib/chunked-compression" ]
-    test_deps = [ "//src/security/lib/scrutiny/testing" ]
     sources = [
-      "src/engine/dispatcher.rs",
-      "src/engine/hook.rs",
-      "src/engine/mod.rs",
       "src/lib.rs",
       "src/model/collection.rs",
       "src/model/collector.rs",
-      "src/model/controller.rs",
       "src/model/error.rs",
       "src/model/mod.rs",
       "src/model/model.rs",

@@ -12,16 +12,11 @@ use argh::FromArgValue;
 use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
 use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAnalyzer};
 use cm_fidl_analyzer::route::{CapabilityRouteError, VerifyRouteResult};
-use cm_fidl_analyzer::{
-    BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker, ModelMappingVisitor,
-};
+use cm_fidl_analyzer::{BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker};
 use cm_rust::CapabilityTypeName;
 use routing::error::{ComponentInstanceError, RoutingError};
-use scrutiny::model::controller::DataController;
 use scrutiny::model::model::*;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use serde_json::value::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -102,38 +97,6 @@ impl From<WarningResult> for ResultBySeverity {
 impl From<ErrorResult> for ResultBySeverity {
     fn from(error_result: ErrorResult) -> Self {
         Self::Error(error_result)
-    }
-}
-
-// V2ComponentModelMappingController
-//
-// A DataController which builds the tree of v2 components and lists all component instance identifiers
-// in breadth-first order.
-#[derive(Default)]
-pub struct V2ComponentModelMappingController {}
-
-impl DataController for V2ComponentModelMappingController {
-    fn query(&self, model: Arc<DataModel>, _value: Value) -> Result<Value> {
-        let component_model = Arc::clone(
-            &model
-                .get::<V2ComponentModel>()
-                .context("Failed to get V2ComponentModel from CapabilityRouteController model")?
-                .component_model,
-        );
-        let mut walker = BreadthFirstModelWalker::new();
-        let mut visitor = ModelMappingVisitor::default();
-        walker.walk(&component_model, &mut visitor)?;
-
-        let mut instances = Vec::new();
-        for (instance, url) in visitor.map().iter() {
-            instances.push(json!({ "instance": instance.clone(), "url": url.clone()}));
-        }
-        Ok(json!({ "instances": instances }))
-    }
-
-    fn description(&self) -> String {
-        "an analyzer that walks the full v2 component tree and reports all instance IDs in breadth-first order"
-            .to_string()
     }
 }
 
