@@ -273,7 +273,6 @@ async fn packet_test<N: Netstack>(name: &str) {
 // TODO(https://fxbug.dev/42169332): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
 async fn bridged_packet_test(name: &str) {
-    // TODO(https://fxbug.dev/42167696): Support bridging in Netstack3.
     type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");

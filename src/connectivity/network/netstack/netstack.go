@@ -1380,10 +1380,6 @@ func (ns *Netstack) Bridge(nics []tcpip.NICID) (*ifState, error) {
 		}
 		links = append(links, ifs.bridgeable)
 
-		// TODO(https://fxbug.dev/42167696): Replace this with explicit
-		// configuration. For now, take the minimum default route
-		// metric across all the links because there is currently
-		// no way to specify it when creating the bridge.
 		if ifs.metric < metric {
 			metric = ifs.metric
 		}
