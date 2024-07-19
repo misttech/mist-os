@@ -46,12 +46,12 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
   };
 
   // TODO(https://fxbug.dev/340928556): start the loader as a separate process instead.
-  DriverHostRunner(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_component::Realm> realm,
-                   std::unique_ptr<driver_loader::Loader> loader);
+  DriverHostRunner(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_component::Realm> realm);
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
 
-  zx::result<> StartDriverHost(StartDriverHostCallback callback);
+  zx::result<> StartDriverHost(driver_loader::Loader* loader, zx::channel bootstrap_receiver,
+                               StartDriverHostCallback callback);
 
   // Returns all started driver hosts. This will be used by tests.
   std::unordered_set<const DriverHost*> DriverHosts();
@@ -69,8 +69,10 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                 StartComponentCallback callback);
-  zx::result<> LoadDriverHost(const fuchsia_component_runner::ComponentStartInfo& start_info,
-                              std::string_view name);
+
+  zx::result<> LoadDriverHost(driver_loader::Loader* loader,
+                              const fuchsia_component_runner::ComponentStartInfo& start_info,
+                              std::string_view name, zx::channel bootstrap_receiver);
 
   // Creates the process and starting thread for a driver host.
   zx::result<DriverHost*> CreateDriverHost(std::string_view name);
@@ -84,9 +86,6 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   uint64_t next_driver_host_id_ = 0;
   fbl::DoublyLinkedList<std::unique_ptr<DriverHost>> driver_hosts_;
-
-  // TODO(https://fxbug.dev/340928556): start the loader as a separate process instead.
-  std::unique_ptr<driver_loader::Loader> loader_;
 };
 
 }  // namespace driver_manager

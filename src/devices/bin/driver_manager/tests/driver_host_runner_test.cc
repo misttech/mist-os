@@ -94,9 +94,9 @@ class TestDirectory : public fio::testing::Directory_TestBase {
 
 class DriverHostRunnerTest : public gtest::TestLoopFixture {
   void SetUp() {
-    std::unique_ptr<driver_loader::Loader> loader = driver_loader::Loader::Create();
-    driver_host_runner_ = std::make_unique<driver_manager::DriverHostRunner>(
-        dispatcher(), ConnectToRealm(), std::move(loader));
+    loader_ = driver_loader::Loader::Create();
+    driver_host_runner_ =
+        std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
   }
 
  protected:
@@ -124,6 +124,7 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
   driver_runner::TestRealm realm_;
   std::optional<fidl::ServerBinding<fuchsia_component::Realm>> realm_binding_;
 
+  std::unique_ptr<driver_loader::Loader> loader_;
   std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner_;
 };
 
@@ -142,13 +143,18 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
         created_component = true;
       });
 
+  zx::channel bootstrap_sender, bootstrap_receiver;
+  zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
+  ASSERT_EQ(ZX_OK, status);
+
   // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
   // entire thing.
   bool got_cb = false;
-  auto res = driver_host_runner_->StartDriverHost([&](zx::result<> result) {
-    ASSERT_EQ(ZX_OK, result.status_value());
-    got_cb = true;
-  });
+  auto res = driver_host_runner_->StartDriverHost(loader_.get(), std::move(bootstrap_receiver),
+                                                  [&](zx::result<> result) {
+                                                    ASSERT_EQ(ZX_OK, result.status_value());
+                                                    got_cb = true;
+                                                  });
   ASSERT_EQ(ZX_OK, res.status_value());
 
   ASSERT_TRUE(RunLoopUntilIdle());

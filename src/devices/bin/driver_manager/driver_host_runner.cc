@@ -109,11 +109,8 @@ zx::result<zx::vmo> GetVdsoVmo() {
 }  // namespace
 
 DriverHostRunner::DriverHostRunner(async_dispatcher_t* dispatcher,
-                                   fidl::ClientEnd<fcomponent::Realm> realm,
-                                   std::unique_ptr<driver_loader::Loader> loader)
-    : dispatcher_(dispatcher),
-      realm_(fidl::WireClient(std::move(realm), dispatcher)),
-      loader_(std::move(loader)) {
+                                   fidl::ClientEnd<fcomponent::Realm> realm)
+    : dispatcher_(dispatcher), realm_(fidl::WireClient(std::move(realm), dispatcher)) {
   // Pick a non-zero starting id so that folks cannot rely on the driver host process names being
   // stable.
   std::random_device rd;
@@ -178,20 +175,23 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
   return ZX_OK;
 }
 
-zx::result<> DriverHostRunner::StartDriverHost(StartDriverHostCallback callback) {
+zx::result<> DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
+                                               zx::channel bootstrap_receiver,
+                                               StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   std::string name = "driver-host-new-" + std::to_string(next_driver_host_id_++);
 
   StartDriverHostComponent(
       name, kUrl,
-      [this, name, callback = std::move(callback)](
+      [this, name, loader, bootstrap_receiver = std::move(bootstrap_receiver),
+       callback = std::move(callback)](
           zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
         if (component.is_error()) {
           LOGF(ERROR, "Failed to start driver host: %s", component.status_string());
           callback(component.take_error());
           return;
         }
-        auto result = LoadDriverHost(component->info, name);
+        auto result = LoadDriverHost(loader, component->info, name, std::move(bootstrap_receiver));
         if (!result.is_ok()) {
           callback(result.take_error());
         } else {
@@ -210,7 +210,8 @@ std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::Driver
 }
 
 zx::result<> DriverHostRunner::LoadDriverHost(
-    const fuchsia_component_runner::ComponentStartInfo& start_info, std::string_view name) {
+    driver_loader::Loader* loader, const fuchsia_component_runner::ComponentStartInfo& start_info,
+    std::string_view name, zx::channel bootstrap_receiver) {
   auto url = *start_info.resolved_url();
   fidl::Arena arena;
   fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_info.program());
@@ -287,9 +288,9 @@ zx::result<> DriverHostRunner::LoadDriverHost(
     return zx::error(status);
   }
 
-  status =
-      loader_->Start(std::move(process), std::move(thread), std::move(root_vmar),
-                     std::move(exec_vmo), std::move(vdso_vmo), std::move(lib_endpoints->client));
+  status = loader->Start(std::move(process), std::move(thread), std::move(root_vmar),
+                         std::move(exec_vmo), std::move(vdso_vmo), std::move(lib_endpoints->client),
+                         std::move(bootstrap_receiver));
   if (status != ZX_OK) {
     LOGF(ERROR, "Loader failed to start driver host: %lu", zx_status_get_string(status));
     return zx::error(status);
