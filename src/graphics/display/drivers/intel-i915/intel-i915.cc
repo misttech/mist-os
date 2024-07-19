@@ -384,7 +384,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   constexpr uint16_t kSequencerData = 0x3c5;
   constexpr uint8_t kClockingModeIdx = 1;
   constexpr uint8_t kClockingModeScreenOff = (1 << 5);
-  zx_status_t status = zx_ioports_request(resources_.ioport_resource->get(), kSequencerIdx, 2);
+  zx_status_t status = zx_ioports_request(resources_.ioport->get(), kSequencerIdx, 2);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map vga ports");
     return false;
@@ -2135,7 +2135,7 @@ void Controller::PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer) {
 void Controller::PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
   if (suspend_reason == DEVICE_SUSPEND_REASON_MEXEC) {
-    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(resources_.framebuffer_resource);
+    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(resources_.framebuffer);
     if (fb_status.is_error()) {
       completer(zx::ok());
       return;
@@ -2218,7 +2218,7 @@ zx_status_t Controller::Init() {
   pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
   zxlogf(TRACE, "Device id %x", device_id_);
 
-  const zx::unowned_resource& driver_mmio_resource = resources_.mmio_resource;
+  const zx::unowned_resource& driver_mmio_resource = resources_.mmio;
   if (!driver_mmio_resource->is_valid()) {
     zxlogf(WARNING, "Failed to get driver MMIO resource. VBT initialization skipped.");
   } else {
@@ -2289,7 +2289,7 @@ zx_status_t Controller::Init() {
     // Prevent clients from allocating memory in this region by telling |gtt_| to exclude it from
     // the region allocator.
     uint32_t offset = 0u;
-    auto fb = GetFramebufferInfo(resources_.framebuffer_resource);
+    auto fb = GetFramebufferInfo(resources_.framebuffer);
     if (fb.is_error()) {
       zxlogf(INFO, "Failed to obtain framebuffer size (%s)", fb.status_string());
       // It is possible for zx_framebuffer_get_info to fail in a headless system as the bootloader

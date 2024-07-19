@@ -61,9 +61,9 @@ constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
 
 ControllerResources GetControllerResources(zx_device_t* parent) {
   return {
-      .framebuffer_resource = zx::unowned_resource(get_framebuffer_resource(parent)),
-      .mmio_resource = zx::unowned_resource(get_mmio_resource(parent)),
-      .ioport_resource = zx::unowned_resource(get_ioport_resource(parent)),
+      .framebuffer = zx::unowned_resource(get_framebuffer_resource(parent)),
+      .mmio = zx::unowned_resource(get_mmio_resource(parent)),
+      .ioport = zx::unowned_resource(get_ioport_resource(parent)),
   };
 }
 

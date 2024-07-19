@@ -57,13 +57,13 @@ typedef struct buffer_allocation {
 struct ControllerResources {
   // Must be of type `ZX_RSRC_KIND_SYSTEM` with base
   // `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`.
-  zx::unowned_resource framebuffer_resource;
+  zx::unowned_resource framebuffer;
 
   // Must be of type `ZX_RSRC_KIND_MMIO` with access to all valid ranges.
-  zx::unowned_resource mmio_resource;
+  zx::unowned_resource mmio;
 
   // Must be of type `ZX_RSRC_KIND_IOPORT` with access to all valid ranges.
-  zx::unowned_resource ioport_resource;
+  zx::unowned_resource ioport;
 };
 
 class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
@@ -76,7 +76,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
   //
   // `sysmem` must be non-null.
   // `pci` must be non-null.
-  // `resources` must outlive the Controller instance.
+  // `resources` must be valid while the Controller instance is alive.
   static zx::result<std::unique_ptr<Controller>> Create(
       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
