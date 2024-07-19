@@ -112,6 +112,10 @@ impl ScrutinyArtifacts {
         ComponentResolversController::get_monikers(self.model.clone(), request)
     }
 
+    pub fn get_cmdline(&self) -> Result<Vec<String>> {
+        Ok(self.model.get::<Zbi>().unwrap().cmdline.clone())
+    }
+
     pub fn extract_package(
         &self,
         url: AbsolutePackageUrl,

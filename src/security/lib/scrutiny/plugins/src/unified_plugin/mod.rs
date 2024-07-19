@@ -43,7 +43,6 @@ impl UnifiedPlugin {
                 "/verify/pre_signing" => PreSigningController::default(),
                 "/verify/route_sources" => RouteSourcesController::default(),
                 "/verify/structured_config" => VerifyStructuredConfigController::default(),
-                "/zbi/cmdline" => ZbiCmdlineController::default(),
                 "/zbi/sections" => ZbiSectionsController::default(),
             },
         )

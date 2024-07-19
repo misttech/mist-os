@@ -4,9 +4,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use ffx_scrutiny_verify_args::kernel_cmdline::Command;
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
+use scrutiny_frontend::scrutiny2::Scrutiny;
 use scrutiny_utils::golden::{CompareResult, GoldenFile};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -30,20 +28,14 @@ struct Query {
 }
 
 fn verify_kernel_cmdline<P: AsRef<Path>>(query: &Query, golden_paths: &Vec<P>) -> Result<()> {
-    let command = CommandBuilder::new("zbi.cmdline").build();
-    let model = if query.recovery {
-        ModelConfig::from_product_bundle_recovery(query.product_bundle.clone())
+    let artifacts = if query.recovery {
+        Scrutiny::from_product_bundle_recovery(&query.product_bundle)
     } else {
-        ModelConfig::from_product_bundle(query.product_bundle.clone())
-    }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).build();
-    config.runtime.logging.silent_mode = true;
+        Scrutiny::from_product_bundle(&query.product_bundle)
+    }?
+    .collect()?;
 
-    let scrutiny_output =
-        launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
-
-    let cmdline: Vec<String> = serde_json::from_str(&scrutiny_output)
-        .context(format!("Failed to deserialize scrutiny output: {}", scrutiny_output))?;
+    let cmdline = artifacts.get_cmdline()?;
 
     let golden_file =
         GoldenFile::from_files(&golden_paths).context("Failed to open golden files")?;

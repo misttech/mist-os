@@ -10,35 +10,6 @@ use scrutiny_utils::usage::UsageBuilder;
 use serde_json::value::Value;
 use std::sync::Arc;
 
-/// The controller for querying the kernel cmdline in a product.
-#[derive(Default)]
-pub struct ZbiCmdlineController;
-
-impl DataController for ZbiCmdlineController {
-    fn query(&self, model: Arc<DataModel>, _: Value) -> Result<Value> {
-        if let Ok(zbi) = model.get::<Zbi>() {
-            Ok(serde_json::to_value(zbi.cmdline.clone())?)
-        } else {
-            let empty: Vec<String> = vec![];
-            Ok(serde_json::to_value(empty)?)
-        }
-    }
-    fn description(&self) -> String {
-        "Returns the zbi cmdline section as a string.".to_string()
-    }
-    fn usage(&self) -> String {
-        UsageBuilder::new()
-            .name("zbi.cmdline - Lists the command line params set in the ZBI.")
-            .summary("zbi.cmdline")
-            .description(
-                "Lists all the command line parameters set in the ZBI. \
-            More specifically it is looking at the ZBI found in the \
-            fuchsia-pkg://fuchsia.com/update package.",
-            )
-            .build()
-    }
-}
-
 #[derive(Default)]
 pub struct ZbiSectionsController {}
 
@@ -68,31 +39,5 @@ impl DataController for ZbiSectionsController {
             fuchsia-pkg://fuchsia.com/update package.",
             )
             .build()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use scrutiny_testing::fake::*;
-    use scrutiny_utils::bootfs::{BootfsFileIndex, BootfsPackageIndex};
-    use serde_json::json;
-    use std::collections::HashSet;
-
-    #[test]
-    fn zbi_cmdline() {
-        let model = fake_data_model();
-        let zbi = Zbi {
-            deps: HashSet::default(),
-            sections: vec![],
-            bootfs_files: BootfsFileIndex::default(),
-            bootfs_packages: BootfsPackageIndex::default(),
-            cmdline: vec!["foo".to_string()],
-        };
-        model.set(zbi).unwrap();
-        let controller = ZbiCmdlineController::default();
-        let cmdline: Vec<String> =
-            serde_json::from_value(controller.query(model, json!("")).unwrap()).unwrap();
-        assert_eq!(cmdline, vec!["foo".to_string()]);
     }
 }
