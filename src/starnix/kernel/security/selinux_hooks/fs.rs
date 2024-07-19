@@ -100,7 +100,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "policyvers",
-            BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).as_bytes().to_vec()),
+            BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).into_bytes()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
@@ -219,7 +219,7 @@ impl BytesFileOps for SeEnforce {
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.is_enforcing() as u32).as_bytes().to_vec().into())
+        Ok(format!("{}", self.security_server.is_enforcing() as u32).into_bytes().into())
     }
 }
 
@@ -235,7 +235,7 @@ impl SeDenyUnknown {
 
 impl BytesFileOps for SeDenyUnknown {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.deny_unknown() as u32).as_bytes().to_vec().into())
+        Ok(format!("{}", self.security_server.deny_unknown() as u32).into_bytes().into())
     }
 }
 
@@ -251,7 +251,7 @@ impl SeRejectUnknown {
 
 impl BytesFileOps for SeRejectUnknown {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.reject_unknown() as u32).as_bytes().to_vec().into())
+        Ok(format!("{}", self.security_server.reject_unknown() as u32).into_bytes().into())
     }
 }
 
@@ -520,7 +520,7 @@ impl BytesFileOps for SeLinuxBoolean {
         // e.g. "1 0" will be read if a boolean is True but will become False.
         let (active, pending) =
             self.security_server.get_boolean(&self.name).map_err(|_| errno!(EIO))?;
-        Ok(format!("{} {}", active as u32, pending as u32).as_bytes().to_vec().into())
+        Ok(format!("{} {}", active as u32, pending as u32).into_bytes().into())
     }
 }
 
