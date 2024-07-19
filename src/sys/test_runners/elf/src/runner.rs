@@ -57,6 +57,21 @@ where
     while let Some(event) = stream.try_next().await.map_err(RunnerError::RequestRead)? {
         match event {
             fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                // TODO(b/350876256): Ensure that the UTC clock is started, before tests that may
+                // implicitly rely upon it (e.g. via FDIO / MUSL calls) try to run.
+                {
+                    use fuchsia_runtime::duplicate_utc_clock_handle;
+                    use fuchsia_zircon as zx;
+
+                    let utc_clock = duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("Failed to duplicate UTC clock");
+
+                    // Wait for the UTC clock to start.  This may never happen, if the device has no network connection, or RTC.
+                    fasync::OnSignals::new(&utc_clock, zx::Signals::CLOCK_STARTED)
+                        .await
+                        .expect("Failed to wait for UTC clock to start");
+                }
+
                 let url = start_info.resolved_url.clone().unwrap_or("".to_owned());
                 if let Err(e) =
                     elf::start_component(start_info, controller, get_test_server, validate_args)
