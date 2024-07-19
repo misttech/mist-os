@@ -119,8 +119,6 @@ func TestBuild(t *testing.T) {
 				ArtifactDir: artifactDir,
 			},
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				NinjaCompdbPath:     filepath.Join(buildDir, ninjaCompdbName),
-				NinjaGraphPath:      filepath.Join(buildDir, ninjaGraphName),
 				BuildstatsJsonFiles: []string{filepath.Join(buildDir, buildstatsJSONName)},
 				NinjatraceJsonFiles: []string{filepath.Join(buildDir, ninjatraceJSONName)},
 			},
@@ -141,8 +139,6 @@ func TestBuild(t *testing.T) {
 				},
 			},
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				NinjaCompdbPath:     filepath.Join(buildDir, ninjaCompdbName),
-				NinjaGraphPath:      filepath.Join(buildDir, ninjaGraphName),
 				BuildstatsJsonFiles: []string{filepath.Join(buildDir, buildstatsJSONName)},
 				NinjatraceJsonFiles: []string{filepath.Join(buildDir, ninjatraceJSONName)},
 				LogFiles: map[string]string{
@@ -166,8 +162,6 @@ func TestBuild(t *testing.T) {
 			runnerFunc: failedBuildRunner,
 			expectedArtifacts: &fintpb.BuildArtifacts{
 				FailureSummary:      unrecognizedFailureMsg + "\n",
-				NinjaCompdbPath:     filepath.Join(buildDir, ninjaCompdbName),
-				NinjaGraphPath:      filepath.Join(buildDir, ninjaGraphName),
 				BuildstatsJsonFiles: []string{filepath.Join(buildDir, buildstatsJSONName)},
 				NinjatraceJsonFiles: []string{filepath.Join(buildDir, ninjatraceJSONName)},
 				DebugFiles: []*fintpb.DebugFile{
@@ -201,8 +195,6 @@ func TestBuild(t *testing.T) {
 			runnerFunc: failedBuildRunner,
 			expectedArtifacts: &fintpb.BuildArtifacts{
 				FailureSummary:      unrecognizedFailureMsg + "\n",
-				NinjaCompdbPath:     filepath.Join(buildDir, ninjaCompdbName),
-				NinjaGraphPath:      filepath.Join(buildDir, ninjaGraphName),
 				BuildstatsJsonFiles: []string{filepath.Join(buildDir, buildstatsJSONName)},
 				NinjatraceJsonFiles: []string{filepath.Join(buildDir, ninjatraceJSONName)},
 				DebugFiles: []*fintpb.DebugFile{
@@ -235,8 +227,6 @@ func TestBuild(t *testing.T) {
 			runnerFunc: failedBuildRunner,
 			expectedArtifacts: &fintpb.BuildArtifacts{
 				FailureSummary:      unrecognizedFailureMsg + "\n",
-				NinjaCompdbPath:     filepath.Join(buildDir, ninjaCompdbName),
-				NinjaGraphPath:      filepath.Join(buildDir, ninjaGraphName),
 				BuildstatsJsonFiles: []string{filepath.Join(buildDir, buildstatsJSONName)},
 				NinjatraceJsonFiles: []string{filepath.Join(buildDir, ninjatraceJSONName)},
 				DebugFiles: []*fintpb.DebugFile{
@@ -269,8 +259,6 @@ func TestBuild(t *testing.T) {
 				ArtifactDir: artifactDir,
 			},
 			expectedArtifacts: &fintpb.BuildArtifacts{
-				NinjaCompdbPath:     filepath.Join(buildDir, ninjaCompdbName),
-				NinjaGraphPath:      filepath.Join(buildDir, ninjaGraphName),
 				BuildstatsJsonFiles: []string{filepath.Join(buildDir, buildstatsJSONName)},
 				NinjatraceJsonFiles: []string{filepath.Join(buildDir, ninjatraceJSONName)},
 				LogFiles: map[string]string{
@@ -670,11 +658,6 @@ func TestBuild(t *testing.T) {
 
 			if tc.expectedArtifacts == nil {
 				tc.expectedArtifacts = &fintpb.BuildArtifacts{}
-			}
-			if len(runner.commandsRun) > 0 {
-				// If preprocessing fails before we run any subprocesses, then
-				// NinjaLogPath will not be set.
-				tc.expectedArtifacts.NinjaLogPath = filepath.Join(buildDir, ninjaLogPath)
 			}
 			opts := cmp.Options{
 				protocmp.Transform(),
