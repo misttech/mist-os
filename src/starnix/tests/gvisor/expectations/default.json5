@@ -1188,6 +1188,9 @@
 
                 // TODO(https://fxbug.dev/353534690) deflake
                 "AllInetTests/RawPacketTest.SendFromLoopback/0",
+
+                // TODO(https://fxbug.dev/354049980) deflake
+                "RtSignalTest.InvalidCodes",
             ],
         },
     ],
