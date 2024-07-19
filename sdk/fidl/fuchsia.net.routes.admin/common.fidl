@@ -122,11 +122,10 @@ closed protocol BaseRuleSet {
 
 /// Possible errors for operating the rule set.
 type RuleSetError = flexible enum : uint32 {
-    /// Cannot perform the authentication for an interface or a route table.
+    /// Cannot perform the authentication for a route table.
     BAD_AUTHENTICATION = 1;
-    /// Tried to install a rule that mentions a route table or an interface that
-    /// this `RuleSet` was never authorized or the mentioned resource doesn't
-    /// exist.
+    /// Tried to install a rule referencing a route table that was not authorized
+    /// through `AuthenticateForRouteTable`.
     UNAUTHENTICATED = 2;
     /// The action is invalid, for example, the action contains an invalid route
     /// table.
@@ -137,6 +136,4 @@ type RuleSetError = flexible enum : uint32 {
     RULE_DOES_NOT_EXIST = 5;
     /// The selector is misconfigured because the base part is missing.
     BASE_SELECTOR_MISSING = 6;
-    /// The selector contains a non-existing interface.
-    BAD_INTERFACE_SELECTOR = 7;
 };

@@ -418,6 +418,36 @@ impl From<u32> for RuleIndex {
     }
 }
 
+/// How the interface of a packet should be matched against a rule.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InterfaceSelector {
+    /// Match on the name of the device.
+    DeviceName(String),
+}
+
+impl TryFrom<fnet_routes::InterfaceSelector> for InterfaceSelector {
+    type Error = RuleFidlConversionError;
+    fn try_from(selector: fnet_routes::InterfaceSelector) -> Result<Self, Self::Error> {
+        match selector {
+            fnet_routes::InterfaceSelector::DeviceName(name) => Ok(Self::DeviceName(name)),
+            fnet_routes::InterfaceSelector::__SourceBreaking { unknown_ordinal } => {
+                Err(RuleFidlConversionError::UnknownOrdinal {
+                    name: "InterfaceSelector",
+                    unknown_ordinal,
+                })
+            }
+        }
+    }
+}
+
+impl From<InterfaceSelector> for fnet_routes::InterfaceSelector {
+    fn from(selector: InterfaceSelector) -> Self {
+        match selector {
+            InterfaceSelector::DeviceName(name) => fnet_routes::InterfaceSelector::DeviceName(name),
+        }
+    }
+}
+
 /// The selector part of the rule that is used to match packets.
 ///
 /// The default selector is the one that matches every packets, i.e., all the
@@ -430,7 +460,7 @@ pub struct RuleSelector<I: Ip> {
     pub locally_generated: Option<bool>,
     /// Matches the packet iff the socket that was bound to the device using
     /// `SO_BINDTODEVICE`.
-    pub bound_device: Option<u64>,
+    pub bound_device: Option<InterfaceSelector>,
     /// The selector for the MARK_1 domain.
     pub mark_1_selector: Option<MarkSelector>,
     /// The selector for the MARK_2 domain.
@@ -458,7 +488,7 @@ impl TryFrom<fnet_routes::RuleSelectorV4> for RuleSelector<Ipv4> {
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
                 .transpose()?,
             locally_generated,
-            bound_device,
+            bound_device: bound_device.map(InterfaceSelector::try_from).transpose()?,
             mark_1_selector: mark_1_selector.map(MarkSelector::try_from).transpose()?,
             mark_2_selector: mark_2_selector.map(MarkSelector::try_from).transpose()?,
         })
@@ -482,7 +512,7 @@ impl From<RuleSelector<Ipv4>> for fnet_routes::RuleSelectorV4 {
             }),
             base: Some(fnet_routes::BaseSelector {
                 locally_generated,
-                bound_device,
+                bound_device: bound_device.map(fnet_routes::InterfaceSelector::from),
                 mark_1_selector: mark_1_selector.map(Into::into),
                 mark_2_selector: mark_2_selector.map(Into::into),
                 __source_breaking: fidl::marker::SourceBreaking,
@@ -513,7 +543,7 @@ impl TryFrom<fnet_routes::RuleSelectorV6> for RuleSelector<Ipv6> {
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
                 .transpose()?,
             locally_generated,
-            bound_device,
+            bound_device: bound_device.map(InterfaceSelector::try_from).transpose()?,
             mark_1_selector: mark_1_selector.map(MarkSelector::try_from).transpose()?,
             mark_2_selector: mark_2_selector.map(MarkSelector::try_from).transpose()?,
         })
@@ -537,7 +567,7 @@ impl From<RuleSelector<Ipv6>> for fnet_routes::RuleSelectorV6 {
             }),
             base: Some(fnet_routes::BaseSelector {
                 locally_generated,
-                bound_device,
+                bound_device: bound_device.map(fnet_routes::InterfaceSelector::from),
                 mark_1_selector: mark_1_selector.map(Into::into),
                 mark_2_selector: mark_2_selector.map(Into::into),
                 __source_breaking: fidl::marker::SourceBreaking,
