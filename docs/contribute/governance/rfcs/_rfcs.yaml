@@ -3296,3 +3296,16 @@
   reviewers: ['jbauman@google.com', 'mcgrathr@google.com', 'hansens@google.com']
   submitted: '2024-06-12'
   reviewed: '2024-07-18'
+
+- name: 'RFC-0253'
+  title: 'zx_object_get_info ZX_INFO_VMAR_MAPS'
+  short_description: 'This RFC proposes adding a new zx_object_get_info topic, ZX_INFO_VMAR_MAPS.'
+  authors: ['maniscalco@google.com']
+  file: '0253_getinfo_vmar_maps.md'
+  area: ['Kernel']
+  issue: ['42085954']
+  gerrit_change_id: ['1068292']
+  status: 'Accepted'
+  reviewers: ['adamperry@google.com', 'adanis@google.com', 'dworsham@google.com', 'mcgrathr@google.com']
+  submitted: '2024-07-19'
+  reviewed: '2024-07-17'

@@ -520,3 +520,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0251_no_root_access.md
   - title: "RFC-0252: No Phys VMO CacheOps"
     path: /docs/contribute/governance/rfcs/0252_no_phys_vmo_cacheops.md
+  - title: "RFC-0253: zx_object_get_info ZX_INFO_VMAR_MAPS"
+    path: /docs/contribute/governance/rfcs/0253_getinfo_vmar_maps.md
