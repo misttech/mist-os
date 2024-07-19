@@ -26,5 +26,6 @@ group("tests") {
     ":rust_test($host_toolchain)",
     "proc-macro:tests",
     "shared:tests",
+    "static:tests",
   ]
 }
