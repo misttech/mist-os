@@ -25,7 +25,7 @@ uint32_t GetHandleCountOrZero(const HandleType& handle) {
   return info.handle_count;
 }
 
-TEST(ObjectGetInfoTest, OpenValidHandleSuceeds) {
+TEST(ObjectGetInfoTest, OpenValidHandleSucceeds) {
   EXPECT_OK(zx::process::self()->get_info(ZX_INFO_HANDLE_VALID, nullptr, 0, nullptr, nullptr));
 }
 

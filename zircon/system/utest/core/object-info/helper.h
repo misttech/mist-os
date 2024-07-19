@@ -19,8 +19,8 @@
 namespace object_info_test {
 
 template <typename EntryType, typename HandleType>
-void CheckSelfInfoSuceeds(zx_object_info_topic_t topic, uint32_t entry_count,
-                          const HandleType& self) {
+void CheckSelfInfoSucceeds(zx_object_info_topic_t topic, uint32_t entry_count,
+                           const HandleType& self) {
   EntryType entries[entry_count];
   size_t actual;
   size_t avail;
@@ -129,7 +129,7 @@ void CheckZeroSizeBufferSucceeds(zx_object_info_topic_t topic, const HandleProvi
 // Passing a nullptr buffer to a topic that expects a single
 // in/out entry should fail.
 template <typename HandleProvider>
-void CheckNullBufferSuceeds(zx_object_info_topic_t topic, const HandleProvider& provider) {
+void CheckNullBufferSucceeds(zx_object_info_topic_t topic, const HandleProvider& provider) {
   const auto& handle = provider();
   size_t actual;
   size_t avail;
@@ -158,8 +158,8 @@ void CheckSmallBufferSucceeds(zx_object_info_topic_t topic, uint32_t entry_count
 }
 
 template <typename EntryType, typename HandleProvider>
-void CheckNullActualSuceeds(zx_object_info_topic_t topic, uint32_t entry_count,
-                            const HandleProvider& provider) {
+void CheckNullActualSucceeds(zx_object_info_topic_t topic, uint32_t entry_count,
+                             const HandleProvider& provider) {
   EntryType entries[entry_count];
   const auto& handle = provider();
   size_t tmp;
@@ -168,8 +168,8 @@ void CheckNullActualSuceeds(zx_object_info_topic_t topic, uint32_t entry_count,
 }
 
 template <typename EntryType, typename HandleProvider>
-void CheckNullAvailSuceeds(zx_object_info_topic_t topic, uint32_t entry_count,
-                           const HandleProvider& provider) {
+void CheckNullAvailSucceeds(zx_object_info_topic_t topic, uint32_t entry_count,
+                            const HandleProvider& provider) {
   EntryType entries[entry_count];
   const auto& handle = provider();
   size_t tmp;
@@ -178,8 +178,8 @@ void CheckNullAvailSuceeds(zx_object_info_topic_t topic, uint32_t entry_count,
 }
 
 template <typename EntryType, typename HandleProvider>
-void CheckNullActualAndAvailSuceeds(zx_object_info_topic_t topic, uint32_t entry_count,
-                                    const HandleProvider& provider) {
+void CheckNullActualAndAvailSucceeds(zx_object_info_topic_t topic, uint32_t entry_count,
+                                     const HandleProvider& provider) {
   EntryType entries[entry_count];
   const auto& handle = provider();
   ASSERT_OK(handle.get_info(topic, entries, sizeof(EntryType) * entry_count, nullptr, nullptr));

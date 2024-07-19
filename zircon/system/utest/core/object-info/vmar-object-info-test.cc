@@ -46,9 +46,9 @@ constexpr auto vmar_provider = []() -> const zx::vmar& {
 
 // Tests for ZX_INFO_HANDLE_BASIC.
 //
-TEST(VmarGetInfoTest, InfoHandleBasicOnSelfSuceeds) {
+TEST(VmarGetInfoTest, InfoHandleBasicOnSelfSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckSelfInfoSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider())));
+      (CheckSelfInfoSucceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider())));
 }
 
 TEST(VmarGetInfoTest, InfoHandleBasicInvalidHandleFails) {
@@ -58,16 +58,16 @@ TEST(VmarGetInfoTest, InfoHandleBasicInvalidHandleFails) {
 
 TEST(VmarGetInfoTest, InfoHandleBasicNullAvailSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullAvailSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
+      (CheckNullAvailSucceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoHandleBasicNullActualSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
+      (CheckNullActualSucceeds<zx_info_handle_basic_t>(ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoHandleBasicNullActualAndAvailSucceeds) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualAndAvailSuceeds<zx_info_handle_basic_t>(
+  ASSERT_NO_FATAL_FAILURE((CheckNullActualAndAvailSucceeds<zx_info_handle_basic_t>(
       ZX_INFO_HANDLE_BASIC, 1, vmar_provider)));
 }
 
@@ -94,7 +94,8 @@ TEST(VmarGetInfoTest, InfoHandleBasicZeroSizedBufferFails) {
 // Tests for ZX_INFO_VMAR.
 //
 TEST(VmarGetInfoTest, InfoVmarOnSelfSucceeds) {
-  ASSERT_NO_FATAL_FAILURE((CheckSelfInfoSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider())));
+  ASSERT_NO_FATAL_FAILURE(
+      (CheckSelfInfoSucceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider())));
 }
 
 TEST(VmarGetInfoTest, InfoVmarInvalidHandleFails) {
@@ -103,16 +104,17 @@ TEST(VmarGetInfoTest, InfoVmarInvalidHandleFails) {
 }
 
 TEST(VmarGetInfoTest, InfoVmarNullAvailSucceeds) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullAvailSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
+  ASSERT_NO_FATAL_FAILURE((CheckNullAvailSucceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoVmarNullActualSucceeds) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
+  ASSERT_NO_FATAL_FAILURE(
+      (CheckNullActualSucceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoVmarNullActualAndAvailSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualAndAvailSuceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
+      (CheckNullActualAndAvailSucceeds<zx_info_vmar_t>(ZX_INFO_VMAR, 1, vmar_provider)));
 }
 
 TEST(VmarGetInfoTest, InfoVmarInvalidBufferPointerFails) {
@@ -153,7 +155,7 @@ using VmarMapsGetInfoTest = ProcessFixture;
 
 TEST_F(VmarMapsGetInfoTest, InfoVmarMapsOnSelfSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckSelfInfoSuceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider())));
+      (CheckSelfInfoSucceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider())));
 }
 
 TEST_F(VmarMapsGetInfoTest, InfoVmarMapsInvalidHandleFails) {
@@ -163,17 +165,17 @@ TEST_F(VmarMapsGetInfoTest, InfoVmarMapsInvalidHandleFails) {
 
 TEST_F(VmarMapsGetInfoTest, InfoVmarMapsNullAvailSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullAvailSuceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider)));
+      (CheckNullAvailSucceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider)));
 }
 
 TEST_F(VmarMapsGetInfoTest, InfoVmarMapsNullActualSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider)));
+      (CheckNullActualSucceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider)));
 }
 
 TEST_F(VmarMapsGetInfoTest, InfoVmarMapsNullActualAndAvailSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualAndAvailSuceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider)));
+      (CheckNullActualAndAvailSucceeds<zx_info_maps_t>(ZX_INFO_VMAR_MAPS, 1, vmar_provider)));
 }
 
 TEST_F(VmarMapsGetInfoTest, InfoVmarMapsInvalidBufferPointerFails) {
@@ -204,8 +206,8 @@ TEST_F(VmarMapsGetInfoTest, InfoVmarMapsRequiresInspectRights) {
 // Tests that ZX_INFO_VMAR_MAPS does not return ZX_ERR_BAD_STATE when the containing process has not
 // yet started.
 //
-// Like ProcessGetInfoTest.InfoProcessMapsUnstartedSuceeds, but for VMARs.
-TEST_F(VmarMapsGetInfoTest, InfoVmarMapsUnstartedSuceeds) {
+// Like ProcessGetInfoTest.InfoProcessMapsUnstartedSucceeds, but for VMARs.
+TEST_F(VmarMapsGetInfoTest, InfoVmarMapsUnstartedSucceeds) {
   static constexpr char kProcessName[] = "object-info-unstarted";
   zx::vmar vmar;
   zx::process process;
