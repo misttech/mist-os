@@ -13,7 +13,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use thiserror::Error;
 
-#[derive(Debug, Deserialize, Serialize, Error)]
+#[derive(Debug, Deserialize, Serialize, Error, Clone)]
 #[serde(rename_all = "snake_case")]
 pub enum StaticPkgsError {
     #[error("Failed to construct blobfs artifact reader with build path {build_path} and blobfs archives {blobfs_paths:?} for static packages collector: {blobfs_error}")]
@@ -89,7 +89,7 @@ impl From<SystemImageError> for StaticPkgsError {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct StaticPkgsCollection {
     pub deps: HashSet<PathBuf>,
     #[serde(serialize_with = "serialize_pkg_index", deserialize_with = "deserialize_pkg_index")]

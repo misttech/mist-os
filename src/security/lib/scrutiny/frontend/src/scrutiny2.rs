@@ -9,6 +9,7 @@ use scrutiny::prelude::{DataCollector, DataModel};
 use scrutiny_config::ModelConfig;
 use scrutiny_plugins::core::collection::{Component, Components, Package, Packages};
 use scrutiny_plugins::core::controller::package_extract::PackageExtractController;
+use scrutiny_plugins::static_pkgs::StaticPkgsCollection;
 use scrutiny_plugins::unified_plugin::UnifiedCollector;
 use scrutiny_plugins::verify::controller::capability_routing::{
     CapabilityRouteController, ResponseLevel,
@@ -102,6 +103,10 @@ impl ScrutinyArtifacts {
     // TODO: Why is this optional?
     pub fn get_bootfs_packages(&self) -> Result<Option<PackageIndexContents>> {
         Ok(self.model.get::<Zbi>().unwrap().bootfs_packages.bootfs_pkgs.clone())
+    }
+
+    pub fn get_static_packages(&self) -> Result<StaticPkgsCollection> {
+        Ok((*self.model.get::<StaticPkgsCollection>().unwrap()).clone())
     }
 
     pub fn get_monikers_for_resolver(

@@ -219,7 +219,6 @@ if (is_host) {
       "src/search/mod.rs",
       "src/static_pkgs/collection.rs",
       "src/static_pkgs/collector.rs",
-      "src/static_pkgs/controller.rs",
       "src/static_pkgs/mod.rs",
       "src/toolkit/controller/blobfs.rs",
       "src/toolkit/controller/far.rs",

@@ -4,6 +4,5 @@
 
 pub mod collection;
 pub mod collector;
-pub mod controller;
 
 pub use collection::StaticPkgsCollection;
