@@ -283,6 +283,17 @@ template("fidl_library") {
     # GN lets us include both integers and strings in the same list.
     _in_development_api_level = "NEXT"
 
+    # TODO(https://fxbug.dev/326277078): Remove this when transitioning to
+    # "NEXT" as the in-development API level. At that time, numbered API levels
+    # will always be frozen and the policy will always be "no_changes".
+    # Until then, this assumes that the highest numbered API level is
+    # in-development (not frozen).
+    _in_development_api_level =
+        platform_version.deprecated_highest_numbered_api_level
+    foreach(level, platform_version.frozen_api_levels) {
+      assert(level != _in_development_api_level)
+    }
+
     api_levels = platform_version.frozen_api_levels
 
     # Include the next numbered API level when bumping the API level.
@@ -290,6 +301,8 @@ template("fidl_library") {
     # Note: This only affects the per-level FIDL compilation below and does not
     # affect the rest of the build or sub-builds.
     if (bump_api_level) {
+      assert(_in_development_api_level == "NEXT",
+             "Bumping no longer supports the old model.")
       _max_frozen_api_level = 0
       foreach(level, platform_version.frozen_api_levels) {
         if (level > _max_frozen_api_level) {
@@ -305,10 +318,6 @@ template("fidl_library") {
       }
 
       api_levels += [ next_numbered_api_level ]
-    } else {
-      # In-development API level 22 is temporarily supported alongside "NEXT".
-      # TODO(https://fxbug.dev/326277078): Remove API level 22 and this line.
-      api_levels += [ 22 ]
     }
 
     api_levels += [ _in_development_api_level ]
@@ -355,9 +364,6 @@ template("fidl_library") {
             # from scratch. See https://fxbug.dev/324481114#comment5.
             policy = "update_golden"
           } else if (level == _in_development_api_level) {
-            policy = "ack_changes"
-          } else if (level == 22) {
-            # TODO(https://fxbug.dev/326277078): Remove API level 22 and this.
             policy = "ack_changes"
           } else {
             policy = "no_changes"

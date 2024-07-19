@@ -81,11 +81,6 @@
             }
         },
         "special_api_levels": {
-            "NEXT": {
-                "abi_revision": "GENERATED_BY_BUILD",
-                "as_u32": 4291821568,
-                "status": "in-development"
-            },
             "HEAD": {
                 "abi_revision": "GENERATED_BY_BUILD",
                 "as_u32": 4292870144,
