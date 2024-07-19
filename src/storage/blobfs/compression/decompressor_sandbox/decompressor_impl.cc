@@ -122,23 +122,64 @@ zx::result<uint64_t> HandleFifoRequest(
   }
 }
 
+zx_status_t SendFifoResponse(const zx::fifo& fifo,
+                             const fuchsia_blobfs_internal::wire::DecompressResponse& response) {
+  constexpr zx_signals_t kFifoWriteSignals = ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED;
+  constexpr size_t kResponseSize = sizeof(fuchsia_blobfs_internal::wire::DecompressResponse);
+
+  // There's a 1-to-1 mapping between the blobfs pager threads and decompressor threads and they
+  // both handle requests synchronously. If a request was received on the fifo then the previous
+  // response should have already been read from the fifo and the fifo should be empty. Only wait
+  // for the fifo to be writable if writing to the fifo initially fails.
+  if (zx_status_t status = fifo.write(kResponseSize, &response, 1, nullptr);
+      status != ZX_ERR_SHOULD_WAIT) {
+    return status;
+  }
+
+  // Wait for the fifo to be writable or blobfs to close the other end.
+  zx_signals_t signal;
+  if (zx_status_t status = fifo.wait_one(kFifoWriteSignals, zx::time::infinite(), &signal);
+      status != ZX_OK) {
+    return status;
+  }
+  if ((signal & ZX_FIFO_PEER_CLOSED) != 0) {
+    return ZX_ERR_PEER_CLOSED;
+  }
+
+  // Attempt to write again.
+  return fifo.write(kResponseSize, &response, 1, nullptr);
+}
+
+zx_status_t WaitForFifoRequest(const zx::fifo& fifo,
+                               fuchsia_blobfs_internal::wire::DecompressRequest& request) {
+  constexpr zx_signals_t kFifoReadSignals = ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED;
+  constexpr size_t kRequestSize = sizeof(fuchsia_blobfs_internal::wire::DecompressRequest);
+
+  // There's a 1-to-1 mapping between the blobfs pager threads and decompressor threads and they
+  // both handle requests synchronously. Blobfs is unlikely to have sent another request immediately
+  // after receiving the previous response. Wait for the fifo to be readable rather than immediately
+  // trying to read.
+  zx_signals_t signal;
+  if (zx_status_t status = fifo.wait_one(kFifoReadSignals, zx::time::infinite(), &signal);
+      status != ZX_OK) {
+    return status;
+  }
+  // It doesn't matter if there's anything left in the queue, nobody is there
+  // to read the response.
+  if ((signal & ZX_FIFO_PEER_CLOSED) != 0) {
+    return ZX_ERR_PEER_CLOSED;
+  }
+
+  return fifo.read(kRequestSize, &request, 1, nullptr);
+}
+
 // Watches a fifo for requests to take data from the compressed_vmo and
 // extract the result into the memory region of decompressed_mapper.
 void WatchFifo(zx::fifo fifo, fzl::OwnedVmoMapper compressed_mapper,
                fzl::OwnedVmoMapper decompressed_mapper) {
-  constexpr zx_signals_t kFifoReadSignals = ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED;
-  constexpr zx_signals_t kFifoWriteSignals = ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED;
-  while (fifo.is_valid()) {
-    zx_signals_t signal;
-    fifo.wait_one(kFifoReadSignals, zx::time::infinite(), &signal);
-    // It doesn't matter if there's anything left in the queue, nobody is there
-    // to read the response.
-    if ((signal & ZX_FIFO_PEER_CLOSED) != 0) {
-      break;
-    }
+  while (true) {
     fuchsia_blobfs_internal::wire::DecompressRequest request;
-    zx_status_t status = fifo.read(sizeof(request), &request, 1, nullptr);
-    if (status != ZX_OK) {
+    if (zx_status_t status = WaitForFifoRequest(fifo, request); status != ZX_OK) {
       break;
     }
 
@@ -152,9 +193,8 @@ void WatchFifo(zx::fifo fifo, fzl::OwnedVmoMapper compressed_mapper,
       response.size = result.value();
     }
 
-    fifo.wait_one(kFifoWriteSignals, zx::time::infinite(), &signal);
-    if ((signal & ZX_FIFO_WRITABLE) == 0 ||
-        fifo.write(sizeof(response), &response, 1, nullptr) != ZX_OK) {
+    if (zx_status_t status = SendFifoResponse(fifo, response); status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to send decompression response";
       break;
     }
   }
