@@ -1004,7 +1004,7 @@ impl Session {
                     trace!("Sending packet to peer: {buf:?}");
                     // The result of this send is irrelevant as failure would indicate that the peer
                     // has disconnected.
-                    let _ = l2cap_channel.as_ref().write(&buf);
+                    let _ = l2cap_channel.write(&buf);
                 }
                 complete => { return; }
             }
@@ -1349,7 +1349,7 @@ mod tests {
         // Remote sends us some data. Even though this is an invalid Frame,
         // the `processing_fut` should still be OK.
         let frame_bytes = [0x03, 0x3F, 0x01, 0x1C];
-        assert_eq!(remote.as_ref().write(&frame_bytes[..]), Ok(4));
+        assert_eq!(remote.write(&frame_bytes[..]), Ok(4));
 
         exec.run_until_stalled(&mut processing_fut)
             .expect_pending("shouldn't be done while remote is live");
@@ -1661,7 +1661,7 @@ mod tests {
 
         // Profile client responds with it's own data.
         let response = vec![0x09, 0x08, 0x07, 0x06];
-        assert_eq!(profile_client_channel.as_ref().write(&response), Ok(4));
+        assert_eq!(profile_client_channel.write(&response), Ok(4));
         // The data should be processed by the SessionChannel, packed as a user data
         // frame, and sent as an outgoing frame.
         expect_user_data_frame(
@@ -1756,7 +1756,7 @@ mod tests {
 
         // Remote sends SABM to start up session multiplexer.
         let sabm = Frame::make_sabm_command(Role::Unassigned, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), sabm);
+        send_peer_frame(&remote, sabm);
         exec.run_until_stalled(&mut session_fut)
             .expect_pending("shouldn't be done while remote is live");
         // Expect the outgoing acknowledgement for the SABM.
@@ -1764,7 +1764,7 @@ mod tests {
 
         // Remote sends us a disconnect frame over the Mux Control DLCI.
         let disconnect = Frame::make_disc_command(Role::Initiator, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), disconnect);
+        send_peer_frame(&remote, disconnect);
         // Once we process the disconnect, the session should terminate.
         let _ = exec.run_until_stalled(&mut session_fut).expect("Session is done now");
         // Expect the outgoing acknowledgement for the disconnect.
@@ -2114,7 +2114,7 @@ mod tests {
         expect_frame_received_by_peer(&mut exec, &mut remote);
         // Remote responds positively.
         let ua = Frame::make_ua_response(Role::Unassigned, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), ua);
+        send_peer_frame(&remote, ua);
 
         // Remote should receive an RFCOMM frame to negotiate parameters.
         expect_frame_received_by_peer(&mut exec, &mut remote);
@@ -2163,7 +2163,7 @@ mod tests {
         // Expect outgoing SABM and simulate peer positive response.
         expect_frame_received_by_peer(&mut exec, &mut remote);
         let ua = Frame::make_ua_response(Role::Unassigned, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), ua);
+        send_peer_frame(&remote, ua);
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // Some client (presumably via the RfcommTest API) requests to close the RFCOMM session.
@@ -2183,7 +2183,7 @@ mod tests {
         }
         // Remote responds positively.
         let ua = Frame::make_ua_response(Role::Unassigned, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), ua);
+        send_peer_frame(&remote, ua);
 
         // At this point, the L2CAP channel should be closed.
         let mut channel_closed_fut = Box::pin(remote.closed());
@@ -2287,19 +2287,19 @@ mod tests {
         expect_frame_received_by_peer(&mut exec, &mut remote);
         // 3. Remote responds positively.
         let ua = Frame::make_ua_response(Role::Unassigned, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), ua);
+        send_peer_frame(&remote, ua);
 
         // 4. Remote should receive an RFCOMM frame to negotiate parameters.
         expect_frame_received_by_peer(&mut exec, &mut remote);
         // 5. Remote responds positively.
         let pn_response = make_dlc_pn_frame(CommandResponse::Response, expected_dlci, true, 100);
-        send_peer_frame(remote.as_ref(), pn_response);
+        send_peer_frame(&remote, pn_response);
 
         // 6. Remote should receive an RFCOMM frame to establish the `expected_dlci`.
         expect_frame_received_by_peer(&mut exec, &mut remote);
         // 7. Remote responds positively.
         let ua = Frame::make_ua_response(Role::Responder, expected_dlci);
-        send_peer_frame(remote.as_ref(), ua);
+        send_peer_frame(&remote, ua);
 
         // Mux startup, Parameter negotiation, and channel establishment are complete. The RFCOMM
         // channel should be ready and relayed to the client.

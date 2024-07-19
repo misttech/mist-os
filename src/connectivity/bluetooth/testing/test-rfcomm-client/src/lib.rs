@@ -118,7 +118,7 @@ impl RfcommSession {
                 bytes_to_peer = write_requests.next() => {
                     match bytes_to_peer {
                         Some(bytes) => {
-                            match channel.as_ref().write(&bytes) {
+                            match channel.write(&bytes) {
                                 Ok(_) => info!("Sent user data over RFCOMM channel ({:?}).", server_channel),
                                 Err(e) => info!("Couldn't send user data for channel ({:?}): {:?}", server_channel, e),
                             }
@@ -429,10 +429,8 @@ mod tests {
     }
 
     async fn expect_data(remote: &mut Channel, expected_data: Vec<u8>) {
-        let mut vec = Vec::new();
-        let read_result = remote.read_datagram(&mut vec).await;
-        assert_eq!(read_result, Ok(expected_data.len()));
-        assert_eq!(vec, expected_data);
+        let read_result = remote.next().await.expect("data").expect("okay");
+        assert_eq!(read_result, expected_data);
     }
 
     async fn expect_advertisement_and_search(
@@ -510,7 +508,7 @@ mod tests {
 
         // Peer sends us data. It should be received gracefully and logged (nothing to test).
         let buf = vec![0x99, 0x11, 0x44];
-        assert_eq!(peer_channel.as_ref().write(&buf), Ok(3));
+        assert_eq!(peer_channel.write(&buf), Ok(3));
 
         // Test client can request to send an RLS update - should be received by RFCOMM Test server.
         assert_matches!(rfcomm_mgr.send_rls(remote_id, random_channel_number), Ok(_));

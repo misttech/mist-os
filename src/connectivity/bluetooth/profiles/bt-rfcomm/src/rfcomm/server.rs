@@ -298,7 +298,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_inspect_derive::WithInspect;
     use futures::task::Poll;
-    use futures::{AsyncWriteExt, StreamExt};
+    use futures::StreamExt;
     use std::pin::pin;
 
     use crate::rfcomm::test_util::{expect_frame_received_by_peer, send_peer_frame};
@@ -346,7 +346,7 @@ mod tests {
         let (mut exec, mut rfcomm) = setup_rfcomm_manager();
 
         let id = PeerId(123);
-        let (mut remote, channel) = Channel::create();
+        let (remote, channel) = Channel::create();
         assert!(rfcomm.new_l2cap_connection(id, channel).is_ok());
 
         // The Session should still be active.
@@ -354,11 +354,8 @@ mod tests {
 
         // Simulate peer sending RFCOMM data to the session - should be OK.
         let buf = [0x00, 0x00, 0x00];
-        let mut write_fut = remote.write(&buf[..]);
-        match exec.run_until_stalled(&mut write_fut) {
-            Poll::Ready(Ok(x)) => {
-                assert_eq!(x, 3);
-            }
+        match remote.write(&buf[..]) {
+            Ok(x) => assert_eq!(x, 3),
             x => panic!("Expected write ready but got {:?}", x),
         }
 
@@ -400,14 +397,14 @@ mod tests {
 
         // Remote peer requests to start up session multiplexer.
         let sabm = Frame::make_sabm_command(Role::Unassigned, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), sabm);
+        send_peer_frame(&remote, sabm);
         // Expect to send a positive response to the peer.
         expect_frame_received_by_peer(&mut exec, &mut remote);
 
         // Remote peer requests to open an RFCOMM channel.
         let user_dlci = first_channel.to_dlci(Role::Responder).unwrap();
         let user_sabm = Frame::make_sabm_command(Role::Initiator, user_dlci);
-        send_peer_frame(remote.as_ref(), user_sabm);
+        send_peer_frame(&remote, user_sabm);
         // Expect to send a positive response to the peer.
         expect_frame_received_by_peer(&mut exec, &mut remote);
 
@@ -540,7 +537,7 @@ mod tests {
         expect_frame_received_by_peer(&mut exec, &mut remote);
         // Simulate peer responding positively.
         let ua = Frame::make_ua_response(Role::Unassigned, DLCI::MUX_CONTROL_DLCI);
-        send_peer_frame(remote.as_ref(), ua);
+        send_peer_frame(&remote, ua);
 
         // Expect to send a frame to peer - parameter negotiation.
         expect_frame_received_by_peer(&mut exec, &mut remote);
@@ -556,13 +553,13 @@ mod tests {
             command_response: CommandResponse::Response,
         };
         let pn_response = Frame::make_mux_command(Role::Responder, data);
-        send_peer_frame(remote.as_ref(), pn_response);
+        send_peer_frame(&remote, pn_response);
 
         // Expect to send a frame to peer - SABM for channel opening.
         expect_frame_received_by_peer(&mut exec, &mut remote);
         // Simulate peer responding positively.
         let ua = Frame::make_ua_response(Role::Responder, expected_dlci);
-        send_peer_frame(remote.as_ref(), ua);
+        send_peer_frame(&remote, ua);
 
         // The channel should be established and relayed to the client that requested it.
         assert_matches!(exec.run_until_stalled(&mut connect_request_fut), Poll::Ready(Ok(Ok(_))));

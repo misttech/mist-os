@@ -1183,12 +1183,7 @@ mod tests {
     }
 
     pub(crate) fn recv_remote(remote: &Channel) -> Result<Vec<u8>, zx::Status> {
-        let waiting = remote.as_ref().outstanding_read_bytes();
-        assert!(waiting.is_ok());
-        let mut response: Vec<u8> = vec![0; waiting.unwrap()];
-        let response_read = remote.as_ref().read(response.as_mut_slice())?;
-        assert_eq!(response.len(), response_read);
-        Ok(response)
+        remote.read_packet()
     }
 
     /// Creates a Peer object, returning a channel connected ot the remote end, a
@@ -1239,7 +1234,7 @@ mod tests {
 
         get_capabilities_rsp.extend_from_slice(response_capabilities);
 
-        assert!(remote.as_ref().write(&get_capabilities_rsp).is_ok());
+        assert!(remote.write(&get_capabilities_rsp).is_ok());
     }
 
     fn expect_get_all_capabilities_and_respond(
@@ -1264,7 +1259,7 @@ mod tests {
 
         get_capabilities_rsp.extend_from_slice(response_capabilities);
 
-        assert!(remote.as_ref().write(&get_capabilities_rsp).is_ok());
+        assert!(remote.write(&get_capabilities_rsp).is_ok());
     }
 
     #[fuchsia::test]
@@ -1334,7 +1329,7 @@ mod tests {
             0x01 << 2 | 0x1 << 1,              // SEID (1), In Use (0b1)
             0x00 << 4 | 0x1 << 3,              // Audio (0x00), Sink (0x01)
         ];
-        assert!(remote.as_ref().write(response).is_ok());
+        assert!(remote.write(response).is_ok());
 
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
 
@@ -1463,7 +1458,7 @@ mod tests {
             0x01 << 2 | 0x1 << 1,              // SEID (1), In Use (0b1)
             0x00 << 4 | 0x1 << 3,              // Audio (0x00), Sink (0x01)
         ];
-        assert!(remote.as_ref().write(response).is_ok());
+        assert!(remote.write(response).is_ok());
 
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
 
@@ -1593,7 +1588,7 @@ mod tests {
             0x01,                         // Discover
             0x31,                         // BAD_STATE
         ];
-        assert!(remote.as_ref().write(response).is_ok());
+        assert!(remote.write(response).is_ok());
 
         // Should be done with an error.
         // Should finish!
@@ -1636,7 +1631,7 @@ mod tests {
             0x01 << 2 | 0x1 << 1,              // SEID (1), In Use (0b1)
             0x00 << 4 | 0x1 << 3,              // Audio (0x00), Sink (0x01)
         ];
-        assert!(remote.as_ref().write(response).is_ok());
+        assert!(remote.write(response).is_ok());
 
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
 
@@ -1655,7 +1650,7 @@ mod tests {
             0x02,                         // Get Capabilities
             0x12,                         // BAD_ACP_SEID
         ];
-        assert!(remote.as_ref().write(response).is_ok());
+        assert!(remote.write(response).is_ok());
 
         assert!(exec.run_until_stalled(&mut collect_future).is_pending());
 
@@ -1674,7 +1669,7 @@ mod tests {
             0x02,                         // Get Capabilities
             0x12,                         // BAD_ACP_SEID
         ];
-        assert!(remote.as_ref().write(response).is_ok());
+        assert!(remote.write(response).is_ok());
 
         // Should be done without an error, but with no streams.
         match exec.run_until_stalled(&mut collect_future) {
@@ -1696,7 +1691,7 @@ mod tests {
             txlabel_raw | 0x0 << 2 | 0x2, // txlabel (same), Single (0b00), Response Accept (0b10)
             signal_id,
         ];
-        assert!(remote.as_ref().write(response).is_ok());
+        assert!(remote.write(response).is_ok());
     }
 
     #[fuchsia::test]

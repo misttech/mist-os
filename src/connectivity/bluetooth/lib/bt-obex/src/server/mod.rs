@@ -221,7 +221,7 @@ impl ObexServer {
     fn send(&self, data: impl Encodable<Error = PacketError>) -> Result<(), Error> {
         let mut buf = vec![0; data.encoded_len()];
         data.encode(&mut buf[..])?;
-        let _ = self.channel.as_ref().write(&buf)?;
+        let _ = self.channel.write(&buf)?;
         Ok(())
     }
 
@@ -549,7 +549,7 @@ mod tests {
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
 
         // Invalid CONNECT request. Missing the 2 byte max packet size field.
-        let _ = remote.as_ref().write(&[0x80, 0x00, 0x05, 0x00, 0x00]).expect("can send data");
+        let _ = remote.write(&[0x80, 0x00, 0x05, 0x00, 0x00]).expect("can send data");
 
         let result = exec.run_until_stalled(&mut server_fut).expect("terminate due to error");
         assert_matches!(result, Err(Error::Packet(_)));

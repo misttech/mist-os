@@ -746,7 +746,7 @@ mod tests {
 
         let buf: &mut [u8] = &mut [0; 1];
 
-        assert_matches!(remote.as_ref().read(buf), Err(zx::Status::PEER_CLOSED));
+        assert_matches!(remote.read(buf), Err(zx::Status::PEER_CLOSED));
 
         assert_matches!(s.configure(&REMOTE_ID, vec![ServiceCapability::MediaTransport]), Ok(()));
 
@@ -760,7 +760,7 @@ mod tests {
     fn setup_peer_for_release(exec: &mut fasync::TestExecutor) -> (Peer, Channel, SimpleResponder) {
         let (peer, signaling) = setup_peer();
         // Send a close from the other side to produce an event we can respond to.
-        let _ = signaling.as_ref().write(&[0x40, 0x08, 0x04]).expect("signaling write");
+        let _ = signaling.write(&[0x40, 0x08, 0x04]).expect("signaling write");
         let mut req_stream = peer.take_request_stream();
         let mut req_fut = req_stream.next();
         let complete = exec.run_until_stalled(&mut req_fut);
@@ -842,10 +842,7 @@ mod tests {
 
         // Reading from the remote end should fail.
         let mut result = vec![0];
-        assert_matches!(
-            remote_transport.as_ref().read(&mut result[..]),
-            Err(zx::Status::PEER_CLOSED)
-        );
+        assert_matches!(remote_transport.read(&mut result[..]), Err(zx::Status::PEER_CLOSED));
 
         // After the stream is gone, any write should return an Err
         let mut write_fut = media_stream.write(&[0xDE, 0xAD]);
@@ -880,7 +877,7 @@ mod tests {
         assert_eq!(0x0A, received[1]);
         let txlabel = received[0] & 0xF0;
         // Send a response
-        assert!(signaling.as_ref().write(&[txlabel | 0x02, 0x0A]).is_ok());
+        assert!(signaling.write(&[txlabel | 0x02, 0x0A]).is_ok());
 
         let _ = exec.run_singlethreaded(&mut remote_transport.closed());
 

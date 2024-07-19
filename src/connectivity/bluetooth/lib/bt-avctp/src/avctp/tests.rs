@@ -25,12 +25,7 @@ fn setup_stream_test() -> (fasync::TestExecutor, CommandStream, Peer, Channel) {
 }
 
 pub(crate) fn recv_remote(remote: &Channel) -> result::Result<Vec<u8>, zx::Status> {
-    let waiting = remote.as_ref().outstanding_read_bytes();
-    assert!(waiting.is_ok());
-    let mut response: Vec<u8> = vec![0; waiting.unwrap()];
-    let response_read = remote.as_ref().read(response.as_mut_slice())?;
-    assert_eq!(response.len(), response_read);
-    Ok(response)
+    remote.read_packet()
 }
 
 pub(crate) fn expect_remote_recv(expected: &[u8], remote: &Channel) {
@@ -64,7 +59,7 @@ fn closes_socket_when_dropped() {
     }
 
     // Writing to the sock from the other end should fail.
-    let write_res = peer_chan.as_ref().write(&[0; 1]);
+    let write_res = peer_chan.write(&[0; 1]);
     assert!(write_res.is_err());
     assert_eq!(Status::PEER_CLOSED, write_res.err().unwrap());
 }
@@ -82,12 +77,12 @@ fn socket_open_when_stream_open() {
         }
 
         // Writing to the sock from the other end should pass.
-        let write_res = peer_chan.as_ref().write(&[0; 1]);
+        let write_res = peer_chan.write(&[0; 1]);
         assert!(write_res.is_ok());
     }
 
     // Writing to the sock from the other end should fail.
-    let write_res = peer_chan.as_ref().write(&[0; 1]);
+    let write_res = peer_chan.write(&[0; 1]);
     assert!(write_res.is_err());
     assert_eq!(Status::PEER_CLOSED, write_res.err().unwrap());
 }
@@ -134,7 +129,6 @@ fn send_command_receive_response() {
     let stream_ret: Poll<Option<Result<Packet>>> = exec.run_until_stalled(&mut response_fut);
     assert!(stream_ret.is_pending());
     assert!(socket
-        .as_ref()
         .write(&[
             0x02, // TxLabel 0, Single 0, Response 1, Ipid 0,
             0x11, // AV PROFILE
@@ -174,7 +168,7 @@ fn receive_command_send_response() {
         0x0D, // Event ID
         0x00, 0x00, 0x00, 0x00, // Playback interval
     ];
-    assert!(socket.as_ref().write(notif_command_packet).is_ok());
+    assert!(socket.write(notif_command_packet).is_ok());
     let command = next_request(&mut stream, &mut exec);
     assert!(command.header().is_type(&MessageType::Command));
     assert!(command.header().is_single());
@@ -225,7 +219,7 @@ fn receive_command_too_short_is_dropped() {
         0x11, // AV PROFILE
         0x0e, // AV PROFILE
     ];
-    assert!(socket.as_ref().write(notif_command_packet).is_ok());
+    assert!(socket.write(notif_command_packet).is_ok());
 
     let mut fut = stream.next();
     let complete = exec.run_until_stalled(&mut fut);
@@ -236,7 +230,7 @@ fn receive_command_too_short_is_dropped() {
 fn receive_invalid_is_dropped() {
     let (mut exec, mut stream, _peer, socket) = setup_stream_test();
     let notif_command_packet = &[0];
-    assert!(socket.as_ref().write(notif_command_packet).is_ok());
+    assert!(socket.write(notif_command_packet).is_ok());
 
     let mut fut = stream.next();
     let complete = exec.run_until_stalled(&mut fut);
@@ -252,7 +246,7 @@ fn invalid_profile_id_response() {
         0x11, 0x00, // random profile ID
         3, 72, 0, // random payload
     ];
-    assert!(socket.as_ref().write(notif_command_packet).is_ok());
+    assert!(socket.write(notif_command_packet).is_ok());
 
     let mut fut = stream.next();
     let complete = exec.run_until_stalled(&mut fut); // wake and pump.
