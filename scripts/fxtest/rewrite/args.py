@@ -126,6 +126,10 @@ class Flags:
             raise FlagError("--parallel must be non-negative")
         if self.parallel_cases < 0:
             raise FlagError("--parallel-cases must be non-negative")
+        if self.has_debugger() and self.host:
+            raise FlagError(
+                "--break-on-failure and --breakpoint flags are not supported with host tests."
+            )
 
         if not termout.is_valid() and self.status:
             raise FlagError(
