@@ -31,6 +31,9 @@ pub struct Request {
 
     /// If true, debug information is requested instead of the actual capabilithy.
     pub debug: bool,
+
+    /// Metadata associated with the request.
+    pub metadata: Dict,
 }
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
@@ -173,6 +176,7 @@ mod tests {
                 availability: Availability::Required,
                 target: FakeInstanceToken::new(),
                 debug: false,
+                metadata: Dict::new(),
             })
             .await
             .unwrap();
