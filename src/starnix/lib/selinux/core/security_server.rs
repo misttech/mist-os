@@ -10,8 +10,8 @@ use crate::SecurityId;
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
 use selinux_common::{
-    AbstractObjectClass, ClassPermission, FileClass, InitialSid, ObjectClass, Permission,
-    FIRST_UNUSED_SID,
+    AbstractObjectClass, ClassPermission, FileClass, InitialSid, NullessByteStr, ObjectClass,
+    Permission, FIRST_UNUSED_SID,
 };
 use selinux_policy::metadata::HandleUnknown;
 use selinux_policy::parser::ByValue;
@@ -203,7 +203,7 @@ impl SecurityServer {
     /// All objects with the same security context will have the same SID associated.
     pub fn security_context_to_sid(
         &self,
-        security_context: &[u8],
+        security_context: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut state = self.state.lock();
         let policy = &state.policy.as_ref().ok_or(anyhow::anyhow!("no policy loaded"))?.parsed;
@@ -242,7 +242,8 @@ impl SecurityServer {
             let new_sids = state.sids.iter().filter_map(|(sid, context)| {
                 let context_str =
                     state.policy.as_ref().unwrap().parsed.serialize_security_context(context);
-                let new_context = policy.parsed.parse_security_context(context_str.as_slice());
+                let new_context =
+                    policy.parsed.parse_security_context(context_str.as_slice().into());
                 new_context.ok().map(|context| (*sid, context))
             });
             state.sids = HashMap::from_iter(new_sids);
@@ -442,7 +443,7 @@ impl SecurityServer {
             .parsed
             .new_file_security_context(source_context, target_context, &file_class)
             // TODO(http://b/334968228): check that transitions are allowed.
-            .map(|sc| state.security_context_to_sid(sc))
+            .map(|sc| state.security_context_to_sid(sc.into()))
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
     }
@@ -464,7 +465,7 @@ impl SecurityServer {
         policy
             .parsed
             .new_security_context(source_context, target_context, &target_class)
-            .map(|sc| state.security_context_to_sid(sc))
+            .map(|sc| state.security_context_to_sid(sc.into()))
             .map_err(anyhow::Error::from)
             .context("computing new security context from policy")
     }
@@ -586,7 +587,7 @@ mod tests {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
         let security_server = security_server_with_tests_policy();
         let sid = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         assert_eq!(
             security_server.sid_to_security_context(sid).expect("sid not found"),
@@ -598,10 +599,10 @@ mod tests {
     fn sids_for_different_security_contexts_differ() {
         let security_server = security_server_with_tests_policy();
         let sid1 = security_server
-            .security_context_to_sid(b"user0:object_r:type0:s0")
+            .security_context_to_sid(b"user0:object_r:type0:s0".into())
             .expect("creating SID from security context should succeed");
         let sid2 = security_server
-            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .expect("creating SID from security context should succeed");
         assert_ne!(sid1, sid2);
     }
@@ -612,10 +613,10 @@ mod tests {
         let security_server = security_server_with_tests_policy();
         let sid_count_before = security_server.state.lock().sids.len();
         let sid1 = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         let sid2 = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         assert_eq!(sid1, sid2);
         assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
@@ -627,7 +628,7 @@ mod tests {
         let security_server = security_server_with_tests_policy();
         let sid_count_before = security_server.state.lock().sids.len();
         let sid = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
         assert!(sid.0.get() >= FIRST_UNUSED_SID);
@@ -803,7 +804,7 @@ mod tests {
     fn parse_security_context_no_policy() {
         let security_server = SecurityServer::new(Mode::Enable);
         let error = security_server
-            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .expect_err("expected error");
         let error_string = format!("{:?}", error);
         assert!(error_string.contains("no policy"));
@@ -848,10 +849,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -874,10 +875,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -900,10 +901,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -925,10 +926,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -951,10 +952,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -976,10 +977,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -1001,10 +1002,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -1027,10 +1028,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -1052,10 +1053,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server

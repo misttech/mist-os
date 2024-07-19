@@ -340,6 +340,11 @@ pub fn clear_ptracer_sid(tracee_task: &Task) {
 /// `name="security.selinux"` and `value` is a valid security context according to the current
 /// policy.
 pub fn post_setxattr(current_task: &CurrentTask, fs_node: &FsNode, name: &FsStr, value: &FsStr) {
+    // TODO(b/351195217): Checking SELinux-specific things generally does not belong in this module,
+    // though returning as early as possible is desirable. Beyond where to put this check,
+    // `set(xattr|security)`-related hooks need to be explored more carefully to determine whether
+    // the implementation of this function and its `selinux_hooks` delegate match the semantics
+    // ascribed to the `inode_post_setxattr` hook.
     let security_selinux_name: &FsStr = "security.selinux".into();
     if name != security_selinux_name {
         return;
@@ -681,7 +686,7 @@ mod tests {
             .security_server
             .as_ref()
             .expect("missing security server")
-            .security_context_to_sid(b"u:object_r:fork_no_t:s0")
+            .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
         let elf_state = ResolvedElfState(elf_sid);
         assert_ne!(elf_sid, initial_state.current_sid);
@@ -701,7 +706,7 @@ mod tests {
             .security_server
             .as_ref()
             .expect("missing security server")
-            .security_context_to_sid(b"u:object_r:fork_no_t:s0")
+            .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
         let elf_state = ResolvedElfState(elf_sid);
         assert_ne!(elf_sid, initial_state.current_sid);

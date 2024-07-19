@@ -11,7 +11,9 @@ use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode, ValueOrSize};
 use selinux::permission_check::PermissionCheck;
 use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
-use selinux_common::{ClassPermission, FilePermission, ObjectClass, Permission, ProcessPermission};
+use selinux_common::{
+    ClassPermission, FilePermission, NullessByteStr, ObjectClass, Permission, ProcessPermission,
+};
 use starnix_logging::{log_debug, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -257,7 +259,7 @@ pub(super) fn post_setxattr(
     fs_node: &FsNode,
     security_selinux_xattr_value: &FsStr,
 ) {
-    match security_server.security_context_to_sid(security_selinux_xattr_value) {
+    match security_server.security_context_to_sid(security_selinux_xattr_value.into()) {
         // Update node SID value if a SID is found to be associated with new security context
         // string.
         Ok(sid) => set_cached_sid(fs_node, sid),
@@ -297,18 +299,11 @@ pub fn set_procattr(
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
-    use std::ffi::CStr;
-
-    // Userspace may write C-style null-terminated strings, which is the only
-    // way to write an "empty" value since POSIX doesn't allow zero-length writes.
-    let context =
-        CStr::from_bytes_until_nul(context).and_then(|x| Ok(x.to_bytes())).unwrap_or(context);
-
+    let context = NullessByteStr::from(context);
     // Attempt to convert the Security Context string to a SID.
-    // Empty writes, or those containing a single newline, clear the SID.
-    let sid = match context {
+    let sid = match context.as_bytes() {
         b"\x0a" | b"" => None,
-        slice => Some(security_server.security_context_to_sid(slice).map_err(|_| errno!(EINVAL))?),
+        _ => Some(security_server.security_context_to_sid(context).map_err(|_| errno!(EINVAL))?),
     };
 
     let check_permission = |permission| {
@@ -369,7 +364,7 @@ fn compute_fs_node_security_id(
         SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
     ) {
         Ok(ValueOrSize::Value(security_context)) => {
-            match security_server.security_context_to_sid(&security_context) {
+            match security_server.security_context_to_sid((&security_context).into()) {
                 Ok(sid) => {
                     // Update node SID value if a SID is found to be associated with new security context
                     // string.
@@ -572,7 +567,7 @@ mod tests {
     fn task_create_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let sid = security_server
-            .security_context_to_sid(b"u:object_r:fork_yes_t:s0")
+            .security_context_to_sid(b"u:object_r:fork_yes_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(check_task_create_access(&security_server.as_permission_check(), sid), Ok(()));
@@ -582,7 +577,7 @@ mod tests {
     fn task_create_denied_for_denied_type() {
         let security_server = security_server_with_policy();
         let sid = security_server
-            .security_context_to_sid(b"u:object_r:fork_no_t:s0")
+            .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -598,14 +593,16 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
         let current_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0".into())
             .expect("invalid security context");
         let exec_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0".into())
             .expect("invalid security context");
 
         let executable_security_context = b"u:object_r:executable_file_trans_t:s0";
-        assert!(security_server.security_context_to_sid(executable_security_context).is_ok());
+        assert!(security_server
+            .security_context_to_sid(executable_security_context.into())
+            .is_ok());
         let executable =
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
@@ -633,14 +630,16 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
         let current_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0".into())
             .expect("invalid security context");
         let exec_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_denied_target_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_denied_target_t:s0".into())
             .expect("invalid security context");
 
         let executable_security_context = b"u:object_r:executable_file_trans_t:s0";
-        assert!(security_server.security_context_to_sid(executable_security_context).is_ok());
+        assert!(security_server
+            .security_context_to_sid(executable_security_context.into())
+            .is_ok());
         let executable =
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
@@ -670,14 +669,16 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
         let current_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_source_t:s0".into())
             .expect("invalid security context");
         let exec_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0".into())
             .expect("invalid security context");
 
         let executable_security_context = b"u:object_r:executable_file_trans_no_entrypoint_t:s0";
-        assert!(security_server.security_context_to_sid(executable_security_context).is_ok());
+        assert!(security_server
+            .security_context_to_sid(executable_security_context.into())
+            .is_ok());
         let executable =
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
@@ -706,11 +707,13 @@ mod tests {
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
 
         let current_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_no_trans_source_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_no_trans_source_t:s0".into())
             .expect("invalid security context");
 
         let executable_security_context = b"u:object_r:executable_file_no_trans_t:s0";
-        assert!(security_server.security_context_to_sid(executable_security_context).is_ok());
+        assert!(security_server
+            .security_context_to_sid(executable_security_context.into())
+            .is_ok());
         let executable =
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
@@ -740,11 +743,13 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
         let current_sid = security_server
-            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0")
+            .security_context_to_sid(b"u:object_r:exec_transition_target_t:s0".into())
             .expect("invalid security context");
 
         let executable_security_context = b"u:object_r:executable_file_no_trans_t:s0";
-        assert!(security_server.security_context_to_sid(executable_security_context).is_ok());
+        assert!(security_server
+            .security_context_to_sid(executable_security_context.into())
+            .is_ok());
         let executable =
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
@@ -782,7 +787,7 @@ mod tests {
         let mut security_state = initial_state.clone();
 
         let elf_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_valid_t:s0")
+            .security_context_to_sid(b"u:object_r:test_valid_t:s0".into())
             .expect("invalid security context");
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&mut security_state, Some(elf_sid));
@@ -804,10 +809,10 @@ mod tests {
     fn getsched_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_yes_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getsched_yes_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -820,10 +825,10 @@ mod tests {
     fn getsched_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_no_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getsched_no_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -836,10 +841,10 @@ mod tests {
     fn setsched_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_setsched_yes_t:s0")
+            .security_context_to_sid(b"u:object_r:test_setsched_yes_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -852,10 +857,10 @@ mod tests {
     fn setsched_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_setsched_no_t:s0")
+            .security_context_to_sid(b"u:object_r:test_setsched_no_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_setsched_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -868,10 +873,10 @@ mod tests {
     fn getpgid_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getpgid_yes_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getpgid_yes_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -884,10 +889,10 @@ mod tests {
     fn getpgid_access_denied_for_denied_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getpgid_no_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getpgid_no_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_getpgid_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -900,10 +905,10 @@ mod tests {
     fn sigkill_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_sigkill_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_sigkill_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -921,10 +926,10 @@ mod tests {
     fn sigchld_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_sigchld_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_sigchld_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -942,10 +947,10 @@ mod tests {
     fn sigstop_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_sigstop_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_sigstop_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0".into())
             .expect("invalid security context");
 
         assert_eq!(
@@ -963,10 +968,10 @@ mod tests {
     fn signal_access_allowed_for_allowed_type() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0".into())
             .expect("invalid security context");
 
         // The `signal` permission allows signals other than SIGKILL, SIGCHLD, SIGSTOP.
@@ -985,10 +990,10 @@ mod tests {
     fn signal_access_denied_for_denied_signals() {
         let security_server = security_server_with_policy();
         let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0".into())
             .expect("invalid security context");
         let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0")
+            .security_context_to_sid(b"u:object_r:test_kill_target_t:s0".into())
             .expect("invalid security context");
 
         // The `signal` permission does not allow SIGKILL, SIGCHLD or SIGSTOP.
@@ -1009,10 +1014,10 @@ mod tests {
     fn ptrace_access_allowed_for_allowed_type_and_state_is_updated() {
         let security_server = security_server_with_policy();
         let tracer_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_ptrace_tracer_yes_t:s0")
+            .security_context_to_sid(b"u:object_r:test_ptrace_tracer_yes_t:s0".into())
             .expect("invalid security context");
         let tracee_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
+            .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0".into())
             .expect("invalid security context");
         let initial_state = TaskState {
             current_sid: tracee_sid,
@@ -1051,10 +1056,10 @@ mod tests {
     fn ptrace_access_denied_for_denied_type_and_state_is_not_updated() {
         let security_server = security_server_with_policy();
         let tracer_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_ptrace_tracer_no_t:s0")
+            .security_context_to_sid(b"u:object_r:test_ptrace_tracer_no_t:s0".into())
             .expect("invalid security context");
         let tracee_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0")
+            .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0".into())
             .expect("invalid security context");
         let initial_state = TaskState {
             current_sid: tracee_sid,

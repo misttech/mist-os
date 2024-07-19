@@ -21,7 +21,7 @@ use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
-use selinux_common::{self as sc, FileClass, ObjectClass};
+use selinux_common::{self as sc, FileClass, NullessByteStr, ObjectClass};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
@@ -239,7 +239,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Returns a [`SecurityContext`] with fields parsed from the supplied Security Context string.
     pub fn parse_security_context(
         &self,
-        security_context: &[u8],
+        security_context: NullessByteStr<'_>,
     ) -> Result<security_context::SecurityContext, security_context::SecurityContextError> {
         security_context::SecurityContext::parse(&self.0, security_context)
     }
