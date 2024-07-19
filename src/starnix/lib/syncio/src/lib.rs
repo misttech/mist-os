@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::zxio::{
-    zxio_dirent_iterator_next, zxio_dirent_iterator_t, ZXIO_NODE_PROTOCOL_CONNECTOR,
-    ZXIO_NODE_PROTOCOL_DIRECTORY, ZXIO_NODE_PROTOCOL_FILE, ZXIO_NODE_PROTOCOL_SYMLINK,
+    zxio_dirent_iterator_next, zxio_dirent_iterator_t, ZXIO_NODE_PROTOCOL_DIRECTORY,
+    ZXIO_NODE_PROTOCOL_FILE,
 };
 use bitflags::bitflags;
 use bstr::BString;
@@ -384,57 +384,14 @@ impl From<CreationMode> for zxio::zxio_creation_mode_t {
     }
 }
 
-/// Options for open2.
-pub struct OpenOptions {
-    /// If None, connects to a service.
-    pub node_protocols: Option<fio::NodeProtocols>,
-
-    /// Behaviour with respect ot existence. See fuchsia.io for precise semantics.
-    pub mode: CreationMode,
-
-    /// See fuchsia.io for semantics. If empty, then it is regarded as absent i.e. rights will be
-    /// inherited.
-    pub rights: fio::Operations,
+/// Options for Open3.
+#[derive(Default)]
+pub struct ZxioOpenOptions<'a> {
+    pub attributes: Option<&'a mut zxio_node_attributes_t>,
 
     /// If an object is to be created, attributes that should be stored with the object at creation
     /// time. Not all servers support all attributes.
-    pub create_attr: Option<zxio::zxio_node_attr>,
-}
-
-impl OpenOptions {
-    /// Returns options to open a directory.
-    pub fn directory(optional_rights: Option<fio::Operations>) -> Self {
-        Self {
-            node_protocols: Some(fio::NodeProtocols {
-                directory: Some(fio::DirectoryProtocolOptions {
-                    optional_rights,
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        }
-    }
-
-    /// Returns options to open a file.
-    pub fn file(flags: fio::FileProtocolFlags) -> Self {
-        Self {
-            node_protocols: Some(fio::NodeProtocols { file: Some(flags), ..Default::default() }),
-            ..Default::default()
-        }
-    }
-}
-
-impl Default for OpenOptions {
-    fn default() -> Self {
-        Self {
-            // Default to opening a node protocol.
-            node_protocols: Some(fio::NodeProtocols::default()),
-            mode: CreationMode::Never,
-            rights: fio::Operations::empty(),
-            create_attr: None,
-        }
-    }
+    pub create_attributes: Option<zxio::zxio_node_attr>,
 }
 
 /// Describes the mode of operation when setting an extended attribute.
@@ -628,49 +585,27 @@ impl Zxio {
         Ok(zxio)
     }
 
-    pub fn open2(
+    pub fn open3(
         &self,
         path: &str,
-        options: OpenOptions,
-        attributes: Option<&mut zxio_node_attributes_t>,
+        flags: fio::Flags,
+        options: ZxioOpenOptions<'_>,
     ) -> Result<Self, zx::Status> {
         let zxio = Zxio::default();
 
-        let mut open_options = zxio::zxio_open2_options::default();
-        if let Some(p) = options.node_protocols {
-            if let Some(dir_options) = p.directory {
-                open_options.protocols |= ZXIO_NODE_PROTOCOL_DIRECTORY;
-                open_options.optional_rights =
-                    dir_options.optional_rights.unwrap_or(fio::Operations::empty()).bits();
-            }
-            if let Some(file_flags) = p.file {
-                open_options.protocols |= ZXIO_NODE_PROTOCOL_FILE;
-                open_options.file_flags = file_flags.bits();
-            }
-            if p.symlink.is_some() {
-                open_options.protocols |= ZXIO_NODE_PROTOCOL_SYMLINK;
-            }
-            if open_options.protocols == 0 {
-                // Ask for any protocol.
-                open_options.protocols = ZXIO_NODE_PROTOCOL_DIRECTORY
-                    | ZXIO_NODE_PROTOCOL_FILE
-                    | ZXIO_NODE_PROTOCOL_SYMLINK;
-            }
-            open_options.mode = options.mode as u32;
-            open_options.rights = options.rights.bits();
-            open_options.create_attr =
-                options.create_attr.as_ref().map(|a| a as *const _).unwrap_or(std::ptr::null());
-        } else {
-            open_options.protocols = ZXIO_NODE_PROTOCOL_CONNECTOR;
-        }
+        let mut zxio_open_options = zxio::zxio_open_options::default();
+        zxio_open_options.inout_attr =
+            options.attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut());
+        zxio_open_options.create_attr =
+            options.create_attributes.as_ref().map(|a| a as *const _).unwrap_or(std::ptr::null());
 
         let status = unsafe {
-            zxio::zxio_open2(
+            zxio::zxio_open3(
                 self.as_ptr(),
                 path.as_ptr() as *const c_char,
                 path.len(),
-                &open_options,
-                attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut()),
+                flags.bits(),
+                &zxio_open_options,
                 zxio.as_storage_ptr(),
             )
         };
@@ -698,21 +633,23 @@ impl Zxio {
     pub fn open_node(
         &self,
         path: &str,
-        node_flags: fio::NodeProtocolFlags,
+        flags: fio::Flags,
         attributes: Option<&mut zxio_node_attributes_t>,
     ) -> Result<Self, zx::Status> {
         let zxio = Zxio::default();
+
         let status = unsafe {
-            zxio::zxio_open2(
+            zxio::zxio_open3(
                 self.as_ptr(),
                 path.as_ptr() as *const c_char,
                 path.len(),
-                &zxio::zxio_open2_options {
-                    node_flags: node_flags.bits(),
-                    mode: CreationMode::Never.into(),
+                // `PROTOCOL_NODE` takes precedence over over protocols. If other protocols are
+                // specified as well, it will be used to validate the target node type.
+                (flags | fio::Flags::PROTOCOL_NODE).bits(),
+                &zxio::zxio_open_options {
+                    inout_attr: attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut()),
                     ..Default::default()
                 },
-                attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut()),
                 zxio.as_storage_ptr(),
             )
         };

@@ -409,7 +409,7 @@ impl ProtocolsExt for fio::Flags {
         // connection later.
         let mut updated_flags = *self;
         if updated_flags.contains(fio::Flags::PERM_INHERIT_WRITE) {
-            updated_flags |= operations_to_flags(fio::INHERITED_WRITE_PERMISSIONS);
+            updated_flags |= fio::INHERITED_WRITE_PERMISSIONS.to_flags();
         }
         if updated_flags.contains(fio::Flags::PERM_INHERIT_EXECUTE) {
             updated_flags |= fio::Flags::PERM_EXECUTE;
@@ -705,34 +705,14 @@ fn flags_to_rights(flags: &fio::Flags) -> fio::Rights {
 }
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-fn operations_to_flags(operations: fio::Operations) -> fio::Flags {
-    let mut flags = fio::Flags::empty();
-    if operations.contains(fio::Operations::CONNECT) {
-        flags |= fio::Flags::PERM_CONNECT;
+pub trait ToFlags {
+    fn to_flags(&self) -> fio::Flags;
+}
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+impl ToFlags for fio::Operations {
+    fn to_flags(&self) -> fio::Flags {
+        // The constants in `fio::Operations` are aligned with those in `fio::Flags`.
+        fio::Flags::from_bits(self.bits()).unwrap()
     }
-    if operations.contains(fio::Operations::READ_BYTES) {
-        flags |= fio::Flags::PERM_READ;
-    }
-    if operations.contains(fio::Operations::WRITE_BYTES) {
-        flags |= fio::Flags::PERM_WRITE;
-    }
-    if operations.contains(fio::Operations::EXECUTE) {
-        flags |= fio::Flags::PERM_EXECUTE;
-    }
-    if operations.contains(fio::Operations::GET_ATTRIBUTES) {
-        flags |= fio::Flags::PERM_GET_ATTRIBUTES;
-    }
-    if operations.contains(fio::Operations::UPDATE_ATTRIBUTES) {
-        flags |= fio::Flags::PERM_SET_ATTRIBUTES;
-    }
-    if operations.contains(fio::Operations::ENUMERATE) {
-        flags |= fio::Flags::PERM_ENUMERATE;
-    }
-    if operations.contains(fio::Operations::TRAVERSE) {
-        flags |= fio::Flags::PERM_TRAVERSE;
-    }
-    if operations.contains(fio::Operations::MODIFY_DIRECTORY) {
-        flags |= fio::Flags::PERM_MODIFY;
-    }
-    flags
 }

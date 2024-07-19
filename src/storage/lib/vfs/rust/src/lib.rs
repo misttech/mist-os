@@ -76,6 +76,9 @@ pub use crate::common::CreationMode;
 pub use object_request::{ObjectRequest, ObjectRequestRef, ToObjectRequest};
 pub use protocols::ProtocolsExt;
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+pub use protocols::ToFlags;
+
 // This allows the pseudo_directory! macro to use absolute paths within this crate to refer to the
 // helper functions. External crates that use pseudo_directory! will rely on the pseudo_directory
 // export above.

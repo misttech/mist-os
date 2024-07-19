@@ -9,8 +9,8 @@ use fuchsia_zircon::{self as zx, HandleBased, Status};
 use fxfs_testing::{close_file_checked, open_file_checked, TestFixture};
 use std::sync::Arc;
 use syncio::{
-    zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, CreationMode,
-    OpenOptions, SeekOrigin, XattrSetMode, Zxio, ZXIO_ROOT_HASH_LENGTH,
+    zxio, zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, SeekOrigin,
+    XattrSetMode, Zxio, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
@@ -20,7 +20,7 @@ use vfs::node::Node;
 use vfs::path::Path;
 use vfs::remote::RemoteLike;
 use vfs::symlink::Symlink;
-use vfs::{pseudo_directory, ObjectRequestRef, ToObjectRequest};
+use vfs::{pseudo_directory, ObjectRequestRef, ToFlags, ToObjectRequest};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::test]
@@ -94,19 +94,12 @@ async fn test_fsverity_enabled() {
         };
         let foo_zxio = Arc::new(
             dir_zxio
-                .open2(
+                .open3(
                     "foo",
-                    syncio::OpenOptions {
-                        node_protocols: Some(fio::NodeProtocols {
-                            file: Some(Default::default()),
-                            ..Default::default()
-                        }),
-                        rights: fio::Operations::UPDATE_ATTRIBUTES,
-                        ..Default::default()
-                    },
-                    Some(&mut attrs),
+                    fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
+                    ZxioOpenOptions { attributes: Some(&mut attrs), ..Default::default() },
                 )
-                .expect("open failed"),
+                .expect("open3 failed"),
         );
         assert!(!attrs.fsverity_enabled);
         let mut builder = MerkleTreeBuilder::new(FsVerityHasher::Sha256(
@@ -178,19 +171,12 @@ async fn test_not_fsverity_enabled() {
         };
         let foo_zxio = Arc::new(
             dir_zxio
-                .open2(
+                .open3(
                     "foo",
-                    syncio::OpenOptions {
-                        node_protocols: Some(fio::NodeProtocols {
-                            file: Some(Default::default()),
-                            ..Default::default()
-                        }),
-                        rights: fio::Operations::UPDATE_ATTRIBUTES,
-                        ..Default::default()
-                    },
-                    Some(&mut attrs),
+                    fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
+                    ZxioOpenOptions { attributes: Some(&mut attrs), ..Default::default() },
                 )
-                .expect("open failed"),
+                .expect("open3 failed"),
         );
         assert!(!attrs.fsverity_enabled);
 
@@ -472,313 +458,6 @@ async fn test_xattr_file_large_attribute() {
     fixture.close().await;
 }
 
-#[fuchsia::test]
-async fn test_open2() {
-    let fixture = TestFixture::new().await;
-
-    let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
-
-    fasync::unblock(|| {
-        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
-
-        // Create a test directory.
-        let test_dir = dir_zxio
-            .open2(
-                "test_dir",
-                OpenOptions {
-                    mode: CreationMode::Always,
-                    rights: fio::RW_STAR_DIR,
-                    ..OpenOptions::directory(None)
-                },
-                None,
-            )
-            .expect("open2 failed");
-
-        // Now create a file in that directory.
-        let test_file = test_dir
-            .open2(
-                "test_file",
-                OpenOptions {
-                    mode: CreationMode::Always,
-                    rights: fio::Operations::WRITE_BYTES,
-                    ..OpenOptions::file(fio::FileProtocolFlags::empty())
-                },
-                None,
-            )
-            .expect("open2 failed");
-
-        // Write something to the file.
-        const CONTENT: &[u8] = b"hello";
-        test_file.write(CONTENT).expect("write failed");
-
-        // Open the directory without specifying any protocols and ask for attributes.
-        let mut attr = zxio_node_attributes_t {
-            has: zxio_node_attr_has_t {
-                protocols: true,
-                abilities: true,
-                id: true,
-                link_count: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let test_dir = dir_zxio
-            .open2(
-                "test_dir",
-                OpenOptions { rights: fio::RW_STAR_DIR, ..Default::default() },
-                Some(&mut attr),
-            )
-            .expect("open2 failed");
-
-        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_DIRECTORY);
-        assert_eq!(
-            attr.abilities,
-            (fio::Operations::ENUMERATE
-                | fio::Operations::TRAVERSE
-                | fio::Operations::MODIFY_DIRECTORY
-                | fio::Operations::GET_ATTRIBUTES
-                | fio::Operations::UPDATE_ATTRIBUTES)
-                .bits()
-        );
-        // Fxfs will always return a non-zero ID.
-        assert_ne!(attr.id, 0);
-        assert_eq!(attr.link_count, 2);
-
-        // And now the file, and ask for attributes.
-        let mut attr = zxio_node_attributes_t {
-            has: zxio_node_attr_has_t {
-                protocols: true,
-                abilities: true,
-                id: true,
-                content_size: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let _test_file = test_dir
-            .open2("test_file", OpenOptions::default(), Some(&mut attr))
-            .expect("open2 failed");
-        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
-        assert_eq!(
-            attr.abilities,
-            (fio::Operations::READ_BYTES
-                | fio::Operations::WRITE_BYTES
-                | fio::Operations::GET_ATTRIBUTES
-                | fio::Operations::UPDATE_ATTRIBUTES)
-                .bits()
-        );
-        // Fxfs will always return a non-zero ID.
-        assert_ne!(attr.id, 0);
-        assert_eq!(attr.content_size, 5);
-
-        // Create and open a symlink.
-        test_dir.create_symlink("symlink", b"target").expect("create_symlink failed");
-
-        let symlink = test_dir
-            .open2(
-                "symlink",
-                OpenOptions { rights: fio::Operations::GET_ATTRIBUTES, ..Default::default() },
-                None,
-            )
-            .expect("open2 failed");
-        assert_eq!(symlink.read_link().expect("read_link failed"), b"target");
-
-        // Test file protocol flags.
-        let test_file = test_dir
-            .open2(
-                "test_file",
-                OpenOptions {
-                    rights: fio::Operations::WRITE_BYTES | fio::Operations::READ_BYTES,
-                    ..OpenOptions::file(fio::FileProtocolFlags::APPEND)
-                },
-                None,
-            )
-            .expect("open2 failed");
-        const APPEND_CONTENT: &[u8] = b" there";
-        test_file.write(APPEND_CONTENT).expect("write failed");
-        test_file.seek(SeekOrigin::Start, 0).expect("seek failed");
-        let mut buf = [0; 20];
-        assert_eq!(
-            test_file.read(&mut buf).expect("read failed"),
-            CONTENT.len() + APPEND_CONTENT.len()
-        );
-        assert_eq!(&buf[..CONTENT.len()], CONTENT);
-        assert_eq!(&buf[CONTENT.len()..CONTENT.len() + APPEND_CONTENT.len()], APPEND_CONTENT);
-
-        // TODO(https://fxbug.dev/42077936): Test create attributes.
-        // TODO(https://fxbug.dev/42076605): Test for POSIX attributes.
-    })
-    .await;
-
-    fixture.close().await;
-}
-
-#[fuchsia::test]
-async fn test_open2_rights() {
-    let fixture = TestFixture::new().await;
-
-    let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
-
-    fasync::unblock(|| {
-        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
-
-        // Create and write to a file.
-        let test_file = dir_zxio
-            .open2(
-                "test_file",
-                OpenOptions {
-                    mode: CreationMode::Always,
-                    rights: fio::Operations::WRITE_BYTES,
-                    ..OpenOptions::file(fio::FileProtocolFlags::empty())
-                },
-                None,
-            )
-            .expect("open2 failed");
-
-        // Write something to the file.
-        const CONTENT: &[u8] = b"hello";
-        test_file.write(CONTENT).expect("write failed");
-
-        // Check rights
-        let test_file = dir_zxio
-            .open2(
-                "test_file",
-                OpenOptions { rights: fio::Operations::READ_BYTES, ..Default::default() },
-                None,
-            )
-            .expect("open2 failed");
-        let mut buf = [0; 20];
-        assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
-        assert_eq!(&buf[..CONTENT.len()], CONTENT);
-
-        // Make sure we can't write to the file.
-        assert_eq!(test_file.write(&buf).expect_err("write succeeded"), zx::Status::BAD_HANDLE);
-
-        // Check rights inherited from directory.
-        let dir = dir_zxio
-            .open2(
-                ".",
-                OpenOptions { rights: fio::Operations::READ_BYTES, ..Default::default() },
-                None,
-            )
-            .expect("open2 failed");
-
-        let test_file = dir
-            .open2(
-                "test_file",
-                OpenOptions { rights: fio::Operations::READ_BYTES, ..Default::default() },
-                None,
-            )
-            .expect("open2 failed");
-
-        assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
-        assert_eq!(&buf[..CONTENT.len()], CONTENT);
-
-        // Make sure we can't write to the file.
-        assert_eq!(test_file.write(&buf).expect_err("write succeeded"), zx::Status::BAD_HANDLE);
-
-        // Optional rights on directories.
-        let test_dir = dir_zxio
-            .open2(
-                ".",
-                OpenOptions {
-                    rights: fio::Operations::READ_BYTES,
-                    ..OpenOptions::directory(Some(fio::Operations::WRITE_BYTES))
-                },
-                None,
-            )
-            .expect("open2 failed");
-
-        // Now make sure we can open and write to the test file.
-        let test_file = test_dir
-            .open2(
-                "test_file",
-                OpenOptions {
-                    rights: fio::Operations::READ_BYTES | fio::Operations::WRITE_BYTES,
-                    ..Default::default()
-                },
-                None,
-            )
-            .expect("open2 failed");
-
-        assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
-        assert_eq!(&buf[..CONTENT.len()], CONTENT);
-
-        // This time we should be able to write to the file.
-        test_file.write(b"foo").expect("write failed");
-    })
-    .await;
-
-    fixture.close().await;
-}
-
-#[fuchsia::test]
-async fn test_open2_node() {
-    let fixture = TestFixture::new().await;
-
-    let (dir_client, dir_server) = zx::Channel::create();
-    fixture
-        .root()
-        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
-        .expect("clone failed");
-
-    fasync::unblock(|| {
-        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
-
-        dir_zxio
-            .open_node(".", fio::NodeProtocolFlags::MUST_BE_DIRECTORY, None)
-            .expect("open_node failed");
-
-        // Create a file.
-        let test_file = dir_zxio
-            .open2(
-                "test_file",
-                OpenOptions {
-                    mode: CreationMode::Always,
-                    rights: fio::Operations::WRITE_BYTES,
-                    ..OpenOptions::file(fio::FileProtocolFlags::empty())
-                },
-                None,
-            )
-            .expect("open2 failed");
-
-        // Write something to the file.
-        const CONTENT: &[u8] = b"hello";
-        test_file.write(CONTENT).expect("write failed");
-
-        assert_eq!(
-            dir_zxio
-                .open_node("test_file", fio::NodeProtocolFlags::MUST_BE_DIRECTORY, None,)
-                .expect_err("open_node succeeded"),
-            zx::Status::NOT_DIR
-        );
-
-        // Check we can get attributes.
-        let mut attr = zxio_node_attributes_t {
-            has: zxio_node_attr_has_t { protocols: true, content_size: true, ..Default::default() },
-            ..Default::default()
-        };
-
-        dir_zxio
-            .open_node("test_file", fio::NodeProtocolFlags::empty(), Some(&mut attr))
-            .expect("open_node failed");
-
-        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
-        assert_eq!(attr.content_size, 5);
-    })
-    .await;
-
-    fixture.close().await;
-}
-
 // TODO(https://fxbug.dev/293943124): once fxfs supports allocate, use the test fixture.
 struct AllocateFile {
     res: Result<(), Status>,
@@ -969,22 +648,16 @@ async fn test_get_set_attributes_node() {
     fasync::unblock(|| {
         let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
 
-        dir_zxio
-            .open_node(".", fio::NodeProtocolFlags::MUST_BE_DIRECTORY, None)
-            .expect("open_node failed");
-
         // Create a file.
         let test_file = dir_zxio
-            .open2(
+            .open3(
                 "test_file",
-                OpenOptions {
-                    mode: CreationMode::Always,
-                    rights: fio::W_STAR_DIR,
-                    ..OpenOptions::file(fio::FileProtocolFlags::empty())
-                },
-                None,
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::PERM_SET_ATTRIBUTES,
+                ZxioOpenOptions::default(),
             )
-            .expect("open2 failed");
+            .expect("open3 failed");
 
         let attr = zxio_node_attributes_t {
             gid: 111,
@@ -1012,6 +685,392 @@ async fn test_get_set_attributes_node() {
         assert_eq!(attributes.gid, 111);
         assert_eq!(attributes.access_time, 222);
         assert_eq!(attributes.modification_time, 333);
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open3() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        // Create a test directory.
+        let test_dir = dir_zxio
+            .open3(
+                "test_dir",
+                fio::Flags::FLAG_MUST_CREATE
+                    | fio::Flags::PROTOCOL_DIRECTORY
+                    | fio::RW_STAR_DIR.to_flags(),
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+
+        // Now create a file in that directory.
+        let test_file = test_dir
+            .open3(
+                "test_file",
+                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+
+        // Write something to the file.
+        const CONTENT: &[u8] = b"hello";
+        test_file.write(CONTENT).expect("write failed");
+
+        // Open the directory without specifying any protocols and ask for attributes (we expect
+        // that the server is able to negotiate the node protocol to be the directory protocol).
+        let mut attr = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t {
+                protocols: true,
+                abilities: true,
+                id: true,
+                link_count: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let _test_dir = dir_zxio
+            .open3(
+                "test_dir",
+                fio::RW_STAR_DIR.to_flags(),
+                ZxioOpenOptions { attributes: Some(&mut attr), create_attributes: None },
+            )
+            .expect("open3 failed");
+
+        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_DIRECTORY);
+        assert_eq!(
+            attr.abilities,
+            (fio::Operations::ENUMERATE
+                | fio::Operations::TRAVERSE
+                | fio::Operations::MODIFY_DIRECTORY
+                | fio::Operations::GET_ATTRIBUTES
+                | fio::Operations::UPDATE_ATTRIBUTES)
+                .bits()
+        );
+        // Fxfs will always return a non-zero ID.
+        assert_ne!(attr.id, 0);
+        assert_eq!(attr.link_count, 2);
+
+        // And now the file, and ask for attributes.
+        let mut attr = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t {
+                protocols: true,
+                abilities: true,
+                id: true,
+                content_size: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let _test_file = test_dir
+            .open3(
+                "test_file",
+                fio::Flags::empty(),
+                ZxioOpenOptions { attributes: Some(&mut attr), create_attributes: None },
+            )
+            .expect("open3 failed");
+        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
+        assert_eq!(
+            attr.abilities,
+            (fio::Operations::READ_BYTES
+                | fio::Operations::WRITE_BYTES
+                | fio::Operations::GET_ATTRIBUTES
+                | fio::Operations::UPDATE_ATTRIBUTES)
+                .bits()
+        );
+        // Fxfs will always return a non-zero ID.
+        assert_ne!(attr.id, 0);
+        assert_eq!(attr.content_size, 5);
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open3_symlink() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        // Create and open a symlink.
+        dir_zxio.create_symlink("symlink", b"target").expect("create_symlink failed");
+        let symlink = dir_zxio
+            .open3(
+                "symlink",
+                fio::Flags::PROTOCOL_SYMLINK | fio::Flags::PERM_GET_ATTRIBUTES,
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+        assert_eq!(symlink.read_link().expect("read_link failed"), b"target");
+
+        // Open should also work without specifying any protocol.
+        let symlink = dir_zxio
+            .open3("symlink", fio::Flags::PERM_GET_ATTRIBUTES, ZxioOpenOptions::default())
+            .expect("open3 failed");
+        assert_eq!(symlink.read_link().expect("read_link failed"), b"target");
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open3_file_protocol_flags() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        let test_file = dir_zxio
+            .open3(
+                "test_file",
+                fio::Flags::FLAG_MUST_CREATE
+                    | fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::PERM_WRITE
+                    | fio::Flags::PERM_READ
+                    | fio::Flags::FILE_APPEND,
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+
+        // Write something to the file.
+        const CONTENT: &[u8] = b"hello";
+        test_file.write(CONTENT).expect("write failed");
+
+        const APPEND_CONTENT: &[u8] = b" there";
+        test_file.write(APPEND_CONTENT).expect("write failed");
+
+        test_file.seek(SeekOrigin::Start, 0).expect("seek failed");
+        let mut buf = [0; 20];
+        assert_eq!(
+            test_file.read(&mut buf).expect("read failed"),
+            CONTENT.len() + APPEND_CONTENT.len()
+        );
+        assert_eq!(&buf[..CONTENT.len()], CONTENT);
+        assert_eq!(&buf[CONTENT.len()..CONTENT.len() + APPEND_CONTENT.len()], APPEND_CONTENT);
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open3_create_attributes() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        // Ask for attributes.
+        let mut attr = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t {
+                protocols: true,
+                abilities: true,
+                id: true,
+                uid: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Set node id.
+        let create_attr = zxio_node_attributes_t {
+            uid: 123456,
+            has: zxio_node_attr_has_t { uid: true, ..Default::default() },
+            ..Default::default()
+        };
+
+        let _test_directory = dir_zxio
+            .open3(
+                "test_dir",
+                fio::Flags::FLAG_MUST_CREATE
+                    | fio::Flags::PROTOCOL_DIRECTORY
+                    | fio::RW_STAR_DIR.to_flags(),
+                ZxioOpenOptions {
+                    attributes: Some(&mut attr),
+                    create_attributes: Some(create_attr),
+                },
+            )
+            .expect("open3 failed");
+
+        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_DIRECTORY);
+        assert_eq!(
+            attr.abilities,
+            (fio::Operations::ENUMERATE
+                | fio::Operations::TRAVERSE
+                | fio::Operations::MODIFY_DIRECTORY
+                | fio::Operations::GET_ATTRIBUTES
+                | fio::Operations::UPDATE_ATTRIBUTES)
+                .bits()
+        );
+        // Fxfs will always return a non-zero ID.
+        assert_ne!(attr.id, 0);
+        assert_eq!(attr.uid, 123456);
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open3_rights() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        // Create and write to a file.
+        let test_file = dir_zxio
+            .open3(
+                "test_file",
+                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+
+        // Write something to the file.
+        const CONTENT: &[u8] = b"hello";
+        test_file.write(CONTENT).expect("write failed");
+
+        // Check rights
+        let test_file = dir_zxio
+            .open3("test_file", fio::Flags::PERM_READ, ZxioOpenOptions::default())
+            .expect("open3 failed");
+        let mut buf = [0; 20];
+        assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
+        assert_eq!(&buf[..CONTENT.len()], CONTENT);
+
+        // Make sure we can't write to the file.
+        assert_eq!(test_file.write(&buf).expect_err("write succeeded"), zx::Status::BAD_HANDLE);
+
+        // Check that no rights are inherited when specifying no permission flags.
+        let test_file = dir_zxio
+            .open3("test_file", fio::Flags::empty(), ZxioOpenOptions::default())
+            .expect("open3 failed");
+        // Make sure we can't read or write to the file.
+        assert_eq!(test_file.read(&mut buf).expect_err("read succeeded"), zx::Status::BAD_HANDLE);
+        assert_eq!(test_file.write(&buf).expect_err("write succeeded"), zx::Status::BAD_HANDLE);
+
+        // Optional rights on directories.
+        let test_dir = dir_zxio
+            .open3(
+                ".",
+                fio::Flags::PERM_READ | fio::Flags::PERM_INHERIT_WRITE,
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+
+        // Now make sure we can open and write to the test file.
+        let test_file = test_dir
+            .open3(
+                "test_file",
+                fio::Flags::PERM_READ | fio::Flags::PERM_WRITE,
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+        assert_eq!(test_file.read(&mut buf).expect("read failed"), CONTENT.len());
+        assert_eq!(&buf[..CONTENT.len()], CONTENT);
+        // This time we should be able to write to the file.
+        test_file.write(b"foo").expect("write failed");
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open3_node() {
+    let fixture = TestFixture::new().await;
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    fixture
+        .root()
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into())
+        .expect("clone failed");
+
+    fasync::unblock(|| {
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+
+        dir_zxio.open_node(".", fio::Flags::PROTOCOL_DIRECTORY, None).expect("open_node failed");
+
+        // Create a file.
+        let test_file = dir_zxio
+            .open3(
+                "test_file",
+                fio::Flags::FLAG_MUST_CREATE | fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_WRITE,
+                ZxioOpenOptions::default(),
+            )
+            .expect("open3 failed");
+
+        // Write something to the file.
+        const CONTENT: &[u8] = b"hello";
+        test_file.write(CONTENT).expect("write failed");
+
+        // Check we can get attributes.
+        let mut attr = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { protocols: true, content_size: true, ..Default::default() },
+            ..Default::default()
+        };
+        dir_zxio
+            .open_node("test_file", fio::Flags::empty(), Some(&mut attr))
+            .expect("open_node failed");
+        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
+        assert_eq!(attr.content_size, 5);
+
+        // It should work if other protocols are specified, as long as it matches the target node.
+        assert_eq!(
+            dir_zxio
+                .open_node("test_file", fio::Flags::PROTOCOL_DIRECTORY, None,)
+                .expect_err("open_node unexpectedly succeeded"),
+            zx::Status::NOT_DIR
+        );
+
+        let mut attr = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { protocols: true, content_size: true, ..Default::default() },
+            ..Default::default()
+        };
+        dir_zxio
+            .open_node("test_file", fio::Flags::PROTOCOL_FILE, Some(&mut attr))
+            .expect("open_node failed");
+        assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
+        assert_eq!(attr.content_size, 5);
     })
     .await;
 
