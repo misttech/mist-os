@@ -6,6 +6,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "lib/async-loop/testing/cpp/real_loop.h"
+
 namespace ui_testing {
 
 namespace {
@@ -40,5 +42,7 @@ void LoggingEventLoop::RunLoopUntilIdle(cpp20::source_location caller) {
   FX_LOGS(INFO) << "Running until idle (from " << ToString(caller) << ")";
   RealLoop::RunLoopUntilIdle();
 }
+
+async_dispatcher_t* LoggingEventLoop::dispatcher() { return RealLoop::dispatcher(); }
 
 }  // namespace ui_testing
