@@ -12,11 +12,8 @@ use cm_types::{Name, Path, RelativePath};
 use moniker::Moniker;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::mapper::RouteSegment;
-use scrutiny::model::controller::DataController;
 use scrutiny::model::model::DataModel;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use serde_json::value::Value;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::read_to_string;
@@ -25,7 +22,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use thiserror::Error as ThisError;
 
-const BAD_REQUEST_CTX: &str = "Failed to parse RouteSourcesController request";
 const MISSING_TARGET_INSTANCE: &str = "Target instance is missing from component model";
 const GATHER_FAILED: &str = "Target instance failed to gather routes_to_skip and routes_to_verify";
 const ROUTE_LISTS_INCOMPLETE: &str = "Component route skip list + verify list incomplete";
@@ -524,12 +520,25 @@ fn process_verify_result<'a>(
 }
 
 /// `DataController` for verifying specific routes used by specific components.
-#[derive(Default)]
 pub struct RouteSourcesController {}
 
 impl RouteSourcesController {
+    pub fn get_results(model: Arc<DataModel>, input: String) -> Result<VerifyRouteSourcesResults> {
+        let config_data = read_to_string(&input).map_err(|err| {
+            anyhow!("Failed to parse config from file: {}: {}", &input, err.to_string())
+        })?;
+        let config: RouteSourcesConfig = serde_json5::from_str(&config_data).map_err(|err| {
+            anyhow!("Failed to parse config from file: {}: {}", &input, err.to_string())
+        })?;
+        let component_model_result = model.get::<V2ComponentModel>()?;
+        let component_model = &component_model_result.component_model;
+        let components = &model.get::<Components>()?.entries;
+        let results = Self::run(component_model, components, &config)?;
+        let deps = component_model_result.deps.clone();
+        Ok(VerifyRouteSourcesResults { deps, results })
+    }
+
     fn run(
-        &self,
         component_model: &Arc<ComponentModelForAnalyzer>,
         components: &Vec<Component>,
         config: &RouteSourcesConfig,
@@ -579,31 +588,12 @@ impl RouteSourcesController {
     }
 }
 
-impl DataController for RouteSourcesController {
-    fn query(&self, model: Arc<DataModel>, request: Value) -> Result<Value, Error> {
-        let request: RouteSourcesRequest =
-            serde_json::from_value(request).context(BAD_REQUEST_CTX)?;
-        let config_data = read_to_string(&request.input).map_err(|err| {
-            anyhow!("Failed to parse config from file: {}: {}", &request.input, err.to_string())
-        })?;
-        let config: RouteSourcesConfig = serde_json5::from_str(&config_data).map_err(|err| {
-            anyhow!("Failed to parse config from file: {}: {}", &request.input, err.to_string())
-        })?;
-        let component_model_result = model.get::<V2ComponentModel>()?;
-        let component_model = &component_model_result.component_model;
-        let components = &model.get::<Components>()?.entries;
-        let results = self.run(component_model, components, &config)?;
-        let deps = component_model_result.deps.clone();
-        Ok(json!(VerifyRouteSourcesResults { deps, results }))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
         Matches, RouteMatch, RouteSourceError, RouteSourcesConfig, RouteSourcesController,
         RouteSourcesSpec, Source, SourceDeclSpec, SourceSpec, UseSpec, VerifyRouteSourcesResult,
-        BAD_REQUEST_CTX, MISSING_TARGET_INSTANCE, ROUTE_LISTS_INCOMPLETE, ROUTE_LISTS_OVERLAP,
+        MISSING_TARGET_INSTANCE, ROUTE_LISTS_INCOMPLETE, ROUTE_LISTS_OVERLAP,
     };
     use crate::core::collection::{Component, ComponentSource, Components};
     use crate::verify::collection::V2ComponentModel;
@@ -623,9 +613,8 @@ mod tests {
     use moniker::Moniker;
     use routing::environment::RunnerRegistry;
     use routing::mapper::RouteSegment;
-    use scrutiny::prelude::{DataController, DataModel};
+    use scrutiny::prelude::DataModel;
     use scrutiny_testing::fake::fake_data_model;
-    use serde_json::json;
     use std::str::FromStr;
     use std::sync::Arc;
 
@@ -944,26 +933,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_component_routes_bad_request() -> Result<()> {
-        let data_model = valid_two_instance_two_dir_tree_model(Some(
-            valid_two_instance_two_dir_components_model(None)?,
-        ))?;
-        let controller = RouteSourcesController::default();
-        assert_eq!(
-            // Request JSON is invalid.
-            controller.query(data_model, json!({"invalid": "request"})).err().unwrap().to_string(),
-            BAD_REQUEST_CTX
-        );
-
-        Ok(())
-    }
-
-    #[fuchsia::test]
     fn test_component_routes_target_ok() -> Result<()> {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         // Vacuous request: Confirms that @root_url uses no input capabilities.
@@ -975,7 +948,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        ok_unwrap!(controller.run(component_model, components, &config));
+        ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
 
         Ok(())
     }
@@ -985,7 +958,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         // Request checking routes of a component instance that does not exist.
@@ -997,7 +969,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let err = err_unwrap!(controller.run(component_model, components, &config));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config));
         // Not using `err_start_with` because matching `err` string, not
         // `err.root_cause()` string; `MISSING_TARGET_INSTANCE` is the last context
         // attached to the error, which originates elsewhere.
@@ -1011,7 +983,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         // Request checking routes of a component instance that does not exist.
@@ -1052,7 +1023,7 @@ mod tests {
                 ],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(result, hashmap! {});
 
         Ok(())
@@ -1063,7 +1034,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         // Request fails because not all capabilities used by @two_dir_user_url
@@ -1076,7 +1046,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let err = err_unwrap!(controller.run(component_model, components, &config,));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config,));
         assert!(err.root_cause().to_string().starts_with(ROUTE_LISTS_INCOMPLETE));
 
         Ok(())
@@ -1087,7 +1057,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         // Successful request that confirms but does not verify sources on all capabilities used by
@@ -1111,7 +1080,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(
             result,
             hashmap! {
@@ -1127,7 +1096,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         // Successful request that confirms but does not verify sources on all
@@ -1159,7 +1127,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(
             result,
             hashmap! {
@@ -1175,7 +1143,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1219,7 +1186,7 @@ mod tests {
                 ],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
 
         assert_eq!(
             result,
@@ -1248,7 +1215,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1291,7 +1257,7 @@ mod tests {
                 ],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(
             result,
             hashmap! {
@@ -1319,7 +1285,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1376,7 +1341,7 @@ mod tests {
                 ],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(
             result,
             hashmap! {
@@ -1415,7 +1380,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1480,7 +1444,7 @@ mod tests {
                 },
             ],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(
             result,
             hashmap! {
@@ -1544,8 +1508,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let controller = RouteSourcesController::default();
-        let err = err_unwrap!(controller.run(component_model, components, &config));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config));
         // List appears incomplete because `routes_to_skip[0]` fails to match,
         // and `routes_to_skip` is allowed to contain unmatched items to support
         // soft transitions.
@@ -1595,8 +1558,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let controller = RouteSourcesController::default();
-        let err = err_unwrap!(controller.run(component_model, components, &config));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config));
         // List appears incomplete because `routes_to_skip[0]` fails to match,
         // and `routes_to_skip` is allowed to contain unmatched items to support
         // soft transitions.
@@ -1650,8 +1612,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let controller = RouteSourcesController::default();
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(result, hashmap! {"two_dir_user".to_string() => vec![]});
 
         Ok(())
@@ -1691,8 +1652,7 @@ mod tests {
                 routes_to_verify: vec![],
             }],
         };
-        let controller = RouteSourcesController::default();
-        let err = err_unwrap!(controller.run(component_model, components, &config));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config));
         err_starts_with!(err, ROUTE_LISTS_OVERLAP);
 
         Ok(())
@@ -1703,7 +1663,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1754,7 +1713,7 @@ mod tests {
                 ],
             }],
         };
-        let err = err_unwrap!(controller.run(component_model, components, &config));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config));
         err_starts_with!(err, ROUTE_LISTS_OVERLAP);
 
         Ok(())
@@ -1766,7 +1725,6 @@ mod tests {
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
         let dup_name = "/data/from/provider";
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1810,7 +1768,7 @@ mod tests {
                 ],
             }],
         };
-        let err = err_unwrap!(controller.run(component_model, components, &config));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config));
         err_starts_with!(err, ROUTE_LISTS_OVERLAP);
 
         Ok(())
@@ -1822,7 +1780,6 @@ mod tests {
             valid_two_instance_two_dir_components_model(None)?,
         ))?;
         let dup_name = "/data/from/provider";
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1864,7 +1821,7 @@ mod tests {
                 ],
             }],
         };
-        let err = err_unwrap!(controller.run(component_model, components, &config));
+        let err = err_unwrap!(RouteSourcesController::run(component_model, components, &config));
         err_contains!(err, ROUTE_LISTS_OVERLAP);
         err_contains!(err, ROUTE_LISTS_INCOMPLETE);
 
@@ -1876,7 +1833,6 @@ mod tests {
         let data_model = valid_two_instance_two_dir_tree_model(Some(
             two_instance_two_dir_components_model_missing_user(None)?,
         ))?;
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -1933,7 +1889,7 @@ mod tests {
                 ],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(
             result,
             hashmap! {
@@ -1959,7 +1915,6 @@ mod tests {
             two_instance_two_dir_components_model_duplicate_user(None)?;
         let data_model = valid_two_instance_two_dir_tree_model(Some(data_model))?;
 
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -2016,7 +1971,7 @@ mod tests {
                 ],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
         assert_eq!(
             result,
             hashmap! {
@@ -2042,7 +1997,6 @@ mod tests {
             two_instance_two_dir_components_model_untrusted_user_source(None)?;
         let data_model = valid_two_instance_two_dir_tree_model(Some(data_model))?;
 
-        let controller = RouteSourcesController::default();
         let component_model = &data_model.get::<V2ComponentModel>()?.component_model;
         let components = &data_model.get::<Components>()?.entries;
         let config = RouteSourcesConfig {
@@ -2099,7 +2053,7 @@ mod tests {
                 ],
             }],
         };
-        let result = ok_unwrap!(controller.run(component_model, components, &config));
+        let result = ok_unwrap!(RouteSourcesController::run(component_model, components, &config));
 
         assert_eq!(
             result,

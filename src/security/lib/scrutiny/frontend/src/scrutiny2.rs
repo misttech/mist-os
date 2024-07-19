@@ -17,10 +17,11 @@ use scrutiny_plugins::verify::controller::component_resolvers::{
     ComponentResolverRequest, ComponentResolverResponse, ComponentResolversController,
 };
 use scrutiny_plugins::verify::controller::pre_signing::{PreSigningController, PreSigningResponse};
+use scrutiny_plugins::verify::controller::route_sources::RouteSourcesController;
 use scrutiny_plugins::verify::controller::structured_config::{
     ExtractStructuredConfigController, ExtractStructuredConfigResponse,
 };
-use scrutiny_plugins::verify::CapabilityRouteResults;
+use scrutiny_plugins::verify::{CapabilityRouteResults, VerifyRouteSourcesResults};
 use scrutiny_plugins::zbi::Zbi;
 use scrutiny_utils::package::PackageIndexContents;
 use scrutiny_utils::url::from_pkg_url_parts;
@@ -135,6 +136,10 @@ impl ScrutinyArtifacts {
         response_level: &ResponseLevel,
     ) -> Result<CapabilityRouteResults> {
         CapabilityRouteController::get_results(self.model.clone(), capability_types, response_level)
+    }
+
+    pub fn get_route_sources(&self, input: String) -> Result<VerifyRouteSourcesResults> {
+        RouteSourcesController::get_results(self.model.clone(), input)
     }
 
     pub fn collect_presigning_errors(

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{anyhow, Error, Result};
 use ffx_scrutiny_verify_args::route_sources::Command;
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
-use scrutiny_plugins::verify::{RouteSourceError, VerifyRouteSourcesResults};
+use scrutiny_frontend::scrutiny2::Scrutiny;
+use scrutiny_plugins::verify::RouteSourceError;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
@@ -50,24 +48,13 @@ impl TryFrom<&Command> for Query {
 }
 
 fn verify_route_sources(query: Query) -> Result<HashSet<PathBuf>> {
-    let command =
-        CommandBuilder::new("verify.route_sources").param("input", query.config_path).build();
-    let model = if query.recovery {
-        ModelConfig::from_product_bundle_recovery(&query.product_bundle)
+    let artifacts = if query.recovery {
+        Scrutiny::from_product_bundle_recovery(&query.product_bundle)
     } else {
-        ModelConfig::from_product_bundle(&query.product_bundle)
-    }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).build();
-    config.runtime.logging.silent_mode = true;
-    config.runtime.model.tmp_dir_path = query.tmp_dir_path;
-
-    let scrutiny_output =
-        launcher::launch_from_config(config).context("Failed to run verify.route_sources")?;
-    let route_sources_results: VerifyRouteSourcesResults = serde_json::from_str(&scrutiny_output)
-        .context(format!(
-        "Failed to parse verify.route_sources JSON output as structured results: {}",
-        scrutiny_output
-    ))?;
+        Scrutiny::from_product_bundle(&query.product_bundle)
+    }?
+    .collect()?;
+    let route_sources_results = artifacts.get_route_sources(query.config_path)?;
 
     let mut errors = HashMap::new();
     for (path, results) in route_sources_results.results.iter() {
