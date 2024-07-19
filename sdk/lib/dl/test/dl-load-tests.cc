@@ -62,11 +62,11 @@ using TestTypes = ::testing::Types<
 TYPED_TEST_SUITE(DlTests, TestTypes);
 
 TYPED_TEST(DlTests, NotFound) {
-  constexpr const char* kNotFoundFile = "does-not-exist.so";
+  constexpr const char* kFile = "does-not-exist.so";
 
-  this->ExpectMissing(kNotFoundFile);
+  this->ExpectMissing(kFile);
 
-  auto result = this->DlOpen(kNotFoundFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
     EXPECT_EQ(result.error_value().take_str(), "does-not-exist.so not found");
@@ -82,7 +82,7 @@ TYPED_TEST(DlTests, NotFound) {
 }
 
 TYPED_TEST(DlTests, InvalidMode) {
-  constexpr const char* kBasicFile = "ret17.module.so";
+  constexpr const char* kFile = "ret17.module.so";
 
   if constexpr (!TestFixture::kCanValidateMode) {
     GTEST_SKIP() << "test requires dlopen to validate mode argment";
@@ -97,7 +97,7 @@ TYPED_TEST(DlTests, InvalidMode) {
   bad_mode &= ~RTLD_DEEPBIND;
 #endif
 
-  auto result = this->DlOpen(kBasicFile, bad_mode);
+  auto result = this->DlOpen(kFile, bad_mode);
   ASSERT_TRUE(result.is_error());
   EXPECT_EQ(result.error_value().take_str(), "invalid mode parameter")
       << "for mode argument " << bad_mode;
@@ -106,11 +106,20 @@ TYPED_TEST(DlTests, InvalidMode) {
 // Load a basic file with no dependencies.
 TYPED_TEST(DlTests, Basic) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kBasicFile = "ret17.module.so";
+  constexpr const char* kFile = "ret17.module.so";
 
-  this->ExpectRootModule(kBasicFile);
+  // TODO(https://fxbug.dev/354043838): Move these checks from tests and into
+  // the test fixture.
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+  }
 
-  auto result = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
+  this->ExpectRootModule(kFile);
+
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -128,11 +137,18 @@ TYPED_TEST(DlTests, Basic) {
 // function's return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Relative) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kRelativeRelocFile = "relative-reloc.module.so";
+  constexpr const char* kFile = "relative-reloc.module.so";
 
-  this->ExpectRootModule(kRelativeRelocFile);
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+  }
 
-  auto result = this->DlOpen(kRelativeRelocFile, RTLD_NOW | RTLD_LOCAL);
+  this->ExpectRootModule(kFile);
+
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -149,11 +165,18 @@ TYPED_TEST(DlTests, Relative) {
 // functions' return value is derived from the resolved symbols.
 TYPED_TEST(DlTests, Symbolic) {
   constexpr int64_t kReturnValue = 17;
-  constexpr const char* kSymbolicRelocFile = "symbolic-reloc.module.so";
+  constexpr const char* kFile = "symbolic-reloc.module.so";
 
-  this->ExpectRootModule(kSymbolicRelocFile);
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+  }
 
-  auto result = this->DlOpen(kSymbolicRelocFile, RTLD_NOW | RTLD_LOCAL);
+  this->ExpectRootModule(kFile);
+
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -169,13 +192,20 @@ TYPED_TEST(DlTests, Symbolic) {
 // Load a module that depends on a symbol provided directly by a dependency.
 TYPED_TEST(DlTests, BasicDep) {
   constexpr int64_t kReturnValue = 17;
+  constexpr const char* kFile = "basic-dep.module.so";
+  constexpr const char* kDepFile = "libld-dep-a.so";
 
-  constexpr const char* kBasicDepFile = "basic-dep.module.so";
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+  }
 
-  this->ExpectRootModule(kBasicDepFile);
-  this->Needed({"libld-dep-a.so"});
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile});
 
-  auto result = this->DlOpen(kBasicDepFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -194,13 +224,22 @@ TYPED_TEST(DlTests, BasicDep) {
 // (e.g. in its DT_NEEDED list):
 TYPED_TEST(DlTests, IndirectDeps) {
   constexpr int64_t kReturnValue = 17;
+  constexpr const char* kFile = "indirect-deps.module.so";
+  constexpr const char* kDepFile1 = "libindirect-deps-a.so";
+  constexpr const char* kDepFile2 = "libindirect-deps-b.so";
+  constexpr const char* kDepFile3 = "libindirect-deps-c.so";
 
-  constexpr const char* kIndirectDepsFile = "indirect-deps.module.so";
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+  }
 
-  this->ExpectRootModule(kIndirectDepsFile);
-  this->Needed({"libindirect-deps-a.so", "libindirect-deps-b.so", "libindirect-deps-c.so"});
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2, kDepFile3});
 
-  auto result = this->DlOpen(kIndirectDepsFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -218,20 +257,25 @@ TYPED_TEST(DlTests, IndirectDeps) {
 // share a dependency.
 TYPED_TEST(DlTests, ManyDeps) {
   constexpr int64_t kReturnValue = 17;
+  constexpr const char* kFile = "many-deps.module.so";
+  constexpr const char* kDepFile1 = "libld-dep-a.so";
+  constexpr const char* kDepFile2 = "libld-dep-b.so";
+  constexpr const char* kDepFile3 = "libld-dep-f.so";
+  constexpr const char* kDepFile4 = "libld-dep-c.so";
+  constexpr const char* kDepFile5 = "libld-dep-d.so";
+  constexpr const char* kDepFile6 = "libld-dep-e.so";
 
-  constexpr const char* kManyDepsFile = "many-deps.module.so";
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+  }
 
-  this->ExpectRootModule(kManyDepsFile);
-  this->Needed({
-      "libld-dep-a.so",
-      "libld-dep-b.so",
-      "libld-dep-f.so",
-      "libld-dep-c.so",
-      "libld-dep-d.so",
-      "libld-dep-e.so",
-  });
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2, kDepFile3, kDepFile4, kDepFile5, kDepFile6});
 
-  auto result = this->DlOpen(kManyDepsFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_ok()) << result.error_value();
   EXPECT_TRUE(result.value());
 
@@ -248,12 +292,13 @@ TYPED_TEST(DlTests, ManyDeps) {
 // Load a module that depends on libld-dep-a.so, but this dependency does not
 // provide the b symbol referenced by the root module, so relocation fails.
 TYPED_TEST(DlTests, MissingSymbol) {
-  constexpr const char* kMissingSymbolFile = "missing-sym.module.so";
+  constexpr const char* kFile = "missing-sym.module.so";
+  constexpr const char* kDepFile = "libld-dep-a.so";
 
-  this->ExpectRootModule(kMissingSymbolFile);
-  this->Needed({"libld-dep-a.so"});
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile});
 
-  auto result = this->DlOpen(kMissingSymbolFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
     EXPECT_EQ(result.error_value().take_str(), "missing-sym.module.so: undefined symbol: b");
@@ -276,12 +321,13 @@ TYPED_TEST(DlTests, MissingSymbol) {
 
 // Try to load a module that has a (direct) dependency that cannot be found.
 TYPED_TEST(DlTests, MissingDependency) {
-  constexpr const char* kMissingDepFile = "missing-dep.module.so";
+  constexpr const char* kFile = "missing-dep.module.so";
+  constexpr const char* kDepFile = "libmissing-dep-dep.so";
 
-  this->ExpectRootModule(kMissingDepFile);
-  this->Needed({NotFound("libmissing-dep-dep.so")});
+  this->ExpectRootModule(kFile);
+  this->Needed({NotFound(kDepFile)});
 
-  auto result = this->DlOpen(kMissingDepFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
 
   // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
@@ -303,12 +349,14 @@ TYPED_TEST(DlTests, MissingDependency) {
 // Try to load a module where the dependency of its direct dependency (i.e. a
 // transitive dependency of the root module) cannot be found.
 TYPED_TEST(DlTests, MissingTransitiveDependency) {
-  constexpr const char* kMissingTransitiveDepFile = "missing-transitive-dep.module.so";
+  constexpr const char* kFile = "missing-transitive-dep.module.so";
+  constexpr const char* kDepFile1 = "libhas-missing-dep.so";
+  constexpr const char* kDepFile2 = "libmissing-dep-dep.so";
 
-  this->ExpectRootModule(kMissingTransitiveDepFile);
-  this->Needed({Found("libhas-missing-dep.so"), NotFound("libmissing-dep-dep.so")});
+  this->ExpectRootModule(kFile);
+  this->Needed({Found(kDepFile1), NotFound(kDepFile2)});
 
-  auto result = this->DlOpen(kMissingTransitiveDepFile, RTLD_NOW | RTLD_LOCAL);
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   // TODO(https://fxbug.dev/336633049): Harmonize "not found" error messages
   // between implementations.
   // Expect that the dependency lib to libhas-missing-dep.so cannot be found.
@@ -330,16 +378,23 @@ TYPED_TEST(DlTests, MissingTransitiveDependency) {
 // dlsym() should return a pointer to the same symbol from the same module as
 // well.
 TYPED_TEST(DlTests, BasicModuleReuse) {
-  constexpr const char* kBasicFile = "ret17.module.so";
+  constexpr const char* kFile = "ret17.module.so";
 
-  this->ExpectRootModule(kBasicFile);
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+  }
 
-  auto res1 = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
+  this->ExpectRootModule(kFile);
+
+  auto res1 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(res1.is_ok()) << res1.error_value();
   auto ptr1 = res1.value();
   EXPECT_TRUE(ptr1);
 
-  auto res2 = this->DlOpen(kBasicFile, RTLD_NOW | RTLD_LOCAL);
+  auto res2 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(res2.is_ok()) << res2.error_value();
   auto ptr2 = res2.value();
   EXPECT_TRUE(ptr2);
@@ -365,21 +420,30 @@ TYPED_TEST(DlTests, BasicModuleReuse) {
 // Test that different mutually-exclusive files that were dlopen-ed do not share
 // pointers or resolved symbols.
 TYPED_TEST(DlTests, UniqueModules) {
-  constexpr const char* kRet17 = "ret17.module.so";
+  constexpr const char* kFile1 = "ret17.module.so";
   constexpr int64_t kReturnValue17 = 17;
-  constexpr const char* kRet23 = "ret23.module.so";
+  constexpr const char* kFile2 = "ret23.module.so";
   constexpr int64_t kReturnValue23 = 23;
 
-  this->ExpectRootModule(kRet17);
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile1);
+      this->ExpectRootModule(kFile2);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
+  }
 
-  auto ret17 = this->DlOpen(kRet17, RTLD_NOW | RTLD_LOCAL);
+  this->ExpectRootModule(kFile1);
+
+  auto ret17 = this->DlOpen(kFile1, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(ret17.is_ok()) << ret17.error_value();
   auto ret17_ptr = ret17.value();
   EXPECT_TRUE(ret17_ptr);
 
-  this->ExpectRootModule(kRet23);
+  this->ExpectRootModule(kFile2);
 
-  auto ret23 = this->DlOpen(kRet23, RTLD_NOW | RTLD_LOCAL);
+  auto ret23 = this->DlOpen(kFile2, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(ret23.is_ok()) << ret23.error_value();
   auto ret23_ptr = ret23.value();
   EXPECT_TRUE(ret23_ptr);

@@ -26,6 +26,8 @@ class DlImplTests : public Base {
   // since the error message returned from the libdl implementation will be the
   // same regardless of the OS.
   static constexpr bool kCanMatchExactError = true;
+  // TODO(https://fxbug.dev/348727901): Implement RTLD_NOLOAD
+  static constexpr bool kSupportsNoLoadMode = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
