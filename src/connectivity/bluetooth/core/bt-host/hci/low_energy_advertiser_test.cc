@@ -148,7 +148,7 @@ class LowEnergyAdvertiserTest : public TestingBase {
     auto name = "fuchsia";
     EXPECT_TRUE(result.SetLocalName(name));
 
-    auto appearance = 0x1234;
+    uint16_t appearance = 0x1234;
     result.SetAppearance(appearance);
 
     EXPECT_LE(result.CalculateBlockSize(include_flags),
@@ -240,7 +240,7 @@ class LowEnergyAdvertiserTest : public TestingBase {
     if (std::is_same_v<T, LegacyLowEnergyAdvertiser>) {
       auto emboss_packet = EmbossCommandPacket::New<
           pw::bluetooth::emboss::LESetRandomAddressCommandWriter>(
-              hci_spec::kLESetRandomAddress);
+          hci_spec::kLESetRandomAddress);
       emboss_packet.view_t().random_address().CopyFrom(
           random_address.value().view());
 

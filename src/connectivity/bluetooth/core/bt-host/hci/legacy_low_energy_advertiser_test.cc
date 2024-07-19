@@ -90,7 +90,7 @@ class LegacyLowEnergyAdvertiserTest : public TestingBase {
     auto name = "fuchsia";
     EXPECT_TRUE(result.SetLocalName(name));
 
-    auto appearance = 0x1234;
+    uint16_t appearance = 0x1234;
     result.SetAppearance(appearance);
 
     EXPECT_LE(result.CalculateBlockSize(include_flags),
@@ -137,8 +137,9 @@ class LegacyLowEnergyAdvertiserTest : public TestingBase {
   }
 
   void SetRandomAddress(DeviceAddress random_address) {
-    auto emboss_packet = EmbossCommandPacket::New<
-        pwemb::LESetRandomAddressCommandWriter>(hci_spec::kLESetRandomAddress);
+    auto emboss_packet =
+        EmbossCommandPacket::New<pwemb::LESetRandomAddressCommandWriter>(
+            hci_spec::kLESetRandomAddress);
     emboss_packet.view_t().random_address().CopyFrom(
         random_address.value().view());
 

@@ -4,6 +4,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/recombiner.h"
 
+#include <cstdint>
+
 #include <gtest/gtest.h>
 #include <pw_bytes/endian.h>
 
@@ -24,8 +26,8 @@ hci::ACLDataPacketPtr PacketFromBytes(T... data) {
   StaticByteBuffer bytes(std::forward<T>(data)...);
   BT_DEBUG_ASSERT(bytes.size() >= sizeof(hci_spec::ACLDataHeader));
 
-  auto packet =
-      hci::ACLDataPacket::New(bytes.size() - sizeof(hci_spec::ACLDataHeader));
+  auto packet = hci::ACLDataPacket::New(
+      static_cast<uint16_t>(bytes.size() - sizeof(hci_spec::ACLDataHeader)));
   packet->mutable_view()->mutable_data().Write(bytes);
   packet->InitializeFromBuffer();
 
@@ -37,13 +39,14 @@ hci::ACLDataPacketPtr FirstFragment(
     std::optional<uint16_t> payload_size = std::nullopt,
     hci_spec::ACLPacketBoundaryFlag pbf =
         hci_spec::ACLPacketBoundaryFlag::kFirstFlushable) {
-  uint16_t header_payload_size =
-      payload_size.has_value() ? *payload_size : payload.size();
-  auto packet =
-      hci::ACLDataPacket::New(kTestHandle,
-                              pbf,
-                              hci_spec::ACLBroadcastFlag::kPointToPoint,
-                              sizeof(BasicHeader) + payload.size());
+  uint16_t header_payload_size = payload_size.has_value()
+                                     ? *payload_size
+                                     : static_cast<uint16_t>(payload.size());
+  auto packet = hci::ACLDataPacket::New(
+      kTestHandle,
+      pbf,
+      hci_spec::ACLBroadcastFlag::kPointToPoint,
+      static_cast<uint16_t>(sizeof(BasicHeader) + payload.size()));
 
   // L2CAP Header
   auto* header = packet->mutable_view()->mutable_payload<BasicHeader>();
@@ -63,7 +66,7 @@ hci::ACLDataPacketPtr ContinuingFragment(std::string payload) {
       kTestHandle,
       hci_spec::ACLPacketBoundaryFlag::kContinuingFragment,
       hci_spec::ACLBroadcastFlag::kPointToPoint,
-      payload.size());
+      static_cast<uint16_t>(payload.size()));
   packet->mutable_view()->mutable_payload_data().Write(BufferView(payload));
   return packet;
 }
