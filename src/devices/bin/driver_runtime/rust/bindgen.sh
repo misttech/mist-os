@@ -33,6 +33,7 @@ readonly RAW_LINES="// Copyright 2024 The Fuchsia Authors. All rights reserved.
 pub use fuchsia_zircon_types::*;
 "
 
+readonly FUCHSIA_API_LEVEL_HEAD=4292870144
 readonly RUST_FILE="src/fdf_sys.rs"
 readonly ASYNC_INCLUDES_PATH="${FUCHSIA_DIR}"/zircon/system/ulib/async/include
 readonly DRIVER_RUNTIME_INCLUDES_PATH="${FUCHSIA_DIR}"/sdk/lib/driver/runtime/include
@@ -69,6 +70,7 @@ filter_headers \
     --allowlist-item 'fdf_.+|async_.+|Driver.+|FDF_.+|DRIVER_.+' \
     --blocklist-type 'zx_.+' \
     -- \
+    -D "__Fuchsia_API_level__=${FUCHSIA_API_LEVEL_HEAD}" \
     -I "${FUCHSIA_DIR}"/zircon/system/public \
     -I "${DRIVER_RUNTIME_INCLUDES_PATH}" \
     -I "${ASYNC_INCLUDES_PATH}"

@@ -6,6 +6,7 @@
 #define LIB_FDF_ARENA_H_
 
 #include <lib/fdf/types.h>
+#include <zircon/availability.h>
 
 __BEGIN_CDECLS
 
@@ -67,6 +68,17 @@ void fdf_arena_free(fdf_arena_t* arena, void* ptr);
 // Returns whether the memory region consisting of [|ptr|, |ptr|+|num_bytes|) resides entirely
 // within memory managed by the |arena|.
 bool fdf_arena_contains(fdf_arena_t* arena, const void* ptr, size_t num_bytes);
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(22)
+// Increments the reference count to the underlying runtime arena object.
+// This is intended mostly for use with FFIs, such as for Rust, to enable
+// more ergonomic use. Users in C should not need to call this, as
+// the reference count will be properly managed with the `fdf_channel_*`
+// and `fdf_arena_drop_ref` functions.
+// Calls to this function must be balanced by corresponding calls to
+// `fdf_arena_drop_ref`.
+void fdf_arena_add_ref(fdf_arena_t* arena);
+#endif
 
 // Destroys the reference to the underlying runtime arena object.
 // If there are no more references to the arena, all memory associated with

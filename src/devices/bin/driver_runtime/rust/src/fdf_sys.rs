@@ -537,6 +537,9 @@ extern "C" {
     ) -> bool;
 }
 extern "C" {
+    pub fn fdf_arena_add_ref(arena: *mut fdf_arena_t);
+}
+extern "C" {
     pub fn fdf_arena_drop_ref(arena: *mut fdf_arena_t);
 }
 #[repr(C)]
