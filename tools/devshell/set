@@ -200,7 +200,9 @@ function main {
     #   resulting binary. It's not needed, and including it requires `go build`
     #   to query for git status, which takes time and can trigger git garbage
     #   collection that messes with ninja build convergence.
-    if ! CGO_ENABLED=0 GOPROXY=off GO111MODULE=on fx-command-run go build -buildvcs=false -o "$exe_path" ./tools/build/fx-set/cmd; then
+    # - GOCACHE="${FX_CACHE_DIR}/gocache" makes sure this script won't write
+    #   outside of Fuchsia dir when bootstrapping.
+    if ! CGO_ENABLED=0 GOPROXY=off GO111MODULE=on GOCACHE="${FX_CACHE_DIR}/gocache" fx-command-run go build -buildvcs=false -o "$exe_path" ./tools/build/fx-set/cmd; then
       if ! $dev; then # If running in dev mode, compilation failures are expected.
         fx-error "Failed to build fx set."
       fi
