@@ -4,7 +4,7 @@
 
 use ffx_scrutiny_fvm_args::ScrutinyFvmCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_plugins::toolkit::fvm::FvmExtractController;
+use scrutiny_frontend::FvmExtractController;
 
 #[derive(FfxTool)]
 pub struct ScrutinyFvmTool {

@@ -4,7 +4,7 @@
 
 use ffx_scrutiny_structured_config_args::ScrutinyStructuredConfigCommand;
 use fho::{bug, FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_frontend::scrutiny2::Scrutiny;
+use scrutiny_frontend::Scrutiny;
 use scrutiny_utils::path::relativize_path;
 
 #[derive(FfxTool)]

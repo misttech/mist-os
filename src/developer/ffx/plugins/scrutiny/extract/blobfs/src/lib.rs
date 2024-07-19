@@ -4,7 +4,7 @@
 
 use ffx_scrutiny_blobfs_args::ScrutinyBlobfsCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_plugins::toolkit::blobfs::BlobFsExtractController;
+use scrutiny_frontend::BlobFsExtractController;
 
 #[derive(FfxTool)]
 pub struct ScrutinyBlobfsTool {

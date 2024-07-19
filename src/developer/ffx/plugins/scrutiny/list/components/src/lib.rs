@@ -4,7 +4,7 @@
 
 use ffx_scrutiny_components_list_args::ScrutinyComponentsCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_frontend::scrutiny2::Scrutiny;
+use scrutiny_frontend::Scrutiny;
 
 #[derive(FfxTool)]
 pub struct ScrutinyComponentsTool {

@@ -4,10 +4,10 @@
 
 use anyhow::{anyhow, Context, Result};
 use ffx_scrutiny_verify_args::component_resolvers::Command;
-use scrutiny_frontend::scrutiny2::{Scrutiny, ScrutinyArtifacts};
-use scrutiny_plugins::verify::controller::component_resolvers::{
+use scrutiny_frontend::verify::component_resolvers::{
     ComponentResolverRequest, ComponentResolverResponse,
 };
+use scrutiny_frontend::{Scrutiny, ScrutinyArtifacts};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;

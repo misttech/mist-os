@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use crate::TEST_REPO_URL;
+use fuchsia_merkle::HASH_SIZE;
 use fuchsia_url::{AbsolutePackageUrl, PackageName, UnpinnedAbsolutePackageUrl};
-use scrutiny::model::model::DataModel;
-use scrutiny_config::ModelConfig;
+use scrutiny_collection::core::ComponentSource;
+use scrutiny_collection::model::DataModel;
+use scrutiny_collection::model_config::ModelConfig;
 use std::str::FromStr;
 use std::sync::Arc;
 use tempfile::tempdir;
@@ -37,4 +39,10 @@ pub fn fake_model_config() -> ModelConfig {
 /// build directory.
 pub fn fake_data_model() -> Arc<DataModel> {
     Arc::new(DataModel::new(fake_model_config()).unwrap())
+}
+
+const FAKE_PKG_MERKLE: [u8; HASH_SIZE] = [0x42; HASH_SIZE];
+
+pub fn fake_component_src_pkg() -> ComponentSource {
+    ComponentSource::Package(FAKE_PKG_MERKLE.into())
 }

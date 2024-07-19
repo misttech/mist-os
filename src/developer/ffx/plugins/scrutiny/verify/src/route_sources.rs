@@ -4,8 +4,8 @@
 
 use anyhow::{anyhow, Error, Result};
 use ffx_scrutiny_verify_args::route_sources::Command;
-use scrutiny_frontend::scrutiny2::Scrutiny;
-use scrutiny_plugins::verify::RouteSourceError;
+use scrutiny_frontend::verify::route_sources::RouteSourceError;
+use scrutiny_frontend::Scrutiny;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 

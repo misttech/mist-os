@@ -10,7 +10,9 @@ rustc_library("cm_config") {
   with_unit_tests = true
 
   visibility = [
-    "//src/security/lib/scrutiny/plugins/*",
+    "//src/security/lib/scrutiny/collection/*",
+    "//src/security/lib/scrutiny/collector/*",
+    "//src/security/lib/scrutiny/frontend/*",
     "//src/security/lib/scrutiny/x/*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_config/*",

@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use ffx_scrutiny_verify_args::kernel_cmdline::Command;
-use scrutiny_frontend::scrutiny2::Scrutiny;
+use scrutiny_frontend::Scrutiny;
 use scrutiny_utils::golden::{CompareResult, GoldenFile};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

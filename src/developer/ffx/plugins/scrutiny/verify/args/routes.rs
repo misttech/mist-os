@@ -5,7 +5,7 @@
 use argh::{ArgsInfo, FromArgs};
 use cm_rust::CapabilityTypeName;
 use ffx_core::ffx_command;
-use scrutiny_plugins::verify::controller::capability_routing::ResponseLevel;
+use scrutiny_frontend::verify::capability_routing::ResponseLevel;
 use std::path::PathBuf;
 
 #[ffx_command()]

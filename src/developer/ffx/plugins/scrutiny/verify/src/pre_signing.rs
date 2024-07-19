@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use ffx_scrutiny_verify_args::pre_signing::Command;
-use scrutiny_frontend::scrutiny2::Scrutiny;
+use scrutiny_frontend::Scrutiny;
 use std::collections::HashSet;
 use std::path::PathBuf;
 

@@ -11,10 +11,9 @@ group("scrutiny") {
 group("lib") {
   if (is_host) {
     public_deps = [
-      "//src/security/lib/scrutiny/config",
-      "//src/security/lib/scrutiny/framework",
+      "//src/security/lib/scrutiny/collection",
+      "//src/security/lib/scrutiny/collector",
       "//src/security/lib/scrutiny/frontend",
-      "//src/security/lib/scrutiny/plugins",
       "//src/security/lib/scrutiny/testing",
       "//src/security/lib/scrutiny/utils",
     ]
@@ -32,10 +31,9 @@ if (is_host) {
   group("host_tests") {
     testonly = true
     deps = [
-      "config:tests",
-      "framework:tests",
+      "collection:tests",
+      "collector:tests",
       "frontend:tests",
-      "plugins:tests",
       "tests:host_tests",
       "utils:tests",
       "x:tests",

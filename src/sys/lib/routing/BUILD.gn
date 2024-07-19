@@ -13,7 +13,9 @@ rustc_library("routing") {
 
   visibility = [
     "//src/lib/assembly/component_id_index/*",
-    "//src/security/lib/scrutiny/plugins/*",
+    "//src/security/lib/scrutiny/collection/*",
+    "//src/security/lib/scrutiny/collector/*",
+    "//src/security/lib/scrutiny/frontend/*",
     "//src/security/lib/scrutiny/x/*",
     "//src/sys/component_manager/*",
     "//src/sys/full-resolver:*",
