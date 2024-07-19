@@ -17,8 +17,6 @@
 // This library is highly customized for the needs of its two users (Netstack
 // and fdio) and should not be relied upon by anyone else.
 
-// TODO(https://fxbug.dev/42179854): Consider replacing this library with FIDL-at-rest.
-
 #ifdef __cplusplus
 extern "C" {
 #endif
