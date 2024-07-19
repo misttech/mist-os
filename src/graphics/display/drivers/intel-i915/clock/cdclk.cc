@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/clock/cdclk.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -15,6 +14,7 @@
 #include "src/graphics/display/drivers/intel-i915/power-controller.h"
 #include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

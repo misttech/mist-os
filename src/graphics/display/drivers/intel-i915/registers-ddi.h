@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_H_
 
-#include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -14,6 +13,7 @@
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace registers {
 

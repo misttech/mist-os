@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
@@ -22,6 +21,7 @@
 #include "src/graphics/display/drivers/intel-i915/power-controller.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi-phy-tiger-lake.h"
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

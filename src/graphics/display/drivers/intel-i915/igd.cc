@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/igd.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/resource.h>
@@ -17,6 +16,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/acpi-memory-region.h"
 #include "src/graphics/display/drivers/intel-i915/firmware-bridge.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

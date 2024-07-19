@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/firmware-bridge.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -16,6 +15,7 @@
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 // Our implementation is based on the following versions of Intel's ACPI IGD
 // (Integrated Graphics Device) OpRegion Specification:

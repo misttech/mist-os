@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
 
@@ -19,6 +18,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

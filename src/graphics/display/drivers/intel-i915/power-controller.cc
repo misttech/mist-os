@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/power-controller.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
@@ -19,6 +18,7 @@
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers-gt-mailbox.h"
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

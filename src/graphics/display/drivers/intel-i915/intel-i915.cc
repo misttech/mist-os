@@ -8,7 +8,6 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/inout.h>
@@ -69,6 +68,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace i915 {

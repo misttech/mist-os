@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/intel-i915/dp-display.h"
 
 #include <endian.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio.h>
@@ -44,6 +43,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 namespace {

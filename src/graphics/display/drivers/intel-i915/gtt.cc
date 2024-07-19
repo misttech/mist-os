@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/gtt.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/align.h>
 
@@ -18,6 +17,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 #define PAGE_PRESENT (1 << 0)
 

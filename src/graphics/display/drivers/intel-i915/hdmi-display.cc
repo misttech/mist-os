@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/hdmi-display.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
@@ -35,6 +34,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

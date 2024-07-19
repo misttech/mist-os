@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-i915/pch-engine.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -21,6 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pch.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

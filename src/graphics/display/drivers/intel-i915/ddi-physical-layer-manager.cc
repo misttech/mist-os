@@ -4,12 +4,12 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer-manager.h"
 
-#include <lib/ddk/debug.h>
 #include <zircon/assert.h>
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/intel-i915.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 

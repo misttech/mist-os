@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
@@ -26,6 +25,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace {
 
