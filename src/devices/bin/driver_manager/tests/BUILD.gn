@@ -112,9 +112,9 @@ fuchsia_unittest_component("bind-manager-test") {
   deps = [ ":bind_manager_test" ]
 }
 
-executable("composite_node_spec_v2_test") {
+executable("composite_node_spec_impl_test") {
   testonly = true
-  sources = [ "composite_node_spec_v2_test.cc" ]
+  sources = [ "composite_node_spec_impl_test.cc" ]
 
   deps = [ ":driver_manager_test_base" ]
 }
@@ -136,7 +136,7 @@ executable("node_test") {
 }
 
 fuchsia_unittest_component("composite-node-spec-v2-test") {
-  deps = [ ":composite_node_spec_v2_test" ]
+  deps = [ ":composite_node_spec_impl_test" ]
 }
 
 executable("node_removal_tracker_test") {

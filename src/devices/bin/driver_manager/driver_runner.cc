@@ -21,7 +21,7 @@
 #include <random>
 #include <stack>
 
-#include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
+#include "src/devices/bin/driver_manager/composite_node_spec_impl.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
 
@@ -272,7 +272,7 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
     return;
   }
 
-  auto spec = std::make_unique<CompositeNodeSpecV2>(
+  auto spec = std::make_unique<CompositeNodeSpecImpl>(
       CompositeNodeSpecCreateInfo{
           .name = std::string(request->name().get()),
           .parents = fidl::ToNatural(request->parents()).value(),

@@ -2,20 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
+#include "src/devices/bin/driver_manager/composite_node_spec_impl.h"
 
 namespace fdd = fuchsia_driver_development;
 
 namespace driver_manager {
 
-CompositeNodeSpecV2::CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info,
-                                         async_dispatcher_t* dispatcher, NodeManager* node_manager)
+CompositeNodeSpecImpl::CompositeNodeSpecImpl(CompositeNodeSpecCreateInfo create_info,
+                                             async_dispatcher_t* dispatcher,
+                                             NodeManager* node_manager)
     : CompositeNodeSpec(std::move(create_info)),
       parent_set_collector_(std::nullopt),
       dispatcher_(dispatcher),
       node_manager_(node_manager) {}
 
-zx::result<std::optional<NodeWkPtr>> CompositeNodeSpecV2::BindParentImpl(
+zx::result<std::optional<NodeWkPtr>> CompositeNodeSpecImpl::BindParentImpl(
     fuchsia_driver_framework::wire::CompositeParent composite_parent, const NodeWkPtr& node_ptr) {
   ZX_ASSERT(composite_parent.has_index());
 
@@ -66,7 +67,7 @@ zx::result<std::optional<NodeWkPtr>> CompositeNodeSpecV2::BindParentImpl(
   return zx::ok(composite_node.value());
 }
 
-void CompositeNodeSpecV2::RemoveImpl(RemoveCompositeNodeCallback callback) {
+void CompositeNodeSpecImpl::RemoveImpl(RemoveCompositeNodeCallback callback) {
   if (!parent_set_collector_) {
     callback(zx::ok());
     return;
@@ -89,7 +90,7 @@ void CompositeNodeSpecV2::RemoveImpl(RemoveCompositeNodeCallback callback) {
   callback(zx::ok());
 }
 
-fdd::wire::CompositeNodeInfo CompositeNodeSpecV2::GetCompositeInfo(fidl::AnyArena& arena) const {
+fdd::wire::CompositeNodeInfo CompositeNodeSpecImpl::GetCompositeInfo(fidl::AnyArena& arena) const {
   auto composite_info = fdd::wire::CompositeNodeInfo::Builder(arena);
   if (!parent_set_collector_) {
     fidl::VectorView<fidl::StringView> parent_topological_paths(arena, size());

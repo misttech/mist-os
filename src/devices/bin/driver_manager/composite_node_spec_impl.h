@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_V2_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_V2_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_IMPL_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_IMPL_H_
 
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/parent_set_collector.h"
 
 namespace driver_manager {
 
-class CompositeNodeSpecV2 : public CompositeNodeSpec {
+class CompositeNodeSpecImpl : public CompositeNodeSpec {
  public:
   // Must only be called by Create() to ensure the objects are verified.
-  CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info, async_dispatcher_t* dispatcher,
-                      NodeManager* node_manager);
+  CompositeNodeSpecImpl(CompositeNodeSpecCreateInfo create_info, async_dispatcher_t* dispatcher,
+                        NodeManager* node_manager);
 
-  ~CompositeNodeSpecV2() override = default;
+  ~CompositeNodeSpecImpl() override = default;
 
   std::optional<NodeWkPtr> completed_composite_node() {
     return parent_set_collector_ ? parent_set_collector_->completed_composite_node() : std::nullopt;
@@ -50,4 +50,4 @@ class CompositeNodeSpecV2 : public CompositeNodeSpec {
 
 }  // namespace driver_manager
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_V2_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_IMPL_H_

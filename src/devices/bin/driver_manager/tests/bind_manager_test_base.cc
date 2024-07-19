@@ -76,7 +76,7 @@ void TestBindManagerBridge::AddSpecToDriverIndex(
 void TestBindManagerBridge::AddCompositeNodeSpec(
     std::string composite, std::vector<std::string> parent_names,
     std::vector<fdf::ParentSpec> parents,
-    std::unique_ptr<driver_manager::CompositeNodeSpecV2> spec) {
+    std::unique_ptr<driver_manager::CompositeNodeSpecImpl> spec) {
   fidl::Arena arena;
   auto fidl_spec = fdf::CompositeNodeSpec{{.name = composite, .parents = std::move(parents)}};
   specs_.emplace(composite, CompositeNodeSpecData{
@@ -245,7 +245,7 @@ void BindManagerTestBase::AddCompositeNodeSpec(std::string composite,
          .properties = {fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id)}}});
   }
 
-  auto spec = std::make_unique<driver_manager::CompositeNodeSpecV2>(
+  auto spec = std::make_unique<driver_manager::CompositeNodeSpecImpl>(
       driver_manager::CompositeNodeSpecCreateInfo{
           .name = composite,
           .parents = parent_specs,
