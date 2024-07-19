@@ -260,13 +260,22 @@ func buildImpl(
 		ninjaDebugFileSets = append(ninjaDebugFileSets, ninjaDebugFiles)
 	}
 
-	// Transitional: exposing the graph and compdb will not be needed
-	// after the soft-transition of ninjatrace and buildstats into fint
-	// is complete, at which point the following block can be deleted.
 	if contextSpec.ArtifactDir != "" && len(ninjaDebugFileSets) > 0 {
+		// Transitional: exposing the graph and compdb will not be needed
+		// after the soft-transition of ninjatrace and buildstats into fint
+		// is complete, at which point the following lines can be deleted.
 		// At the moment, expect only a single debug file set.
 		artifacts.NinjaGraphPath = ninjaDebugFileSets[0].graphPath
 		artifacts.NinjaCompdbPath = ninjaDebugFileSets[0].compdbPath
+
+		for _, debugFileSet := range ninjaDebugFileSets {
+			if debugFileSet.tracePath != "" {
+				artifacts.NinjatraceJsonFiles = append(artifacts.NinjatraceJsonFiles, debugFileSet.tracePath)
+			}
+			if debugFileSet.statsPath != "" {
+				artifacts.BuildstatsJsonFiles = append(artifacts.BuildstatsJsonFiles, debugFileSet.statsPath)
+			}
+		}
 	}
 
 	saveDebugFiles := func(paths []string) error {
