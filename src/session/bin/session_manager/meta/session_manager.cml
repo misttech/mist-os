@@ -169,6 +169,7 @@
                 "fuchsia.settings.Privacy",
                 "fuchsia.settings.Setup",
                 "fuchsia.ssh.AuthorizedKeys",
+                "fuchsia.starnix.runner.Manager",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.ultrasound.Factory",

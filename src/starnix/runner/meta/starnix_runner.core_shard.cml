@@ -159,4 +159,10 @@
             config: "fuchsia.starnix.runner.EnableDataCollection",
         },
     ],
+    expose: [
+        {
+            service: "fuchsia.starnix.runner.Manager",
+            from: "#starnix_runner",
+        },
+    ],
 }
