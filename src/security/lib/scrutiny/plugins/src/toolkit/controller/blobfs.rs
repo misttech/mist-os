@@ -21,7 +21,7 @@ impl BlobFsExtractController {
             .context("Failed to create temporary directory for blobfs extract controller")?;
 
         let blobfs_file = File::open(&input)
-            .map_err(|err| anyhow!("Failed to open blbofs archive {:?}: {}", input, err))?;
+            .map_err(|err| anyhow!("Failed to open blobfs archive {:?}: {}", input, err))?;
         let reader: TryClonableBufReaderFile = BufReader::new(blobfs_file).into();
         let mut reader =
             BlobFsReaderBuilder::new().archive(reader)?.tmp_dir(Arc::new(tmp_dir))?.build()?;

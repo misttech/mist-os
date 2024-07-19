@@ -13,6 +13,9 @@ use scrutiny_plugins::unified_plugin::UnifiedCollector;
 use scrutiny_plugins::verify::controller::capability_routing::{
     CapabilityRouteController, ResponseLevel,
 };
+use scrutiny_plugins::verify::controller::component_resolvers::{
+    ComponentResolverRequest, ComponentResolverResponse, ComponentResolversController,
+};
 use scrutiny_plugins::verify::controller::structured_config::{
     ExtractStructuredConfigController, ExtractStructuredConfigResponse,
 };
@@ -97,6 +100,16 @@ impl ScrutinyArtifacts {
     // TODO: Why is this optional?
     pub fn get_bootfs_packages(&self) -> Result<Option<PackageIndexContents>> {
         Ok(self.model.get::<Zbi>().unwrap().bootfs_packages.bootfs_pkgs.clone())
+    }
+
+    pub fn get_monikers_for_resolver(
+        &self,
+        scheme: String,
+        moniker: String,
+        protocol: String,
+    ) -> Result<ComponentResolverResponse> {
+        let request = ComponentResolverRequest { scheme, moniker, protocol };
+        ComponentResolversController::get_monikers(self.model.clone(), request)
     }
 
     pub fn extract_package(

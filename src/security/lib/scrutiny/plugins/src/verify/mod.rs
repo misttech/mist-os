@@ -153,7 +153,9 @@ mod tests {
     use crate::verify::controller::capability_routing::{
         CapabilityRouteController, ResponseLevel, V2ComponentModelMappingController,
     };
-    use crate::verify::controller::component_resolvers::ComponentResolversController;
+    use crate::verify::controller::component_resolvers::{
+        ComponentResolverRequest, ComponentResolverResponse, ComponentResolversController,
+    };
     use crate::zbi::Zbi;
     use anyhow::Result;
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -666,18 +668,20 @@ mod tests {
             ),
         ])?;
 
-        let controller = ComponentResolversController::default();
-
-        let response = controller.query(
+        let response = ComponentResolversController::get_monikers(
             model.clone(),
-            json!({ "scheme": "fuchsia-pkg", "moniker": "/my-resolver", "protocol": "protocol"}),
+            ComponentResolverRequest {
+                scheme: "fuchsia-pkg".into(),
+                moniker: "/my-resolver".into(),
+                protocol: "protocol".into(),
+            },
         )?;
-        assert_json_eq(
+        assert_eq!(
             response,
-            json!({
-              "deps": ["core_dep"],
-              "monikers": ["logger"],
-            }),
+            ComponentResolverResponse {
+                deps: HashSet::from(["core_dep".into()]),
+                monikers: vec!["logger".into()],
+            },
         );
         Ok(())
     }
@@ -738,18 +742,20 @@ mod tests {
                 }),
             ),
         ])?;
-        let controller = ComponentResolversController::default();
-
-        let response = controller.query(
+        let response = ComponentResolversController::get_monikers(
             model.clone(),
-            json!({ "scheme": "fuchsia-pkg", "moniker": ".", "protocol": "protocol"}),
+            ComponentResolverRequest {
+                scheme: "fuchsia-pkg".into(),
+                moniker: ".".into(),
+                protocol: "protocol".into(),
+            },
         )?;
-        assert_json_eq(
+        assert_eq!(
             response,
-            json!({
-              "deps": ["core_dep"],
-              "monikers": ["logger"],
-            }),
+            ComponentResolverResponse {
+                deps: HashSet::from(["core_dep".into()]),
+                monikers: vec!["logger".into()],
+            },
         );
         Ok(())
     }
@@ -830,18 +836,20 @@ mod tests {
             ),
         ])?;
 
-        let controller = ComponentResolversController::default();
-
-        let response = controller.query(
+        let response = ComponentResolversController::get_monikers(
             model.clone(),
-            json!({ "scheme": "fuchsia-pkg", "moniker": ".", "protocol": "protocol"}),
+            ComponentResolverRequest {
+                scheme: "fuchsia-pkg".into(),
+                moniker: ".".into(),
+                protocol: "protocol".into(),
+            },
         )?;
-        assert_json_eq(
+        assert_eq!(
             response,
-            json!({
-              "deps": ["core_dep"],
-              "monikers": ["logger/log-child"],
-            }),
+            ComponentResolverResponse {
+                deps: HashSet::from(["core_dep".into()]),
+                monikers: vec!["logger/log-child".into()],
+            },
         );
         Ok(())
     }
@@ -1016,20 +1024,22 @@ mod tests {
             ),
         ])?;
 
-        let controller = ComponentResolversController::default();
-
         // Even with an invalid component resolver, ensure queries for other component resolvers
         // find the expected instances.
-        let response = controller.query(
+        let response = ComponentResolversController::get_monikers(
             model.clone(),
-            json!({ "scheme": "fuchsia-pkg", "moniker": "core/custom-resolver", "protocol": "fuchsia.test.SpecialProtocol"}),
+            ComponentResolverRequest {
+                scheme: "fuchsia-pkg".into(),
+                moniker: "core/custom-resolver".into(),
+                protocol: "fuchsia.test.SpecialProtocol".into(),
+            },
         )?;
-        assert_json_eq(
+        assert_eq!(
             response,
-            json!({
-              "deps": ["core_dep"],
-              "monikers": ["core/resolved-from-custom"],
-            }),
+            ComponentResolverResponse {
+                deps: HashSet::from(["core_dep".into()]),
+                monikers: vec!["core/resolved-from-custom".into()],
+            },
         );
         Ok(())
     }

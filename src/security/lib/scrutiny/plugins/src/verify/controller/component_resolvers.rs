@@ -9,11 +9,8 @@ use cm_fidl_analyzer::component_model::ComponentModelForAnalyzer;
 use cm_fidl_analyzer::{BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker};
 use cm_rust::UseDecl;
 use routing::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface};
-use scrutiny::model::controller::DataController;
 use scrutiny::model::model::*;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use serde_json::value::Value;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -27,7 +24,7 @@ use std::sync::Arc;
 pub struct ComponentResolversController {}
 
 /// The expected query format.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct ComponentResolverRequest {
     /// `resolver` URI scheme of interest
     pub scheme: String,
@@ -38,7 +35,7 @@ pub struct ComponentResolverRequest {
 }
 
 /// The response schema.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 pub struct ComponentResolverResponse {
     /// Files accessed to perform this query, for depfile generation.
     pub deps: HashSet<PathBuf>,
@@ -120,39 +117,25 @@ impl ComponentInstanceVisitor for ComponentResolversVisitor {
     }
 }
 
-impl DataController for ComponentResolversController {
-    fn query(&self, model: Arc<DataModel>, request: Value) -> Result<Value> {
+impl ComponentResolversController {
+    pub fn get_monikers(
+        model: Arc<DataModel>,
+        request: ComponentResolverRequest,
+    ) -> Result<ComponentResolverResponse> {
         let tree_data = model
             .get::<V2ComponentModel>()
             .context("Failed to get V2ComponentModel from ComponentResolversController model")?;
         let deps = tree_data.deps.clone();
-        let controller: ComponentResolverRequest = serde_json::from_value(request)?;
 
         let model = &tree_data.component_model;
 
         let mut walker = BreadthFirstModelWalker::new();
-        let mut visitor = ComponentResolversVisitor::new(controller);
+        let mut visitor = ComponentResolversVisitor::new(request);
 
         walker.walk(&model, &mut visitor).context(
             "Failed to walk V2ComponentModel with BreadthFirstWalker and ComponentResolversVisitor",
         )?;
 
-        Ok(json!(ComponentResolverResponse { monikers: visitor.get_monikers(), deps }))
-    }
-
-    fn description(&self) -> String {
-        "Finds components resolved by a particular resolver".to_string()
-    }
-
-    fn usage(&self) -> String {
-        "Finds the absolute monikers of all components that, in their environment,
-         contain a resolver for `scheme`, provided by a component with the given `moniker`
-         and with access to `protocol`.
-
-Required parameters:
---scheme:  the resolver URI scheme to query
---moniker: the absolute moniker of the component providing the resolver capability
---resolver: filter results to components resolved with a resolver that has access to the given protocol"
-            .to_string()
+        Ok(ComponentResolverResponse { monikers: visitor.get_monikers(), deps })
     }
 }
