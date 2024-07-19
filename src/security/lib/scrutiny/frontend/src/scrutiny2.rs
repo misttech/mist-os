@@ -21,6 +21,7 @@ use scrutiny_plugins::verify::controller::pre_signing::{PreSigningController, Pr
 use scrutiny_plugins::verify::controller::route_sources::RouteSourcesController;
 use scrutiny_plugins::verify::controller::structured_config::{
     ExtractStructuredConfigController, ExtractStructuredConfigResponse,
+    VerifyStructuredConfigController, VerifyStructuredConfigResponse,
 };
 use scrutiny_plugins::verify::{CapabilityRouteResults, VerifyRouteSourcesResults};
 use scrutiny_plugins::zbi::Zbi;
@@ -153,5 +154,12 @@ impl ScrutinyArtifacts {
         golden_files_dir: String,
     ) -> Result<PreSigningResponse> {
         PreSigningController::collect_errors(self.model.clone(), policy_path, golden_files_dir)
+    }
+
+    pub fn verify_structured_config(
+        &self,
+        policy_path: impl AsRef<Path>,
+    ) -> Result<VerifyStructuredConfigResponse> {
+        VerifyStructuredConfigController::verify(self.model.clone(), policy_path)
     }
 }

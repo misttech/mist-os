@@ -13,7 +13,6 @@ use crate::search::controller::components::*;
 use crate::search::controller::packages::*;
 use crate::verify::controller::build::*;
 use crate::verify::controller::capability_routing::*;
-use crate::verify::controller::structured_config::*;
 use crate::zbi::controller::*;
 
 use scrutiny::prelude::*;
@@ -36,7 +35,6 @@ impl UnifiedPlugin {
                 "/search/packages" => PackageSearchController::default(),
                 "/verify/build" => VerifyBuildController::default(),
                 "/verify/v2_component_model" => V2ComponentModelMappingController::default(),
-                "/verify/structured_config" => VerifyStructuredConfigController::default(),
                 "/zbi/sections" => ZbiSectionsController::default(),
             },
         )

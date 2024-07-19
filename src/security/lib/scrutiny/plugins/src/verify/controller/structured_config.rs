@@ -8,12 +8,11 @@ use config_encoder::{ConfigField, ConfigFields};
 use config_value_file::field::config_value_from_json_value;
 use scrutiny::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// A controller to extract all of the configuration values in a given build's component topology.
@@ -96,16 +95,17 @@ fn config_value_to_json_value(value: cm_rust::ConfigValue) -> serde_json::Value 
 
 /// A controller which verifies that the system complies with the provided structured configuration
 /// policy.
-#[derive(Default)]
 pub struct VerifyStructuredConfigController;
 
-impl DataController for VerifyStructuredConfigController {
-    fn query(&self, model: Arc<DataModel>, query: serde_json::Value) -> Result<serde_json::Value> {
-        let request: StructuredConfigRequest =
-            serde_json::from_value(query).context("parsing request to verify structured config")?;
+impl VerifyStructuredConfigController {
+    pub fn verify(
+        model: Arc<DataModel>,
+        policy_path: impl AsRef<Path>,
+    ) -> Result<VerifyStructuredConfigResponse> {
+        let policy_path = policy_path.as_ref().to_path_buf();
         let mut policy_reader = BufReader::new(
-            File::open(&request.policy)
-                .with_context(|| format!("opening policy at {}", request.policy.display()))?,
+            File::open(&policy_path)
+                .with_context(|| format!("opening policy at {}", policy_path.display()))?,
         );
         let policy: StructuredConfigPolicy =
             serde_json5::from_reader(&mut policy_reader).context("parsing policy JSON")?;
@@ -119,8 +119,8 @@ impl DataController for VerifyStructuredConfigController {
         let errors = policy.verify(config_by_url);
 
         let mut deps = deps.clone();
-        deps.insert(request.policy);
-        Ok(json!(VerifyStructuredConfigResponse { deps, errors }))
+        deps.insert(policy_path);
+        Ok(VerifyStructuredConfigResponse { deps, errors })
     }
 }
 
@@ -258,13 +258,6 @@ impl FieldPolicy {
             }
         }
     }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct StructuredConfigRequest {
-    /// The input path to a json5 file containing `StructuredConfigPolicy`.
-    pub policy: PathBuf,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
