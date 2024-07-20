@@ -62,6 +62,8 @@ open protocol ListenerRegistry {
     /// The `ListenerRegistry` MUST continue to forward events to the
     /// `listener`, even after the `ListenerRegistry` connection
     /// is closed.
+    ///
+    /// Replaces any existing `listener` that was previously registered.
     flexible RegisterBlockingListener(resource struct {
         listener client_end:BlockingListener;
     }) -> ();
@@ -70,9 +72,13 @@ open protocol ListenerRegistry {
 /// Interface implemented by components which elect to receive
 /// power-state callbacks from a Session, and have the Session
 /// block related power operations until the component replies.
+///
+/// Closing the server endpoint of `BlockingListener` will
+/// remove the blocking listener from the registry and unblock
+/// related power operations.
 @available(added=HEAD)
 open protocol BlockingListener {
-    /// Called by the `ListenerRegistry` to inform the `server_end:BlockingListener`
+    /// Called by the `ListenerRegistry` to inform the component
     /// that the system has started resuming.
     ///
     /// The callee SHOULD minimize the time it (the callee) takes to reply,
@@ -83,7 +89,7 @@ open protocol BlockingListener {
     /// resume process.
     flexible OnResumeStarted() -> ();
 
-    /// Called by the `ListenerRegistry` to inform the `server_end:BlockingListener`
+    /// Called by the `ListenerRegistry` to inform the component
     /// that a suspend attempt failed.
     ///
     /// The callee SHOULD minimize the time it (callee) takes to reply,
