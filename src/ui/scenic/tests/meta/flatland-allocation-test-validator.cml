@@ -2,16 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/ui/scenic/tests/meta/scenic_integration_test_base.shard.cml" ],
+    include: [
+        "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
+        "//sdk/lib/syslog/client.shard.cml",
+    ],
     program: {
-        binary: "bin/flatland-allocation-test-bin",
+        binary: "bin/flatland-allocation-test-validator",
     },
     use: [
         {
             protocol: [
-                "fuchsia.sysmem.Allocator",
+                "fuchsia.logger.LogSink",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.vulkan.loader.Loader",
+                "fuchsia.ui.test.context.ScenicRealmFactory",
             ],
         },
     ],

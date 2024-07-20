@@ -9,6 +9,7 @@ group("tests") {
   testonly = true
   public_deps = [
     ":display-ownership-integration-test",
+    ":flatland-allocation-test",
     ":flatland-integration-tests",
     ":flatland-pixeltest-yuv",
     ":flatland-protected-memory-integration-test",
@@ -117,18 +118,6 @@ source_set("screen-capture-utils") {
   ]
 }
 
-executable("flatland-allocation-test-bin") {
-  testonly = true
-  sources = [ "flatland_integration_tests/flatland_allocation_test.cc" ]
-  deps = [
-    ":common-deps-zxtest-with-realm-builder",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//src/ui/scenic/lib/allocation:allocation",
-    "//src/ui/scenic/lib/utils:utils",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
 # Generate CTF tests required package format.
 #
 # Usage:
@@ -206,11 +195,21 @@ template("ctf_components_packages") {
   }
 }
 
-fuchsia_test_component("flatland-allocation-test") {
-  component_name = "flatland-allocation-test"
-  manifest = "meta/flatland_allocation_test.cml"
-  deps = [ ":flatland-allocation-test-bin" ]
-  test_type = "vulkan"
+ctf_components_packages("flatland-allocation-test") {
+  sources = [ "flatland_integration_tests/flatland_allocation_test.cc" ]
+  deps = [
+    ":common-deps-zxtest",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//src/ui/scenic/lib/allocation:allocation",
+    "//src/ui/scenic/lib/utils:utils",
+    "//zircon/system/ulib/fbl",
+  ]
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 executable("flatland-touch-integration-test-bin") {
@@ -504,7 +503,6 @@ fuchsia_test_component("flatland-pixeltest-general") {
 
 fuchsia_test_package("flatland-integration-tests") {
   test_components = [
-    ":flatland-allocation-test",
     ":flatland-focus-integration-test",
     ":flatland-mouse-integration-test",
     ":flatland-pixeltest-flip-and-orientation",

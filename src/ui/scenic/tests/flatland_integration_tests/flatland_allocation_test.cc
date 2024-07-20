@@ -5,7 +5,6 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
@@ -18,12 +17,10 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
-#include "src/ui/testing/util/logging_event_loop.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 
 namespace integration_tests {
 
-using component_testing::RealmRoot;
 using fuchsia::ui::composition::Allocator;
 using fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result;
 using fuchsia::ui::composition::ContentId;
@@ -54,28 +51,19 @@ fuchsia::sysmem2::BufferCollectionConstraints GetDefaultBufferConstraints() {
 }
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class AllocationTest : public ui_testing::LoggingEventLoop, public zxtest::Test {
+class AllocationTest : public ScenicCtfTest {
  public:
   void SetUp() override {
-    // Build the realm topology and route the protocols required by this test fixture from the
-    // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(ScenicRealmBuilder()
-                                             .AddRealmProtocol(Flatland::Name_)
-                                             .AddRealmProtocol(Allocator::Name_)
-                                             .Build());
+    ScenicCtfTest::SetUp();
 
     auto context = sys::ComponentContext::Create();
     context->svc()->Connect(sysmem_allocator_.NewRequest());
 
     // Create a flatland display so render and cleanup loops happen.
-    flatland_display_ = realm_->component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FX_LOGS(ERROR) << "Lost connection to Scenic: " << zx_status_get_string(status);
-      FAIL();
-    });
+    flatland_display_ = ConnectSyncIntoRealm<fuchsia::ui::composition::FlatlandDisplay>();
 
     // Create a root Flatland.
-    root_flatland_ = realm_->component().Connect<Flatland>();
+    root_flatland_ = ConnectAsyncIntoRealm<Flatland>();
     root_flatland_.set_error_handler([](zx_status_t status) {
       FX_LOGS(ERROR) << "Lost connection to Scenic: " << zx_status_get_string(status);
       FAIL();
@@ -96,11 +84,7 @@ class AllocationTest : public ui_testing::LoggingEventLoop, public zxtest::Test 
     root_flatland_.Unbind();
     flatland_display_.Unbind();
 
-    bool complete = false;
-    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
-    RunLoopUntil([&]() { return complete; });
-
-    zxtest::Test::TearDown();
+    ScenicCtfTest::TearDown();
   }
 
  protected:
@@ -136,15 +120,14 @@ class AllocationTest : public ui_testing::LoggingEventLoop, public zxtest::Test 
   }
 
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
-  std::unique_ptr<RealmRoot> realm_;
   fuchsia::ui::composition::FlatlandPtr root_flatland_;
 
  private:
-  fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
 };
 
 TEST_F(AllocationTest, CreateAndReleaseImage) {
-  auto flatland_allocator = realm_->component().ConnectSync<Allocator>();
+  auto flatland_allocator = ConnectSyncIntoRealm<Allocator>();
 
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
@@ -181,7 +164,7 @@ TEST_F(AllocationTest, CreateAndReleaseImage) {
 
 TEST_F(AllocationTest, CreateAndReleaseMultipleImages) {
   const auto kImageCount = 3;
-  auto flatland_allocator = realm_->component().ConnectSync<Allocator>();
+  auto flatland_allocator = ConnectSyncIntoRealm<Allocator>();
 
   for (uint64_t i = 1; i <= kImageCount; ++i) {
     auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
@@ -253,7 +236,7 @@ TEST_F(AllocationTest, MultipleClientsCreateAndReleaseImages) {
     EXPECT_EQ(status, ZX_OK);
     status = async::PostTask(loop->dispatcher(), [this, i, loop, &view_creation_tokens]() mutable {
       LoggingEventLoop present_loop;
-      auto flatland_allocator = realm_->component().ConnectSync<Allocator>();
+      auto flatland_allocator = ConnectSyncIntoRealm<Allocator>();
 
       auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
@@ -273,7 +256,7 @@ TEST_F(AllocationTest, MultipleClientsCreateAndReleaseImages) {
       auto info =
           SetConstraintsAndAllocateBuffer(std::move(local_token), GetDefaultBufferConstraints());
 
-      auto flatland = realm_->component().Connect<Flatland>();
+      auto flatland = ConnectAsyncIntoRealm<Flatland>();
       flatland.set_error_handler([](zx_status_t status) {
         FX_LOGS(ERROR) << "Lost connection to Scenic: " << zx_status_get_string(status);
         FAIL();
