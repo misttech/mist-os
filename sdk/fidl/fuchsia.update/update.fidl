@@ -332,3 +332,13 @@ type InstallationDeferralReason = flexible enum {
     /// be installed.
     CURRENT_SYSTEM_NOT_COMMITTED = 1;
 };
+
+/// Used by components to wait for the first software update check to complete.
+@available(added=HEAD)
+@discoverable
+open protocol Listener {
+    /// This is a hanging get. It may be called at any time. It will only
+    /// return if the software update checker has completed its post-boot check
+    /// (with or without error) and is not trying to reboot.
+    strict WaitForFirstUpdateCheckToComplete() -> ();
+};
