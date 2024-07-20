@@ -609,7 +609,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Initialize inspect
     let _inspect_server = inspect_runtime::publish(
-        component::inspector(),
+        fuchsia_inspect::component::init_inspector_with_size(500_000),
         inspect_runtime::PublishOptions::default(),
     );
     component::health().set_starting_up();
