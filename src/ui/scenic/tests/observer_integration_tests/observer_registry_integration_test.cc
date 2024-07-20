@@ -5,10 +5,8 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/focus/cpp/fidl.h>
 #include <fuchsia/ui/observation/test/cpp/fidl.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/interface_handle.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
@@ -19,7 +17,7 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
 
 // This test exercises the fuchsia.ui.observation.test.Registry protocol implemented by Scenic.
@@ -68,7 +66,6 @@ using fuc_ChildViewWatcher = fuchsia::ui::composition::ChildViewWatcher;
 using fuc_ContentId = fuchsia::ui::composition::ContentId;
 using fuc_Flatland = fuchsia::ui::composition::Flatland;
 using fuc_FlatlandDisplay = fuchsia::ui::composition::FlatlandDisplay;
-using fuc_FlatlandDisplayPtr = fuchsia::ui::composition::FlatlandDisplayPtr;
 using fuc_FlatlandPtr = fuchsia::ui::composition::FlatlandPtr;
 using fuc_ParentViewportWatcher = fuchsia::ui::composition::ParentViewportWatcher;
 using fuc_TransformId = fuchsia::ui::composition::TransformId;
@@ -87,7 +84,6 @@ using fuv_FocuserPtr = fuchsia::ui::views::FocuserPtr;
 using fuv_ViewRef = fuchsia::ui::views::ViewRef;
 using fuv_ViewRefFocusedPtr = fuchsia::ui::views::ViewRefFocusedPtr;
 using fuv_ViewportCreationToken = fuchsia::ui::views::ViewportCreationToken;
-using RealmRoot = component_testing::RealmRoot;
 
 struct DisplayDimensions {
   float width = 0.f, height = 0.f;
@@ -147,47 +143,32 @@ std::vector<fuog_ViewTreeSnapshot>::const_iterator GetFirstSnapshotWithView(
 
 // Test fixture that sets up an environment with Registry protocol we can connect to. This test
 // fixture is used for tests where the view nodes are created by Flatland instances.
-class FlatlandObserverRegistryIntegrationTest : public zxtest::Test,
-                                                public loop_fixture::RealLoop,
+class FlatlandObserverRegistryIntegrationTest : public ScenicCtfTest,
                                                 public fuf_FocusChainListener {
  protected:
   FlatlandObserverRegistryIntegrationTest() : focus_chain_listener_(this) {}
 
   void SetUp() override {
-    // Build the realm topology and route the protocols required by this test fixture from the
-    // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(
-        ScenicRealmBuilder()
-            .AddRealmProtocol(fuchsia::ui::observation::test::Registry::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-            .AddRealmProtocol(fuchsia::ui::focus::FocusChainListenerRegistry::Name_)
-            .Build());
+    ScenicCtfTest::SetUp();
 
     // Set up focus chain listener and wait for the initial null focus chain.
     fidl::InterfaceHandle<fuf_FocusChainListener> listener_handle;
     focus_chain_listener_.Bind(listener_handle.NewRequest());
-    auto focus_chain_listener_registry =
-        realm_->component().Connect<fuf_FocusChainListenerRegistry>();
+    auto focus_chain_listener_registry = ConnectSyncIntoRealm<fuf_FocusChainListenerRegistry>();
     focus_chain_listener_registry->Register(std::move(listener_handle));
     EXPECT_EQ(CountReceivedFocusChains(), 0u);
     RunLoopUntil([this] { return CountReceivedFocusChains() == 1u; });
     EXPECT_FALSE(LastFocusChain()->has_focus_chain());
 
-    observer_registry_ptr_ = realm_->component().Connect<fuot_Registry>();
-
+    observer_registry_ptr_ = ConnectAsyncIntoRealm<fuot_Registry>();
     observer_registry_ptr_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Observer Registry Protocol: %s", zx_status_get_string(status));
     });
 
-    flatland_display_ = realm_->component().Connect<fuc_FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
-    });
+    flatland_display_ = ConnectSyncIntoRealm<fuc_FlatlandDisplay>();
 
     // Set up root view.
-    root_session_ = realm_->component().Connect<fuc_Flatland>();
+    root_session_ = ConnectAsyncIntoRealm<fuc_Flatland>();
     root_session_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
@@ -275,10 +256,9 @@ class FlatlandObserverRegistryIntegrationTest : public zxtest::Test,
   fuc_FlatlandPtr root_session_;
   zx_koid_t root_view_ref_koid_ = ZX_KOID_INVALID;
   fuv_FocuserPtr root_focuser_;
-  std::unique_ptr<RealmRoot> realm_;
 
  private:
-  fuc_FlatlandDisplayPtr flatland_display_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
   fidl::Binding<fuf_FocusChainListener> focus_chain_listener_;
   std::vector<fuf_FocusChain> observed_focus_chains_;
 };
@@ -313,7 +293,7 @@ TEST_F(FlatlandObserverRegistryIntegrationTest, ClientReceivesTopologyUpdatesFor
   zx_koid_t parent_view_ref_koid = ZX_KOID_INVALID;
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    parent_session = realm_->component().Connect<fuc_Flatland>();
+    parent_session = ConnectAsyncIntoRealm<fuc_Flatland>();
     fidl::InterfacePtr<fuc_ParentViewportWatcher> parent_viewport_watcher;
     fuc_ViewBoundProtocols protocols;
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -331,7 +311,7 @@ TEST_F(FlatlandObserverRegistryIntegrationTest, ClientReceivesTopologyUpdatesFor
   zx_koid_t child_view_ref_koid = ZX_KOID_INVALID;
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    child_session = realm_->component().Connect<fuc_Flatland>();
+    child_session = ConnectAsyncIntoRealm<fuc_Flatland>();
     fidl::InterfacePtr<fuc_ParentViewportWatcher> parent_viewport_watcher;
     fuc_ViewBoundProtocols protocols;
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -422,7 +402,7 @@ TEST_F(FlatlandObserverRegistryIntegrationTest, ClientReceivesLayoutUpdatesForFl
   fuc_FlatlandPtr session;
 
   auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-  session = realm_->component().Connect<fuc_Flatland>();
+  session = ConnectAsyncIntoRealm<fuc_Flatland>();
   fidl::InterfacePtr<fuc_ParentViewportWatcher> parent_viewport_watcher;
   fuc_ViewBoundProtocols protocols;
   auto identity = scenic::NewViewIdentityOnCreation();
@@ -504,7 +484,7 @@ TEST_F(FlatlandObserverRegistryIntegrationTest, ChildRequestsFocusAfterConnectin
   fuv_ViewRefFocusedPtr child_focused_ptr;
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    child_session = realm_->component().Connect<fuc_Flatland>();
+    child_session = ConnectAsyncIntoRealm<fuc_Flatland>();
     fidl::InterfacePtr<fuc_ParentViewportWatcher> parent_viewport_watcher;
     fuc_ViewBoundProtocols protocols;
     protocols.set_view_ref_focused(child_focused_ptr.NewRequest());
@@ -577,7 +557,7 @@ TEST_F(FlatlandObserverRegistryIntegrationTest, ClientDeath_ShouldTriggerNewSnap
   zx_koid_t child_view_koid = ZX_KOID_INVALID;
   {
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
-    child = realm_->component().Connect<fuc_Flatland>();
+    child = ConnectAsyncIntoRealm<fuc_Flatland>();
     fidl::InterfacePtr<fuc_ParentViewportWatcher> parent_viewport_watcher;
     auto identity = scenic::NewViewIdentityOnCreation();
     child_view_koid = ExtractKoid(identity.view_ref);

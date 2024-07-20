@@ -13,7 +13,8 @@ group("tests") {
     ":flatland-pixeltest-yuv",
     ":flatland-protected-memory-integration-test",
     ":null-renderer-integration-test",
-    ":observer-integration-tests",
+    ":observer-registry-integration-test",
+    ":scoped-observer-registry-integration-test",
     ":screen-capture-integration-test",
     ":screen-capture2-integration-test",
     ":singleton-display-integration-test",
@@ -64,11 +65,11 @@ source_set("common-deps-zxtest") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
+    "//src/lib/fostr/fidl/fuchsia.ui.input:fuchsia.ui.input",
     "//src/ui/testing/util:loop_fixture",
     "//src/ui/testing/util:screenshot_helper",
     "//zircon/system/ulib/zxtest",
   ]
-  deps = [ "//src/lib/fostr/fidl/fuchsia.ui.input:fuchsia.ui.input" ]
 }
 
 # TODO(https://fxbug.dev/42175597): use common-deps-zxtest for CTF tests.
@@ -317,45 +318,41 @@ ctf_components_packages("null-renderer-integration-test") {
   }
 }
 
-executable("observer-registry-integration-test-bin") {
-  testonly = true
+ctf_components_packages("observer-registry-integration-test") {
   sources =
       [ "observer_integration_tests/observer_registry_integration_test.cc" ]
   deps = [
-    ":common-deps-zxtest-with-realm-builder",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.geometry:fuchsia.ui.observation.geometry_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.test:fuchsia.ui.observation.test_hlcpp",
   ]
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
-fuchsia_test_component("observer-registry-integration-test") {
-  component_name = "observer-registry-integration-test"
-  manifest = "meta/observer_registry_integration_test.cml"
-  deps = [ ":observer-registry-integration-test-bin" ]
-  test_type = "vulkan"
-}
-
-executable("scoped-observer-registry-integration-test-bin") {
-  testonly = true
+ctf_components_packages("scoped-observer-registry-integration-test") {
   sources = [
     "observer_integration_tests/scoped_observer_registry_integration_test.cc",
   ]
   deps = [
-    ":common-deps-zxtest-with-realm-builder",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.geometry:fuchsia.ui.observation.geometry_hlcpp",
     "//sdk/fidl/fuchsia.ui.observation.scope:fuchsia.ui.observation.scope_hlcpp",
   ]
-}
-
-fuchsia_test_component("scoped-observer-registry-integration-test") {
-  component_name = "scoped-observer-registry-integration-test"
-  manifest = "meta/scoped_observer_registry_integration_test.cml"
-  deps = [ ":scoped-observer-registry-integration-test-bin" ]
-  test_type = "vulkan"
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 executable("protected-memory-integration-test-bin") {
@@ -551,19 +548,6 @@ fuchsia_test_package("flatland-protected-memory-integration-test") {
       sherlock_env,
       nelson_env,
     ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-fuchsia_test_package("observer-integration-tests") {
-  test_components = [
-    ":observer-registry-integration-test",
-    ":scoped-observer-registry-integration-test",
-  ]
-  test_specs = {
-    environments = vulkan_envs
     log_settings = {
       max_severity = "ERROR"
     }

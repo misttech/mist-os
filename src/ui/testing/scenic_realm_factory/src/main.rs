@@ -13,6 +13,9 @@ use fidl_fuchsia_ui_composition_internal::{
     DisplayOwnershipMarker, ScreenCaptureMarker as ScreenCaptureMarker2,
 };
 use fidl_fuchsia_ui_display_singleton::InfoMarker as DisplayInfoMarker;
+use fidl_fuchsia_ui_focus::FocusChainListenerRegistryMarker;
+use fidl_fuchsia_ui_observation_scope::RegistryMarker as ScopedObservationRegistryMarker;
+use fidl_fuchsia_ui_observation_test::RegistryMarker as ObservationRegistryMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -193,6 +196,9 @@ async fn assemble_realm(
                 .capability(Capability::protocol::<ScreenCaptureMarker2>())
                 .capability(Capability::protocol::<DisplayOwnershipMarker>())
                 .capability(Capability::protocol::<DisplayInfoMarker>())
+                .capability(Capability::protocol::<ObservationRegistryMarker>())
+                .capability(Capability::protocol::<FocusChainListenerRegistryMarker>())
+                .capability(Capability::protocol::<ScopedObservationRegistryMarker>())
                 .from(Ref::child(SCENIC))
                 .to(Ref::parent()),
         )
