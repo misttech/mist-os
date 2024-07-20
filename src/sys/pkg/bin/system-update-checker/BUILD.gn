@@ -63,6 +63,7 @@ rustc_binary("bin") {
     "src/channel.rs",
     "src/channel_handler.rs",
     "src/check.rs",
+    "src/completion_responder.rs",
     "src/connect.rs",
     "src/errors.rs",
     "src/main.rs",
