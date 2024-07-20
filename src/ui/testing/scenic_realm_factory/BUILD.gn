@@ -19,6 +19,8 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_rust",
     "//sdk/fidl/fuchsia.ui.observation.scope:fuchsia.ui.observation.scope_rust",
     "//sdk/fidl/fuchsia.ui.observation.test:fuchsia.ui.observation.test_rust",
+    "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_rust",
+    "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_rust",
     "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

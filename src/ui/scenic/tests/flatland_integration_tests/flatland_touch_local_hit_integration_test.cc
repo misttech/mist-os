@@ -6,21 +6,18 @@
 #include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <zircon/status.h>
 
-#include <memory>
 #include <vector>
 
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
 
 // These tests exercise the integration between Flatland and the InputSystem for
 // TouchSourceWithLocalHit. Setup:
@@ -36,7 +33,6 @@ using ChildViewWatcher = fuchsia::ui::composition::ChildViewWatcher;
 using ContentId = fuchsia::ui::composition::ContentId;
 using Flatland = fuchsia::ui::composition::Flatland;
 using FlatlandDisplay = fuchsia::ui::composition::FlatlandDisplay;
-using FlatlandDisplayPtr = fuchsia::ui::composition::FlatlandDisplayPtr;
 using FlatlandPtr = fuchsia::ui::composition::FlatlandPtr;
 using ParentViewportWatcher = fuchsia::ui::composition::ParentViewportWatcher;
 using ViewportProperties = fuchsia::ui::composition::ViewportProperties;
@@ -64,10 +60,7 @@ using TouchSourcePtr = fuchsia::ui::pointer::TouchSourcePtr;
 
 using ViewRef = fuchsia::ui::views::ViewRef;
 
-using RealmRoot = component_testing::RealmRoot;
-
-class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test,
-                                             public ui_testing::LoggingEventLoop {
+class FlatlandTouchLocalHitIntegrationTest : public ScenicCtfTest {
  protected:
   static constexpr uint32_t kDeviceId = 1111;
   static constexpr uint32_t kPointerId = 2222;
@@ -81,34 +74,17 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test,
   // clang-format on
 
   void SetUp() override {
-    // Build the realm topology and route the protocols required by this test fixture from the
-    // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(
-        ScenicRealmBuilder()
-            .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-            .AddRealmProtocol(fuchsia::ui::pointerinjector::Registry::Name_)
-            .Build());
+    ScenicCtfTest::SetUp();
 
-    flatland_display_ = realm_->component().Connect<FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
-    });
-
-    pointerinjector_registry_ =
-        realm_->component().Connect<fuchsia::ui::pointerinjector::Registry>();
-    pointerinjector_registry_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to pointerinjector Registry: %s", zx_status_get_string(status));
-    });
-
-    local_hit_registry_ = realm_->component().Connect<fuchsia::ui::pointer::augment::LocalHit>();
+    flatland_display_ = ConnectSyncIntoRealm<FlatlandDisplay>();
+    pointerinjector_registry_ = ConnectSyncIntoRealm<fuchsia::ui::pointerinjector::Registry>();
+    local_hit_registry_ = ConnectAsyncIntoRealm<fuchsia::ui::pointer::augment::LocalHit>();
     local_hit_registry_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to LocalHit Registry: %s", zx_status_get_string(status));
     });
 
     // Set up root view and root transform.
-    root_instance_ = realm_->component().Connect<Flatland>();
+    root_instance_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     root_instance_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
@@ -163,12 +139,9 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test,
     }
 
     injector_.set_error_handler([this](zx_status_t) { injector_channel_closed_ = true; });
-    bool register_callback_fired = false;
-    pointerinjector_registry_->Register(
-        std::move(config), injector_.NewRequest(),
-        [&register_callback_fired] { register_callback_fired = true; });
+    ASSERT_EQ(ZX_OK,
+              pointerinjector_registry_->Register(std::move(config), injector_.NewRequest()));
 
-    RunLoopUntil([&register_callback_fired] { return register_callback_fired; });
     ASSERT_FALSE(injector_channel_closed_);
   }
 
@@ -227,7 +200,7 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test,
                                 TransformId parent_of_viewport_transform,
                                 ContentId viewport_content_id, FlatlandPtr& child_instance,
                                 fidl::InterfaceRequest<TouchSource> child_touch_source = nullptr) {
-    child_instance = realm_->component().Connect<Flatland>();
+    child_instance = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     // Set up the child view watcher.
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
@@ -282,12 +255,10 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test,
 
   float display_height_ = 0;
 
-  std::unique_ptr<RealmRoot> realm_;
-
  private:
-  FlatlandDisplayPtr flatland_display_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
 
-  fuchsia::ui::pointerinjector::RegistryPtr pointerinjector_registry_;
+  fuchsia::ui::pointerinjector::RegistrySyncPtr pointerinjector_registry_;
 
   DevicePtr injector_;
 

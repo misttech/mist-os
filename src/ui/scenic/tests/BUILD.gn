@@ -10,9 +10,12 @@ group("tests") {
   public_deps = [
     ":display-ownership-integration-test",
     ":flatland-allocation-test",
+    ":flatland-focus-integration-test",
     ":flatland-integration-tests",
+    ":flatland-mouse-integration-test",
     ":flatland-pixeltest-yuv",
     ":flatland-protected-memory-integration-test",
+    ":flatland-touch-integration-test",
     ":null-renderer-integration-test",
     ":observer-registry-integration-test",
     ":scoped-observer-registry-integration-test",
@@ -212,43 +215,39 @@ ctf_components_packages("flatland-allocation-test") {
   }
 }
 
-executable("flatland-touch-integration-test-bin") {
-  testonly = true
+ctf_components_packages("flatland-touch-integration-test") {
   sources = [
     "flatland_integration_tests/flatland_touch_integration_test.cc",
     "flatland_integration_tests/flatland_touch_local_hit_integration_test.cc",
   ]
   deps = [
-    ":common-deps-zxtest-with-realm-builder",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
   ]
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
-fuchsia_test_component("flatland-touch-integration-test") {
-  component_name = "flatland-touch-integration-test"
-  manifest = "meta/flatland_touch_integration_test.cml"
-  deps = [ ":flatland-touch-integration-test-bin" ]
-  test_type = "vulkan"
-}
-
-executable("flatland-focus-integration-test-bin") {
-  testonly = true
+ctf_components_packages("flatland-focus-integration-test") {
   sources = [ "flatland_integration_tests/flatland_focus_integration_test.cc" ]
   deps = [
-    ":common-deps-zxtest-with-realm-builder",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
   ]
-}
-
-fuchsia_test_component("flatland-focus-integration-test") {
-  component_name = "flatland-focus-integration-test"
-  manifest = "meta/flatland_focus_integration_test.cml"
-  deps = [ ":flatland-focus-integration-test-bin" ]
-  test_type = "vulkan"
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 executable("flatland-view-ref-installed-integration-test-bin") {
@@ -450,24 +449,22 @@ ctf_components_packages("singleton-display-integration-test") {
   }
 }
 
-executable("flatland-mouse-integration-test-bin") {
-  testonly = true
+ctf_components_packages("flatland-mouse-integration-test") {
   sources = [ "flatland_integration_tests/flatland_mouse_integration_test.cc" ]
   deps = [
-    ":common-deps-zxtest-with-realm-builder",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_hlcpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
     "//src/ui/scenic/lib/utils",
   ]
-}
-
-fuchsia_test_component("flatland-mouse-integration-test") {
-  component_name = "flatland-mouse-integration-test"
-  manifest = "meta/flatland_mouse_integration_test.cml"
-  deps = [ ":flatland-mouse-integration-test-bin" ]
-  test_type = "vulkan"
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 executable("flatland-pixeltest-bin") {
@@ -503,11 +500,8 @@ fuchsia_test_component("flatland-pixeltest-general") {
 
 fuchsia_test_package("flatland-integration-tests") {
   test_components = [
-    ":flatland-focus-integration-test",
-    ":flatland-mouse-integration-test",
     ":flatland-pixeltest-flip-and-orientation",
     ":flatland-pixeltest-general",
-    ":flatland-touch-integration-test",
     ":flatland-view-ref-installed-integration-test",
     ":flatland-view-integration-test",
   ]
