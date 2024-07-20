@@ -68,7 +68,6 @@
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/7",
 
                 // TODO(https://fxbug.dev/323847465)
-                "BpfMapTest.WriteRingBufTest",
                 "BpfMapTest.NotificationsRingBufTest",
             ],
         },

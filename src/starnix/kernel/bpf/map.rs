@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::mm::memory::MemoryObject;
+use crate::mm::vmar::AllocatedVmar;
 use crate::mm::{MemoryAccessor, ProtectionFlags, PAGE_SIZE};
 use crate::task::CurrentTask;
 use dense_map::DenseMap;
@@ -14,6 +15,7 @@ use starnix_lifecycle::AtomicU32Counter;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS,
@@ -33,11 +35,15 @@ use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_STRUCT_OPS, bpf_map_type_BPF_MAP_TYPE_TASK_STORAGE,
     bpf_map_type_BPF_MAP_TYPE_UNSPEC, bpf_map_type_BPF_MAP_TYPE_USER_RINGBUF,
     bpf_map_type_BPF_MAP_TYPE_XSKMAP, errno, error, from_status_like_fdio, BPF_EXIST, BPF_NOEXIST,
+    BPF_RB_FORCE_WAKEUP, BPF_RB_NO_WAKEUP, BPF_RINGBUF_BUSY_BIT, BPF_RINGBUF_DISCARD_BIT,
+    BPF_RINGBUF_HDR_SZ,
 };
+use static_assertions::const_assert;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::ops::{Bound, Deref, DerefMut, Range, RangeBounds};
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 /// Counter for map identifiers.
@@ -174,6 +180,61 @@ impl Map {
         Ok(())
     }
 
+    pub fn get_memory<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        length: Option<usize>,
+        prot: ProtectionFlags,
+    ) -> Result<Arc<MemoryObject>, Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        self.entries
+            .lock(locked)
+            .as_ringbuf()
+            .ok_or_else(|| errno!(ENODEV))?
+            .get_memory(length, prot)
+    }
+
+    pub fn ringbuf_reserve<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        size: u32,
+        flags: u64,
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        if flags != 0 {
+            return error!(EINVAL);
+        }
+        self.entries.lock(locked).as_ringbuf().ok_or_else(|| errno!(EINVAL))?.reserve(size)
+    }
+
+    /// Submit the data.
+    ///
+    /// # Safety
+    ///
+    /// `addr` must be the value returned by a previous call to `ringbuf_reserve`
+    /// on a map that has not been dropped, otherwise the behaviour is UB.
+    pub unsafe fn ringbuf_submit(addr: u64, flags: RingBufferWakeupPolicy) {
+        let addr = addr as usize;
+        let (ringbuf_storage, header) = Self::ringbuf_get_storage_and_header(addr);
+        ringbuf_storage.commit(header, flags, false);
+    }
+
+    /// Discard the data.
+    ///
+    /// # Safety
+    ///
+    /// `addr` must be the value returned by a previous call to `ringbuf_reserve`
+    /// on a map that has not been dropped, otherwise the behaviour is UB.
+    pub unsafe fn ringbuf_discard(addr: u64, flags: RingBufferWakeupPolicy) {
+        let addr = addr as usize;
+        let (ringbuf_storage, header) = Self::ringbuf_get_storage_and_header(addr);
+        ringbuf_storage.commit(header, flags, true);
+    }
+
     fn get<'a>(entries: &'a mut MapStore, schema: &MapSchema, key: &[u8]) -> Option<&'a mut [u8]> {
         match entries {
             MapStore::Hash(ref mut entries) => entries.get(&schema, key),
@@ -188,20 +249,24 @@ impl Map {
         }
     }
 
-    pub fn get_memory<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        length: Option<usize>,
-        prot: ProtectionFlags,
-    ) -> Result<Arc<MemoryObject>, Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        let entries = self.entries.lock(locked);
-        match entries.deref() {
-            MapStore::RingBuffer(ringbuf) => ringbuf.get_memory(length, prot),
-            _ => error!(ENODEV),
-        }
+    /// Get the `RingBufferStorage` and the `RingBufferRecordHeader` associated with `addr`.
+    ///
+    /// # Safety
+    ///
+    /// `addr` must be the value returned from a previous call to `ringbuf_reserve` on a `Map` that
+    /// has not been dropped and is kept alive as long as the returned value are used.
+    unsafe fn ringbuf_get_storage_and_header(
+        addr: usize,
+    ) -> (&'static RingBufferStorage, &'static RingBufferRecordHeader) {
+        let page_size = *PAGE_SIZE as usize;
+        // addr is the data section. First access the header.
+        let header = &*((addr - std::mem::size_of::<RingBufferRecordHeader>())
+            as *const RingBufferRecordHeader);
+        let addr_page = addr / page_size;
+        let mapping_start_page = addr_page - header.page_count as usize;
+        let mapping_start_address = mapping_start_page * page_size;
+        let ringbuf_storage = &*(mapping_start_address as *const &RingBufferStorage);
+        (ringbuf_storage, header)
     }
 }
 
@@ -213,7 +278,7 @@ type PinnedBuffer = Pin<Box<[u8]>>;
 enum MapStore {
     Array(PinnedBuffer),
     Hash(HashStorage),
-    RingBuffer(RingBufferStorage),
+    RingBuffer(Pin<Box<RingBufferStorage>>),
 }
 
 impl MapStore {
@@ -237,7 +302,6 @@ impl MapStore {
                 Ok(MapStore::Hash(HashStorage::new(&schema)?))
             }
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
-                track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_RINGBUF");
                 if schema.key_size != 0 || schema.value_size != 0 {
                     return error!(EINVAL);
                 }
@@ -377,6 +441,13 @@ impl MapStore {
             }
         }
     }
+
+    fn as_ringbuf(&mut self) -> Option<&mut RingBufferStorage> {
+        match self {
+            Self::RingBuffer(rb) => Some(rb),
+            _ => None,
+        }
+    }
 }
 
 fn compute_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
@@ -470,15 +541,42 @@ impl HashStorage {
 }
 
 struct RingBufferStorage {
-    // The specific memory object used to map the ring buffer.
     memory: Arc<MemoryObject>,
-    // The mask corresponding to the size of the ring buffer. This is used to map back the position
-    // in the ringbuffer (that are always growing) to their actual position in the memory object.
+    /// The mask corresponding to the size of the ring buffer. This is used to map back the
+    /// position in the ringbuffer (that are always growing) to their actual position in the memory
+    /// object.
     mask: u32,
+    /// The never decreasing position of the read head of the ring buffer. This is updated
+    /// exclusively from userspace.
+    consumer_position: &'static AtomicU32,
+    /// The never decreasing position of the writing head of the ring buffer. This is updated
+    /// exclusively from the kernel.
+    producer_position: &'static AtomicU32,
+    /// Pointer to the start of the data of the ring buffer.
+    data: usize,
+    /// The specific memory address space used to map the ring buffer. This is the last field in
+    /// the struct so that all the data that conceptually points to it is destroyed before the
+    /// memory is unmapped.
+    _vmar: AllocatedVmar,
 }
 
 impl RingBufferStorage {
-    fn new(size: usize) -> Result<Self, Errno> {
+    /// Build a new storage of a ring buffer. `size` must be a non zero multiple of the page size
+    /// and a power of 2.
+    ///
+    /// This will create a mapping in the kernel user space with the following layout:
+    ///
+    /// |T| |C| |P| |D| |D|
+    ///
+    /// where:
+    /// - T is 1 page containing at its 0 index a pointer to the `RingBufferStorage` itself.
+    /// - C is 1 page containing at its 0 index a atomic u32 for the consumer position
+    /// - P is 1 page containing at its 0 index a atomic u32 for the producer position
+    /// - D is size bytes and is the content of the ring buffer.
+    ///
+    /// The returns value is a `Pin<Box>`, because the structure is self referencing and is
+    /// required never to move in memory.
+    fn new(size: usize) -> Result<Pin<Box<Self>>, Errno> {
         let page_size: usize = *PAGE_SIZE as usize;
         // Size must be a power of 2 and a multiple of PAGE_SIZE
         if size == 0 || size % page_size != 0 || size & (size - 1) != 0 {
@@ -487,13 +585,138 @@ impl RingBufferStorage {
         let mask: u32 = (size - 1).try_into().map_err(|_| errno!(EINVAL))?;
         // Add the 2 control pages
         let vmo_size = 2 * page_size + size;
+        let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
+        // SAFETY
+        //
+        // The returned value and all pointer to the allocated memory will be part of `Self` and
+        // all pointers will be dropped before the vmar. This ensures the deallocated memory will
+        // not be used after it has been freed.
+        let (vmar, base) = unsafe {
+            AllocatedVmar::allocate(
+                &kernel_root_vmar,
+                0,
+                // Allocate for one technical page, the 2 control pages and twice the size.
+                page_size + vmo_size + size,
+                zx::VmarFlags::CAN_MAP_SPECIFIC
+                    | zx::VmarFlags::CAN_MAP_READ
+                    | zx::VmarFlags::CAN_MAP_WRITE,
+            )?
+        };
+        let technical_vmo =
+            zx::Vmo::create(page_size as u64).map_err(|e| from_status_like_fdio!(e))?;
+        vmar.map(
+            0,
+            &technical_vmo,
+            0,
+            page_size,
+            zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+        )
+        .map_err(|e| from_status_like_fdio!(e))?;
+
         let vmo = zx::Vmo::create(vmo_size as u64).map_err(|e| from_status_like_fdio!(e))?;
-        Ok(Self { memory: Arc::new(MemoryObject::RingBuf(vmo)), mask })
+        vmar.map(
+            page_size,
+            &vmo,
+            0,
+            vmo_size,
+            zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+        )
+        .map_err(|e| from_status_like_fdio!(e))?;
+        vmar.map(
+            page_size + vmo_size,
+            &vmo,
+            0,
+            size,
+            zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+        )
+        .map_err(|e| from_status_like_fdio!(e))?;
+        // SAFETY
+        //
+        // This is safe as long as the vmar mapping stays alive. This will be ensured by the
+        // `RingBufferStorage` itself.
+        let storage_position = unsafe { &mut *((base) as *mut *const Self) };
+        let consumer_position = unsafe { &*((base + page_size) as *const AtomicU32) };
+        let producer_position = unsafe { &*((base + 2 * page_size) as *const AtomicU32) };
+        let data = base + 3 * page_size;
+        let storage = Box::pin(Self {
+            memory: Arc::new(MemoryObject::RingBuf(vmo)),
+            mask,
+            consumer_position,
+            producer_position,
+            data,
+            _vmar: vmar,
+        });
+        // Store the pointer to the storage to the start of the technical vmo. This is required to
+        // access the storage from the bpf methods that only get a pointer to the reserved memory.
+        // This is safe as the returned referenced is Pinned.
+        *storage_position = storage.deref();
+        Ok(storage)
     }
 
-    // The size of the ring buffer.
+    /// The size of the ring buffer.
     fn size(&self) -> usize {
         (self.mask + 1) as usize
+    }
+
+    /// Reserve `size` bytes on the ringbuffer.
+    fn reserve(&mut self, size: u32) -> Result<usize, Errno> {
+        //  The top two bits are used as special flags.
+        if size & (BPF_RINGBUF_BUSY_BIT | BPF_RINGBUF_DISCARD_BIT) > 0 {
+            return error!(EINVAL);
+        }
+        let consumer_position = self.consumer_position.load(Ordering::Acquire);
+        let producer_position = self.producer_position.load(Ordering::Acquire);
+        let max_size = self.mask + 1;
+        // Available size on the ringbuffer.
+        let consumed_size =
+            producer_position.checked_sub(consumer_position).ok_or_else(|| errno!(EINVAL))?;
+        let available_size = max_size.checked_sub(consumed_size).ok_or_else(|| errno!(EINVAL))?;
+        // Total size of the message to write. This is the requested size + the header.
+        let total_size: u32 =
+            round_up_to_increment(size + BPF_RINGBUF_HDR_SZ, std::mem::size_of::<u64>())?;
+        if total_size > available_size {
+            return error!(ENOMEM);
+        }
+        let data_position = self.data_position(producer_position + BPF_RINGBUF_HDR_SZ);
+        let data_length = size | BPF_RINGBUF_BUSY_BIT;
+        let page_count = ((data_position - self.data) / (*PAGE_SIZE as usize) + 3)
+            .try_into()
+            .map_err(|_| errno!(EFBIG))?;
+        let header = self.header_mut(producer_position);
+        *header.length.get_mut() = data_length;
+        header.page_count = page_count;
+        self.producer_position.store(producer_position + total_size, Ordering::Release);
+        Ok(data_position)
+    }
+
+    /// Commit the section of the ringbuffer represented by the `header`. This only consist in
+    /// updating the header length with the correct state bits and signaling the map fd.
+    fn commit(
+        &self,
+        header: &RingBufferRecordHeader,
+        _flags: RingBufferWakeupPolicy,
+        discard: bool,
+    ) {
+        let mut new_length = header.length.load(Ordering::Acquire) & !BPF_RINGBUF_BUSY_BIT;
+        if discard {
+            new_length |= BPF_RINGBUF_DISCARD_BIT;
+        }
+        header.length.store(new_length, Ordering::Release);
+        track_stub!(TODO("https://fxbug.dev/323847465"), "must signal ringbuffer fd");
+    }
+
+    /// The pointer into `data` that corresponds to `position`.
+    fn data_position(&self, position: u32) -> usize {
+        self.data + ((position & self.mask) as usize)
+    }
+
+    /// Access the memory at `position` as a `RingBufferRecordHeader`.
+    fn header_mut(&mut self, position: u32) -> &mut RingBufferRecordHeader {
+        // SAFETY
+        //
+        // Reading / writing to the header is safe because the access is exclusive thanks to the
+        // mutable reference to `self` and userspace has only a read only access to this memory.
+        unsafe { &mut *(self.data_position(position) as *mut RingBufferRecordHeader) }
     }
 
     pub fn get_memory(
@@ -525,6 +748,36 @@ impl RingBufferStorage {
     }
 }
 
+#[repr(u32)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RingBufferWakeupPolicy {
+    DefaultWakeup = 0,
+    NoWakeup = BPF_RB_NO_WAKEUP,
+    ForceWakeup = BPF_RB_FORCE_WAKEUP,
+}
+
+impl From<u32> for RingBufferWakeupPolicy {
+    fn from(v: u32) -> Self {
+        match v {
+            BPF_RB_NO_WAKEUP => Self::NoWakeup,
+            BPF_RB_FORCE_WAKEUP => Self::ForceWakeup,
+            // If flags is invalid, use the default value. This is necessary to prevent userspace
+            // leaking ringbuf value by calling into the kernel with an incorrect flag value.
+            _ => Self::DefaultWakeup,
+        }
+    }
+}
+
+#[repr(C)]
+#[repr(align(8))]
+#[derive(Debug)]
+struct RingBufferRecordHeader {
+    length: AtomicU32,
+    page_count: u32,
+}
+
+const_assert!(std::mem::size_of::<RingBufferRecordHeader>() == BPF_RINGBUF_HDR_SZ as usize);
+
 fn new_pinned_buffer(size: usize) -> PinnedBuffer {
     vec![0u8; size].into_boxed_slice().into()
 }
@@ -537,4 +790,23 @@ fn array_range_for_index(value_size: u32, index: u32) -> Range<usize> {
     let base = index * value_size;
     let limit = base + value_size;
     (base as usize)..(limit as usize)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[fuchsia::test]
+    fn test_ring_buffer_wakeup_policy() {
+        assert_eq!(RingBufferWakeupPolicy::from(0), RingBufferWakeupPolicy::DefaultWakeup);
+        assert_eq!(
+            RingBufferWakeupPolicy::from(BPF_RB_NO_WAKEUP),
+            RingBufferWakeupPolicy::NoWakeup
+        );
+        assert_eq!(
+            RingBufferWakeupPolicy::from(BPF_RB_FORCE_WAKEUP),
+            RingBufferWakeupPolicy::ForceWakeup
+        );
+        assert_eq!(RingBufferWakeupPolicy::from(42), RingBufferWakeupPolicy::DefaultWakeup);
+    }
 }

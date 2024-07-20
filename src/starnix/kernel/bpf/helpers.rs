@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::map::Map;
+use crate::bpf::map::{Map, RingBufferWakeupPolicy};
 use crate::bpf::program::ProgramType;
 use crate::task::CurrentTask;
 use ebpf::{
@@ -17,11 +17,12 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_l4_csum_replace, bpf_func_id_BPF_FUNC_map_delete_elem,
     bpf_func_id_BPF_FUNC_map_lookup_elem, bpf_func_id_BPF_FUNC_map_update_elem,
     bpf_func_id_BPF_FUNC_probe_read_str, bpf_func_id_BPF_FUNC_redirect,
-    bpf_func_id_BPF_FUNC_ringbuf_reserve, bpf_func_id_BPF_FUNC_ringbuf_submit,
-    bpf_func_id_BPF_FUNC_skb_adjust_room, bpf_func_id_BPF_FUNC_skb_change_head,
-    bpf_func_id_BPF_FUNC_skb_change_proto, bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
-    bpf_func_id_BPF_FUNC_skb_pull_data, bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_sock,
-    bpf_sock_addr, bpf_user_pt_regs_t, uref, xdp_md,
+    bpf_func_id_BPF_FUNC_ringbuf_discard, bpf_func_id_BPF_FUNC_ringbuf_reserve,
+    bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_skb_adjust_room,
+    bpf_func_id_BPF_FUNC_skb_change_head, bpf_func_id_BPF_FUNC_skb_change_proto,
+    bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_skb_pull_data,
+    bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_sock, bpf_sock_addr, bpf_user_pt_regs_t, uref,
+    xdp_md,
 };
 use once_cell::sync::Lazy;
 use starnix_logging::track_stub;
@@ -49,6 +50,10 @@ fn bpf_map_lookup_elem(
     _: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
+    // SAFETY
+    //
+    // The safety of the operation is ensured by the bpf verifier. The `map` must be a reference to
+    // a `Map` object kept alive by the program itself and the key must be valid for said map.
     let map: &Map = unsafe { &*map.as_ptr::<Map>() };
     let key =
         unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
@@ -66,6 +71,10 @@ fn bpf_map_update_elem(
     flags: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
+    // SAFETY
+    //
+    // The safety of the operation is ensured by the bpf verifier. The `map` must be a reference to
+    // a `Map` object kept alive by the program itself.
     let map: &Map = unsafe { &*map.as_ptr::<Map>() };
     let key =
         unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
@@ -152,28 +161,66 @@ fn bpf_skb_pull_data(
 const RINGBUF_RESERVE_NAME: &'static str = "ringbuf_reserve";
 
 fn bpf_ringbuf_reserve(
-    _context: &mut HelperFunctionContext<'_>,
-    _: BpfValue,
-    _: BpfValue,
-    _: BpfValue,
+    context: &mut HelperFunctionContext<'_>,
+    map: BpfValue,
+    size: BpfValue,
+    flags: BpfValue,
     _: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
-    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ringbuf_reserve");
-    0.into()
+    // SAFETY
+    //
+    // The safety of the operation is ensured by the bpf verifier. The `map` must be a reference to
+    // a `Map` object kept alive by the program itself.
+    let map: &Map = unsafe { &*map.as_ptr::<Map>() };
+    let size = u32::from(size);
+    let flags = u64::from(flags);
+    map.ringbuf_reserve(context.locked, size, flags)
+        .map(BpfValue::from)
+        .unwrap_or_else(|_| BpfValue::default())
 }
 
 const RINGBUF_SUBMIT_NAME: &'static str = "ringbuf_submit";
 
 fn bpf_ringbuf_submit(
     _context: &mut HelperFunctionContext<'_>,
-    _: BpfValue,
-    _: BpfValue,
+    data: BpfValue,
+    flags: BpfValue,
     _: BpfValue,
     _: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
-    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ringbuf_submit");
+    let flags = RingBufferWakeupPolicy::from(u32::from(flags));
+
+    // SAFETY
+    //
+    // The safety of the operation is ensured by the bpf verifier. The data has to come from the
+    // result of a reserve call.
+    unsafe {
+        Map::ringbuf_submit(u64::from(data), flags);
+    }
+    0.into()
+}
+
+const RINGBUF_DISCARD_NAME: &'static str = "ringbuf_discard";
+
+fn bpf_ringbuf_discard(
+    _context: &mut HelperFunctionContext<'_>,
+    data: BpfValue,
+    flags: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    let flags = RingBufferWakeupPolicy::from(u32::from(flags));
+
+    // SAFETY
+    //
+    // The safety of the operation is ensured by the bpf verifier. The data has to come from the
+    // result of a reserve call.
+    unsafe {
+        Map::ringbuf_discard(u64::from(data), flags);
+    }
     0.into()
 }
 
@@ -456,6 +503,17 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
             index: bpf_func_id_BPF_FUNC_ringbuf_submit,
             name: RINGBUF_SUBMIT_NAME,
             function_pointer: Arc::new(bpf_ringbuf_submit),
+            signature: FunctionSignature {
+                // TODO(347257215): Implement verifier feature
+                args: vec![],
+                return_value: Type::default(),
+                invalidate_array_bounds: false,
+            },
+        },
+        EbpfHelper {
+            index: bpf_func_id_BPF_FUNC_ringbuf_discard,
+            name: RINGBUF_DISCARD_NAME,
+            function_pointer: Arc::new(bpf_ringbuf_discard),
             signature: FunctionSignature {
                 // TODO(347257215): Implement verifier feature
                 args: vec![],

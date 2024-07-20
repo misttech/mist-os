@@ -442,6 +442,9 @@ TEST_F(BpfMapTest, WriteRingBufTest) {
   ASSERT_EQ(0u, record_length & BPF_RINGBUF_DISCARD_BIT);
   ASSERT_EQ(1u, record_length);
 
+  uint32_t page_offset = *reinterpret_cast<uint32_t*>(data + 4);
+  ASSERT_EQ(3u, page_offset);
+
   uint8_t record_value = *(data + 8);
   ASSERT_EQ(42u, record_value);
 
