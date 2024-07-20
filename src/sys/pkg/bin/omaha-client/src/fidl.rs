@@ -13,7 +13,8 @@ use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
 use fidl_fuchsia_update::{
     self as update, AttemptsMonitorMarker, CheckNotStartedReason, CheckingForUpdatesData,
     ErrorCheckingForUpdateData, Initiator, InstallationDeferralReason, InstallationDeferredData,
-    InstallationErrorData, InstallationProgress, InstallingData, ManagerRequest,
+    InstallationErrorData, InstallationProgress, InstallingData, ListenerRequest,
+    ListenerRequestStream, ListenerWaitForFirstUpdateCheckToCompleteResponder, ManagerRequest,
     ManagerRequestStream, MonitorMarker, MonitorProxy, MonitorProxyInterface,
     NoUpdateAvailableData, UpdateInfo,
 };
@@ -210,6 +211,8 @@ where
 
     metrics_reporter: Box<dyn ApiMetricsReporter>,
 
+    completion_responder: CompletionResponder,
+
     current_channel: Option<String>,
 }
 
@@ -217,6 +220,7 @@ pub enum IncomingServices {
     Manager(ManagerRequestStream),
     ChannelControl(ChannelControlRequestStream),
     ChannelProvider(ProviderRequestStream),
+    Listener(ListenerRequestStream),
 }
 
 impl<ST, SM> FidlServer<ST, SM>
@@ -246,6 +250,7 @@ where
         let (attempt_monitor_queue_fut, attempt_monitor_queue) = EventQueue::new();
         fasync::Task::local(single_monitor_queue_fut).detach();
         fasync::Task::local(attempt_monitor_queue_fut).detach();
+        let completion_responder = CompletionResponder::new();
         FidlServer {
             state_machine_control,
             storage_ref,
@@ -257,6 +262,7 @@ where
             single_monitor_queue,
             attempt_monitor_queue,
             metrics_reporter,
+            completion_responder,
             current_channel,
         }
     }
@@ -269,7 +275,8 @@ where
         fs.dir("svc")
             .add_fidl_service(IncomingServices::Manager)
             .add_fidl_service(IncomingServices::ChannelControl)
-            .add_fidl_service(IncomingServices::ChannelProvider);
+            .add_fidl_service(IncomingServices::ChannelProvider)
+            .add_fidl_service(IncomingServices::Listener);
         const MAX_CONCURRENT: usize = 1000;
         // Handle each client connection concurrently.
         fs.for_each_concurrent(MAX_CONCURRENT, |stream| {
@@ -305,6 +312,14 @@ where
                     stream.try_next().await.context("error receiving Provider request")?
                 {
                     Self::handle_channel_provider_request(Rc::clone(&server), request).await?;
+                }
+            }
+            IncomingServices::Listener(mut stream) => {
+                while let Some(request) =
+                    stream.try_next().await.context("error receiving CheckCompletion request")?
+                {
+                    Self::handle_on_update_check_completion_request(Rc::clone(&server), request)
+                        .await?;
                 }
             }
         }
@@ -427,6 +442,19 @@ where
                     .send(&channel)
                     .context("error sending GetCurrent response from Provider")?;
             }
+        }
+        Ok(())
+    }
+
+    async fn handle_on_update_check_completion_request(
+        server: Rc<RefCell<Self>>,
+        request: ListenerRequest,
+    ) -> Result<(), Error> {
+        match request {
+            ListenerRequest::WaitForFirstUpdateCheckToComplete { responder } => {
+                server.borrow_mut().completion_responder.respond_when_appropriate(responder).await;
+            }
+            ListenerRequest::_UnknownMethod { .. } => {}
         }
         Ok(())
     }
@@ -574,6 +602,8 @@ where
             _ => {}
         }
 
+        server.borrow_mut().completion_responder.react_to(&state).await;
+
         Self::send_state_to_queue(Rc::clone(&server)).await;
 
         match state {
@@ -650,6 +680,54 @@ where
 
     pub fn set_urgent_update(server: Rc<RefCell<Self>>, is_urgent: bool) {
         server.borrow_mut().state.urgent = Some(is_urgent);
+    }
+}
+
+enum CompletionResponder {
+    Waiting(Vec<ListenerWaitForFirstUpdateCheckToCompleteResponder>),
+    Satisfied,
+}
+
+impl CompletionResponder {
+    fn new() -> Self {
+        CompletionResponder::Waiting(Vec::new())
+    }
+
+    async fn respond_when_appropriate(
+        &mut self,
+        responder: ListenerWaitForFirstUpdateCheckToCompleteResponder,
+    ) {
+        match self {
+            CompletionResponder::Waiting(ref mut responses) => responses.push(responder),
+            CompletionResponder::Satisfied => {
+                // If the client has closed the connection, that's not our concern.
+                let _ = responder.send();
+            }
+        }
+    }
+
+    async fn react_to(&mut self, state: &state_machine::State) {
+        // If a software update has completed, with or without error, and no reboot is needed,
+        // then send any waiting notifications and change state to Satisfied. Otherwise return.
+        match state {
+            state_machine::State::ErrorCheckingForUpdate
+            | state_machine::State::NoUpdateAvailable
+            | state_machine::State::InstallationDeferredByPolicy => {}
+            state_machine::State::Idle
+            | state_machine::State::InstallingUpdate
+            | state_machine::State::WaitingForReboot
+            | state_machine::State::InstallationError
+            | state_machine::State::CheckingForUpdates(_) => return,
+        }
+        match self {
+            CompletionResponder::Satisfied => return,
+            CompletionResponder::Waiting(responders) => {
+                for responder in responders.drain(..) {
+                    let _ = responder.send();
+                }
+                *self = CompletionResponder::Satisfied;
+            }
+        }
     }
 }
 
@@ -934,13 +1012,17 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::{create_proxy_and_stream, create_request_stream};
     use fidl_fuchsia_update::{
-        self as update, AttemptsMonitorRequest, ManagerMarker, MonitorRequest, MonitorRequestStream,
+        self as update, AttemptsMonitorRequest, ListenerMarker, ManagerMarker, MonitorRequest,
+        MonitorRequestStream,
     };
     use fidl_fuchsia_update_channel::ProviderMarker;
     use fidl_fuchsia_update_channelcontrol::ChannelControlMarker;
+    use fuchsia_async::TestExecutor;
     use fuchsia_inspect::Inspector;
+    use futures::pin_mut;
     use omaha_client::common::App;
     use omaha_client::protocol::Cohort;
+    use std::task::Poll;
 
     fn spawn_fidl_server<M: fidl::endpoints::ProtocolMarker>(
         fidl: Rc<RefCell<stub::StubFidlServer>>,
@@ -1613,5 +1695,65 @@ mod tests {
 
         FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::Idle).await;
         assert_eq!(fidl.borrow().state.urgent, None);
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_whether_state_satisfies() {
+        for state in [
+            state_machine::State::Idle,
+            state_machine::State::CheckingForUpdates(InstallSource::default()),
+            state_machine::State::ErrorCheckingForUpdate,
+            state_machine::State::NoUpdateAvailable,
+            state_machine::State::InstallationDeferredByPolicy,
+            state_machine::State::InstallingUpdate,
+            state_machine::State::WaitingForReboot,
+            state_machine::State::InstallationError,
+        ] {
+            let fidl = FidlServerBuilder::new().build().await;
+            FidlServer::on_state_change(Rc::clone(&fidl), state).await;
+            let proxy = spawn_fidl_server::<ListenerMarker>(fidl, IncomingServices::Listener);
+            let fut = proxy.wait_for_first_update_check_to_complete();
+            pin_mut!(fut);
+            let result = TestExecutor::poll_until_stalled(&mut fut).await;
+            match state {
+                state_machine::State::ErrorCheckingForUpdate
+                | state_machine::State::NoUpdateAvailable
+                | state_machine::State::InstallationDeferredByPolicy => {
+                    assert_matches!(result, Poll::Ready(_), "State {:?} didn't satisfy", state);
+                }
+                state_machine::State::Idle
+                | state_machine::State::CheckingForUpdates(_)
+                | state_machine::State::InstallingUpdate
+                | state_machine::State::WaitingForReboot
+                | state_machine::State::InstallationError => {
+                    assert_matches!(result, Poll::Pending, "State {:?} satisfied", state);
+                }
+            }
+        }
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn correct_response_sequencing() {
+        let fidl = FidlServerBuilder::new().build().await;
+        let proxy1 =
+            spawn_fidl_server::<ListenerMarker>(Rc::clone(&fidl), IncomingServices::Listener);
+        let proxy2 =
+            spawn_fidl_server::<ListenerMarker>(Rc::clone(&fidl), IncomingServices::Listener);
+        let waiter1 = proxy1.wait_for_first_update_check_to_complete();
+        let waiter2 = proxy2.wait_for_first_update_check_to_complete();
+        pin_mut!(waiter1);
+        pin_mut!(waiter2);
+
+        FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::Idle).await;
+        assert_matches!(TestExecutor::poll_until_stalled(&mut waiter1).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut waiter2).await, Poll::Pending);
+
+        FidlServer::on_state_change(Rc::clone(&fidl), state_machine::State::NoUpdateAvailable)
+            .await;
+        let _ = waiter1.await;
+        let _ = waiter2.await;
+        // Clients that start to wait after the happy state is received should return immediately.
+        let proxy3 = spawn_fidl_server::<ListenerMarker>(fidl, IncomingServices::Listener);
+        let _ = proxy3.wait_for_first_update_check_to_complete().await;
     }
 }
