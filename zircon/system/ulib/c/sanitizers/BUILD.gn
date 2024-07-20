@@ -8,7 +8,7 @@ if (zircon_toolchain != false) {
   source_set("sanitizers") {
     deps = [
       ":backtrace",
-      "//sdk/lib/fidl_base",
+      ":debugdata",
       "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",
       "//zircon/third_party/ulib/musl:musl_internal",
@@ -17,7 +17,6 @@ if (zircon_toolchain != false) {
       "__asan_early_init.c",
       "__sanitizer_fast_backtrace.cc",
       "asan-stubs.c",
-      "debugdata.cc",
       "hooks.c",
       "hwasan-stubs.cc",
       "log.c",
@@ -33,6 +32,15 @@ if (zircon_toolchain != false) {
         toolchain_variant.tags) {
       deps += [ ":sancov-stubs" ]
     }
+  }
+
+  source_set("debugdata") {
+    sources = [ "debugdata.cc" ]
+    deps = [
+      "//sdk/lib/ld:fuchsia-debugdata",
+      "//zircon/system/ulib/zx",
+      "//zircon/third_party/ulib/musl:musl_internal",
+    ]
   }
 
   # This code is only needed when compiling for sancov, but the file itself
