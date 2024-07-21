@@ -146,7 +146,10 @@ class TestConnection : public magma::TestDeviceBase {
   uint64_t gpu_addr_ = 0;
 };
 
-TEST(Shutdown, Test) {
+// TODO(https://fxbug.dev/351097268): The test is currently disabled because
+// the DFv2 intel-i915 driver doesn't support the fuchsia.device/Controller
+// protocol and does not export the devfs node.
+TEST(Shutdown, DISABLED_Test) {
   constexpr uint32_t kMaxCount = 10;
   for (uint32_t i = 0; i < kMaxCount; i++) {
     std::future wait_future = std::async([test = std::make_unique<TestConnection>()]() mutable {

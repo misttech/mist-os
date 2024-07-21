@@ -98,16 +98,22 @@ source_set("common_srcs") {
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.intelgpucore:fuchsia.hardware.intelgpucore_banjo_cpp",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/stdcompat",
     "//sdk/lib/zbi-format",
     "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/devices/bind/fuchsia.intel.platform.gpucore:fuchsia.intel.platform.gpucore_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
-    "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
@@ -136,7 +142,7 @@ fuchsia_driver("intel-i915-driver") {
   output_name = "intel-i915"
   deps = [
     ":common_srcs",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
   ]
 }
 
@@ -150,6 +156,34 @@ fuchsia_driver_component("intel-i915") {
 fuchsia_driver_package("package") {
   package_name = "intel-i915"
   driver_components = [ ":intel-i915" ]
+}
+
+test("intel-i915-dfv2-tests") {
+  sources = [ "intel-display-driver-test.cc" ]
+  deps = [
+    ":common_srcs",
+    "testing:fake-framebuffer",
+    "testing:mock-allocator",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/zbi-format:",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/devices/bind/fuchsia.intel.platform.gpucore:fuchsia.intel.platform.gpucore_cpp",
+    "//src/devices/pci/testing:pci-protocol-fake",
+    "//src/devices/testing/fake-resource",
+    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
 }
 
 test("intel-i915-test") {
@@ -171,7 +205,6 @@ test("intel-i915-test") {
     "gtt-unittest.cc",
     "hardware-common-unittest.cc",
     "i2c/gmbus-gpio-unittest.cc",
-    "intel-display-driver-test.cc",
     "intel-i915-test.cc",
     "interrupts-unittest.cc",
     "pch-engine-unittest.cc",
@@ -227,6 +260,7 @@ group("tests") {
   testonly = true
   deps = [
     ":intel-i915-bind_test",
+    ":intel-i915-dfv2-tests-package",
     ":intel-i915-test-package",
     "testing:tests",
   ]
@@ -236,6 +270,16 @@ fuchsia_unittest_package("intel-i915-test-package") {
   package_name = "intel-i915-test"
   deps = [ ":intel-i915-test" ]
   manifest = "meta/intel-i915-test.cml"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_unittest_package("intel-i915-dfv2-tests-package") {
+  package_name = "intel-i915-dfv2-tests"
+  deps = [ ":intel-i915-dfv2-tests" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

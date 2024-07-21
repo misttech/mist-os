@@ -5,7 +5,13 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_DISPLAY_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_DISPLAY_DRIVER_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/ddk/device.h>
+#include <lib/driver/compat/cpp/banjo_server.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/prepare_stop_completer.h>
+#include <lib/driver/component/cpp/start_completer.h>
 #include <lib/zx/result.h>
 
 #include <memory>
@@ -16,49 +22,49 @@
 
 namespace i915 {
 
-class IntelDisplayDriver;
-using DeviceType =
-    ddk::Device<IntelDisplayDriver, ddk::Initializable, ddk::Unbindable, ddk::Suspendable>;
-
 // Driver instance that binds to the intel-i915 PCI device.
 //
 // This class is responsible for interfacing with the Fuchsia Driver Framework.
-class IntelDisplayDriver : public DeviceType {
+class IntelDisplayDriver : public fdf::DriverBase {
  public:
-  // Creates an `IntelDisplayDriver` instance, performs short-running
-  // initialization of the hardware components and instructs the DDK to publish
-  // the device. On success, returns zx::ok() and the ownership of the driver
-  // instance is claimed by the driver manager.
-  //
-  // Long-running initialization is performed in the DdkInit hook.
-  static zx::result<> Create(zx_device_t* parent);
+  IntelDisplayDriver(fdf::DriverStartArgs start_args,
+                     fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  ~IntelDisplayDriver() override;
 
-  IntelDisplayDriver(zx_device_t* parent, std::unique_ptr<Controller> controller);
-  ~IntelDisplayDriver();
-
-  // ddk::Initializable:
-  void DdkInit(ddk::InitTxn txn);
-
-  // ddk::Unbindable:
-  void DdkUnbind(ddk::UnbindTxn txn);
-
-  // ddk::Device:
-  void DdkRelease();
-
-  // ddk::Suspendable:
-  void DdkSuspend(ddk::SuspendTxn txn);
+  // fdf::DriverBase:
+  void Start(fdf::StartCompleter completer) override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  void Stop() override;
 
   zx::result<ddk::AnyProtocol> GetProtocol(uint32_t proto_id);
 
   Controller* controller() const { return controller_.get(); }
 
  private:
-  zx::result<> Bind();
+  zx::result<> InitController();
+
+  // Must be called after `InitController()`.
+  zx::result<> InitDisplayNode();
+
+  // Must be called after `InitController()`.
+  zx::result<> InitGpuCoreNode();
+
+  void PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer);
+  void PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer);
 
   std::unique_ptr<Controller> controller_;
+  zx::resource framebuffer_resource_;
+  zx::resource mmio_resource_;
+  zx::resource ioport_resource_;
 
-  zx_device_t* gpu_core_device_ = nullptr;
-  zx_device_t* display_controller_device_ = nullptr;
+  std::optional<compat::BanjoServer> display_banjo_server_;
+  compat::SyncInitializedDeviceServer display_compat_server_;
+
+  std::optional<compat::BanjoServer> gpu_banjo_server_;
+  compat::SyncInitializedDeviceServer gpu_compat_server_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> display_node_controller_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> gpu_core_node_controller_;
 };
 
 }  // namespace i915

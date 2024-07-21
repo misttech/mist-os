@@ -1819,7 +1819,7 @@ uint16_t Controller::DataBufferBlockCount() const {
   static constexpr uint16_t kKabyLakeDataBufferBlockCount = 892;
 
   // Tiger Lake display engines have two DBUF slice with 1024 blocks each.
-  // TODO(https://fxbug.dev/42063006): We should be able to use 2048 blocks, since we
+  // TODO(https://fxbug.dev/42063006): We should be able to use 2048 blocks, since wee
   // power up both slices.
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev2.0 page 297
   // DG1: IHD-OS-DG1-Vol 12-2.21 page 250

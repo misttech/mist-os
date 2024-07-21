@@ -4,206 +4,323 @@
 
 #include "src/graphics/display/drivers/intel-i915/intel-display-driver.h"
 
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_completer.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
+#include <cstdint>
 #include <memory>
 
-#include <ddktl/device.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/display/cpp/bind.h>
+#include <bind/fuchsia/intel/platform/gpucore/cpp/bind.h>
 #include <fbl/alloc_checker.h>
-#include <src/graphics/display/drivers/intel-i915/intel-i915.h>
+
+#include "src/graphics/display/drivers/intel-i915/intel-i915.h"
 
 namespace i915 {
 
 namespace {
 
-constexpr zx_protocol_device_t kGpuCoreDeviceProtocol = {
-    .version = DEVICE_OPS_VERSION,
-    .get_protocol = [](void* ctx, uint32_t proto_id, void* protocol) -> zx_status_t {
-      if (proto_id != ZX_PROTOCOL_INTEL_GPU_CORE) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      IntelDisplayDriver& intel_display_driver = *reinterpret_cast<IntelDisplayDriver*>(ctx);
-      zx::result<ddk::AnyProtocol> result = intel_display_driver.GetProtocol(proto_id);
-      if (result.is_error()) {
-        return result.error_value();
-      }
-      *reinterpret_cast<ddk::AnyProtocol*>(protocol) = result.value();
-      return ZX_OK;
-    },
-    .release = [](void* ctx) {},
-};
+zx::result<fuchsia_device_manager::SystemPowerState> GetSystemPowerState(fdf::Namespace& incoming) {
+  zx::result<fidl::ClientEnd<fuchsia_device_manager::SystemStateTransition>>
+      sysmem_power_transition_result =
+          incoming.Connect<fuchsia_device_manager::SystemStateTransition>();
+  if (sysmem_power_transition_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to fuchsia.device.manager/SystemStateTransition: %s",
+            sysmem_power_transition_result.status_string());
+    return sysmem_power_transition_result.take_error();
+  }
+  fidl::WireSyncClient system_power_transition(std::move(sysmem_power_transition_result).value());
 
-constexpr zx_protocol_device_t kDisplayControllerDeviceProtocol = {
-    .version = DEVICE_OPS_VERSION,
-    .get_protocol = [](void* ctx, uint32_t proto_id, void* protocol) -> zx_status_t {
-      if (proto_id != ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      IntelDisplayDriver& intel_display_driver = *reinterpret_cast<IntelDisplayDriver*>(ctx);
-      zx::result<ddk::AnyProtocol> result = intel_display_driver.GetProtocol(proto_id);
-      if (result.is_error()) {
-        return result.error_value();
-      }
-      *reinterpret_cast<ddk::AnyProtocol*>(protocol) = result.value();
-      return ZX_OK;
-    },
-    .release = [](void* ctx) {},
-};
+  fidl::WireResult termination_state_result = system_power_transition->GetTerminationSystemState();
+  if (!termination_state_result.ok()) {
+    FDF_LOG(ERROR, "Failed to get termination state: %s", termination_state_result.status_string());
+    return zx::error(termination_state_result.status());
+  }
+  return zx::ok(termination_state_result.value().state);
+}
 
-ControllerResources GetControllerResources(zx_device_t* parent) {
-  return {
-      .framebuffer = zx::unowned_resource(get_framebuffer_resource(parent)),
-      .mmio = zx::unowned_resource(get_mmio_resource(parent)),
-      .ioport = zx::unowned_resource(get_ioport_resource(parent)),
-  };
+uint8_t PowerStateToSuspendReason(fuchsia_device_manager::SystemPowerState power_state) {
+  switch (power_state) {
+    case fuchsia_device_manager::SystemPowerState::kReboot:
+      return DEVICE_SUSPEND_REASON_REBOOT;
+    case fuchsia_device_manager::SystemPowerState::kRebootRecovery:
+      return DEVICE_SUSPEND_REASON_REBOOT_RECOVERY;
+    case fuchsia_device_manager::SystemPowerState::kRebootBootloader:
+      return DEVICE_SUSPEND_REASON_REBOOT_BOOTLOADER;
+    case fuchsia_device_manager::SystemPowerState::kMexec:
+      return DEVICE_SUSPEND_REASON_MEXEC;
+    case fuchsia_device_manager::SystemPowerState::kPoweroff:
+      return DEVICE_SUSPEND_REASON_POWEROFF;
+    case fuchsia_device_manager::SystemPowerState::kSuspendRam:
+      return DEVICE_SUSPEND_REASON_SUSPEND_RAM;
+    case fuchsia_device_manager::SystemPowerState::kRebootKernelInitiated:
+      return DEVICE_SUSPEND_REASON_REBOOT_KERNEL_INITIATED;
+    default:
+      return DEVICE_SUSPEND_REASON_SELECTIVE_SUSPEND;
+  }
+}
+
+template <typename ResourceProtocol>
+zx::result<zx::resource> GetKernelResource(fdf::Namespace& incoming, const char* resource_name) {
+  zx::result resource_result = incoming.Connect<ResourceProtocol>();
+  if (resource_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to kernel %s resource: %s", resource_name,
+            resource_result.status_string());
+    return resource_result.take_error();
+  }
+  fidl::WireSyncClient<ResourceProtocol> resource =
+      fidl::WireSyncClient(std::move(resource_result).value());
+  fidl::WireResult<typename ResourceProtocol::Get> get_result = resource->Get();
+  if (!get_result.ok()) {
+    FDF_LOG(ERROR, "Failed to get kernel %s resource: %s", resource_name,
+            get_result.FormatDescription().c_str());
+    return zx::error(get_result.status());
+  }
+  return zx::ok(std::move(std::move(get_result).value()).resource);
 }
 
 }  // namespace
 
-IntelDisplayDriver::IntelDisplayDriver(zx_device_t* parent, std::unique_ptr<Controller> controller)
-    : DeviceType(parent), controller_(std::move(controller)) {}
+IntelDisplayDriver::IntelDisplayDriver(fdf::DriverStartArgs start_args,
+                                       fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+    : fdf::DriverBase("intel-i915", std::move(start_args), std::move(driver_dispatcher)) {}
 
 IntelDisplayDriver::~IntelDisplayDriver() = default;
 
-// static
-zx::result<> IntelDisplayDriver::Create(zx_device_t* parent) {
+zx::result<> IntelDisplayDriver::InitController() {
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_result =
-      ddk::Device<void>::DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>(parent);
+      incoming()->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to sysmem protocol: %s", sysmem_result.status_string());
+    FDF_LOG(ERROR, "Failed to connect to sysmem protocol: %s", sysmem_result.status_string());
     return sysmem_result.take_error();
   }
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem = std::move(sysmem_result).value();
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_pci::Service::Device>(
-          parent, "pci");
+      incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
   if (pci_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to pci protocol: %s", pci_result.status_string());
+    FDF_LOG(ERROR, "Failed to connect to pci protocol: %s", pci_result.status_string());
     return pci_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_pci::Device> pci = std::move(pci_result).value();
 
-  ControllerResources resources = GetControllerResources(parent);
+  zx::result<zx::resource> framebuffer_resource_result =
+      GetKernelResource<fuchsia_kernel::FramebufferResource>(*incoming(), "framebuffer");
+  if (framebuffer_resource_result.is_error()) {
+    return framebuffer_resource_result.take_error();
+  }
+  framebuffer_resource_ = std::move(framebuffer_resource_result).value();
+
+  zx::result<zx::resource> mmio_resource_result =
+      GetKernelResource<fuchsia_kernel::MmioResource>(*incoming(), "mmio");
+  if (mmio_resource_result.is_error()) {
+    return mmio_resource_result.take_error();
+  }
+  mmio_resource_ = std::move(mmio_resource_result).value();
+
+  zx::result<zx::resource> ioport_resource_result =
+      GetKernelResource<fuchsia_kernel::IoportResource>(*incoming(), "ioport");
+  if (ioport_resource_result.is_error()) {
+    return ioport_resource_result.take_error();
+  }
+  ioport_resource_ = std::move(ioport_resource_result).value();
+
+  ControllerResources resources = {
+      .framebuffer = framebuffer_resource_.borrow(),
+      .mmio = mmio_resource_.borrow(),
+      .ioport = ioport_resource_.borrow(),
+  };
 
   zx::result<std::unique_ptr<Controller>> controller_result = Controller::Create(
-      std::move(sysmem), std::move(pci), std::move(resources), inspect::Inspector{});
+      std::move(sysmem), std::move(pci), std::move(resources), inspector().inspector());
   if (controller_result.is_error()) {
     return controller_result.take_error();
   }
+  controller_ = std::move(controller_result).value();
 
-  fbl::AllocChecker alloc_checker;
-  auto intel_display_driver = fbl::make_unique_checked<IntelDisplayDriver>(
-      &alloc_checker, parent, std::move(controller_result).value());
-  if (!alloc_checker.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  zx::result<> bind_result = intel_display_driver->Bind();
-  if (bind_result.is_error()) {
-    return bind_result.take_error();
-  }
-
-  // `intel_display_driver` is now managed by the driver manager.
-  [[maybe_unused]] IntelDisplayDriver* released_intel_display_driver =
-      intel_display_driver.release();
   return zx::ok();
 }
 
-void IntelDisplayDriver::DdkInit(ddk::InitTxn txn) {
-  fdf::StartCompleter completer(
-      [txn = std::move(txn)](zx::result<> result) mutable { txn.Reply(result.status_value()); });
+void IntelDisplayDriver::Start(fdf::StartCompleter completer) {
+  zx::result<> init_controller_result = InitController();
+  if (init_controller_result.is_error()) {
+    completer(init_controller_result.take_error());
+    return;
+  }
+
+  zx::result<> init_display_node_result = InitDisplayNode();
+  if (init_display_node_result.is_error()) {
+    completer(init_display_node_result.take_error());
+    return;
+  }
+
+  zx::result<> init_gpu_core_node_result = InitGpuCoreNode();
+  if (init_gpu_core_node_result.is_error()) {
+    completer(init_gpu_core_node_result.take_error());
+    return;
+  }
+
   controller_->Start(std::move(completer));
 }
 
-void IntelDisplayDriver::DdkUnbind(ddk::UnbindTxn txn) {
-  device_async_remove(gpu_core_device_);
-  device_async_remove(display_controller_device_);
-
-  fdf::PrepareStopCompleter completer([txn = std::move(txn)](zx::result<> result) mutable {
-    if (result.is_error()) {
-      zxlogf(WARNING, "Failed to unbind the Controller: %s", result.status_string());
+void IntelDisplayDriver::PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer) {
+  if (gpu_core_node_controller_.is_valid()) {
+    fidl::OneWayStatus remove_gpu_result = gpu_core_node_controller_->Remove();
+    if (!remove_gpu_result.ok()) {
+      FDF_LOG(WARNING, "Failed to remove gpu core node: %s", remove_gpu_result.status_string());
     }
-    txn.Reply();
-  });
-  controller_->PrepareStopOnPowerOn(std::move(completer));
+  }
+
+  if (display_node_controller_.is_valid()) {
+    fidl::OneWayStatus remove_display_result = display_node_controller_->Remove();
+    if (!remove_display_result.ok()) {
+      FDF_LOG(WARNING, "Failed to remove display node: %s", remove_display_result.status_string());
+    }
+  }
+
+  if (controller_) {
+    controller_->PrepareStopOnPowerOn(std::move(completer));
+  } else {
+    completer(zx::ok());
+  }
 }
 
-void IntelDisplayDriver::DdkRelease() { delete this; }
-
-void IntelDisplayDriver::DdkSuspend(ddk::SuspendTxn txn) {
-  fdf::PrepareStopCompleter completer([txn = std::move(txn)](zx::result<> result) mutable {
-    txn.Reply(result.status_value(), txn.requested_state());
-  });
-  controller_->PrepareStopOnSuspend(txn.suspend_reason(), std::move(completer));
+void IntelDisplayDriver::PrepareStopOnSuspend(uint8_t suspend_reason,
+                                              fdf::PrepareStopCompleter completer) {
+  if (controller_) {
+    controller_->PrepareStopOnSuspend(suspend_reason, std::move(completer));
+  } else {
+    completer(zx::ok());
+  }
 }
+
+void IntelDisplayDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
+  zx::result<fuchsia_device_manager::SystemPowerState> system_power_state_result =
+      GetSystemPowerState(*incoming());
+  if (system_power_state_result.is_error()) {
+    FDF_LOG(WARNING, "Failed to get system power state: %s, fallback to fully on",
+            system_power_state_result.status_string());
+  }
+
+  fuchsia_device_manager::SystemPowerState system_power_state =
+      system_power_state_result.value_or(fuchsia_device_manager::SystemPowerState::kFullyOn);
+
+  if (system_power_state == fuchsia_device_manager::SystemPowerState::kFullyOn) {
+    PrepareStopOnPowerOn(std::move(completer));
+    return;
+  }
+  PrepareStopOnSuspend(PowerStateToSuspendReason(system_power_state), std::move(completer));
+}
+
+void IntelDisplayDriver::Stop() {}
 
 zx::result<ddk::AnyProtocol> IntelDisplayDriver::GetProtocol(uint32_t proto_id) {
   return controller_->GetProtocol(proto_id);
 }
 
-zx::result<> IntelDisplayDriver::Bind() {
-  zx_status_t add_root_device_status =
-      DdkAdd(ddk::DeviceAddArgs("intel_i915")
-                 .set_inspect_vmo(controller_->inspector().DuplicateVmo())
-                 .set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (add_root_device_status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add root i915 device: %s",
-           zx_status_get_string(add_root_device_status));
-    return zx::error(add_root_device_status);
+zx::result<> IntelDisplayDriver::InitDisplayNode() {
+  ZX_DEBUG_ASSERT(!display_node_controller_.is_valid());
+
+  // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
+  // over the compatibility server.
+  zx::result<ddk::AnyProtocol> protocol_result =
+      controller_->GetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL);
+  ZX_DEBUG_ASSERT(protocol_result.is_ok());
+  ddk::AnyProtocol protocol = std::move(protocol_result).value();
+
+  display_banjo_server_ =
+      compat::BanjoServer(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL, protocol.ctx, protocol.ops);
+  compat::DeviceServer::BanjoConfig banjo_config;
+  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL] = display_banjo_server_->callback();
+
+  static constexpr std::string_view kDisplayChildNodeName = "intel-display-controller";
+  zx::result<> compat_server_init_result =
+      display_compat_server_.Initialize(incoming(), outgoing(), node_name(), kDisplayChildNodeName,
+                                        /*forward_metadata=*/compat::ForwardMetadata::None(),
+                                        /*banjo_config=*/std::move(banjo_config));
+  if (compat_server_init_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize the compatibility server: %s",
+            compat_server_init_result.status_string());
+    return compat_server_init_result.take_error();
   }
 
-  device_add_args_t display_device_add_args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = "intel-display-controller",
-      .ctx = this,
-      .ops = &kDisplayControllerDeviceProtocol,
-      .proto_id = ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
+  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                        bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL),
   };
-  zx_status_t add_display_device_status =
-      device_add(zxdev(), &display_device_add_args, &display_controller_device_);
-  if (add_display_device_status != ZX_OK) {
-    zxlogf(ERROR, "Failed to publish display controller device: %s",
-           zx_status_get_string(add_display_device_status));
-    return zx::error(add_display_device_status);
+  const std::vector<fuchsia_driver_framework::Offer> node_offers =
+      display_compat_server_.CreateOffers2();
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
+      display_node_controller_client_result =
+          AddChild(kDisplayChildNodeName, node_properties, node_offers);
+  if (display_node_controller_client_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add child node: %s",
+            display_node_controller_client_result.status_string());
+    return display_node_controller_client_result.take_error();
   }
 
-  device_add_args_t gpu_device_add_args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = "intel-gpu-core",
-      .ctx = this,
-      .ops = &kGpuCoreDeviceProtocol,
-      .proto_id = ZX_PROTOCOL_INTEL_GPU_CORE,
-  };
-  zx_status_t add_gpu_device_status = device_add(zxdev(), &gpu_device_add_args, &gpu_core_device_);
-  if (add_gpu_device_status != ZX_OK) {
-    zxlogf(ERROR, "Failed to publish gpu core device: %s",
-           zx_status_get_string(add_gpu_device_status));
-    return zx::error(add_gpu_device_status);
-  }
-
+  display_node_controller_ =
+      fidl::WireSyncClient(std::move(display_node_controller_client_result).value());
   return zx::ok();
 }
 
-namespace {
+zx::result<> IntelDisplayDriver::InitGpuCoreNode() {
+  ZX_DEBUG_ASSERT(!gpu_core_node_controller_.is_valid());
 
-constexpr zx_driver_ops_t kDriverOps = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = [](void* ctx,
-               zx_device_t* parent) { return IntelDisplayDriver::Create(parent).status_value(); },
-};
+  // Serves the [`fuchsia.hardware.intelgpucore/IntelGpuCore`] protocol
+  // over the compatibility server.
+  zx::result<ddk::AnyProtocol> protocol_result =
+      controller_->GetProtocol(ZX_PROTOCOL_INTEL_GPU_CORE);
+  ZX_DEBUG_ASSERT(protocol_result.is_ok());
+  ddk::AnyProtocol protocol = std::move(protocol_result).value();
 
-}  // namespace
+  gpu_banjo_server_ = compat::BanjoServer(ZX_PROTOCOL_INTEL_GPU_CORE, protocol.ctx, protocol.ops);
+  compat::DeviceServer::BanjoConfig banjo_config;
+  banjo_config.callbacks[ZX_PROTOCOL_INTEL_GPU_CORE] = gpu_banjo_server_->callback();
+
+  static constexpr std::string_view kGpuCoreChildNodeName = "intel-gpu-core";
+  zx::result<> compat_server_init_result =
+      gpu_compat_server_.Initialize(incoming(), outgoing(), node_name(), kGpuCoreChildNodeName,
+                                    /*forward_metadata=*/compat::ForwardMetadata::None(),
+                                    /*banjo_config=*/std::move(banjo_config));
+  if (compat_server_init_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize the compatibility server: %s",
+            compat_server_init_result.status_string());
+    return compat_server_init_result.take_error();
+  }
+
+  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                        bind_fuchsia_intel_platform_gpucore::BIND_PROTOCOL_DEVICE),
+  };
+  const std::vector<fuchsia_driver_framework::Offer> node_offers =
+      gpu_compat_server_.CreateOffers2();
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
+      gpu_core_node_controller_client_result =
+          AddChild(kGpuCoreChildNodeName, node_properties, node_offers);
+  if (gpu_core_node_controller_client_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add child node: %s",
+            gpu_core_node_controller_client_result.status_string());
+    return gpu_core_node_controller_client_result.take_error();
+  }
+
+  gpu_core_node_controller_ =
+      fidl::WireSyncClient(std::move(gpu_core_node_controller_client_result).value());
+  return zx::ok();
+}
 
 }  // namespace i915
 
-ZIRCON_DRIVER(intel_i915, i915::kDriverOps, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(i915::IntelDisplayDriver);
