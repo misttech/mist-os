@@ -18,6 +18,7 @@ use fidl_fuchsia_ui_observation_scope::RegistryMarker as ScopedObservationRegist
 use fidl_fuchsia_ui_observation_test::RegistryMarker as ObservationRegistryMarker;
 use fidl_fuchsia_ui_pointer_augment::LocalHitMarker;
 use fidl_fuchsia_ui_pointerinjector::RegistryMarker as PointerInjectorRegistryMarker;
+use fidl_fuchsia_ui_views::ViewRefInstalledMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -203,6 +204,7 @@ async fn assemble_realm(
                 .capability(Capability::protocol::<ScopedObservationRegistryMarker>())
                 .capability(Capability::protocol::<PointerInjectorRegistryMarker>())
                 .capability(Capability::protocol::<LocalHitMarker>())
+                .capability(Capability::protocol::<ViewRefInstalledMarker>())
                 .from(Ref::child(SCENIC))
                 .to(Ref::parent()),
         )
