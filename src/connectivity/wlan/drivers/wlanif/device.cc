@@ -55,12 +55,14 @@ Device::Device(fdf::DriverStartArgs start_args,
 
 Device::~Device() { ltrace_fn(*logger_); }
 
-void Device::InitMlme() {
+zx_status_t Device::InitMlme() {
   mlme_ = std::make_unique<FullmacMlme>(this);
   ZX_DEBUG_ASSERT(mlme_ != nullptr);
-  if (mlme_->Init() != ZX_OK) {
+  zx_status_t status = mlme_->Init();
+  if (status != ZX_OK) {
     mlme_.reset();
   }
+  return status;
 }
 
 zx::result<> Device::Start() {
@@ -123,12 +125,6 @@ void Device::PrepareStop(fdf::PrepareStopCompleter completer) {
 
 zx_status_t Device::Bind() {
   ltrace_fn(*logger_);
-  // The MLME interface has no start/stop commands, so we will start the wlan_fullmac_impl
-  // device immediately
-
-  // Connect to the device which serves WlanFullmacImpl protocol service.
-  zx_status_t status = ZX_OK;
-
   auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
   if (mac_sublayer_arena.is_error()) {
     FDF_LOGL(ERROR, *logger_, "Mac Sublayer arena creation failed: %s",
@@ -155,8 +151,7 @@ zx_status_t Device::Bind() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  InitMlme();
-  return status;
+  return InitMlme();
 }
 
 zx_status_t Device::ConnectToWlanFullmacImpl() {
@@ -686,12 +681,12 @@ zx_status_t Device::GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t*
 }
 
 void Device::OnLinkStateChanged(bool online) {
-    auto result = client_.sync()->OnLinkStateChanged(online);
+  auto result = client_.sync()->OnLinkStateChanged(online);
 
-    if (!result.ok()) {
-      FDF_LOGL(ERROR, *logger_, "OnLinkStateChanged failed FIDL error: %s", result.status_string());
-      return;
-    }
+  if (!result.ok()) {
+    FDF_LOGL(ERROR, *logger_, "OnLinkStateChanged failed FIDL error: %s", result.status_string());
+    return;
+  }
 }
 
 void Device::SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp) {

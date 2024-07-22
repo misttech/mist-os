@@ -30,7 +30,7 @@ executable("device_unittest") {
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/sys/cpp/testing:cpp",
-    "//src/connectivity/wlan/drivers/wlanif:lib_source",
+    "//src/connectivity/wlan/drivers/wlanif:lib_source_mlme_stub",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
@@ -46,7 +46,7 @@ executable("convert_unittest") {
   testonly = true
   sources = [ "convert_unittest.cc" ]
   deps = [
-    "//src/connectivity/wlan/drivers/wlanif:lib_source",
+    "//src/connectivity/wlan/drivers/wlanif:lib_source_mlme_stub",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/sync",
