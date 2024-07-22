@@ -142,9 +142,9 @@ TEST_fx-rbe-enabled-exists() {
   BT_ASSERT_FUNCTION_EXISTS fx-rbe-enabled
 }
 
-TEST_fx-rbe-enabled-missing-build-dir() {
-  # Required build dir does not exist yet.
-  BT_EXPECT_FAIL fx-rbe-enabled
+TEST_fx-rbe-enabled-missing-rbe-settings() {
+  # Missing RBE settings file conservatively assumes RBE is enabled.
+  BT_EXPECT fx-rbe-enabled
 }
 
 TEST_fx-rbe-enabled-default-disabled() {

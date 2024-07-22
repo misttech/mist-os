@@ -70,11 +70,23 @@ function fx-rbe-enabled {
   # Returns 1 to indicate that RBE is not enabled.
   fx-build-dir-if-present || return 1
 
-  # Check to see if the rbe settings indicate that the reproxy wrapper is
-  # needed.
-  needs_reproxy=($("${PREBUILT_JQ}" '-r' '.final.needs_reproxy' < "${FUCHSIA_BUILD_DIR}/rbe_settings.json"))
-  if [[ "$needs_reproxy" != "true" ]]; then
-    return 1
+  # This RBE settings file is created at GN gen time.
+  local rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
+
+  if [[ -f "${rbe_settings_file}" ]]; then
+    # Check to see if the rbe settings indicate that the reproxy wrapper is
+    # needed.
+    needs_reproxy=($("${PREBUILT_JQ}" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
+    if [[ "$needs_reproxy" != "true" ]]; then
+      return 1
+    fi
+  else
+    # If, for some reason, this file doesn't exist yet when this function is
+    # called, then proceed as if RBE is enabled (return success), which wraps
+    # the whole ninja build in ${RBE_WRAPPER} (negligible overhead).
+    # Assuming that GN is re-run automatically by the build, we can expect this
+    # file to appear and self-correct.
+    fx-warn "Did not find ${rbe_settings_file}, so conservatively assuming RBE is enabled until GN generates that file."
   fi
 }
 
