@@ -16,16 +16,6 @@
 
 namespace display {
 
-// static
-zx::result<> FakeDisplayCoordinatorConnector::CreateAndPublishService(
-    std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
-    const fake_display::FakeDisplayDeviceConfig& fake_display_device_config,
-    std::string_view parent_directory, component::OutgoingDirectory& outgoing) {
-  return outgoing.AddProtocolAt<fuchsia_hardware_display::Provider>(
-      parent_directory, std::make_unique<FakeDisplayCoordinatorConnector>(
-                            std::move(mock_root), dispatcher, fake_display_device_config));
-}
-
 FakeDisplayCoordinatorConnector::FakeDisplayCoordinatorConnector(
     std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
     const fake_display::FakeDisplayDeviceConfig& fake_display_device_config) {
