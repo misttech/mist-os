@@ -12,6 +12,7 @@ namespace relay_api {
 
 constexpr char kReadyMessage[] = "READY";
 constexpr char kFailedMessage[] = "FAILED";
+constexpr char kEventDelimiter[] = "EVENT";
 constexpr char kEventFormat[] = "EVENT tv_sec=%ld tv_usec=%ld type=%hu code=%hu value=%d";
 
 // The formatted event string will be sent across systems, so verify that the
@@ -26,6 +27,12 @@ constexpr size_t kMaxDigitsPerUnsignedShort = 5;  // 65,535
 
 constexpr size_t kMaxPacketLen = sizeof(kEventFormat) + 3 * internal::kMaxDigitsPerLong +
                                  2 * internal::kMaxDigitsPerUnsignedShort;
+
+// Touch down is expressed in six `uapi::input_event`s: BTN_TOUCH, ABS_MT_SLOT,
+// ABS_MT_TRACKING_ID, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, and EV_SYN.
+// Touch up is expressed in four: BTN_TOUCH, ABS_MT_SLOT, ABS_MT_TRACKING_ID,
+// and EV_SYN.
+constexpr size_t kDownUpNumPackets = 10;
 
 }  // namespace relay_api
 
