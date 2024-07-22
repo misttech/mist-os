@@ -11,6 +11,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/driver.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/sync/completion.h>
@@ -19,7 +20,6 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -43,9 +43,10 @@ class InterruptTest : public testing::Test {
   }
 
  protected:
-  std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_ = mock_ddk::GetDriverRuntime();
+  fdf_testing::DriverRuntime driver_runtime_;
+  fdf_testing::ScopedGlobalLogger logger_;
   fdf::UnownedSynchronizedDispatcher interrupt_dispatcher_ =
-      driver_runtime_->StartBackgroundDispatcher();
+      driver_runtime_.StartBackgroundDispatcher();
 
   async::Loop loop_;
   ddk::Pci pci_;
@@ -56,8 +57,6 @@ class InterruptTest : public testing::Test {
 };
 
 TEST_F(InterruptTest, InitErrorWithoutAvailablePciInterrupt) {
-  std::shared_ptr<MockDevice> parent = MockDevice::FakeRootParent();
-
   async_patterns::TestDispatcherBound<Interrupts> interrupts(
       interrupt_dispatcher_->async_dispatcher(), std::in_place);
   zx_status_t init_status = interrupts.SyncCall([&](Interrupts* interrupts) {
@@ -68,7 +67,6 @@ TEST_F(InterruptTest, InitErrorWithoutAvailablePciInterrupt) {
 }
 
 TEST_F(InterruptTest, InitWithLegacyInterrupt) {
-  std::shared_ptr<MockDevice> parent = MockDevice::FakeRootParent();
   pci::RunAsync(loop_, [&] { fake_pci_.AddLegacyInterrupt(); });
 
   async_patterns::TestDispatcherBound<Interrupts> interrupts(
@@ -81,7 +79,6 @@ TEST_F(InterruptTest, InitWithLegacyInterrupt) {
 }
 
 TEST_F(InterruptTest, InitWithMsiInterrupt) {
-  std::shared_ptr<MockDevice> parent = MockDevice::FakeRootParent();
   pci::RunAsync(loop_, [&] { fake_pci_.AddMsiInterrupt(); });
 
   async_patterns::TestDispatcherBound<Interrupts> interrupts(
@@ -99,7 +96,6 @@ TEST_F(InterruptTest, InitWithMsiInterrupt) {
 }
 
 TEST_F(InterruptTest, InitWithMsiAndLegacyInterrupts) {
-  std::shared_ptr<MockDevice> parent = MockDevice::FakeRootParent();
   pci::RunAsync(loop_, [&] {
     fake_pci_.AddLegacyInterrupt();
     fake_pci_.AddMsiInterrupt();

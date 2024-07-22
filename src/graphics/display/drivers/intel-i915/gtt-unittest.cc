@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/zircon-internal/align.h>
@@ -49,6 +50,8 @@ class GttTest : public testing::Test {
     pci_ = fake_pci_.SetUpFidlServer(loop_);
   }
 
+ protected:
+  fdf_testing::ScopedGlobalLogger logger_;
   async::Loop loop_;
   ddk::Pci pci_;
   pci::FakePciProtocol fake_pci_;

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/pipe-manager.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 
@@ -45,6 +46,7 @@ class PipeManagerTest : public ::testing::Test {
 
  protected:
   constexpr static uint32_t kMinimumRegCount = 0xd0000 / sizeof(uint32_t);
+  fdf_testing::ScopedGlobalLogger logger_;
   ddk_fake::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
   std::optional<fdf::MmioBuffer> mmio_buffer_;
   Controller controller_;

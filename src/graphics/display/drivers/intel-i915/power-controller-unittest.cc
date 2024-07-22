@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/power-controller.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -72,6 +73,8 @@ class PowerControllerTest : public ::testing::Test {
   constexpr static int kRealClockTestTimeout = 1'000'000;
 
   constexpr static int kMmioRangeSize = 0x140000;
+
+  fdf_testing::ScopedGlobalLogger logger_;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 
@@ -1037,6 +1040,7 @@ TEST_F(PowerControllerTest, GetRawMemoryLatencyDataUsGroupTwoTimeout) {
 }
 
 TEST(MemorySubsystemInfoGlobalInfoTest, CreateFromMailboxDataTigerLake) {
+  fdf_testing::ScopedGlobalLogger logger;
   auto dell_5420_info = MemorySubsystemInfo::GlobalInfo::CreateFromMailboxDataTigerLake(0x410);
   EXPECT_EQ(MemorySubsystemInfo::RamType::kDoubleDataRam4, dell_5420_info.ram_type);
   EXPECT_EQ(1, dell_5420_info.memory_channel_count);
@@ -1049,6 +1053,7 @@ TEST(MemorySubsystemInfoGlobalInfoTest, CreateFromMailboxDataTigerLake) {
 }
 
 TEST(MemorySubsystemInfoAgentPointTest, CreateFromMailboxDataTigerLake) {
+  fdf_testing::ScopedGlobalLogger logger;
   auto dell_5420_point1 =
       MemorySubsystemInfo::AgentPoint::CreateFromMailboxDataTigerLake(0x2308'0f0f'0080);
   EXPECT_EQ(2'133'248, dell_5420_point1.dram_clock_khz);

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fpromise/result.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/inspect/cpp/inspector.h>
@@ -20,7 +21,12 @@ using testing::FakeDpcdChannel;
 using testing::kDefaultLaneCount;
 using testing::kMaxLinkRateTableEntries;
 
-TEST(DpCapabilitiesTest, NoSupportedLinkRates) {
+class DpCapabilitiesTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(DpCapabilitiesTest, NoSupportedLinkRates) {
   FakeDpcdChannel fake_dpcd;
 
   const fpromise::result<DpCapabilities> cap = DpCapabilities::Read(&fake_dpcd);
@@ -28,7 +34,7 @@ TEST(DpCapabilitiesTest, NoSupportedLinkRates) {
 }
 
 // Tests that invalid lane counts are rejected.
-TEST(DpCapabilitiesTest, InvalidMaxLaneCount) {
+TEST_F(DpCapabilitiesTest, InvalidMaxLaneCount) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
 
@@ -43,7 +49,7 @@ TEST(DpCapabilitiesTest, InvalidMaxLaneCount) {
 }
 
 // Tests that the basic set of getters work for non-EDP.
-TEST(DpCapabilitiesTest, BasicFields) {
+TEST_F(DpCapabilitiesTest, BasicFields) {
   FakeDpcdChannel fake_dpcd;
 
   fake_dpcd.SetDpcdRevision(dpcd::Revision::k1_4);
@@ -65,7 +71,7 @@ TEST(DpCapabilitiesTest, BasicFields) {
 }
 
 // Tests that eDP registers are processed when supported.
-TEST(DpCapabilitiesTest, EdpRegisters) {
+TEST_F(DpCapabilitiesTest, EdpRegisters) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_2);
@@ -77,7 +83,7 @@ TEST(DpCapabilitiesTest, EdpRegisters) {
   EXPECT_FALSE(cap.value().backlight_aux_brightness());
 }
 
-TEST(DpCapabilitiesTest, EdpBacklight) {
+TEST_F(DpCapabilitiesTest, EdpBacklight) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_2);
@@ -99,7 +105,7 @@ TEST(DpCapabilitiesTest, EdpBacklight) {
 
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
-TEST(DpCapabilitiesTest, MaxLinkRate1620NoEdp) {
+TEST_F(DpCapabilitiesTest, MaxLinkRate1620NoEdp) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k1620Mbps);
@@ -113,7 +119,7 @@ TEST(DpCapabilitiesTest, MaxLinkRate1620NoEdp) {
 
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
-TEST(DpCapabilitiesTest, MaxLinkRate2700NoEdp) {
+TEST_F(DpCapabilitiesTest, MaxLinkRate2700NoEdp) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);
@@ -128,7 +134,7 @@ TEST(DpCapabilitiesTest, MaxLinkRate2700NoEdp) {
 
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
-TEST(DpCapabilitiesTest, MaxLinkRate5400NoEdp) {
+TEST_F(DpCapabilitiesTest, MaxLinkRate5400NoEdp) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k5400Mbps);
@@ -144,7 +150,7 @@ TEST(DpCapabilitiesTest, MaxLinkRate5400NoEdp) {
 
 // Tests that the list of supported link rates is populated correctly using the "Max Link Rate"
 // method.
-TEST(DpCapabilitiesTest, MaxLinkRate8100NoEdp) {
+TEST_F(DpCapabilitiesTest, MaxLinkRate8100NoEdp) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k8100Mbps);
@@ -161,7 +167,7 @@ TEST(DpCapabilitiesTest, MaxLinkRate8100NoEdp) {
 
 // Tests that link rate discovery falls back to MAX_LINK_RATE if eDP v1.4 is supported but the
 // link rate table is empty.
-TEST(DpCapabilitiesTest, FallbackToMaxLinkRateWhenLinkRateTableIsEmpty) {
+TEST_F(DpCapabilitiesTest, FallbackToMaxLinkRateWhenLinkRateTableIsEmpty) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
@@ -175,7 +181,7 @@ TEST(DpCapabilitiesTest, FallbackToMaxLinkRateWhenLinkRateTableIsEmpty) {
 
 // Tests that the list of supported link rates is populated correctly when using the "Link Rate
 // Table" method.
-TEST(DpCapabilitiesTest, LinkRateTableOneEntry) {
+TEST_F(DpCapabilitiesTest, LinkRateTableOneEntry) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
@@ -192,7 +198,7 @@ TEST(DpCapabilitiesTest, LinkRateTableOneEntry) {
 
 // Tests that the list of supported link rates is populated correctly when using the "Link Rate
 // Table" method.
-TEST(DpCapabilitiesTest, LinkRateTableSomeEntries) {
+TEST_F(DpCapabilitiesTest, LinkRateTableSomeEntries) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
@@ -212,7 +218,7 @@ TEST(DpCapabilitiesTest, LinkRateTableSomeEntries) {
 
 // Tests that the list of supported link rates is populated correctly when using the "Link Rate
 // Table" method.
-TEST(DpCapabilitiesTest, LinkRateTableMaxEntries) {
+TEST_F(DpCapabilitiesTest, LinkRateTableMaxEntries) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
@@ -239,7 +245,7 @@ TEST(DpCapabilitiesTest, LinkRateTableMaxEntries) {
 // Tests that the list of supported link rates is populated based on the "Link Rate Table" method
 // when both the table and the MAX_LINK_RATE register hold valid values (which is optional but
 // allowed by the eDP specification).
-TEST(DpCapabilitiesTest, LinkRateTableUsedWhenMaxLinkRateIsAlsoPresent) {
+TEST_F(DpCapabilitiesTest, LinkRateTableUsedWhenMaxLinkRateIsAlsoPresent) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetEdpCapable(dpcd::EdpRevision::k1_4);
@@ -260,7 +266,7 @@ TEST(DpCapabilitiesTest, LinkRateTableUsedWhenMaxLinkRateIsAlsoPresent) {
 
 // Tests that the DP capabilities can be inspected and the DP capability values
 // are correctly propagated to the inspect node.
-TEST(DpCapabilitiesTest, Inspect) {
+TEST_F(DpCapabilitiesTest, Inspect) {
   FakeDpcdChannel fake_dpcd;
   fake_dpcd.SetDefaults();
   fake_dpcd.SetMaxLinkRate(dpcd::LinkBw::k2700Mbps);

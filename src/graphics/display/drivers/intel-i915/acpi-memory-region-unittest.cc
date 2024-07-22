@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/acpi-memory-region.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -54,6 +55,8 @@ class AcpiMemoryRegionTest : public ::testing::Test {
   }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
+
   static constexpr int kVmoSize = 16;
   cpp20::span<uint8_t> region_data_;
 

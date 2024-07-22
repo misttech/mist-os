@@ -9,6 +9,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio-ptr/fake.h>
 
 #include <gtest/gtest.h>
@@ -62,6 +63,7 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
   }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
   async::Loop loop_;
 
   MockAllocator sysmem_;
@@ -158,6 +160,7 @@ fdf::MmioBuffer MakeMmioBuffer(uint8_t* buffer, size_t size) {
 }
 
 TEST(IntelI915Display, ImportImage) {
+  fdf_testing::ScopedGlobalLogger logger;
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   loop.StartThread("fidl-loop");
 

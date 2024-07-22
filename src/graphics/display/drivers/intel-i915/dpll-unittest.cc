@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <cstdint>
@@ -40,6 +41,8 @@ class DisplayPllTigerLakeTest : public ::testing::Test {
   constexpr static int kLargeTimeout = 1'000'000'000;
 
   constexpr static int kMmioRangeSize = 0x140000;
+
+  fdf_testing::ScopedGlobalLogger logger_;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 
