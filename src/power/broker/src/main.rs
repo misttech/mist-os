@@ -19,6 +19,7 @@ use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
 use futures::select;
+use inspect_format::constants::DEFAULT_VMO_SIZE_BYTES as DEFAULT_INSPECT_VMO;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -609,7 +610,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Initialize inspect
     let _inspect_server = inspect_runtime::publish(
-        fuchsia_inspect::component::init_inspector_with_size(500_000),
+        // TODO(https://fxbug.dev/354754310): reduce to default size if possible
+        fuchsia_inspect::component::init_inspector_with_size(2 * DEFAULT_INSPECT_VMO),
         inspect_runtime::PublishOptions::default(),
     );
     component::health().set_starting_up();
