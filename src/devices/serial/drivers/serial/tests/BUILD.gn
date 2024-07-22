@@ -12,9 +12,11 @@ test("serial-unittest-bin") {
   deps = [
     "..:common",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//sdk/lib/fit",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 

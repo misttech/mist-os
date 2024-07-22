@@ -7,31 +7,25 @@
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/wire.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <zircon/types.h>
-
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
 
 namespace serial {
 
-class SerialDevice;
-using DeviceType =
-    ddk::Device<SerialDevice, ddk::Messageable<fuchsia_hardware_serial::DeviceProxy>::Mixin,
-                ddk::Unbindable>;
-
-class SerialDevice : public DeviceType, public fidl::WireServer<fuchsia_hardware_serial::Device> {
+class SerialDevice : public fdf::DriverBase,
+                     public fidl::WireServer<fuchsia_hardware_serial::DeviceProxy>,
+                     public fidl::WireServer<fuchsia_hardware_serial::Device> {
  public:
-  SerialDevice(zx_device_t* parent, fdf::ClientEnd<fuchsia_hardware_serialimpl::Device> serial)
-      : DeviceType(parent), serial_(std::move(serial), fdf::Dispatcher::GetCurrent()->get()) {}
+  SerialDevice(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase("serial", std::move(start_args), std::move(dispatcher)),
+        devfs_connector_(fit::bind_member<&SerialDevice::DevfsConnect>(this)) {}
 
-  static zx_status_t Create(void* ctx, zx_device_t* dev);
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
   zx_status_t Bind();
   zx_status_t Init();
-
-  // Device protocol implementation.
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
 
   void GetChannel(GetChannelRequestView request, GetChannelCompleter::Sync& completer) override;
 
@@ -45,15 +39,18 @@ class SerialDevice : public DeviceType, public fidl::WireServer<fuchsia_hardware
 
   zx_status_t Enable(bool enable);
 
+  zx_status_t Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> server);
+  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_serial::DeviceProxy> server);
+
   // The serial protocol of the device we are binding against.
   fdf::WireClient<fuchsia_hardware_serialimpl::Device> serial_;
 
   uint32_t serial_class_;
-  using Binding = struct {
-    fidl::ServerBindingRef<fuchsia_hardware_serial::Device> binding;
-    std::optional<ddk::UnbindTxn> unbind_txn;
-  };
-  std::optional<Binding> binding_;
+  driver_devfs::Connector<fuchsia_hardware_serial::DeviceProxy> devfs_connector_;
+  fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_serial::DeviceProxy> proxy_bindings_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_serial::Device>> binding_;
 };
 
 }  // namespace serial

@@ -85,6 +85,10 @@ closed protocol Device {
     }) -> () error zx.Status;
 };
 
+service Service {
+    device client_end:Device;
+};
+
 @discoverable
 closed protocol DeviceProxy {
     strict GetChannel(resource struct {
