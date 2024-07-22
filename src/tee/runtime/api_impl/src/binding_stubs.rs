@@ -17,6 +17,8 @@ use tee_internal::binding::{
     TEE_Time, TEE_Whence, TEE_UUID,
 };
 
+use crate::mem;
+
 // This function returns a list of the C entry point that we want to expose from
 // this program. They need to be referenced from main to ensure that the linker
 // thinks that they are referenced and need to be included in the final binary.
@@ -147,6 +149,8 @@ pub fn exposed_c_entry_points() -> &'static [*const extern "C" fn()] {
         TEE_BigIntConvertToFMM as *const extern "C" fn(),
         TEE_BigIntConvertFromFMM as *const extern "C" fn(),
         TEE_BigIntComputeFMM as *const extern "C" fn(),
+        // This function is exposed to configure our default heap allocator.
+        mem::__scudo_default_options as *const extern "C" fn(),
     ]
 }
 
@@ -157,7 +161,7 @@ pub extern "C" fn TEE_Panic(code: u32) {
 
 #[no_mangle]
 extern "C" fn TEE_Malloc(size: usize, hint: u32) -> *mut ::std::os::raw::c_void {
-    unimplemented!()
+    mem::malloc(size, hint)
 }
 
 #[no_mangle]
@@ -165,12 +169,12 @@ extern "C" fn TEE_Realloc(
     buffer: *mut ::std::os::raw::c_void,
     newSize: usize,
 ) -> *mut ::std::os::raw::c_void {
-    unimplemented!()
+    unsafe { mem::realloc(buffer, newSize) }
 }
 
 #[no_mangle]
 extern "C" fn TEE_Free(buffer: *mut ::std::os::raw::c_void) {
-    unimplemented!()
+    unsafe { mem::free(buffer) }
 }
 
 #[no_mangle]
@@ -179,7 +183,7 @@ extern "C" fn TEE_MemMove(
     src: *mut ::std::os::raw::c_void,
     size: usize,
 ) {
-    unimplemented!()
+    mem::mem_move(dest, src, size)
 }
 
 #[no_mangle]
@@ -188,12 +192,12 @@ extern "C" fn TEE_MemCompare(
     buffer2: *mut ::std::os::raw::c_void,
     size: usize,
 ) -> i32 {
-    unimplemented!()
+    mem::mem_compare(buffer1, buffer2, size)
 }
 
 #[no_mangle]
 extern "C" fn TEE_MemFill(buffer: *mut ::std::os::raw::c_void, x: u8, size: usize) {
-    unimplemented!()
+    mem::mem_fill(buffer, x, size)
 }
 
 #[no_mangle]
