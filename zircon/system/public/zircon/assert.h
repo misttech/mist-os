@@ -117,14 +117,22 @@ __END_CDECLS
 //
 #ifdef __cplusplus
 
+// Only use the [[likely]] attribute if we are sure the compiler is going to
+// understand it.
+#if defined(__has_cpp_attribute) && (__has_cpp_attribute(likely) >= 201803L)
+#define _ZIRCON_ASSERT_ATTRIBUTE_LIKELY [[likely]]
+#else
+#define _ZIRCON_ASSERT_ATTRIBUTE_LIKELY
+#endif
+
 // Assert that |x| is true, else panic.
 //
 // ZX_ASSERT is always enabled and |x| will be evaluated regardless of any build arguments.
 #define ZX_ASSERT(x)                                                    \
   do {                                                                  \
-    if (x) [[likely]] {                                                 \
-      break;                                                            \
-    } else {                                                            \
+    if (x)                                                              \
+      _ZIRCON_ASSERT_ATTRIBUTE_LIKELY { break; }                        \
+    else {                                                              \
       ZX_PANIC("ASSERT FAILED at (%s:%d): %s", __FILE__, __LINE__, #x); \
     }                                                                   \
   } while (0)
@@ -134,9 +142,9 @@ __END_CDECLS
 // ZX_ASSERT_MSG is always enabled and |x| will be evaluated regardless of any build arguments.
 #define ZX_ASSERT_MSG(x, msg, msgargs...)                                              \
   do {                                                                                 \
-    if (x) [[likely]] {                                                                \
-      break;                                                                           \
-    } else {                                                                           \
+    if (x)                                                                             \
+      _ZIRCON_ASSERT_ATTRIBUTE_LIKELY { break; }                                       \
+    else {                                                                             \
       ZX_PANIC("ASSERT FAILED at (%s:%d): %s" msg, __FILE__, __LINE__, #x, ##msgargs); \
     }                                                                                  \
   } while (0)
@@ -148,9 +156,9 @@ __END_CDECLS
 #define ZX_DEBUG_ASSERT(x)                                                      \
   do {                                                                          \
     if (ZX_DEBUG_ASSERT_IMPLEMENTED) {                                          \
-      if (x) [[likely]] {                                                       \
-        break;                                                                  \
-      } else {                                                                  \
+      if (x)                                                                    \
+        _ZIRCON_ASSERT_ATTRIBUTE_LIKELY { break; }                              \
+      else {                                                                    \
         ZX_PANIC("DEBUG ASSERT FAILED at (%s:%d): %s", __FILE__, __LINE__, #x); \
       }                                                                         \
     }                                                                           \
@@ -163,9 +171,9 @@ __END_CDECLS
 #define ZX_DEBUG_ASSERT_MSG(x, msg, msgargs...)                                                \
   do {                                                                                         \
     if (ZX_DEBUG_ASSERT_IMPLEMENTED) {                                                         \
-      if (x) [[likely]] {                                                                      \
-        break;                                                                                 \
-      } else {                                                                                 \
+      if (x)                                                                                   \
+        _ZIRCON_ASSERT_ATTRIBUTE_LIKELY { break; }                                             \
+      else {                                                                                   \
         ZX_PANIC("DEBUG ASSERT FAILED at (%s:%d): %s" msg, __FILE__, __LINE__, #x, ##msgargs); \
       }                                                                                        \
     }                                                                                          \
