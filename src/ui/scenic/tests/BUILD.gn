@@ -57,36 +57,6 @@ source_set("common-deps-zxtest") {
   ]
 }
 
-# TODO(https://fxbug.dev/42175597): use common-deps-zxtest for CTF tests.
-source_set("common-deps-zxtest-with-realm-builder") {
-  testonly = true
-  public_deps = [
-    ":common-deps-zxtest",
-    ":scenic-realm-builder",
-  ]
-}
-
-source_set("scenic-realm-builder") {
-  testonly = true
-  sources = [
-    "utils/scenic_realm_builder.cc",
-    "utils/scenic_realm_builder.h",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
-    "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
-    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
-    "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/ui/testing/ui_test_realm:test_realms",
-  ]
-}
-
 source_set("screen-capture-utils") {
   testonly = true
   sources = [
@@ -166,7 +136,7 @@ template("ctf_components_packages") {
     testonly = true
     component_name = "${test_prefix}"
     manifest = "meta/${test_prefix}.cml"
-    test_type = "system"  # ctf
+    test_type = "ctf"
   }
 
   fuchsia_test_package(target_name) {
