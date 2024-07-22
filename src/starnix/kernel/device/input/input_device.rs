@@ -157,13 +157,15 @@ impl InputDevice {
                                 }
                                 None => (),
                             }
-                            // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
-                            // not provide access to events that occurred before the file was
-                            // opened.
-                            inner.events.append(&mut new_events);
-                            // TODO(https://fxbug.dev/42075439): Skip notify if `inner.events`
-                            // is empty.
-                            inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                            if !new_events.is_empty() {
+                                // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
+                                // not provide access to events that occurred before the file was
+                                // opened.
+                                inner.events.append(&mut new_events);
+                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                            }
+
                             files.push(Arc::downgrade(&file));
                         }
                     }
@@ -201,8 +203,12 @@ impl InputDevice {
                                 files.drain(..).flat_map(|f| f.upgrade()).collect();
                             for file in filtered_files {
                                 let mut inner = file.inner.lock();
-                                inner.events.extend(new_events.clone());
-                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                                if !new_events.is_empty() {
+                                    inner.events.extend(new_events.clone());
+                                    inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                                }
+
                                 files.push(Arc::downgrade(&file));
                             }
 
@@ -272,8 +278,12 @@ impl InputDevice {
                                     }
                                     None => (),
                                 }
-                                inner.events.extend(new_events.clone());
-                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                                if !new_events.is_empty() {
+                                  inner.events.extend(new_events.clone());
+                                  inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                                }
+
                                 files.push(Arc::downgrade(&file));
                             }
 
@@ -713,6 +723,31 @@ mod test {
         // the reply to its first request. Figure out why that happens, and remove this second
         // reply.
         answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
+    }
+
+    #[::fuchsia::test]
+    async fn does_not_notify_polling_waiters_without_new_data() {
+        // Set up resources.
+        let (_kernel, current_task) = create_kernel_and_task();
+        let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
+        let waiter1 = Waiter::new();
+        let waiter2 = Waiter::new();
+
+        // Ask `input_file` to notify waiters when data is available to read.
+        [&waiter1, &waiter2].iter().for_each(|waiter| {
+            input_file.wait_async(&current_task, waiter, FdEvents::POLLIN, EventHandler::None);
+        });
+        assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
+
+        // Reply to first `Watch` request with an empty set of events.
+        answer_next_watch_request(&mut touch_source_stream, vec![]).await;
+
+        // `InputFile` should be done processing the first reply. Since there
+        // were no touch_events given, `InputFile` should not have notified the
+        // interested waiters.
+        assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
     }
 
     // Note: a user program may also want to be woken if events were already ready at the

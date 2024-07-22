@@ -388,13 +388,12 @@ impl FileOps for InputFile {
         // events queued to be written.
         let limit = std::cmp::min(data.available() / INPUT_EVENT_SIZE, num_events);
         if num_events > limit {
-            // TODO(https://fxbug.dev/353521096): This could be a good
-            // opportunity to send another `POLLIN` event.
             log_info!(
-                "There was only space in the given buffer to read {} of the {} queued events.",
+                "There was only space in the given buffer to read {} of the {} queued events. Sending a notification to prompt another read.",
                 limit,
                 num_events
             );
+            inner.waiters.notify_fd_events(FdEvents::POLLIN);
         }
         let events = inner.events.drain(..limit).collect::<Vec<_>>();
         inner.inspect_status.as_ref().map(|status| status.count_read_events(events.len() as u64));
