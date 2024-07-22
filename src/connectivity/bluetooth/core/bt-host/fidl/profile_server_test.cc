@@ -2372,6 +2372,9 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadFail) {
   // Verify that |audio_offload_controller_client| was closed with |ZX_ERR_INTERNAL| epitaph
   ASSERT_TRUE(audio_offload_controller_epitaph.has_value());
   EXPECT_EQ(audio_offload_controller_epitaph.value(), ZX_ERR_INTERNAL);
+
+  bt::l2cap::A2dpOffloadStatus a2dp_offload_status = fake_channel->a2dp_offload_status();
+  EXPECT_EQ(bt::l2cap::A2dpOffloadStatus::kStopped, a2dp_offload_status);
 }
 
 TEST_P(AndroidSupportedFeaturesTest, AudioOffloadExtStartAudioOffloadInProgress) {
@@ -2885,6 +2888,117 @@ TEST_P(AndroidSupportedFeaturesTest, AudioOffloadControllerStopAfterAlreadyStopp
 
   // Verify that stopping audio offload has no effect when it's already stopped
   EXPECT_EQ(cb_count, 1u);
+}
+
+TEST_P(AndroidSupportedFeaturesTest, AudioOffloadControllerUnbindStopsAudioOffload) {
+  FakeChannel::WeakPtr fake_channel;
+  adapter()->fake_bredr()->set_l2cap_channel_callback(
+      [&](FakeChannel::WeakPtr chan) { fake_channel = std::move(chan); });
+
+  const bool android_vendor_ext_support = GetParam().first;
+  const uint32_t a2dp_offload_capabilities = GetParam().second;
+
+  if (android_vendor_ext_support) {
+    adapter()->mutable_state().controller_features |= FeaturesBits::kAndroidVendorExtensions;
+
+    bt::StaticPacket<android_emb::LEGetVendorCapabilitiesCommandCompleteEventWriter> params;
+    params.SetToZeros();
+    params.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
+    params.view().version_supported().major_number().Write(0);
+    params.view().version_supported().minor_number().Write(98);
+    params.view().a2dp_source_offload_capability_mask().BackingStorage().UncheckedWriteUInt(
+        a2dp_offload_capabilities);
+    adapter()->mutable_state().android_vendor_capabilities =
+        bt::gap::AndroidVendorCapabilities::New(params.view());
+  }
+
+  const bt::PeerId peer_id(1);
+  const fuchsia::bluetooth::PeerId fidl_peer_id{peer_id.value()};
+
+  // Set L2CAP channel parameters
+  fidlbredr::L2capParameters l2cap_params;
+  fidlbredr::ConnectParameters conn_params;
+  l2cap_params.set_psm(fidlbredr::PSM_AVDTP);
+  l2cap_params.set_parameters(fidlbredr::ChannelParameters());
+  conn_params.set_l2cap(std::move(l2cap_params));
+
+  std::optional<fidlbredr::Channel> response_channel;
+  client()->Connect(fidl_peer_id, std::move(conn_params),
+                    [&response_channel](fidlbredr::Profile_Connect_Result result) {
+                      ASSERT_TRUE(result.is_response());
+                      response_channel = std::move(result.response().channel);
+                    });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(response_channel.has_value());
+  if (!android_vendor_ext_support || !a2dp_offload_capabilities) {
+    EXPECT_FALSE(response_channel->has_ext_audio_offload());
+    return;
+  }
+  ASSERT_TRUE(response_channel->has_ext_audio_offload());
+
+  // Set Audio Offload Configuration Values
+  std::unique_ptr<fidlbredr::AudioOffloadFeatures> codec = fidlbredr::AudioOffloadFeatures::New();
+  std::unique_ptr<fidlbredr::AudioSbcSupport> codec_value = fidlbredr::AudioSbcSupport::New();
+  codec->set_sbc(std::move(*codec_value));
+
+  std::unique_ptr<fidlbredr::AudioEncoderSettings> encoder_settings =
+      std::make_unique<fidlbredr::AudioEncoderSettings>();
+  std::unique_ptr<fuchsia::media::SbcEncoderSettings> encoder_settings_value =
+      fuchsia::media::SbcEncoderSettings::New();
+  encoder_settings->set_sbc(*encoder_settings_value);
+
+  std::unique_ptr<fidlbredr::AudioOffloadConfiguration> config =
+      std::make_unique<fidlbredr::AudioOffloadConfiguration>();
+  config->set_codec(std::move(*codec));
+  config->set_max_latency(10);
+  config->set_scms_t_enable(true);
+  config->set_sampling_frequency(fidlbredr::AudioSamplingFrequency::HZ_44100);
+  config->set_bits_per_sample(fidlbredr::AudioBitsPerSample::BPS_16);
+  config->set_channel_mode(fidlbredr::AudioChannelMode::MONO);
+  config->set_encoded_bit_rate(10);
+  config->set_encoder_settings(std::move(*encoder_settings));
+
+  fidlbredr::AudioOffloadExtPtr audio_offload_ext_client =
+      response_channel->mutable_ext_audio_offload()->Bind();
+  fidlbredr::AudioOffloadControllerHandle controller_handle;
+  fidl::InterfaceRequest<fidlbredr::AudioOffloadController> controller_request =
+      controller_handle.NewRequest();
+  audio_offload_ext_client->StartAudioOffload(std::move(*config), std::move(controller_request));
+
+  fidlbredr::AudioOffloadControllerPtr audio_offload_controller_client;
+  audio_offload_controller_client.Bind(std::move(controller_handle));
+
+  std::optional<zx_status_t> audio_offload_controller_epitaph;
+  audio_offload_controller_client.set_error_handler(
+      [&](zx_status_t status) { audio_offload_controller_epitaph = status; });
+
+  size_t on_started_count = 0;
+  audio_offload_controller_client.events().OnStarted = [&]() { on_started_count++; };
+
+  RunLoopUntilIdle();
+
+  // Verify that OnStarted event was sent successfully
+  EXPECT_EQ(on_started_count, 1u);
+
+  // Verify that |audio_offload_controller_client| was not closed with an epitaph
+  ASSERT_FALSE(audio_offload_controller_epitaph.has_value());
+
+  bt::l2cap::A2dpOffloadStatus a2dp_offload_status = fake_channel->a2dp_offload_status();
+
+  // Verify that |a2dp_offload_status| is set to started
+  ASSERT_EQ(bt::l2cap::A2dpOffloadStatus::kStarted, a2dp_offload_status);
+
+  audio_offload_controller_client.Unbind();
+
+  RunLoopUntilIdle();
+
+  // Verify that client is unbound from fidl channel
+  ASSERT_FALSE(audio_offload_controller_client.is_bound());
+
+  a2dp_offload_status = fake_channel->a2dp_offload_status();
+
+  // Verify that |a2dp_offload_status| is set to stopped
+  ASSERT_EQ(bt::l2cap::A2dpOffloadStatus::kStopped, a2dp_offload_status);
 }
 
 const std::vector<std::pair<bool, uint32_t>> kVendorCapabilitiesParams = {
