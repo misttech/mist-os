@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_hardware_hrtimer as fhrtimer;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef};
-use starnix_logging::{log_error, log_info};
+use starnix_logging::{log_debug, log_error};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
@@ -176,7 +176,14 @@ impl HrTimerManager {
                                     }
                                 }
                             }
-                            Ok(Err(e)) => log_info!("HrTimer::StartAndWait driver error: {e:?}"),
+                            Ok(Err(e)) => match e {
+                                fhrtimer::DriverError::Canceled => log_debug!(
+                                    "A new HrTimer with \
+                                an earlier deadline has been started. \
+                                This `StartAndWait` attempt is cancelled."
+                                ),
+                                _ => log_error!("HrTimer::StartAndWait driver error: {e:?}"),
+                            },
                             Err(e) => log_error!("HrTimer::StartAndWait fidl error: {e}"),
                         }
                     }
