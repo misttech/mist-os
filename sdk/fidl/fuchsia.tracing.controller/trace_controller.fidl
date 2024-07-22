@@ -38,7 +38,41 @@ type SessionState = flexible enum {
     TERMINATING = 7;
 };
 
-/// The controller interface used by the trace tool to initialize/start/stop/terminate tracing.
+/// The provisioner interface used by the trace tool to initialize tracing
+///
+/// The provisioner is required to start a tracing session and bind the control
+/// to the client. It can also perform tasks like getting the list of registered
+/// providers and known categories, which can be performed without a existing
+/// trace session.
+@discoverable
+open protocol Provisioner {
+    /// Requests to initialize tracing with the specified `config`.
+    ///
+    /// A bad request will terminate the connection.
+    ///
+    /// The trace controller emits trace data to `output` as a sequence of
+    /// binary formatted trace records.  Traces obtained from different providers
+    /// are delimited by metadata records within the stream.
+    /// The format of these records can be found here:
+    /// https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format
+    flexible InitializeTracing(resource struct {
+        controller server_end:Session;
+        config TraceConfig;
+        output zx.Handle:SOCKET;
+    });
+
+    /// Return the set of registered providers.
+    flexible GetProviders() -> (struct {
+        providers vector<ProviderInfo>:MAX_NUM_PROVIDERS;
+    });
+
+    // Gets the known categories.
+    flexible GetKnownCategories() -> (struct {
+        categories vector<fuchsia.tracing.KnownCategory>:fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES;
+    });
+};
+
+/// The controller interface used by the trace tool to start/stop/terminate a tracing session.
 ///
 /// The trace controller may lightly validate the structure of
 /// trace records as it copies them from trace buffers into the output.
@@ -49,6 +83,46 @@ type SessionState = flexible enum {
 /// themselves.  For example, it does not try to check argument lengths in
 /// events.  This ensures that the trace format can be extended without needing
 /// to modify the trace controller.
+open protocol Session {
+    /// Requests to start tracing with the specified `options`.
+    ///
+    /// If tracing has already started then the request is ignored,
+    /// except to send back an error code.
+    ///
+    /// The trace controller acknowledges the request when all
+    /// registered providers have been started or after
+    /// `TraceConfig.start_timeout_milliseconds` milliseconds.
+    /// One useful reason for the has-started acknowledgement is that the
+    /// trace program can start a program to trace knowing that all the
+    /// providers are started.
+    flexible StartTracing(struct {
+        options StartOptions;
+    }) -> () error StartErrorCode;
+
+    /// Requests to stop tracing.
+    ///
+    /// If tracing has already stopped then this does nothing.
+    /// Returning a result lets callers know when it's ok to, for example,
+    /// start tracing again.
+    flexible StopTracing(struct {
+        options StopOptions;
+    }) -> (struct {
+        result TerminateResult;
+    }) error StopErrorCode;
+
+    /// Returns the next alert when it arrives.
+    flexible WatchAlert() -> (struct {
+        alert_name AlertName;
+    });
+
+    /// Event sent when the session state changes.
+    flexible -> OnSessionStateChange(struct {
+        state SessionState;
+    });
+};
+
+// Copy of the existing controller to keep things working until all references
+// are to it are removed
 @discoverable
 protocol Controller {
     /// Requests to initialize tracing with the specified `config`.
@@ -183,6 +257,16 @@ type StartErrorCode = flexible enum {
     STOPPING = 3;
     /// Tracing is currently being terminated.
     TERMINATING = 4;
+};
+
+/// Error codes from Stop operations.
+type StopErrorCode = flexible enum {
+    /// Trace controller is unavailable. Nothing to stop.
+    NOT_INITIALIZED = 1;
+    /// Tracing has not started or is currently stoppped.
+    NOT_STARTED = 2;
+    /// Tracing aborted due to error.
+    ABORTED = 3;
 };
 
 /// Additional options to control trace data collection.

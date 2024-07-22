@@ -439,7 +439,7 @@ TransferStatus Tracee::TransferRecords() const {
 }
 
 std::optional<controller::ProviderStats> Tracee::GetStats() const {
-  if (state_ == State::kTerminated) {
+  if (state_ == State::kTerminated || state_ == State::kStopped) {
     return std::move(provider_stats_);
   }
   return std::nullopt;

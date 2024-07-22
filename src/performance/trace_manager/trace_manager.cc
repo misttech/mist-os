@@ -56,32 +56,209 @@ using KnownCategoryVector = std::vector<fuchsia::tracing::KnownCategory>;
 
 }  // namespace
 
+TraceController::TraceController(TraceManagerApp* app, std::unique_ptr<TraceSession> session)
+    : app_(app), session_(std::move(session)) {
+  session_->MarkInitialized();
+}
+
+TraceController::~TraceController() = default;
+
+// fidl
+void TraceController::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  FX_LOGS(WARNING) << "Received an unknown method with ordinal " << ordinal;
+}
+
+// fidl
+void TraceController::StartTracing(controller::StartOptions options,
+                                   StartTracingCallback start_callback) {
+  FX_LOGS(DEBUG) << "StartTracing";
+
+  controller::Session_StartTracing_Result result;
+
+  if (!session_) {
+    FX_LOGS(ERROR) << "Ignoring start request, trace must be initialized first";
+    result.set_err(controller::StartErrorCode::NOT_INITIALIZED);
+    start_callback(std::move(result));
+    return;
+  }
+
+  switch (session_->state()) {
+    case TraceSession::State::kStarting:
+    case TraceSession::State::kStarted:
+      FX_LOGS(ERROR) << "Ignoring start request, trace already started";
+      result.set_err(controller::StartErrorCode::ALREADY_STARTED);
+      start_callback(std::move(result));
+      return;
+    case TraceSession::State::kStopping:
+      FX_LOGS(ERROR) << "Ignoring start request, trace stopping";
+      result.set_err(controller::StartErrorCode::STOPPING);
+      start_callback(std::move(result));
+      return;
+    case TraceSession::State::kTerminating:
+      FX_LOGS(ERROR) << "Ignoring start request, trace terminating";
+      result.set_err(controller::StartErrorCode::TERMINATING);
+      start_callback(std::move(result));
+      return;
+    case TraceSession::State::kInitialized:
+    case TraceSession::State::kStopped:
+      break;
+    default:
+      FX_NOTREACHED();
+      return;
+  }
+
+  std::vector<std::string> additional_categories;
+  if (options.has_additional_categories()) {
+    additional_categories = std::move(options.additional_categories());
+  }
+
+  // This default matches trace's.
+  fuchsia::tracing::BufferDisposition buffer_disposition =
+      fuchsia::tracing::BufferDisposition::RETAIN;
+  if (options.has_buffer_disposition()) {
+    buffer_disposition = options.buffer_disposition();
+    switch (buffer_disposition) {
+      case fuchsia::tracing::BufferDisposition::CLEAR_ENTIRE:
+      case fuchsia::tracing::BufferDisposition::CLEAR_NONDURABLE:
+      case fuchsia::tracing::BufferDisposition::RETAIN:
+        break;
+      default:
+        FX_LOGS(ERROR) << "Bad value for buffer disposition: " << buffer_disposition
+                       << ", dropping connection";
+        // TODO(dje): IWBN to drop the connection. How?
+        result.set_err(controller::StartErrorCode::TERMINATING);
+        start_callback(std::move(result));
+        return;
+    }
+  }
+
+  FX_LOGS(INFO) << "Starting trace, buffer disposition: " << buffer_disposition;
+
+  session_->Start(buffer_disposition, additional_categories, std::move(start_callback));
+}
+
+// fidl
+void TraceController::StopTracing(controller::StopOptions options,
+                                  StopTracingCallback stop_callback) {
+  controller::Session_StopTracing_Result stop_result;
+
+  if (session_->state() != TraceSession::State::kInitialized &&
+      session_->state() != TraceSession::State::kStarting &&
+      session_->state() != TraceSession::State::kStarted) {
+    FX_LOGS(INFO) << "Ignoring stop request, state != Initialized,Starting,Started";
+    stop_result.set_err(controller::StopErrorCode::NOT_STARTED);
+    stop_callback(std::move(stop_result));
+    return;
+  }
+
+  bool write_results = false;
+  if (options.has_write_results()) {
+    write_results = options.write_results();
+  }
+
+  FX_LOGS(INFO) << "Stopping trace" << (write_results ? ", and writing results" : "");
+  session_->Stop(write_results, [stop_callback = std::move(stop_callback)](
+                                    controller::Session_StopTracing_Result result) {
+    FX_LOGS(DEBUG) << "Stopped trace";
+    stop_callback(std::move(result));
+  });
+}
+
+void TraceController::TerminateTracing(controller::TerminateOptions options, fit::closure cb) {
+  // Check the state first because the log messages are useful, but not if
+  // tracing has ended.
+  if (session_->state() == TraceSession::State::kTerminating) {
+    FX_LOGS(INFO) << "Ignoring terminate request. Already terminating";
+    return;
+  }
+
+  if (options.has_write_results()) {
+    session_->set_write_results_on_terminate(options.write_results());
+  }
+
+  session_->Terminate([this, callback = std::move(cb)]() {
+    FX_LOGS(DEBUG) << "Session Terminated";
+
+    // Clean up any bindings for currently running trace so a new one
+    // can be initiated
+    session_.reset();
+
+    FX_DCHECK(callback);
+    // The call back will destroy the TraceController object. Only issue the callback
+    // as the last thing to do.
+    callback();
+  });
+}
+
 TraceManager::TraceManager(TraceManagerApp* app, Config config, async::Executor& executor)
     : app_(app), config_(std::move(config)), executor_(executor) {}
 
 TraceManager::~TraceManager() = default;
 
+void TraceManager::CloseSession() {
+  // Clean up any bindings for the currently running trace so a new one
+  // can be initiated.
+
+  // The actual trace_controller object is held by app.SessionBindings
+  // and will be removed once the binding is closed. Remove the stored
+  // referencce to the trace_controller object to prevent use after free
+  FX_LOGS(DEBUG) << "Clean up leftover bindings";
+  app_->CloseSessionBindings();
+  trace_controller_.reset();
+}
+
 void TraceManager::OnEmptyControllerSet() {
   // While one controller could go away and another remain causing a trace
   // to not be terminated, at least handle the common case.
-  FX_LOGS(DEBUG) << "Controller is gone";
-  if (session_) {
-    // Check the state first because the log messages are useful, but not if
-    // tracing has ended.
-    if (session_->state() != TraceSession::State::kTerminating) {
-      FX_LOGS(INFO) << "Controller is gone, terminating trace";
-      session_->Terminate([this](controller::Controller_TerminateTracing_Result result) {
-        FX_LOGS(INFO) << "Trace terminated";
-        session_.reset();
-      });
-    }
+  FX_LOGS(INFO) << "Controller is gone";
+  if (trace_controller_) {
+    FX_LOGS(DEBUG) << "Terminating trace and closing session";
+    controller::TerminateOptions options;
+    // Terminate the running trace and the close the trace session.
+    trace_controller_->TerminateTracing(std::move(options), [this]() { CloseSession(); });
+  } else {
+    CloseSession();
   }
+}
 
-  while (!watch_alert_callbacks_.empty()) {
-    watch_alert_callbacks_.pop();
-  }
-  while (!alerts_.empty()) {
-    alerts_.pop();
+void TraceManager::TerminateTracing(
+    controller::TerminateOptions options,
+    fit::function<void(controller::Controller_TerminateTracing_Result)> cb) {
+  if (session() && session()->state() != TraceSession::State::kTerminating) {
+    FX_LOGS(DEBUG) << "Stop and Terminate tracing";
+    // Trace may still be running. Make sure we stop first in order to get stats.
+    controller::StopOptions stop_options;
+    stop_options.set_write_results((options.has_write_results() && options.write_results()));
+
+    fpromise::bridge<controller::TerminateResult> bridge;
+    trace_controller_->StopTracing(
+        std::move(stop_options), [completer = std::move(bridge.completer)](
+                                     controller::Session_StopTracing_Result stop_result) mutable {
+          if (stop_result.is_response()) {
+            completer.complete_ok(std::move(stop_result.response().result));
+          } else {
+            std::vector<controller::ProviderStats> stats;
+            controller::TerminateResult terminate_result;
+            terminate_result.set_provider_stats(std::move(stats));
+            completer.complete_ok(std::move(terminate_result));
+          }
+        });
+    auto terminate_promise = bridge.consumer.promise().then(
+        [this, cb = std::move(cb)](fpromise::result<controller::TerminateResult>& result) mutable {
+          controller::TerminateOptions options;
+          trace_controller_->TerminateTracing(std::move(options), [this, result = std::move(result),
+                                                                   callback =
+                                                                       std::move(cb)]() mutable {
+            controller::Controller_TerminateTracing_Result terminate_result;
+            controller::Controller_TerminateTracing_Response response(std::move(result.value()));
+            terminate_result.set_response(std::move(response));
+            CloseSession();
+            FX_DCHECK(callback);
+            callback(std::move(terminate_result));
+          });
+        });
+
+    executor_.schedule_task(std::move(terminate_promise));
   }
 }
 
@@ -91,10 +268,11 @@ void TraceManager::handle_unknown_method(uint64_t ordinal, bool method_has_respo
 }
 
 // fidl
-void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket output) {
+void TraceManager::InitializeTracing(fidl::InterfaceRequest<controller::Session> controller,
+                                     controller::TraceConfig config, zx::socket output) {
   FX_LOGS(DEBUG) << "InitializeTracing";
 
-  if (session_) {
+  if (trace_controller_) {
     FX_LOGS(ERROR) << "Ignoring initialize request, trace already initialized";
     return;
   }
@@ -160,171 +338,35 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
     start_timeout = zx::msec(config.start_timeout_milliseconds());
   }
 
-  session_ = std::make_unique<TraceSession>(
+  auto session = std::make_unique<TraceSession>(
       executor_, std::move(output), std::move(categories), default_buffer_size_megabytes,
       tracing_buffering_mode, std::move(provider_specs), start_timeout, kStopTimeout,
       [this]() {
-        if (session_->state() != TraceSession::State::kTerminating) {
-          FX_LOGS(INFO) << "Aborting and terminating trace";
-          session_->Terminate([this](controller::Controller_TerminateTracing_Result result) {
-            FX_LOGS(INFO) << "Terminated trace";
-            session_.reset();
-          });
+        if (trace_controller_) {
+          controller::TerminateOptions options;
+          options.set_write_results(false);
+          trace_controller_->TerminateTracing(std::move(options), [this]() { CloseSession(); });
         }
       },
-      [this](const std::string& alert_name) { OnAlert(alert_name); });
+      [this](const std::string& alert_name) { trace_controller_->OnAlert(alert_name); });
 
   // The trace header is written now to ensure it appears first, and to avoid
   // timing issues if the trace is terminated early (and the session being
   // deleted).
-  session_->WriteTraceInfo();
+  session->WriteTraceInfo();
 
   for (auto& bundle : providers_) {
-    session_->AddProvider(&bundle);
+    session->AddProvider(&bundle);
   }
 
-  session_->MarkInitialized();
-}
-
-// fidl
-void TraceManager::TerminateTracing(controller::TerminateOptions options,
-                                    TerminateTracingCallback terminate_callback) {
-  controller::Controller_TerminateTracing_Result result;
-  controller::TerminateResult terminate_result;
-  if (!session_) {
-    FX_LOGS(DEBUG) << "Ignoring terminate request, tracing not initialized";
-    result.set_response(
-        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
-    terminate_callback(std::move(result));
-    return;
-  }
-
-  if (session_->state() == TraceSession::State::kTerminating) {
-    FX_LOGS(INFO) << "Ignoring terminate request. Already terminating";
-    result.set_response(
-        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
-    terminate_callback(std::move(result));
-    return;
-  }
-
-  if (options.has_write_results()) {
-    session_->set_write_results_on_terminate(options.write_results());
-  }
-
-  FX_LOGS(INFO) << "Terminating trace";
-  session_->Terminate([this, terminate_callback = std::move(terminate_callback)](
-                          controller::Controller_TerminateTracing_Result result) {
-    terminate_callback(std::move(result));
-    session_.reset();
-  });
-}
-
-// fidl
-void TraceManager::StartTracing(controller::StartOptions options,
-                                StartTracingCallback start_callback) {
-  FX_LOGS(DEBUG) << "StartTracing";
-
-  controller::Controller_StartTracing_Result result;
-
-  if (!session_) {
-    FX_LOGS(ERROR) << "Ignoring start request, trace must be initialized first";
-    result.set_err(controller::StartErrorCode::NOT_INITIALIZED);
-    start_callback(std::move(result));
-    return;
-  }
-
-  switch (session_->state()) {
-    case TraceSession::State::kStarting:
-    case TraceSession::State::kStarted:
-      FX_LOGS(ERROR) << "Ignoring start request, trace already started";
-      result.set_err(controller::StartErrorCode::ALREADY_STARTED);
-      start_callback(std::move(result));
-      return;
-    case TraceSession::State::kStopping:
-      FX_LOGS(ERROR) << "Ignoring start request, trace stopping";
-      result.set_err(controller::StartErrorCode::STOPPING);
-      start_callback(std::move(result));
-      return;
-    case TraceSession::State::kTerminating:
-      FX_LOGS(ERROR) << "Ignoring start request, trace terminating";
-      result.set_err(controller::StartErrorCode::TERMINATING);
-      start_callback(std::move(result));
-      return;
-    case TraceSession::State::kInitialized:
-    case TraceSession::State::kStopped:
-      break;
-    default:
-      FX_NOTREACHED();
-      return;
-  }
-
-  std::vector<std::string> additional_categories;
-  if (options.has_additional_categories()) {
-    additional_categories = std::move(options.additional_categories());
-  }
-
-  // This default matches trace's.
-  fuchsia::tracing::BufferDisposition buffer_disposition =
-      fuchsia::tracing::BufferDisposition::RETAIN;
-  if (options.has_buffer_disposition()) {
-    buffer_disposition = options.buffer_disposition();
-    switch (buffer_disposition) {
-      case fuchsia::tracing::BufferDisposition::CLEAR_ENTIRE:
-      case fuchsia::tracing::BufferDisposition::CLEAR_NONDURABLE:
-      case fuchsia::tracing::BufferDisposition::RETAIN:
-        break;
-      default:
-        FX_LOGS(ERROR) << "Bad value for buffer disposition: " << buffer_disposition
-                       << ", dropping connection";
-        // TODO(dje): IWBN to drop the connection. How?
-        result.set_err(controller::StartErrorCode::TERMINATING);
-        start_callback(std::move(result));
-        return;
-    }
-  }
-
-  FX_LOGS(INFO) << "Starting trace, buffer disposition: " << buffer_disposition;
-
-  session_->Start(buffer_disposition, additional_categories, std::move(start_callback));
-}
-
-// fidl
-void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallback stop_callback) {
-  controller::Controller_StopTracing_Result stop_result;
-  controller::Controller_StopTracing_Response response;
-  if (!session_) {
-    FX_LOGS(DEBUG) << "Ignoring stop request, tracing not started";
-    stop_result.set_response(response);
-    stop_callback(std::move(stop_result));
-    return;
-  }
-
-  if (session_->state() != TraceSession::State::kInitialized &&
-      session_->state() != TraceSession::State::kStarting &&
-      session_->state() != TraceSession::State::kStarted) {
-    FX_LOGS(DEBUG) << "Ignoring stop request, state != Initialized,Starting,Started";
-    stop_result.set_response(response);
-    stop_callback(std::move(stop_result));
-    return;
-  }
-
-  bool write_results = false;
-  if (options.has_write_results()) {
-    write_results = options.write_results();
-  }
-
-  FX_LOGS(INFO) << "Stopping trace" << (write_results ? ", and writing results" : "");
-  session_->Stop(write_results, [stop_callback = std::move(stop_callback)](
-                                    controller::Controller_StopTracing_Result result) {
-    FX_LOGS(INFO) << "Stopped trace";
-    stop_callback(std::move(result));
-  });
+  trace_controller_ = std::make_shared<TraceController>(app_, std::move(session));
+  app_->AddSessionBinding(trace_controller_, std::move(controller));
 }
 
 // fidl
 void TraceManager::GetProviders(GetProvidersCallback callback) {
   FX_LOGS(DEBUG) << "GetProviders";
-  controller::Controller_GetProviders_Result result;
+  controller::Provisioner_GetProviders_Result result;
   std::vector<controller::ProviderInfo> provider_info;
   for (const auto& provider : providers_) {
     controller::ProviderInfo info;
@@ -333,7 +375,7 @@ void TraceManager::GetProviders(GetProvidersCallback callback) {
     info.set_name(provider.name);
     provider_info.push_back(std::move(info));
   }
-  result.set_response(controller::Controller_GetProviders_Response(std::move(provider_info)));
+  result.set_response(controller::Provisioner_GetProviders_Response(std::move(provider_info)));
   callback(std::move(result));
 }
 
@@ -396,8 +438,8 @@ void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
                                             result_known_categories.end());
                   }
                 }
-                controller::Controller_GetKnownCategories_Result result;
-                result.set_response(controller::Controller_GetKnownCategories_Response(
+                controller::Provisioner_GetKnownCategories_Result result;
+                result.set_response(controller::Provisioner_GetKnownCategories_Response(
                     {known_categories.begin(), known_categories.end()}));
                 callback(std::move(result));
               });
@@ -406,13 +448,13 @@ void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
   executor_.schedule_task(std::move(timeout));
 }
 
-void TraceManager::WatchAlert(WatchAlertCallback cb) {
+void TraceController::WatchAlert(WatchAlertCallback cb) {
   FX_LOGS(DEBUG) << "WatchAlert";
   if (alerts_.empty()) {
     watch_alert_callbacks_.push(std::move(cb));
   } else {
-    controller::Controller_WatchAlert_Result result;
-    result.set_response(controller::Controller_WatchAlert_Response(std::move(alerts_.front())));
+    controller::Session_WatchAlert_Result result;
+    result.set_response(controller::Session_WatchAlert_Response(std::move(alerts_.front())));
     cb(std::move(result));
     alerts_.pop();
   }
@@ -423,15 +465,15 @@ void TraceManager::RegisterProviderWorker(fidl::InterfaceHandle<provider::Provid
   FX_LOGS(DEBUG) << "Registering provider {" << pid << ":" << name.value_or("") << "}";
   auto it = providers_.emplace(providers_.end(), provider.Bind(), next_provider_id_++, pid,
                                name.value_or(""));
-
   it->provider.set_error_handler([this, it](zx_status_t status) {
-    if (session_)
-      session_->RemoveDeadProvider(&(*it));
+    if (session()) {
+      session()->RemoveDeadProvider(&(*it));
+    }
     providers_.erase(it);
   });
 
-  if (session_) {
-    session_->AddProvider(&(*it));
+  if (session()) {
+    session()->AddProvider(&(*it));
   }
 }
 
@@ -446,18 +488,26 @@ void TraceManager::RegisterProviderSynchronously(fidl::InterfaceHandle<provider:
                                                  uint64_t pid, std::string name,
                                                  RegisterProviderSynchronouslyCallback callback) {
   RegisterProviderWorker(std::move(provider), pid, std::move(name));
-  bool already_started = (session_ && (session_->state() == TraceSession::State::kStarting ||
-                                       session_->state() == TraceSession::State::kStarted));
+  auto session_ptr = session();
+  bool already_started = (session_ptr && (session_ptr->state() == TraceSession::State::kStarting ||
+                                          session_ptr->state() == TraceSession::State::kStarted));
   callback(ZX_OK, already_started);
 }
 
-void TraceManager::SendSessionStateEvent(controller::SessionState state) {
-  for (const auto& binding : app_->controller_bindings().bindings()) {
+void TraceController::SendSessionStateEvent(controller::SessionState state) {
+  for (const auto& binding : app_->session_bindings().bindings()) {
     binding->events().OnSessionStateChange(state);
   }
 }
 
-controller::SessionState TraceManager::TranslateSessionState(TraceSession::State state) {
+TraceSession* TraceManager::session() const {
+  if (trace_controller_) {
+    return trace_controller_->session();
+  }
+  return nullptr;
+}
+
+controller::SessionState TraceController::TranslateSessionState(TraceSession::State state) {
   switch (state) {
     case TraceSession::State::kReady:
       return controller::SessionState::READY;
@@ -476,7 +526,7 @@ controller::SessionState TraceManager::TranslateSessionState(TraceSession::State
   }
 }
 
-void TraceManager::OnAlert(const std::string& alert_name) {
+void TraceController::OnAlert(const std::string& alert_name) {
   if (watch_alert_callbacks_.empty()) {
     if (alerts_.size() == kMaxAlertQueueDepth) {
       // We're at our queue depth limit. Discard the oldest alert.
@@ -487,10 +537,189 @@ void TraceManager::OnAlert(const std::string& alert_name) {
     return;
   }
 
-  controller::Controller_WatchAlert_Result result;
-  result.set_response(controller::Controller_WatchAlert_Response(alert_name));
+  controller::Session_WatchAlert_Result result;
+  result.set_response(controller::Session_WatchAlert_Response(alert_name));
   watch_alert_callbacks_.front()(std::move(result));
   watch_alert_callbacks_.pop();
+}
+
+OldTraceManager::OldTraceManager(TraceManagerApp* app, TraceManager* trace_manager,
+                                 async::Executor& executor)
+    : app_(app), trace_manager_(trace_manager), executor_(executor) {
+  FX_DCHECK(trace_manager_);
+}
+
+OldTraceManager::~OldTraceManager() = default;
+
+void OldTraceManager::OnEmptyControllerSet() {
+  if (trace_controller_.is_bound()) {
+    trace_manager_->OnEmptyControllerSet();
+  }
+  trace_controller_ = fidl::InterfacePtr<controller::Session>();
+}
+
+// fidl
+void OldTraceManager::InitializeTracing(controller::TraceConfig config, zx::socket output) {
+  if (trace_controller_.is_bound()) {
+    FX_LOGS(ERROR) << "Ignoring initialize request, trace already initialized";
+    return;
+  }
+
+  trace_manager_->InitializeTracing(trace_controller_.NewRequest(), std::move(config),
+                                    std::move(output));
+}
+
+// fidl
+void OldTraceManager::TerminateTracing(controller::TerminateOptions options,
+                                       TerminateTracingCallback callback) {
+  if (!trace_controller_.is_bound()) {
+    FX_LOGS(ERROR) << "Ignoring terminate request, trace not initialized";
+    controller::Controller_TerminateTracing_Result result;
+    controller::TerminateResult terminate_result;
+    result.set_response(
+        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
+    FX_DCHECK(callback);
+    callback(std::move(result));
+    return;
+  }
+
+  // The existing Controller allows tracing to be terminated without being stopped first and returns
+  // provider stats on terminate. The new protocol will return stats on terminate and will
+  // automatically clean up on dropping the fidl interface. Explicit termination is not required.
+
+  // For now, trace_manager will do the proper clean-up. It will stop the trace if it is running,
+  // get the provider stats, terminate the providers, close the session and return the stats
+  // collected after stop.
+  trace_manager_->TerminateTracing(
+      std::move(options), [this, terminate_cb = std::move(callback)](
+                              controller::Controller_TerminateTracing_Result res) {
+        controller::Controller_TerminateTracing_Result result;
+        if (res.is_response() && !res.response().result.provider_stats().empty()) {
+          result = std::move(res);
+        } else {
+          result.set_response(
+              controller::Controller_TerminateTracing_Response(std::move(terminate_result_)));
+        }
+        FX_DCHECK(terminate_cb);
+        terminate_cb(std::move(result));
+        trace_controller_ = fidl::InterfacePtr<controller::Session>();
+      });
+}
+
+// fidl
+void OldTraceManager::StartTracing(controller::StartOptions options,
+                                   StartTracingCallback callback) {
+  if (!trace_controller_.is_bound()) {
+    FX_LOGS(ERROR) << "Ignoring start request. Trace not initialized";
+    controller::Controller_StartTracing_Result result;
+    result.set_err(controller::StartErrorCode::NOT_INITIALIZED);
+    FX_DCHECK(callback);
+    callback(std::move(result));
+    return;
+  }
+
+  trace_controller_->StartTracing(
+      std::move(options),
+      [callback = std::move(callback)](controller::Session_StartTracing_Result start_result) {
+        controller::Controller_StartTracing_Result result;
+        if (start_result.is_err()) {
+          result.set_err(start_result.err());
+        } else {
+          controller::Controller_StartTracing_Response response;
+          result.set_response(response);
+        }
+        FX_DCHECK(callback);
+        callback(std::move(result));
+      });
+}
+
+// fidl
+void OldTraceManager::StopTracing(controller::StopOptions options, StopTracingCallback callback) {
+  if (!trace_controller_.is_bound()) {
+    FX_LOGS(ERROR) << "Ignoring stop request. Trace not initialized";
+    controller::Controller_StopTracing_Result result;
+    controller::Controller_StopTracing_Response response;
+    result.set_response(response);
+    FX_DCHECK(callback);
+    callback(std::move(result));
+    return;
+  }
+
+  trace_controller_->StopTracing(
+      std::move(options),
+      [this, callback = std::move(callback)](controller::Session_StopTracing_Result stop_result) {
+        if (stop_result.is_response()) {
+          terminate_result_ = std::move(stop_result.response().result);
+        }
+        controller::Controller_StopTracing_Result result;
+        controller::Controller_StopTracing_Response response;
+        result.set_response(response);
+        FX_DCHECK(callback);
+        callback(std::move(result));
+      });
+}
+
+// fidl
+void OldTraceManager::GetProviders(GetProvidersCallback callback) {
+  trace_manager_->GetProviders([callback = std::move(callback)](
+                                   controller::Provisioner_GetProviders_Result providers_result) {
+    controller::Controller_GetProviders_Result result;
+    std::vector<controller::ProviderInfo> provider_info;
+    if (providers_result.is_response()) {
+      provider_info = std::move(providers_result.response().providers);
+    }
+    result.set_response(controller::Controller_GetProviders_Response(std::move(provider_info)));
+    FX_DCHECK(callback);
+    callback(std::move(result));
+  });
+}
+
+// fidl
+void OldTraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
+  trace_manager_->GetKnownCategories(
+      [callback = std::move(callback)](
+          controller::Provisioner_GetKnownCategories_Result categories_result) {
+        controller::Controller_GetKnownCategories_Result result;
+        KnownCategoryVector categories;
+        if (categories_result.is_response()) {
+          categories = std::move(categories_result.response().categories);
+        }
+        result.set_response(
+            controller::Controller_GetKnownCategories_Response(std::move(categories)));
+        FX_DCHECK(callback);
+        callback(std::move(result));
+      });
+}
+
+// fidl
+void OldTraceManager::WatchAlert(WatchAlertCallback callback) {
+  trace_controller_->WatchAlert(
+      [callback = std::move(callback)](controller::Session_WatchAlert_Result alert_result) {
+        controller::Controller_WatchAlert_Result result;
+        if (alert_result.is_response()) {
+          result.set_response(controller::Controller_WatchAlert_Response(
+              std::move(alert_result.response().alert_name)));
+        }
+        FX_DCHECK(callback);
+        callback(std::move(result));
+      });
+}
+
+// fidl
+void OldTraceManager::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  FX_LOGS(WARNING) << "Received an unknown method with ordinal " << ordinal;
+}
+
+void OldTraceManager::SendSessionStateEvent(controller::SessionState state) {
+  trace_manager_->trace_controller_->SendSessionStateEvent(state);
+}
+
+controller::SessionState OldTraceManager::TranslateSessionState(TraceSession::State state) {
+  return trace_manager_->trace_controller_->TranslateSessionState(state);
+}
+
+void OldTraceManager::OnAlert(const std::string& alert_name) {
+  trace_manager_->trace_controller_->OnAlert(alert_name);
 }
 
 }  // namespace tracing
