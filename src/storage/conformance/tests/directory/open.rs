@@ -580,6 +580,21 @@ async fn open3_open_directory() {
         .expect_err("opening directory as file should fail");
     assert_eq!(status, zx::Status::NOT_FILE);
 
+    // Attempting to open with file protocols should fail with ZX_ERR_INVALID_ARGS. It is worth
+    // noting that the behaviour for opening file flags with directory is not clearly defined. Linux
+    // allows opening a directory with `O_APPEND` but not `O_TRUNC`.
+    let status = test_dir
+        .open3_node::<fio::NodeMarker>(
+            "dir",
+            fio::Flags::FLAG_SEND_REPRESENTATION
+                | fio::Flags::FILE_APPEND
+                | fio::Flags::FILE_TRUNCATE,
+            None,
+        )
+        .await
+        .expect_err("opening directory as file should fail");
+    assert_eq!(status, zx::Status::INVALID_ARGS);
+
     // Attempting to open the directory as a symbolic link should fail with ZX_ERR_WRONG_TYPE.
     let status = test_dir
         .open3_node::<fio::NodeMarker>(
