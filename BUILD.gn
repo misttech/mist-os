@@ -236,33 +236,31 @@ build_api_module("api") {
   ]
 }
 
-if (current_toolchain == default_toolchain) {
-  # This target is used to generate, at `gn gen` time a file
-  # that is exclusively used by //build/api/client.py.
-  # NOTE: nothing should depend on this target.
-  generated_file("build_api_client_info") {
-    deps = [ "//:api" ]
-    outputs = [ "$root_build_dir/build_api_client_info" ]
-    data_keys = [ "build_api_client_info" ]
-    walk_keys = [ "build_api_client_info_barrier" ]
-    testonly = true
-    visibility = []  # Empty on purpose
-  }
+# This target is used to generate, at `gn gen` time a file
+# that is exclusively used by //build/api/client.py.
+# NOTE: nothing should depend on this target.
+generated_file("build_api_client_info") {
+  deps = [ "//:api" ]
+  outputs = [ "$root_build_dir/build_api_client_info" ]
+  data_keys = [ "build_api_client_info" ]
+  walk_keys = [ "build_api_client_info_barrier" ]
+  testonly = true
+  visibility = []  # Empty on purpose
+}
 
-  # This target generates a file that contains the path to the build API client
-  # script, relative to the build directory (e.g. '../../build/api/client').
-  #
-  # Many tools that process the build API files only have a path to the build
-  # directory, and do not know where the Fuchsia source directory itself is
-  # located. By reading this file, they can retrieve this information easily,
-  # without relying on fragile heuristics. This file should always be
-  # generated at `gn gen` time, and nothing should depend on it.
-  generated_file("build_api_client_path") {
-    # IMPORTANT: Do not include a newline at the end of "contents"
-    contents = rebase_path("//build/api/client", root_build_dir)
-    outputs = [ "$root_build_dir/build_api_client_path" ]
-    visibility = []  # Empty on purpose.
-  }
+# This target generates a file that contains the path to the build API client
+# script, relative to the build directory (e.g. '../../build/api/client').
+#
+# Many tools that process the build API files only have a path to the build
+# directory, and do not know where the Fuchsia source directory itself is
+# located. By reading this file, they can retrieve this information easily,
+# without relying on fragile heuristics. This file should always be
+# generated at `gn gen` time, and nothing should depend on it.
+generated_file("build_api_client_path") {
+  # IMPORTANT: Do not include a newline at the end of "contents"
+  contents = rebase_path("//build/api/client", root_build_dir)
+  outputs = [ "$root_build_dir/build_api_client_path" ]
+  visibility = []  # Empty on purpose.
 }
 
 # This describes the location of the package repository, in:
