@@ -62,8 +62,4 @@ message Context {
 
   // Absolute path to PGO profile data file.
   string pgo_profile_path = 14;
-
-  // Deprecated: renamed to 'job_count' above.
-  // TODO(b/340581192): delete this
-  int32 goma_job_count = 15;
 }

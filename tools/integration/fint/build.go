@@ -179,10 +179,6 @@ func buildImpl(
 		return artifacts, err
 	}
 	jobCount := int(contextSpec.JobCount)
-	// temporary fallback for migration
-	if jobCount == 0 {
-		jobCount = int(contextSpec.GomaJobCount)
-	}
 	r := ninjaRunner{
 		runner:    runner,
 		ninjaPath: ninjaPath,
