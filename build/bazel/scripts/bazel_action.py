@@ -43,7 +43,11 @@ _BAZEL_ROOT_WORKSPACE_NAME = "main"
 # files are part of Bazel's installation, their content would hardly change
 # between build invocations anyway, so this is safe.
 #
-_BAZEL_BUILTIN_REPOSITORIES = ("@bazel_tools//", "@local_config_cc//")
+_BAZEL_BUILTIN_REPOSITORIES = (
+    "@bazel_tools//",
+    "@local_config_cc//",
+    "@local_config_platform//",
+)
 
 # A list of file extensions for files that should be ignored from depfiles.
 _IGNORED_FILE_SUFFIXES = (
