@@ -339,7 +339,7 @@ class _RealPowerSampler(PowerSampler):
         return self._sampled_data
 
     def extract_samples(self) -> Sequence["Sample"]:
-        return _read_power_samples(self._csv_output_path)
+        return read_power_samples(self._csv_output_path)
 
 
 def create_power_sampler(
@@ -439,7 +439,7 @@ class Sample:
         )
 
 
-def _read_power_samples(power_trace_path: str) -> list[Sample]:
+def read_power_samples(power_trace_path: str) -> list[Sample]:
     """Return a tuple of the current and power samples from the power csv"""
     samples: list[Sample] = []
     with open(power_trace_path, "r") as power_csv:
