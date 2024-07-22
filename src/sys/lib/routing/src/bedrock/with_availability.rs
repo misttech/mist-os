@@ -41,7 +41,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use router_error::{DowncastErrorForTest, RouterError};
-    use sandbox::{Capability, Data, Dict, WeakInstanceToken};
+    use sandbox::{Capability, Data, WeakInstanceToken};
     use std::sync::Arc;
 
     #[derive(Debug)]
@@ -69,7 +69,6 @@ mod tests {
                 availability: Availability::Optional,
                 target: FakeComponentToken::new(),
                 debug: false,
-                metadata: Dict::new(),
             })
             .await
             .unwrap();
@@ -90,7 +89,6 @@ mod tests {
                 availability: Availability::Required,
                 target: FakeComponentToken::new(),
                 debug: false,
-                metadata: Dict::new(),
             })
             .await
             .unwrap_err();

@@ -369,8 +369,6 @@ type RouteRequest = resource table {
     1: availability Availability;
     /// The component that is requesting the capability.
     2: requesting InstanceToken;
-    /// Metadata associated with this capability request.
-    3: metadata DictionaryRef;
 };
 
 @available(added=HEAD)

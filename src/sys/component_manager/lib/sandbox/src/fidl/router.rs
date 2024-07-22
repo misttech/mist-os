@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Capability, Request, Router};
+use crate::{Request, Router};
 use fidl::handle::{AsHandleRef, EventPair};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_zircon::Koid;
@@ -16,7 +16,6 @@ impl From<Request> for fsandbox::RouteRequest {
         fsandbox::RouteRequest {
             availability: Some(availability),
             requesting: Some(fsandbox::InstanceToken { token }),
-            metadata: Some(request.metadata.into()),
             ..Default::default()
         }
     }
@@ -49,9 +48,6 @@ impl Router {
             let Some(token) = payload.requesting else {
                 return Err(fsandbox::RouterError::InvalidArgs);
             };
-            let Some(metadata) = payload.metadata else {
-                return Err(fsandbox::RouterError::InvalidArgs);
-            };
             let capability =
                 crate::fidl::registry::get(token.token.as_handle_ref().get_koid().unwrap());
             let component = match capability {
@@ -59,17 +55,8 @@ impl Router {
                 Some(_) => return Err(fsandbox::RouterError::InvalidArgs),
                 None => return Err(fsandbox::RouterError::InvalidArgs),
             };
-            let Capability::Dictionary(metadata) =
-                Capability::try_from(fsandbox::Capability::Dictionary(metadata)).unwrap()
-            else {
-                return Err(fsandbox::RouterError::InvalidArgs);
-            };
-            let request = Request {
-                availability: to_cm_type(availability),
-                target: component,
-                debug: false,
-                metadata,
-            };
+            let request =
+                Request { availability: to_cm_type(availability), target: component, debug: false };
             let cap = router.route(request).await?;
             Ok(cap.into())
         }
@@ -119,7 +106,7 @@ fn from_cm_type(value: cm_types::Availability) -> fsandbox::Availability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Dict, Receiver, WeakInstanceToken};
+    use crate::{Receiver, WeakInstanceToken};
     use assert_matches::assert_matches;
     use std::sync::Arc;
 
@@ -155,7 +142,6 @@ mod tests {
             .route(fsandbox::RouteRequest {
                 availability: Some(fsandbox::Availability::Required),
                 requesting: Some(fsandbox::InstanceToken { token: component_client }),
-                metadata: Some(Dict::new().into()),
                 ..Default::default()
             })
             .await
