@@ -32,18 +32,11 @@ _common_deps = [
   "//third_party/rust_crates:zerocopy",
 ]
 if (is_host) {
-  rustc_test("syscalls_rust_test_baseline") {
+  rustc_test("syscalls_rust_host_tests") {
     edition = "2021"
     source_root = "src/lib.rs"
     sources = _common_sources
     deps = _common_deps
-  }
-
-  host_test("syscalls_rust_host_tests") {
-    binary_path =
-        get_label_info(":syscalls_rust_test_baseline", "root_out_dir") +
-        "/syscalls_rust_test_baseline"
-    deps = [ ":syscalls_rust_test_baseline" ]
   }
 }
 
