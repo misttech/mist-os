@@ -657,12 +657,6 @@ pub(crate) struct PortHandler {
     max_frame_size: usize,
 }
 
-#[derive(thiserror::Error, Debug)]
-pub(crate) enum SendError {
-    #[error("device error: {0}")]
-    Device(#[from] netdevice_client::Error),
-}
-
 impl PortHandler {
     pub(crate) fn port_class(&self) -> fhardware_network::PortClass {
         self.port_class
