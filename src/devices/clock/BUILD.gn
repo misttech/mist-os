@@ -5,10 +5,7 @@
 group("drivers") {
   deps = [ "drivers/clock" ]
   if (target_cpu == "arm64") {
-    deps += [
-      "drivers/amlogic-clk",
-      "drivers/vim3-clk:bazel_package",
-    ]
+    deps += [ "drivers/amlogic-clk" ]
   }
 }
 

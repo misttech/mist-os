@@ -4,7 +4,6 @@
 
 group("drivers") {
   deps = [
-    "adc-buttons:bazel_package",
     "buttons",
     "ctaphid",
     "focaltech",

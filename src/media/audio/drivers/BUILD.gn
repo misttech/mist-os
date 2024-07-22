@@ -29,7 +29,6 @@ group("drivers") {
       "aml-dsp/aml-g12-tdm-dsp",
       "aml-g12-pdm:aml-g12-pdm",
       "aml-g12-tdm",
-      "aml-g12-tdm:aml-g12-composite-bazel-package",
       "aml-g12-tdm:aml-g12-tdm-dai",
     ]
   }
