@@ -22,6 +22,24 @@ type GpioPolarity = strict enum : uint32 {
     HIGH = 0x1;
 };
 
+type BufferMode = strict enum {
+    INPUT = 0;
+    OUTPUT_LOW = 1;
+    OUTPUT_HIGH = 2;
+};
+
+type InterruptMode = strict enum {
+    EDGE_LOW = 0;
+    EDGE_HIGH = 1;
+    EDGE_BOTH = 2;
+    LEVEL_LOW = 3;
+    LEVEL_HIGH = 4;
+};
+
+type InterruptConfiguration = table {
+    1: mode InterruptMode;
+};
+
 open protocol Gpio {
     /// Get the pin of a GPIO
     strict GetPin() -> (struct {

@@ -1,0 +1,18 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.hardware.pinimpl") {
+  sources = [
+    "metadata.fidl",
+    "pin-impl.fidl",
+  ]
+  contains_drivers = true
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.gpio",
+    "//sdk/fidl/fuchsia.hardware.pin",
+    "//zircon/vdso/zx",
+  ]
+}

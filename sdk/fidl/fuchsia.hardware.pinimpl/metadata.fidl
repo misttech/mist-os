@@ -1,0 +1,44 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.hardware.pinimpl;
+
+using fuchsia.hardware.gpio;
+using fuchsia.hardware.pin;
+using zx;
+
+/// Arguments to a fuchsia.hardware.pinimpl.PinImpl call to make as part of an `InitStep`.
+type InitCall = flexible union {
+    /// If set, the GPIO core driver will call `Configure' with the given config.
+    1: pin_config fuchsia.hardware.pin.Configuration;
+    /// If set, the GPIO core driver will call `SetBufferMode` with the given mode.
+    2: buffer_mode fuchsia.hardware.gpio.BufferMode;
+};
+
+/// A single init step to be performed by the GPIO core driver.
+type InitStep = flexible union {
+    /// If set, the GPIO core driver will make a call to the PinImpl driver with the given pin and
+    /// arguments.
+    1: call struct {
+        /// The platform-specific pin number that this call operates on.
+        pin uint32;
+        /// The call to make and the arguments to pass to it.
+        call InitCall;
+    };
+
+    /// If set, the GPIO core driver will delay for this long before processing the next step.
+    2: delay zx.Duration;
+};
+
+/// Passed to the GPIO core driver in metadata as DEVICE_METADATA_GPIO_INIT. Steps are processed
+/// sequentially in the order that they appear in the vector. Processing occurs once during the GPIO
+/// core driver's bind hook.
+type Metadata = table {
+    1: init_steps vector<InitStep>:MAX;
+};
+
+type ControllerMetadata = struct {
+    /// ID for the controller which is unique among all GPIO controllers.
+    id uint32;
+};
