@@ -5,6 +5,14 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_link_attribute.gni")
+
+# The Rust stdlib has an implicit link attribute to libfdio.
+# Any Rust executable should depend on this target to link
+# properly. See //build/rust/rustc_artifact.gni.
+rustc_link_attribute("fdio_for_rust_stdlib") {
+  lib_shared_target = "//sdk/lib/fdio"
+}
 
 rustc_library("fdio") {
   with_unit_tests = true

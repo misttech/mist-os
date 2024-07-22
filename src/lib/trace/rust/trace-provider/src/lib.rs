@@ -26,7 +26,7 @@ pub fn trace_provider_wait_for_init() {
 }
 
 mod sys {
-    #[link(name = "rust-trace-provider")]
+    // From librust-trace-provider.so
     extern "C" {
         // See the C++ documentation for these functions in trace_provider.cc
         pub(super) fn trace_provider_create_with_fdio_rust();

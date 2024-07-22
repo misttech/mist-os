@@ -330,6 +330,13 @@ template("rustc_artifact") {
     assert(!defined(_pass_through.metadata))
     not_needed([ "_pass_through" ])
 
+    # The Fuchsia standard library has an implicit #[link] directive
+    # pointing to libfdio.so
+    if (is_fuchsia && (invoker.target_type == "executable" ||
+                       invoker.target_type == "shared_library")) {
+      deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
+    }
+
     metadata = {
       if (defined(invoker.metadata)) {
         forward_variables_from(invoker.metadata, "*")

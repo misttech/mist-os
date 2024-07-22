@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use libc::{c_char, c_int};
 use std::ffi::CString;
 
-#[link(name = "ffi")]
+// From libffi.so
 extern "C" {
     fn blobfs_export_blobs(source_path: *const c_char, output_path: *const c_char) -> c_int;
 }

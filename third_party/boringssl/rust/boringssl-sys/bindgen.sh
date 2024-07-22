@@ -85,8 +85,6 @@ cat >> "$TMP" <<EOF
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 
-#[link(name = "crypto")] extern {}
-
 EOF
 
 cat src/lib.rs >> "$TMP"

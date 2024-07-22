@@ -8,12 +8,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-// This attribute ensures proper linkage. Applying it to an empty block to satisfy
-// linking requirements for later blocks is explicitly suggested by
-// https://doc.rust-lang.org/reference/items/external-blocks.html#the-link-attribute.
-#[link(name = "fastboot-shared-lib", kind = "dylib")]
-extern "C" {}
-
 pub type size_t = ::std::os::raw::c_ulong;
 #[repr(C)]
 #[repr(align(16))]

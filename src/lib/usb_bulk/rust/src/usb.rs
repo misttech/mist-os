@@ -8,12 +8,6 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-// This attribute ensures proper linkage. Applying it to an empty block to satisfy
-// linking requirements for later blocks is explicitly suggested by
-// https://doc.rust-lang.org/reference/items/external-blocks.html#the-link-attribute.
-#[link(name = "usb_bulk", kind = "static")]
-extern "C" {}
-
 // Configure linkage for MacOS.
 #[cfg(target_os = "macos")]
 #[link(name = "IOKit", kind = "framework")]
