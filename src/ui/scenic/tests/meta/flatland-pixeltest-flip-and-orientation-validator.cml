@@ -1,10 +1,13 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/ui/scenic/tests/meta/scenic_integration_test_base.shard.cml" ],
+    include: [
+        "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
+        "//sdk/lib/syslog/client.shard.cml",
+    ],
     program: {
-        binary: "bin/flatland-pixeltest-bin",
+        binary: "bin/flatland-pixeltest-flip-and-orientation-validator",
 
         // Only run the flip and orientation tests, so that this test component can
         // run within the test timeout.
@@ -13,9 +16,9 @@
     use: [
         {
             protocol: [
-                "fuchsia.sysmem.Allocator",
+                "fuchsia.logger.LogSink",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.vulkan.loader.Loader",
+                "fuchsia.ui.test.context.ScenicRealmFactory",
             ],
         },
     ],

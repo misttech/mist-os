@@ -11,8 +11,9 @@ group("tests") {
     ":display-ownership-integration-test",
     ":flatland-allocation-test",
     ":flatland-focus-integration-test",
-    ":flatland-integration-tests",
     ":flatland-mouse-integration-test",
+    ":flatland-pixeltest-flip-and-orientation",
+    ":flatland-pixeltest-general",
     ":flatland-pixeltest-yuv",
     ":flatland-protected-memory-integration-test",
     ":flatland-touch-integration-test",
@@ -469,11 +470,10 @@ ctf_components_packages("flatland-mouse-integration-test") {
   }
 }
 
-executable("flatland-pixeltest-bin") {
-  testonly = true
+ctf_components_packages("flatland-pixeltest-general") {
   sources = [ "flatland_integration_tests/flatland_pixeltest.cc" ]
   deps = [
-    ":common-deps-zxtest-with-realm-builder",
+    ":common-deps-zxtest",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
@@ -484,26 +484,27 @@ executable("flatland-pixeltest-bin") {
     "//src/ui/testing/util:screenshot_helper",
     "//zircon/system/ulib/fbl",
   ]
+  test_specs = {
+    environments = vulkan_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
-fuchsia_test_component("flatland-pixeltest-flip-and-orientation") {
-  component_name = "flatland-pixeltest-flip-and-orientation"
-  manifest = "meta/flatland_pixeltest_flip_and_orientation.cml"
-  deps = [ ":flatland-pixeltest-bin" ]
-  test_type = "vulkan"
-}
-
-fuchsia_test_component("flatland-pixeltest-general") {
-  component_name = "flatland-pixeltest-general"
-  manifest = "meta/flatland_pixeltest_general.cml"
-  deps = [ ":flatland-pixeltest-bin" ]
-  test_type = "vulkan"
-}
-
-fuchsia_test_package("flatland-integration-tests") {
-  test_components = [
-    ":flatland-pixeltest-flip-and-orientation",
-    ":flatland-pixeltest-general",
+ctf_components_packages("flatland-pixeltest-flip-and-orientation") {
+  sources = [ "flatland_integration_tests/flatland_pixeltest.cc" ]
+  deps = [
+    ":common-deps-zxtest",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//src/lib/testing/loop_fixture",
+    "//src/ui/scenic/lib/allocation:allocation",
+    "//src/ui/scenic/lib/utils",
+    "//src/ui/scenic/lib/utils:utils",
+    "//src/ui/testing/util:screenshot_helper",
+    "//zircon/system/ulib/fbl",
   ]
   test_specs = {
     environments = vulkan_envs
@@ -513,15 +514,20 @@ fuchsia_test_package("flatland-integration-tests") {
   }
 }
 
-fuchsia_test_component("pixeltest-yuv") {
-  component_name = "flatland-pixeltest-yuv"
-  manifest = "meta/flatland_pixeltest_yuv.cml"
-  deps = [ ":flatland-pixeltest-bin" ]
-  test_type = "vulkan"
-}
-
-fuchsia_test_package("flatland-pixeltest-yuv") {
-  test_components = [ ":pixeltest-yuv" ]
+ctf_components_packages("flatland-pixeltest-yuv") {
+  sources = [ "flatland_integration_tests/flatland_pixeltest.cc" ]
+  deps = [
+    ":common-deps-zxtest",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.compression.internal:fuchsia.ui.compression.internal_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//src/lib/testing/loop_fixture",
+    "//src/ui/scenic/lib/allocation:allocation",
+    "//src/ui/scenic/lib/utils",
+    "//src/ui/scenic/lib/utils:utils",
+    "//src/ui/testing/util:screenshot_helper",
+    "//zircon/system/ulib/fbl",
+  ]
   test_specs = {
     # TODO(https://fxbug.dev/42137913): Skip this test for AEMU as YUV Sysmem images are not supported yet.
     environments = magma_libvulkan_hardware_envs

@@ -7,7 +7,7 @@ use cm_rust::FidlIntoNative;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_media::ProfileProviderMarker;
 use fidl_fuchsia_ui_composition::{
-    AllocatorMarker, FlatlandDisplayMarker, FlatlandMarker, ScreenCaptureMarker,
+    AllocatorMarker, FlatlandDisplayMarker, FlatlandMarker, ScreenCaptureMarker, ScreenshotMarker,
 };
 use fidl_fuchsia_ui_composition_internal::{
     DisplayOwnershipMarker, ScreenCaptureMarker as ScreenCaptureMarker2,
@@ -205,6 +205,7 @@ async fn assemble_realm(
                 .capability(Capability::protocol::<PointerInjectorRegistryMarker>())
                 .capability(Capability::protocol::<LocalHitMarker>())
                 .capability(Capability::protocol::<ViewRefInstalledMarker>())
+                .capability(Capability::protocol::<ScreenshotMarker>())
                 .from(Ref::child(SCENIC))
                 .to(Ref::parent()),
         )
