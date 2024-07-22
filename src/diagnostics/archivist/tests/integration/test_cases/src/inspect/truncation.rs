@@ -20,10 +20,20 @@ async fn accessor_truncation_test() {
     .await
     .expect("create base topology");
 
+    let mut writers = vec![];
     for (i, x) in itertools::iproduct!(0..3, letters.iter()) {
         let puppet =
             test_topology::connect_to_puppet(&realm_proxy, &format!("child_{x}{i}")).await.unwrap();
-        puppet.emit_example_inspect_data().await.unwrap();
+
+        let writer = puppet
+            .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+            .await
+            .unwrap()
+            .into_proxy()
+            .unwrap();
+
+        writer.emit_example_inspect_data().await.unwrap();
+        writers.push(writer);
     }
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();

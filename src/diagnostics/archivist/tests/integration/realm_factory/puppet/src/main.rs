@@ -24,13 +24,11 @@ use fuchsia_inspect::{component, Inspector};
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use inspect_runtime::{EscrowOptions, PublishedInspectController};
+use inspect_runtime::EscrowOptions;
 use inspect_testing::ExampleInspectData;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use {
-    fidl_fuchsia_archivist_test as fpuppet, fidl_fuchsia_inspect as finspect, fuchsia_zircon as zx,
-};
+use {fidl_fuchsia_archivist_test as fpuppet, fuchsia_zircon as zx};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),
@@ -47,11 +45,7 @@ async fn main() -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
 
-    let publish_options = inspect_runtime::PublishOptions::default();
-    let inspect_controller =
-        inspect_runtime::publish(component::inspector(), publish_options).unwrap();
-
-    let puppet_server = Arc::new(PuppetServer::new(interest_recv, inspect_controller));
+    let puppet_server = Arc::new(PuppetServer::new(interest_recv));
 
     fs.dir("svc")
         .add_fidl_service(IncomingServices::Puppet)
@@ -97,50 +91,17 @@ struct PuppetServer {
     interest_changed: Mutex<UnboundedReceiver<InterestChangedEvent>>,
     // Tasks waiting to be notified of interest changed events.
     interest_waiters: Mutex<TaskGroup>,
-    // Example inspect data, visible only to clients that request it using
-    // Puppet/EmitExampleInspectData.
-    inspect_data: Mutex<ExampleInspectData>,
-    // The inspect controller that allows to escrow the data.
-    controller: Mutex<Option<PublishedInspectController>>,
+    // Published Inspectors
+    published_inspectors: Mutex<TaskGroup>,
 }
 
 impl PuppetServer {
-    fn new(
-        receiver: UnboundedReceiver<InterestChangedEvent>,
-        controller: PublishedInspectController,
-    ) -> Self {
+    fn new(receiver: UnboundedReceiver<InterestChangedEvent>) -> Self {
         Self {
             interest_changed: Mutex::new(receiver),
             interest_waiters: Mutex::new(TaskGroup::new()),
-            inspect_data: Mutex::new(ExampleInspectData::default()),
-            controller: Mutex::new(Some(controller)),
+            published_inspectors: Mutex::new(TaskGroup::new()),
         }
-    }
-
-    async fn emit_example_inspect_data(&self) {
-        let mut inspect_data = self.inspect_data.lock().await;
-        inspect_data.write_to(component::inspector().root());
-    }
-
-    fn record_string(&self, key: String, value: String) {
-        component::inspector().root().record_string(key, value);
-    }
-
-    fn record_int(&self, key: String, value: i64) {
-        component::inspector().root().record_int(key, value);
-    }
-
-    fn set_health_ok(&self) {
-        component::health().set_ok();
-    }
-
-    async fn escrow(&self, name: Option<String>) -> finspect::EscrowToken {
-        let controller = self.controller.lock().await.take().unwrap();
-        let mut options = EscrowOptions::default();
-        if let Some(name) = name {
-            options = options.name(name);
-        }
-        controller.escrow_frozen(options).await.unwrap()
     }
 }
 
@@ -181,39 +142,83 @@ async fn serve_inspect_puppet(
     }
 }
 
+async fn handle_inspect_writer(
+    mut stream: fpuppet::InspectWriterRequestStream,
+    name: Option<String>,
+) -> Result<(), Error> {
+    let inspector = match name {
+        None => component::inspector().clone(),
+        Some(_) => Inspector::default(),
+    };
+
+    let opts = match name {
+        None => inspect_runtime::PublishOptions::default(),
+        Some(ref n) => inspect_runtime::PublishOptions::default().inspect_tree_name(n),
+    };
+
+    let controller = inspect_runtime::publish(&inspector, opts).unwrap();
+
+    let mut example_inspect = ExampleInspectData::default();
+
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            fpuppet::InspectWriterRequest::EmitExampleInspectData { responder } => {
+                example_inspect.write_to(inspector.root());
+                responder.send().expect("response succeeds")
+            }
+            fpuppet::InspectWriterRequest::RecordString { key, value, responder } => {
+                inspector.root().record_string(key, value);
+                responder.send().expect("response succeeds")
+            }
+            fpuppet::InspectWriterRequest::RecordInt { key, value, responder } => {
+                inspector.root().record_int(key, value);
+                responder.send().expect("response succeeds")
+            }
+            fpuppet::InspectWriterRequest::SetHealthOk { responder } => {
+                if name.is_none() {
+                    component::health().set_ok();
+                }
+
+                responder.send().expect("response succeeds")
+            }
+            fpuppet::InspectWriterRequest::EscrowAndExit {
+                payload: fpuppet::InspectWriterEscrowAndExitRequest { name, .. },
+                responder,
+            } => {
+                let mut options = EscrowOptions::default();
+                if let Some(name) = name {
+                    options = options.name(name);
+                }
+                let token = controller.escrow_frozen(options).await.unwrap();
+                responder
+                    .send(fpuppet::InspectWriterEscrowAndExitResponse {
+                        token: Some(token),
+                        ..Default::default()
+                    })
+                    .expect("response succeeds");
+                std::process::exit(0);
+            }
+            fpuppet::InspectWriterRequest::_UnknownMethod { .. } => unreachable!(),
+        }
+    }
+    Ok(())
+}
+
 async fn handle_inspect_puppet_request(
     server: Arc<PuppetServer>,
     request: fpuppet::InspectPuppetRequest,
 ) -> Result<(), Error> {
     match request {
-        fpuppet::InspectPuppetRequest::EmitExampleInspectData { responder } => {
-            server.emit_example_inspect_data().await;
-            responder.send().expect("response succeeds")
-        }
-        fpuppet::InspectPuppetRequest::RecordString { key, value, responder } => {
-            server.record_string(key, value);
-            responder.send().expect("response succeeds")
-        }
-        fpuppet::InspectPuppetRequest::RecordInt { key, value, responder } => {
-            server.record_int(key, value);
-            responder.send().expect("response succeeds")
-        }
-        fpuppet::InspectPuppetRequest::SetHealthOk { responder } => {
-            server.set_health_ok();
-            responder.send().expect("response succeeds")
-        }
-        fpuppet::InspectPuppetRequest::EscrowAndExit {
-            payload: fpuppet::InspectPuppetEscrowAndExitRequest { name, .. },
+        fpuppet::InspectPuppetRequest::CreateInspector {
+            payload: fpuppet::InspectPuppetCreateInspectorRequest { name, .. },
             responder,
         } => {
-            let token = server.escrow(name).await;
-            responder
-                .send(fpuppet::InspectPuppetEscrowAndExitResponse {
-                    token: Some(token),
-                    ..Default::default()
-                })
-                .expect("response succeeds");
-            std::process::exit(0);
+            let (client_end, server_end) = fidl::endpoints::create_endpoints();
+            server.published_inspectors.lock().await.spawn(async move {
+                handle_inspect_writer(server_end.into_stream().unwrap(), name).await.unwrap()
+            });
+
+            responder.send(client_end).expect("response succeeds");
         }
         fpuppet::InspectPuppetRequest::_UnknownMethod { .. } => unreachable!(),
     }
@@ -225,42 +230,24 @@ async fn handle_puppet_request(
     request: fpuppet::PuppetRequest,
 ) -> Result<(), Error> {
     match request {
-        fpuppet::PuppetRequest::Crash { message, .. } => {
-            panic!("{message}");
-        }
-        fpuppet::PuppetRequest::EscrowAndExit {
-            payload: fpuppet::InspectPuppetEscrowAndExitRequest { name, .. },
+        fpuppet::PuppetRequest::CreateInspector {
+            payload: fpuppet::InspectPuppetCreateInspectorRequest { name, .. },
             responder,
         } => {
-            let token = server.escrow(name).await;
-            responder
-                .send(fpuppet::InspectPuppetEscrowAndExitResponse {
-                    token: Some(token),
-                    ..Default::default()
-                })
-                .expect("response succeeds");
-            std::process::exit(0);
+            let (client_end, server_end) = fidl::endpoints::create_endpoints();
+            server.published_inspectors.lock().await.spawn(async move {
+                handle_inspect_writer(server_end.into_stream().unwrap(), name).await.unwrap()
+            });
+
+            responder.send(client_end).expect("response succeeds");
         }
-        fpuppet::PuppetRequest::EmitExampleInspectData { responder } => {
-            server.emit_example_inspect_data().await;
-            responder.send().expect("response succeeds")
+        fpuppet::PuppetRequest::Crash { message, .. } => {
+            panic!("{message}");
         }
         fpuppet::PuppetRequest::RecordLazyValues { key, responder } => {
             let (client, requests) = create_request_stream()?;
             responder.send(client).expect("response succeeds");
             record_lazy_values(key, requests).await?;
-        }
-        fpuppet::PuppetRequest::RecordString { key, value, responder } => {
-            server.record_string(key, value);
-            responder.send().expect("response succeeds")
-        }
-        fpuppet::PuppetRequest::RecordInt { key, value, responder } => {
-            server.record_int(key, value);
-            responder.send().expect("response succeeds")
-        }
-        fpuppet::PuppetRequest::SetHealthOk { responder } => {
-            server.set_health_ok();
-            responder.send().expect("response succeeds")
         }
         fpuppet::PuppetRequest::Println { message, responder } => {
             println!("{message}");

@@ -27,7 +27,14 @@ async fn escrow_inspect_data() {
 
     // Publish some inspect in the puppet.
     let child_puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
-    child_puppet.set_health_ok().await.unwrap();
+    let writer = child_puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.set_health_ok().await.unwrap();
 
     // Assert the current live data that the component exposes.
     let data = read_data(&realm_proxy, RetryConfig::always()).await.pop().unwrap();
@@ -40,8 +47,8 @@ async fn escrow_inspect_data() {
     });
 
     // Tell the puppet to escrow the data it's currently exposing.
-    let token = child_puppet
-        .escrow_and_exit(&ftest::InspectPuppetEscrowAndExitRequest {
+    let token = writer
+        .escrow_and_exit(&ftest::InspectWriterEscrowAndExitRequest {
             name: Some("test-escrow".to_string()),
             ..Default::default()
         })

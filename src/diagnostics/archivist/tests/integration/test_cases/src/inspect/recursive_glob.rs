@@ -30,14 +30,30 @@ async fn read_components_recursive_glob() {
     ]);
 
     let puppet_a = test_topology::connect_to_puppet(&realm_proxy, "child_a").await.unwrap();
-    puppet_a.set_health_ok().await.unwrap();
-    let puppet_b = test_topology::connect_to_puppet(&realm_proxy, "child_b").await.unwrap();
-    puppet_b.set_health_ok().await.unwrap();
+    let writer_a = puppet_a
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
-    expose_nested_inspect(&realm_proxy, "child_a", "nested_one").await;
-    expose_nested_inspect(&realm_proxy, "child_a", "nested_two").await;
-    expose_nested_inspect(&realm_proxy, "child_b", "nested_one").await;
-    expose_nested_inspect(&realm_proxy, "child_b", "nested_two").await;
+    writer_a.set_health_ok().await.unwrap();
+
+    let puppet_b = test_topology::connect_to_puppet(&realm_proxy, "child_b").await.unwrap();
+    let writer_b = puppet_b
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer_b.set_health_ok().await.unwrap();
+
+    let mut exposed_inspect = vec![];
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_a", "nested_one").await);
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_a", "nested_two").await);
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_b", "nested_one").await);
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_b", "nested_two").await);
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     let data_vec = ArchiveReader::new()
@@ -75,14 +91,30 @@ async fn read_components_subtree_with_recursive_glob() {
     .unwrap();
 
     let puppet_a = test_topology::connect_to_puppet(&realm_proxy, "child_a").await.unwrap();
-    puppet_a.set_health_ok().await.unwrap();
-    let puppet_b = test_topology::connect_to_puppet(&realm_proxy, "child_b").await.unwrap();
-    puppet_b.set_health_ok().await.unwrap();
+    let writer_a = puppet_a
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
-    expose_nested_inspect(&realm_proxy, "child_a", "nested_one").await;
-    expose_nested_inspect(&realm_proxy, "child_a", "nested_two").await;
-    expose_nested_inspect(&realm_proxy, "child_b", "nested_one").await;
-    expose_nested_inspect(&realm_proxy, "child_b", "nested_two").await;
+    writer_a.set_health_ok().await.unwrap();
+
+    let puppet_b = test_topology::connect_to_puppet(&realm_proxy, "child_b").await.unwrap();
+    let writer_b = puppet_b
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer_b.set_health_ok().await.unwrap();
+
+    let mut exposed_inspect = vec![];
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_a", "nested_one").await);
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_a", "nested_two").await);
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_b", "nested_one").await);
+    exposed_inspect.push(expose_nested_inspect(&realm_proxy, "child_b", "nested_two").await);
 
     // Only inspect from test_app_a, and descendants of test_app_a should be reported
     let expected_monikers = HashSet::from_iter(vec![
@@ -122,12 +154,21 @@ async fn expose_nested_inspect(
     realm_proxy: &RealmProxyClient,
     puppet_name: &str,
     nested_puppet_name: &str,
-) {
+) -> ftest::InspectWriterProxy {
     let puppet_protocol_alias =
         format!("{}.{puppet_name}.{nested_puppet_name}", ftest::InspectPuppetMarker::PROTOCOL_NAME);
     let puppet_inspect = realm_proxy
         .connect_to_named_protocol::<ftest::InspectPuppetMarker>(&puppet_protocol_alias)
         .await
         .expect("failed to connect to nested inspect puppet");
-    puppet_inspect.set_health_ok().await.expect("set health to ok");
+
+    let writer = puppet_inspect
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.set_health_ok().await.unwrap();
+    writer
 }

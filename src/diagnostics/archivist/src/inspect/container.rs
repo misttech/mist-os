@@ -15,7 +15,7 @@ use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::warn;
@@ -338,7 +338,7 @@ pub struct PopulatedInspectDataContainer {
 
 enum Status {
     Begin,
-    Pending(VecDeque<(Option<InspectHandleName>, InspectData)>),
+    Pending(collector::InspectHandleDeque),
 }
 
 struct State {
@@ -352,11 +352,7 @@ struct State {
 }
 
 impl State {
-    fn into_pending(
-        self,
-        pending: VecDeque<(Option<InspectHandleName>, InspectData)>,
-        start_time: zx::Time,
-    ) -> Self {
+    fn into_pending(self, pending: collector::InspectHandleDeque, start_time: zx::Time) -> Self {
         Self {
             unpopulated: self.unpopulated,
             status: Status::Pending(pending),
@@ -381,8 +377,7 @@ impl State {
                 Status::Begin => {
                     let data_map =
                         collector::populate_data_map(&self.unpopulated.inspect_handles).await;
-                    self = self
-                        .into_pending(data_map.into_iter().collect::<VecDeque<_>>(), start_time);
+                    self = self.into_pending(data_map, start_time);
                 }
                 Status::Pending(ref mut pending) => match pending.pop_front() {
                     None => {
@@ -486,7 +481,7 @@ impl UnpopulatedInspectDataContainer {
                     Some((
                         result,
                         State {
-                            status: Status::Pending(VecDeque::new()),
+                            status: Status::Pending(collector::InspectHandleDeque::new()),
                             unpopulated: unpopulated_for_timeout,
                             batch_timeout: timeout,
                             global_stats,
