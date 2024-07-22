@@ -7,6 +7,7 @@ pub(super) mod fs;
 use super::{FsNodeState, ProcAttr};
 
 use crate::task::CurrentTask;
+use crate::vfs::syscalls::LookupFlags;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode, ValueOrSize};
 use selinux::permission_check::PermissionCheck;
 use selinux::security_server::SecurityServer;
@@ -229,6 +230,18 @@ pub(super) fn sb_mount(
     _data: &bstr::BStr,
 ) -> Result<(), Errno> {
     track_stub!(TODO("https://fxbug.dev/352507622"), "sb_mount: validate permission");
+    Ok(())
+}
+
+/// Checks if the task with `_source_sid` has the permission to unmount the filesystem mounted on
+/// `_node` using the unmount flags `_flags`.
+pub(super) fn sb_umount(
+    _permission_check: &impl PermissionCheck,
+    _source_sid: SecurityId,
+    _node: &NamespaceNode,
+    _flags: LookupFlags,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/353936182"), "sb_umount: validate permission");
     Ok(())
 }
 

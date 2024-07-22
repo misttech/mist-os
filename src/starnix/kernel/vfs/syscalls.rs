@@ -588,8 +588,8 @@ where
 }
 
 /// Options for lookup_at.
-#[derive(Debug, Default)]
-struct LookupFlags {
+#[derive(Debug, Default, Copy, Clone)]
+pub struct LookupFlags {
     /// Whether AT_EMPTY_PATH was supplied.
     allow_empty_path: bool,
 
@@ -1802,6 +1802,9 @@ pub fn sys_umount2(
         LookupFlags::default()
     };
     let target = lookup_at(current_task, FdNumber::AT_FDCWD, target_addr, flags)?;
+
+    security::sb_umount(current_task, &target, flags)?;
+
     target.unmount()
 }
 

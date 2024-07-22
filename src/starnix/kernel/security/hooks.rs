@@ -4,6 +4,7 @@
 
 use super::{selinux_hooks, ResolvedElfState, TaskState};
 use crate::task::{CurrentTask, Task};
+use crate::vfs::syscalls::LookupFlags;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode};
 
 use selinux::security_server::SecurityServer;
@@ -324,6 +325,20 @@ pub fn sb_mount(
             flags,
             data,
         )
+    })
+}
+
+/// Checks if `source` has the permission to unmount the filesystem mounted on
+/// `node` using the unmount flags `flags`.
+/// Corresponds to the `security_sb_umount` hook.
+pub fn sb_umount(
+    source: &CurrentTask,
+    node: &NamespaceNode,
+    flags: LookupFlags,
+) -> Result<(), Errno> {
+    check_if_selinux(source, |security_server| {
+        let source_sid = get_current_sid(&source);
+        selinux_hooks::sb_umount(&security_server.as_permission_check(), source_sid, node, flags)
     })
 }
 
