@@ -47,7 +47,7 @@ class VaApiEncoderOutput {
   ~VaApiEncoderOutput();
 
   VaApiEncoderOutput& operator=(VaApiEncoderOutput&& other) noexcept;
-  VaApiEncoderOutput& operator=(VaApiEncoderOutput& other) noexcept = delete;
+  VaApiEncoderOutput& operator=(const VaApiEncoderOutput& other) noexcept = delete;
 
  private:
   uint8_t* base_address_ = nullptr;
