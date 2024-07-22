@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/firmware-bridge.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -15,7 +16,6 @@
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 // Our implementation is based on the following versions of Intel's ACPI IGD
 // (Integrated Graphics Device) OpRegion Specification:
@@ -121,7 +121,7 @@ zx::result<zx_paddr_t> PciConfigOpRegion::ReadMemoryOpRegionAddress() {
   uint32_t asl_storage_value;
   const zx_status_t status = pci_.ReadConfig32(kAslStoragePciOffset, &asl_storage_value);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "PCI OpRegion register read error: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "PCI OpRegion register read error: %s", zx_status_get_string(status));
     return zx::error_result(status);
   }
 
@@ -158,7 +158,7 @@ zx::result<> PciConfigOpRegion::TriggerSystemControlInterrupt() {
   const zx_status_t read_status =
       pci_.ReadConfig16(SoftwareSystemControlInterrupt::kPciOffset, &swsci_value);
   if (read_status != ZX_OK) {
-    zxlogf(ERROR, "PCI OpRegion register read error: %s", zx_status_get_string(read_status));
+    FDF_LOG(ERROR, "PCI OpRegion register read error: %s", zx_status_get_string(read_status));
     return zx::error_result(read_status);
   }
   auto swsci = SoftwareSystemControlInterrupt::GetFromValue(swsci_value);
@@ -166,14 +166,14 @@ zx::result<> PciConfigOpRegion::TriggerSystemControlInterrupt() {
     return zx::error_result(ZX_ERR_NOT_SUPPORTED);
   }
   if (swsci.entry_trigger() != 0) {
-    zxlogf(ERROR, "PCI OpRegion interrupt trigger already armed. Bad boot firmware handoff?");
+    FDF_LOG(ERROR, "PCI OpRegion interrupt trigger already armed. Bad boot firmware handoff?");
     return zx::error_result(ZX_ERR_BAD_STATE);
   }
 
   const zx_status_t write_status = pci_.WriteConfig16(SoftwareSystemControlInterrupt::kPciOffset,
                                                       swsci.set_entry_trigger(1).reg_value());
   if (write_status != ZX_OK) {
-    zxlogf(ERROR, "PCI OpRegion register write error: %s", zx_status_get_string(write_status));
+    FDF_LOG(ERROR, "PCI OpRegion register write error: %s", zx_status_get_string(write_status));
   }
   return zx::make_result(write_status);
 }

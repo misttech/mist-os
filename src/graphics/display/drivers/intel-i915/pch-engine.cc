@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/pch-engine.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -20,7 +21,6 @@
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pch.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 
@@ -941,8 +941,8 @@ void PchEngine::SetPanelBrightness(double brightness) {
 
 void PchEngine::Log() {
   const PchClockParameters clock_parameters = ClockParameters();
-  zxlogf(TRACE, "PCH Raw Clock: %d Hz", clock_parameters.raw_clock_hz);
-  zxlogf(TRACE, "PCH Panel Power Clock frequency: %d Hz", clock_parameters.panel_power_clock_hz);
+  FDF_LOG(TRACE, "PCH Raw Clock: %d Hz", clock_parameters.raw_clock_hz);
+  FDF_LOG(TRACE, "PCH Panel Power Clock frequency: %d Hz", clock_parameters.panel_power_clock_hz);
 
   const char* state_text = "bug";
   switch (PanelPowerState()) {
@@ -962,54 +962,54 @@ void PchEngine::Log() {
       state_text = "powering down";
       break;
   }
-  zxlogf(TRACE, "PCH Panel power state: %s", state_text);
+  FDF_LOG(TRACE, "PCH Panel power state: %s", state_text);
 
   const PchPanelPowerTarget power_target = PanelPowerTarget();
-  zxlogf(TRACE, "PCH Panel power target: %s", power_target.power_on ? "on" : "off");
-  zxlogf(TRACE, "PCH Panel backlight: %s", power_target.backlight_on ? "enabled" : "disabled");
-  zxlogf(TRACE, "PCH Panel VDD operation: %s",
-         power_target.force_power_on ? "forced on" : "standard");
-  zxlogf(TRACE, "PCH Backlight counter %s",
-         power_target.brightness_pwm_counter_on ? "enabled" : "disabled");
+  FDF_LOG(TRACE, "PCH Panel power target: %s", power_target.power_on ? "on" : "off");
+  FDF_LOG(TRACE, "PCH Panel backlight: %s", power_target.backlight_on ? "enabled" : "disabled");
+  FDF_LOG(TRACE, "PCH Panel VDD operation: %s",
+          power_target.force_power_on ? "forced on" : "standard");
+  FDF_LOG(TRACE, "PCH Backlight counter %s",
+          power_target.brightness_pwm_counter_on ? "enabled" : "disabled");
 
   const PchPanelParameters panel_parameters = PanelParameters();
-  zxlogf(TRACE, "PCH Panel T2 delay: %" PRId64 " us",
-         panel_parameters.power_on_to_backlight_on_delay_micros);
-  zxlogf(TRACE, "PCH Panel T3 delay: %" PRId64 " us",
-         panel_parameters.power_on_to_hpd_aux_ready_delay_micros);
-  zxlogf(TRACE, "PCH Panel T9 delay: %" PRId64 " us",
-         panel_parameters.backlight_off_to_video_end_delay_micros);
-  zxlogf(TRACE, "PCH Panel T10 delay: %" PRId64 " us",
-         panel_parameters.video_end_to_power_off_delay_micros);
-  zxlogf(TRACE, "PCH Panel T12 delay: %" PRId64 " us", panel_parameters.power_cycle_delay_micros);
-  zxlogf(TRACE, "PCH Panel power down on reset: %s",
-         panel_parameters.power_down_on_reset ? "on" : "off");
-  zxlogf(TRACE, "PCH Backlight PWM frequency: %" PRId32 " Hz",
-         panel_parameters.backlight_pwm_frequency_hz);
-  zxlogf(TRACE, "PCH Backlight PWM polarity: %s",
-         panel_parameters.backlight_pwm_inverted ? "inverted" : "not inverted");
+  FDF_LOG(TRACE, "PCH Panel T2 delay: %" PRId64 " us",
+          panel_parameters.power_on_to_backlight_on_delay_micros);
+  FDF_LOG(TRACE, "PCH Panel T3 delay: %" PRId64 " us",
+          panel_parameters.power_on_to_hpd_aux_ready_delay_micros);
+  FDF_LOG(TRACE, "PCH Panel T9 delay: %" PRId64 " us",
+          panel_parameters.backlight_off_to_video_end_delay_micros);
+  FDF_LOG(TRACE, "PCH Panel T10 delay: %" PRId64 " us",
+          panel_parameters.video_end_to_power_off_delay_micros);
+  FDF_LOG(TRACE, "PCH Panel T12 delay: %" PRId64 " us", panel_parameters.power_cycle_delay_micros);
+  FDF_LOG(TRACE, "PCH Panel power down on reset: %s",
+          panel_parameters.power_down_on_reset ? "on" : "off");
+  FDF_LOG(TRACE, "PCH Backlight PWM frequency: %" PRId32 " Hz",
+          panel_parameters.backlight_pwm_frequency_hz);
+  FDF_LOG(TRACE, "PCH Backlight PWM polarity: %s",
+          panel_parameters.backlight_pwm_inverted ? "inverted" : "not inverted");
 
-  zxlogf(TRACE, "NDE_RSTWRN_OPT: %" PRIx32,
-         registers::DisplayResetOptions::Get().ReadFrom(mmio_buffer_).reg_value());
-  zxlogf(TRACE, "SCHICKEN_1: %" PRIx32, misc_.reg_value());
-  zxlogf(TRACE, "RAWCLK_FREQ: %" PRIx32, clock_.reg_value());
+  FDF_LOG(TRACE, "NDE_RSTWRN_OPT: %" PRIx32,
+          registers::DisplayResetOptions::Get().ReadFrom(mmio_buffer_).reg_value());
+  FDF_LOG(TRACE, "SCHICKEN_1: %" PRIx32, misc_.reg_value());
+  FDF_LOG(TRACE, "RAWCLK_FREQ: %" PRIx32, clock_.reg_value());
 
-  zxlogf(TRACE, "PP_CONTROL: %" PRIx32, panel_power_control_.reg_value());
-  zxlogf(TRACE, "PP_ON_DELAYS: %" PRIx32, panel_power_on_delays_.reg_value());
-  zxlogf(TRACE, "PP_OFF_DELAYS: %" PRIx32, panel_power_off_delays_.reg_value());
-  zxlogf(TRACE, "PP_STATUS: %" PRIx32,
-         registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer_).reg_value());
+  FDF_LOG(TRACE, "PP_CONTROL: %" PRIx32, panel_power_control_.reg_value());
+  FDF_LOG(TRACE, "PP_ON_DELAYS: %" PRIx32, panel_power_on_delays_.reg_value());
+  FDF_LOG(TRACE, "PP_OFF_DELAYS: %" PRIx32, panel_power_off_delays_.reg_value());
+  FDF_LOG(TRACE, "PP_STATUS: %" PRIx32,
+          registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer_).reg_value());
   if (is_skl(device_id_) || is_kbl(device_id_)) {
-    zxlogf(TRACE, "PP_DIVISOR: %" PRIx32, panel_power_clock_delay_.reg_value());
+    FDF_LOG(TRACE, "PP_DIVISOR: %" PRIx32, panel_power_clock_delay_.reg_value());
   }
 
-  zxlogf(TRACE, "SBLC_PWM_CTL1: %" PRIx32, backlight_control_.reg_value());
+  FDF_LOG(TRACE, "SBLC_PWM_CTL1: %" PRIx32, backlight_control_.reg_value());
   if (is_skl(device_id_) || is_kbl(device_id_)) {
-    zxlogf(TRACE, "SBLC_PWM_CTL2: %" PRIx32, backlight_freq_duty_.reg_value());
+    FDF_LOG(TRACE, "SBLC_PWM_CTL2: %" PRIx32, backlight_freq_duty_.reg_value());
   }
   if (is_tgl(device_id_)) {
-    zxlogf(TRACE, "SBLC_PWM_FREQ: %" PRIx32, backlight_pwm_freq_.reg_value());
-    zxlogf(TRACE, "SBLC_PWM_DUTY: %" PRIx32, backlight_pwm_duty_.reg_value());
+    FDF_LOG(TRACE, "SBLC_PWM_FREQ: %" PRIx32, backlight_pwm_freq_.reg_value());
+    FDF_LOG(TRACE, "SBLC_PWM_DUTY: %" PRIx32, backlight_pwm_duty_.reg_value());
   }
 }
 

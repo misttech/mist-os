@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
 
@@ -18,7 +19,6 @@
 #include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 
@@ -75,12 +75,12 @@ DisplayPll::DisplayPll(PllId pll_id) : pll_id_(pll_id), name_(GetDpllName(pll_id
 
 DisplayPll* DisplayPllManager::SetDdiPllConfig(DdiId ddi_id, bool is_edp,
                                                const DdiPllConfig& desired_config) {
-  zxlogf(TRACE, "Configuring PLL for DDI %d - SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s",
-         ddi_id, desired_config.spread_spectrum_clocking ? "yes" : "no",
-         desired_config.ddi_clock_khz, desired_config.admits_display_port ? "yes" : "no",
-         desired_config.admits_hdmi ? "yes" : "no");
+  FDF_LOG(TRACE, "Configuring PLL for DDI %d - SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s",
+          ddi_id, desired_config.spread_spectrum_clocking ? "yes" : "no",
+          desired_config.ddi_clock_khz, desired_config.admits_display_port ? "yes" : "no",
+          desired_config.admits_hdmi ? "yes" : "no");
 
-  // Asserting after zxlogf() facilitates debugging, because the invalid
+  // Asserting after FDF_LOG() facilitates debugging, because the invalid
   // configuration will be captured in the log.
   ZX_ASSERT(desired_config.IsValid());
 
@@ -88,28 +88,29 @@ DisplayPll* DisplayPllManager::SetDdiPllConfig(DdiId ddi_id, bool is_edp,
   if (ddi_to_dpll_it != ddi_to_dpll_.end()) {
     DisplayPll* pll = ddi_to_dpll_it->second;
     if (pll->config() == desired_config) {
-      zxlogf(WARNING, "SetDdiPllConfig() will unnecessarily reset the PLL for DDI %d", ddi_id);
+      FDF_LOG(WARNING, "SetDdiPllConfig() will unnecessarily reset the PLL for DDI %d", ddi_id);
     }
     ResetDdiPll(ddi_id);
   }
 
   DisplayPll* best_dpll = FindPllFor(ddi_id, is_edp, desired_config);
   if (!best_dpll) {
-    zxlogf(ERROR, "Failed to allocate DPLL to DDI %d - %d kHz %s DisplayPort: %s HDMI: %s", ddi_id,
-           desired_config.ddi_clock_khz, desired_config.spread_spectrum_clocking ? "SSC" : "no SSC",
-           desired_config.admits_display_port ? "yes" : "no",
-           desired_config.admits_hdmi ? "yes" : "no");
+    FDF_LOG(ERROR, "Failed to allocate DPLL to DDI %d - %d kHz %s DisplayPort: %s HDMI: %s", ddi_id,
+            desired_config.ddi_clock_khz,
+            desired_config.spread_spectrum_clocking ? "SSC" : "no SSC",
+            desired_config.admits_display_port ? "yes" : "no",
+            desired_config.admits_hdmi ? "yes" : "no");
     return nullptr;
   }
-  zxlogf(DEBUG, "Assigning DPLL %s to DDI %d - %d kHz %s DisplayPort: %s HDMI: %s",
-         best_dpll->name().c_str(), ddi_id, desired_config.ddi_clock_khz,
-         desired_config.spread_spectrum_clocking ? "SSC" : "no SSC",
-         desired_config.admits_display_port ? "yes" : "no",
-         desired_config.admits_hdmi ? "yes" : "no");
+  FDF_LOG(DEBUG, "Assigning DPLL %s to DDI %d - %d kHz %s DisplayPort: %s HDMI: %s",
+          best_dpll->name().c_str(), ddi_id, desired_config.ddi_clock_khz,
+          desired_config.spread_spectrum_clocking ? "SSC" : "no SSC",
+          desired_config.admits_display_port ? "yes" : "no",
+          desired_config.admits_hdmi ? "yes" : "no");
 
   if (ref_count_[best_dpll] > 0 || best_dpll->Enable(desired_config)) {
     if (!SetDdiClockSource(ddi_id, best_dpll->pll_id())) {
-      zxlogf(ERROR, "Failed to map DDI %d to DPLL (%s)", ddi_id, best_dpll->name().c_str());
+      FDF_LOG(ERROR, "Failed to map DDI %d to DPLL (%s)", ddi_id, best_dpll->name().c_str());
       return nullptr;
     }
     ref_count_[best_dpll]++;
@@ -120,47 +121,47 @@ DisplayPll* DisplayPllManager::SetDdiPllConfig(DdiId ddi_id, bool is_edp,
 }
 
 bool DisplayPll::Enable(const DdiPllConfig& pll_config) {
-  zxlogf(TRACE, "Configuring PLL %d: SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s", pll_id(),
-         pll_config.spread_spectrum_clocking ? "yes" : "no", pll_config.ddi_clock_khz,
-         pll_config.admits_display_port ? "yes" : "no", pll_config.admits_hdmi ? "yes" : "no");
+  FDF_LOG(TRACE, "Configuring PLL %d: SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s", pll_id(),
+          pll_config.spread_spectrum_clocking ? "yes" : "no", pll_config.ddi_clock_khz,
+          pll_config.admits_display_port ? "yes" : "no", pll_config.admits_hdmi ? "yes" : "no");
 
-  // Asserting after zxlogf() facilitates debugging, because the invalid
+  // Asserting after FDF_LOG() facilitates debugging, because the invalid
   // configuration will be captured in the log.
   ZX_ASSERT(pll_config.IsValid());
 
   if (!config_.IsEmpty()) {
-    zxlogf(ERROR, "Enable(): PLL %s already enabled!", name().c_str());
+    FDF_LOG(ERROR, "Enable(): PLL %s already enabled!", name().c_str());
     return false;
   }
 
   const bool success = DoEnable(pll_config);
   if (success) {
     config_ = pll_config;
-    zxlogf(TRACE, "Enabled DPLL %d: SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s", pll_id(),
-           pll_config.spread_spectrum_clocking ? "yes" : "no", pll_config.ddi_clock_khz,
-           pll_config.admits_display_port ? "yes" : "no", pll_config.admits_hdmi ? "yes" : "no");
+    FDF_LOG(TRACE, "Enabled DPLL %d: SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s", pll_id(),
+            pll_config.spread_spectrum_clocking ? "yes" : "no", pll_config.ddi_clock_khz,
+            pll_config.admits_display_port ? "yes" : "no", pll_config.admits_hdmi ? "yes" : "no");
 
   } else {
-    zxlogf(ERROR, "Failed to enable DPLL %d: SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s",
-           pll_id(), pll_config.spread_spectrum_clocking ? "yes" : "no", pll_config.ddi_clock_khz,
-           pll_config.admits_display_port ? "yes" : "no", pll_config.admits_hdmi ? "yes" : "no");
+    FDF_LOG(ERROR, "Failed to enable DPLL %d: SSC %s, DDI clock %d kHz, DisplayPort %s, HDMI %s",
+            pll_id(), pll_config.spread_spectrum_clocking ? "yes" : "no", pll_config.ddi_clock_khz,
+            pll_config.admits_display_port ? "yes" : "no", pll_config.admits_hdmi ? "yes" : "no");
   }
   return success;
 }
 
 bool DisplayPll::Disable() {
-  zxlogf(TRACE, "Disabling PLL %d", pll_id());
+  FDF_LOG(TRACE, "Disabling PLL %d", pll_id());
   if (config_.IsEmpty()) {
-    zxlogf(INFO, "DoDisable(): PLL %s already disabled", name().c_str());
+    FDF_LOG(INFO, "DoDisable(): PLL %s already disabled", name().c_str());
     return true;
   }
   const bool success = DoDisable();
 
   if (success) {
     config_ = {};
-    zxlogf(TRACE, "Disabled PLL %d", pll_id());
+    FDF_LOG(TRACE, "Disabled PLL %d", pll_id());
   } else {
-    zxlogf(ERROR, "Failed to disable PLL %d", pll_id());
+    FDF_LOG(ERROR, "Failed to disable PLL %d", pll_id());
   }
   return success;
 }
@@ -172,7 +173,7 @@ bool DisplayPllManager::ResetDdiPll(DdiId ddi_id) {
 
   DisplayPll* dpll = ddi_to_dpll_[ddi_id];
   if (!ResetDdiClockSource(ddi_id)) {
-    zxlogf(ERROR, "Failed to unmap DPLL (%s) for DDI %d", dpll->name().c_str(), ddi_id);
+    FDF_LOG(ERROR, "Failed to unmap DPLL (%s) for DDI %d", dpll->name().c_str(), ddi_id);
     return false;
   }
 
@@ -221,7 +222,7 @@ bool DpllSkylake::DoEnable(const DdiPllConfig& pll_config) {
             return registers::DisplayPllStatus::Get().ReadFrom(mmio_space_).pll_locked(pll_id());
           },
           zx::msec(1), 5)) {
-    zxlogf(ERROR, "Skylake DPLL %d failed to lock after 5ms!", pll_id());
+    FDF_LOG(ERROR, "Skylake DPLL %d failed to lock after 5ms!", pll_id());
     return false;
   }
 
@@ -236,8 +237,8 @@ bool DpllSkylake::ConfigureForDisplayPort(const DdiPllConfig& pll_config) {
   // Skylake: IHD-OS-SKL-Vol 12-05.16 page 130
 
   const int32_t display_port_link_rate_mhz = pll_config.ddi_clock_khz / 500;
-  zxlogf(TRACE, "Configuring Skylake DPLL %d: DisplayPort, link rate %d Mbps", pll_id(),
-         display_port_link_rate_mhz);
+  FDF_LOG(TRACE, "Configuring Skylake DPLL %d: DisplayPort, link rate %d Mbps", pll_id(),
+          display_port_link_rate_mhz);
 
   auto dpll_control1 = registers::DisplayPllControl1::Get().ReadFrom(mmio_space_);
   const int16_t ddi_clock_mhz = static_cast<int16_t>(pll_config.ddi_clock_khz / 1'000);
@@ -272,9 +273,10 @@ bool DpllSkylake::ConfigureForHdmi(const DdiPllConfig& pll_config) {
   const DpllFrequencyDividerConfig divider_config =
       CreateDpllFrequencyDividerConfigKabyLake(dco_config.frequency_divider);
 
-  zxlogf(TRACE, "Configuring DPLL %d: HDMI DCO frequency=%d dividers P*Q*K=%u*%u*%u Center=%u Mhz",
-         pll_id(), dco_config.frequency_khz, divider_config.p0_p_divider,
-         divider_config.p1_q_divider, divider_config.p2_k_divider, dco_config.center_frequency_khz);
+  FDF_LOG(TRACE, "Configuring DPLL %d: HDMI DCO frequency=%d dividers P*Q*K=%u*%u*%u Center=%u Mhz",
+          pll_id(), dco_config.frequency_khz, divider_config.p0_p_divider,
+          divider_config.p1_q_divider, divider_config.p2_k_divider,
+          dco_config.center_frequency_khz);
 
   auto dpll_control1 = registers::DisplayPllControl1::Get().ReadFrom(mmio_space_);
   dpll_control1.set_pll_uses_hdmi_configuration_mode(pll_id(), true)
@@ -340,14 +342,14 @@ bool DpllManagerSkylake::ResetDdiClockSource(DdiId ddi_id) {
 DdiPllConfig DpllManagerSkylake::LoadState(DdiId ddi_id) {
   auto dpll_ddi_map = registers::DisplayPllDdiMapKabyLake::Get().ReadFrom(mmio_space_);
   if (dpll_ddi_map.ddi_clock_disabled(ddi_id)) {
-    zxlogf(TRACE, "Loaded DDI %d DPLL state: DDI clock disabled", ddi_id);
+    FDF_LOG(TRACE, "Loaded DDI %d DPLL state: DDI clock disabled", ddi_id);
     return DdiPllConfig{};
   }
 
   const PllId pll_id = dpll_ddi_map.ddi_clock_display_pll(ddi_id);
   auto dpll_enable = registers::PllEnable::GetForSkylakeDpll(pll_id).ReadFrom(mmio_space_);
   if (!dpll_enable.pll_enabled()) {
-    zxlogf(TRACE, "Loaded DDI %d DPLL %d state: DPLL disabled", ddi_id, pll_id);
+    FDF_LOG(TRACE, "Loaded DDI %d DPLL %d state: DPLL disabled", ddi_id, pll_id);
     return DdiPllConfig{};
   }
 
@@ -378,12 +380,12 @@ DdiPllConfig DpllManagerSkylake::LoadState(DdiId ddi_id) {
     const int32_t ddi_clock_khz =
         static_cast<int32_t>(dpll_dco_frequency.dco_frequency_khz() / dco_frequency_divider);
 
-    zxlogf(TRACE,
-           "Loaded DDI %d DPLL %d state: HDMI no SSC DCO frequency=%d kHz divider P*Q*K=%u*%u*%u "
-           "Center=%u Mhz",
-           ddi_id, pll_id, dpll_dco_frequency.dco_frequency_khz(), dpll_dco_dividers.p_p0_divider(),
-           dpll_dco_dividers.q_p1_divider(), dpll_dco_dividers.k_p2_divider(),
-           dpll_dco_dividers.center_frequency_mhz());
+    FDF_LOG(TRACE,
+            "Loaded DDI %d DPLL %d state: HDMI no SSC DCO frequency=%d kHz divider P*Q*K=%u*%u*%u "
+            "Center=%u Mhz",
+            ddi_id, pll_id, dpll_dco_frequency.dco_frequency_khz(),
+            dpll_dco_dividers.p_p0_divider(), dpll_dco_dividers.q_p1_divider(),
+            dpll_dco_dividers.k_p2_divider(), dpll_dco_dividers.center_frequency_mhz());
 
     // TODO(fxbug.com/112752): The DpllSkylake instance is not updated to
     //                         reflect the state in the registers.
@@ -397,16 +399,17 @@ DdiPllConfig DpllManagerSkylake::LoadState(DdiId ddi_id) {
 
   const int16_t ddi_frequency_mhz = dpll_control1.pll_display_port_ddi_frequency_mhz(pll_id);
   if (ddi_frequency_mhz == 0) {
-    zxlogf(ERROR, "DPLL %d has invalid DisplayPort DDI clock. DPLL_CTRL1 value: %x", pll_id,
-           dpll_control1.reg_value());
+    FDF_LOG(ERROR, "DPLL %d has invalid DisplayPort DDI clock. DPLL_CTRL1 value: %x", pll_id,
+            dpll_control1.reg_value());
     return DdiPllConfig{};
   }
 
   const int32_t ddi_clock_khz = ddi_frequency_mhz * 1'000;
   const bool spread_spectrum_clocking = dpll_control1.pll_spread_spectrum_clocking_enabled(pll_id);
 
-  zxlogf(TRACE, "Loaded DDI %d DPLL %d state: DisplayPort %s %d kHz (link rate %d Mbps)", ddi_id,
-         pll_id, spread_spectrum_clocking ? "SSC" : "no SSC", ddi_clock_khz, ddi_frequency_mhz * 2);
+  FDF_LOG(TRACE, "Loaded DDI %d DPLL %d state: DisplayPort %s %d kHz (link rate %d Mbps)", ddi_id,
+          pll_id, spread_spectrum_clocking ? "SSC" : "no SSC", ddi_clock_khz,
+          ddi_frequency_mhz * 2);
 
   // TODO(fxbug.com/112752): The DpllSkylake instance is not updated to reflect
   //                         the state in the registers.
@@ -476,16 +479,17 @@ bool DisplayPllTigerLake::DoEnable(const DdiPllConfig& pll_config) {
 
   const DpllFrequencyDividerConfig divider_config =
       CreateDpllFrequencyDividerConfigTigerLake(dco_config.frequency_divider);
-  zxlogf(TRACE, "Configuring PLL %d: DCO frequency=%d dividers P*Q*K=%u*%u*%u Center=%u Mhz",
-         pll_id(), dco_config.frequency_khz, divider_config.p0_p_divider,
-         divider_config.p1_q_divider, divider_config.p2_k_divider, dco_config.center_frequency_khz);
+  FDF_LOG(TRACE, "Configuring PLL %d: DCO frequency=%d dividers P*Q*K=%u*%u*%u Center=%u Mhz",
+          pll_id(), dco_config.frequency_khz, divider_config.p0_p_divider,
+          divider_config.p1_q_divider, divider_config.p2_k_divider,
+          dco_config.center_frequency_khz);
 
   auto dpll_enable = registers::PllEnable::GetForTigerLakeDpll(pll_id()).ReadFrom(mmio_space_);
   dpll_enable.set_power_on_request_tiger_lake(true);
   dpll_enable.WriteTo(mmio_space_);
   if (!PollUntil([&] { return dpll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
                  zx::msec(1), g_display_pll_tiger_lake_power_on_wait_timeout_ms)) {
-    zxlogf(ERROR, "DPLL %d power up failure!", pll_id());
+    FDF_LOG(ERROR, "DPLL %d power up failure!", pll_id());
     return false;
   }
 
@@ -513,7 +517,7 @@ bool DisplayPllTigerLake::DoEnable(const DdiPllConfig& pll_config) {
   if (!PollUntil(
           [&] { return dpll_enable.ReadFrom(mmio_space_).pll_locked_tiger_lake_and_lcpll1(); },
           zx::usec(1), g_display_pll_tiger_lake_lock_wait_timeout_us)) {
-    zxlogf(ERROR, "DPLL %d lock failure! Failed to lock after 500us", pll_id());
+    FDF_LOG(ERROR, "DPLL %d lock failure! Failed to lock after 500us", pll_id());
     return false;
   }
 
@@ -623,7 +627,7 @@ bool DekelPllTigerLake::DoDisable() {
   if (!PollUntil(
           [&] { return !pll_enable.ReadFrom(mmio_space_).pll_locked_tiger_lake_and_lcpll1(); },
           zx::usec(1), 50)) {
-    zxlogf(ERROR, "Dekel PLL %s: Cannot disable PLL", name().c_str());
+    FDF_LOG(ERROR, "Dekel PLL %s: Cannot disable PLL", name().c_str());
   }
 
   // Step 5. If the frequency will result in a change to the voltage
@@ -641,7 +645,7 @@ bool DekelPllTigerLake::DoDisable() {
   // - Should complete immediately.
   if (!PollUntil([&] { return !pll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
                  zx::usec(1), 10)) {
-    zxlogf(ERROR, "Dekel PLL %s: Cannot disable PLL power", name().c_str());
+    FDF_LOG(ERROR, "Dekel PLL %s: Cannot disable PLL power", name().c_str());
   }
 
   return true;
@@ -649,7 +653,7 @@ bool DekelPllTigerLake::DoDisable() {
 
 bool DekelPllTigerLake::EnableHdmi(const DdiPllConfig& pll_config) {
   // TODO(https://fxbug.dev/42060757): Support HDMI on Type-C.
-  zxlogf(ERROR, "Dekel PLL %s: EnableHdmi: Not implemented", name().c_str());
+  FDF_LOG(ERROR, "Dekel PLL %s: EnableHdmi: Not implemented", name().c_str());
   return false;
 }
 
@@ -663,7 +667,7 @@ bool DekelPllTigerLake::EnableDp(const DdiPllConfig& pll_config) {
   pll_enable.set_power_on_request_tiger_lake(true).WriteTo(mmio_space_);
   if (!PollUntil([&] { return pll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
                  zx::usec(1), 10)) {
-    zxlogf(ERROR, "Dekel PLL %s: Cannot enable PLL power", name().c_str());
+    FDF_LOG(ERROR, "Dekel PLL %s: Cannot enable PLL power", name().c_str());
     return false;
   }
 
@@ -748,7 +752,7 @@ bool DekelPllTigerLake::EnableDp(const DdiPllConfig& pll_config) {
       break;
     }
     default: {
-      zxlogf(ERROR, "Unsupported DP link rate: %d Mbps", display_port_link_rate_mbps);
+      FDF_LOG(ERROR, "Unsupported DP link rate: %d Mbps", display_port_link_rate_mbps);
       return false;
     }
   }
@@ -775,7 +779,7 @@ bool DekelPllTigerLake::EnableDp(const DdiPllConfig& pll_config) {
   if (!PollUntil(
           [&] { return pll_enable.ReadFrom(mmio_space_).pll_locked_tiger_lake_and_lcpll1(); },
           zx::usec(1), 900)) {
-    zxlogf(ERROR, "Dekel PLL (%s): Cannot enable PLL", name().c_str());
+    FDF_LOG(ERROR, "Dekel PLL (%s): Cannot enable PLL", name().c_str());
     return false;
   }
 
@@ -853,11 +857,11 @@ bool DpllManagerTigerLake::SetDdiClockSource(DdiId ddi_id, PllId pll_id) {
 
     case PllId::DPLL_2:
       // TODO(https://fxbug.dev/42182480): Thunderbolt support.
-      zxlogf(ERROR, "SetDdiClockSource() does not support DPLL 2 (for Thunderbolt) yet");
+      FDF_LOG(ERROR, "SetDdiClockSource() does not support DPLL 2 (for Thunderbolt) yet");
       return false;
 
     default:
-      zxlogf(ERROR, "SetDdiClockSource() does not support DPLL %d yet", pll_id);
+      FDF_LOG(ERROR, "SetDdiClockSource() does not support DPLL %d yet", pll_id);
       return false;
   }
 }
@@ -883,27 +887,28 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForComboDdi(DdiId ddi_id) {
 
   auto ddi_clock_config = registers::DdiClockConfig::Get().ReadFrom(mmio_space_);
   if (ddi_clock_config.ddi_clock_disabled(ddi_id)) {
-    zxlogf(TRACE, "Loaded DDI %d DPLL config: DDI clock disabled", ddi_id);
+    FDF_LOG(TRACE, "Loaded DDI %d DPLL config: DDI clock disabled", ddi_id);
     return DdiPllConfig{};
   }
 
   const PllId pll_id = ddi_clock_config.ddi_clock_display_pll(ddi_id);
   if (pll_id == PllId::DPLL_INVALID) {
-    zxlogf(WARNING,
-           "Invalid DDI %d DPLL config: Invalid clock source DPLL! DDI Clock Config register: %x",
-           ddi_id, ddi_clock_config.reg_value());
+    FDF_LOG(WARNING,
+            "Invalid DDI %d DPLL config: Invalid clock source DPLL! DDI Clock Config register: %x",
+            ddi_id, ddi_clock_config.reg_value());
     return DdiPllConfig{};
   }
   if (pll_id == PllId::DPLL_2) {
-    zxlogf(WARNING,
-           "Invalid DDI %d DPLL config: clock source is DPLL 2, but DPLL2 reserved for Thunderbot.",
-           ddi_id);
+    FDF_LOG(
+        WARNING,
+        "Invalid DDI %d DPLL config: clock source is DPLL 2, but DPLL2 reserved for Thunderbot.",
+        ddi_id);
     return DdiPllConfig{};
   }
 
   auto dpll_enable = registers::PllEnable::GetForTigerLakeDpll(pll_id).ReadFrom(mmio_space_);
   if (!dpll_enable.pll_enabled()) {
-    zxlogf(TRACE, "Loaded DDI %d DPLL %d config: DPLL disabled", ddi_id, pll_id);
+    FDF_LOG(TRACE, "Loaded DDI %d DPLL %d config: DPLL disabled", ddi_id, pll_id);
     return DdiPllConfig{};
   }
 
@@ -911,7 +916,7 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForComboDdi(DdiId ddi_id) {
   // register. However, since the field breakdown is documented, we can log it,
   // in case it helps any future investigation.
   auto dpll_divider = registers::DisplayPllDivider::GetForDpll(pll_id).ReadFrom(mmio_space_);
-  zxlogf(
+  FDF_LOG(
       TRACE,
       "Loaded DDI %d DPLL %d dividers: early lock %d, true lock %d, AFC start point %d, "
       "feedback clock retiming %s, loop filter - integral 2^(-%d) proportional 2^(1-%d) gain 2^%d "
@@ -934,7 +939,7 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForComboDdi(DdiId ddi_id) {
 
   if (dpll_dco_dividers.reference_clock_select() !=
       registers::DisplayPllDcoDividersTigerLake::ReferenceClockSelect::kDisplayReference) {
-    zxlogf(
+    FDF_LOG(
         ERROR,
         "Loaded DDI %d DPLL %d config: DPLL uses genlock clock reference %d. Genlock not supported!",
         ddi_id, pll_id, static_cast<int>(dpll_dco_dividers.reference_clock_select()));
@@ -962,7 +967,7 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForComboDdi(DdiId ddi_id) {
 
   const int32_t ddi_clock_khz = static_cast<int32_t>(dco_frequency_khz / dco_frequency_divider);
 
-  zxlogf(
+  FDF_LOG(
       TRACE,
       "Loaded DDI %d DPLL %d config: %s DDI clock %d kHz DCO frequency=%d kHz divider P*Q*K=%u*%u*%u",
       ddi_id, pll_id, dpll_spread_spectrum_clocking.enabled() ? "SSC" : "no SSC", ddi_clock_khz,
@@ -1062,8 +1067,8 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForTypeCDdi(DdiId ddi_id) {
     }
   }
 
-  zxlogf(WARNING, "LoadTypeCPllState: DDI %d has invalid DisplayPort bit rate: %ld KHz", ddi_id,
-         bit_rate_khz);
+  FDF_LOG(WARNING, "LoadTypeCPllState: DDI %d has invalid DisplayPort bit rate: %ld KHz", ddi_id,
+          bit_rate_khz);
   return DdiPllConfig{};
 }
 

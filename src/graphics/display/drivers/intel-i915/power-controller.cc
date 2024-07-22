@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/power-controller.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
@@ -18,7 +19,6 @@
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers-gt-mailbox.h"
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 
@@ -83,7 +83,7 @@ zx::result<uint64_t> PowerController::Transact(PowerControllerCommand command) {
 
   if (!PollUntil([&] { return !mailbox_interface.ReadFrom(mmio_buffer_).has_active_transaction(); },
                  zx::usec(1), g_previous_command_timeout_us)) {
-    zxlogf(WARNING, "Timed out while waiting for PCU to finish pre-existing work");
+    FDF_LOG(WARNING, "Timed out while waiting for PCU to finish pre-existing work");
     return zx::error_result(ZX_ERR_IO_MISSED_DEADLINE);
   }
 
@@ -392,8 +392,8 @@ zx::result<MemorySubsystemInfo> PowerController::GetMemorySubsystemInfoTigerLake
     if (global_info.is_error()) {
       return global_info.take_error();
     }
-    zxlogf(TRACE, "MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_GLOBAL_INFO - %lx",
-           global_info.value());
+    FDF_LOG(TRACE, "MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_GLOBAL_INFO - %lx",
+            global_info.value());
     result.global_info =
         MemorySubsystemInfo::GlobalInfo::CreateFromMailboxDataTigerLake(global_info.value());
   }
@@ -420,8 +420,8 @@ zx::result<MemorySubsystemInfo> PowerController::GetMemorySubsystemInfoTigerLake
       return zx::error_result(ZX_ERR_IO_REFUSED);
     }
 
-    zxlogf(TRACE, "MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_QGV_POINT_INFO - %lx",
-           point_info.value());
+    FDF_LOG(TRACE, "MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_QGV_POINT_INFO - %lx",
+            point_info.value());
     result.points[point_index] =
         MemorySubsystemInfo::AgentPoint::CreateFromMailboxDataTigerLake(point_info.value());
   }

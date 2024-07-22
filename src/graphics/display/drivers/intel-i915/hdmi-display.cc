@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/intel-i915/hdmi-display.h"
 
 #include <lib/ddk/driver.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
@@ -34,7 +35,6 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace i915 {
 
@@ -127,12 +127,12 @@ bool HdmiDisplay::Query() {
     };
     registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
     if (i2c().Transact(&op, 1) == ZX_OK) {
-      zxlogf(TRACE, "Found a hdmi/dvi monitor");
+      FDF_LOG(TRACE, "Found a hdmi/dvi monitor");
       return true;
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
   }
-  zxlogf(TRACE, "Failed to query hdmi i2c bus");
+  FDF_LOG(TRACE, "Failed to query hdmi i2c bus");
   return false;
 }
 
@@ -163,14 +163,14 @@ bool HdmiDisplay::DdiModeset(const display::DisplayTiming& mode) {
   controller()->power()->SetDdiIoPowerState(ddi_id(), /*enable=*/true);
   if (!PollUntil([&] { return controller()->power()->GetDdiIoPowerState(ddi_id()); }, zx::usec(1),
                  20)) {
-    zxlogf(ERROR, "DDI %d IO power did not come up in 20us", ddi_id());
+    FDF_LOG(ERROR, "DDI %d IO power did not come up in 20us", ddi_id());
     return false;
   }
 
   controller()->power()->SetAuxIoPowerState(ddi_id(), /*enable=*/true);
   if (!PollUntil([&] { return controller()->power()->GetAuxIoPowerState(ddi_id()); }, zx::usec(1),
                  10)) {
-    zxlogf(ERROR, "DDI %d IO power did not come up in 10us", ddi_id());
+    FDF_LOG(ERROR, "DDI %d IO power did not come up in 10us", ddi_id());
     return false;
   }
 

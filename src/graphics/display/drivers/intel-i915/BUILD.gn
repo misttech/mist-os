@@ -106,6 +106,7 @@ source_set("common_srcs") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/incoming/cpp",
+    "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/stdcompat",
     "//sdk/lib/zbi-format",
@@ -118,7 +119,6 @@ source_set("common_srcs") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/fxl",
@@ -140,10 +140,7 @@ source_set("common_srcs") {
 
 fuchsia_driver("intel-i915-driver") {
   output_name = "intel-i915"
-  deps = [
-    ":common_srcs",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
-  ]
+  deps = [ ":common_srcs" ]
 }
 
 fuchsia_driver_component("intel-i915") {
@@ -227,7 +224,6 @@ test("intel-i915-tests") {
     "//src/devices/testing/fake-resource",
     "//src/devices/testing/mock-mmio-range",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

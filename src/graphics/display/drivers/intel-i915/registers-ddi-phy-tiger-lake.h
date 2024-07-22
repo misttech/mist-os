@@ -22,6 +22,7 @@
 // DG1, but PBC (preserve bit content) on Ice Lake. These fields are currently
 // described as MBZ.
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -29,7 +30,6 @@
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace registers {
 
