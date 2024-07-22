@@ -33,3 +33,24 @@ bazel_product_bundle("microfuchsia_eng.${target_cpu}") {
         ".bazel_input",
   ]
 }
+
+if (target_cpu == "x64" || target_cpu == "arm64") {
+  board = "pkvm-${target_cpu}"
+
+  bazel_product_bundle("microfuchsia_eng.${board}") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    image_has_fxfs_blob = false
+    image_has_fvm = false
+    image_use_vbmeta = false
+    bazel_product_bundle_target =
+        "//products/microfuchsia:product_bundle_eng.${board}"
+    bazel_product_image_target =
+        "//products/microfuchsia:microfuchsia_eng.${board}"
+    bazel_inputs_from_gn = [
+      "//build/images/flash:esp.bazel_input",
+      "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+      "//boards/pkvm:${target_cpu}.bazel_input",
+    ]
+  }
+}

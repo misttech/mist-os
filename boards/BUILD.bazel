@@ -25,3 +25,13 @@ fuchsia_prebuilt_board_configuration(
     name = "riscv64",
     directory = "@gn_targets//boards/riscv64",
 )
+
+fuchsia_prebuilt_board_configuration(
+    name = "pkvm-x64",
+    directory = "@gn_targets//boards/pkvm:x64",
+)
+
+fuchsia_prebuilt_board_configuration(
+    name = "pkvm-arm64",
+    directory = "@gn_targets//boards/pkvm:arm64",
+)
