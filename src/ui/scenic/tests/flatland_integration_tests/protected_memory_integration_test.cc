@@ -4,22 +4,17 @@
 
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
-#include <iostream>
-
-#include <gtest/gtest.h>
+#include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
-#include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
 
@@ -28,29 +23,21 @@ using fuchsia::ui::composition::ContentId;
 using fuchsia::ui::composition::FlatlandPtr;
 using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::TransformId;
-using ui_testing::Screenshot;
 
-class ProtectedMemoryIntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
+class ProtectedMemoryIntegrationTest : public ScenicCtfTest {
  public:
-  ProtectedMemoryIntegrationTest()
-      : realm_(ScenicRealmBuilder()
-                   .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-                   .Build()) {
-    auto context = sys::ComponentContext::Create();
-    context->svc()->Connect(sysmem_allocator_.NewRequest());
+  void SetUp() override {
+    ScenicCtfTest::SetUp();
 
-    flatland_display_ = realm_.component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
-    });
+    LocalServiceDirectory()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_allocator_ = realm_.component().ConnectSync<fuchsia::ui::composition::Allocator>();
+    flatland_display_ = ConnectSyncIntoRealm<fuchsia::ui::composition::FlatlandDisplay>();
 
-    root_flatland_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
+    flatland_allocator_ = ConnectSyncIntoRealm<fuchsia::ui::composition::Allocator>();
+
+    root_flatland_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     root_flatland_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
+      FX_LOGS(INFO) << "Lost connection to Scenic: " << zx_status_get_string(status);
     });
 
     // Attach |root_flatland_| as the only Flatland under |flatland_display_|.
@@ -69,7 +56,7 @@ class ProtectedMemoryIntegrationTest : public ui_testing::LoggingEventLoop, publ
     display_width_ = info->logical_size().width;
     display_height_ = info->logical_size().height;
 
-    screenshotter_ = realm_.component().ConnectSync<fuchsia::ui::composition::Screenshot>();
+    screenshotter_ = ConnectSyncIntoRealm<fuchsia::ui::composition::Screenshot>();
   }
 
  protected:
@@ -125,8 +112,7 @@ class ProtectedMemoryIntegrationTest : public ui_testing::LoggingEventLoop, publ
   fuchsia::ui::composition::ScreenshotSyncPtr screenshotter_;
 
  private:
-  component_testing::RealmRoot realm_;
-  fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
 };
 
 TEST_F(ProtectedMemoryIntegrationTest, RendersProtectedImage) {
