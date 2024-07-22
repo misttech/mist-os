@@ -50,7 +50,7 @@ group("arrayref") {
 }
 
 group("arrayvec") {
-  public_deps = [ ":arrayvec-v0_7_1" ]
+  public_deps = [ ":arrayvec-v0_7_4" ]
 }
 
 group("ash") {
@@ -1718,18 +1718,18 @@ rust_library("arrayref-v0_3_5") {
   applicable_licenses = [ ":arrayref-v0_3_5.license" ]
 }
 
-license("arrayvec-v0_7_1.license") {
+license("arrayvec-v0_7_4.license") {
   public_package_name = "arrayvec"
   license_files = [
-    "//third_party/rust_crates/vendor/arrayvec-0.7.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/arrayvec-0.7.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/arrayvec-0.7.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/arrayvec-0.7.4/LICENSE-MIT",
   ]
 }
 
-rust_library("arrayvec-v0_7_1") {
+rust_library("arrayvec-v0_7_4") {
   crate_name = "arrayvec"
-  crate_root = "//third_party/rust_crates/vendor/arrayvec-0.7.1/src/lib.rs"
-  output_name = "arrayvec-2b25e26ec4c0a472"
+  crate_root = "//third_party/rust_crates/vendor/arrayvec-0.7.4/src/lib.rs"
+  output_name = "arrayvec-1608a91a4e3a890"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -1739,15 +1739,15 @@ rust_library("arrayvec-v0_7_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=2b25e26ec4c0a472",
-    "-Cextra-filename=-2b25e26ec4c0a472",
+    "-Cmetadata=1608a91a4e3a890",
+    "-Cextra-filename=-1608a91a4e3a890",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":arrayvec-v0_7_1.license" ]
+  applicable_licenses = [ ":arrayvec-v0_7_4.license" ]
 }
 
 license("ash-v0_37_0+1_3_209.license") {

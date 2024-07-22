@@ -33,7 +33,7 @@ anyhow = "1.0.86"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 argh = "0.1.12"
 arrayref = "0.3.5"
-arrayvec = "0.7.1"
+arrayvec = "0.7.4"
 ash = { version = "0.37.0", features = ["linked"], default-features = false }
 assert_matches = "1.5.0"
 async-channel = "1.8.0"

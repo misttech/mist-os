@@ -1,4 +1,4 @@
-use std::borrow::Borrow;
+use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::convert::TryFrom;
 use std::fmt;
@@ -82,11 +82,11 @@ impl<const CAP: usize> ArrayString<CAP>
 
     /// Return the length of the string.
     #[inline]
-    pub fn len(&self) -> usize { self.len as usize }
+    pub const fn len(&self) -> usize { self.len as usize }
 
     /// Returns whether the string is empty.
     #[inline]
-    pub fn is_empty(&self) -> bool { self.len() == 0 }
+    pub const fn is_empty(&self) -> bool { self.len() == 0 }
 
     /// Create a new `ArrayString` from a `str`.
     ///
@@ -129,6 +129,28 @@ impl<const CAP: usize> ArrayString<CAP>
         Ok(vec)
     }
 
+    /// Create a new `ArrayString` value fully filled with ASCII NULL characters (`\0`). Useful
+    /// to be used as a buffer to collect external data or as a buffer for intermediate processing.
+    ///
+    /// ```
+    /// use arrayvec::ArrayString;
+    ///
+    /// let string = ArrayString::<16>::zero_filled();
+    /// assert_eq!(string.len(), 16);
+    /// ```
+    #[inline]
+    pub fn zero_filled() -> Self {
+        assert_capacity_limit!(CAP);
+        // SAFETY: `assert_capacity_limit` asserts that `len` won't overflow and
+        // `zeroed` fully fills the array with nulls.
+        unsafe {
+            ArrayString {
+                xs: MaybeUninit::zeroed().assume_init(),
+                len: CAP as _
+            }
+        }
+    }
+
     /// Return the capacity of the `ArrayString`.
     ///
     /// ```
@@ -138,7 +160,7 @@ impl<const CAP: usize> ArrayString<CAP>
     /// assert_eq!(string.capacity(), 3);
     /// ```
     #[inline(always)]
-    pub fn capacity(&self) -> usize { CAP }
+    pub const fn capacity(&self) -> usize { CAP }
 
     /// Return if the `ArrayString` is completely filled.
     ///
@@ -150,7 +172,20 @@ impl<const CAP: usize> ArrayString<CAP>
     /// string.push_str("A");
     /// assert!(string.is_full());
     /// ```
-    pub fn is_full(&self) -> bool { self.len() == self.capacity() }
+    pub const fn is_full(&self) -> bool { self.len() == self.capacity() }
+
+    /// Returns the capacity left in the `ArrayString`.
+    ///
+    /// ```
+    /// use arrayvec::ArrayString;
+    ///
+    /// let mut string = ArrayString::<3>::from("abc").unwrap();
+    /// string.pop();
+    /// assert_eq!(string.remaining_capacity(), 1);
+    /// ```
+    pub const fn remaining_capacity(&self) -> usize {
+        self.capacity() - self.len()
+    }
 
     /// Adds the given char to the end of the string.
     ///
@@ -166,6 +201,7 @@ impl<const CAP: usize> ArrayString<CAP>
     ///
     /// assert_eq!(&string[..], "ab");
     /// ```
+    #[track_caller]
     pub fn push(&mut self, c: char) {
         self.try_push(c).unwrap();
     }
@@ -217,6 +253,7 @@ impl<const CAP: usize> ArrayString<CAP>
     ///
     /// assert_eq!(&string[..], "ad");
     /// ```
+    #[track_caller]
     pub fn push_str(&mut self, s: &str) {
         self.try_push_str(s).unwrap()
     }
@@ -336,10 +373,12 @@ impl<const CAP: usize> ArrayString<CAP>
 
         let next = idx + ch.len_utf8();
         let len = self.len();
+        let ptr = self.as_mut_ptr();
         unsafe {
-            ptr::copy(self.as_ptr().add(next),
-                      self.as_mut_ptr().add(idx),
-                      len - next);
+            ptr::copy(
+                ptr.add(next),
+                ptr.add(idx),
+                len - next);
             self.set_len(len - (next - idx));
         }
         ch
@@ -367,6 +406,11 @@ impl<const CAP: usize> ArrayString<CAP>
 
     /// Return a string slice of the whole `ArrayString`.
     pub fn as_str(&self) -> &str {
+        self
+    }
+
+    /// Return a mutable string slice of the whole `ArrayString`.
+    pub fn as_mut_str(&mut self) -> &mut str {
         self
     }
 
@@ -437,6 +481,11 @@ impl<const CAP: usize> Hash for ArrayString<CAP>
 impl<const CAP: usize> Borrow<str> for ArrayString<CAP>
 {
     fn borrow(&self) -> &str { self }
+}
+
+impl<const CAP: usize> BorrowMut<str> for ArrayString<CAP>
+{
+    fn borrow_mut(&mut self) -> &mut str { self }
 }
 
 impl<const CAP: usize> AsRef<str> for ArrayString<CAP>
@@ -596,5 +645,29 @@ impl<'a, const CAP: usize> TryFrom<fmt::Arguments<'a>> for ArrayString<CAP>
         let mut v = Self::new();
         v.write_fmt(f).map_err(|e| CapacityError::new(e))?;
         Ok(v)
+    }
+}
+
+#[cfg(feature = "zeroize")]
+/// "Best efforts" zeroing of the `ArrayString`'s buffer when the `zeroize` feature is enabled.
+///
+/// The length is set to 0, and the buffer is dropped and zeroized.
+/// Cannot ensure that previous moves of the `ArrayString` did not leave values on the stack.
+///
+/// ```
+/// use arrayvec::ArrayString;
+/// use zeroize::Zeroize;
+/// let mut string = ArrayString::<6>::from("foobar").unwrap();
+/// string.zeroize();
+/// assert_eq!(string.len(), 0);
+/// unsafe { string.set_len(string.capacity()) };
+/// assert_eq!(&*string, "\0\0\0\0\0\0");
+/// ```
+impl<const CAP: usize> zeroize::Zeroize for ArrayString<CAP> {
+    fn zeroize(&mut self) {
+        // There are no elements to drop
+        self.clear();
+        // Zeroize the backing array.
+        self.xs.zeroize();
     }
 }
