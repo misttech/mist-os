@@ -90,15 +90,14 @@ def main() -> None:
         multi_device=args.multi_device,
         config_path=args.config_yaml_path,
         params_path=args.params_yaml_path,
-        ffx_subtools_search_path=os.path.abspath(args.ffx_subtools_path)
-        if args.ffx_subtools_path
-        else None,
+        ffx_subtools_search_path=(
+            os.path.abspath(args.ffx_subtools_path)
+            if args.ffx_subtools_path
+            else None
+        ),
         ssh_path=os.path.abspath(args.ssh_path) if args.ssh_path else None,
     )
     driver = factory.get_driver()
-
-    signal.signal(signal.SIGINT, driver.teardown)
-    signal.signal(signal.SIGTERM, driver.teardown)
 
     # Use the same Python runtime for Mobly test execution as the one that's
     # currently running this Mobly driver script.
