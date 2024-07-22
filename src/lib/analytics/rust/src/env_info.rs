@@ -5,6 +5,7 @@
 use anyhow::{bail, Error, Result};
 #[allow(unused_imports)]
 use home::home_dir;
+use nix::unistd;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::env::VarError;
@@ -22,6 +23,10 @@ pub fn get_os() -> String {
 
 pub fn get_arch() -> String {
     std::env::consts::ARCH.to_string()
+}
+
+pub fn get_hostname() -> String {
+    unistd::gethostname().expect("$HOSTNAME").into_string().expect("$HOSTNAME")
 }
 
 fn convert_macos_to_darwin(arch: &str) -> String {
@@ -190,6 +195,7 @@ const C_GOOGLERS_DOMAIN_NAME: &str = r"c.googlers.com$";
 const CORP_GOOGLERS_DOMAIN_NAME: &str = r"corp.google.com$";
 #[allow(dead_code)]
 const USER_REDACTED: &str = "$USER";
+const HOSTNAME_REDACTED: &str = "$HOSTNAME";
 
 pub fn is_test_env() -> bool {
     std::env::var(TEST_ENV_VAR).is_ok()
@@ -214,6 +220,10 @@ pub fn is_analytics_disabled_by_env() -> bool {
         || is_user_a_bot()
 }
 
+pub fn is_googler() -> bool {
+    is_googler_host_domain(&get_hostname())
+}
+
 #[allow(dead_code)]
 pub fn is_googler_host_domain(domain: &str) -> bool {
     static C_GOOGLERS_DOMAIN_RE: Lazy<Regex> =
@@ -224,11 +234,21 @@ pub fn is_googler_host_domain(domain: &str) -> bool {
 }
 
 #[allow(dead_code)]
+pub(crate) fn redact_host_and_user_from(parameter: &str) -> String {
+    redact_hostname_from(&redact_user_name_from(parameter))
+}
+
+#[allow(dead_code)]
 pub fn redact_user_name_from(parameter: &str) -> String {
     match get_username_from_env() {
         Ok(user_value) => parameter.replace(user_value.as_str(), USER_REDACTED),
         _ => parameter.to_string(),
     }
+}
+
+#[allow(dead_code)]
+pub fn redact_hostname_from(parameter: &str) -> String {
+    parameter.replace(get_hostname().as_str(), HOSTNAME_REDACTED)
 }
 
 #[cfg(not(test))]

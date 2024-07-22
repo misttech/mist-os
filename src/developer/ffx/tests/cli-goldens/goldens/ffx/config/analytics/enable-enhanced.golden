@@ -1,6 +1,6 @@
 {
-  "name": "enable",
-  "description": "enable basic (redacted) analytics",
+  "name": "enable-enhanced",
+  "description": "enable enhanced analytics (Googlers only)",
   "examples": [],
   "flags": [
     {

@@ -5,7 +5,8 @@
 use crate::api::value::{ConfigValue, ValueStrategy};
 use crate::api::{validate_type, ConfigError};
 use ::errors::ffx_bail;
-use analytics::{is_opted_in, set_opt_in_status};
+use analytics::metrics_state::MetricsStatus;
+use analytics::{set_new_opt_in_status, show_status_message};
 use anyhow::{anyhow, Context, Result};
 use core::fmt;
 use std::io::Write;
@@ -234,16 +235,25 @@ pub async fn print_log_hint<W: std::io::Write>(writer: &mut W) {
     }
 }
 
-pub async fn set_metrics_status(value: bool) -> Result<()> {
-    set_opt_in_status(value).await
+pub async fn set_metrics_status(value: MetricsStatus) -> Result<()> {
+    set_new_opt_in_status(value).await
+}
+
+pub async fn enable_basic_metrics() -> Result<()> {
+    set_new_opt_in_status(MetricsStatus::OptedIn).await
+}
+
+pub async fn enable_enhanced_metrics() -> Result<()> {
+    set_new_opt_in_status(MetricsStatus::OptedInEnhanced).await
+}
+
+pub async fn disable_metrics() -> Result<()> {
+    set_new_opt_in_status(MetricsStatus::OptedOut).await
 }
 
 pub async fn show_metrics_status<W: Write>(mut writer: W) -> Result<()> {
-    let state = match is_opted_in().await {
-        true => "enabled",
-        false => "disabled",
-    };
-    writeln!(&mut writer, "Analytics data collection is {}", state)?;
+    let status_message = show_status_message().await;
+    writeln!(&mut writer, "{status_message}")?;
     Ok(())
 }
 

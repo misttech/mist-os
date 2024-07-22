@@ -9,7 +9,10 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use uuid::Uuid;
 
+use crate::env_info::is_googler;
+
 const OPT_IN_STATUS_FILENAME: &str = "analytics-status";
+const ANALYTICS_STATUS_INTERNAL_FILENAME: &str = "analytics-status-internal";
 
 pub const UNKNOWN_APP_NAME: &str = "unknown_app";
 pub const UNKNOWN_VERSION: &str = "unknown build version";
@@ -35,12 +38,15 @@ pub struct MetricsState {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum MetricsStatus {
-    Disabled,  // the environment is set to turn off analytics
-    NewUser,   // user has never seen the full analytics notice for the Fuchsia tools
-    NewToTool, // user has never seen the brief analytics notice for this tool
-    OptedIn,   // user is allowing collection of analytics data
-    OptedOut,  // user has opted out of collection of analytics data
+pub enum MetricsStatus {
+    Disabled,                     // the environment is set to turn off analytics
+    NewUser,            // user has never seen the full analytics notice for the Fuchsia tools
+    NewToTool,          // user has never seen the brief analytics notice for this tool
+    OptedIn,            // user is allowing collection of basic analytics data
+    OptedOut,           // user has opted out of collection of analytics data
+    OptedInEnhanced,    // user is a googler opted in to enhanced analytics
+    GooglerNeedsNotice, // user is a googler yet to set an analytics state and will be shown the enhanced analytics notice
+    GooglerOptedInAndNeedsNotice, // user is a googler yet to set an analytics state and will be shown the enhanced analytics notice and we will collect basic analytics
 }
 
 impl MetricsState {
@@ -92,52 +98,7 @@ impl MetricsState {
         metrics.ga4_product_code = ga4_product_code;
         metrics.ga4_key = ga4_key;
         metrics.invoker = invoker;
-
-        match read_opt_in_status(Path::new(&metrics_dir)) {
-            Ok(true) => metrics.status = MetricsStatus::OptedIn,
-            Ok(false) => metrics.status = MetricsStatus::OptedOut,
-            Err(_) => {
-                metrics.status = MetricsStatus::NewUser;
-                if let Err(e) = write_opt_in_status(metrics_dir, true) {
-                    eprintln!("Could not write opt in status {:}", e);
-                }
-            }
-        }
-
-        if metrics.status == MetricsStatus::OptedOut {
-            return metrics;
-        }
-
-        match read_uuid_file(metrics_dir) {
-            Ok(uuid) => metrics.uuid = Some(uuid),
-            Err(_) => {
-                let uuid = Uuid::new_v4();
-                metrics.uuid = Some(uuid);
-
-                if let Err(e) = write_uuid_file(metrics_dir, &uuid.to_string()) {
-                    eprintln!("Could not write uuid file {:}", e);
-                }
-            }
-        }
-
-        // Set the user_first_touch_timestamp to the modified time of the uuid.
-        metrics.user_first_touch_timestamp = get_modified_time_uuid_file(metrics_dir);
-
-        if metrics.status == MetricsStatus::NewUser {
-            // record usage of the app on disk, but, stay 'NewUser' to prevent collection on first usage.
-            if let Err(e) = write_app_status(metrics_dir, &metrics.app_name, true) {
-                eprintln!("Could not write app file,  {}, {:}", &metrics.app_name, e);
-            }
-            return metrics;
-        }
-
-        if let Err(_e) = read_app_status(metrics_dir, &metrics.app_name) {
-            metrics.status = MetricsStatus::NewToTool;
-            if let Err(e) = write_app_status(metrics_dir, &metrics.app_name, true) {
-                eprintln!("Could not write app file,  {}, {:}", &metrics.app_name, e);
-            }
-        }
-
+        metrics.init_status();
         metrics
     }
 
@@ -171,9 +132,47 @@ impl MetricsState {
 
     pub(crate) fn is_opted_in(&self) -> bool {
         match self.status {
-            MetricsStatus::OptedIn | MetricsStatus::NewToTool => true,
+            MetricsStatus::OptedIn
+            | MetricsStatus::OptedInEnhanced
+            | MetricsStatus::NewToTool
+            | MetricsStatus::GooglerOptedInAndNeedsNotice => true,
             _ => false,
         }
+    }
+
+    pub(crate) fn set_new_opt_in_status(&mut self, status: MetricsStatus) -> Result<(), Error> {
+        if self.status == MetricsStatus::Disabled {
+            return Ok(());
+        }
+
+        self.status = status;
+        if is_googler() {
+            write_analytics_status_internal(&self.metrics_dir, &self.status)?;
+        } else {
+            // TODO unify optin state to one file
+            if self.status == MetricsStatus::OptedInEnhanced {
+                // non googlers cannot enable enhanced analytics
+                self.status = MetricsStatus::OptedIn;
+            }
+            let opted_in = self.status == MetricsStatus::OptedIn;
+            write_opt_in_status(&self.metrics_dir, opted_in)?;
+        }
+        match self.status {
+            MetricsStatus::OptedOut => {
+                self.uuid = None;
+                delete_uuid_file(&self.metrics_dir)?;
+                delete_app_file(&self.metrics_dir, &self.app_name)?;
+            }
+            MetricsStatus::OptedIn | MetricsStatus::OptedInEnhanced => {
+                let uuid = Uuid::new_v4();
+                self.uuid = Some(uuid);
+
+                write_uuid_file(&self.metrics_dir, &uuid.to_string())?;
+                write_app_status(&self.metrics_dir, &self.app_name, true)?;
+            }
+            _ => (),
+        };
+        Ok(())
     }
 
     // disable analytics for this invocation only
@@ -184,6 +183,126 @@ impl MetricsState {
         }
         self.status = MetricsStatus::OptedOut;
         Ok(())
+    }
+
+    fn init_status(&mut self) {
+        if !is_googler() {
+            self.init_status_for_non_googler()
+        } else {
+            self.init_status_for_googler()
+        }
+    }
+
+    /// In the current design, non googlers' analytic status
+    /// will be maintained in the old file, analytics-state.
+    /// TODO redesign this to be unified with googler status
+    /// as well as backward compatible.
+    fn init_status_for_non_googler(&mut self) {
+        match read_opt_in_status(Path::new(&self.metrics_dir)) {
+            Ok(true) => self.status = MetricsStatus::OptedIn,
+            Ok(false) => {
+                self.status = MetricsStatus::OptedOut;
+                return;
+            }
+            Err(_) => {
+                self.status = MetricsStatus::NewUser;
+            }
+        }
+        // write the state to the analytics-status
+        if let Err(e) =
+            write_opt_in_status(&self.metrics_dir, self.status != MetricsStatus::OptedOut)
+        {
+            eprintln!("Could not write opt in status to analytics-status {:}", e);
+        }
+
+        if self.status == MetricsStatus::OptedOut {
+            return;
+        }
+
+        self.init_uuid();
+
+        if self.status == MetricsStatus::NewUser {
+            // record usage of the app on disk, but, stay 'NewUser' to prevent collection on first usage.
+            if let Err(e) = write_app_status(&self.metrics_dir, &self.app_name, true) {
+                eprintln!("Could not write app file,  {}, {:}", &self.app_name, e);
+            }
+            return;
+        }
+
+        if let Err(_e) = read_app_status(&self.metrics_dir, &self.app_name) {
+            self.status = MetricsStatus::NewToTool;
+            if let Err(e) = write_app_status(&self.metrics_dir, &self.app_name, true) {
+                eprintln!("Could not write app file,  {}, {:}", &self.app_name, e);
+            }
+        }
+    }
+
+    fn init_status_for_googler(&mut self) {
+        match read_analytics_status_internal(&self.metrics_dir) {
+            Ok(status) => {
+                tracing::trace!("Found status in analytics-status-internal");
+                match status {
+                    MetricsStatus::OptedIn
+                    | MetricsStatus::OptedInEnhanced
+                    | MetricsStatus::OptedOut => {
+                        self.status = status;
+                    }
+                    _ => {
+                        tracing::trace!("Empty value found in analytics-status-internal");
+                        self.status = MetricsStatus::GooglerNeedsNotice;
+                    }
+                }
+                self.init_uuid();
+                return;
+            }
+            Err(_) => {
+                tracing::trace!("No value found in analytics-status-internal.");
+                self.status = MetricsStatus::GooglerNeedsNotice;
+            }
+        }
+        // if analytics-internal-status was not found, look for older, analytics-status file
+        match read_opt_in_status(Path::new(&self.metrics_dir)) {
+            Ok(true) => self.status = MetricsStatus::GooglerOptedInAndNeedsNotice,
+            Ok(false) => self.status = MetricsStatus::OptedOut,
+            Err(_) => {
+                self.status = MetricsStatus::GooglerNeedsNotice;
+            }
+        }
+        // write the state to the new analytics-internal-status if it is already settled.
+        // If the googler still has not opted in, do not write a status file.
+        // TODO unify this with non-googler tracking by keeping the state in the old analytics-status file.
+        // and by explicitly tracking whether the googler has seen the notice and responded to it as two
+        // separate variables.
+        if self.status != MetricsStatus::GooglerNeedsNotice
+            && self.status != MetricsStatus::GooglerOptedInAndNeedsNotice
+        {
+            if let Err(e) = write_analytics_status_internal(&self.metrics_dir, &self.status) {
+                eprintln!("Could not write opt in status to analytics-status-internal {:}", e);
+            }
+        }
+
+        if self.status != MetricsStatus::OptedOut
+            && self.status != MetricsStatus::GooglerNeedsNotice
+        {
+            self.init_uuid();
+        }
+        // Do not set app_status. It is not a valid state for a googler.
+    }
+
+    fn init_uuid(&mut self) {
+        match read_uuid_file(&self.metrics_dir) {
+            Ok(uuid) => self.uuid = Some(uuid),
+            Err(_) => {
+                let uuid = Uuid::new_v4();
+                self.uuid = Some(uuid);
+
+                if let Err(e) = write_uuid_file(&self.metrics_dir, &uuid.to_string()) {
+                    eprintln!("Could not write uuid file {:}", e);
+                }
+            }
+        }
+        // Set the user_first_touch_timestamp to the modified time of the uuid.
+        self.user_first_touch_timestamp = get_modified_time_uuid_file(&self.metrics_dir);
     }
 }
 
@@ -229,6 +348,45 @@ pub fn write_app_status(metrics_dir: &PathBuf, app: &str, status: bool) -> Resul
     write_bool_to(&status_file, status)
 }
 
+fn read_analytics_status_internal(metrics_dir: &Path) -> Result<MetricsStatus, Error> {
+    let status_file = metrics_dir.join(ANALYTICS_STATUS_INTERNAL_FILENAME);
+    read_metric_status_from(&status_file)
+}
+
+fn read_metric_status_from(path: &PathBuf) -> Result<MetricsStatus, Error> {
+    let result = read_to_string(path)?;
+    let parse: &str = &result.trim_end();
+    let status = match parse {
+        "0" => MetricsStatus::OptedOut,
+        "1" => MetricsStatus::OptedIn,
+        "2" => MetricsStatus::OptedInEnhanced,
+        _ => MetricsStatus::NewUser,
+    };
+    Ok(status)
+}
+
+pub(crate) fn write_analytics_status_internal(
+    metrics_dir: &PathBuf,
+    status: &MetricsStatus,
+) -> Result<(), Error> {
+    create_dir_all(&metrics_dir)?;
+
+    let status_file = metrics_dir.join(ANALYTICS_STATUS_INTERNAL_FILENAME);
+    write_metric_status_to(&status_file, status)
+}
+
+fn write_metric_status_to(path: &PathBuf, status: &MetricsStatus) -> Result<(), Error> {
+    let tmp_file = File::create(path)?;
+    let value = match status {
+        MetricsStatus::OptedOut => "0",
+        MetricsStatus::OptedIn => "1",
+        MetricsStatus::OptedInEnhanced => "2",
+        _ => "",
+    };
+    writeln!(&tmp_file, "{}", value)?;
+    Ok(())
+}
+
 fn read_bool_from(path: &PathBuf) -> Result<bool, Error> {
     let result = read_to_string(path)?;
     let parse = &result.trim_end().parse::<u8>()?;
@@ -269,15 +427,17 @@ fn get_modified_time_uuid_file(metrics_dir: &PathBuf) -> SystemTime {
 }
 
 fn delete_uuid_file(metrics_dir: &PathBuf) -> Result<(), Error> {
-    let file = metrics_dir.join("uuid");
-    let path = file.as_path();
-    Ok(remove_file(path)?)
+    delete_app_file(metrics_dir, "uuid")
 }
 
 fn delete_app_file(metrics_dir: &PathBuf, app: &str) -> Result<(), Error> {
-    let status_file = metrics_dir.join(app);
-    let path = status_file.as_path();
-    Ok(remove_file(path)?)
+    let file = metrics_dir.join(app);
+    let path = file.as_path();
+    if file.exists() {
+        Ok(remove_file(path)?)
+    } else {
+        Ok(())
+    }
 }
 
 fn write_uuid_file(dir: &PathBuf, uuid: &str) -> Result<(), Error> {
@@ -330,13 +490,26 @@ mod tests {
             false,
             None,
         );
-        assert_eq!(m.status, MetricsStatus::NewUser);
+        if !is_googler() {
+            assert_eq!(m.status, MetricsStatus::NewUser);
+        } else {
+            assert_eq!(m.status, MetricsStatus::GooglerNeedsNotice);
+        }
         let result = read_uuid_file(&dir);
-        match result {
-            Ok(uuid) => {
-                assert_eq!(m.uuid, Some(uuid));
+        if !is_googler() {
+            match result {
+                Ok(uuid) => {
+                    assert_eq!(m.uuid, Some(uuid));
+                }
+                Err(_) => panic!("Could not read uuid"),
             }
-            Err(_) => panic!("Could not read uuid"),
+        } else {
+            match result {
+                Ok(_) => {
+                    panic!("When is_googler, should not have generated uuid file")
+                }
+                Err(_) => assert_eq!(true, true),
+            }
         }
 
         drop(dir);
@@ -364,10 +537,22 @@ mod tests {
         );
 
         assert_ne!(Some(&m), None);
-        assert_eq!(m.status, MetricsStatus::NewToTool);
+        if !is_googler() {
+            assert_eq!(m.status, MetricsStatus::NewToTool);
+        } else {
+            assert_eq!(m.status, MetricsStatus::GooglerOptedInAndNeedsNotice);
+        }
         assert_eq!(m.uuid, Some(uuid));
+
         let app_status_file = &dir.join(&APP_NAME);
-        assert!(metadata(app_status_file).is_ok(), "App status file should exist.");
+        if !is_googler() {
+            assert!(metadata(app_status_file).is_ok(), "App status file should exist.");
+        } else {
+            assert!(
+                metadata(app_status_file).is_err(),
+                "App status file should not exist when is_googler."
+            );
+        }
 
         drop(dir);
         Ok(())
@@ -394,7 +579,11 @@ mod tests {
         );
 
         assert_ne!(Some(&m), None);
-        assert_eq!(m.status, MetricsStatus::OptedIn);
+        if !is_googler() {
+            assert_eq!(m.status, MetricsStatus::OptedIn);
+        } else {
+            assert_eq!(m.status, MetricsStatus::GooglerOptedInAndNeedsNotice);
+        }
         assert_eq!(m.uuid, Some(uuid));
 
         drop(dir);
@@ -467,7 +656,11 @@ mod tests {
         );
 
         assert_ne!(Some(&m), None);
-        assert_eq!(m.status, MetricsStatus::OptedIn);
+        if !is_googler() {
+            assert_eq!(m.status, MetricsStatus::OptedIn);
+        } else {
+            assert_eq!(m.status, MetricsStatus::GooglerOptedInAndNeedsNotice);
+        }
         assert_eq!(m.uuid, Some(uuid));
 
         m.set_opt_in_status(false)?;

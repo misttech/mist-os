@@ -6,7 +6,8 @@ use crate::{FhoEnvironment, FhoToolMetadata, ToolIO, TryFromEnv};
 use argh::{ArgsInfo, CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
-    user_error, Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner, ToolSuite,
+    send_enhanced_analytics, user_error, Error, FfxCommandLine, FfxContext, MetricsSession, Result,
+    ToolRunner, ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
@@ -153,7 +154,10 @@ impl<T: FfxTool> FhoTool<T> {
             DaemonVersionCheck::SameVersionInfo(build_info),
         )
         .await?;
-        let redacted_args = ffx.redact_subcmd(&tool);
+        let redacted_args = match send_enhanced_analytics().await {
+            false => ffx.redact_subcmd(&tool),
+            true => ffx.unredacted_args_for_analytics(),
+        };
         let env = FhoEnvironment { ffx, context: context.clone(), injector: Arc::new(injector) };
         let main = T::from_env(env.clone(), tool).await?;
 

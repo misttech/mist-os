@@ -9,6 +9,7 @@ use ffx_command_error::bug;
 use ffx_config::environment::ExecutableKind;
 use ffx_config::logging::LogDestination;
 use ffx_config::{EnvironmentContext, FfxConfigBacked};
+use ffx_metrics::{enhanced_analytics, sanitize};
 use ffx_writer::Format;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -118,13 +119,16 @@ impl FfxCommandLine {
                 Error::Help { command: self.command.clone(), output, code }
             }
         };
-        // construct a 'sanitized' argument list that includes an indication of whether
-        // it was just no arguments passed or an unknown subtool.
-        let redacted: Vec<_> = self
-            .redact_ffx_cmd()
-            .into_iter()
-            .chain(subcmd_name.map(|_| "<unknown-subtool>".to_owned()).into_iter())
-            .collect();
+        let args_for_analytics: Vec<_> = match enhanced_analytics().await {
+            // construct a 'sanitized' argument list that includes an indication of whether
+            // it was just no arguments passed or an unknown subtool.
+            false => self
+                .redact_ffx_cmd()
+                .into_iter()
+                .chain(subcmd_name.map(|_| "<unknown-subtool>".to_owned()).into_iter())
+                .collect(),
+            true => self.unredacted_args_for_analytics(),
+        };
 
         let error_res = match help_err.exit_code() {
             0 => Ok(ExitStatus::from_raw(0)),
@@ -135,8 +139,18 @@ impl FfxCommandLine {
             }),
         };
 
-        metrics.command_finished(&error_res, &redacted).await?;
+        metrics.command_finished(&error_res, &args_for_analytics).await?;
         Ok(help_err)
+    }
+
+    /// Creates a Vec<String> of full args from the commandline
+    /// for use in enhanced analytics.
+    pub fn unredacted_args_for_analytics(&self) -> Vec<String> {
+        let mut v: Vec<String> = self.cmd_iter().into_iter().map(|v| v.to_string()).collect();
+        let x: Vec<String> = self.ffx_args_iter().into_iter().map(|v| v.to_string()).collect();
+        v.extend(x);
+        v.extend(self.subcmd_iter().map(|v| v.to_string()));
+        v.into_iter().map(|a| sanitize(&a)).collect()
     }
 
     /// Creates the command from the args directly. This is used when building JSON help information

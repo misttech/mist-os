@@ -5,7 +5,9 @@
 use crate::Error;
 use analytics::{get_notice, opt_out_for_this_invocation};
 use ffx_config::EnvironmentContext;
-use ffx_metrics::{add_ffx_launch_event, add_ffx_overnet_proxy_drop_event, init_metrics_svc};
+use ffx_metrics::{
+    add_ffx_launch_event, add_ffx_overnet_proxy_drop_event, enhanced_analytics, init_metrics_svc,
+};
 use fuchsia_async::TimeoutExt;
 use itertools::Itertools;
 use std::io::Write;
@@ -125,6 +127,10 @@ impl MetricsSession {
         }
         Ok(stats)
     }
+}
+
+pub async fn send_enhanced_analytics() -> bool {
+    enhanced_analytics().await
 }
 
 async fn get_sdk_version(context: &EnvironmentContext) -> Option<String> {
