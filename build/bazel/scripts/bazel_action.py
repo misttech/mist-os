@@ -890,6 +890,12 @@ def main() -> int:
         help="List of bazel target patterns.",
     )
     parser.add_argument(
+        "--stamp-files",
+        default=[],
+        nargs="*",
+        help="List of stamp files to touch.",
+    )
+    parser.add_argument(
         "--file-outputs",
         action=FileOutputsAction,
         help="A list of (bazel_path, ninja_path) file paths.",
@@ -1359,6 +1365,10 @@ access when it is run.
         os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
         with open(args.depfile, "w") as f:
             f.write(depfile_content)
+
+        for f in args.stamp_files:
+            with open(f, "w") as f:
+                f.write("")
 
     # Done!
     return 0
