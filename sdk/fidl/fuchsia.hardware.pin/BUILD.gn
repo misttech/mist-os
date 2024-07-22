@@ -5,6 +5,8 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.pin") {
+  sdk_category = "partner"
+  sdk_area = "Drivers"
   sources = [ "pin.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.gpio",
