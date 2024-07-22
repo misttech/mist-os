@@ -7,8 +7,6 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/hw/inout.h>
 #include <lib/device-protocol/pci.h>
@@ -2132,9 +2130,10 @@ void Controller::PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer) {
   completer(zx::ok());
 }
 
-void Controller::PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer) {
+void Controller::PrepareStopOnPowerStateTransition(
+    fuchsia_device_manager::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
-  if (suspend_reason == DEVICE_SUSPEND_REASON_MEXEC) {
+  if (power_state == fuchsia_device_manager::SystemPowerState::kMexec) {
     zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(resources_.framebuffer);
     if (fb_status.is_error()) {
       completer(zx::ok());

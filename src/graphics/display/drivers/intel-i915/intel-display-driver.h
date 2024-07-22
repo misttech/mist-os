@@ -6,7 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_DISPLAY_DRIVER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
-#include <lib/ddk/device.h>
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -50,7 +49,8 @@ class IntelDisplayDriver : public fdf::DriverBase {
   zx::result<> InitGpuCoreNode();
 
   void PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer);
-  void PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer);
+  void PrepareStopOnPowerStateTransition(fuchsia_device_manager::SystemPowerState power_state,
+                                         fdf::PrepareStopCompleter completer);
 
   std::unique_ptr<Controller> controller_;
   zx::resource framebuffer_resource_;

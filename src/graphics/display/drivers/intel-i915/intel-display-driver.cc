@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
-#include <lib/ddk/device.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
@@ -49,27 +48,6 @@ zx::result<fuchsia_device_manager::SystemPowerState> GetSystemPowerState(fdf::Na
     return zx::error(termination_state_result.status());
   }
   return zx::ok(termination_state_result.value().state);
-}
-
-uint8_t PowerStateToSuspendReason(fuchsia_device_manager::SystemPowerState power_state) {
-  switch (power_state) {
-    case fuchsia_device_manager::SystemPowerState::kReboot:
-      return DEVICE_SUSPEND_REASON_REBOOT;
-    case fuchsia_device_manager::SystemPowerState::kRebootRecovery:
-      return DEVICE_SUSPEND_REASON_REBOOT_RECOVERY;
-    case fuchsia_device_manager::SystemPowerState::kRebootBootloader:
-      return DEVICE_SUSPEND_REASON_REBOOT_BOOTLOADER;
-    case fuchsia_device_manager::SystemPowerState::kMexec:
-      return DEVICE_SUSPEND_REASON_MEXEC;
-    case fuchsia_device_manager::SystemPowerState::kPoweroff:
-      return DEVICE_SUSPEND_REASON_POWEROFF;
-    case fuchsia_device_manager::SystemPowerState::kSuspendRam:
-      return DEVICE_SUSPEND_REASON_SUSPEND_RAM;
-    case fuchsia_device_manager::SystemPowerState::kRebootKernelInitiated:
-      return DEVICE_SUSPEND_REASON_REBOOT_KERNEL_INITIATED;
-    default:
-      return DEVICE_SUSPEND_REASON_SELECTIVE_SUSPEND;
-  }
 }
 
 template <typename ResourceProtocol>
@@ -197,10 +175,10 @@ void IntelDisplayDriver::PrepareStopOnPowerOn(fdf::PrepareStopCompleter complete
   }
 }
 
-void IntelDisplayDriver::PrepareStopOnSuspend(uint8_t suspend_reason,
-                                              fdf::PrepareStopCompleter completer) {
+void IntelDisplayDriver::PrepareStopOnPowerStateTransition(
+    fuchsia_device_manager::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
   if (controller_) {
-    controller_->PrepareStopOnSuspend(suspend_reason, std::move(completer));
+    controller_->PrepareStopOnPowerStateTransition(power_state, std::move(completer));
   } else {
     completer(zx::ok());
   }
@@ -221,7 +199,7 @@ void IntelDisplayDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
     PrepareStopOnPowerOn(std::move(completer));
     return;
   }
-  PrepareStopOnSuspend(PowerStateToSuspendReason(system_power_state), std::move(completer));
+  PrepareStopOnPowerStateTransition(system_power_state, std::move(completer));
 }
 
 void IntelDisplayDriver::Stop() {}

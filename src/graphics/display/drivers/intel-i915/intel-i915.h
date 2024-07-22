@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_I915_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_I915_H_
 
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -93,14 +94,15 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
 
   ~Controller();
 
-  // Corresponds to DFv1 `DdkInit()` and DFv2 `Start()`.
+  // Corresponds to DFv2 `Start()`.
   void Start(fdf::StartCompleter completer);
 
-  // Corresponds to DFv1 `DdkUnbind()` and DFv2 `PrepareStop()`.
+  // Corresponds to DFv2 `PrepareStop()`.
   void PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer);
 
-  // Corresponds to DFv1 `DdkSuspend()` and DFv2 `PrepareStop()`.
-  void PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer);
+  // Corresponds to DFv2 `PrepareStop()`.
+  void PrepareStopOnPowerStateTransition(fuchsia_device_manager::SystemPowerState power_state,
+                                         fdf::PrepareStopCompleter completer);
 
   // display controller protocol ops
   void DisplayControllerImplSetDisplayControllerInterface(
