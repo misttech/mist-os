@@ -27,6 +27,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <limits>
 #include <memory>
 #include <string_view>
@@ -605,7 +606,9 @@ void capture_release() {
 void usage(void) {
   printf(
       "Usage: display-test [OPTIONS]\n\n"
-      "--controller N           : open coordinator N [/dev/class/display-coordinator/N]\n"
+      "--controller path        : Open the display coordinator device at <path>\n"
+      "                           If not specified, open the first available device at\n"
+      "                           /dev/class/display-coordinator\n"
       "--dump                   : print properties of attached display\n"
       "--mode-set D N           : Set Display D to mode N (use dump option for choices)\n"
       "--format-set D N         : Set Display D to format N (use dump option for choices)\n"
@@ -688,6 +691,24 @@ Platforms GetPlatform() {
   return UNKNOWN_PLATFORM;
 }
 
+std::optional<std::string> FindCoordinatorFromDirectory(std::string_view directory) {
+  std::filesystem::path directory_path(directory);
+  if (!std::filesystem::exists(directory_path)) {
+    fprintf(stderr, "%s does not exist!\n", directory_path.c_str());
+    return std::nullopt;
+  }
+  if (!std::filesystem::is_directory(directory_path)) {
+    fprintf(stderr, "%s is not a valid directory!\n", directory_path.c_str());
+    return std::nullopt;
+  }
+  for (const std::filesystem::directory_entry& entry :
+       std::filesystem::directory_iterator(directory)) {
+    return entry.path();
+  }
+  fprintf(stderr, "There is no display coordinator in %s!\n", directory_path.c_str());
+  return std::nullopt;
+}
+
 int main(int argc, const char* argv[]) {
   printf("Running display test\n");
 
@@ -698,7 +719,7 @@ int main(int argc, const char* argv[]) {
   int32_t delay = 0;
   bool capture = false;
   bool verify_capture = false;
-  const char* coordinator = "/dev/class/display-coordinator/000";
+  std::optional<std::string> coordinator_path_override = std::nullopt;
 
   platform = GetPlatform();
 
@@ -719,12 +740,28 @@ int main(int argc, const char* argv[]) {
 
   for (int i = 1; i < argc - 1; i++) {
     if (!strcmp(argv[i], "--controller")) {
-      coordinator = argv[i + 1];
+      coordinator_path_override = argv[i + 1];
       break;
     }
   }
 
-  if (!bind_display(coordinator, &displays)) {
+  std::string coordinator_path;
+  if (coordinator_path_override.has_value()) {
+    coordinator_path = coordinator_path_override.value();
+  } else {
+    static constexpr std::string_view kDefaultCoordinatorDirectory =
+        "/dev/class/display-coordinator";
+    std::optional<std::string> default_coordinator_path =
+        FindCoordinatorFromDirectory(kDefaultCoordinatorDirectory);
+    if (!default_coordinator_path.has_value()) {
+      fprintf(stderr, "Failed to find display coordinator from default path\n");
+      return -1;
+    }
+    coordinator_path = std::move(default_coordinator_path).value();
+  }
+  printf("Display coordinator device: %s\n", coordinator_path.c_str());
+
+  if (!bind_display(coordinator_path.c_str(), &displays)) {
     usage();
     return -1;
   }
