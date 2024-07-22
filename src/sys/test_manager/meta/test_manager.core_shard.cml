@@ -361,6 +361,13 @@
             to: "#test_manager",
             subdir: "securemem",
         },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-hrtimer",
+            to: "#test_manager",
+            subdir: "hrtimer",
+        },
 
         // Tests of the media system want to test against the real hardware
         // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.

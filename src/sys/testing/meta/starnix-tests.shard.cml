@@ -63,6 +63,12 @@
             rights: [ "r*" ],
         },
         {
+            directory: "dev-hrtimer",
+            from: "parent",
+            to: [ "#starnix-tests" ],
+            rights: [ "r*" ],
+        },
+        {
             directory: "boot",
             from: "parent",
             as: "boot-kernel",
