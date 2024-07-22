@@ -507,29 +507,42 @@ where
                     responder.send(result).expect("failed to send result");
                 }
                 rule_set_work_item = rule_set_work_receivers.next() => {
-                    let Some((Some(RuleWorkItem {
-                        op,
-                        responder
-                    }), mut rest)) = rule_set_work_item else {
+                    let Some((Some(rule_work), mut rest)) = rule_set_work_item else {
                         continue;
                     };
-                    let is_removal = matches!(op, RuleOp::RemoveSet { .. });
-                    let result = Self::handle_rule_op(
-                        rules,
-                        tables,
-                        op,
-                        rule_update_dispatcher
-                    );
-                    if is_removal {
-                        // We must close the channel so that the rule set
-                        // can no longer send RuleOps. Note that we make
-                        // sure no more operations will be sent once
-                        // `RemoveSet` is sent.
-                        rest.close();
-                    } else {
-                        rule_set_work_receivers.push(rest.into_future());
+                    match rule_work {
+                        RuleWorkItem::RuleOp {
+                            op, responder
+                        } => {
+                            let is_removal = matches!(op, RuleOp::RemoveSet { .. });
+                            let result = Self::handle_rule_op(
+                                rules,
+                                op,
+                                rule_update_dispatcher
+                            );
+                            if is_removal {
+                                // We must close the channel so that the rule set
+                                // can no longer send RuleOps. Note that we make
+                                // sure no more operations will be sent once
+                                // `RemoveSet` is sent.
+                                rest.close();
+                            } else {
+                                rule_set_work_receivers.push(rest.into_future());
+                            }
+                            responder.send(result).expect("the receiver is dropped");
+                        }
+                        RuleWorkItem::AuthenticateForRouteTable {
+                            table_id, token, responder
+                        } => {
+                            let result = Self::handle_route_table_authentication(
+                                tables,
+                                table_id,
+                                token,
+                            );
+                            rule_set_work_receivers.push(rest.into_future());
+                            responder.send(result).expect("the receiver is dropped");
+                        }
                     }
-                    responder.send(result).expect("the receiver is dropped");
                 }
                 complete => break,
             )
@@ -598,7 +611,6 @@ where
 
     fn handle_rule_op(
         rule_table: &mut RuleTable<I>,
-        route_tables: &HashMap<TableId<I>, Table<I::Addr>>,
         op: RuleOp<I>,
         rules_update_dispatcher: &rules_state::RuleUpdateDispatcher<I>,
     ) -> Result<(), fnet_routes_admin::RuleSetError> {
@@ -631,18 +643,22 @@ where
                     .expect("failed to notify a removed rule");
                 Ok(())
             }
-            RuleOp::AuthenticateForRouteTable { table_id, token } => {
-                let route_table = route_tables
-                    .get(&table_id)
-                    .ok_or(fnet_routes_admin::RuleSetError::BadAuthentication)?;
-                let stored_koid =
-                    route_table.token.basic_info().expect("failed to get basic info").koid;
-                if token.basic_info().expect("failed to get basic info").koid != stored_koid {
-                    Err(fnet_routes_admin::RuleSetError::BadAuthentication)
-                } else {
-                    Ok(())
-                }
-            }
+        }
+    }
+
+    fn handle_route_table_authentication(
+        route_tables: &HashMap<TableId<I>, Table<I::Addr>>,
+        table_id: TableId<I>,
+        token: zx::Event,
+    ) -> Result<(), fnet_routes_admin::AuthenticateForRouteTableError> {
+        let route_table = route_tables
+            .get(&table_id)
+            .ok_or(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication)?;
+        let stored_koid = route_table.token.basic_info().expect("failed to get basic info").koid;
+        if token.basic_info().expect("failed to get basic info").koid != stored_koid {
+            Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication)
+        } else {
+            Ok(())
         }
     }
 }

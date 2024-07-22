@@ -214,14 +214,14 @@ async fn bad_route_table_authentication<
                 .expect("failed to duplicate token")
         )
         .await,
-        Ok(Err(fnet_routes_admin::RuleSetError::BadAuthentication))
+        Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))
     );
 
     // Non-existent table that matches the IP version.
     assert_matches!(
         fnet_routes_ext::rules::authenticate_for_route_table::<I>(&rule_set, table_id + 2, token)
             .await,
-        Ok(Err(fnet_routes_admin::RuleSetError::BadAuthentication))
+        Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))
     );
 
     // Wrong token.
@@ -232,6 +232,6 @@ async fn bad_route_table_authentication<
             zx::Event::create(),
         )
         .await,
-        Ok(Err(fnet_routes_admin::RuleSetError::BadAuthentication))
+        Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))
     );
 }

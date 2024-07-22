@@ -269,7 +269,7 @@ pub trait FidlRuleAdminIpExt: Ip {
     >;
     /// The responder for AuthenticateForRouteTable requests.
     type RuleSetAuthenticateForRouteTableResponder: Responder<
-        Payload = Result<(), fnet_routes_admin::RuleSetError>,
+        Payload = Result<(), fnet_routes_admin::AuthenticateForRouteTableError>,
         ControlHandle = Self::RuleSetControlHandle,
     >;
     /// The control handle for RuleTable protocols.
@@ -348,7 +348,7 @@ impl_responder!(
 );
 impl_responder!(
     fnet_routes_admin::RuleSetV4AuthenticateForRouteTableResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
+    Result<(), fnet_routes_admin::AuthenticateForRouteTableError>,
 );
 impl_responder!(
     fnet_routes_admin::RuleSetV6AddRuleResponder,
@@ -360,7 +360,7 @@ impl_responder!(
 );
 impl_responder!(
     fnet_routes_admin::RuleSetV6AuthenticateForRouteTableResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
+    Result<(), fnet_routes_admin::AuthenticateForRouteTableError>,
 );
 
 /// Conversion error for rule elements.
@@ -837,7 +837,7 @@ pub async fn authenticate_for_route_table<I: Ip + FidlRuleAdminIpExt>(
     rule_set: &<I::RuleSetMarker as ProtocolMarker>::Proxy,
     table_id: u32,
     token: fidl::Event,
-) -> Result<Result<(), fnet_routes_admin::RuleSetError>, fidl::Error> {
+) -> Result<Result<(), fnet_routes_admin::AuthenticateForRouteTableError>, fidl::Error> {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     struct AuthenticateForRouteTableInput<'a, I: FidlRuleAdminIpExt> {

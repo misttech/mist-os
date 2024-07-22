@@ -21,6 +21,19 @@ type AuthenticateForInterfaceError = flexible enum {
     INVALID_AUTHENTICATION = 1;
 };
 
+/// Error type returned when failing to authenticate a route table for a
+/// rules set.
+type AuthenticateForRouteTableError = flexible enum {
+    /// The provided authentication proof is invalid.
+    /// This may happen if:
+    ///   - the provided proof's `table_id' is unknown to the system,
+    ///   - the provided proof's `token` is unknown to the system, or
+    ///   - the provided proof`s `token` is not associated with the
+    ///     `table_id` (e.g., the `token` authenticates a different
+    ///     route table).
+    INVALID_AUTHENTICATION = 1;
+};
+
 /// Error type returned when failing to manipulate a route set.
 type RouteSetError = flexible enum {
     /// The route set attempted to add/remove a route that uses an
@@ -101,7 +114,7 @@ closed protocol BaseRuleSet {
         // TODO(https://fxbug.dev/42079239): We want to restrict the rights to None, but currently
         // there are issues in FIDL or zither preventing us from naming the constant.
         token zx.Handle:<EVENT, 0>;
-    }) -> () error RuleSetError;
+    }) -> () error AuthenticateForRouteTableError;
 
     /// Removes a rule from this rule set.
     ///
@@ -122,18 +135,16 @@ closed protocol BaseRuleSet {
 
 /// Possible errors for operating the rule set.
 type RuleSetError = flexible enum : uint32 {
-    /// Cannot perform the authentication for a route table.
-    BAD_AUTHENTICATION = 1;
     /// Tried to install a rule referencing a route table that was not authorized
     /// through `AuthenticateForRouteTable`.
-    UNAUTHENTICATED = 2;
+    UNAUTHENTICATED = 1;
     /// The action is invalid, for example, the action contains an invalid route
     /// table.
-    INVALID_ACTION = 3;
+    INVALID_ACTION = 2;
     /// Tried to install a rule at an index that already has an existing rule.
-    RULE_ALREADY_EXISTS = 4;
+    RULE_ALREADY_EXISTS = 3;
     /// Tried to remove a rule at an index that does not have an existing rule.
-    RULE_DOES_NOT_EXIST = 5;
+    RULE_DOES_NOT_EXIST = 4;
     /// The selector is misconfigured because the base part is missing.
-    BASE_SELECTOR_MISSING = 6;
+    BASE_SELECTOR_MISSING = 5;
 };

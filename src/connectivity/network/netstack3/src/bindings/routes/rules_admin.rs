@@ -80,10 +80,6 @@ pub(super) enum RuleOp<I: Ip> {
     RemoveSet {
         priority: RuleSetPriority,
     },
-    AuthenticateForRouteTable {
-        table_id: routes::TableId<I>,
-        token: zx::Event,
-    },
 }
 
 pub(super) struct NewRuleSet<I: Ip> {
@@ -92,9 +88,16 @@ pub(super) struct NewRuleSet<I: Ip> {
     pub(super) responder: oneshot::Sender<Result<(), SetPriorityConflict>>,
 }
 
-pub(super) struct RuleWorkItem<I: Ip> {
-    pub(super) op: RuleOp<I>,
-    pub(super) responder: oneshot::Sender<Result<(), fnet_routes_admin::RuleSetError>>,
+pub(super) enum RuleWorkItem<I: Ip> {
+    RuleOp {
+        op: RuleOp<I>,
+        responder: oneshot::Sender<Result<(), fnet_routes_admin::RuleSetError>>,
+    },
+    AuthenticateForRouteTable {
+        table_id: routes::TableId<I>,
+        token: zx::Event,
+        responder: oneshot::Sender<Result<(), fnet_routes_admin::AuthenticateForRouteTableError>>,
+    },
 }
 
 #[derive(Debug)]
@@ -196,29 +199,27 @@ struct UserRuleSet<I: Ip> {
 }
 
 #[derive(Debug)]
-enum ApplyRuleOpError {
+enum ApplyRuleWorkError<E> {
     RuleSetClosed,
-    RuleSetError(fnet_routes_admin::RuleSetError),
+    RuleWorkError(E),
 }
 
-impl From<fnet_routes_admin::RuleSetError> for ApplyRuleOpError {
-    fn from(err: fnet_routes_admin::RuleSetError) -> Self {
-        Self::RuleSetError(err)
+impl<E> From<E> for ApplyRuleWorkError<E> {
+    fn from(err: E) -> Self {
+        Self::RuleWorkError(err)
     }
 }
 
-impl ApplyRuleOpError {
-    fn respond_result_with<
-        R: Responder<ControlHandle: Clone, Payload = Result<(), fnet_routes_admin::RuleSetError>>,
-    >(
+impl<E> ApplyRuleWorkError<E> {
+    fn respond_result_with<R: Responder<ControlHandle: Clone, Payload = Result<(), E>>>(
         result: Result<(), Self>,
         responder: R,
     ) -> Result<ControlFlow<R::ControlHandle>, fidl::Error> {
         match result {
-            Err(ApplyRuleOpError::RuleSetClosed) => {
+            Err(ApplyRuleWorkError::RuleSetClosed) => {
                 Ok(ControlFlow::Break(responder.control_handle().clone()))
             }
-            Err(ApplyRuleOpError::RuleSetError(err)) => {
+            Err(ApplyRuleWorkError::RuleWorkError(err)) => {
                 responder.send(Err(err)).map(ControlFlow::Continue)
             }
             Ok(()) => responder.send(Ok(())).map(ControlFlow::Continue),
@@ -233,7 +234,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
         index: RuleIndex,
         selector: RuleSelector<I>,
         action: RuleAction,
-    ) -> Result<(), ApplyRuleOpError> {
+    ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
         let selector = AddableSelector::from(selector);
         if let RuleAction::Lookup(table_id) = action {
             let table_id = routes::TableId::new(table_id)
@@ -249,10 +250,17 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
         &mut self,
         table: u32,
         token: zx::Event,
-    ) -> Result<(), ApplyRuleOpError> {
+    ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::AuthenticateForRouteTableError>> {
         let table_id = routes::TableId::new(table)
-            .ok_or(fnet_routes_admin::RuleSetError::BadAuthentication)?;
-        self.apply_rule_op(RuleOp::AuthenticateForRouteTable { table_id, token }).await?;
+            .ok_or(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication)?;
+        let (responder, receiver) = oneshot::channel();
+        self.rule_work_sink
+            .unbounded_send(RuleWorkItem::AuthenticateForRouteTable { table_id, token, responder })
+            .map_err(|mpsc::TrySendError { .. }| ApplyRuleWorkError::RuleSetClosed)?;
+        receiver
+            .await
+            .expect("responder should not be dropped")
+            .map_err(ApplyRuleWorkError::RuleWorkError)?;
         let _: bool = self.route_table_authorization_set.insert(table_id);
         Ok(())
     }
@@ -273,31 +281,34 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                     }
                 };
                 let result = self.add_fidl_rule(self.priority, index, selector, action).await;
-                ApplyRuleOpError::respond_result_with(result, responder)
+                ApplyRuleWorkError::respond_result_with(result, responder)
             }
             RuleSetRequest::RemoveRule { index, responder } => {
                 let priority = self.priority;
 
                 let result = self.apply_rule_op(RuleOp::Remove { priority, index }).await;
-                ApplyRuleOpError::respond_result_with(result, responder)
+                ApplyRuleWorkError::respond_result_with(result, responder)
             }
             RuleSetRequest::AuthenticateForRouteTable { table, token, responder } => {
                 let result = self.authenticate_for_route_table(table, token).await;
-                ApplyRuleOpError::respond_result_with(result, responder)
+                ApplyRuleWorkError::respond_result_with(result, responder)
             }
             RuleSetRequest::Close { control_handle } => Ok(ControlFlow::Break(control_handle)),
         }
     }
 
-    async fn apply_rule_op(&self, op: RuleOp<I>) -> Result<(), ApplyRuleOpError> {
+    async fn apply_rule_op(
+        &self,
+        op: RuleOp<I>,
+    ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
         let (responder, receiver) = oneshot::channel();
         self.rule_work_sink
-            .unbounded_send(RuleWorkItem { op, responder })
-            .map_err(|mpsc::TrySendError { .. }| ApplyRuleOpError::RuleSetClosed)?;
+            .unbounded_send(RuleWorkItem::RuleOp { op, responder })
+            .map_err(|mpsc::TrySendError { .. }| ApplyRuleWorkError::RuleSetClosed)?;
         receiver
             .await
             .expect("responder should not be dropped")
-            .map_err(ApplyRuleOpError::RuleSetError)
+            .map_err(ApplyRuleWorkError::RuleWorkError)
     }
 }
 
@@ -339,7 +350,7 @@ async fn serve_rule_set<I: FidlRuleAdminIpExt>(
     match set.apply_rule_op(RuleOp::RemoveSet { priority: set.priority }).await {
         Ok(()) => {}
         Err(err) => {
-            assert_matches!(err, ApplyRuleOpError::RuleSetClosed);
+            assert_matches!(err, ApplyRuleWorkError::RuleSetClosed);
             log::warn!(
                 "rule set was already removed when finish serving {}",
                 I::RuleSetMarker::DEBUG_NAME
