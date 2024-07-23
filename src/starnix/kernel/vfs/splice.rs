@@ -8,7 +8,7 @@ use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use crate::vfs::pipe::{Pipe, PipeFileObject, PipeOperands};
 use crate::vfs::{FdNumber, FileHandle};
 use starnix_logging::track_stub;
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
@@ -208,6 +208,7 @@ pub fn splice(
         // If both ends are pipes, use the symmetric `Pipe::splice` function.
         (Some(_), Some(_)) => {
             let PipeOperands { mut read, mut write } = PipeFileObject::lock_pipes(
+                locked,
                 current_task,
                 &operand_in.file,
                 &operand_out.file,
@@ -248,7 +249,7 @@ pub fn splice(
 }
 
 pub fn vmsplice(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: UserAddress,
@@ -274,11 +275,11 @@ pub fn vmsplice(
 
     if should_write {
         bytes_transferred +=
-            pipe.vmsplice_from(current_task, &file, iovec.clone(), non_blocking)?;
+            pipe.vmsplice_from(locked, current_task, &file, iovec.clone(), non_blocking)?;
     }
 
     if should_read {
-        bytes_transferred += pipe.vmsplice_to(current_task, &file, iovec, non_blocking)?;
+        bytes_transferred += pipe.vmsplice_to(locked, current_task, &file, iovec, non_blocking)?;
     }
 
     Ok(bytes_transferred)
@@ -339,13 +340,17 @@ pub fn copy_file_range(
     copy_data(locked, current_task, operand_in, operand_out, length)
 }
 
-pub fn tee(
+pub fn tee<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     fd_out: FdNumber,
     len: usize,
     flags: u32,
-) -> Result<usize, Errno> {
+) -> Result<usize, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
@@ -360,6 +365,6 @@ pub fn tee(
 
     // tee requires that both files are pipes.
     let PipeOperands { mut read, mut write } =
-        PipeFileObject::lock_pipes(current_task, &file_in, &file_out, len, non_blocking)?;
+        PipeFileObject::lock_pipes(locked, current_task, &file_in, &file_out, len, non_blocking)?;
     Pipe::tee(&mut read, &mut write, len)
 }

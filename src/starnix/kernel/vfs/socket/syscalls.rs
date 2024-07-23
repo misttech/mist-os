@@ -232,7 +232,7 @@ pub fn sys_accept(
 }
 
 pub fn sys_accept4(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -242,7 +242,7 @@ pub fn sys_accept4(
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let accepted_socket =
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             socket.accept()
         })?;
 
@@ -264,7 +264,7 @@ pub fn sys_accept4(
 }
 
 pub fn sys_connect(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -307,12 +307,13 @@ pub fn sys_connect(
         Err(errno) if errno.code == EINPROGRESS => {
             let waiter = Waiter::new();
             client_socket.wait_async(
+                locked,
                 current_task,
                 &waiter,
                 FdEvents::POLLOUT,
                 WaitCallback::none(),
             );
-            if !client_socket.query_events(current_task)?.contains(FdEvents::POLLOUT) {
+            if !client_socket.query_events(locked, current_task)?.contains(FdEvents::POLLOUT) {
                 waiter.wait(current_task)?;
             }
             client_socket.connect(current_task, peer)

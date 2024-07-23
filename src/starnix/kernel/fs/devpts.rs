@@ -376,9 +376,13 @@ impl FileOps for DevPtmxFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.main_read(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.main_read(locked, current_task, data),
+        )
     }
 
     fn write(
@@ -390,13 +394,18 @@ impl FileOps for DevPtmxFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.main_write(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.main_write(locked, current_task, data),
+        )
     }
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -408,6 +417,7 @@ impl FileOps for DevPtmxFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -475,9 +485,13 @@ impl FileOps for DevPtsFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_read(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.replica_read(locked, current_task, data),
+        )
     }
 
     fn write(
@@ -489,13 +503,18 @@ impl FileOps for DevPtsFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_write(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.replica_write(locked, current_task, data),
+        )
     }
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -507,6 +526,7 @@ impl FileOps for DevPtsFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1446,8 +1466,8 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let pts = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
 
-        let has_data_ready_to_read = |fd: &FileHandle| {
-            fd.query_events(&task).expect("query_events").contains(FdEvents::POLLIN)
+        let has_data_ready_to_read = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle| {
+            fd.query_events(locked, &task).expect("query_events").contains(FdEvents::POLLIN)
         };
 
         let write_and_assert = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
@@ -1458,7 +1478,7 @@ mod tests {
         };
 
         let read_and_check = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
-            assert!(has_data_ready_to_read(fd));
+            assert!(has_data_ready_to_read(locked, fd));
             let mut buffer = VecOutputBuffer::new(data.len() + 1);
             assert_eq!(fd.read(locked, &task, &mut buffer).expect("read"), data.len());
             assert_eq!(data, buffer.data());
@@ -1479,6 +1499,6 @@ mod tests {
         read_and_check(&mut locked, &ptmx, hello_transformed_buffer);
 
         // Data has not been echoed
-        assert!(!has_data_ready_to_read(&pts));
+        assert!(!has_data_ready_to_read(&mut locked, &pts));
     }
 }

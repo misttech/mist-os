@@ -209,7 +209,7 @@ impl FileOps for InotifyFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -217,7 +217,7 @@ impl FileOps for InotifyFileObject {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
 
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             let mut state = self.state.lock();
             if let Some(front) = state.events.front() {
                 if data.available() < front.size() {
@@ -261,6 +261,7 @@ impl FileOps for InotifyFileObject {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -272,6 +273,7 @@ impl FileOps for InotifyFileObject {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

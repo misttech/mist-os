@@ -9,7 +9,7 @@ use crate::vfs::socket::{
     SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType, DEFAULT_LISTEN_BACKLOG,
 };
 use crate::vfs::FileHandle;
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
@@ -180,6 +180,7 @@ impl SocketOps for VsockSocket {
 
     fn wait_async(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -189,7 +190,7 @@ impl SocketOps for VsockSocket {
         let inner = self.lock();
         match &inner.state {
             VsockSocketState::Connected(file) => file
-                .wait_async(current_task, waiter, events, handler)
+                .wait_async(locked, current_task, waiter, events, handler)
                 .expect("vsock socket should be connected to a file that can be waited on"),
             _ => inner.waiters.wait_async_fd_events(waiter, events, handler),
         }
@@ -197,10 +198,11 @@ impl SocketOps for VsockSocket {
 
     fn query_events(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        self.lock().query_events(current_task)
+        self.lock().query_events(locked, current_task)
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
@@ -278,10 +280,17 @@ impl VsockSocket {
 }
 
 impl VsockSocketInner {
-    fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
+    fn query_events<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         Ok(match &self.state {
             VsockSocketState::Disconnected => FdEvents::empty(),
-            VsockSocketState::Connected(file) => file.query_events(current_task)?,
+            VsockSocketState::Connected(file) => file.query_events(locked, current_task)?,
             VsockSocketState::Listening(queue) => {
                 if !queue.sockets.is_empty() {
                     FdEvents::POLLIN
@@ -422,25 +431,27 @@ mod tests {
         let socket = Socket::new_file(&current_task, socket_object, OpenFlags::RDWR);
 
         assert_eq!(
-            socket.query_events(&current_task),
+            socket.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
         let event = EpollEvent::new(FdEvents::POLLIN, 0);
-        epoll_file.add(&current_task, &socket, &epoll_object, event).expect("poll_file.add");
+        epoll_file
+            .add(&mut locked, &current_task, &socket, &epoll_object, event)
+            .expect("poll_file.add");
 
-        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
 
         assert_eq!(
-            socket.query_events(&current_task),
+            socket.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
-        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(
@@ -449,10 +460,10 @@ mod tests {
         );
 
         assert_eq!(
-            socket.query_events(&current_task),
+            socket.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
-        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
     }
 }

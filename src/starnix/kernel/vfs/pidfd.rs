@@ -10,6 +10,7 @@ use crate::vfs::{
     FileObject, FileOps,
 };
 use fuchsia_zircon::{self as zx, AsHandleRef};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::pid_t;
@@ -73,6 +74,7 @@ impl FileOps for PidFdFileObject {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -95,6 +97,7 @@ impl FileOps for PidFdFileObject {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

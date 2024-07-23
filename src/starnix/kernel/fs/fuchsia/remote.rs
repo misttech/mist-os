@@ -1559,34 +1559,35 @@ impl FileOps for RemotePipeObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             zxio_read(&self.zxio, data)
         })
     }
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, |_| {
             zxio_write(&self.zxio, current_task, data)
         })
     }
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -1598,6 +1599,7 @@ impl FileOps for RemotePipeObject {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1775,23 +1777,28 @@ mod test {
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
 
-        assert_eq!(pipe.query_events(&current_task), Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM));
+        assert_eq!(
+            pipe.query_events(&mut locked, &current_task),
+            Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
+        );
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
         let event = EpollEvent::new(FdEvents::POLLIN, 0);
-        epoll_file.add(&current_task, &pipe, &epoll_object, event).expect("poll_file.add");
+        epoll_file
+            .add(&mut locked, &current_task, &pipe, &epoll_object, event)
+            .expect("poll_file.add");
 
-        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
 
         assert_eq!(
-            pipe.query_events(&current_task),
+            pipe.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
-        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(
@@ -1799,8 +1806,11 @@ mod test {
             1
         );
 
-        assert_eq!(pipe.query_events(&current_task), Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM));
-        let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");
+        assert_eq!(
+            pipe.query_events(&mut locked, &current_task),
+            Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
+        );
+        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
         assert!(fds.is_empty());
     }
 

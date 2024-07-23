@@ -314,6 +314,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// If your file does not support blocking waits, leave this as the default implementation.
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -332,6 +333,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// See https://linux.die.net/man/2/poll
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -494,21 +496,23 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn wait_async(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        self.deref().wait_async(file, current_task, waiter, events, handler)
+        self.deref().wait_async(locked, file, current_task, waiter, events, handler)
     }
 
     fn query_events(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        self.deref().query_events(file, current_task)
+        self.deref().query_events(locked, file, current_task)
     }
 
     fn ioctl(
@@ -985,14 +989,6 @@ impl FileOps for ProxyFileOps {
             offset: off_t,
             target: SeekTarget,
         ) -> Result<off_t, Errno>;
-        fn wait_async(
-            &self,
-            _file: &FileObject,
-            _current_task: &CurrentTask,
-            _waiter: &Waiter,
-            _events: FdEvents,
-            _handler: EventHandler,
-        ) -> Option<WaitCanceler>;
         fn fcntl(
             &self,
             file: &FileObject,
@@ -1003,13 +999,6 @@ impl FileOps for ProxyFileOps {
         fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno>;
     }
     // These don't take &FileObject making it too hard to handle them properly in the macro
-    fn query_events(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-    ) -> Result<FdEvents, Errno> {
-        self.0.ops().query_events(file, current_task)
-    }
     fn has_persistent_offsets(&self) -> bool {
         self.0.ops().has_persistent_offsets()
     }
@@ -1017,6 +1006,25 @@ impl FileOps for ProxyFileOps {
         self.0.ops().is_seekable()
     }
     // These take &mut Locked<'_, L> as a second argument
+    fn wait_async(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        self.0.ops().wait_async(locked, &self.0, current_task, waiter, events, handler)
+    }
+    fn query_events(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        self.0.ops().query_events(locked, &self.0, current_task)
+    }
     fn read(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
@@ -1260,18 +1268,20 @@ impl FileObject {
         self.flags().contains(OpenFlags::NONBLOCK)
     }
 
-    pub fn blocking_op<T, Op>(
+    pub fn blocking_op<L, T, Op>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         events: FdEvents,
         deadline: Option<zx::Time>,
         mut op: Op,
     ) -> Result<T, Errno>
     where
-        Op: FnMut() -> Result<T, Errno>,
+        L: LockEqualOrBefore<FileOpsCore>,
+        Op: FnMut(&mut Locked<'_, L>) -> Result<T, Errno>,
     {
         // Run the operation a first time without registering a waiter in case no wait is needed.
-        match op() {
+        match op(locked) {
             Err(errno) if errno == EAGAIN && !self.flags().contains(OpenFlags::NONBLOCK) => {}
             result => return result,
         }
@@ -1279,8 +1289,8 @@ impl FileObject {
         let waiter = Waiter::new();
         loop {
             // Register the waiter before running the operation to prevent a race.
-            self.wait_async(current_task, &waiter, events, WaitCallback::none());
-            match op() {
+            self.wait_async(locked, current_task, &waiter, events, WaitCallback::none());
+            match op(locked) {
                 Err(e) if e == EAGAIN => {}
                 result => return result,
             }
@@ -1718,20 +1728,40 @@ impl FileObject {
     }
 
     /// Wait on the specified events and call the EventHandler when ready
-    pub fn wait_async(
+    pub fn wait_async<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         mut handler: EventHandler,
-    ) -> Option<WaitCanceler> {
+    ) -> Option<WaitCanceler>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         handler.add_mapping(add_equivalent_fd_events);
-        self.ops().wait_async(self, current_task, waiter, events, handler)
+        self.ops().wait_async(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            waiter,
+            events,
+            handler,
+        )
     }
 
     /// The events currently active on this file.
-    pub fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
-        self.ops().query_events(self, current_task).map(add_equivalent_fd_events)
+    pub fn query_events<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops()
+            .query_events(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
+            .map(add_equivalent_fd_events)
     }
 
     pub fn record_lock(

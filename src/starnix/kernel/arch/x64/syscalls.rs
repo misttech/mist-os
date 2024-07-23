@@ -349,14 +349,14 @@ pub fn sys_pipe(
 }
 
 pub fn sys_poll(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     user_fds: UserRef<pollfd>,
     num_fds: i32,
     timeout: i32,
 ) -> Result<usize, Errno> {
     let deadline = zx::Time::after(duration_from_poll_timeout(timeout)?);
-    poll(current_task, user_fds, num_fds, None, deadline)
+    poll(locked, current_task, user_fds, num_fds, None, deadline)
 }
 
 pub fn sys_readlink(

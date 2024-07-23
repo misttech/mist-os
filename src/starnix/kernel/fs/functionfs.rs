@@ -421,6 +421,7 @@ impl FileOps for FunctionFsControlEndpoint {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

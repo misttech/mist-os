@@ -75,21 +75,23 @@ impl FileOps for SocketFile {
 
     fn wait_async(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.socket.wait_async(current_task, waiter, events, handler))
+        Some(self.socket.wait_async(locked, current_task, waiter, events, handler))
     }
 
     fn query_events(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        self.socket.query_events(current_task)
+        self.socket.query_events(locked, current_task)
     }
 
     fn ioctl(
@@ -138,7 +140,7 @@ impl SocketFile {
         debug_assert!(data.bytes_read() == 0);
 
         // TODO: Implement more `flags`.
-        let mut op = || {
+        let mut op = |locked: &mut Locked<'_, L>| {
             let offset_before = data.bytes_read();
             let sent_bytes = self.socket.write(
                 locked,
@@ -155,10 +157,16 @@ impl SocketFile {
         };
 
         let result = if flags.contains(SocketMessageFlags::DONTWAIT) {
-            op()
+            op(locked)
         } else {
             let deadline = self.socket.send_timeout().map(zx::Time::after);
-            file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, deadline, op)
+            file.blocking_op(
+                locked,
+                current_task,
+                FdEvents::POLLOUT | FdEvents::POLLHUP,
+                deadline,
+                op,
+            )
         };
 
         let bytes_written = data.bytes_read();
@@ -193,14 +201,14 @@ impl SocketFile {
         // TODO: Implement more `flags`.
         let mut read_info = MessageReadInfo::default();
 
-        let mut op = || {
+        let mut op = |locked: &mut Locked<'_, L>| {
             let mut info = self.socket.read(locked, current_task, data, flags)?;
             read_info.append(&mut info);
             read_info.address = info.address;
 
             let should_wait_all = self.socket.socket_type == SocketType::Stream
                 && flags.contains(SocketMessageFlags::WAITALL)
-                && !self.socket.query_events(current_task)?.contains(FdEvents::POLLHUP);
+                && !self.socket.query_events(locked, current_task)?.contains(FdEvents::POLLHUP);
             if should_wait_all && data.available() > 0 {
                 return error!(EAGAIN);
             }
@@ -210,10 +218,16 @@ impl SocketFile {
         let dont_wait =
             flags.intersects(SocketMessageFlags::DONTWAIT | SocketMessageFlags::ERRQUEUE);
         let result = if dont_wait {
-            op()
+            op(locked)
         } else {
             let deadline = deadline.or_else(|| self.socket.receive_timeout().map(zx::Time::after));
-            file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, deadline, op)
+            file.blocking_op(
+                locked,
+                current_task,
+                FdEvents::POLLIN | FdEvents::POLLHUP,
+                deadline,
+                op,
+            )
         };
 
         if read_info.bytes_read == 0 {

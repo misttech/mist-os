@@ -136,6 +136,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Returns a WaitCanceler that can be used to cancel the wait.
     fn wait_async(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -144,7 +145,12 @@ pub trait SocketOps: Send + Sync + AsAny {
     ) -> WaitCanceler;
 
     /// Return the events that are currently active on the `socket`.
-    fn query_events(&self, socket: &Socket, current_task: &CurrentTask) -> Result<FdEvents, Errno>;
+    fn query_events(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno>;
 
     /// Shuts down this socket according to how, preventing any future reads and/or writes.
     ///
@@ -748,18 +754,36 @@ impl Socket {
         self.ops.write(&mut locked, self, current_task, data, dest_address, ancillary_data)
     }
 
-    pub fn wait_async(
+    pub fn wait_async<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitCanceler {
-        self.ops.wait_async(self, current_task, waiter, events, handler)
+    ) -> WaitCanceler
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops.wait_async(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            waiter,
+            events,
+            handler,
+        )
     }
 
-    pub fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
-        self.ops.query_events(self, current_task)
+    pub fn query_events<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops.query_events(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     pub fn shutdown(&self, how: SocketShutdownFlags) -> Result<(), Errno> {

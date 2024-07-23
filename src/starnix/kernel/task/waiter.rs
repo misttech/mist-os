@@ -1091,7 +1091,8 @@ mod tests {
             mappings: Default::default(),
         });
         let waiter = Waiter::new();
-        pipe.wait_async(&current_task, &waiter, FdEvents::POLLIN, handler).expect("wait_async");
+        pipe.wait_async(&mut locked, &current_task, &waiter, FdEvents::POLLIN, handler)
+            .expect("wait_async");
         let test_string_clone = test_string.clone();
 
         let write_count = AtomicUsizeCounter::default();
@@ -1133,7 +1134,7 @@ mod tests {
                 mappings: Default::default(),
             });
             let wait_canceler = event
-                .wait_async(&current_task, &waiter, FdEvents::POLLIN, handler)
+                .wait_async(&mut locked, &current_task, &waiter, FdEvents::POLLIN, handler)
                 .expect("wait_async");
             if do_cancel {
                 wait_canceler.cancel();

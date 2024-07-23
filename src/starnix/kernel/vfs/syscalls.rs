@@ -27,7 +27,8 @@ use fuchsia_zircon as zx;
 use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked,
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex,
+    Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
@@ -1963,7 +1964,8 @@ pub fn sys_timerfd_settime(
     Ok(())
 }
 
-fn select(
+fn select<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
@@ -1971,7 +1973,10 @@ fn select(
     exceptfds_addr: UserRef<__kernel_fd_set>,
     deadline: zx::Time,
     sigmask_addr: UserRef<pselect6_sigmask>,
-) -> Result<i32, Errno> {
+) -> Result<i32, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     const BITS_PER_BYTE: usize = 8;
 
     fn sizeof<T>(_: &T) -> usize {
@@ -2022,6 +2027,7 @@ fn select(
             let fd = FdNumber::from_raw(fd as i32);
             let file = current_task.files.get(fd)?;
             waiter.add(
+                locked,
                 current_task,
                 fd,
                 Some(&file),
@@ -2088,7 +2094,7 @@ fn select(
 }
 
 pub fn sys_pselect6(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
@@ -2107,6 +2113,7 @@ pub fn sys_pselect6(
     };
 
     let num_fds = select(
+        locked,
         current_task,
         nfds,
         readfds_addr,
@@ -2129,7 +2136,7 @@ pub fn sys_pselect6(
 
 #[cfg(target_arch = "x86_64")]
 pub fn sys_select(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
@@ -2147,6 +2154,7 @@ pub fn sys_select(
     };
 
     let num_fds = select(
+        locked,
         current_task,
         nfds,
         readfds_addr,
@@ -2183,7 +2191,7 @@ pub fn sys_epoll_create1(
 }
 
 pub fn sys_epoll_ctl(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     epfd: FdNumber,
     op: u32,
@@ -2215,11 +2223,11 @@ pub fn sys_epoll_ctl(
     let ctl_file = current_task.files.get(fd)?;
     match op {
         EPOLL_CTL_ADD => {
-            epoll_file.add(current_task, &ctl_file, &file, epoll_event?)?;
+            epoll_file.add(locked, current_task, &ctl_file, &file, epoll_event?)?;
             ctl_file.register_epfd(epfd);
         }
         EPOLL_CTL_MOD => {
-            epoll_file.modify(current_task, &ctl_file, epoll_event?)?;
+            epoll_file.modify(locked, current_task, &ctl_file, epoll_event?)?;
         }
         EPOLL_CTL_DEL => {
             epoll_file.delete(&ctl_file)?;
@@ -2231,14 +2239,18 @@ pub fn sys_epoll_ctl(
 }
 
 // Backend for sys_epoll_pwait and sys_epoll_pwait2 that takes an already-decoded deadline.
-fn do_epoll_pwait(
+fn do_epoll_pwait<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     unvalidated_max_events: i32,
     deadline: zx::Time,
     user_sigmask: UserRef<SigSet>,
-) -> Result<usize, Errno> {
+) -> Result<usize, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
@@ -2258,10 +2270,10 @@ fn do_epoll_pwait(
     let active_events = if !user_sigmask.is_null() {
         let signal_mask = current_task.read_object(user_sigmask)?;
         current_task.wait_with_temporary_mask(signal_mask, |current_task| {
-            epoll_file.wait(current_task, max_events, deadline)
+            epoll_file.wait(locked, current_task, max_events, deadline)
         })?
     } else {
-        epoll_file.wait(current_task, max_events, deadline)?
+        epoll_file.wait(locked, current_task, max_events, deadline)?
     };
 
     current_task.write_objects(events, &active_events)?;
@@ -2269,7 +2281,7 @@ fn do_epoll_pwait(
 }
 
 pub fn sys_epoll_pwait(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
@@ -2278,11 +2290,11 @@ pub fn sys_epoll_pwait(
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let deadline = zx::Time::after(duration_from_poll_timeout(timeout)?);
-    do_epoll_pwait(current_task, epfd, events, max_events, deadline, user_sigmask)
+    do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
 pub fn sys_epoll_pwait2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
@@ -2296,7 +2308,7 @@ pub fn sys_epoll_pwait2(
         let ts = current_task.read_object(user_timespec)?;
         zx::Time::after(duration_from_timespec(ts)?)
     };
-    do_epoll_pwait(current_task, epfd, events, max_events, deadline, user_sigmask)
+    do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
 struct FileWaiter<Key: Into<ReadyItemKey>> {
@@ -2312,13 +2324,17 @@ impl<Key: Into<ReadyItemKey>> Default for FileWaiter<Key> {
 }
 
 impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
-    fn add(
+    fn add<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         key: Key,
         file: Option<&FileHandle>,
         requested_events: FdEvents,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let key = key.into();
 
         if let Some(file) = file {
@@ -2330,8 +2346,8 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
                 sought_events,
                 mappings: Default::default(),
             });
-            file.wait_async(current_task, &self.waiter, sought_events, handler);
-            let current_events = file.query_events(current_task)? & sought_events;
+            file.wait_async(locked, current_task, &self.waiter, sought_events, handler);
+            let current_events = file.query_events(locked, current_task)? & sought_events;
             if !current_events.is_empty() {
                 self.ready_items.lock().push_back(ReadyItem { key, events: current_events });
             }
@@ -2372,13 +2388,17 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
     }
 }
 
-pub fn poll(
+pub fn poll<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &mut CurrentTask,
     user_pollfds: UserRef<pollfd>,
     num_fds: i32,
     mask: Option<SigSet>,
     deadline: zx::Time,
-) -> Result<usize, Errno> {
+) -> Result<usize, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     if num_fds < 0 || num_fds as u64 > current_task.thread_group.get_rlimit(Resource::NOFILE) {
         return error!(EINVAL);
     }
@@ -2394,6 +2414,7 @@ pub fn poll(
         }
         let file = current_task.files.get(FdNumber::from_raw(poll_descriptor.fd)).ok();
         waiter.add(
+            locked,
             current_task,
             index,
             file.as_ref(),
@@ -2428,7 +2449,7 @@ pub fn poll(
 }
 
 pub fn sys_ppoll(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     user_fds: UserRef<pollfd>,
     num_fds: i32,
@@ -2458,7 +2479,7 @@ pub fn sys_ppoll(
         None
     };
 
-    let poll_result = poll(current_task, user_fds, num_fds, mask, deadline);
+    let poll_result = poll(locked, current_task, user_fds, num_fds, mask, deadline);
 
     if user_timespec.is_null() {
         return poll_result;
@@ -2776,14 +2797,14 @@ pub fn sys_copy_file_range(
 }
 
 pub fn sys_tee(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     fd_out: FdNumber,
     len: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
-    splice::tee(current_task, fd_in, fd_out, len, flags)
+    splice::tee(locked, current_task, fd_in, fd_out, len, flags)
 }
 
 pub fn sys_readahead(

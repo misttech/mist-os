@@ -92,8 +92,16 @@ impl FrameReader {
             }
 
             let waiter = Waiter::new();
-            self.file.wait_async(current_task, &waiter, FdEvents::POLLIN, EventHandler::None);
-            while self.file.query_events(current_task)? & FdEvents::POLLIN != FdEvents::POLLIN {
+            self.file.wait_async(
+                locked,
+                current_task,
+                &waiter,
+                FdEvents::POLLIN,
+                EventHandler::None,
+            );
+            while self.file.query_events(locked, current_task)? & FdEvents::POLLIN
+                != FdEvents::POLLIN
+            {
                 waiter.wait(current_task)?;
             }
             self.file.read(locked, current_task, &mut self.read_buffer)?;

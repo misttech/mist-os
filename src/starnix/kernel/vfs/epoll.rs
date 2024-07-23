@@ -15,7 +15,7 @@ use crate::vfs::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_logging::log_warn;
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::errors::{Errno, EBADF, EINTR, ETIMEDOUT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::{EpollEvent, FdEvents};
@@ -121,23 +121,27 @@ impl EpollFileObject {
         })
     }
 
-    fn wait_on_file(
+    fn wait_on_file<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         key: ReadyItemKey,
         wait_object: &mut WaitObject,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let target = wait_object.target()?;
 
         // First start the wait. If an event happens after this, we'll get it.
-        self.wait_on_file_edge_triggered(current_task, key, wait_object)?;
+        self.wait_on_file_edge_triggered(locked, current_task, key, wait_object)?;
 
         // Now check the events. If an event happened before this, we'll detect it here. There's
         // now no race window where an event would be missed.
         //
         // That said, if an event happens between the wait and the query_events, we'll get two
         // notifications. We handle this by deduping on the epoll_wait end.
-        let events = target.query_events(current_task)?;
+        let events = target.query_events(locked, current_task)?;
         if !(events & wait_object.events).is_empty() {
             self.waiter.wake_immediately(events, self.new_wait_handler(key));
             if let Some(wait_canceler) = wait_object.wait_canceler.take() {
@@ -149,13 +153,18 @@ impl EpollFileObject {
         Ok(())
     }
 
-    fn wait_on_file_edge_triggered(
+    fn wait_on_file_edge_triggered<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         key: ReadyItemKey,
         wait_object: &mut WaitObject,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         wait_object.wait_canceler = wait_object.target()?.wait_async(
+            locked,
             current_task,
             &self.waiter,
             wait_object.events,
@@ -190,13 +199,17 @@ impl EpollFileObject {
     }
 
     /// Asynchronously wait on certain events happening on a FileHandle.
-    pub fn add(
+    pub fn add<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         epoll_file_handle: &FileHandle,
         epoll_event: EpollEvent,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // Check if adding this file would cause a cycle at a max depth of 5.
         if let Some(epoll_to_add) = file.downcast_file::<EpollFileObject>() {
             // We need to check for `MAX_NESTED_DEPTH - 1` because adding `epoll_to_add` to self
@@ -216,18 +229,22 @@ impl EpollFileObject {
                     wait_canceler: None,
                     wake_lease: WakeLease::new("epoll"),
                 });
-                self.wait_on_file(current_task, key, wait_object)
+                self.wait_on_file(locked, current_task, key, wait_object)
             }
         }
     }
 
     /// Modify the events we are looking for on a Filehandle.
-    pub fn modify(
+    pub fn modify<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         epoll_event: EpollEvent,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let mut state = self.state.lock();
         let key = as_epoll_key(file).into();
         state.rearm_list.retain(|x| x.key != key);
@@ -246,7 +263,7 @@ impl EpollFileObject {
                 {
                     wait_object.wake_lease.take_lease();
                 }
-                self.wait_on_file(current_task, key, wait_object)
+                self.wait_on_file(locked, current_task, key, wait_object)
             }
             Entry::Vacant(_) => error!(ENOENT),
         }
@@ -275,12 +292,16 @@ impl EpollFileObject {
     /// If an event in the trigger list is stale, the event will be re-added to the waiter.
     ///
     /// Returns true if any events were added. False means there was nothing in the trigger list.
-    fn process_triggered_events(
+    fn process_triggered_events<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         pending_list: &mut Vec<ReadyItem>,
         max_events: usize,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let mut state = self.state.lock();
         // Move all the elements from `self.trigger_list` to this intermediary
         // queue that we handle events from. This reduces the time spent holding
@@ -296,7 +317,7 @@ impl EpollFileObject {
                     if let Some(target) = wait.target.upgrade() {
                         let ready = ReadyItem {
                             key: pending.key,
-                            events: target.query_events(current_task)?,
+                            events: target.query_events(locked, current_task)?,
                         };
                         if ready.events.intersects(wait.events) {
                             pending_list.push(ready);
@@ -304,7 +325,7 @@ impl EpollFileObject {
                             // Another thread already handled this event, wait for another one.
                             // Files can be legitimately closed out from under us so bad file
                             // descriptors are not an error.
-                            match self.wait_on_file(current_task, pending.key, wait) {
+                            match self.wait_on_file(locked, current_task, pending.key, wait) {
                                 Err(err) if err == EBADF => {} // File closed.
                                 Err(err) => return Err(err),
                                 _ => {}
@@ -319,16 +340,20 @@ impl EpollFileObject {
 
     /// Waits until an event exists in `pending_list` or until `timeout` has
     /// been reached.
-    fn wait_until_pending_event(
+    fn wait_until_pending_event<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         max_events: usize,
         mut wait_deadline: zx::Time,
-    ) -> Result<Vec<ReadyItem>, Errno> {
+    ) -> Result<Vec<ReadyItem>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let mut pending_list = Vec::new();
 
         loop {
-            self.process_triggered_events(current_task, &mut pending_list, max_events)?;
+            self.process_triggered_events(locked, current_task, &mut pending_list, max_events)?;
 
             if pending_list.len() == max_events {
                 break; // No input events or output list full, nothing more we can do.
@@ -378,12 +403,16 @@ impl EpollFileObject {
     }
 
     /// Blocking wait on all waited upon events with a timeout.
-    pub fn wait(
+    pub fn wait<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         max_events: usize,
         deadline: zx::Time,
-    ) -> Result<Vec<EpollEvent>, Errno> {
+    ) -> Result<Vec<EpollEvent>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // First we start waiting again on wait objects that have
         // previously been triggered.
         {
@@ -394,11 +423,12 @@ impl EpollFileObject {
                 let w = state.wait_objects.get_mut(&to_wait.key).unwrap();
                 // Drop the wake lease
                 w.wake_lease.take_lease();
-                self.wait_on_file(current_task, to_wait.key, w)?;
+                self.wait_on_file(locked, current_task, to_wait.key, w)?;
             }
         }
 
-        let pending_list = self.wait_until_pending_event(current_task, max_events, deadline)?;
+        let pending_list =
+            self.wait_until_pending_event(locked, current_task, max_events, deadline)?;
 
         // Process the pending list and add processed ReadyItem
         // entries to the rearm_list for the next wait.
@@ -419,7 +449,12 @@ impl EpollFileObject {
                 if wait.events.contains(FdEvents::EPOLLET) {
                     // The file can be closed while registered for epoll which is not an error.
                     // We do not expect other errors from waiting.
-                    match self.wait_on_file_edge_triggered(current_task, pending_event.key, wait) {
+                    match self.wait_on_file_edge_triggered(
+                        locked,
+                        current_task,
+                        pending_event.key,
+                        wait,
+                    ) {
                         Err(err) if err == EBADF => {} // File closed, ignore.
                         Err(err) => log_warn!("Unexpected wait result {:#?}", err),
                         _ => {}
@@ -501,6 +536,7 @@ impl FileOps for EpollFileObject {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -512,6 +548,7 @@ impl FileOps for EpollFileObject {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -526,10 +563,10 @@ impl FileOps for EpollFileObject {
 
 #[cfg(test)]
 mod tests {
-    use super::{EpollFileObject, EventHandler, OpenFlags};
+    use super::*;
     use crate::fs::fuchsia::create_fuchsia_pipe;
     use crate::task::Waiter;
-    use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked, create_task};
+    use crate::testing::{create_kernel_task_and_unlocked, create_task};
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::vfs::eventfd::{new_eventfd, EventFdType};
     use crate::vfs::pipe::new_pipe;
@@ -538,6 +575,7 @@ mod tests {
         HandleBased, {self as zx},
     };
     use starnix_lifecycle::AtomicUsizeCounter;
+    use starnix_sync::Unlocked;
     use starnix_uapi::vfs::{EpollEvent, FdEvents};
     use syncio::Zxio;
 
@@ -558,6 +596,7 @@ mod tests {
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
         epoll_file
             .add(
+                &mut locked,
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
@@ -575,7 +614,7 @@ mod tests {
                 WRITE_COUNT.add(bytes_written);
             }
         });
-        let events = epoll_file.wait(&current_task, 10, zx::Time::INFINITE).unwrap();
+        let events = epoll_file.wait(&mut locked, &current_task, 10, zx::Time::INFINITE).unwrap();
         thread.await.expect("join");
         assert_eq!(1, events.len());
         let event = &events[0];
@@ -612,6 +651,7 @@ mod tests {
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
         epoll_file
             .add(
+                &mut locked,
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
@@ -619,7 +659,7 @@ mod tests {
             )
             .unwrap();
 
-        let events = epoll_file.wait(&current_task, 10, zx::Time::INFINITE).unwrap();
+        let events = epoll_file.wait(&mut locked, &current_task, 10, zx::Time::INFINITE).unwrap();
         assert_eq!(1, events.len());
         let event = &events[0];
         assert!(event.events().contains(FdEvents::POLLIN));
@@ -643,6 +683,7 @@ mod tests {
             const EVENT_DATA: u64 = 42;
             epoll_file
                 .add(
+                    &mut locked,
                     &current_task,
                     &event,
                     &epoll_file_handle,
@@ -655,7 +696,13 @@ mod tests {
             }
 
             let wait_canceler = event
-                .wait_async(&current_task, &waiter, FdEvents::POLLIN, EventHandler::None)
+                .wait_async(
+                    &mut locked,
+                    &current_task,
+                    &waiter,
+                    FdEvents::POLLIN,
+                    EventHandler::None,
+                )
                 .expect("wait_async");
             if do_cancel {
                 wait_canceler.cancel();
@@ -674,7 +721,7 @@ mod tests {
                 std::mem::size_of::<u64>()
             );
 
-            let events = epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap();
+            let events = epoll_file.wait(&mut locked, &current_task, 10, zx::Time::ZERO).unwrap();
 
             if do_cancel {
                 assert_eq!(0, events.len());
@@ -699,24 +746,36 @@ mod tests {
         let server1_zxio = Zxio::create(server1.into_handle()).expect("Zxio::create");
         let server2_zxio = Zxio::create(server2.into_handle()).expect("Zxio::create");
 
-        let poll = || {
+        let poll = |locked: &mut Locked<'_, Unlocked>| {
             let epoll_object = EpollFileObject::new_file(&current_task);
             let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
             epoll_file
-                .add(&current_task, &pipe1, &epoll_object, EpollEvent::new(FdEvents::POLLIN, 1))
+                .add(
+                    locked,
+                    &current_task,
+                    &pipe1,
+                    &epoll_object,
+                    EpollEvent::new(FdEvents::POLLIN, 1),
+                )
                 .expect("epoll_file.add");
             epoll_file
-                .add(&current_task, &pipe2, &epoll_object, EpollEvent::new(FdEvents::POLLIN, 2))
+                .add(
+                    locked,
+                    &current_task,
+                    &pipe2,
+                    &epoll_object,
+                    EpollEvent::new(FdEvents::POLLIN, 2),
+                )
                 .expect("epoll_file.add");
-            epoll_file.wait(&current_task, 2, zx::Time::ZERO).expect("wait")
+            epoll_file.wait(locked, &current_task, 2, zx::Time::ZERO).expect("wait")
         };
 
-        let fds = poll();
+        let fds = poll(&mut locked);
         assert!(fds.is_empty());
 
         assert_eq!(server1_zxio.write(&[0]).expect("write"), 1);
 
-        let fds = poll();
+        let fds = poll(&mut locked);
         assert_eq!(fds.len(), 1);
         assert_eq!(fds[0].events(), FdEvents::POLLIN);
         assert_eq!(fds[0].data(), 1);
@@ -725,12 +784,12 @@ mod tests {
             1
         );
 
-        let fds = poll();
+        let fds = poll(&mut locked);
         assert!(fds.is_empty());
 
         assert_eq!(server2_zxio.write(&[0]).expect("write"), 1);
 
-        let fds = poll();
+        let fds = poll(&mut locked);
         assert_eq!(fds.len(), 1);
         assert_eq!(fds[0].events(), FdEvents::POLLIN);
         assert_eq!(fds[0].data(), 2);
@@ -739,7 +798,7 @@ mod tests {
             1
         );
 
-        let fds = poll();
+        let fds = poll(&mut locked);
         assert!(fds.is_empty());
     }
 
@@ -754,6 +813,7 @@ mod tests {
         const EVENT_DATA: u64 = 42;
         epoll_file
             .add(
+                &mut locked,
                 &current_task,
                 &event,
                 &epoll_file_handle,
@@ -770,19 +830,25 @@ mod tests {
             std::mem::size_of::<u64>()
         );
 
-        assert_eq!(epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap().len(), 1);
+        assert_eq!(
+            epoll_file.wait(&mut locked, &current_task, 10, zx::Time::ZERO).unwrap().len(),
+            1
+        );
 
         // Remove the thing
         epoll_file.delete(&event).unwrap();
 
         // Wait for new notifications
-        assert_eq!(epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap().len(), 0);
+        assert_eq!(
+            epoll_file.wait(&mut locked, &current_task, 10, zx::Time::ZERO).unwrap().len(),
+            0
+        );
         // That shouldn't crash
     }
 
     #[::fuchsia::test]
     async fn test_add_then_modify() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (socket1, _socket2) = UnixSocket::new_pair(
             &current_task,
             SocketDomain::Unix,
@@ -797,19 +863,29 @@ mod tests {
         const EVENT_DATA: u64 = 42;
         epoll_file
             .add(
+                &mut locked,
                 &current_task,
                 &socket1,
                 &epoll_file_handle,
                 EpollEvent::new(FdEvents::POLLIN, EVENT_DATA),
             )
             .unwrap();
-        assert_eq!(epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap().len(), 0);
+        assert_eq!(
+            epoll_file.wait(&mut locked, &current_task, 10, zx::Time::ZERO).unwrap().len(),
+            0
+        );
 
         let read_write_event = FdEvents::POLLIN | FdEvents::POLLOUT;
         epoll_file
-            .modify(&current_task, &socket1, EpollEvent::new(read_write_event, EVENT_DATA))
+            .modify(
+                &mut locked,
+                &current_task,
+                &socket1,
+                EpollEvent::new(read_write_event, EVENT_DATA),
+            )
             .unwrap();
-        let triggered_events = epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap();
+        let triggered_events =
+            epoll_file.wait(&mut locked, &current_task, 10, zx::Time::ZERO).unwrap();
         assert_eq!(1, triggered_events.len());
         let event = &triggered_events[0];
         assert_eq!(event.events(), FdEvents::POLLOUT);
