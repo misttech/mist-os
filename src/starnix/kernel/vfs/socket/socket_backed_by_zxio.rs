@@ -23,7 +23,7 @@ use starnix_uapi::{
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use static_assertions::const_assert_eq;
 use std::sync::{Arc, OnceLock};
-use syncio::zxio::{SOL_SOCKET, SO_DOMAIN, SO_PROTOCOL, SO_TYPE};
+use syncio::zxio::{IP_RECVERR, SOL_IP, SOL_SOCKET, SO_DOMAIN, SO_PROTOCOL, SO_TYPE};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode};
 use {
     fidl_fuchsia_posix_socket as fposix_socket,
@@ -401,6 +401,11 @@ impl SocketOps for ZxioBackedSocket {
 
         if level == SOL_SOCKET && optname == SO_ATTACH_FILTER {
             track_stub!(TODO("https://fxbug.dev/42079971"), "SOL_SOCKET.SO_ATTACH_FILTER");
+            return Ok(());
+        }
+
+        if level == SOL_IP && optname == IP_RECVERR {
+            track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
             return Ok(());
         }
 

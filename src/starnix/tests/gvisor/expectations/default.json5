@@ -769,7 +769,10 @@
                 // socket_ip_udp_loopback_test
                 "AllUDPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AllUDPSockets/NonStreamSocketPairTest.RecvmsgMsghdrFlagMsgTrunc/*",
-                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/*",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/0",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/2",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/3",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/5",
 
                 // socket_netdevice_test
                 "NetdeviceTest.InterfaceName",
