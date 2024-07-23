@@ -262,7 +262,7 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
         let mut writer = VmoWriter::new(*this.max_packet_size);
-        writer.write_all(&[b'['])?;
+        writer.write_all(b"[")?;
 
         if let Some(item) = this.overflow.take() {
             let batch_writer = BufWriter::new(writer.clone());
@@ -315,7 +315,7 @@ where
             }
         }
 
-        writer.write_all(&[b']'])?;
+        writer.write_all(b"]")?;
         let writer_tail = writer.tail();
         if writer_tail > *this.max_packet_size {
             error!(
