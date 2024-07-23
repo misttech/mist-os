@@ -31,6 +31,17 @@ static constexpr bool
                                            std::is_floating_point_v<typename T::value_type>>> =
         true;
 
+// Workaround for libc++ not supporting qualified types for atomic ref.
+// BUG(https://fxbug.dev/352337748): Unblocks toolchain roll.
+// BUG(https://github.com/llvm/llvm-project/issues/98689): Upstream libc++ bug.
+#if defined(_LIBCPP_VERSION)
+template <typename T>
+using LibcxxBugWorkaround = std::remove_cv_t<T>;
+#else
+template <typename T>
+using LibcxxBugWorkaround = T;
+#endif
+
 // For signature name, the specialization type T, can be used.
 #define ATOMIC_REF_HAS_METHOD_TRAIT(trait_name, fn_name, sig)            \
                                                                          \
@@ -76,10 +87,11 @@ ATOMIC_REF_HAS_METHOD_TRAIT(specialization_has_fetch_xor, fetch_xor,
 
 template <typename T>
 void CheckIntegerSpecialization() {
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::value_type, T>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::difference_type, T>, "");
-  static_assert(cpp20::atomic_ref<T>::required_alignment == std::max(alignof(T), sizeof(T)), "");
-  static_assert(kHasDifferenceType<cpp20::atomic_ref<T>>, "");
+  using U = LibcxxBugWorkaround<T>;
+  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::value_type, U>, "");
+  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::difference_type, U>, "");
+  static_assert(cpp20::atomic_ref<U>::required_alignment == std::max(alignof(U), sizeof(U)), "");
+  static_assert(kHasDifferenceType<cpp20::atomic_ref<U>>, "");
 }
 
 template <typename T, typename U>
@@ -100,11 +112,13 @@ struct CheckAtomicOpsMutable {
 template <typename T>
 struct CheckAtomicOpsMutable<T, std::enable_if_t<!cpp17::is_const_v<T>>> {
   static void CheckStoreAndExchange() {
-    T zero = cast_helper<T>(0);
-    T one = cast_helper<T>(1);
+    using U = LibcxxBugWorkaround<T>;
 
-    T obj = zero;
-    cpp20::atomic_ref<T> ref(obj);
+    U zero = cast_helper<U>(0);
+    U one = cast_helper<U>(1);
+
+    U obj = zero;
+    cpp20::atomic_ref<U> ref(obj);
 
     ref.store(one);
     EXPECT_EQ(obj, one);
@@ -127,14 +141,15 @@ struct CheckAtomicOpsCompareExchange {
 template <typename T>
 struct CheckAtomicOpsCompareExchange<T, std::enable_if_t<cpp20::atomic_internal::unqualified<T>>> {
   static void CheckCompareExchange() {
-    T zero = cast_helper<T>(0);
-    T one = cast_helper<T>(1);
+    using U = LibcxxBugWorkaround<T>;
+    U zero = cast_helper<U>(0);
+    U one = cast_helper<U>(1);
 
-    std::remove_const_t<T> obj = zero;
-    cpp20::atomic_ref<T> ref(obj);
+    std::remove_const_t<U> obj = zero;
+    cpp20::atomic_ref<U> ref(obj);
 
     obj = zero;
-    std::remove_const_t<T> exp = one;
+    std::remove_const_t<U> exp = one;
 
     EXPECT_FALSE(ref.compare_exchange_weak(exp, one));
     EXPECT_EQ(obj, zero);
@@ -160,23 +175,24 @@ struct CheckAtomicOpsCompareExchange<T, std::enable_if_t<cpp20::atomic_internal:
 
 template <typename T>
 void CheckAtomicOperations() {
-  T zero = cast_helper<T>(0);
-  T one = cast_helper<T>(1);
+  using U = LibcxxBugWorkaround<T>;
+  U zero = cast_helper<U>(0);
+  U one = cast_helper<U>(1);
 
-  T obj = zero;
-  cpp20::atomic_ref<T> ref(obj);
+  U obj = zero;
+  cpp20::atomic_ref<U> ref(obj);
   EXPECT_EQ(ref.load(), zero);
 
-  T obj2 = one;
-  cpp20::atomic_ref<T> ref2(obj2);
+  U obj2 = one;
+  cpp20::atomic_ref<U> ref2(obj2);
   EXPECT_EQ(ref2.load(), one);
 
   // Copy.
-  cpp20::atomic_ref<T> ref_cpy(ref);
+  cpp20::atomic_ref<U> ref_cpy(ref);
   EXPECT_EQ(ref_cpy.load(), ref.load());
 
   // Operator T.
-  T val = ref;
+  U val = ref;
   EXPECT_EQ(val, ref.load());
 
   // store, exchange and compare_and_exchange depends on |T|'s qualification.
@@ -184,47 +200,48 @@ void CheckAtomicOperations() {
   // * |volatile T| does not support compare_and_exchange operations.
   //
   // The following checks, will be No-Op depending on |T|.
-  CheckAtomicOpsMutable<T>::CheckStoreAndExchange();
-  CheckAtomicOpsCompareExchange<T>::CheckCompareExchange();
+  CheckAtomicOpsMutable<U>::CheckStoreAndExchange();
+  CheckAtomicOpsCompareExchange<U>::CheckCompareExchange();
 }
 
 template <typename T>
 constexpr void CheckIntegerOperations() {
-  T obj = 20;
-  cpp20::atomic_ref<T> ref(obj);
+  using U = LibcxxBugWorkaround<T>;
+  U obj = 20;
+  cpp20::atomic_ref<U> ref(obj);
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ(ref.fetch_add(4), prev);
     EXPECT_EQ(ref.load(), prev + 4);
     EXPECT_EQ(ref.load(), obj);
 
-    T val = ref;
+    U val = ref;
     EXPECT_EQ(val, ref.load());
   }
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ(ref.fetch_sub(4), prev);
     EXPECT_EQ(ref.load(), prev - 4);
     EXPECT_EQ(ref.load(), obj);
   }
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ((ref += 4), prev + 4);
     EXPECT_EQ(ref.load(), prev + 4);
     EXPECT_EQ(ref.load(), obj);
   }
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ((ref -= 4), prev - 4);
     EXPECT_EQ(ref.load(), prev - 4);
     EXPECT_EQ(ref.load(), obj);
   }
 
-  T mask = static_cast<T>(0b01010101);
+  U mask = static_cast<T>(0b01010101);
 
   {
     obj = -1;
@@ -283,43 +300,45 @@ constexpr void CheckIntegerOperations() {
 
 template <typename T>
 void CheckFloatSpecialization() {
-  static_assert(kHasDifferenceType<cpp20::atomic_ref<T>>, "");
-  static_assert(!specialization_has_fetch_and_v<cpp20::atomic_ref<T>>, "");
-  static_assert(!specialization_has_fetch_or_v<cpp20::atomic_ref<T>>, "");
-  static_assert(!specialization_has_fetch_xor_v<cpp20::atomic_ref<T>>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::value_type, T>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::difference_type, T>, "");
-  static_assert(cpp20::atomic_ref<T>::required_alignment == alignof(T), "");
+  using U = LibcxxBugWorkaround<T>;
+  static_assert(kHasDifferenceType<cpp20::atomic_ref<U>>, "");
+  static_assert(!specialization_has_fetch_and_v<cpp20::atomic_ref<U>>, "");
+  static_assert(!specialization_has_fetch_or_v<cpp20::atomic_ref<U>>, "");
+  static_assert(!specialization_has_fetch_xor_v<cpp20::atomic_ref<U>>, "");
+  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::value_type, U>, "");
+  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::difference_type, U>, "");
+  static_assert(cpp20::atomic_ref<U>::required_alignment == alignof(U), "");
 }
 
 template <typename T>
 constexpr void CheckFloatOperations() {
-  T obj = 4.f;
-  cpp20::atomic_ref<T> ref(obj);
+  using U = LibcxxBugWorkaround<T>;
+  U obj = 4.f;
+  cpp20::atomic_ref<U> ref(obj);
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ(ref.fetch_add(4.f), prev);
     EXPECT_EQ(ref.load(), prev + 4.f);
     EXPECT_EQ(ref.load(), obj);
   }
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ(ref.fetch_sub(4.f), prev);
     EXPECT_EQ(ref.load(), prev - 4.f);
     EXPECT_EQ(ref.load(), obj);
   }
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ((ref += 4.f), prev + 4.f);
     EXPECT_EQ(ref.load(), prev + 4.f);
     EXPECT_EQ(ref.load(), obj);
   }
 
   {
-    T prev = ref.load();
+    U prev = ref.load();
     EXPECT_EQ((ref -= 4.f), prev - 4.f);
     EXPECT_EQ(ref.load(), prev - 4.f);
     EXPECT_EQ(ref.load(), obj);
@@ -486,7 +505,7 @@ TEST(AtomicRefTest, ConstFromNonConst) {
   int a = 12345;
 
   // From non const T.
-  cpp20::atomic_ref<const int> b(a);
+  cpp20::atomic_ref<LibcxxBugWorkaround<const int>> b(a);
   EXPECT_EQ(b.load(), a);
 }
 
