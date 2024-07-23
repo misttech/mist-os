@@ -7,6 +7,7 @@
 use core::alloc::Layout;
 use core::cmp::max;
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr::{null_mut, slice_from_raw_parts_mut, NonNull};
 
@@ -39,6 +40,20 @@ impl Arena {
         }
     }
 
+    /// Returns true if the allocation pointed to was made by this arena
+    pub fn contains_ptr<T: ?Sized>(&self, ptr: &T) -> bool {
+        // SAFETY: self.0 is valid as constructed, and `fdf_arena_contains` does not access data at the
+        // pointer but just compares its pointer value to the buffers in the arena.
+        unsafe {
+            fdf_arena_contains(self.0.as_ptr(), ptr as *const _ as *const _, size_of_val(ptr))
+        }
+    }
+
+    /// Returns true if the allocation was made by this arena
+    pub fn contains<T: ?Sized>(&self, item: &ArenaBox<'_, T>) -> bool {
+        self.contains_ptr(ArenaBox::deref(item))
+    }
+
     /// Allocates the appropriate amount of memory for the given layout and
     /// returns a pointer to `T` at the start of that memory.
     ///
@@ -67,17 +82,41 @@ impl Arena {
         storage
     }
 
+    /// Inserts a [`MaybeUninit`] object and returns the [`ArenaBox`] of it.
+    pub fn insert_uninit<T: Sized>(&self) -> ArenaBox<'_, MaybeUninit<T>> {
+        let layout = Layout::new::<MaybeUninit<T>>();
+        // SAFETY: The layout we're passing to `alloc_bytes_for` is for zero or
+        // more objects of type `T`, which is the pointer type we get back from
+        // it.
+        unsafe { ArenaBox::new(self.alloc_bytes_for(layout)) }
+    }
+
+    /// Inserts a slice of [`MaybeUninit`] objects of len `len`
+    ///
+    /// # Panics
+    ///
+    /// Panics if an array `[T; n]` is too large to be allocated.
+    pub fn insert_uninit_slice<T: Sized>(&self, len: usize) -> ArenaBox<'_, [MaybeUninit<T>]> {
+        let layout = Layout::array::<MaybeUninit<T>>(len).expect("allocation too large");
+        // SAFETY: The layout we're passing to `alloc_bytes_for` is for zero or
+        // more objects of type `T`, which is the pointer type we get back from
+        // it.
+        let storage = unsafe { self.alloc_bytes_for(layout) };
+        // At this point we have a `*mut T` but we need to return a `[T]`,
+        // which is unsized. We need to use [`slice_from_raw_parts_mut`]
+        // to construct the unsized pointer from the data and its length.
+        let ptr = slice_from_raw_parts_mut(storage.as_ptr(), len);
+        // SAFETY: alloc_bytes_for is expected to return a valid pointer.
+        unsafe { ArenaBox::new(NonNull::new_unchecked(ptr)) }
+    }
+
     /// Moves `obj` of type `T` into the arena and returns an [`ArenaBox`]
     /// containing the moved value.
     pub fn insert<T: Sized>(&self, obj: T) -> ArenaBox<'_, T> {
-        // SAFETY: The layout we give to `alloc_bytes_for` is for storing one
-        // object of type `T`, which is the pointer type we get from it.
-        let storage = unsafe { self.alloc_bytes_for(Layout::for_value(&obj)) };
-        // SAFETY: moves the object into the arena memory we
-        // just allocated, without any additional drops.
-        unsafe { core::ptr::write(storage.as_ptr(), obj) };
-        // SAFETY: alloc_bytes_for is expected to return a valid pointer.
-        ArenaBox::new(unsafe { NonNull::new_unchecked(storage.as_ptr()) })
+        let mut uninit = self.insert_uninit();
+        uninit.write(obj);
+        // SAFETY: we wrote `obj` to the object
+        unsafe { uninit.assume_init() }
     }
 
     /// Moves a [`Box`]ed slice into the arena and returns an [`ArenaBox`]
@@ -92,9 +131,10 @@ impl Arena {
         // SAFETY: Moving the object into the arena memory we just allocated by
         // first copying the bytes over and then deallocating the raw memory
         // we took from the box.
-        let slice_ptr = unsafe {
+        let slice_box = unsafe {
             core::ptr::copy_nonoverlapping(original_storage as *mut T, storage.as_ptr(), len);
-            NonNull::new_unchecked(slice_from_raw_parts_mut(storage.as_ptr(), len))
+            let slice_ptr = slice_from_raw_parts_mut(storage.as_ptr(), len);
+            ArenaBox::new(NonNull::new_unchecked(slice_ptr))
         };
         if layout.size() != 0 {
             // SAFETY: Since we have decomposed the Box we have to deallocate it,
@@ -103,35 +143,35 @@ impl Arena {
                 std::alloc::dealloc(original_storage as *mut u8, layout);
             }
         }
-        ArenaBox::new(slice_ptr)
+        slice_box
     }
 
     /// Copies the slice into the arena and returns an [`ArenaBox`] containing
     /// the copied values.
     pub fn insert_slice<T: Sized + Clone>(&self, slice: &[T]) -> ArenaBox<'_, [T]> {
         let len = slice.len();
-        // SAFETY: The layout we're passing to `alloc_bytes_for` is for zero or
-        // more objects of type `T`, which is the pointer type we get back from
-        // it.
-        let storage = unsafe { self.alloc_bytes_for(Layout::for_value(slice)) };
-        let mut storage_pos = storage;
-        for item in slice {
-            // SAFETY: for each object in the original slice we clone it and
-            // write the clone into the new slice's backing memory. Since
-            // core::ptr::write 'forgets' the item we give it, this is
-            // effectively a move.
-            unsafe { core::ptr::write(storage_pos.as_ptr(), item.clone()) };
-            // SAFETY: Since we allocated enough storage for all of the
-            // elements, and we are iterating based on the original slice,
-            // we should never dereference beyond the end of the new storage.
-            storage_pos = unsafe { storage_pos.add(1) };
+        let mut uninit_slice = self.insert_uninit_slice(len);
+        for (from, to) in slice.iter().zip(uninit_slice.iter_mut()) {
+            to.write(from.clone());
         }
-        // At this point we have a `*mut T` but we need to return a `[T]`,
-        // which is unsized. We need to use [`slice_from_raw_parts_mut`]
-        // to construct the unsized pointer from the data and its length.
-        let ptr = slice_from_raw_parts_mut(storage.as_ptr(), len);
-        // SAFETY: alloc_bytes_for is expected to return a valid pointer.
-        ArenaBox::new(unsafe { NonNull::new_unchecked(ptr) })
+
+        // SAFETY: we wrote `from.clone()` to each item of the slice.
+        unsafe { uninit_slice.assume_init_slice() }
+    }
+
+    /// Inserts a slice of [`Default`]-initialized objects of type `T` to the
+    /// arena and returns an [`ArenaBox`] of it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an array `[T; n]` is too large to be allocated.
+    pub fn insert_default_slice<T: Sized + Default>(&self, len: usize) -> ArenaBox<'_, [T]> {
+        let mut uninit_slice = self.insert_uninit_slice(len);
+        for i in uninit_slice.iter_mut() {
+            i.write(T::default());
+        }
+        // SAFETY: we wrote `T::default()` to each item of the slice.
+        unsafe { uninit_slice.assume_init_slice() }
     }
 
     /// Returns an ArenaBox for the pointed to object, assuming that it is part
@@ -139,11 +179,58 @@ impl Arena {
     ///
     /// # Safety
     ///
-    /// This does not verify that the pointer came from this arena and that it's
-    /// not null, so the caller is responsible for verifying that.
-    pub unsafe fn assume_unchecked<T: ?Sized>(&self, ptr: *mut T) -> ArenaBox<'_, T> {
+    /// This does not verify that the pointer came from this arena,
+    /// so the caller is responsible for verifying that.
+    pub unsafe fn assume_unchecked<T: ?Sized>(&self, ptr: NonNull<T>) -> ArenaBox<'_, T> {
         // SAFETY: Caller is responsible for ensuring this per safety doc section.
-        ArenaBox::new(unsafe { NonNull::new_unchecked(ptr) })
+        unsafe { ArenaBox::new(ptr) }
+    }
+
+    /// Returns an [`ArenaBox`] for the pointed to object, verifying that it
+    /// is a part of this arena in the process.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the given pointer is not in this [`Arena`].
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that only one [`ArenaBox`] is constructed
+    /// for a given pointer, and that the pointer originated from an `ArenaBox<T>` or
+    /// a direct allocation with the arena through [`fdf_arena_allocate`], and is:
+    /// - initialized to a value of `T`.
+    /// - properly aligned for `T`.
+    /// - pointing to the beginning of the object, and not to a subfield of another
+    /// [`ArenaBox`]ed object.
+    pub unsafe fn assume<T: ?Sized>(&self, ptr: NonNull<T>) -> ArenaBox<'_, T> {
+        // SAFETY: caller promises the pointer is initialized and valid
+        assert!(
+            self.contains_ptr(unsafe { ptr.as_ref() }),
+            "Arena can't assume ownership over a pointer not allocated from within it"
+        );
+        // SAFETY: we will verify the provenance below
+        let data = unsafe { self.assume_unchecked(ptr) };
+        data
+    }
+
+    /// Transforms this Arena into an fdf_arena_t without dropping the reference.
+    ///
+    /// # Safety
+    ///
+    /// If the caller drops the returned fdf_arena_t, the memory allocated by the
+    /// arena will never be freed.
+    pub unsafe fn into_raw(self) -> NonNull<fdf_arena_t> {
+        let res = self.0;
+        core::mem::forget(self);
+        return res;
+    }
+}
+
+impl Clone for Arena {
+    fn clone(&self) -> Self {
+        // SAFETY: We own this arena reference and so we can add ref it
+        unsafe { fdf_arena_add_ref(self.0.as_ptr()) }
+        Self(self.0)
     }
 }
 
@@ -164,7 +251,7 @@ impl<'a, T> ArenaBox<'a, T> {
     pub fn take(value: Self) -> T {
         // SAFETY: `Self::into_ptr` will forget `value` and prevent
         // calling its `drop`.
-        unsafe { core::ptr::read(Self::into_ptr(value)) }
+        unsafe { core::ptr::read(Self::into_ptr(value).as_ptr()) }
     }
 
     /// Moves the inner value of this ArenaBox out into a [`Box`] using the
@@ -188,6 +275,42 @@ impl<'a, T> ArenaBox<'a, T> {
     }
 }
 
+impl<'a, T> ArenaBox<'a, MaybeUninit<T>> {
+    /// Assumes the contents of this [`MaybeUninit`] box are initialized now.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the value is initialized
+    /// properly. See [`MaybeUninit::assume_init`] for more details on the
+    /// safety requirements of this.
+    pub unsafe fn assume_init(self) -> ArenaBox<'a, T> {
+        // SAFETY: This pointer came from an `ArenaBox` we just leaked,
+        // and casting `*MaybeUninit<T>` to `*T` is safe.
+        unsafe { ArenaBox::new(ArenaBox::into_ptr(self).cast()) }
+    }
+}
+
+impl<'a, T> ArenaBox<'a, [MaybeUninit<T>]> {
+    /// Assumes the contents of this box of `[MaybeUninit<T>]` are initialized now.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the value is initialized
+    /// properly. See [`MaybeUninit::assume_init`] for more details on the
+    /// safety requirements of this.
+    pub unsafe fn assume_init_slice(self) -> ArenaBox<'a, [T]> {
+        let len = self.len();
+        // SAFETY: We are about to reconstitute this pointer back into
+        // a new `ArenaBox` with the same lifetime, and casting
+        // `MaybeUninit<T>` to `T` is safe.
+        let data: NonNull<T> = unsafe { ArenaBox::into_ptr(self) }.cast();
+        let slice_ptr = NonNull::slice_from_raw_parts(data, len);
+
+        // SAFETY: We just got this pointer from an `ArenaBox` we decomposed.
+        unsafe { ArenaBox::new(slice_ptr) }
+    }
+}
+
 impl<'a, T> ArenaBox<'a, [T]> {
     /// Like [`Self::take_boxed`], this moves the inner value of this ArenaBox
     /// out into a [`Box`] using the global allocator, and using it avoids
@@ -201,7 +324,11 @@ impl<'a, T> ArenaBox<'a, [T]> {
         let storage = unsafe { global_alloc(Layout::for_value(&*value)) };
         // SAFETY: storage is sufficiently large to store the slice in `value`
         let slice_ptr = unsafe {
-            core::ptr::copy_nonoverlapping(Self::into_ptr(value) as *mut T, storage.as_ptr(), len);
+            core::ptr::copy_nonoverlapping(
+                Self::into_ptr(value).as_ptr() as *mut T,
+                storage.as_ptr(),
+                len,
+            );
             core::ptr::slice_from_raw_parts_mut(storage.as_ptr(), len)
         };
         // SAFETY: we used Layout to make sure that Box will be happy with the
@@ -211,21 +338,44 @@ impl<'a, T> ArenaBox<'a, [T]> {
 }
 
 impl<'a, T: ?Sized> ArenaBox<'a, T> {
-    fn new(obj: NonNull<T>) -> ArenaBox<'a, T> {
+    pub(crate) unsafe fn new(obj: NonNull<T>) -> ArenaBox<'a, T> {
         Self(obj, PhantomData)
     }
 
-    /// Decomposes this arenabox into its pointer.
+    /// Decomposes this [`ArenaBox`] into its pointer.
     ///
     /// # Safety
     ///
-    /// This is unsafe because it loses the lifetime of the Arena it
+    /// This is unsafe because it loses the lifetime of the [`Arena`] it
     /// came from. The caller must make sure to not let the pointer outlive the
     /// arena. The caller is also responsible for making sure the object is
-    /// dropped before the `Arena`, or it may leak resources.
-    pub(crate) unsafe fn into_ptr(value: Self) -> *mut T {
-        let res = value.0.as_ptr();
+    /// dropped before the [`Arena`], or it may leak resources.
+    pub unsafe fn into_ptr(value: Self) -> NonNull<T> {
+        let res = value.0;
         core::mem::forget(value);
+        res
+    }
+
+    /// Turns this [`ArenaBox`] into one with the given lifetime.
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it loses the lifetime of the [`Arena`] it
+    /// came from. The caller must make sure to not let the
+    /// [`ArenaBox`] outlive the [`Arena`] it was created from. The caller
+    /// is also responsible for making sure the object is dropped before
+    /// the [`Arena`], or it may leak resources.
+    pub unsafe fn erase_lifetime(value: Self) -> ArenaBox<'static, T> {
+        // SAFETY: the caller promises to ensure this object does not
+        // outlive the arena.
+        unsafe { ArenaBox::new(ArenaBox::into_ptr(value)) }
+    }
+
+    /// Consumes and leaks this [`ArenaBox`], returning a mutable reference
+    /// to its contents.
+    pub fn leak(mut this: Self) -> &'a mut T {
+        let res = unsafe { this.0.as_mut() };
+        core::mem::forget(this);
         res
     }
 }
@@ -285,7 +435,7 @@ unsafe fn global_alloc<T>(layout: Layout) -> NonNull<T> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::cell::Cell;
     use std::sync::mpsc;
 
@@ -295,9 +445,9 @@ mod tests {
     /// on an [`mpsc::Sender`] when its 'last' clone is dropped. It will assert
     /// if an attempt to re-clone an already cloned [`DropSender`] happens,
     /// ensuring that the object is only cloned in a linear path.
-    struct DropSender<T: Clone>(T, Cell<Option<mpsc::Sender<T>>>);
+    pub struct DropSender<T: Clone>(pub T, Cell<Option<mpsc::Sender<T>>>);
     impl<T: Clone> DropSender<T> {
-        fn new(val: T, sender: mpsc::Sender<T>) -> Self {
+        pub fn new(val: T, sender: mpsc::Sender<T>) -> Self {
             Self(val, Cell::new(Some(sender)))
         }
     }
@@ -337,6 +487,8 @@ mod tests {
         assert_eq!(&*val, &[5, 6, 7, 8]);
         let val: ArenaBox<'_, [()]> = arena.insert_slice(&[]);
         assert_eq!(&*val, &[]);
+        let val: ArenaBox<'_, [u8]> = arena.insert_default_slice(10);
+        assert_eq!(&*val, &[0; 10]);
     }
 
     #[test]
@@ -405,5 +557,38 @@ mod tests {
         assert_eq!(rx.try_recv().unwrap(), 2);
 
         rx.try_recv().expect_err("no more drops");
+    }
+
+    #[test]
+    fn arena_contains() {
+        let arena1 = Arena::new().unwrap();
+        let arena2 = Arena::new().unwrap();
+
+        let val1 = arena1.insert(1);
+        let val2 = arena2.insert(2);
+
+        assert!(arena1.contains(&val1));
+        assert!(arena2.contains(&val2));
+        assert!(!arena1.contains(&val2));
+        assert!(!arena2.contains(&val1));
+    }
+
+    #[test]
+    fn arena_assume() {
+        let arena = Arena::new().unwrap();
+
+        let val = arena.insert(1);
+        let val_leaked = unsafe { ArenaBox::into_ptr(val) };
+        let val = unsafe { arena.assume(val_leaked) };
+
+        assert!(arena.contains(&val));
+    }
+
+    #[test]
+    #[should_panic]
+    fn arena_bad_assume() {
+        let arena = Arena::new().unwrap();
+
+        unsafe { arena.assume(NonNull::<()>::dangling()) };
     }
 }
