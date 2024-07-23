@@ -5513,6 +5513,9 @@ TEST_F(FlatlandTest, ImageImportPassesAndFailsOnDifferentImportersTest) {
       /*destroy_instance_functon=*/[]() {}, flatland_presenter_, link_system_,
       uber_struct_system_->AllocateQueueForSession(session_id), importers, [](auto...) {},
       [](auto...) {}, [](auto...) {}, [](auto...) {});
+  // Wait for Bind() to occur within Flatland::New().
+  RunLoopUntilIdle();
+
   EXPECT_CALL(*local_mock_buffer_collection_importer, ImportBufferCollection(_, _, _, _, _))
       .WillOnce(Return(true));
 
@@ -5877,6 +5880,8 @@ TEST_F(FlatlandTest, MultithreadedLinkResolution) {
   auto child_flatland_thread_loop_holder =
       std::make_shared<utils::LoopDispatcherHolder>(&kAsyncLoopConfigNoAttachToCurrentThread);
   auto& child_flatland_thread_loop = child_flatland_thread_loop_holder->loop();
+  auto [child_flatland_client_end, child_flatland_server_end] =
+      fidl::Endpoints<fuchsia_ui_composition::Flatland>::Create();
 
   auto [child_view_watcher_client_end, child_view_watcher_server_end] =
       fidl::Endpoints<ChildViewWatcher>::Create();
@@ -5891,8 +5896,6 @@ TEST_F(FlatlandTest, MultithreadedLinkResolution) {
     std::vector<std::shared_ptr<BufferCollectionImporter>> importers;
     importers.push_back(buffer_collection_importer_);
 
-    auto [child_flatland_client_end, child_flatland_server_end] =
-        fidl::Endpoints<fuchsia_ui_composition::Flatland>::Create();
     child_flatland = Flatland::New(
         child_flatland_thread_loop_holder, std::move(child_flatland_server_end), session_id,
         [](auto...) {}, flatland_presenter_, link_system_,
@@ -5928,8 +5931,8 @@ TEST_F(FlatlandTest, MultithreadedLinkResolution) {
   // We post this task onto the other Flatland's thread, so that we can have a *chance* of locking
   // the LinkSystem mutex in between the execution of the two link-resolution closures (each of
   // which also locks the LinkSystem mutex).
-  bool presented = false;
   EXPECT_CALL(*mock_flatland_presenter_, ScheduleUpdateForSession(_, _, _, _));
+  libsync::Completion completion;
   async::PostTask(child_flatland_thread_loop.dispatcher(), ([&]() {
                     child_flatland->CreateView2(
                         fidl::HLCPPToNatural(creation_tokens.view_token),
@@ -5941,15 +5944,11 @@ TEST_F(FlatlandTest, MultithreadedLinkResolution) {
                         .acquire_fences({})
                         .release_fences({})
                         .unsquashable({});
-                    child_flatland->Present(std::move(present_args));
-
                     // `Present()` puts the resulting UberStruct into the "acquire fence queue";
                     // since there are no fences it is not-quite-immediately made available via a
-                    // posted task.  If we were to quit immediately, then this task wouldn't get a
-                    // chance to run.  So instead, we wrap `Quit()` in a task that will run after
-                    // UberStruct is made available.
-                    async::PostTask(child_flatland_thread_loop.dispatcher(),
-                                    [&]() { child_flatland_thread_loop.Quit(); });
+                    // posted task.
+                    child_flatland->Present(std::move(present_args));
+                    completion.Signal();
                   }));
 
   // This runs "concurrently" with the task above.  Ideally, it will sometimes fall between the
@@ -5967,11 +5966,19 @@ TEST_F(FlatlandTest, MultithreadedLinkResolution) {
   // By waiting for the task to finish running, we know that the Present() has happened, and
   // therefore both the parent and child Flatland sessions will have provided UberStructs, so
   // that there will now be a resolved link between the viewport and the view.
-  child_flatland_thread_loop.JoinThreads();
+  completion.Wait();
+
   ApplySessionUpdatesAndSignalFences();
   UpdateLinks(parent_flatland->GetRoot());
   links = link_system_->GetResolvedTopologyLinks();
   EXPECT_EQ(links.size(), 1U);
+
+  // Need to destroy the child Flatland on the correct thread, so the FIDL binding doesn't CHECK.
+  async::PostTask(child_flatland_thread_loop.dispatcher(),
+                  [&, flatland_to_destroy = std::move(child_flatland)]() {
+                    child_flatland_thread_loop.Quit();
+                  });
+  child_flatland_thread_loop.JoinThreads();
 }
 
 // Verify that `destroy_instance_function_()` is only invoked once, even if there are multiple

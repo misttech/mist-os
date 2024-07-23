@@ -283,8 +283,7 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
 
  private:
   Flatland(std::shared_ptr<utils::DispatcherHolder> dispatcher_holder,
-           scheduling::SessionId session_id, std::function<void()> destroy_instance_function,
-           std::shared_ptr<FlatlandPresenter> flatland_presenter,
+           scheduling::SessionId session_id, std::shared_ptr<FlatlandPresenter> flatland_presenter,
            std::shared_ptr<LinkSystem> link_system,
            std::shared_ptr<UberStructSystem::UberStructQueue> uber_struct_queue,
            const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
@@ -299,11 +298,11 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
                register_mouse_source);
 
   // `Flatland::New()` dispatches a task to invoke this.
-  void Bind(fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end);
+  void Bind(fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end,
+            std::function<void()> destroy_instance_function);
 
   void OnFidlClosed(fidl::UnbindInfo unbind_info);
 
-  void ReportBadOperationError();
   void ReportLinkProtocolError(const std::string& error_log);
   void CloseConnection(fuchsia_ui_composition::FlatlandError error);
 
@@ -347,15 +346,6 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
   // UberStructs with the UberStructSystem.
   const scheduling::SessionId session_id_;
 
-  // A function that, when called, will destroy this instance. Necessary because an async::Wait can
-  // only wait on peer channel destruction, not "this" channel destruction, so the FlatlandManager
-  // cannot detect if this instance closes |binding_|.
-  std::function<void()> destroy_instance_function_;
-
-  // Keep track of whether |destroy_instance_function_| has been invoked, in order to guarantee that
-  // it is called at most once.
-  bool destroy_instance_function_was_invoked_ = false;
-
   // A Present2Helper to facilitate sendng the appropriate OnFramePresented() callback to FIDL
   // clients when frames are presented to the display.
   scheduling::Present2Helper present2_helper_;
@@ -374,9 +364,6 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
   // Used to import Flatland images to external services that Flatland does not have knowledge of.
   // Each importer is used for a different service.
   std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> buffer_collection_importers_;
-
-  // True if any function has failed since the previous call to Present(), false otherwise.
-  bool failure_since_previous_present_ = false;
 
   // True if there were errors in ParentViewportWatcher or ChildViewWatcher channels.
   bool link_protocol_error_ = false;
@@ -513,10 +500,16 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
   fit::function<void(fidl::ServerEnd<fuchsia_ui_pointer::MouseSource>, zx_koid_t)>
       register_mouse_source_;
 
+  // Helper class that is responsible for managing the Flatland instance's FIDL connection, and also
+  // provides an RAII approach to guaranteeing that `destroy_instance_function_` is invoked.
   class BindingData {
    public:
     BindingData(Flatland* flatland, async_dispatcher_t* dispatcher,
-                fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end);
+                fidl::ServerEnd<fuchsia_ui_composition::Flatland> server_end,
+                std::function<void()> destroy_instance_function);
+
+    // RAII: invokes `destroy_instance_function_`.
+    ~BindingData();
 
     // Send `OnFramePresented` FIDL event to client.
     void SendOnFramePresented(fuchsia_scenic_scheduling::FramePresentedInfo info);
@@ -531,6 +524,11 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
     // The FIDL binding for this Flatland instance, which references |this| as the implementation
     // and run on |dispatcher_|.
     fidl::ServerBinding<fuchsia_ui_composition::Flatland> binding_;
+
+    // A function that, when called, will destroy this instance. Necessary because an async::Wait
+    // can/ only wait on peer channel destruction, not "this" channel destruction, so the
+    // FlatlandManager cannot detect if this instance closes |binding_|.
+    std::function<void()> destroy_instance_function_;
   };
 
   std::unique_ptr<BindingData> binding_data_;
