@@ -1113,7 +1113,7 @@ impl NetlinkRouteMessage {
         //
         // length of source prefix
         // tos filter (type of service)
-        route_header.protocol = RouteProtocol::Unspec;
+        route_header.protocol = RouteProtocol::Kernel;
         // Universe for routes with next_hop. Valid as long as route action
         // is forwarding.
         route_header.scope = RouteScope::Universe;
@@ -1587,6 +1587,7 @@ mod tests {
         route_header.address_family = address_family;
         route_header.destination_prefix_length = destination_prefix_length;
         route_header.kind = RouteType::Unicast;
+        route_header.protocol = RouteProtocol::Kernel;
 
         let (table_u8, _) = get_table_u8_and_nla_from_key(table);
         route_header.table = table_u8;
