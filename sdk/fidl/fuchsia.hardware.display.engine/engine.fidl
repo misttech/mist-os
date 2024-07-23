@@ -97,7 +97,7 @@ type RawDisplayInfo = resource struct {
     /// only supported operational mode in this member. Drivers that support
     /// seamless display handoff from a bootloader report the display's initial
     /// mode in this member.
-    preferred_modes vector<DisplayMode>:MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES;
+    preferred_modes vector<DisplayMode>:<MAX_COUNT_DISPLAY_INFO_PREFERRED_MODES>;
 
     /// Display capabilities, encoded using the E-EDID standard.
     ///
@@ -112,7 +112,7 @@ type RawDisplayInfo = resource struct {
     ///
     /// Drivers for external (connected) displays use this member to report the
     /// display's E-EDID, when it is exposed in a non-standard manner.
-    edid_bytes vector<uint8>:MAX_COUNT_EDID_BYTES;
+    edid_bytes vector<uint8>:<MAX_COUNT_EDID_BYTES>;
 
     /// Connection to the display's implementation of the E-DDC standard.
     ///
@@ -125,7 +125,7 @@ type RawDisplayInfo = resource struct {
     /// When this client is valid, the E-DDC connection may be used to retrieve
     /// the display's E-EDID information, and may be used to issue DDC/CI
     /// commands.
-    eddc_client client_end:fuchsia.hardware.i2cimpl.Device;
+    eddc_client client_end:<fuchsia.hardware.i2cimpl.Device, optional>;
 
     /// A list of pixel formats supported by the display.
     ///
