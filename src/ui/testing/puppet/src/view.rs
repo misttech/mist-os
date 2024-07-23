@@ -271,9 +271,10 @@ impl View {
                             info!("received parent status update");
                             this.borrow_mut().update_parent_status(status);
                         }
-                        // In CTF tests, test realm exit earlier than puppet so we don't panic here.
+                        // Currently, CTF tests share the same puppet factory, so when one test exits,
+                        // all other tests will get a channel closed error.
                         Err(fidl::Error::ClientChannelClosed{..}) => {
-                            std::process::exit(0);
+                            break;
                         }
                         Err(e) => {
                             panic!("get_status got unexpected error {:?}", e);
@@ -285,9 +286,10 @@ impl View {
                         Ok(layout_info) => {
                             this.borrow_mut().update_view_parameters(layout_info.logical_size, layout_info.device_pixel_ratio);
                         }
-                        // In CTF tests, test realm exit earlier than puppet so we don't panic here.
+                        // Currently, CTF tests share the same puppet factory, so when one test exits,
+                        // all other tests will get a channel closed error.
                         Err(fidl::Error::ClientChannelClosed{..}) => {
-                            std::process::exit(0);
+                            break;
                         }
                         Err(e) => {
                             panic!("get_layout got unexpected error {:?}", e);

@@ -38,8 +38,9 @@ source_set("conformance-test-base") {
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gtest",
+    "//src/ui/testing/util:loop_fixture",
+    "//src/ui/testing/util:zxtest_helpers",
+    "//zircon/system/ulib/zxtest",
   ]
 }
 
@@ -59,7 +60,6 @@ executable("touch-validator-bin") {
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
@@ -121,7 +121,6 @@ executable("mouse-validator-bin") {
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
@@ -185,7 +184,6 @@ executable("key-validator-bin") {
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
@@ -248,7 +246,6 @@ executable("focus-validator-bin") {
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
@@ -314,7 +311,6 @@ executable("media-button-validator-bin") {
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fostr/fidl/fuchsia.ui.input",
     "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 

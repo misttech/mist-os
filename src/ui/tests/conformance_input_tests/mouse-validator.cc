@@ -14,8 +14,9 @@
 
 #include <memory>
 
-#include <gtest/gtest.h>
+#include <zxtest/zxtest.h>
 
+#include "src/ui/testing/util/zxtest_helpers.h"
 #include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
 namespace ui_conformance_testing {
@@ -63,7 +64,7 @@ struct MousePuppet {
 using device_pixel_ratio = float;
 
 class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
-                             public ::testing::WithParamInterface<device_pixel_ratio> {
+                             public zxtest::WithParamInterface<device_pixel_ratio> {
  public:
   ~MouseConformanceTest() override = default;
 
@@ -180,7 +181,7 @@ class MouseConformanceTest : public ui_conformance_test_base::ConformanceTest,
   uint32_t display_height_ = 0;
 };
 
-INSTANTIATE_TEST_SUITE_P(/*no prefix*/, MouseConformanceTest, ::testing::Values(1.0, 2.0));
+INSTANTIATE_TEST_SUITE_P(/*no prefix*/, MouseConformanceTest, ::zxtest::Values(1.0, 2.0));
 
 TEST_P(MouseConformanceTest, SimpleClick) {
   // Inject click with no mouse movement.

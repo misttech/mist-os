@@ -17,12 +17,14 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include <zxtest/zxtest.h>
+
+#include "src/ui/testing/util/logging_event_loop.h"
 
 namespace ui_conformance_test_base {
 
 /// ConformanceTest use realm_proxy to connect test realm.
-class ConformanceTest : public gtest::RealLoopFixture {
+class ConformanceTest : public zxtest::Test, public ui_testing::LoggingEventLoop {
  public:
   ConformanceTest() = default;
   ~ConformanceTest() override = default;
