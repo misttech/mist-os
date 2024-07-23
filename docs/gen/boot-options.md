@@ -718,17 +718,6 @@ The active ratio only triggers aging in the period between the
 `kernel.page-scanner.min-aging-interval-ms` and the `kernel.page-scanner.max-aging-interval-ms`,
 and as such has no effect if the intervals are equal.
 
-### kernel.page-scanner.eviction-interval-seconds=\<uint32_t>
-
-**Default:** `0xa`
-
-This option specifies the periodic interval (in seconds) at which kernel eviction
-will run in the background to try and keep the system out of memory pressure.
-This will only take effect if continuous eviction is enabled with
-`kernel.oom.evict-continuous`. If this value is lower than the page queue
-rotation / aging interval (10s by default), it will be ignored and the eviction
-interval will instead be set equal to the page queue rotation interval.
-
 ### kernel.page-scanner.start-at-boot=\<bool>
 
 **Default:** `true`

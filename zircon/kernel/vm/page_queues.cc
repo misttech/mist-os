@@ -688,6 +688,14 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
     // active bucket might have changed, but this will work.
     RecalculateActiveInactiveLocked(dps);
   }
+
+  {
+    Guard<CriticalMutex> guard{&aging_event_mutex_};
+    if (aging_event_) {
+      aging_event_->Signal();
+    }
+  }
+
   // Keep a count of the different reasons we have rotated.
   switch (reason) {
     case AgeReason::Timeout:
@@ -1505,6 +1513,12 @@ PageQueues::ActiveInactiveCounts PageQueues::GetActiveInactiveCountsLocked() con
                                 .active = static_cast<uint64_t>(active_queue_count_),
                                 .inactive = static_cast<uint64_t>(inactive_queue_count_)};
   }
+}
+
+void PageQueues::SetAgingEvent(Event* event) {
+  Guard<CriticalMutex> guard{&aging_event_mutex_};
+  ASSERT(!event || !aging_event_);
+  aging_event_ = event;
 }
 
 void PageQueues::EnableAnonymousReclaim(bool zero_forks) {

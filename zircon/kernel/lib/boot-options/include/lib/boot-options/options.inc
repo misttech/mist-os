@@ -611,16 +611,6 @@ The active ratio only triggers aging in the period between the
 and as such has no effect if the intervals are equal.
 )""")
 
-DEFINE_OPTION("kernel.page-scanner.eviction-interval-seconds", uint32_t,
-              page_scanner_eviction_interval_seconds, {10}, R"""(
-This option specifies the periodic interval (in seconds) at which kernel eviction
-will run in the background to try and keep the system out of memory pressure.
-This will only take effect if continuous eviction is enabled with
-`kernel.oom.evict-continuous`. If this value is lower than the page queue
-rotation / aging interval (10s by default), it will be ignored and the eviction
-interval will instead be set equal to the page queue rotation interval.
-)""")
-
 DEFINE_OPTION("kernel.page-scanner.start-at-boot", bool, page_scanner_start_at_boot, {true},
               R"""(
 This option causes the kernels active memory scanner to be initially

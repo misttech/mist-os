@@ -22,11 +22,6 @@ class TestPmmNode;
 }
 
 // Implements page evictor logic to free pages belonging to a PmmNode under memory pressure.
-// Provides APIs for
-// 1) one-shot eviction, which involves arming an eviction target and triggering eviction
-// and
-// 2) continuous eviction, which creates a dedicated thread to perform periodic evictions to
-// maintain a free memory level.
 // Eviction in this context is both direct eviction of pager backed memory and discardable VMO
 // memory, as well as by performing compression.
 // This class is thread-safe.
@@ -82,10 +77,8 @@ class Evictor {
   Evictor() = delete;
   ~Evictor();
 
-  // Called from the scanner with kernel cmdline values.
-  void SetContinuousEvictionInterval(zx_time_t eviction_interval);
   // Called from the scanner to enable eviction if required. Creates an eviction thread to process
-  // asynchronous eviction requests (both one-shot and continuous).
+  // asynchronous eviction requests.
   // By default this only enables user pager based eviction and |use_compression| can be used to
   // also perform compression.
   void EnableEviction(bool use_compression);
@@ -126,23 +119,7 @@ class Evictor {
                                 EvictionLevel eviction_level = EvictionLevel::OnlyOldest,
                                 Output output = Output::NoPrint);
 
-  // Enable continuous eviction on the eviction thread. Pages are evicted until the free memory
-  // level is restored to |free_mem_target| (in bytes) and at least |min_mem_to_free| (in bytes) has
-  // been evicted. The eviction thread will re-evaluate these two conditions at a fixed cadence of
-  // |default_eviction_interval_| (controlled by the kernel cmdline option
-  // `kernel.page-scanner.eviction-interval-seconds`), and continue to evict pages if required,
-  // until eviction is explicitly disabled with DisableContinuousEviction(). The |eviction_level| is
-  // a rough control that maps to how old a page needs to be for being considered for eviction. The
-  // |output| controls whether the eviction thread prints its progress each time it frees pages.
-  void EnableContinuousEviction(uint64_t min_mem_to_free, uint64_t free_mem_target,
-                                EvictionLevel eviction_level = EvictionLevel::OnlyOldest,
-                                Output output = Output::NoPrint);
-
-  // Disable continuous eviction on the eviction thread. Use EnableContinuousEviction() to re-enable
-  // eviction when required.
-  void DisableContinuousEviction();
-
-  // Whether any eviction (one-shot and continuous) can occur.
+  // Whether any eviction can occur.
   bool IsEvictionEnabled() const;
 
   // Whether eviction should attempt to use compression.
@@ -189,12 +166,7 @@ class Evictor {
   // The main loop for the eviction thread.
   int EvictionThreadLoop() TA_EXCL(lock_);
 
-  // Control parameters for continuous eviction.
-  EvictionTarget continuous_eviction_target_ TA_GUARDED(lock_) = {};
-  zx_time_t next_eviction_interval_ TA_GUARDED(lock_) = ZX_TIME_INFINITE;
-
-  // Targets for one-shot eviction, kept separate from the continuous eviction control parameters
-  // above.
+  // Target for eviction.
   EvictionTarget one_shot_eviction_target_ TA_GUARDED(lock_) = {};
 
   // Event that enforces only one eviction attempt to be active at any time. This prevents us from
@@ -205,7 +177,7 @@ class Evictor {
   // protected by this lock.
   mutable DECLARE_SPINLOCK_WITH_TYPE(Evictor, MonitoredSpinLock) lock_;
 
-  // The eviction thread used to process asynchronous requests (both one-shot and continuous).
+  // The eviction thread used to process asynchronous requests.
   // Created only if eviction is enabled i.e. |eviction_enabled_| is set to true.
   Thread *eviction_thread_ = nullptr;
   ktl::atomic<bool> eviction_thread_exiting_ = false;
@@ -237,9 +209,6 @@ class Evictor {
   // Control of what kinds of evictions to perform. This is const as it is designed only to
   // facilitate testing and must be set at construction.
   const uint8_t eviction_types_;
-  // Default continuous eviction interval. Set to 10s to match the scanner aging interval, since we
-  // won't find any new pages to evict before the next aging round.
-  zx_time_t default_eviction_interval_ TA_GUARDED(lock_) = ZX_SEC(10);
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_EVICTOR_H_
