@@ -68,6 +68,10 @@ zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderFactory() {
   return zx::ok(std::move(endpoints->client));
 }
 
+std::unique_ptr<driver_loader::Loader> DynamicLinkerFactory() {
+  return driver_loader::Loader::Create();
+}
+
 fdecl::ChildRef CreateChildRef(std::string name, std::string collection) {
   return fdecl::ChildRef({.name = std::move(name), .collection = std::move(collection)});
 }
@@ -142,8 +146,8 @@ class TestTransaction : public fidl::Transaction {
 
 fidl::ClientEnd<fuchsia_component::Realm> DriverRunnerTest::ConnectToRealm() {
   auto realm_endpoints = fidl::Endpoints<fcomponent::Realm>::Create();
-  realm_binding_.emplace(dispatcher(), std::move(realm_endpoints.server), &realm_,
-                         fidl::kIgnoreBindingClosure);
+  realm_bindings_.AddBinding(dispatcher(), std::move(realm_endpoints.server), &realm_,
+                             fidl::kIgnoreBindingClosure);
   return std::move(realm_endpoints.client);
 }
 FakeDriverIndex DriverRunnerTest::CreateDriverIndex() {
@@ -213,6 +217,17 @@ void DriverRunnerTest::SetupDriverRunner(FakeDriverIndex driver_index) {
                          dispatcher(), false);
   SetupDevfs();
 }
+
+void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
+    std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner) {
+  driver_index_.emplace(CreateDriverIndex());
+  driver_runner_.emplace(ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory,
+                         dispatcher(), false,
+                         driver_manager::DriverRunner::DynamicLinkerArgs{
+                             &DynamicLinkerFactory, std::move(driver_host_runner)});
+  SetupDevfs();
+}
+
 void DriverRunnerTest::SetupDriverRunner() { SetupDriverRunner(CreateDriverIndex()); }
 void DriverRunnerTest::PrepareRealmForDriverComponentStart(const std::string& name,
                                                            const std::string& url) {
@@ -253,6 +268,21 @@ void DriverRunnerTest::PrepareRealmForStartDriverHost(bool use_next_vdso) {
                                  &driver_host_, fidl::kIgnoreBindingClosure);
   });
 }
+
+void DriverRunnerTest::PrepareRealmForStartDriverHostDynamicLinker() {
+  constexpr std::string_view kCollection = "driver-hosts";
+  constexpr std::string_view kDriverHostName = "driver-host-new-";
+  constexpr std::string_view kComponentUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
+
+  realm().SetCreateChildHandler(
+      [kCollection, kDriverHostName, kComponentUrl](fdecl::CollectionRef collection,
+                                                    fdecl::Child decl, auto offers) {
+        EXPECT_EQ(kCollection, collection.name());
+        EXPECT_EQ(kDriverHostName, decl.name().value().substr(0, kDriverHostName.size()));
+        EXPECT_EQ(kComponentUrl, decl.url());
+      });
+}
+
 void DriverRunnerTest::StopDriverComponent(
     fidl::ClientEnd<frunner::ComponentController> component) {
   fidl::WireClient client(std::move(component), dispatcher());
@@ -275,12 +305,16 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
       });
 
   if (!driver.colocate) {
-    PrepareRealmForStartDriverHost(driver.use_next_vdso);
+    if (driver.use_dynamic_linker) {
+      PrepareRealmForStartDriverHostDynamicLinker();
+    } else {
+      PrepareRealmForStartDriverHost(driver.use_next_vdso);
+    }
   }
 
   fidl::Arena arena;
 
-  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 4);
+  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 5);
   program_entries[0].key.Set(arena, "binary");
   program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, driver.binary);
 
@@ -295,6 +329,10 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
   program_entries[3].key.Set(arena, "use_next_vdso");
   program_entries[3].value =
       fdata::wire::DictionaryValue::WithStr(arena, driver.use_next_vdso ? "true" : "false");
+
+  program_entries[4].key.Set(arena, "use_dynamic_linker");
+  program_entries[4].value =
+      fdata::wire::DictionaryValue::WithStr(arena, driver.use_dynamic_linker ? "true" : "false");
 
   auto program_builder = fdata::wire::Dictionary::Builder(arena);
   program_builder.entries(program_entries);
@@ -353,12 +391,13 @@ void DriverRunnerTest::Unbind() {
 void DriverRunnerTest::ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program,
                                        std::string_view binary, std::string_view colocate,
                                        std::string_view host_restart_on_crash,
-                                       std::string_view use_next_vdso) {
+                                       std::string_view use_next_vdso,
+                                       std::string_view use_dynamic_linker) {
   ZX_ASSERT(program.has_value());
   auto& entries_opt = program.value().entries();
   ZX_ASSERT(entries_opt.has_value());
   auto& entries = entries_opt.value();
-  EXPECT_EQ(4u, entries.size());
+  EXPECT_EQ(5u, entries.size());
   EXPECT_EQ("binary", entries[0].key());
   EXPECT_EQ(std::string(binary), entries[0].value()->str().value());
   EXPECT_EQ("colocate", entries[1].key());
@@ -367,6 +406,8 @@ void DriverRunnerTest::ValidateProgram(std::optional<::fuchsia_data::Dictionary>
   EXPECT_EQ(std::string(host_restart_on_crash), entries[2].value()->str().value());
   EXPECT_EQ("use_next_vdso", entries[3].key());
   EXPECT_EQ(std::string(use_next_vdso), entries[3].value()->str().value());
+  EXPECT_EQ("use_dynamic_linker", entries[4].key());
+  EXPECT_EQ(std::string(use_dynamic_linker), entries[4].value()->str().value());
 }
 void DriverRunnerTest::AssertNodeBound(const std::shared_ptr<CreatedChild>& child) {
   auto& node = child->node;

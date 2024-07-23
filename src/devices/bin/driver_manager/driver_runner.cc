@@ -228,7 +228,8 @@ Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
 DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
                            fidl::ClientEnd<fdi::DriverIndex> driver_index, InspectManager& inspect,
                            LoaderServiceFactory loader_service_factory,
-                           async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays)
+                           async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays,
+                           std::optional<DynamicLinkerArgs> dynamic_linker_args)
     : driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
@@ -239,7 +240,8 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       bind_manager_(this, this, dispatcher),
       runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)),
       removal_tracker_(dispatcher),
-      enable_test_shutdown_delays_(enable_test_shutdown_delays) {
+      enable_test_shutdown_delays_(enable_test_shutdown_delays),
+      dynamic_linker_args_(std::move(dynamic_linker_args)) {
   if (enable_test_shutdown_delays_) {
     // TODO(https://fxbug.dev/42084497): Allow the seed to be set from the configuration.
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -507,6 +509,41 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost(bool use_next_vdso) {
 
   auto driver_host_ptr = driver_host.get();
   driver_hosts_.push_back(std::move(driver_host));
+
+  return zx::ok(driver_host_ptr);
+}
+
+zx::result<DriverHost*> DriverRunner::CreateDriverHostDynamicLinker(
+    fit::callback<void(zx::result<>)> completion_cb) {
+  if (!dynamic_linker_args_.has_value()) {
+    LOGF(ERROR, "Dynamic linker was not available");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  auto dynamic_linker_service_client = dynamic_linker_args_->linker_service_factory();
+  if (!dynamic_linker_service_client) {
+    LOGF(ERROR, "Failed to create dynamic linker client");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  zx::channel bootstrap_sender, bootstrap_receiver;
+  zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Failed to create bootstrap channels: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  auto res = dynamic_linker_args_->driver_host_runner->StartDriverHost(
+      dynamic_linker_service_client.get(), std::move(bootstrap_receiver), std::move(completion_cb));
+  if (res.is_error()) {
+    LOGF(ERROR, "Failed to start driver host: %s", res.status_string());
+    return res.take_error();
+  }
+
+  auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
+      std::move(bootstrap_sender), std::move(dynamic_linker_service_client));
+
+  auto driver_host_ptr = driver_host.get();
+  dynamic_linker_driver_hosts_.push_back(std::move(driver_host));
 
   return zx::ok(driver_host_ptr);
 }

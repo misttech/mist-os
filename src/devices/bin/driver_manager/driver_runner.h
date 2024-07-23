@@ -21,11 +21,13 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "src/devices/bin/driver_loader/loader.h"
 #include "src/devices/bin/driver_manager/bind/bind_manager.h"
 #include "src/devices/bin/driver_manager/bootup_tracker.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 #include "src/devices/bin/driver_manager/driver_host.h"
+#include "src/devices/bin/driver_manager/driver_host_runner.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/node.h"
 #include "src/devices/bin/driver_manager/runner.h"
@@ -45,11 +47,22 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                      public NodeRemover {
   using LoaderServiceFactory = fit::function<zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>>()>;
 
+  // TODO(https://fxbug.dev/341997294): replace pointer with a FIDL channel.
+  using DynamicLinkerServiceFactory = fit::function<std::unique_ptr<driver_loader::Loader>()>;
+
  public:
+  // Args required to enable dynamic linking
+  struct DynamicLinkerArgs {
+    DynamicLinkerServiceFactory linker_service_factory;
+    std::unique_ptr<DriverHostRunner> driver_host_runner;
+  };
+
+  // |Dynamic_linker_args| should be set if dynamic linking is available.
   DriverRunner(fidl::ClientEnd<fuchsia_component::Realm> realm,
                fidl::ClientEnd<fuchsia_driver_index::DriverIndex> driver_index,
                InspectManager& inspect, LoaderServiceFactory loader_service_factory,
-               async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays);
+               async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays,
+               std::optional<DynamicLinkerArgs> dynamic_linker_args = std::nullopt);
 
   // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager> interface
   void AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) override;
@@ -127,6 +140,11 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   const BindManager& bind_manager() const { return bind_manager_; }
   driver_manager::Runner& runner_for_tests() { return runner_; }
 
+  driver_manager::DriverHostRunner* driver_host_runner_for_tests() {
+    return dynamic_linker_args_.has_value() ? dynamic_linker_args_->driver_host_runner.get()
+                                            : nullptr;
+  }
+
  private:
   // NodeManager interface.
   // Attempt to bind `node`. A nullptr for result_tracker is acceptable if the caller doesn't intend
@@ -136,6 +154,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                  std::shared_ptr<BindResultTracker> result_tracker) override;
   void DestroyDriverComponent(Node& node, DestroyDriverComponentCallback callback) override;
   zx::result<DriverHost*> CreateDriverHost(bool use_next_vdso) override;
+  // Creates the driver host component, loads the driver host using dynamic linking,
+  // and calls |cb| on completion. |cb| will only be called if the return value is zx::ok.
+  zx::result<DriverHost*> CreateDriverHostDynamicLinker(
+      fit::callback<void(zx::result<>)> completion_cb) override;
   bool IsDriverHostValid(DriverHost* driver_host) const override;
 
   // BindManagerBridge interface.
@@ -180,6 +202,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   std::shared_ptr<BootupTracker> bootup_tracker_;
 
   fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>> driver_hosts_;
+  // Driver hosts started using dynamic linking.
+  fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>
+      dynamic_linker_driver_hosts_;
 
   // True if the driver manager should inject test delays in the shutdown process. Set by the
   // structured config.
@@ -188,6 +213,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   // RNG engine for the shutdown test delays. For reproducibility reasons, only one engine should
   // be used.
   std::shared_ptr<std::mt19937> shutdown_test_delay_rng_;
+
+  // Set if dynamic linking is available.
+  std::optional<DynamicLinkerArgs> dynamic_linker_args_;
 };
 
 Collection ToCollection(const Node& node, fuchsia_driver_framework::DriverPackageType package_type);

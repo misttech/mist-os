@@ -22,9 +22,15 @@ namespace {
 
 namespace fcomponent = fuchsia_component;
 namespace fdata = fuchsia_data;
+namespace fdfw = fuchsia_driver_framework;
 namespace fdecl = fuchsia_component_decl;
 namespace fio = fuchsia::io;
 namespace frunner = fuchsia_component_runner;
+
+void CallComponentStart(driver_runner::TestRealm& realm,
+                        driver_manager::DriverHostRunner& driver_host_runner,
+                        std::string_view driver_host_path,
+                        const std::vector<std::string_view> expected_libs);
 
 class TestTransaction : public fidl::Transaction {
  private:
@@ -111,9 +117,6 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
                        const std::vector<std::string_view> expected_libs);
 
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm();
-  void CallComponentStart(driver_manager::DriverHostRunner& driver_host_runner,
-                          std::string_view driver_host_path,
-                          const std::vector<std::string_view> expected_libs);
 
   // Returns the exit status of the process.
   int64_t WaitForProcessExit(const zx::process& process);
@@ -161,7 +164,7 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   ASSERT_TRUE(created_component);
 
   ASSERT_NO_FATAL_FAILURE(
-      CallComponentStart(*driver_host_runner_, driver_host_path, expected_libs));
+      CallComponentStart(realm(), *driver_host_runner_, driver_host_path, expected_libs));
   ASSERT_TRUE(got_cb);
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
@@ -179,9 +182,10 @@ fidl::ClientEnd<fuchsia_component::Realm> DriverHostRunnerTest::ConnectToRealm()
   return std::move(realm_endpoints.client);
 }
 
-void DriverHostRunnerTest::CallComponentStart(driver_manager::DriverHostRunner& driver_host_runner,
-                                              std::string_view driver_host_path,
-                                              const std::vector<std::string_view> expected_libs) {
+void CallComponentStart(driver_runner::TestRealm& realm,
+                        driver_manager::DriverHostRunner& driver_host_runner,
+                        std::string_view driver_host_path,
+                        const std::vector<std::string_view> expected_libs) {
   async::Loop dir_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   ASSERT_EQ(ZX_OK, dir_loop.StartThread());
 
@@ -247,7 +251,7 @@ void DriverHostRunnerTest::CallComponentStart(driver_manager::DriverHostRunner& 
   start_info_builder.resolved_url("fuchsia-boot:///driver_host2#meta/driver_host2.cm")
       .program(program_builder.Build())
       .ns(ns_entries)
-      .numbered_handles(realm().TakeHandles(arena));
+      .numbered_handles(realm.TakeHandles(arena));
 
   auto controller_endpoints = fidl::Endpoints<frunner::ComponentController>::Create();
   TestTransaction transaction;
@@ -295,6 +299,49 @@ TEST_F(DriverHostRunnerTest, StartFakeDriverHost) {
       "libdh-deps-c.so",
   };
   StartDriverHost(kDriverHostPath, kExpectedLibs);
+}
+
+class DynamicLinkingTest : public driver_runner::DriverRunnerTest {};
+
+TEST_F(DynamicLinkingTest, StartRootDriver) {
+  constexpr std::string_view kDriverHostPath = "/pkg/bin/driver_host2";
+  // TODO(https://fxbug.dev/341998660): setup fake driver and expected /pkg.
+  const std::string kRootDriverBinary = "driver/fake_driver.so";
+
+  PrepareRealmForDriverComponentStart("dev", driver_runner::root_driver_url);
+
+  auto driver_host_runner =
+      std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
+
+  SetupDriverRunnerWithDynamicLinker(std::move(driver_host_runner));
+
+  auto start = driver_runner().StartRootDriver(driver_runner::root_driver_url);
+  ASSERT_FALSE(start.is_error());
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  StartDriverHandler start_handler = [kRootDriverBinary](driver_runner::TestDriver* driver,
+                                                         fdfw::DriverStartArgs start_args) {
+    ValidateProgram(start_args.program(), kRootDriverBinary, "false" /* colocate */,
+                    "false" /* host_restart_on_crash */, "false" /* use_next_vdso */,
+                    "true" /* use_dynamic_linker */);
+  };
+  // TODO(https://fxbug.dev/341998660): currently starting the driver has not been
+  // completely implemented, so the returned StartDriverResult is not very useful.
+  [[maybe_unused]] auto root_driver = StartDriver(
+      {
+          .url = driver_runner::root_driver_url,
+          .binary = kRootDriverBinary,
+          .use_dynamic_linker = true,
+      },
+      std::move(start_handler));
+
+  const std::vector<std::string_view> kExpectedLibs;
+  ASSERT_NO_FATAL_FAILURE(CallComponentStart(
+      realm(), *driver_runner().driver_host_runner_for_tests(), kDriverHostPath, kExpectedLibs));
+
+  std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
+      driver_runner().driver_host_runner_for_tests()->DriverHosts();
+  ASSERT_EQ(1u, driver_hosts.size());
 }
 
 }  // namespace
