@@ -106,6 +106,12 @@ impl argh::FromArgValue for ConfigLevel {
     }
 }
 
+pub async fn invalidate_global_cache() {
+    if let Some(env_context) = global_env_context() {
+        crate::cache::invalidate(&env_context.cache).await;
+    }
+}
+
 pub fn global_env_context() -> Option<EnvironmentContext> {
     ENV.lock().unwrap().clone()
 }
