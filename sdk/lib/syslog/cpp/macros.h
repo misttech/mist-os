@@ -307,9 +307,6 @@ uint8_t GetVlogVerbosity();
 // LOG_FATAL and above is always true.
 bool IsSeverityEnabled(LogSeverity severity);
 
-// Deprecated, please use IsSeverityEnabled instead.
-inline bool ShouldCreateLogMessage(LogSeverity severity) { return IsSeverityEnabled(severity); }
-
 }  // namespace fuchsia_logging
 
 #define FX_LOG_STREAM(severity, tag)                                                            \
