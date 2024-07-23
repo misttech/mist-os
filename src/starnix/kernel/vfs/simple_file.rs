@@ -161,14 +161,9 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
         _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
-        offset: usize,
+        _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        if offset != 0 {
-            // TODO: Validate whether this error condition is correct.
-            // It doesn't appear to be correct for /proc/<pid>/oom_*
-            return error!(EINVAL);
-        }
         let data = data.read_all()?;
         let len = data.len();
         self.0.write(current_task, data)?;
