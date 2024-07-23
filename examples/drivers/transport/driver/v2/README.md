@@ -2,8 +2,8 @@
 
 Reviewed on: 2024-03-20
 
-This example demonstrates a parent driver serving a FIDL protocol over driver transport and a
-child driver that connects and queries data from it.
+This example demonstrates a parent driver that implements and serves the driver transport FIDL protocol, fuchsia.hardware.i2cimpl, and a child driver that connects
+to the protocol to interact with the parent.
 
 ## Building
 
@@ -57,9 +57,9 @@ Moniker  : dev.driver_transport_parent.driver_transport_child
 Driver   : fuchsia-pkg://fuchsia.com/driver_transport#meta/driver_transport_child.cm
 2 Properties
 [ 1/  2] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
-[ 2/  2] : Key "fuchsia.examples.gizmo.Service" Value "fuchsia.examples.gizmo.Service.DriverTransport"
+[ 2/  2] : Key "fuchsia.hardware.i2cimpl.Service" Value "fuchsia.hardware.i2cimpl.Service.DriverTransport"
 1 Offers
-Service: fuchsia.examples.gizmo.Service
+Service: fuchsia.hardware.i2cimpl.Service
   Source: dev.driver_transport_parent
   Instances: default
 

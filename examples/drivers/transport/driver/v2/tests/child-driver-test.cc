@@ -11,50 +11,67 @@
 namespace testing {
 
 namespace {
-constexpr uint32_t kTestHardwareId = 0x1234567;
-constexpr uint32_t kTestMajorVersion = 0x9;
-constexpr uint32_t kTestMinorVersion = 0x5;
+constexpr uint32_t kTestMaxTransferSize = 0x1234567;
+constexpr uint32_t kTestBitrate = 0x5;
 }  // namespace
 
-class FakeGizmoServer : public fdf::WireServer<fuchsia_examples_gizmo::Device> {
+class FakeI2cImplServer : public fdf::WireServer<fuchsia_hardware_i2cimpl::Device> {
  public:
-  void GetHardwareId(fdf::Arena& arena, GetHardwareIdCompleter::Sync& completer) override {
-    completer.buffer(arena).ReplySuccess(kTestHardwareId);
+  void GetMaxTransferSize(fdf::Arena& arena,
+                          GetMaxTransferSizeCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess(kTestMaxTransferSize);
   }
 
-  void GetFirmwareVersion(fdf::Arena& arena,
-                          GetFirmwareVersionCompleter::Sync& completer) override {
-    completer.buffer(arena).ReplySuccess(kTestMajorVersion, kTestMinorVersion);
+  void SetBitrate(SetBitrateRequestView request, fdf::Arena& arena,
+                  SetBitrateCompleter::Sync& completer) override {
+    bitrate = request->bitrate;
+    completer.buffer(arena).ReplySuccess();
   }
+
+  void Transact(TransactRequestView request, fdf::Arena& arena,
+                TransactCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess({});
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FDF_LOG(
+        ERROR,
+        "Unknown method in fuchsia.hardware.i2cimpl Device protocol, closing with ZX_ERR_NOT_SUPPORTED");
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  uint32_t bitrate;
 };
 
 class DriverTransportTestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    fuchsia_examples_gizmo::Service::InstanceHandler handler({
+    fuchsia_hardware_i2cimpl::Service::InstanceHandler handler({
         .device = server_bindings_.CreateHandler(&server_, fdf::Dispatcher::GetCurrent()->get(),
                                                  fidl::kIgnoreBindingClosure),
     });
 
-    auto result = to_driver_vfs.AddService<fuchsia_examples_gizmo::Service>(std::move(handler));
+    auto result = to_driver_vfs.AddService<fuchsia_hardware_i2cimpl::Service>(std::move(handler));
     EXPECT_EQ(ZX_OK, result.status_value());
     return zx::ok();
   }
 
+  uint32_t GetBitrate() const { return server_.bitrate; }
+
  private:
-  FakeGizmoServer server_;
-  fdf::ServerBindingGroup<fuchsia_examples_gizmo::Device> server_bindings_;
+  FakeI2cImplServer server_;
+  fdf::ServerBindingGroup<fuchsia_hardware_i2cimpl::Device> server_bindings_;
 };
 
 class FixtureConfig final {
  public:
-  using DriverType = driver_transport::ChildDriverTransportDriver;
+  using DriverType = driver_transport::ChildTransportDriver;
   using EnvironmentType = DriverTransportTestEnvironment;
 };
 
-class ChildDriverTransportDriverTest
-    : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
-      public ::testing::Test {
+class ChildTransportDriverTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
+                                 public ::testing::Test {
   void SetUp() override {
     zx::result<> result = StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
@@ -65,11 +82,12 @@ class ChildDriverTransportDriverTest
   }
 };
 
-TEST_F(ChildDriverTransportDriverTest, VerifyQueryValues) {
+TEST_F(ChildTransportDriverTest, VerifyQueryValues) {
   // Verify that the queried values match the fake parent driver server.
-  EXPECT_EQ(kTestHardwareId, driver()->hardware_id());
-  EXPECT_EQ(kTestMajorVersion, driver()->major_version());
-  EXPECT_EQ(kTestMinorVersion, driver()->minor_version());
+  EXPECT_EQ(kTestMaxTransferSize, driver()->max_transfer_size());
+
+  RunInEnvironmentTypeContext(
+      [&](DriverTransportTestEnvironment& env) { EXPECT_EQ(kTestBitrate, env.GetBitrate()); });
 }
 
 }  // namespace testing

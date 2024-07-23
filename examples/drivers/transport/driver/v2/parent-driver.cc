@@ -11,21 +11,21 @@
 
 namespace driver_transport {
 
-zx::result<> ParentDriverTransportDriver::Start() {
-  // Publish `fuchsia.examples.gizmo.Service` to the outgoing directory.
-  fuchsia_examples_gizmo::Service::InstanceHandler handler({
+zx::result<> ParentTransportDriver::Start() {
+  // Publish `fuchsia.hardware.i2cimpl.Service` to the outgoing directory.
+  fuchsia_hardware_i2cimpl::Service::InstanceHandler handler({
       .device = server_bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
                                                fidl::kIgnoreBindingClosure),
   });
-  zx::result result = outgoing()->AddService<fuchsia_examples_gizmo::Service>(std::move(handler));
+  zx::result result = outgoing()->AddService<fuchsia_hardware_i2cimpl::Service>(std::move(handler));
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
     return result.take_error();
   }
 
   // Add a child with a `fuchsia.examples.gizmo.Service` offer.
-  zx::result child_result =
-      AddChild("driver_transport_child", {}, {fdf::MakeOffer2<fuchsia_examples_gizmo::Service>()});
+  zx::result child_result = AddChild("driver_transport_child", {},
+                                     {fdf::MakeOffer2<fuchsia_hardware_i2cimpl::Service>()});
   if (child_result.is_error()) {
     return child_result.take_error();
   }
@@ -34,16 +34,33 @@ zx::result<> ParentDriverTransportDriver::Start() {
   return zx::ok();
 }
 
-void ParentDriverTransportDriver::GetHardwareId(fdf::Arena& arena,
-                                                GetHardwareIdCompleter::Sync& completer) {
+void ParentTransportDriver::GetMaxTransferSize(fdf::Arena& arena,
+                                               GetMaxTransferSizeCompleter::Sync& completer) {
   completer.buffer(arena).ReplySuccess(0x1234ABCD);
 }
 
-void ParentDriverTransportDriver::GetFirmwareVersion(fdf::Arena& arena,
-                                                     GetFirmwareVersionCompleter::Sync& completer) {
-  completer.buffer(arena).ReplySuccess(0x0, 0x1);
+void ParentTransportDriver::SetBitrate(SetBitrateRequestView request, fdf::Arena& arena,
+                                       SetBitrateCompleter::Sync& completer) {
+  bitrate_ = request->bitrate;
+  completer.buffer(arena).ReplySuccess();
+}
+
+void ParentTransportDriver::Transact(TransactRequestView request, fdf::Arena& arena,
+                                     TransactCompleter::Sync& completer) {
+  std::vector<fuchsia_hardware_i2cimpl::wire::ReadData> reads;
+  reads.push_back({.data = fidl::VectorView<uint8_t>(arena, {0, 1, 2})});
+  completer.buffer(arena).ReplySuccess({arena, reads});
+}
+
+void ParentTransportDriver::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(
+      ERROR,
+      "Unknown method in fuchsia.hardware.i2cimpl Device protocol, closing with ZX_ERR_NOT_SUPPORTED");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace driver_transport
 
-FUCHSIA_DRIVER_EXPORT(driver_transport::ParentDriverTransportDriver);
+FUCHSIA_DRIVER_EXPORT(driver_transport::ParentTransportDriver);
