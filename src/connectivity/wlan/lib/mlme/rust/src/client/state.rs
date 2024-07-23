@@ -1493,7 +1493,6 @@ mod tests {
     use wlan_common::test_utils::fake_stas::IesOverrides;
     use wlan_common::timer::{self, create_timer};
     use wlan_common::{assert_variant, fake_bss_description, mgmt_writer};
-    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
     use wlan_frame_writer::write_frame_with_dynamic_buffer;
     use {
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_zircon as zx,
@@ -1561,7 +1560,6 @@ mod tests {
             Context {
                 _config: Default::default(),
                 device: self.fake_device.clone(),
-                buffer_provider: BufferProvider::new(FakeFfiBufferProvider::new()),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
             }

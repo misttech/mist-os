@@ -17,6 +17,7 @@ use crate::error::Error;
 use crate::{akm_algorithm, ddk_converter};
 use anyhow::format_err;
 use channel_switch::ChannelState;
+use fdf::{Arena, ArenaStaticBox};
 use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid};
 use scanner::Scanner;
 use state::States;
@@ -33,7 +34,6 @@ use wlan_common::sequence::SequenceManager;
 use wlan_common::time::TimeUnit;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm};
-use wlan_ffi_transport::{BufferProvider, FinalizedBuffer};
 use wlan_frame_writer::{
     write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
 };
@@ -92,7 +92,6 @@ pub struct ClientConfig {
 pub struct Context<D> {
     _config: ClientConfig,
     device: D,
-    buffer_provider: BufferProvider,
     timer: Timer<TimedEvent>,
     seq_mgr: SequenceManager,
 }
@@ -111,10 +110,9 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
     async fn new(
         config: Self::Config,
         device: Self::Device,
-        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, anyhow::Error> {
-        Self::new(config, device, buffer_provider, timer).await.map_err(From::from)
+        Self::new(config, device, timer).await.map_err(From::from)
     }
     async fn handle_mlme_request(
         &mut self,
@@ -206,19 +204,12 @@ impl<D: DeviceOps> ClientMlme<D> {
     pub async fn new(
         config: ClientConfig,
         mut device: D,
-        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, Error> {
         let iface_mac = device::try_query_iface_mac(&mut device).await?;
         Ok(Self {
             sta: None,
-            ctx: Context {
-                _config: config,
-                device,
-                buffer_provider,
-                timer,
-                seq_mgr: SequenceManager::new(),
-            },
+            ctx: Context { _config: config, device, timer, seq_mgr: SequenceManager::new() },
             scanner: Scanner::new(iface_mac.into()),
             channel_state: Default::default(),
         })
@@ -617,7 +608,7 @@ impl Client {
         ctx: &mut Context<D>,
         state: PowerState,
     ) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(ctx.buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -635,7 +626,7 @@ impl Client {
             },
         })?;
         ctx.device
-            .send_wlan_frame(buffer.finalize(written), fidl_softmac::WlanTxInfoFlags::empty(), None)
+            .send_wlan_frame(buffer, fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|error| Error::Status(format!("error sending power management frame"), error))
     }
 
@@ -726,7 +717,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         result_code: mac::StatusCode,
         auth_content: &[u8],
     ) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -745,7 +736,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             },
             body: auth_content,
         })?;
-        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
+        self.send_mgmt_or_ctrl_frame(buffer)
             .map_err(|s| Error::Status(format!("error sending open auth frame"), s))
     }
 
@@ -770,7 +761,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         let vht_cap = cap.vht_cap;
         let security_ie = self.sta.connect_req.security_ie.clone();
 
-        let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -799,7 +790,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 vht_cap?: vht_cap,
             },
         })?;
-        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
+        self.send_mgmt_or_ctrl_frame(buffer)
             .map_err(|s| Error::Status(format!("error sending assoc req frame"), s))
     }
 
@@ -809,7 +800,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     // be some investigation, whether these "keep alive" frames are the right way of keeping a
     // client associated to legacy APs.
     fn send_keep_alive_resp_frame(&mut self) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 mac::FixedDataHdrFields: &data_writer::data_hdr_client_to_ap(
                     mac::FrameControl(0)
@@ -824,12 +815,12 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         })?;
         self.ctx
             .device
-            .send_wlan_frame(buffer.finalize(written), fidl_softmac::WlanTxInfoFlags::empty(), None)
+            .send_wlan_frame(buffer, fidl_softmac::WlanTxInfoFlags::empty(), None)
             .map_err(|s| Error::Status(format!("error sending keep alive frame"), s))
     }
 
     pub fn send_deauth_frame(&mut self, reason_code: mac::ReasonCode) -> Result<(), Error> {
-        let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
                     mac::FrameControl(0)
@@ -846,7 +837,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             },
         })?;
         let result = self
-            .send_mgmt_or_ctrl_frame(buffer.finalize(written))
+            .send_mgmt_or_ctrl_frame(buffer)
             .map_err(|s| Error::Status(format!("error sending deauthenticate frame"), s));
         // Clear main_channel since there is no "main channel" after deauthenticating
         self.channel_state.bind(&mut self.ctx, &mut self.scanner).clear_main_channel();
@@ -902,7 +893,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         };
         let addr4 = if from_ds && to_ds { Some(src) } else { None };
 
-        let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -938,14 +929,12 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             mac::ETHER_TYPE_EAPOL => fidl_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY,
             _ => fidl_softmac::WlanTxInfoFlags::empty(),
         };
-        self.ctx.device.send_wlan_frame(buffer.finalize(written), tx_flags, Some(async_id)).map_err(
-            |s| {
-                if !async_id_provided {
-                    wtrace::async_end_wlansoftmac_tx(async_id, s);
-                }
-                Error::Status(format!("error sending data frame"), s)
-            },
-        )
+        self.ctx.device.send_wlan_frame(buffer, tx_flags, Some(async_id)).map_err(|s| {
+            if !async_id_provided {
+                wtrace::async_end_wlansoftmac_tx(async_id, s);
+            }
+            Error::Status(format!("error sending data frame"), s)
+        })
     }
 
     /// Sends an MLME-EAPOL.indication to MLME's SME peer.
@@ -1008,7 +997,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     pub fn send_ps_poll_frame(&mut self, aid: Aid) -> Result<(), Error> {
         const PS_POLL_ID_MASK: u16 = 0b11000000_00000000;
 
-        let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 mac::FrameControl: &mac::FrameControl(0)
                     .with_frame_type(mac::FrameType::CTRL)
@@ -1022,7 +1011,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 },
             },
         })?;
-        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
+        self.send_mgmt_or_ctrl_frame(buffer)
             .map_err(|s| Error::Status(format!("error sending PS-Poll frame"), s))
     }
 
@@ -1193,7 +1182,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .unwrap_or_else(|e| error!("error sending OnSaeHandshakeInd: {}", e));
     }
 
-    fn send_mgmt_or_ctrl_frame(&mut self, buffer: FinalizedBuffer) -> Result<(), zx::Status> {
+    fn send_mgmt_or_ctrl_frame(&mut self, buffer: ArenaStaticBox<[u8]>) -> Result<(), zx::Status> {
         self.ctx.device.send_wlan_frame(buffer, fidl_softmac::WlanTxInfoFlags::empty(), None)
     }
 }
@@ -1265,7 +1254,9 @@ impl<'a, D: DeviceOps> BlockAckTx for BoundClient<'a, D> {
     ///
     /// BlockAck frames are described by 802.11-2016, section 9.6.5.2, 9.6.5.3, and 9.6.5.4.
     fn send_block_ack_frame(&mut self, n: usize, body: &[u8]) -> Result<(), Error> {
-        let mut buffer = self.ctx.buffer_provider.get_buffer(n)?;
+        let arena = Arena::new().expect("unable to create arena");
+        let buffer = arena.insert_default_slice::<u8>(n);
+        let mut buffer = arena.make_static(buffer);
         let mut writer = BufferWriter::new(&mut buffer[..]);
         write_block_ack_hdr(
             &mut writer,
@@ -1274,8 +1265,7 @@ impl<'a, D: DeviceOps> BlockAckTx for BoundClient<'a, D> {
             &mut self.ctx.seq_mgr,
         )
         .and_then(|_| writer.append_bytes(body).map_err(Into::into))?;
-        let written = writer.bytes_written();
-        self.send_mgmt_or_ctrl_frame(buffer.finalize(written))
+        self.send_mgmt_or_ctrl_frame(buffer)
             .map_err(|status| Error::Status(format!("error sending BlockAck frame"), status))
     }
 }
@@ -1333,7 +1323,6 @@ mod tests {
     use wlan_common::test_utils::fake_frames::*;
     use wlan_common::timer::{self, create_timer};
     use wlan_common::{assert_variant, fake_bss_description, fake_fidl_bss_description};
-    use wlan_ffi_transport::FakeFfiBufferProvider;
     use wlan_sme::responder::Responder;
     use wlan_statemachine::*;
     use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal};
@@ -1399,7 +1388,6 @@ mod tests {
             let mut mlme = ClientMlme::new(
                 Default::default(),
                 self.fake_device.clone(),
-                BufferProvider::new(FakeFfiBufferProvider::new()),
                 self.timer.take().unwrap(),
             )
             .await

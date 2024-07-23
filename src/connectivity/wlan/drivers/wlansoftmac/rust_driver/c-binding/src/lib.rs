@@ -10,9 +10,7 @@ use fuchsia_async::LocalExecutor;
 use std::ffi::c_void;
 use std::sync::Once;
 use tracing::info;
-use wlan_ffi_transport::{
-    BufferProvider, EthernetRx, FfiBufferProvider, FfiEthernetRx, FfiWlanTx, WlanTx,
-};
+use wlan_ffi_transport::{EthernetRx, FfiEthernetRx, FfiWlanTx, WlanTx};
 use wlan_mlme::completers::Completer;
 use wlan_mlme::device::Device;
 use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx, wlan_trace as wtrace};
@@ -72,7 +70,6 @@ pub unsafe extern "C" fn start_bridged_wlansoftmac(
     ),
     ethernet_rx: FfiEthernetRx,
     wlan_tx: FfiWlanTx,
-    buffer_provider: FfiBufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
     // The Fuchsia syslog must not be initialized from Rust more than once per process. In the case
@@ -150,11 +147,8 @@ pub unsafe extern "C" fn start_bridged_wlansoftmac(
         };
         let device = Device::new(wlan_softmac_bridge_proxy, ethernet_rx, wlan_tx);
 
-        let result = executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(
-            start_completer,
-            device,
-            BufferProvider::new(buffer_provider),
-        ));
+        let result =
+            executor.run_singlethreaded(wlansoftmac_rust::start_and_serve(start_completer, device));
         shutdown_completer.reply(result);
     });
 

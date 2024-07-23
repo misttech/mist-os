@@ -19,7 +19,6 @@
 
 #include <wlan/drivers/log.h>
 
-#include "buffer_allocator.h"
 #include "softmac_ifc_bridge.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
@@ -94,22 +93,6 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   std::shared_ptr<std::mutex> ethernet_proxy_lock_;
   ddk::EthernetIfcProtocolClient* ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
   mutable std::optional<uint32_t>* cached_ethernet_status_ __TA_GUARDED(ethernet_proxy_lock_);
-
-  static wlansoftmac_buffer_t IntoRustBuffer(std::unique_ptr<Buffer> buffer);
-  wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
-      .get_buffer = [](size_t min_capacity) -> wlansoftmac_buffer_t {
-        if (min_capacity == 0) {
-          return IntoRustBuffer(std::unique_ptr<Buffer>(nullptr));
-        }
-
-        WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_buffer_provider_ops_t.get_buffer");
-        // Note: Once Rust MLME supports more than sending WLAN frames this needs
-        // to change.
-        auto buffer = GetBuffer(min_capacity);
-        ZX_DEBUG_ASSERT(buffer != nullptr);
-        return IntoRustBuffer(std::move(buffer));
-      },
-  };
 };
 
 }  // namespace wlan::drivers::wlansoftmac

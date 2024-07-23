@@ -422,6 +422,7 @@ closed protocol WlanTx {
         2: packet_size uint64;
         3: packet_info WlanTxInfo;
         4: async_id uint64;
+        5: arena uint64;
     }) -> () error zx.Status;
 };
 

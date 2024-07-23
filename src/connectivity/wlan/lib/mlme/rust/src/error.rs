@@ -22,8 +22,6 @@ pub enum Error {
     Internal(anyhow::Error),
     #[error("{}", _0)]
     Fidl(fidl::Error),
-    #[error("{}", _0)]
-    Allocator(wlan_ffi_transport::Error),
     #[error("{}; {}", _0, _1)]
     Status(String, zx::Status),
 }
@@ -42,10 +40,6 @@ impl From<Error> for zx::Status {
                 | fidl::Error::ServerResponseWrite(status)
                 | fidl::Error::ServerRequestRead(status) => status,
                 _ => zx::Status::IO,
-            },
-            Error::Allocator(e) => match e {
-                wlan_ffi_transport::Error::NoResources { .. } => zx::Status::NO_RESOURCES,
-                wlan_ffi_transport::Error::InvalidFfiBuffer(..) => zx::Status::INTERNAL,
             },
             Error::Status(_, status) => status,
         }
@@ -106,9 +100,9 @@ impl From<fidl::Error> for Error {
     }
 }
 
-impl From<wlan_ffi_transport::Error> for Error {
-    fn from(e: wlan_ffi_transport::Error) -> Self {
-        Error::Allocator(e)
+impl From<zx::Status> for Error {
+    fn from(e: zx::Status) -> Self {
+        Error::Status(e.to_string(), e)
     }
 }
 
@@ -134,34 +128,8 @@ mod tests {
         let status = zx::Status::from(Error::BufferTooSmall);
         assert_eq!(status, zx::Status::BUFFER_TOO_SMALL);
 
-        let status = zx::Status::from(Error::Allocator(wlan_ffi_transport::Error::NoResources {
-            requested_capacity: 42,
-        }));
-        assert_eq!(status, zx::Status::NO_RESOURCES);
-
-        let status =
-            zx::Status::from(Error::Allocator(wlan_ffi_transport::Error::InvalidFfiBuffer(
-                wlan_ffi_transport::InvalidFfiBuffer::NullCtx,
-            )));
-        assert_eq!(status, zx::Status::INTERNAL);
-
         let status =
             zx::Status::from(Error::Fidl(fidl::Error::ClientWrite(zx::Status::NOT_SUPPORTED)));
         assert_eq!(status, zx::Status::NOT_SUPPORTED);
-    }
-
-    #[test]
-    fn test_result_into_status() {
-        let status = Err(Error::Status("foo".to_string(), zx::Status::OK));
-        assert_eq!(status.into_raw_zx_status(), zx::sys::ZX_OK);
-
-        let status = Err(Error::Status("foo".to_string(), zx::Status::NOT_SUPPORTED));
-        assert_eq!(status.into_raw_zx_status(), zx::sys::ZX_ERR_NOT_SUPPORTED);
-
-        let status = Err(Error::Internal(format_err!("lorem")));
-        assert_eq!(status.into_raw_zx_status(), zx::sys::ZX_ERR_INTERNAL);
-
-        let status = Ok(());
-        assert_eq!(status.into_raw_zx_status(), zx::sys::ZX_OK);
     }
 }

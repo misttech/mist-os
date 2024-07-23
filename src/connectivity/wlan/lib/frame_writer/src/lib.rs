@@ -6,8 +6,7 @@ pub use wlan_frame_writer_macro::{
     write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
 };
 
-#[doc(hidden)]
-pub use wlan_ffi_transport::BufferProvider as __BufferProvider;
+pub use fdf::Arena as __Arena;
 
 #[cfg(test)]
 extern crate self as wlan_frame_writer;
@@ -16,6 +15,7 @@ extern crate self as wlan_frame_writer;
 mod tests {
     use super::*;
     use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+    use fuchsia_zircon::Status;
     use ieee80211::MacAddr;
     use std::fmt;
     use thiserror::Error;
@@ -27,7 +27,6 @@ mod tests {
     use wlan_common::mac::*;
     use wlan_common::organization::Oui;
     use wlan_common::{self as common};
-    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
 
     #[derive(Debug, Error, PartialEq, Eq, Ord, PartialOrd, Hash)]
     pub enum Error {
@@ -53,8 +52,8 @@ mod tests {
         }
     }
 
-    impl From<wlan_ffi_transport::Error> for Error {
-        fn from(_: wlan_ffi_transport::Error) -> Self {
+    impl From<Status> for Error {
+        fn from(_: Status) -> Self {
             Error::FrameWriteError
         }
     }
@@ -71,10 +70,9 @@ mod tests {
     }
 
     #[test]
-    fn write_emit_offset_buffer_provider() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
+    fn write_emit_offset_default_source() {
         let mut offset = 0;
-        write_frame!(buffer_provider, {
+        write_frame!({
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
                 offset @ extended_supported_rates: &[1u8, 2, 3, 4]
@@ -129,34 +127,31 @@ mod tests {
 
     #[test]
     fn write_ssid() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: { ssid: &b"foobar"[..] }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 8);
+        assert_eq!(buffer.len(), 8);
         assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114,][..], &buffer[..]);
     }
 
     #[test]
     fn write_ssid_empty() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: { ssid: [0u8; 0] }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 2);
+        assert_eq!(buffer.len(), 2);
         assert_eq!(&[0, 0][..], &buffer[..]);
     }
 
     #[test]
     fn write_ssid_max() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: { ssid: [2u8; (fidl_ieee80211::MAX_SSID_BYTE_LEN as usize)] }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 34);
+        assert_eq!(buffer.len(), 34);
         #[rustfmt::skip]
         assert_eq!(
             &[
@@ -172,8 +167,7 @@ mod tests {
 
     #[test]
     fn write_ssid_too_large() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let err = write_frame!(buffer_provider, {
+        let err = write_frame!({
             ies: { ssid: [2u8; 33] }
         })
         .expect_err("frame construction succeeded");
@@ -237,30 +231,27 @@ mod tests {
 
     #[test]
     fn write_rates() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: { supported_rates: &[1u8, 2, 3, 4, 5] }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 7);
+        assert_eq!(buffer.len(), 7);
         assert_eq!(&[1, 5, 1, 2, 3, 4, 5,][..], &buffer[..]);
     }
 
     #[test]
     fn write_rates_too_large() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: { supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9] }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 10);
+        assert_eq!(buffer.len(), 10);
         assert_eq!(&[1, 8, 1, 2, 3, 4, 5, 6, 7, 8][..], &buffer[..]);
     }
 
     #[test]
     fn write_rates_empty() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let err = write_frame!(buffer_provider, {
+        let err = write_frame!({
             ies: { supported_rates: &[] }
         })
         .expect_err("frame construction succeeded");
@@ -269,8 +260,7 @@ mod tests {
 
     #[test]
     fn write_extended_supported_rates_too_few_rates() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let err = write_frame!(buffer_provider, {
+        let err = write_frame!({
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6],
                 extended_supported_rates: &[1u8, 2, 3, 4]
@@ -282,8 +272,7 @@ mod tests {
 
     #[test]
     fn write_extended_supported_rates_too_many_rates() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let err = write_frame!(buffer_provider, {
+        let err = write_frame!({
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9],
                 extended_supported_rates: &[1u8, 2, 3, 4]
@@ -295,29 +284,27 @@ mod tests {
 
     #[test]
     fn write_extended_supported_rates_continued() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9],
                 extended_supported_rates: {/* continue rates */}
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 13);
+        assert_eq!(buffer.len(), 13);
         assert_eq!(&[1, 8, 1, 2, 3, 4, 5, 6, 7, 8, 50, 1, 9][..], &buffer[..]);
     }
 
     #[test]
     fn write_extended_supported_rates_separate() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
                 extended_supported_rates: &[11u8, 12, 13],
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 15);
+        assert_eq!(buffer.len(), 15);
         assert_eq!(&[1, 8, 1, 2, 3, 4, 5, 6, 7, 8, 50, 3, 11, 12, 13][..], &buffer[..]);
     }
 
@@ -325,12 +312,11 @@ mod tests {
     fn write_rsne() {
         let rsne = rsne::Rsne::wpa2_rsne();
 
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: { rsne: &rsne, }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 20);
+        assert_eq!(buffer.len(), 20);
         assert_eq!(
             &[
                 48, 18, // Element header
@@ -351,12 +337,11 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: { wpa1: &wpa_ie, }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 24);
+        assert_eq!(buffer.len(), 24);
         assert_eq!(
             &[
                 0xdd, 0x16, // Vendor IE header
@@ -378,8 +363,7 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 wpa1?: match 2u8 {
                     1 => None,
@@ -389,7 +373,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 24);
+        assert_eq!(buffer.len(), 24);
         assert_eq!(
             &[
                 0xdd, 0x16, // Vendor IE header
@@ -411,11 +395,10 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 // Add another field that is present since write_frame!() will
-                // return an error if no bytes are written.
+                // return an error if no bytes are buffer.len().
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
                 wpa1?: match 1u8 {
                     1 => None,
@@ -427,7 +410,7 @@ mod tests {
         .expect("frame construction failed");
 
         // Only supported rates are written.
-        assert_eq!(written, 10);
+        assert_eq!(buffer.len(), 10);
         assert_eq!(&[1, 8, 1, 2, 3, 4, 5, 6, 7, 8][..], &buffer[..]);
     }
 
@@ -444,8 +427,7 @@ mod tests {
             akm_list: vec![Akm { oui: Oui::MSFT, suite_type: PSK }],
         };
 
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 wpa1: match 1u8 {
                     1 => &wpa_ie_first,
@@ -454,7 +436,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 24);
+        assert_eq!(buffer.len(), 24);
         assert_eq!(
             &[
                 0xdd, 0x16, // Vendor IE header
@@ -467,8 +449,7 @@ mod tests {
             &buffer[..]
         );
 
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 wpa1: match 2u8 {
                     1 => &wpa_ie_first,
@@ -477,7 +458,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 24);
+        assert_eq!(buffer.len(), 24);
         assert_eq!(
             &[
                 0xdd, 0x16, // Vendor IE header
@@ -493,8 +474,7 @@ mod tests {
 
     #[test]
     fn write_ht_caps() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 ht_cap: &ie::HtCapabilities {
                     ht_cap_info: ie::HtCapabilityInfo(0x1234),
@@ -507,7 +487,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 28);
+        assert_eq!(buffer.len(), 28);
         assert_eq!(
             &[
                 45, 26, // Element header
@@ -525,8 +505,7 @@ mod tests {
 
     #[test]
     fn write_vht_caps() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 vht_cap: &ie::VhtCapabilities {
                     vht_cap_info: ie::VhtCapabilitiesInfo(0x1200_3400),
@@ -535,7 +514,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 14);
+        assert_eq!(buffer.len(), 14);
         assert_eq!(
             &[
                 191, 12, // Element header
@@ -548,8 +527,7 @@ mod tests {
 
     #[test]
     fn write_dsss_param_set() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 dsss_param_set: &ie::DsssParamSet {
                     current_channel: 42
@@ -557,14 +535,13 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 3);
+        assert_eq!(buffer.len(), 3);
         assert_eq!(&[3, 1, 42][..], &buffer[..]);
     }
 
     #[test]
     fn write_bss_max_idle_period() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 bss_max_idle_period: &ie::BssMaxIdlePeriod {
                     max_idle_period: 42,
@@ -573,7 +550,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 5);
+        assert_eq!(buffer.len(), 5);
         assert_eq!(&[90, 3, 42, 0, 8,][..], &buffer[..]);
     }
 
@@ -594,8 +571,7 @@ mod tests {
             });
         }
 
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             ies: {
                 ssid: if always_true { &[2u8; 2][..] } else { &[2u8; 33][..] },
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9],
@@ -610,7 +586,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 31);
+        assert_eq!(buffer.len(), 31);
         #[rustfmt::skip]
         assert_eq!(
             &[
@@ -627,8 +603,7 @@ mod tests {
 
     #[test]
     fn write_headers() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 // Struct expressions:
                 MgmtHdr: &MgmtHdr {
@@ -651,7 +626,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 57);
+        assert_eq!(buffer.len(), 57);
         #[rustfmt::skip]
         assert_eq!(
             &[
@@ -671,30 +646,27 @@ mod tests {
 
     #[test]
     fn write_body() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             body: &[9u8; 9],
         })
         .expect("frame construction failed");
-        assert_eq!(written, 9);
+        assert_eq!(buffer.len(), 9);
         assert_eq!(&[9, 9, 9, 9, 9, 9, 9, 9, 9][..], &buffer[..]);
     }
 
     #[test]
     fn write_payload() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             payload: &[9u8; 9],
         })
         .expect("frame construction failed");
-        assert_eq!(written, 9);
+        assert_eq!(buffer.len(), 9);
         assert_eq!(&[9, 9, 9, 9, 9, 9, 9, 9, 9][..], &buffer[..]);
     }
 
     #[test]
     fn write_complex() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             headers: {
                 MgmtHdr: &MgmtHdr {
                     frame_ctrl: FrameControl(0x1234),
@@ -724,7 +696,7 @@ mod tests {
             payload: vec![42u8; 5]
         })
         .expect("frame construction failed");
-        assert_eq!(written, 96);
+        assert_eq!(buffer.len(), 96);
         #[rustfmt::skip]
         assert_eq!(
             &[
@@ -752,8 +724,7 @@ mod tests {
 
     #[test]
     fn write_complex_verify_order() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        let (buffer, written) = write_frame!(buffer_provider, {
+        let buffer = write_frame!({
             payload: vec![42u8; 5],
             ies: {
                 ssid: &[2u8; 2][..],
@@ -783,7 +754,7 @@ mod tests {
             },
         })
         .expect("frame construction failed");
-        assert_eq!(written, 96);
+        assert_eq!(buffer.len(), 96);
         #[rustfmt::skip]
         assert_eq!(
             &[
@@ -811,7 +782,8 @@ mod tests {
 
     #[test]
     fn write_nothing() {
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
-        write_frame!(buffer_provider, {}).expect_err("frame construction succeeded");
+        let buffer = write_frame!({}).expect("frame construction failed");
+        assert_eq!(0, buffer.len());
+        assert_eq!(&[0u8; 0], &buffer[..]);
     }
 }

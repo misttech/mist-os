@@ -80,6 +80,17 @@ impl Parse for MacroArgs {
     }
 }
 
+struct DefaultSourceMacroArgs {
+    write_defs: WriteDefinitions,
+}
+
+impl Parse for DefaultSourceMacroArgs {
+    fn parse(input: ParseStream<'_>) -> Result<Self> {
+        let write_defs = input.parse::<WriteDefinitions>()?;
+        Ok(DefaultSourceMacroArgs { write_defs })
+    }
+}
+
 /// A parseable struct representing the macro's arguments.
 struct WriteDefinitions {
     hdrs: Vec<Writeable>,
@@ -216,7 +227,7 @@ fn process_write_definitions(
     }
 
     TokenStream::from(quote! {
-        || -> Result<(_, usize), Error> {
+        || -> Result<_, Error> {
             use {
                 wlan_common::{
                     appendable::Appendable,
@@ -242,17 +253,18 @@ fn process_write_definitions(
     })
 }
 
-pub fn process_with_buffer_provider(input: TokenStream) -> TokenStream {
-    let macro_args = parse_macro_input!(input as MacroArgs);
-    let buffer_source = macro_args.buffer_source;
+pub fn process_with_default_source(input: TokenStream) -> TokenStream {
+    let macro_args = parse_macro_input!(input as DefaultSourceMacroArgs);
     let buf_tokens = quote!(
-        let mut buffer_provider: &::wlan_frame_writer::__BufferProvider = &#buffer_source;
-        let mut buffer = buffer_provider.get_buffer(frame_len)?;
+        let arena = wlan_frame_writer::__Arena::new()?;
+        let mut buffer = arena.insert_default_slice::<u8>(frame_len);
         let mut w = BufferWriter::new(&mut buffer[..]);
     );
     let return_buf_tokens = quote!(
         let written = w.written();
-        Ok((buffer, written))
+        assert_eq!(written, frame_len);
+
+        Ok(arena.make_static(buffer))
     );
     process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens)
 }

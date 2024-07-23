@@ -551,7 +551,6 @@ mod tests {
     use wlan_common::assert_variant;
     use wlan_common::sequence::SequenceManager;
     use wlan_common::timer::{self, create_timer, Timer};
-    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
 
     lazy_static! {
         static ref BSSID_FOO: Bssid = [6u8; 6].into();
@@ -1193,7 +1192,6 @@ mod tests {
             Context {
                 _config: Default::default(),
                 device: self.fake_device.clone(),
-                buffer_provider: BufferProvider::new(FakeFfiBufferProvider::new()),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
             }

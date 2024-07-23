@@ -151,7 +151,6 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
           .ctx = softmac_bridge.get(),
           .transfer = &SoftmacBridge::WlanTx,
       },
-      softmac_bridge->rust_buffer_provider,
       softmac_bridge_endpoints->client.TakeHandle().release());
 
   if (start_result != ZX_OK) {
@@ -354,17 +353,21 @@ zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payl
     return ZX_ERR_INTERNAL;
   }
 
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    FDF_LOG(ERROR, "Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
   if (!fidl_request->async_id()) {
     FDF_LOG(ERROR, "QueueWlanTx request missing async_id field.");
     return ZX_ERR_INTERNAL;
   }
   auto async_id = fidl_request->async_id().value();
+
+  if (!fidl_request->arena()) {
+    FDF_LOG(ERROR, "QueueWlanTx request missing arena field.");
+    auto status = ZX_ERR_INTERNAL;
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
+    return status;
+  }
+
+  auto arena = fdf::Arena(reinterpret_cast<fdf_arena_t*>(  // NOLINT(performance-no-int-to-ptr)
+      fidl_request->arena().value()));
 
   if (!fidl_request->packet_address() || !fidl_request->packet_size() ||
       !fidl_request->packet_info()) {
@@ -374,7 +377,7 @@ zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payl
     return status;
   }
 
-  auto buffer = reinterpret_cast<Buffer*>(  // NOLINT(performance-no-int-to-ptr)
+  auto buffer = reinterpret_cast<uint8_t*>(  // NOLINT(performance-no-int-to-ptr)
       fidl_request->packet_address().value());
   if (buffer == nullptr) {
     FDF_LOG(ERROR, "QueueWlanTx contains NULL packet address.");
@@ -382,14 +385,12 @@ zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payl
     WLAN_TRACE_ASYNC_END_TX(async_id, status);
     return status;
   }
+  auto buffer_len = fidl_request->packet_size().value();
+  ZX_DEBUG_ASSERT(buffer_len <= std::numeric_limits<uint16_t>::max());
 
-  auto finalized_buffer = FinalizedBuffer(buffer, fidl_request->packet_size().value());
-  ZX_DEBUG_ASSERT(finalized_buffer.written() <= std::numeric_limits<uint16_t>::max());
-
-  fuchsia_wlan_softmac::WlanTxPacket fdf_request;
-  fdf_request.mac_frame(::std::vector<uint8_t>(
-      finalized_buffer.data(), finalized_buffer.data() + finalized_buffer.written()));
-  fdf_request.info(fidl_request->packet_info().value());
+  fuchsia_wlan_softmac::wire::WlanTxPacket fdf_request;
+  fdf_request.mac_frame = fidl::VectorView<uint8_t>::FromExternal(buffer, buffer_len);
+  fdf_request.info = fidl::ToWire(arena, fidl_request->packet_info().value());
 
   // Queue the frame to be sent by the vendor driver, but don't block this thread on
   // the returned status. Supposing an error preventing transmission beyond this point
@@ -402,18 +403,20 @@ zx_status_t SoftmacBridge::WlanTx(void* ctx, const uint8_t* payload, size_t payl
   // Unlike other error logging above, it's critical this callback logs an error
   // if there is one because the error may otherwise be silently discarded since
   // MLME will not receive the error.
-  self->softmac_client_->QueueTx(fdf_request)
-      .Then([loc = cpp20::source_location::current(),
-             async_id](fdf::Result<fuchsia_wlan_softmac::WlanSoftmac::QueueTx>& result) mutable {
-        if (result.is_error()) {
-          auto status = FidlErrorToStatus(result.error_value());
-          FDF_LOG(ERROR, "Failed to queue frame in the vendor driver: %s",
-                  zx_status_get_string(status));
-          WLAN_TRACE_ASYNC_END_TX(async_id, status);
-        } else {
-          WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
-        }
-      });
+  self->softmac_client_.wire(arena)
+      ->QueueTx(fdf_request)
+      .Then(
+          [arena = std::move(arena), loc = cpp20::source_location::current(), async_id](
+              fdf::WireUnownedResult<fuchsia_wlan_softmac::WlanSoftmac::QueueTx>& result) mutable {
+            auto status = result.status();
+            if (status != ZX_OK) {
+              FDF_LOG(ERROR, "Failed to queue frame in the vendor driver: %s",
+                      zx_status_get_string(status));
+              WLAN_TRACE_ASYNC_END_TX(async_id, status);
+            } else {
+              WLAN_TRACE_ASYNC_END_TX(async_id, ZX_OK);
+            }
+          });
 
   return ZX_OK;
 }
@@ -450,21 +453,6 @@ zx_status_t SoftmacBridge::EthernetRx(void* ctx, const uint8_t* payload, size_t 
   }
 
   return ZX_OK;
-}
-
-wlansoftmac_buffer_t SoftmacBridge::IntoRustBuffer(std::unique_ptr<Buffer> buffer) {
-  WLAN_TRACE_DURATION();
-  auto* released_buffer = buffer.release();
-  return wlansoftmac_buffer_t{
-      .free =
-          [](void* raw) {
-            WLAN_LAMBDA_TRACE_DURATION("wlansoftmac_in_buf_t.free_buffer");
-            std::unique_ptr<Buffer>(static_cast<Buffer*>(raw)).reset();
-          },
-      .ctx = released_buffer,
-      .data = released_buffer->data(),
-      .capacity = released_buffer->capacity(),
-  };
 }
 
 }  // namespace wlan::drivers::wlansoftmac

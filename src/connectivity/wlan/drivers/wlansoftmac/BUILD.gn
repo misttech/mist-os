@@ -20,8 +20,6 @@ driver_bind_rules("wlansoftmac-bind") {
 
 source_set("source_set") {
   sources = [
-    "buffer_allocator.cc",
-    "buffer_allocator.h",
     "softmac_bridge.cc",
     "softmac_bridge.h",
     "softmac_driver.cc",
@@ -72,27 +70,6 @@ fuchsia_driver_package("wlansoftmac") {
   driver_components = [ ":wlansoftmac_driver" ]
 }
 
-test("buffer-allocator-tests") {
-  sources = [
-    "buffer_allocator.cc",
-    "buffer_allocator.h",
-    "tests/buffer_allocator_tests.cc",
-  ]
-
-  deps = [
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
-    "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
-    "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
-fuchsia_unittest_package("wlansoftmac-buffer-allocator-tests") {
-  deps = [ ":buffer-allocator-tests" ]
-}
-
 test("good-driver-tests") {
   sources = [
     "tests/custom_environment.h",
@@ -141,7 +118,6 @@ group("tests") {
   deps = [
     ":wlansoftmac-bad-driver-tests",
     ":wlansoftmac-bind_test",
-    ":wlansoftmac-buffer-allocator-tests",
     ":wlansoftmac-good-driver-tests",
   ]
 }
