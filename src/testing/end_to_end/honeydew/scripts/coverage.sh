@@ -42,8 +42,8 @@ fi
 
 echo "Configuring environment..."
 OLD_PYTHONPATH=$PYTHONPATH
-PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_DIR/src/lib/diagnostics/python;$PYTHONPATH
-# Set FIDL_IR_PATH inorder to successfully imoport Fuchsia-Controller
+PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$FUCHSIA_DIR/src/lib/diagnostics/python:$PYTHONPATH
+# Set FIDL_IR_PATH inorder to successfully import Fuchsia-Controller
 export FIDL_IR_PATH="$(fx get-build-dir)/fidling/gen/ir_root"
 
 echo "Running coverage tool..."
