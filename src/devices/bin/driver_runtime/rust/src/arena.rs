@@ -10,6 +10,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::ops::{Deref, DerefMut};
 use core::ptr::{null_mut, slice_from_raw_parts_mut, NonNull};
+use std::sync::{Arc, Weak};
 
 use fuchsia_zircon::Status;
 
@@ -38,6 +39,17 @@ impl Arena {
         } else {
             Err(Status::from_raw(res))
         }
+    }
+
+    /// Creates an arena from a raw pointer to the arena object.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that only one [`Arena`]
+    /// is constructed from this pointer, and that is has not previously
+    /// been freed.
+    pub unsafe fn from_raw(ptr: NonNull<fdf_arena_t>) -> Self {
+        Self(ptr)
     }
 
     /// Returns true if the allocation pointed to was made by this arena
@@ -213,6 +225,32 @@ impl Arena {
         data
     }
 
+    /// Moves the given [`ArenaBox`] into an [`ArenaRc`] with an owned
+    /// reference to this [`Arena`], allowing for it to be used in `'static`
+    /// contexts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given [`ArenaBox`] is not allocated from this arena.
+    pub fn make_rc<T: ?Sized>(&self, data: ArenaBox<'_, T>) -> ArenaRc<T> {
+        assert!(self.contains(&data), "Arena doesn't own the ArenaBox");
+        // SAFETY: we just checked the box is owned by this arena.
+        unsafe { ArenaRc::new_unchecked(self.clone(), data) }
+    }
+
+    /// Moves the given [`ArenaBox`] into an [`ArenaStaticBox`] with an owned
+    /// reference to this [`Arena`], allowing for it to be used in `'static`
+    /// contexts.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the given [`ArenaBox`] is not allocated from this arena.
+    pub fn make_static<T: ?Sized>(&self, data: ArenaBox<'_, T>) -> ArenaStaticBox<T> {
+        assert!(self.contains(&data), "Arena doesn't own the ArenaBox");
+        // SAFETY: we just checked the box is owned by this arena.
+        unsafe { ArenaStaticBox::new_unchecked(self.clone(), data) }
+    }
+
     /// Transforms this Arena into an fdf_arena_t without dropping the reference.
     ///
     /// # Safety
@@ -244,6 +282,7 @@ impl Drop for Arena {
 /// Holds a reference to data of type `T` in an [`Arena`] with lifetime `'a`,
 /// and ensures that the object is properly dropped before the [`Arena`] goes
 /// out of scope.
+#[derive(Debug)]
 pub struct ArenaBox<'a, T: ?Sized>(NonNull<T>, PhantomData<&'a Arena>);
 
 impl<'a, T> ArenaBox<'a, T> {
@@ -405,6 +444,132 @@ impl<T: ?Sized> DerefMut for ArenaBox<'_, T> {
         // contents of the ArenaBox, rust will enforce the aliasing rules
         // of the contents of the inner `NonZero` object.
         unsafe { self.0.as_mut() }
+    }
+}
+
+/// An equivalent to [`ArenaBox`] that holds onto a reference to the
+/// arena to allow it to have static lifetime.
+#[derive(Debug)]
+pub struct ArenaStaticBox<T: ?Sized> {
+    data: ArenaBox<'static, T>,
+    // Safety Note: it is important that this be last in the struct so that it is
+    // guaranteed to be freed after the [`ArenaBox`].
+    arena: Arena,
+}
+
+impl<T: ?Sized> ArenaStaticBox<T> {
+    /// Transforms the given [`ArenaBox`] into an [`ArenaStaticBox`] with an owned
+    /// reference to the given [`Arena`], allowing for it to be used in `'static`
+    /// contexts.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the given [`ArenaBox`] is owned by this
+    /// arena, or it may result in use-after-free.
+    pub unsafe fn new_unchecked(arena: Arena, data: ArenaBox<'_, T>) -> ArenaStaticBox<T> {
+        // SAFETY: The `ArenaBox` will not outlive the `Arena` as it is owned
+        // by the current struct and can't be moved out.
+        let data = unsafe { ArenaBox::erase_lifetime(data) };
+        Self { data, arena }
+    }
+
+    /// Takes ownership over the arena and data backing the given
+    /// [`ArenaStaticBox`].
+    ///
+    /// This returns an [`ArenaBox`] tied to the lifetime of the `&mut Option<Arena>`
+    /// given, and places the arena in that space.
+    pub fn unwrap(this: Self, arena: &mut Option<Arena>) -> ArenaBox<'_, T> {
+        let ArenaStaticBox { data, arena: inner_arena } = this;
+        arena.replace(inner_arena);
+        data
+    }
+
+    /// Takes ownership of the arena and data backing the given
+    /// [`ArenaStaticBox`] as raw pointers.
+    ///
+    /// Note that while this is safe, care must be taken to ensure that
+    /// the raw pointer to the data is not accessed after the arena pointer has
+    /// been released.
+    pub fn into_raw(this: Self) -> (NonNull<fdf_arena_t>, NonNull<T>) {
+        let res = (this.arena.0, this.data.0);
+        // make sure that drop handlers aren't called for the arena
+        // or box
+        core::mem::forget(this);
+        res
+    }
+}
+
+impl<T: ?Sized> Deref for ArenaStaticBox<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        ArenaBox::deref(&self.data)
+    }
+}
+
+impl<T: ?Sized> DerefMut for ArenaStaticBox<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        ArenaBox::deref_mut(&mut self.data)
+    }
+}
+
+/// An equivalent to [`ArenaBox`] that holds onto a reference to the
+/// arena to allow it to have static lifetime, and implements [`Clone`]
+/// allowing it to be shared. Since it's shared, you can't get a mutable
+/// reference to it back without using [`Self::try_unwrap`] to get the
+/// inner [`ArenaStaticBox`].
+#[derive(Clone, Debug)]
+pub struct ArenaRc<T: ?Sized>(Arc<ArenaStaticBox<T>>);
+#[derive(Clone, Debug)]
+pub struct ArenaWeak<T: ?Sized>(Weak<ArenaStaticBox<T>>);
+
+impl<T: ?Sized> ArenaRc<T> {
+    /// Transforms the given [`ArenaBox`] into an [`ArenaRc`] with an owned
+    /// reference to the given [`Arena`], allowing for it to be used in `'static`
+    /// contexts.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the given [`ArenaBox`] is owned by this
+    /// arena, or it may result in use-after-free.
+    pub unsafe fn new_unchecked(arena: Arena, data: ArenaBox<'_, T>) -> ArenaRc<T> {
+        // SAFETY: The `ArenaBox` will not outlive the `Arena` as it is owned
+        // by the current struct and can't be moved out.
+        let data = unsafe { ArenaBox::erase_lifetime(data) };
+        Self(Arc::new(ArenaStaticBox { arena, data }))
+    }
+
+    /// Downgrades the given [`ArenaRc`] into an [`ArenaWeak`].
+    pub fn downgrade(this: &Self) -> ArenaWeak<T> {
+        ArenaWeak(Arc::downgrade(&this.0))
+    }
+
+    /// Attempts to take ownership over the arena and data backing the given
+    /// [`ArenaRc`] if there is only one strong reference held to it.
+    ///
+    /// If there is only one strong reference, this returns an [`ArenaBox`]
+    /// tied to the lifetime of the `&mut Option<Arena>` given, and places the
+    /// arena in that space.
+    pub fn try_unwrap(this: Self) -> Result<ArenaStaticBox<T>, Self> {
+        Arc::try_unwrap(this.0).map_err(|storage| Self(storage))
+    }
+}
+
+impl<T: ?Sized> From<ArenaStaticBox<T>> for ArenaRc<T> {
+    fn from(value: ArenaStaticBox<T>) -> Self {
+        Self(Arc::new(value))
+    }
+}
+
+impl<T: ?Sized> Deref for ArenaRc<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        ArenaBox::deref(&self.0.data)
+    }
+}
+
+impl<T: ?Sized> ArenaWeak<T> {
+    pub fn upgrade(&self) -> Option<ArenaRc<T>> {
+        self.0.upgrade().map(ArenaRc)
     }
 }
 
@@ -590,5 +755,85 @@ pub(crate) mod tests {
         let arena = Arena::new().unwrap();
 
         unsafe { arena.assume(NonNull::<()>::dangling()) };
+    }
+
+    #[test]
+    #[should_panic]
+    fn bad_static_box_ownership() {
+        let arena1 = Arena::new().unwrap();
+        let arena2 = Arena::new().unwrap();
+
+        let val = arena1.insert(1);
+        arena2.make_static(val);
+    }
+
+    #[test]
+    #[should_panic]
+    fn bad_rc_ownership() {
+        let arena1 = Arena::new().unwrap();
+        let arena2 = Arena::new().unwrap();
+
+        let val = arena1.insert(1);
+        arena2.make_rc(val);
+    }
+
+    #[test]
+    fn box_lifecycle() {
+        let arena = Arena::new().unwrap();
+
+        // create the initial value and modify it
+        let mut val = arena.insert(1);
+        *val = 2;
+        assert_eq!(*val, 2);
+
+        // make it a static box and modify it
+        let mut val = arena.make_static(val);
+        *val = 3;
+        assert_eq!(*val, 3);
+
+        // make it into a refcounted shared pointer and check the value is still the
+        // same
+        let val = ArenaRc::from(val);
+        assert_eq!(*val, 3);
+
+        // clone the refcount and verify that we can't unwrap it back to a static box.
+        let val_copied = val.clone();
+        assert_eq!(*val_copied, 3);
+        let val = ArenaRc::try_unwrap(val).expect_err("Double strong count should fail to unwrap");
+        assert_eq!(*val, 3);
+        drop(val_copied);
+
+        // now that the cloned rc is gone, unwrap it back to a static box and modify it
+        let mut val =
+            ArenaRc::try_unwrap(val).expect("strong count should be one so this should unwrap now");
+        *val = 4;
+        assert_eq!(*val, 4);
+
+        // bring it back to a normal arena box and modify it
+        let mut shared_arena = None;
+        let mut val = ArenaStaticBox::unwrap(val, &mut shared_arena);
+        *val = 5;
+        assert_eq!(*val, 5);
+
+        // make it back into an rc but directly rather than from a static box
+        let val = arena.make_rc(val);
+        assert_eq!(*val, 5);
+    }
+
+    #[test]
+    fn static_raw_roundtrip() {
+        let arena = Arena::new().unwrap();
+        let val = arena.make_static(arena.insert(1));
+
+        // turn it into raw pointers and modify it
+        let (arena_ptr, mut data_ptr) = ArenaStaticBox::into_raw(val);
+        *unsafe { data_ptr.as_mut() } = 2;
+        assert_eq!(*unsafe { data_ptr.as_ref() }, 2);
+
+        // reconstitute it back to an `ArenaBox` and then transform it
+        let arena = unsafe { Arena::from_raw(arena_ptr) };
+        let val = unsafe { arena.assume(data_ptr) };
+
+        assert_eq!(*val, 2);
     }
 }
