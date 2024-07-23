@@ -112,7 +112,7 @@ impl GrantedSyslog<'_> {
                 Ok(Some(log)) => return write_log(log),
                 Ok(None) => return Ok(0),
             }
-            waiter.wait_until(current_task, zx::Time::INFINITE)?;
+            waiter.wait(current_task)?;
         }
     }
 

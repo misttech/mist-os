@@ -313,7 +313,7 @@ pub fn sys_connect(
                 WaitCallback::none(),
             );
             if !client_socket.query_events(current_task)?.contains(FdEvents::POLLOUT) {
-                waiter.wait_until(current_task, zx::Time::INFINITE)?;
+                waiter.wait(current_task)?;
             }
             client_socket.connect(current_task, peer)
         }
