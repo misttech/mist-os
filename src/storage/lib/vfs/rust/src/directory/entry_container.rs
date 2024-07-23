@@ -105,7 +105,9 @@ pub trait Directory: Node {
         _path: Path,
         _protocols: fio::ConnectionProtocols,
         _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status>;
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
 
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(

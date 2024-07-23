@@ -76,7 +76,7 @@ impl ObjectRequest {
     }
 
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    pub(crate) fn options(&self) -> fio::Options {
+    pub fn options(&self) -> fio::Options {
         fio::Options {
             attributes: (!self.attributes.is_empty()).then_some(self.attributes),
             create_attributes: self
