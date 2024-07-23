@@ -1525,14 +1525,20 @@ impl NetstackSeed {
                                 "serving {}",
                                 fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
                             );
-                            multicast_admin::serve_table_controller::<Ipv4>(controller).await;
+                            multicast_admin::serve_table_controller::<Ipv4>(
+                                netstack.ctx.clone(),
+                                controller
+                            ).await;
                         }
                         Service::MulticastAdminV6(controller) => {
                             debug!(
                                 "serving {}",
                                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
                             );
-                            multicast_admin::serve_table_controller::<Ipv6>(controller).await;
+                            multicast_admin::serve_table_controller::<Ipv6>(
+                                netstack.ctx.clone(),
+                                controller
+                            ).await;
                         }
                         Service::DebugInterfaces(debug_interfaces) => {
                             debug_interfaces

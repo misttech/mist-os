@@ -185,6 +185,13 @@ pub struct RawIpSocketState<I>(PhantomData<I>, Never);
 // Lock level attributed to the collection of all raw IP sockets.
 pub struct AllRawIpSockets<I>(PhantomData<I>, Never);
 
+// Lock level attributed to all multicast forwarding state.
+pub struct IpMulticastForwardingState<I>(PhantomData<I>, Never);
+// Lock level attributed to the multicast routing table.
+pub struct IpMulticastRouteTable<I>(PhantomData<I>, Never);
+// Lock level attributed to the table of pending multicast packets.
+pub struct IpMulticastForwardingPendingPackets<I>(PhantomData<I>, Never);
+
 pub enum DeviceLayerStateOrigin {}
 pub enum DeviceLayerState {}
 pub enum AllDeviceSockets {}
@@ -262,7 +269,13 @@ impl_lock_after!(UdpBoundMap<Ipv6> => IpDeviceConfiguration<Ipv4>);
 impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceConfiguration<Ipv6>);
 impl_lock_after!(IpDeviceConfiguration<Ipv6> => Ipv6DeviceRouteDiscovery);
 impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceSlaac);
-impl_lock_after!(Ipv6DeviceSlaac => IpStateRoutingTable<Ipv4>);
+impl_lock_after!(Ipv6DeviceSlaac => IpMulticastForwardingState<Ipv4>);
+impl_lock_after!(IpMulticastForwardingState<Ipv4> => IpMulticastRouteTable<Ipv4>);
+impl_lock_after!(IpMulticastRouteTable<Ipv4> => IpMulticastForwardingPendingPackets<Ipv4>);
+impl_lock_after!(IpMulticastForwardingPendingPackets<Ipv4> => IpMulticastForwardingState<Ipv6>);
+impl_lock_after!(IpMulticastForwardingState<Ipv6> => IpMulticastRouteTable<Ipv6>);
+impl_lock_after!(IpMulticastRouteTable<Ipv6> => IpMulticastForwardingPendingPackets<Ipv6>);
+impl_lock_after!(IpMulticastForwardingPendingPackets<Ipv6> => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);
 impl_lock_after!(IpStateRoutingTable<Ipv6> => Ipv6DeviceAddressDad);
 impl_lock_after!(Ipv6DeviceAddressDad => FilterState<Ipv4>);

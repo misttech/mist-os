@@ -22,6 +22,7 @@ use netstack3_ip::device::{
     IpDeviceIpExt,
 };
 use netstack3_ip::icmp::{IcmpBindingsContext, IcmpBindingsTypes};
+use netstack3_ip::multicast_forwarding::MulticastForwardingStateContext;
 use netstack3_ip::nud::{NudBindingsContext, NudContext};
 use netstack3_ip::raw::{
     RawIpSocketMapContext, RawIpSocketStateContext, RawIpSocketsBindingsContext,
@@ -79,6 +80,7 @@ pub trait CoreContext<I, BC>:
         WeakDeviceId = EthernetWeakDeviceId<BC>,
     > + RawIpSocketMapContext<I, BC>
     + RawIpSocketStateContext<I, BC>
+    + MulticastForwardingStateContext<I>
 where
     I: IpExt,
     BC: IpBindingsContext<I>,
@@ -105,7 +107,8 @@ where
             DeviceId = EthernetDeviceId<BC>,
             WeakDeviceId = EthernetWeakDeviceId<BC>,
         > + RawIpSocketMapContext<I, BC>
-        + RawIpSocketStateContext<I, BC>,
+        + RawIpSocketStateContext<I, BC>
+        + MulticastForwardingStateContext<I>,
 {
 }
 

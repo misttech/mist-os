@@ -86,6 +86,7 @@ rustc_library_with_features("netstack3-core") {
     "src/filter/integration.rs",
     "src/ip/base.rs",
     "src/ip/device.rs",
+    "src/ip/multicast_forwarding.rs",
     "src/ip/raw.rs",
     "src/lib.rs",
     "src/lock_ordering.rs",

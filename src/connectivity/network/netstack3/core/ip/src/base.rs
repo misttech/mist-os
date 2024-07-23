@@ -55,6 +55,7 @@ use crate::internal::icmp::{
 };
 use crate::internal::ipv6;
 use crate::internal::ipv6::Ipv6PacketAction;
+use crate::internal::multicast_forwarding::state::MulticastForwardingState;
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
@@ -1301,6 +1302,15 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<MulticastForwardingState<I, D>> for IpStateInner<I, D, BT>
+{
+    type Lock = RwLock<MulticastForwardingState<I, D>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.multicast_forwarding)
+    }
+}
+
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     OrderedLockAccess<RawIpSocketMap<I, D::Weak, BT>> for IpStateInner<I, D, BT>
 {
     type Lock = RwLock<RawIpSocketMap<I, D::Weak, BT>>;
@@ -1440,6 +1450,7 @@ impl<BT> IpStateBindingsTypes for BT where
 #[generic_over_ip(I, Ip)]
 pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> {
     table: RwLock<ForwardingTable<I, D>>,
+    multicast_forwarding: RwLock<MulticastForwardingState<I, D>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
@@ -1482,6 +1493,7 @@ impl<
     pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
             table: Default::default(),
+            multicast_forwarding: Default::default(),
             fragment_cache: Mutex::new(
                 IpPacketFragmentCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx),
             ),

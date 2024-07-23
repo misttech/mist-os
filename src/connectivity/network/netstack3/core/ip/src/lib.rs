@@ -24,6 +24,7 @@ mod internal {
     pub(super) mod gmp;
     pub(super) mod icmp;
     pub(super) mod ipv6;
+    pub(super) mod multicast_forwarding;
     pub(super) mod raw;
     pub(super) mod reassembly;
     pub(super) mod socket;
@@ -180,6 +181,16 @@ pub mod socket {
             FakeDeviceConfig, FakeDualStackIpSocketCtx, FakeIpSocketCtx, InnerFakeIpSocketCtx,
         };
     }
+}
+
+/// Multicast Forwarding
+pub mod multicast_forwarding {
+    pub use crate::internal::multicast_forwarding::api::MulticastForwardingApi;
+    pub use crate::internal::multicast_forwarding::state::{
+        MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
+        MulticastForwardingPendingPacketsContext, MulticastForwardingState,
+        MulticastForwardingStateContext, MulticastRouteTable, MulticastRouteTableContext,
+    };
 }
 
 /// Raw IP sockets.

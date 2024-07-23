@@ -114,6 +114,7 @@ pub mod ip {
     pub(crate) mod integration {
         mod base;
         mod device;
+        mod multicast_forwarding;
         mod raw;
 
         pub(crate) use device::{CoreCtxWithIpDeviceConfiguration, IpAddrCtxSpec};
