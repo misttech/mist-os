@@ -21,6 +21,7 @@
         {
             protocol: [
                 "fuchsia.factory.AlphaFactoryStoreProvider",
+                "fuchsia.factory.CastCredentialsFactoryStoreProvider",
                 "fuchsia.factory.WeaveFactoryStoreProvider",
             ],
             from: "#factory_store_providers",
@@ -29,6 +30,7 @@
         },
         {
             protocol: [
+                "fuchsia.tee.Application.93a424e2-5608-4413-84a8-58b16a064dce",
                 "fuchsia.tee.Application.aa6aa795-9ab7-41a9-9138-320e37bffb11",
                 "fuchsia.tee.Application.af1ae3a4-888b-4e11-b4ab-1c2b972d1c11",
                 "fuchsia.tee.Application.d83c3c4a-9e8d-4e4e-ad30-9d40e137f689",
@@ -37,6 +39,11 @@
             from: "#tee_manager",
             to: "#trusted-apps",
             source_availability: "unknown",
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#trusted-apps",
         },
     ],
 }

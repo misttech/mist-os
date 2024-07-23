@@ -72,6 +72,13 @@ impl AbsolutePackageUrl {
         }
     }
 
+    pub fn name(&self) -> &PackageName {
+        match self {
+            Self::Unpinned(unpinned) => &unpinned.name(),
+            Self::Pinned(pinned) => pinned.name(),
+        }
+    }
+
     /// The URL without the optional package hash.
     pub fn as_unpinned(&self) -> &UnpinnedAbsolutePackageUrl {
         match self {

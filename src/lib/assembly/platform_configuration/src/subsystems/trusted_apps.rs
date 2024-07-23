@@ -8,7 +8,7 @@ use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::product_config::TrustedApp as ProductTrustedApp;
-use assembly_util::{BlobfsCompiledPackageDestination, CompiledPackageDestination};
+use assembly_util::{BlobfsCompiledPackageDestination, CompiledPackageDestination, FileEntry};
 use fuchsia_url::AbsoluteComponentUrl;
 use std::io::Write;
 
@@ -116,6 +116,33 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                     )
                 });
             }
+
+            if let Some(config_data) = &trusted_app.config_data {
+                // For each key in config data, add the file at the path of the value to config data
+                let package_name = component_url.package_url().name();
+
+                for (key, value) in config_data {
+                    builder
+                        .package(&package_name.to_string())
+                        .config_data(FileEntry { source: value.into(), destination: key.into() })
+                        .context(format!(
+                            "Adding config data file {} to package {}",
+                            key, package_name
+                        ))?;
+                }
+
+                // Route the config-data subdir named with the package-name to this component
+                let directory_name = create_name("config-data")?;
+                let subdir_name: cml::RelativePath = cm_types::RelativePath::new(package_name)?;
+                offer.push(cml::Offer {
+                    directory: Some(directory_name.into()),
+                    subdir: Some(subdir_name),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
         }
 
         let cml = cml::Document {
@@ -160,6 +187,7 @@ mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
     use assembly_file_relative_path::FileRelativePathBuf;
+    use std::collections::BTreeMap;
 
     #[test]
     // This test is a change detector, but we actually want to observe changes
@@ -173,6 +201,10 @@ mod tests {
             guids: vec!["1234".to_string(), "5678".to_string()],
             additional_required_protocols: vec!["fuchsia.foo.bar".to_string()],
             capabilities: vec!["fuchsia.baz.bang".to_string()],
+            config_data: Some(BTreeMap::from([
+                ("foo".to_string(), "bar".to_string()),
+                ("baz".to_string(), "qux".to_string()),
+            ])),
         }];
 
         let mut builder = ConfigurationBuilderImpl::default();
@@ -260,6 +292,12 @@ mod tests {
             "from": "parent",
             "to": "#test-app",
             "source_availability": "unknown"
+          },
+          {
+            "directory": "config-data",
+            "from": "parent",
+            "to": "#test-app",
+            "subdir": "trusted-apps",
           }
         ]});
 

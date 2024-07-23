@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::BTreeMap;
+
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -181,6 +183,10 @@ pub struct TrustedApp {
     /// which will be routed from 'parent'
     #[serde(default)]
     pub additional_required_protocols: Vec<String>,
+    /// Config data files required for this component to work, and which will be inserted into
+    /// config data for this package (with a package name based on the component URL)
+    #[serde(default)]
+    pub config_data: Option<BTreeMap<String, String>>,
 }
 
 #[cfg(test)]
