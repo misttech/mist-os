@@ -28,6 +28,7 @@ use starnix_core::execution::{
     execute_task_with_prerun_result,
 };
 use starnix_core::fs::layeredfs::LayeredFs;
+use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
@@ -538,8 +539,11 @@ where
     if features.test_data {
         mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
     }
-    let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
 
+    let mut root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
+    if features.rootfs_rw {
+        root_fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root_fs)?;
+    }
     Ok(FsContext::new(root_fs))
 }
 

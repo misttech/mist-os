@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::tmpfs::{TmpFs, TmpfsDirectory};
 use crate::mm::memory::MemoryObject;
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::rw_queue::RwQueueReadGuard;
 use crate::vfs::{
     default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync,
@@ -987,6 +988,35 @@ impl OverlayFs {
         let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
         let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, overlay_fs, options)?;
+        fs.set_root(root_node);
+        Ok(fs)
+    }
+
+    /// Given a filesystem, wraps it in a tmpfs-backed writable overlayfs.
+    pub fn wrap_fs_in_writable_layer(
+        kernel: &Arc<Kernel>,
+        rootfs: FileSystemHandle,
+    ) -> Result<FileSystemHandle, Errno> {
+        let lower = ActiveEntry { entry: rootfs.root().clone(), mount: MountInfo::detached() };
+
+        // Create upper and work directories in an invisible tmpfs.
+        let invisible_tmp = TmpFs::new_fs(kernel);
+        let upper = ActiveEntry {
+            entry: invisible_tmp.insert_node(FsNode::new_root(TmpfsDirectory::new())),
+            mount: MountInfo::detached(),
+        };
+        let work = ActiveEntry {
+            entry: invisible_tmp.insert_node(FsNode::new_root(TmpfsDirectory::new())),
+            mount: MountInfo::detached(),
+        };
+
+        let lower_fs = rootfs.clone();
+        let upper_fs = invisible_tmp.clone();
+
+        let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
+        let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
+        let fs =
+            FileSystem::new(kernel, CacheMode::Uncached, overlay_fs, FileSystemOptions::default())?;
         fs.set_root(root_node);
         Ok(fs)
     }

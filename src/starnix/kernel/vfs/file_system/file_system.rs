@@ -168,15 +168,20 @@ impl FileSystem {
     }
 
     /// Set up the root of the filesystem. Must not be called more than once.
-    pub fn set_root_node(self: &FileSystemHandle, mut root: FsNode) {
-        if root.node_id == 0 {
-            root.set_id(self.next_node_id());
-        }
-        root.set_fs(self);
-        let root_node: FsNodeHandle = root.into_handle();
-        self.nodes.lock().insert(root_node.node_id, Arc::downgrade(&root_node));
-        let root = DirEntry::new(root_node, None, FsString::default());
+    pub fn set_root_node(self: &FileSystemHandle, root: FsNode) {
+        let root = self.insert_node(root);
         assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
+    }
+
+    /// Inserts a node in the FsNode cache.
+    pub fn insert_node(self: &FileSystemHandle, mut node: FsNode) -> DirEntryHandle {
+        if node.node_id == 0 {
+            node.set_id(self.next_node_id());
+        }
+        node.set_fs(self);
+        let handle: FsNodeHandle = node.into_handle();
+        self.nodes.lock().insert(handle.node_id, Arc::downgrade(&handle));
+        DirEntry::new(handle, None, FsString::default())
     }
 
     pub fn has_permanent_entries(&self) -> bool {

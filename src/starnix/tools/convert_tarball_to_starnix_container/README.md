@@ -5,6 +5,14 @@ packages that can be run in Starnix.
 
 ## Creating a package
 
+Be sure to have `//src/starnix/tools/convert_tarball_to_starnix_container` in
+the GN graph, e.g.:
+```
+fx set workbench_eng.x64 --release --with //src/starnix/tools/convert_tarball_to_starnix_container
+```
+
+Then follow one of the following two subsections.
+
 ### From a tarball containing the root filesystem
 
 Given a tar file with the contents of the root filesystem:
@@ -29,6 +37,7 @@ $ fx host-tool convert_tarball_to_starnix_container --input-format docker-archiv
 
 ## Running the container
 
+With `workbench_eng` and `fx serve` already running:
 ```
 $ ffx repository publish "$(fx get-build-dir)/amber-files" --package-archive ~/example.far
 $ ffx component run --recreate \
@@ -37,7 +46,19 @@ $ ffx component run --recreate \
 ```
 
 Launch an interactive shell in it:
-
 ```
 $ ffx starnix console --moniker /core/starnix_runner/playground:example /bin/sh -i
 ```
+
+Note: after running `fx build`, the `ffx repository publish ...` command must be
+run again.
+
+### Making the root filesystem writable
+
+By default, the root filesystem of the container will be read-only.
+
+To make it writable, add `--features rootfs_rw` to the
+`convert_tarball_to_starnix_container` command line.
+
+Changes will be stored in RAM and they will not persist after restarting the
+container.
