@@ -180,15 +180,14 @@ class CatapultConverterTest(unittest.TestCase):
     def test_run_converter_local(self) -> None:
         """Test case that ensures we correctly run the Converter with local args"""
         subprocess_check_call: mock.Mock = mock.Mock()
-        converter: publish.CatapultConverter = (
-            self.make_catapult_converter_for_test(
-                [self._empty_fuchsia_perf_json],
-                _EMPTY_EXPECTED_METRICS_FILE,
-                env={
-                    publish.ENV_RELEASE_VERSION: "1",
-                },
-                subprocess_check_call=subprocess_check_call,
-            )
+        converter: publish.CatapultConverter = self.make_catapult_converter_for_test(
+            [self._empty_fuchsia_perf_json],
+            _EMPTY_EXPECTED_METRICS_FILE,
+            env={
+                publish.ENV_RELEASE_VERSION: "1",
+                publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+            },
+            subprocess_check_call=subprocess_check_call,
         )
 
         # Files are moved to a `fuchsiaperf_full.json` file given that they are
@@ -219,23 +218,160 @@ class CatapultConverterTest(unittest.TestCase):
                 "http://ci.example.com/build/300",
                 "--bots",
                 "local-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
                 "--product-versions",
                 "1",
+            ]
+        )
+
+    def test_run_converter_invalid_git_commits(self) -> None:
+        """Test case that ensures we reject incorrect git commit combinations"""
+        subprocess_check_call: mock.Mock = mock.Mock()
+
+        # Smart integration and public integration can't be specified at the same time
+        with self.assertRaises(ValueError) as context:
+            converter = self.make_catapult_converter_for_test(
+                [self._test_fuchsia_perf_json],
+                _EXPECTED_METRICS_FILE,
+                env={
+                    publish.ENV_RELEASE_VERSION: "1",
+                    publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+                    publish.ENV_SMART_INTEGRATION_GIT_COMMIT: "44f1a18b8947dadedd4cb3c942e0ba65ee390a72",
+                    publish.ENV_INTEGRATION_PUBLIC_GIT_COMMIT: "434bd828599874d0befc8e2663703883feb02007",
+                },
+                subprocess_check_call=subprocess_check_call,
+            )
+
+        self.assertIn(
+            ("but not both"),
+            str(context.exception),
+        )
+
+        self.assertFalse(subprocess_check_call.called)
+
+        # We always need internal integration
+        with self.assertRaises(ValueError) as context:
+            converter = self.make_catapult_converter_for_test(
+                [self._test_fuchsia_perf_json],
+                _EXPECTED_METRICS_FILE,
+                env={
+                    publish.ENV_RELEASE_VERSION: "1",
+                    publish.ENV_INTEGRATION_PUBLIC_GIT_COMMIT: "434bd828599874d0befc8e2663703883feb02007",
+                },
+                subprocess_check_call=subprocess_check_call,
+            )
+
+        self.assertIn(
+            ("INTEGRATION_INTERNAL_GIT_COMMIT is required"),
+            str(context.exception),
+        )
+
+        self.assertFalse(subprocess_check_call.called)
+
+    def test_run_converter_public_integration(self) -> None:
+        """
+        Test case that ensures that we correctly run the Converter with public integration specified
+        """
+        subprocess_check_call: mock.Mock = mock.Mock()
+        converter: publish.CatapultConverter = self.make_catapult_converter_for_test(
+            [self._empty_fuchsia_perf_json],
+            _EMPTY_EXPECTED_METRICS_FILE,
+            env={
+                publish.ENV_CATAPULT_DASHBOARD_MASTER: "the-master",
+                publish.ENV_CATAPULT_DASHBOARD_BOT: "the-bot",
+                publish.ENV_BUILDBUCKET_ID: "bucket-123",
+                publish.ENV_BUILD_CREATE_TIME: "98765",
+                publish.ENV_RELEASE_VERSION: "2",
+                publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+                publish.ENV_INTEGRATION_PUBLIC_GIT_COMMIT: "434bd828599874d0befc8e2663703883feb02007",
+            },
+            subprocess_check_call=subprocess_check_call,
+        )
+
+        converter.run()
+
+        subprocess_check_call.assert_called_with(
+            [
+                _CATAPULT_CONVERTER_VALIDATOR,
+                "--input",
+                self._expected_input_path,
+                "--output",
+                self._expected_output_path,
+                "--execution-timestamp-ms",
+                "98765",
+                "--masters",
+                "the-master",
+                "--log-url",
+                "https://ci.chromium.org/b/bucket-123",
+                "--bots",
+                "the-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
+                "--product-versions",
+                "2",
+                "--integration-public-git-commit",
+                "434bd828599874d0befc8e2663703883feb02007",
+            ]
+        )
+
+    def test_run_converter_smart_integration(self) -> None:
+        """
+        Test case that ensures that we correctly run the Converter with public integration specified
+        """
+        subprocess_check_call: mock.Mock = mock.Mock()
+        converter: publish.CatapultConverter = self.make_catapult_converter_for_test(
+            [self._empty_fuchsia_perf_json],
+            _EMPTY_EXPECTED_METRICS_FILE,
+            env={
+                publish.ENV_CATAPULT_DASHBOARD_MASTER: "the-master",
+                publish.ENV_CATAPULT_DASHBOARD_BOT: "the-bot",
+                publish.ENV_BUILDBUCKET_ID: "bucket-123",
+                publish.ENV_BUILD_CREATE_TIME: "98765",
+                publish.ENV_RELEASE_VERSION: "2",
+                publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+                publish.ENV_SMART_INTEGRATION_GIT_COMMIT: "434bd828599874d0befc8e2663703883feb02007",
+            },
+            subprocess_check_call=subprocess_check_call,
+        )
+
+        converter.run()
+
+        subprocess_check_call.assert_called_with(
+            [
+                _CATAPULT_CONVERTER_VALIDATOR,
+                "--input",
+                self._expected_input_path,
+                "--output",
+                self._expected_output_path,
+                "--execution-timestamp-ms",
+                "98765",
+                "--masters",
+                "the-master",
+                "--log-url",
+                "https://ci.chromium.org/b/bucket-123",
+                "--bots",
+                "the-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
+                "--product-versions",
+                "2",
+                "--smart-integration-git-commit",
+                "434bd828599874d0befc8e2663703883feb02007",
             ]
         )
 
     def test_converter_summarizes_input(self) -> None:
         """Test case that ensures we correctly run the Converter with local args"""
         subprocess_check_call: mock.Mock = mock.Mock()
-        converter: publish.CatapultConverter = (
-            self.make_catapult_converter_for_test(
-                [self._test_fuchsia_perf_json],
-                self._expected_metrics_txt,
-                env={
-                    publish.ENV_RELEASE_VERSION: "1",
-                },
-                subprocess_check_call=subprocess_check_call,
-            )
+        converter: publish.CatapultConverter = self.make_catapult_converter_for_test(
+            [self._test_fuchsia_perf_json],
+            self._expected_metrics_txt,
+            env={
+                publish.ENV_RELEASE_VERSION: "1",
+                publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+            },
+            subprocess_check_call=subprocess_check_call,
         )
 
         converter.run()
@@ -283,6 +419,8 @@ class CatapultConverterTest(unittest.TestCase):
                 "http://ci.example.com/build/300",
                 "--bots",
                 "local-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
                 "--product-versions",
                 "1",
             ]
@@ -293,19 +431,18 @@ class CatapultConverterTest(unittest.TestCase):
         Test case that ensures that we correctly run the Converter with CI args
         """
         subprocess_check_call: mock.Mock = mock.Mock()
-        converter: publish.CatapultConverter = (
-            self.make_catapult_converter_for_test(
-                [self._empty_fuchsia_perf_json],
-                _EMPTY_EXPECTED_METRICS_FILE,
-                env={
-                    publish.ENV_CATAPULT_DASHBOARD_MASTER: "the-master",
-                    publish.ENV_CATAPULT_DASHBOARD_BOT: "the-bot",
-                    publish.ENV_BUILDBUCKET_ID: "bucket-123",
-                    publish.ENV_BUILD_CREATE_TIME: "98765",
-                    publish.ENV_RELEASE_VERSION: "2",
-                },
-                subprocess_check_call=subprocess_check_call,
-            )
+        converter: publish.CatapultConverter = self.make_catapult_converter_for_test(
+            [self._empty_fuchsia_perf_json],
+            _EMPTY_EXPECTED_METRICS_FILE,
+            env={
+                publish.ENV_CATAPULT_DASHBOARD_MASTER: "the-master",
+                publish.ENV_CATAPULT_DASHBOARD_BOT: "the-bot",
+                publish.ENV_BUILDBUCKET_ID: "bucket-123",
+                publish.ENV_BUILD_CREATE_TIME: "98765",
+                publish.ENV_RELEASE_VERSION: "2",
+                publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+            },
+            subprocess_check_call=subprocess_check_call,
         )
 
         converter.run()
@@ -325,6 +462,8 @@ class CatapultConverterTest(unittest.TestCase):
                 "https://ci.chromium.org/b/bucket-123",
                 "--bots",
                 "the-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
                 "--product-versions",
                 "2",
             ]
@@ -341,6 +480,7 @@ class CatapultConverterTest(unittest.TestCase):
             "BUILDBUCKET_ID": "bucket-123",
             "BUILD_CREATE_TIME": "98765",
             "RELEASE_VERSION": "2",
+            "INTEGRATION_INTERNAL_GIT_COMMIT": "756a290e1a199dd47141f2d4f34eb3539b954306",
         }
         converter: publish.CatapultConverter = (
             self.make_catapult_converter_for_test(
@@ -368,6 +508,8 @@ class CatapultConverterTest(unittest.TestCase):
                 "https://ci.chromium.org/b/bucket-123",
                 "--bots",
                 "the-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
                 "--product-versions",
                 "2",
             ]
@@ -384,7 +526,9 @@ class CatapultConverterTest(unittest.TestCase):
             self.make_catapult_converter_for_test(
                 [self._mismatch_metrics_fuchsia_perf_json],
                 _EXPECTED_METRICS_FILE,
-                env={},
+                env={
+                    publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+                },
                 subprocess_check_call=subprocess_check_call,
             )
         self.assertIn(
@@ -405,13 +549,13 @@ class CatapultConverterTest(unittest.TestCase):
     ) -> None:
         """Test case that ensures that we correctly validate the expected metrics"""
         subprocess_check_call: mock.Mock = mock.Mock()
-        converter: publish.CatapultConverter = (
-            self.make_catapult_converter_for_test(
-                [self._test_fuchsia_perf_json],
-                _EXPECTED_METRICS_FILE,
-                env={},
-                subprocess_check_call=subprocess_check_call,
-            )
+        converter: publish.CatapultConverter = self.make_catapult_converter_for_test(
+            [self._test_fuchsia_perf_json],
+            _EXPECTED_METRICS_FILE,
+            env={
+                "INTEGRATION_INTERNAL_GIT_COMMIT": "756a290e1a199dd47141f2d4f34eb3539b954306",
+            },
+            subprocess_check_call=subprocess_check_call,
         )
         converter.run()
 
@@ -430,6 +574,8 @@ class CatapultConverterTest(unittest.TestCase):
                 "http://ci.example.com/build/300",
                 "--bots",
                 "local-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
             ]
         )
 
@@ -446,6 +592,7 @@ class CatapultConverterTest(unittest.TestCase):
                 _EXPECTED_METRICS_FILE,
                 env={
                     publish.ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR: tmpdir,
+                    publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
                 },
                 subprocess_check_call=subprocess_check_call,
             )
@@ -472,6 +619,8 @@ class CatapultConverterTest(unittest.TestCase):
                 "http://ci.example.com/build/300",
                 "--bots",
                 "local-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
             ]
         )
 
@@ -486,7 +635,9 @@ class CatapultConverterTest(unittest.TestCase):
             self.make_catapult_converter_for_test(
                 [self._invalid_suite_fuchsia_perf_json],
                 _EXPECTED_METRICS_FILE,
-                env={},
+                env={
+                    publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+                },
                 subprocess_check_call=subprocess_check_call,
             )
         self.assertTrue(
@@ -519,14 +670,13 @@ class CatapultConverterTest(unittest.TestCase):
         with open(expected_metrics_file, "w") as f:
             f.write(expected_metrics)
 
-        converter: publish.CatapultConverter = (
-            publish.CatapultConverter.from_env(
-                [test_perf_file],
-                expected_metrics_file,
-                env={
-                    publish.ENV_RELEASE_VERSION: "1",
-                },
-            )
+        converter: publish.CatapultConverter = publish.CatapultConverter.from_env(
+            [test_perf_file],
+            expected_metrics_file,
+            env={
+                publish.ENV_RELEASE_VERSION: "1",
+                publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+            },
         )
 
         converter.run()
@@ -539,15 +689,14 @@ class CatapultConverterTest(unittest.TestCase):
             input_perf_json = json.load(f)
 
         subprocess_check_call: mock.Mock = mock.Mock()
-        converter: publish.CatapultConverter = (
-            self.make_catapult_converter_for_test(
-                [self._test_fuchsia_perf_json],
-                self._expected_metrics_no_summarize_txt,
-                env={
-                    publish.ENV_RELEASE_VERSION: "1",
-                },
-                subprocess_check_call=subprocess_check_call,
-            )
+        converter: publish.CatapultConverter = self.make_catapult_converter_for_test(
+            [self._test_fuchsia_perf_json],
+            self._expected_metrics_no_summarize_txt,
+            env={
+                publish.ENV_RELEASE_VERSION: "1",
+                publish.ENV_INTEGRATION_INTERNAL_GIT_COMMIT: "756a290e1a199dd47141f2d4f34eb3539b954306",
+            },
+            subprocess_check_call=subprocess_check_call,
         )
 
         self.assertTrue(os.path.isfile(self._expected_input_path))
@@ -572,6 +721,8 @@ class CatapultConverterTest(unittest.TestCase):
                 "http://ci.example.com/build/300",
                 "--bots",
                 "local-bot",
+                "--integration-internal-git-commit",
+                "756a290e1a199dd47141f2d4f34eb3539b954306",
                 "--product-versions",
                 "1",
             ]
