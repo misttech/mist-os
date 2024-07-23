@@ -289,7 +289,7 @@ TEST_F(NetworkPortTest, GetInfoClient) {
   fdf::Arena arena('WLAN');
   auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetInfo();
   ASSERT_OK(result.status());
-  EXPECT_EQ(result->info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlan);
+  EXPECT_EQ(result->info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlanClient);
 }
 
 TEST_F(NetworkPortTest, GetInfoAp) {
@@ -325,7 +325,7 @@ TEST_F(NetworkPortTestWithPort, GetInfo) {
   ASSERT_OK(result.status());
   auto& info = result->info;
   // Should be a WLAN port in the default setting
-  EXPECT_EQ(info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlan);
+  EXPECT_EQ(info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlanClient);
 
   // Must support at least reception of ethernet frames
   const auto& rx_types = info.rx_types();

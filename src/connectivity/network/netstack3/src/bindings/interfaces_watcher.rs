@@ -920,7 +920,7 @@ impl IntoFidlBackwardsCompatible<finterfaces::Properties> for finterfaces_ext::P
             finterfaces_ext::PortClass::Ethernet => {
                 finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet)
             }
-            finterfaces_ext::PortClass::Wlan => {
+            finterfaces_ext::PortClass::WlanClient => {
                 finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Wlan)
             }
             finterfaces_ext::PortClass::WlanAp => {

@@ -733,7 +733,7 @@ func TestFilterUpdates(t *testing.T) {
 				{
 					Action:      filter.ActionDrop,
 					Direction:   filter.DirectionIncoming,
-					DeviceClass: filter.DeviceClassWithMatch(network.PortClassWlan),
+					DeviceClass: filter.DeviceClassWithMatch(network.PortClassWlanClient),
 				},
 			},
 			result: filter.FilterUpdateRulesResultWithResponse(filter.FilterUpdateRulesResponse{}),
@@ -756,7 +756,7 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Matchers: []stack.Matcher{
 								&deviceClassNICMatcher{
-									match:     network.PortClassWlan,
+									match:     network.PortClassWlanClient,
 									direction: NICMatcherDirectionInput,
 								},
 							},
@@ -815,7 +815,7 @@ func TestFilterUpdates(t *testing.T) {
 						{
 							Matchers: []stack.Matcher{
 								&deviceClassNICMatcher{
-									match:     network.PortClassWlan,
+									match:     network.PortClassWlanClient,
 									direction: NICMatcherDirectionInput,
 								},
 							},
@@ -1276,7 +1276,7 @@ func TestDeviceClassMatcher(t *testing.T) {
 		nic2Name = "eth2"
 	)
 	nic1Class := network.PortClassEthernet
-	nic2Class := network.PortClassWlan
+	nic2Class := network.PortClassWlanClient
 	var cache enabledNicsCache
 	cache.init()
 	cache.add(nic0Name, cachedNicInfo{})

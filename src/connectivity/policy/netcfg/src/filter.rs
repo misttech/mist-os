@@ -547,11 +547,13 @@ impl FilterEnabledState {
         interface_type
             .as_ref()
             .map(|ty| match ty {
-                InterfaceType::Wlan | InterfaceType::Ethernet => self.interface_types.contains(ty),
-                // An AP device can be filtered by specifying AP or WLAN.
-                InterfaceType::Ap => {
+                InterfaceType::WlanClient | InterfaceType::Ethernet => {
                     self.interface_types.contains(ty)
-                        | self.interface_types.contains(&InterfaceType::Wlan)
+                }
+                // An AP device can be filtered by specifying AP or WLAN.
+                InterfaceType::WlanAp => {
+                    self.interface_types.contains(ty)
+                        | self.interface_types.contains(&InterfaceType::WlanClient)
                 }
             })
             .unwrap_or(false)
@@ -755,8 +757,9 @@ mod tests {
         let types_empty: HashSet<InterfaceType> = [].iter().cloned().collect();
         let types_ethernet: HashSet<InterfaceType> =
             [InterfaceType::Ethernet].iter().cloned().collect();
-        let types_wlan: HashSet<InterfaceType> = [InterfaceType::Wlan].iter().cloned().collect();
-        let types_ap: HashSet<InterfaceType> = [InterfaceType::Ap].iter().cloned().collect();
+        let types_wlan: HashSet<InterfaceType> =
+            [InterfaceType::WlanClient].iter().cloned().collect();
+        let types_ap: HashSet<InterfaceType> = [InterfaceType::WlanAp].iter().cloned().collect();
 
         let id = const_unwrap_option(NonZeroU64::new(10));
 
@@ -766,7 +769,7 @@ mod tests {
             topological_path: "",
         };
 
-        let wlan_info = make_info(DeviceClass::Wlan);
+        let wlan_info = make_info(DeviceClass::WlanClient);
         let wlan_ap_info = make_info(DeviceClass::WlanAp);
         let ethernet_info = make_info(DeviceClass::Ethernet);
 

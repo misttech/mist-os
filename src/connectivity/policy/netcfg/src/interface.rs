@@ -345,9 +345,9 @@ impl DynamicNameCompositionRule {
                 get_bus_type_for_topological_path(info.topological_path).to_string()
             }
             DynamicNameCompositionRule::DeviceClass => match info.device_class.into() {
-                crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
+                crate::InterfaceType::WlanClient => INTERFACE_PREFIX_WLAN,
                 crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
-                crate::InterfaceType::Ap => INTERFACE_PREFIX_AP,
+                crate::InterfaceType::WlanAp => INTERFACE_PREFIX_AP,
             }
             .to_string(),
             DynamicNameCompositionRule::NormalizedMac => {
@@ -546,7 +546,7 @@ impl<'a> DeviceInfoRef<'a> {
         let DeviceInfoRef { device_class, mac: _, topological_path: _ } = self;
         match device_class {
             DeviceClass::WlanAp => true,
-            DeviceClass::Wlan
+            DeviceClass::WlanClient
             | DeviceClass::Virtual
             | DeviceClass::Ethernet
             | DeviceClass::Bridge
@@ -602,8 +602,8 @@ mod tests {
     fn device_class_from_interface_type(ty: crate::InterfaceType) -> DeviceClass {
         match ty {
             crate::InterfaceType::Ethernet => DeviceClass::Ethernet,
-            crate::InterfaceType::Wlan => DeviceClass::Wlan,
-            crate::InterfaceType::Ap => DeviceClass::WlanAp,
+            crate::InterfaceType::WlanClient => DeviceClass::WlanClient,
+            crate::InterfaceType::WlanAp => DeviceClass::WlanAp,
         }
     }
 
@@ -611,7 +611,7 @@ mod tests {
     #[test_case(
         "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
         [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-        crate::InterfaceType::Wlan,
+        crate::InterfaceType::WlanClient,
         "wlanx1";
         "usb_wlan"
     )]
@@ -626,7 +626,7 @@ mod tests {
     #[test_case(
         "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/ethernet",
         [0x03, 0x03, 0x03, 0x03, 0x03, 0x03],
-        crate::InterfaceType::Wlan,
+        crate::InterfaceType::WlanClient,
         "wlanp0014";
         "pci_wlan"
     )]
@@ -641,7 +641,7 @@ mod tests {
     #[test_case(
         "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
         [0x05, 0x05, 0x05, 0x05, 0x05, 0x05],
-        crate::InterfaceType::Wlan,
+        crate::InterfaceType::WlanClient,
         "wlans05006";
         "platform_wlan"
     )]
@@ -656,21 +656,21 @@ mod tests {
     #[test_case(
         "/dev/sys/unknown",
         [0x08, 0x08, 0x08, 0x08, 0x08, 0x08],
-        crate::InterfaceType::Wlan,
+        crate::InterfaceType::WlanClient,
         "wlanx8";
         "unknown_wlan1"
     )]
     #[test_case(
         "unknown",
         [0x09, 0x09, 0x09, 0x09, 0x09, 0x09],
-        crate::InterfaceType::Wlan,
+        crate::InterfaceType::WlanClient,
         "wlanx9";
         "unknown_wlan2"
     )]
     #[test_case(
         "unknown",
         [0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a],
-        crate::InterfaceType::Ap,
+        crate::InterfaceType::WlanAp,
         "apxa";
         "unknown_ap"
     )]
@@ -711,7 +711,7 @@ mod tests {
     #[test_case([StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-        interface_type: crate::InterfaceType::Wlan,
+        interface_type: crate::InterfaceType::WlanClient,
         want_name: "wlanp0014",
         expected_size: 1 }];
         "single_interface"
@@ -721,12 +721,12 @@ mod tests {
     #[test_case([StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-        interface_type: crate::InterfaceType::Wlan,
+        interface_type: crate::InterfaceType::WlanClient,
         want_name: "wlanp0014",
         expected_size: 1}, StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
-        interface_type: crate::InterfaceType::Ap,
+        interface_type: crate::InterfaceType::WlanAp,
         want_name: "app0014",
         expected_size: 2 }];
         "two_interfaces_same_topo_path_different_mac"
@@ -734,7 +734,7 @@ mod tests {
     #[test_case([StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-        interface_type: crate::InterfaceType::Wlan,
+        interface_type: crate::InterfaceType::WlanClient,
         want_name: "wlanp0014",
         expected_size: 1}, StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
@@ -756,7 +756,7 @@ mod tests {
         expected_size: 1 }, StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
         mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
-        interface_type: crate::InterfaceType::Wlan,
+        interface_type: crate::InterfaceType::WlanClient,
         want_name: "wlanp01",
         expected_size: 1 }];
         "two_interfaces_different_device_class"
@@ -797,7 +797,9 @@ mod tests {
 
             let name = config
                 .generate_name(&DeviceInfoRef {
-                    device_class: device_class_from_interface_type(crate::InterfaceType::Wlan),
+                    device_class: device_class_from_interface_type(
+                        crate::InterfaceType::WlanClient,
+                    ),
                     mac: &fidl_fuchsia_net_ext::MacAddress { octets },
                     topological_path: topo_usb,
                 })
@@ -809,7 +811,7 @@ mod tests {
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
         assert!(config
             .generate_name(&DeviceInfoRef {
-                device_class: device_class_from_interface_type(crate::InterfaceType::Wlan),
+                device_class: device_class_from_interface_type(crate::InterfaceType::WlanClient),
                 mac: &fidl_fuchsia_net_ext::MacAddress { octets },
                 topological_path: topo_usb
             },)
@@ -1060,18 +1062,18 @@ mod tests {
     )]
     #[test_case(
         DeviceClass::Ethernet,
-        vec![DeviceClass::Wlan, DeviceClass::WlanAp],
+        vec![DeviceClass::WlanClient, DeviceClass::WlanAp],
         false;
         "eth_no_match"
     )]
     #[test_case(
-        DeviceClass::Wlan,
-        vec![DeviceClass::Wlan],
+        DeviceClass::WlanClient,
+        vec![DeviceClass::WlanClient],
         true;
         "wlan_match"
     )]
     #[test_case(
-        DeviceClass::Wlan,
+        DeviceClass::WlanClient,
         vec![DeviceClass::Ethernet, DeviceClass::WlanAp],
         false;
         "wlan_no_match"
@@ -1084,7 +1086,7 @@ mod tests {
     )]
     #[test_case(
         DeviceClass::WlanAp,
-        vec![DeviceClass::Ethernet, DeviceClass::Wlan],
+        vec![DeviceClass::Ethernet, DeviceClass::WlanClient],
         false;
         "ap_no_match"
     )]
@@ -1109,7 +1111,7 @@ mod tests {
         DeviceClass::Ethernet,
         "/dev/pci-00:15.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet"
     )]
-    #[test_case(DeviceClass::Wlan, "/dev/pci-00:14.0/ethernet")]
+    #[test_case(DeviceClass::WlanClient, "/dev/pci-00:14.0/ethernet")]
     fn test_interface_matching_by_any_matching_rule(
         device_class: DeviceClass,
         topological_path: &'static str,
@@ -1133,13 +1135,13 @@ mod tests {
 
     #[test_case(
         DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
-        vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan])],
+        vec![MatchingRule::DeviceClasses(vec![DeviceClass::WlanClient])],
         false;
         "false_single_rule"
     )]
     #[test_case(
         DeviceInfoRef { device_class: DeviceClass::Ethernet, ..default_device_info() },
-        vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan]), MatchingRule::Any(true)],
+        vec![MatchingRule::DeviceClasses(vec![DeviceClass::WlanClient]), MatchingRule::Any(true)],
         false;
         "false_one_rule_of_multiple"
     )]
@@ -1170,14 +1172,14 @@ mod tests {
         "",
         vec![
             ProvisioningMatchingRule::Common(
-                MatchingRule::DeviceClasses(vec![DeviceClass::Wlan])
+                MatchingRule::DeviceClasses(vec![DeviceClass::WlanClient])
             )
         ],
         false;
         "false_single_rule"
     )]
     #[test_case(
-        DeviceInfoRef { device_class: DeviceClass::Wlan, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::WlanClient, ..default_device_info() },
         "wlanx5009",
         vec![
             ProvisioningMatchingRule::InterfaceName {
@@ -1267,7 +1269,7 @@ mod tests {
     )]
     #[test_case(
         vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass }],
-        DeviceInfoRef { device_class: DeviceClass::Wlan, ..default_device_info() },
+        DeviceInfoRef { device_class: DeviceClass::WlanClient, ..default_device_info() },
         "wlan";
         "wlan_device_class"
     )]
@@ -1287,7 +1289,7 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
         ],
         DeviceInfoRef {
-            device_class: DeviceClass::Wlan,
+            device_class: DeviceClass::WlanClient,
             mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x8] },
             ..default_device_info()
         },
@@ -1483,7 +1485,7 @@ mod tests {
                 provisioning: ProvisioningAction::Delegated,
             }],
             &DeviceInfoRef {
-                device_class: DeviceClass::Wlan,
+                device_class: DeviceClass::WlanClient,
                 mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
                 topological_path: "",
             },

@@ -31,7 +31,7 @@ pub fn is_globally_routable(
         PortClass::Loopback => return false,
         PortClass::Virtual
         | PortClass::Ethernet
-        | PortClass::Wlan
+        | PortClass::WlanClient
         | PortClass::WlanAp
         | PortClass::Ppp
         | PortClass::Bridge

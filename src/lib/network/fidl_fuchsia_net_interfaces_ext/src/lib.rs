@@ -35,7 +35,7 @@ pub enum PortClass {
     Loopback,
     Virtual,
     Ethernet,
-    Wlan,
+    WlanClient,
     WlanAp,
     Ppp,
     Bridge,
@@ -49,7 +49,7 @@ impl PortClass {
             PortClass::Loopback => true,
             PortClass::Virtual
             | PortClass::Ethernet
-            | PortClass::Wlan
+            | PortClass::WlanClient
             | PortClass::WlanAp
             | PortClass::Ppp
             | PortClass::Bridge
@@ -110,8 +110,8 @@ impl From<PortClass> for fnet_interfaces::PortClass {
             PortClass::Ethernet => {
                 fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Ethernet)
             }
-            PortClass::Wlan => {
-                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Wlan)
+            PortClass::WlanClient => {
+                fnet_interfaces::PortClass::Device(fhardware_network::PortClass::WlanClient)
             }
             PortClass::WlanAp => {
                 fnet_interfaces::PortClass::Device(fhardware_network::PortClass::WlanAp)
@@ -133,7 +133,7 @@ impl TryFrom<fhardware_network::PortClass> for PortClass {
         match port_class {
             fhardware_network::PortClass::Virtual => Ok(PortClass::Virtual),
             fhardware_network::PortClass::Ethernet => Ok(PortClass::Ethernet),
-            fhardware_network::PortClass::Wlan => Ok(PortClass::Wlan),
+            fhardware_network::PortClass::WlanClient => Ok(PortClass::WlanClient),
             fhardware_network::PortClass::WlanAp => Ok(PortClass::WlanAp),
             fhardware_network::PortClass::Ppp => Ok(PortClass::Ppp),
             fhardware_network::PortClass::Bridge => Ok(PortClass::Bridge),

@@ -66,7 +66,7 @@ fn parse_devclass(pair: Pair<'_, Rule>) -> Option<fnet_interfaces_ext::PortClass
     pair.into_inner().next().map(|pair| match pair.as_rule() {
         Rule::virt => fnet_interfaces_ext::PortClass::Virtual,
         Rule::ethernet => fnet_interfaces_ext::PortClass::Ethernet,
-        Rule::wlan => fnet_interfaces_ext::PortClass::Wlan,
+        Rule::wlan => fnet_interfaces_ext::PortClass::WlanClient,
         Rule::ppp => fnet_interfaces_ext::PortClass::Ppp,
         Rule::bridge => fnet_interfaces_ext::PortClass::Bridge,
         Rule::ap => fnet_interfaces_ext::PortClass::WlanAp,

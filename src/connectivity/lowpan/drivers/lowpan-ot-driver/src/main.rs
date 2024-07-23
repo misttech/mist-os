@@ -162,7 +162,7 @@ impl Config {
                         );
                         if let (
                             Some(fidl_fuchsia_net_interfaces::PortClass::Device(
-                                fidl_fuchsia_hardware_network::PortClass::Wlan,
+                                fidl_fuchsia_hardware_network::PortClass::WlanClient,
                             )),
                             Some(true),
                         ) = (port_class, online)

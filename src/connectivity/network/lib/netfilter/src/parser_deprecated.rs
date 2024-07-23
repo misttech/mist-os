@@ -51,7 +51,7 @@ fn parse_devclass(pair: Pair<'_, Rule>) -> filter::DeviceClass {
         Some(pair) => match pair.as_rule() {
             Rule::virt => filter::DeviceClass::Match_(fhnet::PortClass::Virtual),
             Rule::ethernet => filter::DeviceClass::Match_(fhnet::PortClass::Ethernet),
-            Rule::wlan => filter::DeviceClass::Match_(fhnet::PortClass::Wlan),
+            Rule::wlan => filter::DeviceClass::Match_(fhnet::PortClass::WlanClient),
             Rule::ppp => filter::DeviceClass::Match_(fhnet::PortClass::Ppp),
             Rule::bridge => filter::DeviceClass::Match_(fhnet::PortClass::Bridge),
             Rule::ap => filter::DeviceClass::Match_(fhnet::PortClass::WlanAp),

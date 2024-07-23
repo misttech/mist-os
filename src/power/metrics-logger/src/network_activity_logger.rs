@@ -91,7 +91,7 @@ async fn watch_and_update_ports(
                     ) {
                         Some(port_class) => {
                             if port_class == fhwnet::PortClass::WlanAp
-                                || port_class == fhwnet::PortClass::Wlan
+                                || port_class == fhwnet::PortClass::WlanClient
                             {
                                 if ports.borrow_mut().insert(port_id.base, port).is_none() {
                                     info!(port_id.base, port_id.salt, "Added a new/existing port");

@@ -539,7 +539,7 @@ impl EventLoop {
             fnet_interfaces_ext::PortClass::Loopback => false,
             fnet_interfaces_ext::PortClass::Virtual
             | fnet_interfaces_ext::PortClass::Ethernet
-            | fnet_interfaces_ext::PortClass::Wlan
+            | fnet_interfaces_ext::PortClass::WlanClient
             | fnet_interfaces_ext::PortClass::WlanAp
             | fnet_interfaces_ext::PortClass::Ppp
             | fnet_interfaces_ext::PortClass::Bridge

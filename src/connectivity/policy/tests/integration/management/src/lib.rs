@@ -219,27 +219,27 @@ async fn test_oir<M: Manager, N: Netstack>(name: &str, config: ManagerConfig, pr
 #[test_case(
     ManagerConfig::Empty,
     ManagerConfig::PacketFilterWlan,
-    fhardware_network::PortClass::Wlan,
+    fhardware_network::PortClass::WlanClient,
     false; "receiver_wlan_enabled__both_ports_wlan")]
 #[test_case(
     ManagerConfig::PacketFilterWlan,
     ManagerConfig::Empty,
-    fhardware_network::PortClass::Wlan,
+    fhardware_network::PortClass::WlanClient,
     false; "sender_wlan_enabled__both_ports_wlan")]
 #[test_case(
     ManagerConfig::PacketFilterWlan,
     ManagerConfig::PacketFilterWlan,
-    fhardware_network::PortClass::Wlan,
+    fhardware_network::PortClass::WlanClient,
     false; "both_wlan_enabled__both_ports_wlan")]
 #[test_case(
     ManagerConfig::PacketFilterEthernet,
     ManagerConfig::PacketFilterEthernet,
-    fhardware_network::PortClass::Wlan,
+    fhardware_network::PortClass::WlanClient,
     true; "both_eth_enabled__both_ports_wlan")]
 #[test_case(
     ManagerConfig::Empty,
     ManagerConfig::Empty,
-    fhardware_network::PortClass::Wlan,
+    fhardware_network::PortClass::WlanClient,
     true; "both_no_filter__both_ports_wlan")]
 #[test_case(
     ManagerConfig::Empty,

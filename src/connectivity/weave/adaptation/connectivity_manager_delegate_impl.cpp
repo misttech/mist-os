@@ -306,7 +306,7 @@ void ConnectivityManagerDelegateImpl::OnInterfaceEvent(fuchsia::net::interfaces:
 
     if (wlan_interface_id_ == 0 && properties.has_port_class() &&
         properties.port_class().is_device() &&
-        properties.port_class().device() == PortClass::WLAN) {
+        properties.port_class().device() == PortClass::WLAN_CLIENT) {
       wlan_interface_id_ = properties.id();
       wlan_interface_name_ = properties.name();
       FX_LOGS(INFO) << "Identifying interface \"" << properties.name()
