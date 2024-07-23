@@ -131,7 +131,6 @@ pub struct DisconnectInfo {
 pub struct ConnectDisconnectLogger {
     connection_state: Arc<Mutex<ConnectionState>>,
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    _inspect_node: InspectNode,
     connect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     disconnect_events_node: Mutex<AutoPersist<BoundedListNode>>,
     connected_networks_node: Mutex<InspectBoundedSetNode<InspectConnectedNetwork>>,
@@ -141,7 +140,7 @@ pub struct ConnectDisconnectLogger {
 impl ConnectDisconnectLogger {
     pub fn new(
         cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-        inspect_node: InspectNode,
+        inspect_node: &InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
     ) -> Self {
         let connect_events = inspect_node.create_child("connect_events");
@@ -151,7 +150,6 @@ impl ConnectDisconnectLogger {
         Self {
             cobalt_1dot1_proxy,
             connection_state: Arc::new(Mutex::new(ConnectionState::Idle(IdleState {}))),
-            _inspect_node: inspect_node,
             connect_events_node: Mutex::new(AutoPersist::new(
                 BoundedListNode::new(connect_events, INSPECT_CONNECT_EVENTS_LIMIT),
                 "wlan-connect-events",
@@ -246,9 +244,10 @@ mod tests {
     #[fuchsia::test]
     fn test_log_connect_attempt_inspect() {
         let mut test_helper = setup_test();
+        let inspect_node = test_helper.create_inspect_node("test_stats");
         let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
-            test_helper.create_inspect_node("test_stats"),
+            &inspect_node,
             test_helper.persistence_sender.clone(),
         );
 
@@ -281,9 +280,10 @@ mod tests {
     #[fuchsia::test]
     fn test_log_connect_attempt_cobalt() {
         let mut test_helper = setup_test();
+        let inspect_node = test_helper.create_inspect_node("test_stats");
         let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
-            test_helper.create_inspect_node("test_stats"),
+            &inspect_node,
             test_helper.persistence_sender.clone(),
         );
 
@@ -315,9 +315,10 @@ mod tests {
     #[fuchsia::test]
     fn test_log_disconnect_inspect() {
         let mut test_helper = setup_test();
+        let inspect_node = test_helper.create_inspect_node("test_stats");
         let logger = ConnectDisconnectLogger::new(
             test_helper.cobalt_1dot1_proxy.clone(),
-            test_helper.create_inspect_node("test_stats"),
+            &inspect_node,
             test_helper.persistence_sender.clone(),
         );
 

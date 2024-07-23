@@ -3,3 +3,4 @@
 // found in the LICENSE file.
 
 pub mod connect_disconnect;
+pub mod toggle_events;

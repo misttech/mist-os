@@ -18,6 +18,7 @@ use {
 mod processors;
 pub(crate) mod util;
 pub use crate::processors::connect_disconnect::DisconnectInfo;
+pub use crate::processors::toggle_events::ClientConnectionsToggleEvent;
 pub use util::sender::TelemetrySender;
 #[cfg(test)]
 mod testing;
@@ -31,6 +32,8 @@ pub enum TelemetryEvent {
     ConnectResult { result: fidl_ieee80211::StatusCode, bss: Box<BssDescription> },
     /// Report a disconnection.
     Disconnect { info: DisconnectInfo },
+    /// Report a client connections enabled or disabled event.
+    ClientConnectionsToggle { event: ClientConnectionsToggleEvent },
 }
 
 /// Attempts to connect to the Cobalt service.
@@ -98,11 +101,15 @@ pub fn serve_telemetry(
     // Create and initialize modules
     let connect_disconnect = processors::connect_disconnect::ConnectDisconnectLogger::new(
         cobalt_1dot1_proxy,
-        inspect_node,
+        &inspect_node,
         persistence_req_sender,
     );
 
+    let mut toggle_logger = processors::toggle_events::ToggleLogger::new(&inspect_node);
+
     let fut = async move {
+        // Prevent the inspect node from being dropped while the loop is running.
+        let _inspect_node = inspect_node;
         loop {
             let Some(event) = receiver.next().await else {
                 error!("Telemetry event stream unexpectedly terminated.");
@@ -116,6 +123,9 @@ pub fn serve_telemetry(
                 }
                 Disconnect { info } => {
                     connect_disconnect.log_disconnect(&info).await;
+                }
+                ClientConnectionsToggle { event } => {
+                    toggle_logger.log_toggle_event(event);
                 }
             }
         }
