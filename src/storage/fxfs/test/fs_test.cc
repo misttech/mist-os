@@ -2,22 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/fs_test/fs_test.h"
+
 #include <fcntl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <unistd.h>
 #include <zircon/errors.h>
 
+#include <cstddef>
+#include <cstring>
+#include <memory>
+#include <string>
 #include <utility>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <storage/buffer/owned_vmoid.h>
 
 #include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/storage/fs_test/fs_test_fixture.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
-#include "storage/buffer/owned_vmoid.h"
+#include "src/storage/lib/fs_management/cpp/format.h"
 
 namespace fs_test {
 namespace {

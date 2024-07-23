@@ -5,45 +5,55 @@
 #include "src/storage/fs_test/fs_test.h"
 
 #include <dlfcn.h>
-#include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <fidl/fuchsia.fs/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.hardware.nand/cpp/wire.h>
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
-#include <fuchsia/fs/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
-#include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
-#include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/sync/completion.h>
-#include <lib/zx/channel.h>
-#include <stdlib.h>
+#include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <functional>
 #include <iostream>
-#include <unordered_map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
+#include <variant>
+#include <vector>
 
-#include <fbl/unique_fd.h>
+#include <ramdevice-client/ramdisk.h>
+#include <ramdevice-client/ramnand.h>
+#include <rapidjson/rapidjson.h>
 
-#include "sdk/lib/syslog/cpp/macros.h"
 #include "src/lib/json_parser/json_parser.h"
+#include "src/lib/uuid/uuid.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/fs_test/blobfs_test.h"
 #include "src/storage/fs_test/json_filesystem.h"
 #include "src/storage/lib/fs_management/cpp/admin.h"
+#include "src/storage/lib/fs_management/cpp/component.h"
 #include "src/storage/lib/fs_management/cpp/format.h"
 #include "src/storage/lib/fs_management/cpp/fvm.h"
 #include "src/storage/lib/fs_management/cpp/mkfs_with_default.h"
 #include "src/storage/lib/fs_management/cpp/mount.h"
+#include "src/storage/lib/fs_management/cpp/options.h"
 #include "src/storage/testing/fvm.h"
+#include "src/storage/testing/ram_disk.h"
 
 namespace fs_test {
 namespace {

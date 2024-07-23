@@ -54,19 +54,12 @@ test("external_decompressor_integration") {
   sources = [ "external_decompressor_test.cc" ]
   deps = [
     ":blobfs_integration_fixtures",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/blobfs",
-    "//src/storage/blobfs:fuchsia.blobfs.internal_cpp",
     "//src/storage/blobfs/test:test_utils",
-    "//src/storage/lib/block_client/cpp:fake_device",
     "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/id_allocator",
     "//zircon/system/ulib/zx",
   ]
 }

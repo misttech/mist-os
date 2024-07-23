@@ -5,53 +5,58 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.fs/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.fs/cpp/common_types.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async-loop/loop.h>
-#include <lib/async/cpp/executor.h>
-#include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fidl/cpp/binding.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
+#include <lib/fit/defer.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/testing/cpp/inspect.h>
-#include <lib/sync/completion.h>
-#include <lib/zx/vmo.h>
+#include <lib/zx/result.h>
+#include <poll.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <unistd.h>
 #include <utime.h>
 #include <zircon/errors.h>
-#include <zircon/fidl.h>
 #include <zircon/status.h>
-#include <zircon/time.h>
+#include <zircon/syscalls.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <fbl/algorithm.h>
-#include <fbl/array.h>
 #include <fbl/unique_fd.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <safemath/safe_conversions.h>
 
 #include "src/lib/digest/digest.h"
+#include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/integration/blobfs_fixtures.h"
 #include "src/storage/blobfs/test/integration/fdio_test.h"
+#include "src/storage/fs_test/fs_test.h"
+#include "src/storage/fs_test/test_filesystem.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
-#include "src/storage/lib/fs_management/cpp/mount.h"
+#include "src/storage/lib/fs_management/cpp/options.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
 namespace blobfs {
 namespace {
@@ -1138,8 +1143,8 @@ void CloneThread(CloneThreadArgs* args) {
     // Explicitly close |fd| before unmapping.
     fd.reset();
     // Yielding before unmapping significantly improves the ability of this test to detect bugs
-    // (e.g. https://fxbug.dev/42131342) by increasing the length of time that the file is closed but still has
-    // a VMO clone.
+    // (e.g. https://fxbug.dev/42131342) by increasing the length of time that the file is closed
+    // but still has a VMO clone.
     zx_thread_legacy_yield(0);
     ASSERT_EQ(0, munmap(addr, args->info->size_data));
   }
@@ -1157,8 +1162,8 @@ TEST_P(BlobfsIntegrationTest, VmoCloneWatchingTest) {
     ASSERT_NO_FATAL_FAILURE(MakeBlob(*info, &fd));
   }
 
-  struct CloneThreadArgs thread_args {
-    .info = info.get(),
+  struct CloneThreadArgs thread_args{
+      .info = info.get(),
   };
   std::thread clone_thread(CloneThread, &thread_args);
 

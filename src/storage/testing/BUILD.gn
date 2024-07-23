@@ -38,8 +38,8 @@ source_set("storage_driver_test_support") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_hlcpp",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/sys/cpp",
