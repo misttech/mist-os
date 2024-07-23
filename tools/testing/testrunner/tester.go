@@ -682,7 +682,7 @@ func (t *FFXTester) ProcessResult(ctx context.Context, test testsharder.Test, ou
 	}
 	if finalTestResult.Result != runtests.TestSuccess {
 		if ok, errMsg := containsError(testRun.output, []string{
-			sshutilconstants.ProcessTerminatedMsg, ffxutilconstants.TimeoutReachingTargetMsg}); ok {
+			sshutilconstants.ProcessTerminatedMsg, ffxutilconstants.TimeoutReachingTargetMsg, ffxutilconstants.UnableToResolveAddressMsg}); ok {
 			if err == nil {
 				err = errors.New(errMsg)
 			}

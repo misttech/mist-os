@@ -680,6 +680,15 @@ func infraToolLogChecks() []FailureModeCheck {
 			AttributeToTest: true,
 			AddTag:          true,
 		},
+		// For https://fxbug.dev/354707902.
+		&stringInLogCheck{
+			String:          ffxutilconstants.UnableToResolveAddressMsg,
+			Type:            swarmingOutputType,
+			SkipPassedTest:  true,
+			IgnoreFlakes:    true,
+			AttributeToTest: true,
+			AddTag:          true,
+		},
 		// For https://fxbug.dev/321754579.
 		&stringInLogCheck{
 			String:         fmt.Sprintf("%s: context deadline exceeded", ffxutilconstants.CommandFailedMsg),

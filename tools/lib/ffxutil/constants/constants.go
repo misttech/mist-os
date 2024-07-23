@@ -11,4 +11,5 @@ const (
 	// LINT.IfChange
 	TimeoutReachingTargetMsg = "Timeout attempting to reach target"
 	// LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/transports/ffx.py)
+	UnableToResolveAddressMsg = "unable to resolve address for target"
 )
