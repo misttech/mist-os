@@ -167,7 +167,6 @@ multiconst!(u32, [
     ZX_VMO_OP_PREFETCH = 14;
 ]);
 
-// TODO: add an alias for this type in the C headers.
 multiconst!(zx_vm_option_t, [
     ZX_VM_PERM_READ             = 1 << 0;
     ZX_VM_PERM_WRITE            = 1 << 1;
@@ -1548,6 +1547,8 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_KMEM_STATS_EXTENDED        = 31; // zx_info_kmem_stats_extended_t[1]
     ZX_INFO_VCPU                       = 32; // zx_info_vcpu_t[1]
     ZX_INFO_KMEM_STATS_COMPRESSION     = 33; // zx_info_kmem_stats_compression_t[1]
+    ZX_INFO_IOB                        = 34; // zx_info_iob_t[1]
+    ZX_INFO_IOB_REGIONS                = 35; // zx_iob_region_info_t[n]
 ]);
 
 // This macro takes struct-like syntax and creates another macro that can be used to create

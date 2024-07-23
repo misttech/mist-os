@@ -65,6 +65,8 @@ assoc_values!(Topic, [
     SOCKET = sys::ZX_INFO_SOCKET;
     VMO = sys::ZX_INFO_VMO;
     JOB = sys::ZX_INFO_JOB;
+    IOB = sys::ZX_INFO_IOB;
+    IOB_REGIONS = sys::ZX_INFO_IOB_REGIONS;
 ]);
 
 /// Query information about a zircon object. Returns a valid slice and any remaining capacity on
