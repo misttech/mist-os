@@ -4,17 +4,13 @@
 
 //! Type-safe bindings for Zircon processes.
 
-use crate::sys::{zx_handle_t, zx_rights_t};
+use crate::sys::{self as sys, zx_handle_t, zx_rights_t, zx_time_t, ZX_OBJ_TYPE_UPPER_BOUND};
 use crate::{
     object_get_info_single, object_get_info_vec, object_get_property, object_set_property, ok,
-    AsHandleRef, Handle, HandleBased, HandleRef, Koid, ObjectQuery, Property, PropertyQuery,
-    Status, Task, Thread, Topic, VmoInfo,
+    AsHandleRef, Handle, HandleBased, HandleRef, Koid, MapInfo, ObjectQuery, Property,
+    PropertyQuery, Status, Task, Thread, Topic, VmoInfo,
 };
 use bitflags::bitflags;
-use fuchsia_zircon_sys::{
-    self as sys, zx_info_maps_type_t, zx_koid_t, zx_time_t, zx_vaddr_t, zx_vm_option_t,
-    InfoMapsTypeUnion, PadByte, ZX_MAX_NAME_LEN, ZX_OBJ_TYPE_UPPER_BOUND,
-};
 use std::mem::MaybeUninit;
 
 bitflags! {
@@ -105,53 +101,10 @@ unsafe impl ObjectQuery for TaskStatsInfo {
     type InfoTy = TaskStatsInfo;
 }
 
-sys::zx_info_maps_mapping_t!(MapsMappingInfo);
-
-impl From<sys::zx_info_maps_mapping_t> for MapsMappingInfo {
-    fn from(
-        sys::zx_info_maps_mapping_t {
-            mmu_flags,
-            padding1,
-            vmo_koid,
-            vmo_offset,
-            committed_pages,
-            populated_pages,
-        }: sys::zx_info_maps_mapping_t,
-    ) -> Self {
-        Self { mmu_flags, padding1, vmo_koid, vmo_offset, committed_pages, populated_pages }
-    }
-}
-
-sys::zx_info_maps_t!(ProcessMapsInfo);
-
-impl ProcessMapsInfo {
-    pub fn into_mapping_info(&self) -> Option<MapsMappingInfo> {
-        if self.r#type != sys::ZX_INFO_MAPS_TYPE_MAPPING {
-            return None;
-        }
-        // All the fields of u.mapping are objects that are well defined for any bit
-        // representation, hence it is always safe to read it.
-        Some(unsafe { self.u.mapping }.into())
-    }
-}
-
-impl Default for ProcessMapsInfo {
-    fn default() -> Self {
-        let mapping = sys::zx_info_maps_mapping_t::default();
-        Self {
-            u: sys::InfoMapsTypeUnion { mapping },
-            name: Default::default(),
-            base: Default::default(),
-            size: Default::default(),
-            depth: Default::default(),
-            r#type: Default::default(),
-        }
-    }
-}
-
+struct ProcessMapsInfo;
 unsafe impl ObjectQuery for ProcessMapsInfo {
     const TOPIC: Topic = Topic::PROCESS_MAPS;
-    type InfoTy = ProcessMapsInfo;
+    type InfoTy = sys::zx_info_maps_t;
 }
 
 struct ProcessVmoInfo;
@@ -314,8 +267,15 @@ impl Process {
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_PROCESS_MAPS topic.
-    pub fn info_maps_vec(&self) -> Result<Vec<ProcessMapsInfo>, Status> {
-        object_get_info_vec::<ProcessMapsInfo>(self.as_handle_ref())
+    pub fn info_maps_vec(&self) -> Result<Vec<MapInfo>, Status> {
+        object_get_info_vec::<ProcessMapsInfo>(self.as_handle_ref())?
+            .into_iter()
+            .map(|i| {
+                // SAFETY: these values were written by the kernel which is the requirement for this
+                // function.
+                unsafe { MapInfo::from_raw(i) }
+            })
+            .collect::<Result<Vec<_>, _>>()
     }
 
     /// Exit the current process with the given return code.
@@ -375,8 +335,8 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_zircon::sys::ZX_RIGHT_NONE;
     use fuchsia_zircon::{
-        sys, system_get_page_size, AsHandleRef, Handle, ProcessInfo, ProcessInfoFlags,
-        ProcessMapsInfo, ProcessOptions, Signals, Task, TaskStatsInfo, Time, VmarFlags, Vmo,
+        sys, system_get_page_size, AsHandleRef, Handle, MapDetails, ProcessInfo, ProcessInfoFlags,
+        ProcessOptions, Signals, Task, TaskStatsInfo, Time, VmarFlags, Vmo,
     };
     use std::ffi::CString;
 
@@ -512,8 +472,10 @@ mod tests {
         // We should find our two mappings in the info.
         let count = info
             .iter()
-            .filter_map(ProcessMapsInfo::into_mapping_info)
-            .filter(|map| map.vmo_koid == vmo_koid.raw_koid())
+            .filter(|info| match info.details {
+                MapDetails::Mapping(d) => d.vmo_koid == vmo_koid,
+                _ => false,
+            })
             .count();
         assert_eq!(count, 2);
 
@@ -546,8 +508,10 @@ mod tests {
         // We should find our two mappings in the info.
         let count = info
             .iter()
-            .filter_map(ProcessMapsInfo::into_mapping_info)
-            .filter(|map| map.vmo_koid == vmo_koid.raw_koid())
+            .filter(|info| match info.details {
+                MapDetails::Mapping(d) => d.vmo_koid == vmo_koid,
+                _ => false,
+            })
             .count();
         assert_eq!(count, 2);
 

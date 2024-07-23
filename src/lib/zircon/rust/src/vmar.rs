@@ -5,11 +5,10 @@
 //! Type-safe bindings for Zircon vmar objects.
 
 use crate::{
-    object_get_info_single, ok, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery, Status,
-    Topic, Vmo,
+    object_get_info_single, ok, sys, AsHandleRef, Handle, HandleBased, HandleRef, Koid, Name,
+    ObjectQuery, Status, Topic, Vmo,
 };
 use bitflags::bitflags;
-use fuchsia_zircon_sys as sys;
 
 /// An object representing a Zircon
 /// [virtual memory address region](https://fuchsia.dev/fuchsia-src/concepts/objects/vm_address_region.md).
@@ -32,6 +31,78 @@ impl From<sys::zx_info_vmar_t> for VmarInfo {
 unsafe impl ObjectQuery for VmarInfo {
     const TOPIC: Topic = Topic::VMAR;
     type InfoTy = VmarInfo;
+}
+
+/// Ergonomic wrapper around `zx_info_maps_t`.
+#[derive(Copy, Clone, Debug)]
+pub struct MapInfo {
+    pub name: Name,
+    pub base: usize,
+    pub size: usize,
+    pub depth: usize,
+    pub details: MapDetails,
+}
+
+impl MapInfo {
+    /// # Safety
+    ///
+    /// Must be passed a value written by the kernel.
+    pub(crate) unsafe fn from_raw(
+        sys::zx_info_maps_t { name, base, size, depth, r#type, u }: sys::zx_info_maps_t,
+    ) -> Result<Self, Status> {
+        let details = match r#type {
+            sys::ZX_INFO_MAPS_TYPE_NONE => MapDetails::None,
+            sys::ZX_INFO_MAPS_TYPE_ASPACE => MapDetails::AddressSpace,
+            sys::ZX_INFO_MAPS_TYPE_VMAR => MapDetails::Vmar,
+            sys::ZX_INFO_MAPS_TYPE_MAPPING => {
+                // SAFETY: as long as this value was written by the kernel we can trust that the
+                // type corresponds to this layout.
+                let &sys::zx_info_maps_mapping_t {
+                    mmu_flags,
+                    padding1: _,
+                    vmo_koid,
+                    vmo_offset,
+                    committed_pages,
+                    populated_pages,
+                } = unsafe { &u.mapping };
+                MapDetails::Mapping(MappingDetails {
+                    mmu_flags: VmarFlagsExtended::from_bits_retain(mmu_flags),
+                    vmo_koid: Koid::from_raw(vmo_koid),
+                    vmo_offset,
+                    committed_pages,
+                    populated_pages,
+                })
+            }
+            _ => return Err(Status::INTERNAL),
+        };
+        Ok(Self { name: Name::from_raw(name), base, size, depth, details })
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum MapDetails {
+    None,
+    AddressSpace,
+    Vmar,
+    Mapping(MappingDetails),
+}
+
+impl MapDetails {
+    pub fn as_mapping(&self) -> Option<MappingDetails> {
+        match self {
+            Self::Mapping(d) => Some(*d),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct MappingDetails {
+    pub mmu_flags: VmarFlagsExtended,
+    pub vmo_koid: Koid,
+    pub vmo_offset: u64,
+    pub committed_pages: usize,
+    pub populated_pages: usize,
 }
 
 impl Vmar {
