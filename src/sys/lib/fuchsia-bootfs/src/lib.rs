@@ -25,8 +25,12 @@ fn zbi_bootfs_dirent_size(name_len: u32) -> u32 {
     (ZBI_BOOTFS_DIRENT_SIZE as u32 + name_len + 3) & !3u32
 }
 
-fn zbi_bootfs_page_align(size: u32) -> u32 {
+pub fn zbi_bootfs_page_align(size: u32) -> u32 {
     size.wrapping_add(ZBI_BOOTFS_PAGE_SIZE - 1) & !(ZBI_BOOTFS_PAGE_SIZE - 1)
+}
+
+pub fn zbi_bootfs_is_aligned(size: u32) -> bool {
+    size % ZBI_BOOTFS_PAGE_SIZE == 0
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]

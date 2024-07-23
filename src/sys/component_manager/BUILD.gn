@@ -117,6 +117,7 @@ rustc_binary("bin") {
     "//src/sys/lib/cm_config",
     "//src/sys/lib/cm_rust/testing",
     "//src/sys/lib/component_id_index",
+    "//src/sys/lib/fuchsia-bootfs:testdata_bootfs",
     "//src/sys/lib/library_loader",
     "//src/sys/lib/routing/testing:routing_test_helpers",
     "//third_party/rust_crates:assert_matches",

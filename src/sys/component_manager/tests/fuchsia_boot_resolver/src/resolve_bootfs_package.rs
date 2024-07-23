@@ -11,7 +11,8 @@ use {
     fidl_fuchsia_sys2 as fsys,
     fuchsia_component_test::ScopedInstance,
     fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon::HandleBased,
+    fuchsia_zircon::{self as zx, HandleBased},
+    std::{fs::File, io::Read},
 };
 
 // macros
@@ -20,19 +21,20 @@ use vfs::assert_read_dirents;
 use vfs::directory::test_utils::DirentsSameInodeBuilder;
 
 const ZBI_PATH: &str = "/pkg/data/tests/uncompressed_bootfs";
+
+// Create a vmo of the test bootfs image that can be decommitted by BootfsSvc.
+#[cfg(test)]
+fn read_file_to_vmo(path: &str) -> zx::Vmo {
+    let mut file_buffer = Vec::new();
+    File::open(path).and_then(|mut f| f.read_to_end(&mut file_buffer)).unwrap();
+    let vmo = zx::Vmo::create(file_buffer.len() as u64).unwrap();
+    vmo.write(&file_buffer, 0).unwrap();
+    vmo
+}
+
 #[fuchsia::test]
 async fn package_resolution() {
-    let bootfs_image = fuchsia_fs::file::open_in_namespace(
-        ZBI_PATH,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .unwrap();
-
-    let vmo = bootfs_image
-        .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::EXECUTE)
-        .await
-        .unwrap()
-        .unwrap();
+    let vmo = read_file_to_vmo(ZBI_PATH);
     let numbered_handles = vec![fprocess::HandleInfo {
         handle: vmo.into_handle(),
         id: HandleInfo::from(HandleType::BootfsVmo).as_raw(),
