@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #![recursion_limit = "512"]
+
 use tracing_mutex as _;
 
 pub mod arch;
