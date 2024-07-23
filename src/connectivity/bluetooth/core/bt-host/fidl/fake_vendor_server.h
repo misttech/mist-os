@@ -5,16 +5,11 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_FAKE_VENDOR_SERVER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_FAKE_VENDOR_SERVER_H_
 
-#include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
-#include <lib/zx/channel.h>
 
 #include <cstdint>
-#include <string>
 
-#include "lib/fidl/cpp/interface_request.h"
-#include "lib/fpromise/result.h"
-#include "src/connectivity/bluetooth/core/bt-host/fidl/fake_hci_server.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/fake_hci_transport_server.h"
 
 namespace bt::fidl::testing {
 
@@ -26,13 +21,12 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
         dispatcher_(dispatcher) {
     fuchsia_hardware_bluetooth::VendorFeatures features;
     features.acl_priority_command(true);
-    auto result = ::fidl::SendEvent(binding_)->OnFeatures(features);
-    EXPECT_TRUE(result.is_ok());
+    BT_ASSERT(::fidl::SendEvent(binding_)->OnFeatures(features).is_ok());
   }
 
   void Unbind() { binding_.Unbind(); }
 
-  fidl::testing::FakeHciServer* hci_server() { return &fake_hci_server_.value(); }
+  fidl::testing::FakeHciTransportServer* hci_server() { return &fake_hci_server_.value(); }
 
   void set_open_hci_error(bool val) { open_hci_error_ = val; }
 
@@ -47,33 +41,26 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
     completer.Reply(fit::success(tmp));
   }
 
-  void OpenHci(OpenHciCompleter::Sync& completer) override {
+  // Not supported
+  void OpenHci(OpenHciCompleter::Sync& completer) override { BT_PANIC("OpenHci not supported"); }
+
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {
     if (open_hci_error_) {
       completer.Reply(fit::error(ZX_ERR_INTERNAL));
       return;
     }
 
     auto [hci_client_end, hci_server_end] =
-        ::fidl::Endpoints<fuchsia_hardware_bluetooth::Hci>::Create();
+        ::fidl::Endpoints<fuchsia_hardware_bluetooth::HciTransport>::Create();
 
     fake_hci_server_.emplace(std::move(hci_server_end), dispatcher_);
     completer.Reply(fit::success(std::move(hci_client_end)));
   }
 
-  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
-
   void handle_unknown_method(
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override {
     // Not implemented
-  }
-
-  void InitializeWait(async::WaitBase& wait, zx::channel& channel) {
-    BT_ASSERT(channel.is_valid());
-    wait.Cancel();
-    wait.set_object(channel.get());
-    wait.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-    BT_ASSERT(wait.Begin(dispatcher_) == ZX_OK);
   }
 
   uint8_t WhichSetAclPriority(fuchsia_hardware_bluetooth::VendorAclPriority priority,
@@ -90,7 +77,7 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
   // Flag for testing. |OpenHci()| returns an error when set to true
   bool open_hci_error_ = false;
 
-  std::optional<fidl::testing::FakeHciServer> fake_hci_server_;
+  std::optional<fidl::testing::FakeHciTransportServer> fake_hci_server_;
 
   ::fidl::ServerBindingRef<fuchsia_hardware_bluetooth::Vendor> binding_;
 

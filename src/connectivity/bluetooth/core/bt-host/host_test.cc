@@ -8,7 +8,7 @@
 
 #include <string>
 
-#include "src/connectivity/bluetooth/core/bt-host/fidl/fake_hci_server.h"
+#include "src/connectivity/bluetooth/core/bt-host/fidl/fake_hci_transport_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_vendor_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 
@@ -29,7 +29,7 @@ class HostComponentTest : public TestingBase {
         fidl::Endpoints<fuchsia_hardware_bluetooth::Vendor>::Create();
 
     auto [hci_client_end, hci_server_end] =
-        fidl::Endpoints<fuchsia_hardware_bluetooth::Hci>::Create();
+        fidl::Endpoints<fuchsia_hardware_bluetooth::HciTransport>::Create();
 
     vendor_ = std::move(vendor_client_end);
     hci_ = std::move(hci_client_end);
@@ -46,7 +46,7 @@ class HostComponentTest : public TestingBase {
     TestingBase::TearDown();
   }
 
-  fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci() { return std::move(hci_); }
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::HciTransport> hci() { return std::move(hci_); }
 
   fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor() { return std::move(vendor_); }
 
@@ -58,11 +58,11 @@ class HostComponentTest : public TestingBase {
  private:
   std::unique_ptr<BtHostComponent> host_;
 
-  fidl::ClientEnd<fuchsia_hardware_bluetooth::Hci> hci_;
+  fidl::ClientEnd<fuchsia_hardware_bluetooth::HciTransport> hci_;
 
   fidl::ClientEnd<fuchsia_hardware_bluetooth::Vendor> vendor_;
 
-  std::optional<bt::fidl::testing::FakeHciServer> fake_hci_server_;
+  std::optional<bt::fidl::testing::FakeHciTransportServer> fake_hci_server_;
 
   std::optional<bt::fidl::testing::FakeVendorServer> fake_vendor_server_;
 
