@@ -16,6 +16,8 @@ use fuchsia_zircon::Status;
 
 use crate::fdf_sys::*;
 
+pub use crate::fdf_sys::fdf_arena_t;
+
 /// Implements a memory arena allocator to be used with the Fuchsia Driver
 /// Runtime when sending and receiving from channels.
 #[derive(Debug)]
@@ -253,11 +255,9 @@ impl Arena {
 
     /// Transforms this Arena into an fdf_arena_t without dropping the reference.
     ///
-    /// # Safety
-    ///
     /// If the caller drops the returned fdf_arena_t, the memory allocated by the
     /// arena will never be freed.
-    pub unsafe fn into_raw(self) -> NonNull<fdf_arena_t> {
+    pub fn into_raw(self) -> NonNull<fdf_arena_t> {
         let res = self.0;
         core::mem::forget(self);
         return res;
