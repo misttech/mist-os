@@ -329,21 +329,18 @@ void Device::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Vendor> met
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-// driver_devfs::Connector<fhbt::Vendor>
-void Device::Connect(fidl::ServerEnd<fhbt::Vendor> request) {
+// driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor>
+void Device::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
+  fidl::Status status = fidl::WireSendEvent(request)->OnFeatures(builder.Build());
+
+  if (status.status() != ZX_OK) {
+    errorf("Failed to send vendor features: %s", status.status_string());
+  }
+
   vendor_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    std::move(request), this, fidl::kIgnoreBindingClosure);
-
-  vendor_binding_group_.ForEachBinding([](const fidl::ServerBinding<fhbt::Vendor>& binding) {
-    fidl::Arena arena;
-    auto builder = fhbt::wire::VendorFeatures::Builder(arena);
-    builder.acl_priority_command(false);
-    fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
-
-    if (status.status() != ZX_OK) {
-      errorf("Failed to send vendor features to bt-host: %s", status.status_string());
-    }
-  });
 }
 
 zx_status_t Device::LoadSecureFirmware() {
