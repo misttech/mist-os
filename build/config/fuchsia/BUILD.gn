@@ -143,9 +143,11 @@ config("compiler_target") {
 
 config("compiler_fuchsia_api_level") {
   if (is_gcc || !is_fuchsia) {
-    defines = [ "__Fuchsia_API_level__=${clang_fuchsia_api_level}" ]
+    defines =
+        [ "__Fuchsia_API_level__=${current_build_target_api_level_as_integer}" ]
   } else {
-    cflags = [ "-ffuchsia-api-level=${clang_fuchsia_api_level}" ]
+    cflags =
+        [ "-ffuchsia-api-level=${current_build_target_api_level_as_integer}" ]
     asmflags = cflags
     ldflags = cflags
   }

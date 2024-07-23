@@ -369,7 +369,7 @@ template("go_build") {
     }
 
     if (is_fuchsia) {
-      args += [ "--clang-fuchsia-api-level=${clang_fuchsia_api_level}" ]
+      args += [ "--clang-fuchsia-api-level=${current_build_target_api_level_as_integer}" ]
 
       # When building with an instrumented variant, ensure the binary embeds a reference
       # to the right dynamic linker path.

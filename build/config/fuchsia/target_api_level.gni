@@ -80,6 +80,3 @@ if (current_build_target_api_level == "PLATFORM") {
   sdk_prebuilt_base_for_target_api_level =
       "obj/${target_cpu_dir_name_for_target_api_level}"
 }
-
-# TODO(https://fxbug.dev/326277078): Replace all uses and remove.
-clang_fuchsia_api_level = current_build_target_api_level_as_integer
