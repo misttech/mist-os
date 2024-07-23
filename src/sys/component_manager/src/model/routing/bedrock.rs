@@ -4,6 +4,7 @@
 
 use super::router_ext::WeakInstanceTokenExt;
 use crate::model::component::WeakComponentInstance;
+use ::routing::bedrock::request_metadata::protocol_metadata;
 use ::routing::bedrock::sandbox_construction::ComponentSandbox;
 use ::routing::DictExt;
 use cm_rust::{ExposeDecl, ExposeProtocolDecl, UseDecl, UseProtocolDecl};
@@ -39,6 +40,7 @@ impl UseRouteRequest {
                     availability: decl.availability,
                     target: WeakInstanceToken::new_component(target.clone()),
                     debug,
+                    metadata: protocol_metadata(),
                 };
                 let Some(capability) = program_input_dict.get_capability(&decl.target_path) else {
                     panic!(
@@ -110,6 +112,7 @@ impl RouteRequest {
                     availability: decl.availability,
                     target: WeakInstanceToken::new_component(target.clone()),
                     debug,
+                    metadata: protocol_metadata(),
                 };
                 let Some(capability) =
                     sandbox.component_output_dict.get_capability(&decl.target_name)

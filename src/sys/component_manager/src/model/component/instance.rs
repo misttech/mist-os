@@ -40,7 +40,7 @@ use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
 use cm_logger::scoped::ScopedLogger;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-    FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
+    ExposeDeclCommon, FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
 };
 use cm_types::{Name, RelativePath};
 use config_encoder::ConfigFields;
@@ -615,12 +615,20 @@ impl ResolvedInstanceState {
     /// backed by legacy routing, and hosts [`Open`]s instead of [`Router`]s. This [`Dict`] is used
     /// to generate the `exposed_dir`.
     pub async fn get_exposed_dict(&self) -> &Dict {
+        let exposes_needing_metadata: HashMap<Name, CapabilityTypeName> = self
+            .decl()
+            .exposes
+            .iter()
+            .filter(|e| matches!(e, cm_rust::ExposeDecl::Protocol(_)))
+            .map(|e| (e.target_name().clone(), CapabilityTypeName::from(e)))
+            .collect();
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
             let dict = Router::dict_routers_to_open(
                 &WeakInstanceToken::new_component(self.weak_component.clone()),
                 &component.execution_scope,
                 &self.sandbox.component_output_dict,
+                &exposes_needing_metadata,
             );
             Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
             dict

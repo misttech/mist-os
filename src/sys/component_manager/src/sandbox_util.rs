@@ -400,6 +400,7 @@ pub mod tests {
                     availability: Availability::Required,
                     target: WeakInstanceToken::invalid(),
                     debug: false,
+                    metadata: Dict::new(),
                 },
             )
             .await;
@@ -421,6 +422,7 @@ pub mod tests {
                     availability: Availability::Required,
                     target: WeakInstanceToken::invalid(),
                     debug: false,
+                    metadata: Dict::new(),
                 },
             )
             .await;
@@ -444,6 +446,7 @@ pub mod tests {
                     availability: Availability::Required,
                     target: WeakInstanceToken::invalid(),
                     debug: false,
+                    metadata: Dict::new(),
                 },
             )
             .await;
@@ -465,6 +468,7 @@ pub mod tests {
                     availability: Availability::Required,
                     target: WeakInstanceToken::invalid(),
                     debug: false,
+                    metadata: Dict::new(),
                 },
             )
             .await;
@@ -477,6 +481,7 @@ pub mod tests {
                     availability: Availability::Required,
                     target: WeakInstanceToken::invalid(),
                     debug: false,
+                    metadata: Dict::new(),
                 },
             )
             .await;
@@ -531,6 +536,7 @@ pub mod tests {
                 availability: Availability::Required,
                 target: WeakInstanceToken::new_component(component.as_weak()),
                 debug: false,
+                metadata: Dict::new(),
             })
             .await
             .unwrap();
@@ -583,6 +589,7 @@ pub mod tests {
                 availability: Availability::Required,
                 target: WeakInstanceToken::new_component(component.as_weak()),
                 debug: false,
+                metadata: Dict::new(),
             })
             .await
             .unwrap();
@@ -645,6 +652,7 @@ pub mod tests {
                 availability: Availability::Required,
                 target: WeakInstanceToken::new_component(target.as_weak()),
                 debug: true,
+                metadata: Dict::new(),
             })
             .await
             .unwrap();
@@ -671,6 +679,7 @@ pub mod tests {
                 availability: Availability::Optional,
                 target: WeakInstanceToken::invalid(),
                 debug: false,
+                metadata: Dict::new(),
             })
             .await
             .unwrap();
@@ -710,6 +719,7 @@ pub mod tests {
                 availability: Availability::Optional,
                 target: WeakInstanceToken::invalid(),
                 debug: false,
+                metadata: Dict::new(),
             })
             .await
             .unwrap();
