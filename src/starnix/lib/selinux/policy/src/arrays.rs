@@ -1075,10 +1075,12 @@ impl<PS: ParseStrategy> Validate for GenericFsContexts<PS> {
     }
 }
 
+/// Information parsed parsed from `genfscon [fs_type] [partial_path] [fs_context]` statements
+/// about a specific filesystem type.
 #[derive(Debug, PartialEq)]
 pub(crate) struct GenericFsContext<PS: ParseStrategy> {
-    /// The name of the filesystem instance.
-    fs_name: SimpleArray<PS, PS::Slice<u8>>,
+    /// The filesystem type.
+    fs_type: SimpleArray<PS, PS::Slice<u8>>,
     /// The set of contexts defined for this filesystem.
     contexts: SimpleArray<PS, FsContexts<PS>>,
 }
@@ -1093,7 +1095,7 @@ where
     fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (fs_name, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
+        let (fs_type, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem context name")?;
 
@@ -1101,7 +1103,7 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem contexts")?;
 
-        Ok((Self { fs_name, contexts }, tail))
+        Ok((Self { fs_type, contexts }, tail))
     }
 }
 
