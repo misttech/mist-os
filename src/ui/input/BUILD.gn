@@ -9,6 +9,7 @@ group("input") {
 group("drivers") {
   testonly = true
   deps = [
+    "drivers/adc-buttons:bazel_package",
     "drivers/buttons",
     "drivers/ctaphid",
     "drivers/focaltech",

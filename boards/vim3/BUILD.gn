@@ -4,7 +4,6 @@
 
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
-import("//build/bazel/bazel_build_group.gni")
 
 assert(current_toolchain == default_toolchain,
        "The vim3 board can only be defined in the default toolchain.")
@@ -144,7 +143,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-sdmmc.cm" ]
     },
     {
-      package_target = ":vim3-clk.vim3-clk.far"
+      package_target = "//src/devices/clock/drivers/vim3-clk:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-clk.cm" ]
     },
@@ -154,7 +153,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-cpu.cm" ]
     },
     {
-      package_target = ":aml-gpio.aml-gpio.far"
+      package_target = "//src/devices/gpio/drivers/aml-gpio:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-gpio.cm" ]
     },
@@ -164,7 +163,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/ti-tca6408a.cm" ]
     },
     {
-      package_target = ":aml-i2c.aml-i2c.far"
+      package_target = "//src/devices/i2c/drivers/aml-i2c:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-i2c.cm" ]
     },
@@ -229,7 +228,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/dwc2.cm" ]
     },
     {
-      package_target = ":aml-usb-phy.aml-usb-phy.far"
+      package_target = "//src/devices/usb/drivers/aml-usb-phy:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-usb-phy.cm" ]
     },
@@ -255,7 +254,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-gpu.cm" ]
     },
     {
-      package_target = ":aml-g12-composite.aml-g12-composite.far"
+      package_target = "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-g12-composite.cm" ]
     },
@@ -265,7 +264,7 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/vim3-pwm-backlight.cm" ]
     },
     {
-      package_target = ":adc-buttons.adc-buttons.far"
+      package_target = "//src/ui/input/drivers/adc-buttons:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/adc-buttons.cm" ]
     },
@@ -317,7 +316,8 @@ board_input_bundle("devicetree_board_driver") {
   }
   drivers = [
     {
-      package_target = ":vim3-devicetree.vim3-devicetree.far"
+      package_target =
+          "//src/devices/board/drivers/vim3-devicetree:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-devicetree.cm" ]
     },
@@ -335,91 +335,6 @@ board_input_bundle("rtc_driver") {
       package_target = "//src/devices/rtc/drivers/nxp:pcf8563"
       package_set = "base"
       driver_components = [ "meta/pcf8563.cm" ]
-    },
-  ]
-}
-
-bazel_build_group("vim3_bazel_drivers") {
-  subtargets = [
-    {
-      bazel_target = "//src/devices/gpio/drivers/aml-gpio:aml-gpio"
-      gn_target_name = "aml-gpio"
-      package_outputs = [
-        {
-          package_label = "//src/devices/gpio/drivers/aml-gpio:aml-gpio"
-          generate_prebuilt = true
-          archive = "aml-gpio.far"
-        },
-      ]
-    },
-    {
-      bazel_target = "//src/devices/i2c/drivers/aml-i2c:aml-i2c"
-      gn_target_name = "aml-i2c"
-      package_outputs = [
-        {
-          package_label = "//src/devices/i2c/drivers/aml-i2c:aml-i2c"
-          generate_prebuilt = true
-          archive = "aml-i2c.far"
-        },
-      ]
-    },
-    {
-      bazel_target = "//src/devices/clock/drivers/vim3-clk:vim3-clk"
-      gn_target_name = "vim3-clk"
-      package_outputs = [
-        {
-          package_label = "//src/devices/clock/drivers/vim3-clk:vim3-clk"
-          generate_prebuilt = true
-          archive = "vim3-clk.far"
-        },
-      ]
-    },
-    {
-      bazel_target = "//src/devices/usb/drivers/aml-usb-phy:aml-usb-phy"
-      gn_target_name = "aml-usb-phy"
-      package_outputs = [
-        {
-          package_label = "//src/devices/usb/drivers/aml-usb-phy:aml-usb-phy"
-          generate_prebuilt = true
-          archive = "aml-usb-phy.far"
-        },
-      ]
-    },
-    {
-      bazel_target = "//src/ui/input/drivers/adc-buttons:adc-buttons"
-      gn_target_name = "adc-buttons"
-      package_outputs = [
-        {
-          package_label = "//src/ui/input/drivers/adc-buttons:adc-buttons"
-          generate_prebuilt = true
-          archive = "adc-buttons.far"
-        },
-      ]
-    },
-    {
-      bazel_target = "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite"
-      gn_target_name = "aml-g12-composite"
-      package_outputs = [
-        {
-          package_label =
-              "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite"
-          generate_prebuilt = true
-          archive = "aml-g12-composite.far"
-        },
-      ]
-    },
-    {
-      bazel_target =
-          "//src/devices/board/drivers/vim3-devicetree:vim3-devicetree"
-      gn_target_name = "vim3-devicetree"
-      package_outputs = [
-        {
-          package_label =
-              "//src/devices/board/drivers/vim3-devicetree:vim3-devicetree"
-          generate_prebuilt = true
-          archive = "vim3-devicetree.far"
-        },
-      ]
     },
   ]
 }

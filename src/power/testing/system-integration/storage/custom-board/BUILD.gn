@@ -85,7 +85,7 @@ board_input_bundle("drivers") {
       driver_components = [ "meta/bootpart.cm" ]
     },
     {
-      package_target = "//boards/vim3:vim3-clk.vim3-clk.far"
+      package_target = "//src/devices/clock/drivers/vim3-clk:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-clk.cm" ]
     },
@@ -95,7 +95,7 @@ board_input_bundle("drivers") {
       driver_components = [ "meta/aml-cpu.cm" ]
     },
     {
-      package_target = "//boards/vim3:aml-gpio.aml-gpio.far"
+      package_target = "//src/devices/gpio/drivers/aml-gpio:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-gpio.cm" ]
     },
@@ -105,7 +105,7 @@ board_input_bundle("drivers") {
       driver_components = [ "meta/ti-tca6408a.cm" ]
     },
     {
-      package_target = "//boards/vim3:aml-i2c.aml-i2c.far"
+      package_target = "//src/devices/i2c/drivers/aml-i2c:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-i2c.cm" ]
     },
@@ -160,7 +160,7 @@ board_input_bundle("drivers") {
       driver_components = [ "meta/dwc2.cm" ]
     },
     {
-      package_target = "//boards/vim3:aml-usb-phy.aml-usb-phy.far"
+      package_target = "//src/devices/usb/drivers/aml-usb-phy:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-usb-phy.cm" ]
     },
@@ -170,7 +170,7 @@ board_input_bundle("drivers") {
       driver_components = [ "meta/vim3-pwm-backlight.cm" ]
     },
     {
-      package_target = "//boards/vim3:adc-buttons.adc-buttons.far"
+      package_target = "//src/ui/input/drivers/adc-buttons:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/adc-buttons.cm" ]
     },
@@ -202,7 +202,8 @@ board_input_bundle("board_driver") {
   }
   drivers = [
     {
-      package_target = "//boards/vim3:vim3-devicetree.vim3-devicetree.far"
+      package_target =
+          "//src/devices/board/drivers/vim3-devicetree:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/vim3-devicetree.cm" ]
     },

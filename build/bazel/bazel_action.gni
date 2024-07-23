@@ -392,7 +392,7 @@ template("bazel_action") {
     }
     _manifest = ""
     if (defined(entry.manifest)) {
-      _manifest = "$target_out_dir/${entry.manifest}"
+      _manifest = "$target_out_dir/${entry.archive}"
     }
     _all_outputs += [
       {

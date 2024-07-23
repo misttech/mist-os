@@ -72,6 +72,12 @@ template("bazel_driver_package") {
         copy_debug_symbols = true
       },
     ]
+
+    metadata = {
+      # Used by the check_included_drivers template.
+      fuchsia_driver_labels =
+          [ get_label_info(":$target_name", "label_no_toolchain") ]
+    }
   }
   if (defined(invoker.gn_driver_package_for_verification)) {
     verify_against_gn = true
@@ -108,6 +114,11 @@ template("bazel_driver_package") {
     deps += [ ":$bazel_build_target" ]
     if (verify_against_gn) {
       deps += [ ":$verify_target_name" ]
+    }
+
+    metadata = {
+      # Used by the assert_driver_components template.
+      driver_component_barrier = []
     }
   }
 }

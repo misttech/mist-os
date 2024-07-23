@@ -5,6 +5,7 @@
 //examples/drivers/simple/dfv1:driver
 //examples/drivers/simple/dfv2:driver
 //examples/drivers/skeleton:driver
+//examples/drivers/template:bazel_package.bazel_build
 //examples/drivers/transport/banjo/v1:child_driver
 //examples/drivers/transport/banjo/v1:parent_driver
 //examples/drivers/transport/banjo/v2:child_driver
@@ -17,6 +18,7 @@
 //examples/drivers/transport/zircon/v1:parent_driver
 //examples/drivers/transport/zircon/v2:child_driver
 //examples/drivers/transport/zircon/v2:parent_driver
+//sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build
 //sdk/lib/driver/metadata/cpp/tests/test_child:driver
 //sdk/lib/driver/metadata/cpp/tests/test_grandchild:driver
 //sdk/lib/driver/metadata/cpp/tests/test_parent:driver
@@ -79,6 +81,7 @@
 //src/devices/bin/driver_host:test_not_driver_driver
 //src/devices/block/drivers/ahci:ahci-driver
 //src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver
+//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo-bazel-package.bazel_build
 //src/devices/block/drivers/block-verity:block-verity-driver
 //src/devices/block/drivers/bootpart:bootpart-driver
 //src/devices/block/drivers/core:core-driver
@@ -108,6 +111,7 @@
 //src/devices/board/drivers/sherlock/post-init:post-init-driver
 //src/devices/board/drivers/sherlock:sherlock-driver
 //src/devices/board/drivers/sherlock:sherlock-factory-driver
+//src/devices/board/drivers/vim3-devicetree:bazel_package.bazel_build
 //src/devices/bus/drivers/pci/test:pci_fake-driver
 //src/devices/bus/drivers/pci/test:pci_protocol_test_driver-driver
 //src/devices/bus/drivers/pci:bus-pci-driver
@@ -131,9 +135,11 @@
 //src/devices/clock/drivers/clock:clock-driver
 //src/devices/cpu/drivers/aml-cpu-legacy:aml-cpu-legacy-driver
 //src/devices/cpu/drivers/aml-cpu:aml-cpu-driver
+//src/devices/gpio/drivers/aml-gpio:bazel_package.bazel_build
 //src/devices/gpio/drivers/gpio:gpio-driver
 //src/devices/gpio/drivers/ti-tca6408a:ti-tca6408a-driver
 //src/devices/hrtimer/drivers/aml-hrtimer:aml-hrtimer-driver
+//src/devices/i2c/drivers/aml-i2c:bazel_package.bazel_build
 //src/devices/i2c/drivers/i2c:i2c-driver
 //src/devices/i2c/drivers/intel-i2c:intel-i2c-driver
 //src/devices/light-sensor/drivers/ams-light:ams-light-driver
@@ -340,6 +346,7 @@
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver
 //src/ui/backlight/drivers/ti-lp8556:ti-lp8556-driver
 //src/ui/backlight/drivers/vim3-pwm-backlight:vim3-pwm-backlight-driver
+//src/ui/input/drivers/adc-buttons:bazel_package.bazel_build
 //src/ui/input/drivers/buttons:buttons-driver
 //src/ui/input/drivers/ctaphid:ctaphid-driver
 //src/ui/input/drivers/focaltech:focaltech-driver
