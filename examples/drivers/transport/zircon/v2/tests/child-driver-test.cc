@@ -11,38 +11,48 @@
 namespace testing {
 
 namespace {
-constexpr uint32_t kTestHardwareId = 0x1234567;
-constexpr uint32_t kTestMajorVersion = 0x9;
-constexpr uint32_t kTestMinorVersion = 0x5;
+
+const std::string kTestName = "test_i2c";
+
 }  // namespace
 
-class FakeGizmoServer : public fidl::WireServer<fuchsia_examples_gizmo::Device> {
+class FakeI2cServer : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
  public:
-  void GetHardwareId(GetHardwareIdCompleter::Sync& completer) override {
-    completer.ReplySuccess(kTestHardwareId);
+  FakeI2cServer() {
+    read_buffer_ = {0xA, 0xB, 0xC};
+    read_vectors_.emplace_back(fidl::VectorView<uint8_t>::FromExternal(read_buffer_));
   }
 
-  void GetFirmwareVersion(GetFirmwareVersionCompleter::Sync& completer) override {
-    completer.ReplySuccess(kTestMajorVersion, kTestMinorVersion);
+  void Transfer(TransferRequestView request, TransferCompleter::Sync& completer) override {
+    completer.ReplySuccess(
+        fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_));
   }
+
+  void GetName(GetNameCompleter::Sync& completer) override {
+    completer.ReplySuccess(fidl::StringView::FromExternal(kTestName));
+  }
+
+ private:
+  std::vector<fidl::VectorView<uint8_t>> read_vectors_;
+  std::vector<uint8_t> read_buffer_;
 };
 
 class ZirconTransportTestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    fuchsia_examples_gizmo::Service::InstanceHandler handler({
+    fuchsia_hardware_i2c::Service::InstanceHandler handler({
         .device =
             bindings_.CreateHandler(&server_, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                     fidl::kIgnoreBindingClosure),
     });
-    auto result = to_driver_vfs.AddService<fuchsia_examples_gizmo::Service>(std::move(handler));
+    auto result = to_driver_vfs.AddService<fuchsia_hardware_i2c::Service>(std::move(handler));
     EXPECT_EQ(ZX_OK, result.status_value());
     return zx::ok();
   }
 
  private:
-  FakeGizmoServer server_;
-  fidl::ServerBindingGroup<fuchsia_examples_gizmo::Device> bindings_;
+  FakeI2cServer server_;
+  fidl::ServerBindingGroup<fuchsia_hardware_i2c::Device> bindings_;
 };
 
 class FixtureConfig final {
@@ -66,9 +76,7 @@ class ChildZirconTransportDriverTest
 
 TEST_F(ChildZirconTransportDriverTest, VerifyQueryValues) {
   // Verify that the queried values match the fake parent driver server.
-  EXPECT_EQ(kTestHardwareId, driver()->hardware_id());
-  EXPECT_EQ(kTestMajorVersion, driver()->major_version());
-  EXPECT_EQ(kTestMinorVersion, driver()->minor_version());
+  EXPECT_EQ(kTestName, driver()->name());
 }
 
 }  // namespace testing

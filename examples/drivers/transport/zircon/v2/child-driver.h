@@ -5,11 +5,13 @@
 #ifndef EXAMPLES_DRIVERS_TRANSPORT_ZIRCON_V2_CHILD_DRIVER_H_
 #define EXAMPLES_DRIVERS_TRANSPORT_ZIRCON_V2_CHILD_DRIVER_H_
 
-#include <fidl/fuchsia.examples.gizmo/cpp/wire.h>
+#include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 
 namespace zircon_transport {
 
+// A driver that binds to the child node added by ParentZirconTransportDriver. This driver
+// connects to the fuchsia.hardware.i2c and use it to interact with the parent
 class ChildZirconTransportDriver : public fdf::DriverBase {
  public:
   ChildZirconTransportDriver(fdf::DriverStartArgs start_args,
@@ -18,16 +20,13 @@ class ChildZirconTransportDriver : public fdf::DriverBase {
 
   zx::result<> Start() override;
 
-  uint32_t hardware_id() const { return hardware_id_; }
-  uint32_t major_version() const { return major_version_; }
-  uint32_t minor_version() const { return minor_version_; }
+  std::string name() const { return name_; }
 
  private:
-  zx::result<> QueryParent(fidl::ClientEnd<fuchsia_examples_gizmo::Device> client_end);
+  zx::result<> QueryParent(fidl::ClientEnd<fuchsia_hardware_i2c::Device> client_end);
 
-  uint32_t hardware_id_;
-  uint32_t major_version_;
-  uint32_t minor_version_;
+  std::string name_;
+  std::vector<std::vector<uint8_t>> read_result_;
 
   fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
 };

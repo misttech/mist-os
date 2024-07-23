@@ -2,6 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.examples.gizmo;
+using fuchsia.hardware.i2c;
 
-fuchsia.examples.gizmo.Service == fuchsia.examples.gizmo.Service.ZirconTransport;
+fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;

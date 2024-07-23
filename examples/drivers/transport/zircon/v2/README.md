@@ -1,9 +1,8 @@
-# Driver Transport Example
+# Zircon Transport Example
 
 Reviewed on: 2024-03-21
 
-This example demonstrates a parent driver serving a FIDL protocol over zircon transport and a
-child driver that connects and queries data from it.
+This example demonstrates a parent driver serving the fuchsia.hardware.i2c FIDL protocol over zircon transport and a child driver that connects to the protocol to interact with the parent driver.
 
 ## Building
 
@@ -57,9 +56,9 @@ Moniker  : dev.zircon_transport_parent.zircon_transport_child
 Driver   : fuchsia-pkg://fuchsia.com/zircon_transport#meta/zircon_transport_child.cm
 2 Properties
 [ 1/  2] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
-[ 2/  2] : Key "fuchsia.examples.gizmo.Service" Value "fuchsia.examples.gizmo.Service.ZirconTransport"
+[ 2/  2] : Key "fuchsia.hardware.i2c.Service" Value "fuchsia.hardware.i2c.Service.ZirconTransport"
 1 Offers
-Service: fuchsia.examples.gizmo.Service
+Service: fuchsia.hardware.i2c.Service
   Source: dev.zircon_transport_parent
   Instances: default
 

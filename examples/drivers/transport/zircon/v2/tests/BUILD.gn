@@ -12,7 +12,7 @@ test("child-driver-test") {
     "child-driver-test.cc",
   ]
   deps = [
-    "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
     "//src/lib/fxl/test:gtest_main",
   ]

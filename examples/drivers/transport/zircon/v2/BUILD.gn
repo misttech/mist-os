@@ -18,7 +18,7 @@ fuchsia_driver("parent_driver") {
   sources = [ "parent-driver.cc" ]
   deps = [
     ":parent_bind",
-    "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]
@@ -34,8 +34,7 @@ fuchsia_driver_component("parent_component") {
 driver_bind_rules("child_bind") {
   rules = "child-driver.bind"
   bind_output = "child-driver.bindbc"
-  deps =
-      [ "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_bindlib" ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib" ]
 }
 
 fuchsia_driver("child_driver") {
@@ -43,7 +42,7 @@ fuchsia_driver("child_driver") {
   sources = [ "child-driver.cc" ]
   deps = [
     ":child_bind",
-    "//examples/drivers/transport/zircon:fuchsia.examples.gizmo_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]

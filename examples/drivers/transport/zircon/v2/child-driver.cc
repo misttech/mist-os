@@ -10,9 +10,10 @@
 namespace zircon_transport {
 
 zx::result<> ChildZirconTransportDriver::Start() {
-  zx::result connect_result = incoming()->Connect<fuchsia_examples_gizmo::Service::Device>();
+  zx::result connect_result = incoming()->Connect<fuchsia_hardware_i2c::Service::Device>();
   if (connect_result.is_error() || !connect_result->is_valid()) {
-    FDF_LOG(ERROR, "Failed to connect to gizmo service: %s", connect_result.status_string());
+    FDF_LOG(ERROR, "Failed to connect to fuchsia.hardware.i2c service: %s",
+            connect_result.status_string());
     return connect_result.take_error();
   }
 
@@ -31,40 +32,43 @@ zx::result<> ChildZirconTransportDriver::Start() {
 }
 
 zx::result<> ChildZirconTransportDriver::QueryParent(
-    fidl::ClientEnd<fuchsia_examples_gizmo::Device> client_end) {
-  // Query and store the hardware ID.
-  auto hardware_id_result = fidl::WireCall(client_end)->GetHardwareId();
-  if (!hardware_id_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to request hardware ID.",
-             KV("status", hardware_id_result.status_string()));
-    return zx::error(hardware_id_result.status());
+    fidl::ClientEnd<fuchsia_hardware_i2c::Device> client_end) {
+  // Query and store the i2c name.
+  auto name_result = fidl::WireCall(client_end)->GetName();
+  if (!name_result.ok()) {
+    FDF_SLOG(ERROR, "Failed to request name.", KV("status", name_result.status_string()));
+    return zx::error(name_result.status());
   }
-  if (hardware_id_result->is_error()) {
-    FDF_SLOG(ERROR, "Hardware ID request returned an error.",
-             KV("status", hardware_id_result->error_value()));
-    return hardware_id_result->take_error();
+  if (name_result->is_error()) {
+    FDF_SLOG(ERROR, "Name request returned an error.", KV("status", name_result->error_value()));
+    return name_result->take_error();
   }
 
-  hardware_id_ = hardware_id_result.value().value()->response;
-  FDF_LOG(INFO, "Transport client hardware: %X", hardware_id_);
+  name_ = std::string(name_result.value()->name.get());
+  FDF_LOG(INFO, "I2C name: %s", name_.c_str());
 
-  // Query and store the firmware version.
-  auto firmware_result = fidl::WireCall(client_end)->GetFirmwareVersion();
-  if (!firmware_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to request firmware version.",
-             KV("status", firmware_result.status_string()));
-    return zx::error(firmware_result.status());
+  // Transfer and read from the i2c server.
+  fidl::Arena arena;
+  auto i2c_transactions = fidl::VectorView<fuchsia_hardware_i2c::wire::Transaction>(arena, 1);
+  i2c_transactions[0] =
+      fuchsia_hardware_i2c::wire::Transaction::Builder(arena)
+          .data_transfer(fuchsia_hardware_i2c::wire::DataTransfer::WithReadSize(3))
+          .Build();
+
+  auto transfer_result = fidl::WireCall(client_end)->Transfer(i2c_transactions);
+  if (!transfer_result.ok()) {
+    FDF_SLOG(ERROR, "Failed to request transfer.", KV("status", transfer_result.status_string()));
+    return zx::error(transfer_result.status());
   }
-  if (firmware_result->is_error()) {
-    FDF_SLOG(ERROR, "Firmware version request returned an error.",
-             KV("status", firmware_result->error_value()));
-    return firmware_result->take_error();
+  if (transfer_result->is_error()) {
+    FDF_SLOG(ERROR, "Transfer returned an error.", KV("status", transfer_result->error_value()));
+    return transfer_result->take_error();
   }
 
-  major_version_ = firmware_result.value().value()->major;
-  minor_version_ = firmware_result.value().value()->minor;
-  FDF_LOG(INFO, "Transport client firmware: %d.%d", major_version_, minor_version_);
-
+  read_result_.reserve(transfer_result->value()->read_data.count());
+  for (auto& read_data : transfer_result->value()->read_data) {
+    read_result_.emplace_back(std::vector<uint8_t>(read_data.begin(), read_data.end()));
+  }
   return zx::ok();
 }
 
