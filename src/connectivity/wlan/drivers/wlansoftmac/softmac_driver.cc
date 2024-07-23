@@ -326,12 +326,11 @@ void SoftmacDriver::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* net
   // `softmac_ifc_bridge_` to the bridged wlansoftmac driver. The `SoftmacIfcBridge`
   // class is not designed to be thread-safe. Making calls to its methods from
   // different dispatchers could result in unexpected behavior.
-  async::PostTask(dispatcher(), [&, op = std::move(op), async_id]() {
-    auto result = softmac_bridge_->EthernetTx(op.get(), async_id);
+  async::PostTask(dispatcher(), [&, op = std::move(op), async_id]() mutable {
+    auto result = softmac_bridge_->EthernetTx(std::move(op), async_id);
     if (!result.is_ok()) {
       WLAN_TRACE_ASYNC_END_TX(async_id, result.status_value());
     }
-    op->Complete(result.status_value());
   });
 }
 

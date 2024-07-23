@@ -21,7 +21,10 @@ rustc_library("wlan-ffi-transport") {
     "//third_party/rust_crates:tracing",
   ]
 
+  test_deps = [ "//third_party/rust_crates:futures" ]
+
   sources = [
+    "src/completers.rs",
     "src/lib.rs",
     "src/transport.rs",
   ]

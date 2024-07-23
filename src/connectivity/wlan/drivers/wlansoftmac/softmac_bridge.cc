@@ -332,9 +332,9 @@ void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequest& request,
       ForwardResult<fuchsia_wlan_softmac::WlanSoftmac::UpdateWmmParameters>(completer.ToAsync()));
 }
 
-zx::result<> SoftmacBridge::EthernetTx(eth::BorrowedOperation<>* op,
+zx::result<> SoftmacBridge::EthernetTx(std::unique_ptr<eth::BorrowedOperation<>> op,
                                        trace_async_id_t async_id) const {
-  return softmac_ifc_bridge_->EthernetTx(op, async_id);
+  return softmac_ifc_bridge_->EthernetTx(std::move(op), async_id);
 }
 
 // Queues a packet for transmission.

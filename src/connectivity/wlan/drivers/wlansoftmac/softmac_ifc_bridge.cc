@@ -87,13 +87,26 @@ void SoftmacIfcBridge::Recv(RecvRequest& fdf_request, RecvCompleter::Sync& compl
   completer.Reply();
 }
 
-zx::result<> SoftmacIfcBridge::EthernetTx(eth::BorrowedOperation<>* op,
+// Safety: This function type matches the requirement of
+// fuchsia.wlan.softmac/EthernetTx.complete_borrowed_operation.
+void complete_borrowed_operation(eth::BorrowedOperation<>* op, zx_status_t status) {
+  op->Complete(status);
+  delete op;
+}
+
+zx::result<> SoftmacIfcBridge::EthernetTx(std::unique_ptr<eth::BorrowedOperation<>> op,
                                           trace_async_id_t async_id) const {
   WLAN_TRACE_DURATION();
   fuchsia_wlan_softmac::EthernetTxTransferRequest request;
   request.packet_address(reinterpret_cast<uint64_t>(op->operation()->data_buffer));
   request.packet_size(reinterpret_cast<uint64_t>(op->operation()->data_size));
   request.async_id(async_id);
+
+  // Safety: These fields are properly set according to the requirements of
+  // fuchsia.wlan.softmac/EthernetTx.
+  auto op_ptr = op.release();
+  request.borrowed_operation(reinterpret_cast<uint64_t>(op_ptr));
+  request.complete_borrowed_operation(reinterpret_cast<uint64_t>(complete_borrowed_operation));
 
   auto fidl_request_persisted = ::fidl::Persist(request);
   if (!fidl_request_persisted.is_ok()) {
@@ -104,6 +117,12 @@ zx::result<> SoftmacIfcBridge::EthernetTx(eth::BorrowedOperation<>* op,
   auto result =
       zx::make_result(ethernet_tx_.transfer(ethernet_tx_.ctx, fidl_request_persisted.value().data(),
                                             fidl_request_persisted.value().size()));
+
+  // wlan_ffi_transport::EthernetTx::ethernet_tx_transfer returns ZX_ERR_BAD_STATE if and only if
+  // it did not take ownership of the BorrowedOperation before returning.
+  if (result.status_value() == ZX_ERR_BAD_STATE) {
+    complete_borrowed_operation(op_ptr, result.status_value());
+  }
   return result;
 }
 

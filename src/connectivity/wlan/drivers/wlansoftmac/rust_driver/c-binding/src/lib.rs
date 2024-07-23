@@ -10,8 +10,8 @@ use fuchsia_async::LocalExecutor;
 use std::ffi::c_void;
 use std::sync::Once;
 use tracing::info;
+use wlan_ffi_transport::completers::Completer;
 use wlan_ffi_transport::{EthernetRx, FfiEthernetRx, FfiWlanTx, WlanTx};
-use wlan_mlme::completers::Completer;
 use wlan_mlme::device::Device;
 use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx, wlan_trace as wtrace};
 

@@ -64,7 +64,8 @@ class SoftmacBridge : public fidl::Server<fuchsia_wlan_softmac::WlanSoftmacBridg
   void CancelScan(CancelScanRequest& request, CancelScanCompleter::Sync& completer) final;
   void UpdateWmmParameters(UpdateWmmParametersRequest& request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
-  zx::result<> EthernetTx(eth::BorrowedOperation<>* op, trace_async_id_t async_id) const;
+  zx::result<> EthernetTx(std::unique_ptr<eth::BorrowedOperation<>> op,
+                          trace_async_id_t async_id) const;
   static zx_status_t WlanTx(void* ctx, const uint8_t* payload, size_t payload_size);
   static zx_status_t EthernetRx(void* ctx, const uint8_t* payload, size_t payload_size);
 

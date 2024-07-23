@@ -29,7 +29,8 @@ class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc
   ~SoftmacIfcBridge() override = default;
 
   void Recv(RecvRequest& fdf_request, RecvCompleter::Sync& completer) override;
-  zx::result<> EthernetTx(eth::BorrowedOperation<>* op, trace_async_id_t async_id) const;
+  zx::result<> EthernetTx(std::unique_ptr<eth::BorrowedOperation<>> op,
+                          trace_async_id_t async_id) const;
   void ReportTxResult(ReportTxResultRequest& request,
                       ReportTxResultCompleter::Sync& completer) override;
   void NotifyScanComplete(NotifyScanCompleteRequest& request,
