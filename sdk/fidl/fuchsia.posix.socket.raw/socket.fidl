@@ -86,6 +86,7 @@ const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.raw/Socket";
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
+@discoverable
 closed protocol Socket {
     compose fuchsia.posix.socket.BaseNetworkSocket;
 

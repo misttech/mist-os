@@ -91,6 +91,12 @@ If _name_ is omitted, a name is generated based on the library and protocol name
 same format. Note that this is **not** the [fully qualified name], which would
 use a slash (e.g. `some.library/SomeProtocol`).
 
+The `@discoverable` name is also used by `fuchsia.unknown/Queryable` to enable
+dynamic protocol resolution for type erased channels. For example, if a client
+has an untyped [Zircon channel][channel] but knows the server implements
+`Queryable`, the `fuchsia.unknown/Queryable.Query` method can be used to obtain
+the concrete protocol type.
+
 ## `@doc` {#doc}
 
 **USAGE**: `@doc("`_string_`")`

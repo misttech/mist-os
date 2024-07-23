@@ -113,6 +113,64 @@ class ZxioCreateOnRepresentationEventHandler final : public fidl::WireSyncEventH
   zx_status_t& status_;
 };
 
+// Helper for `ProtocolToObjectType` to reduce verbosity when getting protocol identifier strings
+// and to provide protocol names for non-discoverable protocols.
+template <typename Protocol>
+constexpr std::string_view kProtocolName = fidl::DiscoverableProtocolName<Protocol>;
+
+// TODO(https://fxbug.dev/42056856): We can't mark certain fuchsia.io protocols as @discoverable
+// so we need to hard-code these constants until they are updated.
+template <>
+constexpr std::string_view kProtocolName<fuchsia_io::Directory> = "fuchsia.io.Directory";
+template <>
+constexpr std::string_view kProtocolName<fuchsia_io::File> = "fuchsia.io.File";
+
+// Maps a given discoverable FIDL protocol to an equivalent ZXIO type. If the protocol is unknown,
+// it will be mapped to `ZXIO_OBJECT_TYPE_NONE`.
+constexpr zxio_object_type_t ProtocolToObjectType(std::string_view protocol) {
+  // Note the static assertions for each protocol to object type mapping. If the FIDL @discoverable
+  // protocol name ever changes, care needs to be taken to ensure backwards compatibility with
+  // existing servers until they are updated.
+  static_assert(kProtocolName<fio::Directory> == "fuchsia.io.Directory");
+  if (protocol == kProtocolName<fio::Directory>) {
+    return ZXIO_OBJECT_TYPE_DIR;
+  }
+  static_assert(kProtocolName<fio::File> == "fuchsia.io.File");
+  if (protocol == kProtocolName<fio::File>) {
+    return ZXIO_OBJECT_TYPE_FILE;
+  }
+  static_assert(kProtocolName<fuchsia_hardware_pty::Device> == "fuchsia.hardware.pty.Device");
+  if (protocol == kProtocolName<fuchsia_hardware_pty::Device>) {
+    return ZXIO_OBJECT_TYPE_TTY;
+  }
+  static_assert(kProtocolName<fuchsia_posix_socket::DatagramSocket> ==
+                "fuchsia.posix.socket.DatagramSocket");
+  if (protocol == kProtocolName<fuchsia_posix_socket::DatagramSocket>) {
+    return ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET;
+  }
+  static_assert(kProtocolName<fuchsia_posix_socket::StreamSocket> ==
+                "fuchsia.posix.socket.StreamSocket");
+  if (protocol == kProtocolName<fuchsia_posix_socket::StreamSocket>) {
+    return ZXIO_OBJECT_TYPE_STREAM_SOCKET;
+  }
+  static_assert(kProtocolName<fuchsia_posix_socket::SynchronousDatagramSocket> ==
+                "fuchsia.posix.socket.SynchronousDatagramSocket");
+  if (protocol == kProtocolName<fuchsia_posix_socket::SynchronousDatagramSocket>) {
+    return ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET;
+  }
+  static_assert(kProtocolName<fuchsia_posix_socket_packet::Socket> ==
+                "fuchsia.posix.socket.packet.Socket");
+  if (protocol == kProtocolName<fuchsia_posix_socket_packet::Socket>) {
+    return ZXIO_OBJECT_TYPE_PACKET_SOCKET;
+  }
+  static_assert(kProtocolName<fuchsia_posix_socket_raw::Socket> ==
+                "fuchsia.posix.socket.raw.Socket");
+  if (protocol == kProtocolName<fuchsia_posix_socket_raw::Socket>) {
+    return ZXIO_OBJECT_TYPE_RAW_SOCKET;
+  }
+  return ZXIO_OBJECT_TYPE_NONE;
+}
+
 }  // namespace
 
 zx::result<zxio_object_type_t> zxio_get_object_type(
@@ -122,30 +180,37 @@ zx::result<zxio_object_type_t> zxio_get_object_type(
     return zx::error(result.status());
   }
   const fidl::WireResponse response = result.value();
-  const std::string_view got{reinterpret_cast<const char*>(response.protocol.data()),
-                             response.protocol.count()};
-  if (got == std::string_view{fio::wire::kFileProtocolName}) {
+  const std::string_view protocol{reinterpret_cast<const char*>(response.protocol.data()),
+                                  response.protocol.count()};
+  const zxio_object_type_t type = ProtocolToObjectType(protocol);
+  if (type != ZXIO_OBJECT_TYPE_NONE) {
+    return zx::ok(type);
+  }
+  // TODO(https://fxbug.dev/42056856): We can remove the checks for legacy protocol name constants
+  // once all prebuilt servers are using the latest SDK.
+  if (protocol == std::string_view{fio::wire::kFileProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_FILE);
   }
-  if (got == std::string_view{fio::wire::kDirectoryProtocolName}) {
+  if (protocol == std::string_view{fio::wire::kDirectoryProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_DIR);
   }
-  if (got == std::string_view{fuchsia_hardware_pty::wire::kDeviceProtocolName}) {
+  if (protocol == std::string_view{fuchsia_hardware_pty::wire::kDeviceProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_TTY);
   }
-  if (got == std::string_view{fuchsia_posix_socket::wire::kDatagramSocketProtocolName}) {
+  if (protocol == std::string_view{fuchsia_posix_socket::wire::kDatagramSocketProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET);
   }
-  if (got == std::string_view{fuchsia_posix_socket::wire::kStreamSocketProtocolName}) {
+  if (protocol == std::string_view{fuchsia_posix_socket::wire::kStreamSocketProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_STREAM_SOCKET);
   }
-  if (got == std::string_view{fuchsia_posix_socket::wire::kSynchronousDatagramSocketProtocolName}) {
+  if (protocol ==
+      std::string_view{fuchsia_posix_socket::wire::kSynchronousDatagramSocketProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET);
   }
-  if (got == std::string_view{fuchsia_posix_socket_packet::wire::kSocketProtocolName}) {
+  if (protocol == std::string_view{fuchsia_posix_socket_packet::wire::kSocketProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_PACKET_SOCKET);
   }
-  if (got == std::string_view{fuchsia_posix_socket_raw::wire::kSocketProtocolName}) {
+  if (protocol == std::string_view{fuchsia_posix_socket_raw::wire::kSocketProtocolName}) {
     return zx::ok(ZXIO_OBJECT_TYPE_RAW_SOCKET);
   }
   return zx::ok(ZXIO_OBJECT_TYPE_NONE);
