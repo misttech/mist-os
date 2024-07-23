@@ -191,7 +191,7 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
-    pub use netstack3_base::{Payload, SendPayload};
+    pub use netstack3_base::{Payload, PayloadLen, SendPayload};
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,

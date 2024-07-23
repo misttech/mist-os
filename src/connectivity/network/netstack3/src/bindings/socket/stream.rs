@@ -25,9 +25,9 @@ use netstack3_core::socket::ShutdownType;
 use netstack3_core::tcp::{
     self, AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
     ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
-    OriginalDestinationError, Payload, ReceiveBuffer, RingBuffer, SendBuffer, SendPayload,
-    SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable, TcpBindingsTypes,
-    UnboundInfo,
+    OriginalDestinationError, Payload, PayloadLen, ReceiveBuffer, RingBuffer, SendBuffer,
+    SendPayload, SetReuseAddrError, SocketAddr, SocketInfo, SocketOptions, Takeable,
+    TcpBindingsTypes, UnboundInfo,
 };
 use netstack3_core::IpExt;
 use once_cell::sync::Lazy;

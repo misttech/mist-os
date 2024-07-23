@@ -5164,7 +5164,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     BC: TcpBindingsTypes,
     D: WeakDeviceIdentifier,
 {
-    let control = segment.contents.control();
+    let control = segment.header.control;
     let result = match ip_sock {
         Some(ip_sock) => {
             let body = tcp_serialize_segment(segment, conn_addr);

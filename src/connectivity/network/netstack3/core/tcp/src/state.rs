@@ -18,8 +18,8 @@ use derivative::Derivative;
 use explicit::ResultExt as _;
 use log::error;
 use netstack3_base::{
-    Control, IcmpErrorCode, Instant, Mss, Options, Payload, Segment, SendPayload, SeqNum,
-    UnscaledWindowSize, WindowScale, WindowSize,
+    Control, IcmpErrorCode, Instant, Mss, Options, Payload, PayloadLen as _, Segment,
+    SegmentHeader, SendPayload, SeqNum, UnscaledWindowSize, WindowScale, WindowSize,
 };
 use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
@@ -164,10 +164,13 @@ impl<Error> Closed<Error> {
     /// Processes an incoming segment in the CLOSED state.
     ///
     /// TCP will either drop the incoming segment or generate a RST.
-    pub(crate) fn on_segment(
-        &self,
-        Segment { seq: seg_seq, ack: seg_ack, wnd: _, contents, options: _ }: Segment<impl Payload>,
-    ) -> Option<Segment<()>> {
+    pub(crate) fn on_segment(&self, segment: &Segment<impl Payload>) -> Option<Segment<()>> {
+        let segment_len = segment.len();
+        let Segment {
+            header: SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: _, control, options: _ },
+            data: _,
+        } = segment;
+
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-65):
         //   If the state is CLOSED (i.e., TCB does not exist) then
         //   all data in the incoming segment is discarded.  An incoming
@@ -181,12 +184,12 @@ impl<Error> Closed<Error> {
         //   If the ACK bit is on,
         //    <SEQ=SEG.ACK><CTL=RST>
         //   Return.
-        if contents.control() == Some(Control::RST) {
+        if *control == Some(Control::RST) {
             return None;
         }
         Some(match seg_ack {
-            Some(seg_ack) => Segment::rst(seg_ack),
-            None => Segment::rst_ack(SeqNum::from(0), seg_seq + contents.len()),
+            Some(seg_ack) => Segment::rst(*seg_ack),
+            None => Segment::rst_ack(SeqNum::from(0), *seg_seq + segment_len),
         })
     }
 }
@@ -225,7 +228,9 @@ enum ListenOnSegmentDisposition<I: Instant> {
 impl Listen {
     fn on_segment<I: Instant>(
         &self,
-        Segment { seq, ack, wnd: _, contents, options }: Segment<impl Payload>,
+        Segment { header: SegmentHeader { seq, ack, wnd: _, control, options }, data: _ }: Segment<
+            impl Payload,
+        >,
         now: I,
     ) -> ListenOnSegmentDisposition<I> {
         let Listen { iss, buffer_sizes, device_mss, default_mss, user_timeout } = *self;
@@ -233,7 +238,7 @@ impl Listen {
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-65):
         //   first check for an RST
         //   An incoming RST should be ignored.  Return.
-        if contents.control() == Some(Control::RST) {
+        if control == Some(Control::RST) {
             return ListenOnSegmentDisposition::Ignore;
         }
         if let Some(ack) = ack {
@@ -247,7 +252,7 @@ impl Listen {
             //   Return.
             return ListenOnSegmentDisposition::SendRst(Segment::rst(ack));
         }
-        if contents.control() == Some(Control::SYN) {
+        if control == Some(Control::SYN) {
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-65):
             //   third check for a SYN
             //   Set RCV.NXT to SEG.SEQ+1, IRS is set to SEG.SEQ and any other
@@ -350,9 +355,10 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
     /// the segment is dropped or an RST is generated.
     fn on_segment(
         &self,
-        Segment { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, contents, options }: Segment<
-            impl Payload,
-        >,
+        Segment {
+            header: SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, control, options },
+            data: _,
+        }: Segment<impl Payload>,
         now: I,
     ) -> SynSentOnSegmentDisposition<I, ActiveOpen> {
         let SynSent {
@@ -378,7 +384,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
                 // In our implementation, because we don't carry data in our
                 // initial SYN segment, SND.UNA == ISS, SND.NXT == ISS+1.
                 if ack.before(iss) || ack.after(iss + 1) {
-                    return if contents.control() == Some(Control::RST) {
+                    return if control == Some(Control::RST) {
                         SynSentOnSegmentDisposition::Ignore
                     } else {
                         SynSentOnSegmentDisposition::SendRst(Segment::rst(ack))
@@ -389,7 +395,7 @@ impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
             None => false,
         };
 
-        match contents.control() {
+        match control {
             Some(Control::RST) => {
                 // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-67):
                 //   second check the RST bit
@@ -1155,7 +1161,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             debug_assert_eq!(discarded, 0);
             Some(seg)
         })?;
-        let seq_max = next_seg + seg.contents.len();
+        let seq_max = next_seg + seg.len();
         match *last_seq_ts {
             Some((seq, _ts)) => {
                 if seq_max.after(seq) {
@@ -1706,7 +1712,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         let mut data_acked = DataAcked::No;
         let seg = (|| {
             let (mut rcv_nxt, rcv_wnd, rcv_wnd_scale, snd_max) = match self {
-                State::Closed(closed) => return closed.on_segment(incoming),
+                State::Closed(closed) => return closed.on_segment(&incoming),
                 State::Listen(listen) => {
                     return match listen.on_segment(incoming, now) {
                         ListenOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
@@ -1847,28 +1853,31 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             // past this line.
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
             //   first check sequence number
-            let is_rst = incoming.contents.control() == Some(Control::RST);
+            let is_rst = incoming.header.control == Some(Control::RST);
             // pure ACKs (empty segments) don't need to be ack'ed.
-            let pure_ack = incoming.contents.len() == 0;
+            let pure_ack = incoming.len() == 0;
             let needs_ack = !pure_ack;
-            let Segment { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, contents, options: _ } =
-                match incoming.overlap(rcv_nxt, rcv_wnd) {
-                    Some(incoming) => incoming,
-                    None => {
-                        // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
-                        //   If an incoming segment is not acceptable, an acknowledgment
-                        //   should be sent in reply (unless the RST bit is set, if so drop
-                        //   the segment and return):
-                        //     <SEQ=SND.NXT><ACK=RCV.NXT><CTL=ACK>
-                        //   After sending the acknowledgment, drop the unacceptable segment
-                        //   and return.
-                        return if is_rst {
-                            None
-                        } else {
-                            Some(Segment::ack(snd_max, rcv_nxt, rcv_wnd >> rcv_wnd_scale))
-                        };
-                    }
-                };
+            let Segment {
+                header:
+                    SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, control, options: _ },
+                data,
+            } = match incoming.overlap(rcv_nxt, rcv_wnd) {
+                Some(incoming) => incoming,
+                None => {
+                    // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
+                    //   If an incoming segment is not acceptable, an acknowledgment
+                    //   should be sent in reply (unless the RST bit is set, if so drop
+                    //   the segment and return):
+                    //     <SEQ=SND.NXT><ACK=RCV.NXT><CTL=ACK>
+                    //   After sending the acknowledgment, drop the unacceptable segment
+                    //   and return.
+                    return if is_rst {
+                        None
+                    } else {
+                        Some(Segment::ack(snd_max, rcv_nxt, rcv_wnd >> rcv_wnd_scale))
+                    };
+                }
+            };
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-70):
             //   second check the RST bit
             //   If the RST bit is set then, any outstanding RECEIVEs and SEND
@@ -1876,7 +1885,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //   flushed.  Users should also receive an unsolicited general
             //   "connection reset" signal.  Enter the CLOSED state, delete the
             //   TCB, and return.
-            if contents.control() == Some(Control::RST) {
+            if control == Some(Control::RST) {
                 self.transition_to_state(
                     counters,
                     State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
@@ -1893,7 +1902,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //   If the SYN is not in the window this step would not be reached
             //   and an ack would have been sent in the first step (sequence
             //   number check).
-            if contents.control() == Some(Control::SYN) {
+            if control == Some(Control::SYN) {
                 self.transition_to_state(
                     counters,
                     State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
@@ -2104,11 +2113,11 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         // Write the segment data in the buffer and keep track if it fills
                         // any hole in the assembler.
                         let had_out_of_order = rcv.assembler.has_out_of_order();
-                        if contents.data().len() > 0 {
+                        if data.len() > 0 {
                             let offset = usize::try_from(seg_seq - rcv.nxt()).unwrap_or_else(|TryFromIntError {..}| {
                                 panic!("The segment was trimmed to fit the window, thus seg.seq({:?}) must not come before rcv.nxt({:?})", seg_seq, rcv.nxt());
                             });
-                            let nwritten = rcv.buffer.write_at(offset, contents.data());
+                            let nwritten = rcv.buffer.write_at(offset, &data);
                             let readable = rcv.assembler.insert(seg_seq..seg_seq + nwritten);
                             rcv.buffer.make_readable(readable);
                             rcv_nxt = rcv.nxt();
@@ -2126,7 +2135,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             match &mut rcv.timer {
                                 Some(ReceiveTimer::DelayedAck { at: _, received_bytes }) => {
                                     *received_bytes = received_bytes.saturating_add(
-                                        u32::try_from(contents.data().len()).unwrap_or(u32::MAX),
+                                        u32::try_from(data.len()).unwrap_or(u32::MAX),
                                     );
                                     // Per RFC 5681 Section 4.2:
                                     //  An implementation is deemed to comply
@@ -2140,7 +2149,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 }
                                 None => {
                                     if let Some(received_bytes) = NonZeroU32::new(
-                                        u32::try_from(contents.data().len()).unwrap_or(u32::MAX),
+                                        u32::try_from(data.len()).unwrap_or(u32::MAX),
                                     ) {
                                         rcv.timer = Some(ReceiveTimer::DelayedAck {
                                             at: now.add(ACK_DELAY_THRESHOLD),
@@ -2169,9 +2178,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             };
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
             //   eighth, check the FIN bit
-            let ack_to_fin = if contents.control() == Some(Control::FIN)
-                && rcv_nxt == seg_seq + contents.data().len()
-            {
+            let ack_to_fin = if control == Some(Control::FIN) && rcv_nxt == seg_seq + data.len() {
                 // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
                 //   If the FIN bit is set, signal the user "connection closing" and
                 //   return any pending RECEIVEs with same message, advance RCV.NXT
@@ -3076,7 +3083,7 @@ mod test {
         incoming: impl Into<Segment<&'static [u8]>>,
     ) -> Option<Segment<()>> {
         let closed = Closed { reason: () };
-        closed.on_segment(incoming.into())
+        closed.on_segment(&incoming.into())
     }
 
     #[test_case(
@@ -3322,9 +3329,9 @@ mod test {
         let counters = TcpCountersInner::default();
         let mut state = State::new_syn_rcvd(clock.now());
         let segment = state.abort(&counters).unwrap();
-        assert_eq!(segment.contents.control(), Some(Control::RST));
-        assert_eq!(segment.seq, ISS_2 + 1);
-        assert_eq!(segment.ack, Some(ISS_1 + 1));
+        assert_eq!(segment.header.control, Some(Control::RST));
+        assert_eq!(segment.header.seq, ISS_2 + 1);
+        assert_eq!(segment.header.ack, Some(ISS_1 + 1));
     }
 
     #[test_case(
@@ -5355,22 +5362,23 @@ mod test {
         }
 
         let f = |segment: Segment<SendPayload<'_>>| {
-            let Segment { contents, ack: _, seq: _, wnd: _, options: _ } = segment;
-            let contents_len = contents.data().len();
+            let segment_len = segment.len();
+            let Segment { header: _, data } = segment;
+            let data_len = data.len();
 
             if has_fin && reserved_bytes == 0 {
                 assert_eq!(
-                    contents.len(),
-                    u32::try_from(contents_len + 1).unwrap(),
+                    segment_len,
+                    u32::try_from(data_len + 1).unwrap(),
                     "FIN not accounted for"
                 );
             } else {
-                assert_eq!(contents.len(), u32::try_from(contents_len).unwrap());
+                assert_eq!(segment_len, u32::try_from(data_len).unwrap());
             }
 
-            let mut target = vec![0; contents_len];
-            contents.data().partial_copy(0, target.as_mut_slice());
-            assert_eq!(target, vec![VALUE; contents_len]);
+            let mut target = vec![0; data_len];
+            data.partial_copy(0, target.as_mut_slice());
+            assert_eq!(target, vec![VALUE; data_len]);
         };
         match has_fin {
             true => with_poll_send_result::<true>(f, reserved_bytes),
@@ -5642,8 +5650,11 @@ mod test {
         while let Some(seg) = state.poll_send_with_default_options(u32::MAX, clock.now(), &counters)
         {
             if zero_window_probe {
-                let zero_window_ack =
-                    Segment::ack(seg.ack.unwrap(), seg.seq, UnscaledWindowSize::from(0));
+                let zero_window_ack = Segment::ack(
+                    seg.header.ack.unwrap(),
+                    seg.header.seq,
+                    UnscaledWindowSize::from(0),
+                );
                 assert_eq!(
                     state.on_segment_with_default_options::<(), ClientlessBufferProvider>(
                         zero_window_ack,
