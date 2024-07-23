@@ -168,21 +168,47 @@ multiconst!(u32, [
 ]);
 
 multiconst!(zx_vm_option_t, [
-    ZX_VM_PERM_READ             = 1 << 0;
-    ZX_VM_PERM_WRITE            = 1 << 1;
-    ZX_VM_PERM_EXECUTE          = 1 << 2;
-    ZX_VM_COMPACT               = 1 << 3;
-    ZX_VM_SPECIFIC              = 1 << 4;
-    ZX_VM_SPECIFIC_OVERWRITE    = 1 << 5;
-    ZX_VM_CAN_MAP_SPECIFIC      = 1 << 6;
-    ZX_VM_CAN_MAP_READ          = 1 << 7;
-    ZX_VM_CAN_MAP_WRITE         = 1 << 8;
-    ZX_VM_CAN_MAP_EXECUTE       = 1 << 9;
-    ZX_VM_MAP_RANGE             = 1 << 10;
-    ZX_VM_REQUIRE_NON_RESIZABLE = 1 << 11;
-    ZX_VM_ALLOW_FAULTS          = 1 << 12;
-    ZX_VM_OFFSET_IS_UPPER_LIMIT = 1 << 13;
+    ZX_VM_PERM_READ                    = 1 << 0;
+    ZX_VM_PERM_WRITE                   = 1 << 1;
+    ZX_VM_PERM_EXECUTE                 = 1 << 2;
+    ZX_VM_COMPACT                      = 1 << 3;
+    ZX_VM_SPECIFIC                     = 1 << 4;
+    ZX_VM_SPECIFIC_OVERWRITE           = 1 << 5;
+    ZX_VM_CAN_MAP_SPECIFIC             = 1 << 6;
+    ZX_VM_CAN_MAP_READ                 = 1 << 7;
+    ZX_VM_CAN_MAP_WRITE                = 1 << 8;
+    ZX_VM_CAN_MAP_EXECUTE              = 1 << 9;
+    ZX_VM_MAP_RANGE                    = 1 << 10;
+    ZX_VM_REQUIRE_NON_RESIZABLE        = 1 << 11;
+    ZX_VM_ALLOW_FAULTS                 = 1 << 12;
+    ZX_VM_OFFSET_IS_UPPER_LIMIT        = 1 << 13;
     ZX_VM_PERM_READ_IF_XOM_UNSUPPORTED = 1 << 14;
+
+    // VM alignment options
+    ZX_VM_ALIGN_BASE                   = 24;
+    ZX_VM_ALIGN_1KB                    = 10 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_2KB                    = 11 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_4KB                    = 12 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_8KB                    = 13 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_16KB                   = 14 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_32KB                   = 15 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_64KB                   = 16 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_128KB                  = 17 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_256KB                  = 18 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_512KB                  = 19 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_1MB                    = 20 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_2MB                    = 21 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_4MB                    = 22 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_8MB                    = 23 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_16MB                   = 24 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_32MB                   = 25 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_64MB                   = 26 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_128MB                  = 27 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_256MB                  = 28 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_512MB                  = 29 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_1GB                    = 30 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_2GB                    = 31 << ZX_VM_ALIGN_BASE;
+    ZX_VM_ALIGN_4GB                    = 32 << ZX_VM_ALIGN_BASE;
 ]);
 
 multiconst!(u32, [
