@@ -80,9 +80,9 @@ inline zx_time_t compute_monotonic_time(const TimeValues& tvalues) {
       return ticks;
     }
   }
-  const affine::Ratio ticks_to_mono_ratio(tvalues.ticks_to_mono_numerator,
-                                          tvalues.ticks_to_mono_denominator);
-  return ticks_to_mono_ratio.Scale(ticks);
+  const affine::Ratio ticks_to_time_ratio(tvalues.ticks_to_time_numerator,
+                                          tvalues.ticks_to_time_denominator);
+  return ticks_to_time_ratio.Scale(ticks);
 }
 
 }  // namespace fasttime::internal

@@ -185,16 +185,16 @@ void CheckBuildId(const fbl::RefPtr<VmObject>& vmo) {
 void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
   zx_ticks_t per_second = ticks_per_second();
 
-  // Grab a copy of the ticks to mono ratio; we need this to initialize the
+  // Grab a copy of the ticks to time ratio; we need this to initialize the
   // constants window.
-  affine::Ratio ticks_to_mono_ratio = timer_get_ticks_to_time_ratio();
+  affine::Ratio ticks_to_time_ratio = timer_get_ticks_to_time_ratio();
 
   // At this point in time, we absolutely must know the rate that our tick
   // counter is ticking at.  If we don't, then something has gone horribly
   // wrong.
   ASSERT(per_second != 0);
-  ASSERT(ticks_to_mono_ratio.numerator() != 0);
-  ASSERT(ticks_to_mono_ratio.denominator() != 0);
+  ASSERT(ticks_to_time_ratio.numerator() != 0);
+  ASSERT(ticks_to_time_ratio.denominator() != 0);
 
   // Check if usermode can access ticks.
   const bool usermode_can_access_ticks =
@@ -235,8 +235,8 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
       .ticks_per_second = per_second,
       .boot_ticks_offset = timer_get_boot_ticks_offset(),
       .mono_ticks_offset = timer_get_mono_ticks_offset(),
-      .ticks_to_mono_numerator = ticks_to_mono_ratio.numerator(),
-      .ticks_to_mono_denominator = ticks_to_mono_ratio.denominator(),
+      .ticks_to_time_numerator = ticks_to_time_ratio.numerator(),
+      .ticks_to_time_denominator = ticks_to_time_ratio.denominator(),
       .usermode_can_access_ticks = usermode_can_access_ticks,
       .use_a73_errata_mitigation = needs_a73_mitigation,
   };

@@ -38,8 +38,8 @@ struct TimeValues {
   //
   // ClockMono(ticks) = (ticks * N) / D
   //
-  const uint32_t ticks_to_mono_numerator;
-  const uint32_t ticks_to_mono_denominator;
+  const uint32_t ticks_to_time_numerator;
+  const uint32_t ticks_to_time_denominator;
 
   // True if usermode can access ticks.
   const bool usermode_can_access_ticks;
