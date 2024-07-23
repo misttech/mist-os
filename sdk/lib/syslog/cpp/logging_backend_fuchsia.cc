@@ -32,8 +32,6 @@
 
 namespace syslog_runtime {
 
-using log_word_t = uint64_t;
-
 class GlobalStateLock;
 namespace internal {
 class LogState {
@@ -102,18 +100,18 @@ class GlobalStateLock {
 };
 namespace {
 
-zx_koid_t GetKoid(zx_handle_t handle) {
+zx_koid_t ProcessSelfKoid() {
   zx_info_handle_basic_t info;
   // We need to use _zx_object_get_info to avoid breaking the driver ABI.
   // fake_ddk can fake out this method, which results in us deadlocking
   // when used in certain drivers because the fake doesn't properly pass-through
   // to the real syscall in this case.
-  zx_status_t status =
-      _zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  zx_status_t status = _zx_object_get_info(zx_process_self(), ZX_INFO_HANDLE_BASIC, &info,
+                                           sizeof(info), nullptr, nullptr);
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-zx_koid_t pid = GetKoid(zx_process_self());
+zx_koid_t pid = ProcessSelfKoid();
 thread_local zx_koid_t tid = internal::FuchsiaLogGetCurrentThreadKoid();
 const char kTagFieldName[] = "tag";
 
