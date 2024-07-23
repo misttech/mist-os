@@ -14,6 +14,7 @@
 
 #include <fbl/enum_bits.h>
 #include <ktl/atomic.h>
+#include <ktl/optional.h>
 #include <ktl/type_traits.h>
 
 using zx_boot_time_t = int64_t;
@@ -67,6 +68,16 @@ inline void timer_set_initial_ticks_offset(uint64_t offset) {
 
   internal::mono_ticks_modifier.store(new_mono_offset, ktl::memory_order_relaxed);
   internal::boot_ticks_offset.store(offset, ktl::memory_order_relaxed);
+}
+
+// Converts a ticks value on the monotonic timeline to a raw hardware ticks value.
+// Returns the raw ticks value if the monotonic clock is not paused, and nullopt if it is.
+inline ktl::optional<zx_ticks_t> timer_convert_mono_to_raw_ticks(zx_ticks_t mono_ticks) {
+  const zx_ticks_t modifier = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+  if (modifier > 0) {
+    return ktl::nullopt;
+  }
+  return ktl::optional<zx_ticks_t>(mono_ticks - modifier);
 }
 
 // Access the platform specific offset from the raw ticks timeline to the monotonic ticks

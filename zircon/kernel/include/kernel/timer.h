@@ -31,8 +31,18 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
  public:
   using Callback = void (*)(Timer*, zx_time_t now, void* arg);
 
+  // Keeps track of which timeline a Timer is operating on.
+  enum class ReferenceTimeline : uint8_t {
+    kMono,
+    kBoot,
+  };
+
   // Timers need a constexpr constructor, as it is valid to construct them in static storage.
-  constexpr Timer() = default;
+  // TODO(https://fxbug.dev/328306129): The default value for the timeline parameter should be
+  // removed, thus forcing users of the Timer class to explicitly declare the timeline they wish
+  // to use.
+  constexpr explicit Timer(ReferenceTimeline timeline = ReferenceTimeline::kMono)
+      : timeline_(timeline) {}
 
   // We ensure that timers are not on a list or an active cpu when destroyed.
   ~Timer();
@@ -65,8 +75,11 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
   bool Cancel();
 
   // Equivalent to Set with no slack
-  void SetOneshot(zx_time_t deadline, Callback callback, void* arg) {
-    return Set(Deadline::no_slack(deadline), callback, arg);
+  // The deadline parameter should be interpreted differently depending on the timeline_ field.
+  // If timeline_ is set to kMono, deadline is a zx_time_t.
+  // If timeline_ is set to kBoot, deadline is a zx_boot_time_t.
+  void SetOneshot(int64_t deadline, Callback callback, void* arg) {
+    Set(Deadline::no_slack(deadline), callback, arg);
   }
 
   // Special helper routine to simultaneously try to acquire a spinlock and
@@ -78,7 +91,13 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
 
   // Private accessors for timer tests.
   zx_duration_t slack_for_test() const { return slack_; }
-  zx_time_t scheduled_time_for_test() const { return scheduled_time_; }
+
+  // This function returns a zx_time_t if the expected_timeline is kMono and a zx_boot_time_t if
+  // the expected_timeline is kBoot.
+  int64_t scheduled_time_for_test(ReferenceTimeline expected_timeline) const {
+    DEBUG_ASSERT(timeline_ == expected_timeline);
+    return scheduled_time_;
+  }
 
  private:
   // TimerQueues can directly manipulate the state of their enqueued Timers.
@@ -87,7 +106,11 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
   static constexpr uint32_t kMagic = fbl::magic("timr");
   uint32_t magic_ = kMagic;
 
-  zx_time_t scheduled_time_ = 0;
+  // This field should be interpreted differently depending on the timeline_ field.
+  // If timeline_ is set to kMono, this is a zx_time_t.
+  // If timeline_ is set to kBoot, this is a zx_boot_time_t.
+  int64_t scheduled_time_ = 0;
+
   // Stores the applied slack adjustment from the ideal scheduled_time.
   zx_duration_t slack_ = 0;
   Callback callback_ = nullptr;
@@ -98,6 +121,9 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
 
   // true if cancel is pending
   ktl::atomic<bool> cancel_{false};
+
+  // The timeline this timer is set on.
+  const ReferenceTimeline timeline_;
 };
 
 // Preemption Timers
@@ -145,11 +171,14 @@ class TimerQueue {
   // Add |timer| to this TimerQueue, possibly coalescing deadlines as well.
   void Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t latest_deadline);
 
-  // Set the platform's oneshot timer to the minimum of its current
-  // deadline and |new_deadline|.
+  // The UpdatePlatformTimer* methods are used to update the platform's oneshot timer to the
+  // minimum of the existing deadline (stored in next_timer_deadline_) and the given new_deadline.
+  // The two separate variations of this method are provided for convenience, so that callers can
+  // provide either a montonic or a boot timestamp depending on the context they're operating in.
   //
-  // This can only be called when interrupts are disabled.
-  void UpdatePlatformTimer(zx_time_t new_deadline);
+  // These can only be called when interrupts are disabled.
+  void UpdatePlatformTimerMono(zx_time_t new_deadline);
+  void UpdatePlatformTimerBoot(zx_boot_time_t new_deadline);
 
   // This is called by Tick(), and processes all timers with scheduled times less than now.
   // Once it's done, the scheduled time of the timer at the front of the queue is returned.
@@ -157,14 +186,19 @@ class TimerQueue {
   static TimestampType TickInternal(TimestampType now, cpu_num_t cpu,
                                     fbl::DoublyLinkedList<Timer*>& timer_list);
 
-  // Timers on this queue.
-  fbl::DoublyLinkedList<Timer*> timer_list_;
+  // Timers on the monotonic timeline are placed in this list.
+  fbl::DoublyLinkedList<Timer*> monotonic_timer_list_;
+
+  // Timers on the boot timeline are placed in this list.
+  fbl::DoublyLinkedList<Timer*> boot_timer_list_;
 
   // This TimerQueue's preemption deadline. ZX_TIME_INFINITE means not set.
   zx_time_t preempt_timer_deadline_ = ZX_TIME_INFINITE;
 
-  // This TimerQueue's deadline for its platform timer or ZX_TIME_INFINITE if not set
-  zx_time_t next_timer_deadline_ = ZX_TIME_INFINITE;
+  // This TimerQueue's deadline for its platform timer or ZX_TIME_INFINITE if not set.
+  // The deadline is stored in raw platform ticks, as that is the unit used by the
+  // platform_set_oneshot_timer API.
+  zx_ticks_t next_timer_deadline_ = ZX_TIME_INFINITE;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_TIMER_H_

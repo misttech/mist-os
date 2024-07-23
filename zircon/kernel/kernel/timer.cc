@@ -115,16 +115,51 @@ zx_boot_time_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_
 
 zx_ticks_t ticks_per_second(void) { return gTicksPerSecond; }
 
-void TimerQueue::UpdatePlatformTimer(zx_time_t new_deadline) {
+void TimerQueue::UpdatePlatformTimerBoot(zx_boot_time_t new_deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
-  if (new_deadline < next_timer_deadline_) {
-    LTRACEF("rescheduling timer for %" PRIi64 " nsecs\n", new_deadline);
-    // Convert the new_deadline to a raw ticks value.
-    zx_ticks_t deadline_ticks =
-        timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(new_deadline);
-    zx_ticks_t deadline_raw_ticks = deadline_ticks - timer_get_mono_ticks_offset();
+
+  if (new_deadline == ZX_TIME_INFINITE) {
+    return;
+  }
+
+  // Convert from boot time to a raw ticks value to set the platform timer to.
+  const zx_ticks_t deadline_boot_ticks =
+      timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(new_deadline);
+  const zx_ticks_t deadline_raw_ticks = deadline_boot_ticks - timer_get_boot_ticks_offset();
+
+  if (deadline_raw_ticks < next_timer_deadline_) {
+    LTRACEF("rescheduling timer for %" PRIi64 " ticks from UpdatePlatformTimerBoot, next: %" PRIi64
+            " \n",
+            deadline_raw_ticks, next_timer_deadline_);
     platform_set_oneshot_timer(deadline_raw_ticks);
-    next_timer_deadline_ = new_deadline;
+    next_timer_deadline_ = deadline_raw_ticks;
+  }
+}
+
+void TimerQueue::UpdatePlatformTimerMono(zx_time_t new_deadline) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  if (new_deadline == ZX_TIME_INFINITE) {
+    return;
+  }
+
+  // Convert from monotonic time to a raw ticks value to set the platform timer to.
+  const zx_ticks_t deadline_mono_ticks =
+      timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(new_deadline);
+  const ktl::optional<zx_ticks_t> deadline_raw_ticks =
+      timer_convert_mono_to_raw_ticks(deadline_mono_ticks);
+
+  // If the conversion function returned no value, the monotonic clock is paused, so return early.
+  if (!deadline_raw_ticks.has_value()) {
+    return;
+  }
+
+  if (deadline_raw_ticks.value() < next_timer_deadline_) {
+    LTRACEF("rescheduling timer for %" PRIi64 " ticks from UpdatePlatformTimerMono, next: %" PRIi64
+            "\n",
+            deadline_raw_ticks.value(), next_timer_deadline_);
+    platform_set_oneshot_timer(deadline_raw_ticks.value());
+    next_timer_deadline_ = deadline_raw_ticks.value();
   }
 }
 
@@ -146,14 +181,17 @@ void TimerQueue::Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t lat
   // - Let |x| be the end of the list (not a timer)
   // - Let |(| and |)| the earliest_deadline and latest_deadline.
 
-  for (Timer& entry : timer_list_) {
+  fbl::DoublyLinkedList<Timer*>& timer_list = timer->timeline_ == Timer::ReferenceTimeline::kMono
+                                                  ? monotonic_timer_list_
+                                                  : boot_timer_list_;
+  for (Timer& entry : timer_list) {
     if (entry.scheduled_time_ > latest_deadline) {
       // New timer latest is earlier than the current timer.
       // Just add upfront as is, without slack.
       //
       //   ---------t---)--e-------------------------------> time
       timer->slack_ = 0ll;
-      timer_list_.insert(entry, timer);
+      timer_list.insert(entry, timer);
       return;
     }
 
@@ -165,7 +203,7 @@ void TimerQueue::Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t lat
       timer->slack_ = zx_time_sub_time(entry.scheduled_time_, timer->scheduled_time_);
       timer->scheduled_time_ = entry.scheduled_time_;
       kcounter_add(timer_coalesced_counter, 1);
-      timer_list_.insert_after(timer_list_.make_iterator(entry), timer);
+      timer_list.insert_after(timer_list.make_iterator(entry), timer);
       return;
     }
 
@@ -183,9 +221,9 @@ void TimerQueue::Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t lat
     //
     //  -------------(--e---t-----?-------------------> time
 
-    auto iter = timer_list_.make_iterator(entry);
+    auto iter = timer_list.make_iterator(entry);
     ++iter;
-    if (iter != timer_list_.end()) {
+    if (iter != timer_list.end()) {
       const Timer& next = *iter;
       if (next.scheduled_time_ <= timer->scheduled_time_) {
         // The new timer is to the right of the next timer. There is no
@@ -222,13 +260,13 @@ void TimerQueue::Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t lat
     timer->slack_ = zx_time_sub_time(entry.scheduled_time_, timer->scheduled_time_);
     timer->scheduled_time_ = entry.scheduled_time_;
     kcounter_add(timer_coalesced_counter, 1);
-    timer_list_.insert_after(timer_list_.make_iterator(entry), timer);
+    timer_list.insert_after(timer_list.make_iterator(entry), timer);
     return;
   }
 
   // Walked off the end of the list and there was no overlap.
   timer->slack_ = 0;
-  timer_list_.push_back(timer);
+  timer_list.push_back(timer);
 }
 
 Timer::~Timer() {
@@ -279,21 +317,36 @@ void Timer::Set(const Deadline& deadline, Callback callback, void* arg) {
   LTRACEF("scheduled time %" PRIi64 "\n", scheduled_time_);
 
   TimerQueue& timer_queue = percpu::Get(cpu).timer_queue;
-
+  // For now we should only ever have one boottime timer, which is the one that wakes up the
+  // system. So, we can assert that either this is a monotonic timer, or the boottime timer queue
+  // is empty.
+  // TODO(https://fxbug.dev/328306129): Remove this assert once we support generic boot timers.
+  DEBUG_ASSERT(timeline_ == Timer::ReferenceTimeline::kMono ||
+               timer_queue.boot_timer_list_.is_empty());
   timer_queue.Insert(this, earliest_deadline, latest_deadline);
-  kcounter_add(timer_created_counter, 1);
 
-  if (!timer_queue.timer_list_.is_empty() && &timer_queue.timer_list_.front() == this) {
-    // We just modified the head of the timer queue.
-    timer_queue.UpdatePlatformTimer(deadline.when());
+  switch (timeline_) {
+    case Timer::ReferenceTimeline::kMono:
+      if (!timer_queue.monotonic_timer_list_.is_empty() &&
+          &timer_queue.monotonic_timer_list_.front() == this) {
+        timer_queue.UpdatePlatformTimerMono(deadline.when());
+      }
+      break;
+    case Timer::ReferenceTimeline::kBoot:
+      if (!timer_queue.boot_timer_list_.is_empty() &&
+          &timer_queue.boot_timer_list_.front() == this) {
+        timer_queue.UpdatePlatformTimerBoot(deadline.when());
+      }
+      break;
   }
+  kcounter_add(timer_created_counter, 1);
 }
 
 void TimerQueue::PreemptReset(zx_time_t deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
   LTRACEF("preempt timer cpu %u deadline %" PRIi64 "\n", arch_curr_cpu_num(), deadline);
   preempt_timer_deadline_ = deadline;
-  UpdatePlatformTimer(deadline);
+  UpdatePlatformTimerMono(deadline);
 }
 
 bool Timer::Cancel() {
@@ -328,8 +381,11 @@ bool Timer::Cancel() {
 
     // Save a copy of the old head of the queue so later we can see if we modified the head.
     const Timer* oldhead = nullptr;
-    if (!timer_queue.timer_list_.is_empty()) {
-      oldhead = &timer_queue.timer_list_.front();
+    fbl::DoublyLinkedList<Timer*>& timer_list = timeline_ == Timer::ReferenceTimeline::kMono
+                                                    ? timer_queue.monotonic_timer_list_
+                                                    : timer_queue.boot_timer_list_;
+    if (!timer_list.is_empty()) {
+      oldhead = &timer_list.front();
     }
 
     // Remove this Timer from this whatever TimerQueue it's on.
@@ -346,8 +402,15 @@ bool Timer::Cancel() {
     if (unlikely(oldhead == this)) {
       // The Timer we're canceling was at head of this queue, so see if we should update platform
       // timer.
-      if (!timer_queue.timer_list_.is_empty()) {
-        timer_queue.UpdatePlatformTimer(timer_queue.timer_list_.front().scheduled_time_);
+      if (!timer_list.is_empty()) {
+        switch (timeline_) {
+          case Timer::ReferenceTimeline::kMono:
+            timer_queue.UpdatePlatformTimerMono(timer_list.front().scheduled_time_);
+            break;
+          case Timer::ReferenceTimeline::kBoot:
+            timer_queue.UpdatePlatformTimerBoot(timer_list.front().scheduled_time_);
+            break;
+        }
       } else if (timer_queue.next_timer_deadline_ == ZX_TIME_INFINITE) {
         LTRACEF("clearing old hw timer, preempt timer not set, nothing in the queue\n");
         platform_stop_timer();
@@ -383,6 +446,7 @@ void timer_tick() {
 
 void TimerQueue::Tick(cpu_num_t cpu) {
   zx_time_t now = current_time();
+  zx_boot_time_t boot_now = current_boot_time();
   LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
 
   // The platform timer has fired, so no deadline is set.
@@ -394,13 +458,12 @@ void TimerQueue::Tick(cpu_num_t cpu) {
     Scheduler::TimerTick(SchedTime{now});
   }
 
-  zx_time_t deadline = TickInternal(now, cpu, timer_list_);
+  // Tick both of the timer lists.
+  const zx_time_t deadline_mono = TickInternal(now, cpu, monotonic_timer_list_);
+  UpdatePlatformTimerMono(ktl::min(deadline_mono, preempt_timer_deadline_));
 
-  // Set the platform timer to the *soonest* of queue event and preemption timer.
-  if (preempt_timer_deadline_ < deadline) {
-    deadline = preempt_timer_deadline_;
-  }
-  UpdatePlatformTimer(deadline);
+  const zx_boot_time_t deadline_boot = TickInternal(boot_now, cpu, boot_timer_list_);
+  UpdatePlatformTimerBoot(deadline_boot);
 }
 
 template <typename TimestampType>
@@ -498,14 +561,13 @@ zx_status_t Timer::TrylockOrCancel(ChainLock& lock) {
 void TimerQueue::TransitionOffCpu(TimerQueue& source) {
   Guard<MonitoredSpinLock, IrqSave> guard{TimerLock::Get(), SOURCE_TAG};
 
-  Timer* old_head = nullptr;
-  if (!timer_list_.is_empty()) {
-    old_head = &timer_list_.front();
+  // Move all monotonic timers from |source| to this TimerQueue.
+  Timer* old_mono_head = nullptr;
+  if (!monotonic_timer_list_.is_empty()) {
+    old_mono_head = &monotonic_timer_list_.front();
   }
-
-  // Move all timers from |source| to this TimerQueue.
   Timer* timer;
-  while ((timer = source.timer_list_.pop_front()) != nullptr) {
+  while ((timer = source.monotonic_timer_list_.pop_front()) != nullptr) {
     // We lost the original asymmetric slack information so when we combine them
     // with the other timer queue they are not coalesced again.
     // TODO(cpu): figure how important this case is.
@@ -514,15 +576,36 @@ void TimerQueue::TransitionOffCpu(TimerQueue& source) {
     // timers from one queue to another and we already counted them when they were first
     // created.
   }
-
-  Timer* new_head = nullptr;
-  if (!timer_list_.is_empty()) {
-    new_head = &timer_list_.front();
+  Timer* new_mono_head = nullptr;
+  if (!monotonic_timer_list_.is_empty()) {
+    new_mono_head = &monotonic_timer_list_.front();
   }
 
-  if (new_head != nullptr && new_head != old_head) {
-    // We just modified the head of the timer queue.
-    UpdatePlatformTimer(new_head->scheduled_time_);
+  // Move all boottime timers from |source| to this TimerQueue.
+  Timer* old_boot_head = nullptr;
+  if (!boot_timer_list_.is_empty()) {
+    old_boot_head = &boot_timer_list_.front();
+  }
+  while ((timer = source.boot_timer_list_.pop_front()) != nullptr) {
+    // We lost the original asymmetric slack information so when we combine them
+    // with the other timer queue they are not coalesced again.
+    // TODO(cpu): figure how important this case is.
+    Insert(timer, timer->scheduled_time_, timer->scheduled_time_);
+    // Note, we do not increment the "created" counter here because we are simply moving these
+    // timers from one queue to another and we already counted them when they were first
+    // created.
+  }
+  Timer* new_boot_head = nullptr;
+  if (!boot_timer_list_.is_empty()) {
+    new_boot_head = &boot_timer_list_.front();
+  }
+
+  if (new_mono_head != nullptr && new_mono_head != old_mono_head) {
+    UpdatePlatformTimerMono(new_mono_head->scheduled_time_);
+  }
+
+  if (new_boot_head != nullptr && new_boot_head != old_boot_head) {
+    UpdatePlatformTimerBoot(new_boot_head->scheduled_time_);
   }
 
   // The old TimerQueue has no tasks left, so reset the deadlines.
@@ -532,7 +615,8 @@ void TimerQueue::TransitionOffCpu(TimerQueue& source) {
 
 void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
   size_t ptr = 0;
-  zx_time_t now = current_time();
+  const zx_time_t mono_now = current_time();
+  const zx_boot_time_t boot_now = current_boot_time();
 
   Guard<MonitoredSpinLock, IrqSave> guard{TimerLock::Get(), SOURCE_TAG};
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
@@ -541,10 +625,13 @@ void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
       if (ptr >= len) {
         return;
       }
-      zx_time_t last = now;
-      for (Timer& t : percpu::Get(i).timer_queue.timer_list_) {
-        zx_duration_t delta_now = zx_time_sub_time(t.scheduled_time_, now);
-        zx_duration_t delta_last = zx_time_sub_time(t.scheduled_time_, last);
+
+      // Print out the monotonic timers.
+      zx_time_t last_mono = mono_now;
+      ptr += snprintf(buf + ptr, len - ptr, "monotonic timers:\n");
+      for (Timer& t : percpu::Get(i).timer_queue.monotonic_timer_list_) {
+        zx_duration_t delta_now = zx_time_sub_time(t.scheduled_time_, mono_now);
+        zx_duration_t delta_last = zx_time_sub_time(t.scheduled_time_, last_mono);
         ptr += snprintf(buf + ptr, len - ptr,
                         "\ttime %" PRIi64 " delta_now %" PRIi64 " delta_last %" PRIi64
                         " func %p arg %p\n",
@@ -552,7 +639,23 @@ void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
         if (ptr >= len) {
           return;
         }
-        last = t.scheduled_time_;
+        last_mono = t.scheduled_time_;
+      }
+
+      // Print out the boot timers.
+      zx_time_t last_boot = boot_now;
+      ptr += snprintf(buf + ptr, len - ptr, "boot timers:\n");
+      for (Timer& t : percpu::Get(i).timer_queue.boot_timer_list_) {
+        zx_duration_t delta_now = zx_time_sub_time(t.scheduled_time_, boot_now);
+        zx_duration_t delta_last = zx_time_sub_time(t.scheduled_time_, last_boot);
+        ptr += snprintf(buf + ptr, len - ptr,
+                        "\ttime %" PRIi64 " delta_now %" PRIi64 " delta_last %" PRIi64
+                        " func %p arg %p\n",
+                        t.scheduled_time_, delta_now, delta_last, t.callback_, t.arg_);
+        if (ptr >= len) {
+          return;
+        }
+        last_boot = t.scheduled_time_;
       }
     }
   }
