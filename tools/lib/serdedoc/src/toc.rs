@@ -26,6 +26,10 @@ impl<'a> TableOfContents<'a> {
         let mut stack = Vec::<(String, String, usize)>::new();
         let mut path = HashSet::<String>::new();
 
+        // Keep a set of all the types to detect types that are not in the graph.
+        let mut all_types = HashSet::new();
+        all_types.extend(self.data.data_types.keys());
+
         stack.push((self.data.root.clone(), "AssemblyConfig".to_string(), 0));
         path.insert(self.data.root.clone());
 
@@ -66,6 +70,17 @@ impl<'a> TableOfContents<'a> {
 
             // Print the current node.
             self.write_node(writer, name, &node, has_children, indent_level)?;
+            all_types.remove(&rust_type);
+        }
+
+        // TODO(b/332348955): Support complex enum variant types.
+        // Write out types that are not connected to the graph yet due to b/332348955
+        for ty in all_types {
+            if let Some(node) = self.data.data_types.get(ty) {
+                self.write_node(writer, ty.clone(), &node, false, 0)?;
+            } else {
+                anyhow::bail!("node missing for {ty}")
+            }
         }
 
         Ok(())
