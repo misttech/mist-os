@@ -51,6 +51,13 @@ def weighted_average(arr: Iterable[float], weights: Iterable[int]) -> float:
     ) / sum(weights)
 
 
+def normalize(lst: Iterable[float]) -> list[float]:
+    """Return a copy of the list normalized between [0, 1.0]."""
+    lst_min = min(lst)
+    lst_max = max(lst)
+    return [(f - lst_min) / (lst_max - lst_min) for f in lst]
+
+
 # We don't have numpy in the vendored python libraries so we'll have to roll our own correlate
 # functionality which will be slooooow.
 #
@@ -812,6 +819,9 @@ def merge_power_data(
         max_sequence_samples, len(avg_cpu_combined), len(power_samples)
     )
 
+    current_samples = normalize([sample.current for sample in power_samples])
+    avg_cpu_combined = normalize(avg_cpu_combined)
+
     # Ensures feature list is always shorter than the number of signal samples
     feature_samples = int(0.8 * signal_samples)
     (
@@ -819,13 +829,13 @@ def merge_power_data(
         power_after_cpu_correlation_idx,
     ) = cross_correlate_arg_max(
         avg_cpu_combined[0:signal_samples],
-        [s.current for s in power_samples[0:feature_samples]],
+        current_samples[0:feature_samples],
     )
     (
         cpu_after_power_correlation,
         cpu_after_power_correlation_idx,
     ) = cross_correlate_arg_max(
-        [s.current for s in power_samples[0:signal_samples]],
+        current_samples[0:signal_samples],
         avg_cpu_combined[0:feature_samples],
     )
     starting_ticks = 0

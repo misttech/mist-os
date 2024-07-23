@@ -200,3 +200,33 @@ class PowerSamplerTest(unittest.TestCase):
             ),
             (4666366670000, 10000),
         )
+
+    def test_normalize(self) -> None:
+        signal = [0, 1, 2, 3, 4, 5]
+        normalized = power_test_utils.normalize(signal)
+        expected = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        self.assertEqual(normalized, expected)
+
+    def test_normalized_xcorrelate(self) -> None:
+        signal = [5, 0, 0, 0, 0, 2, 2, 2, 2, 2]
+        feature = [10, 5, 5, 5, 5]
+
+        # If we cross correlate without normalizing, we correlate best with the 2s
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(signal, feature), (60, 5)
+        )
+
+        # But if we normalize first
+        # We'll have
+        #
+        # signal: [1, 0, 0, 0, 0, .4, .4, .4, .4]
+        # feature: [1, 0, 0, 0, 0]
+        #
+        # which correctly correlates best with the beginning
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(
+                power_test_utils.normalize(signal),
+                power_test_utils.normalize(feature),
+            ),
+            (1.0, 0),
+        )
