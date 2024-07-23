@@ -220,7 +220,7 @@ type AssociateIndication = struct {
     ssid ieee80211.Ssid:optional;
     rates vector<uint8>:internal.MAX_ASSOC_BASIC_RATES;
     // BSSMembershipSelectorSet
-    rsne vector<uint8>:<MAX, optional>;
+    rsne vector<uint8>:<ieee80211.WLAN_IE_MAX_LEN, optional>;
 
     // etc
 };
@@ -333,7 +333,7 @@ type StartRequest = struct {
     // primitive. However, IEEE doesn't define any other primitive to configure the RSN after its
     // BSS was started. The RSNE must be available when the BSS is started, and thus, this is the
     // right place to transfer the RSNE to the MLME.
-    rsne vector<uint8>:<MAX, optional>;
+    rsne vector<uint8>:<ieee80211.WLAN_IE_MAX_LEN, optional>;
 
     // Combined with what MLME knows about the device capabilities,
     // following parameters determine what to be advertised to the peer
