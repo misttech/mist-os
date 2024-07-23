@@ -4,6 +4,7 @@
 
 import("//build/components/fuchsia_package.gni")
 import("//build/dist/distribution_manifest.gni")
+import("//build/packages/exported_fuchsia_package_archive.gni")
 
 # Defines a Fuchsia driver package.
 # A fuchsia_driver_package is a fuchsia_package but with extra
@@ -60,7 +61,8 @@ template("fuchsia_driver_package") {
       outputs = [ "${distribution_manifest_file}" ]
     }
 
-    fuchsia_package(target_name) {
+    package_target = target_name
+    fuchsia_package(package_target) {
       forward_variables_from(invoker, "*")
       if (!defined(deps)) {
         deps = []
@@ -79,6 +81,12 @@ template("fuchsia_driver_package") {
         ]
         driver_package_component_files_barrier = []
       }
+    }
+
+    archive_target = target_name + "-archive"
+    exported_fuchsia_package_archive(archive_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+      package = ":${package_target}"
     }
   } else {
     group(target_name) {
