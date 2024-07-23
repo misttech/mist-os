@@ -4,6 +4,7 @@
 
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
+import("//build/packages/exported_fuchsia_package_archive.gni")
 
 driver_bind_rules("aml_eth_bind") {
   rules = "aml_eth.bind"
@@ -57,6 +58,10 @@ fuchsia_driver_component("aml-ethernet") {
 fuchsia_driver_package("package") {
   package_name = "aml-ethernet"
   driver_components = [ ":aml-ethernet" ]
+}
+
+exported_fuchsia_package_archive("package-archive") {
+  package = ":package"
 }
 
 group("tests") {

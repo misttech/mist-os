@@ -338,3 +338,10 @@ board_input_bundle("rtc_driver") {
     },
   ]
 }
+
+group("vim3-release") {
+  deps = [
+    "//src/connectivity/ethernet/drivers/aml-ethernet:package-archive",
+    "//src/devices/hrtimer/drivers/aml-hrtimer:package-archive",
+  ]
+}

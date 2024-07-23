@@ -9,6 +9,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
+import("//build/packages/exported_fuchsia_package_archive.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-hrtimer-bind") {
@@ -41,6 +42,10 @@ fuchsia_driver_component("aml-hrtimer") {
 fuchsia_driver_package("package") {
   package_name = "aml-hrtimer"
   driver_components = [ ":aml-hrtimer" ]
+}
+
+exported_fuchsia_package_archive("package-archive") {
+  package = ":package"
 }
 
 source_set("common") {
