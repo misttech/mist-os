@@ -685,7 +685,7 @@ pub trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     ) -> O;
 }
 
-/// Provices access to an IP device's state for the IP layer.
+/// Provides access to an IP device's state for the IP layer.
 pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Calls the callback with the next packet ID.
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
