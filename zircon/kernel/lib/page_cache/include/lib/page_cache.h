@@ -59,7 +59,7 @@ class PageCache {
   PageCache& operator=(PageCache&&) = default;
 
   // Returns true if this PageCache instance is non-empty.
-  explicit operator bool() const { return bool(per_cpu_caches_); }
+  explicit operator bool() const { return !!per_cpu_caches_; }
 
   // Utility type for returning a list of pages via zx::result. Automatically
   // frees a non-empty list of pages on destruction to improve safety and
@@ -110,7 +110,7 @@ class PageCache {
         KTRACE_BEGIN_SCOPE_ENABLE(kTraceEnabled, "kernel:sched", "PageCache::Allocate",
                                   ("page_count", page_count), ("alloc_flags", alloc_flags));
     DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
-    DEBUG_ASSERT(per_cpu_caches_ != nullptr);
+    DEBUG_ASSERT(per_cpu_caches_);
 
     // Fall back to the PMM for low mem/loaned pages.
     if (alloc_flags & (PMM_ALLOC_FLAG_LO_MEM | PMM_ALLOC_FLAG_LOANED)) {
@@ -132,7 +132,7 @@ class PageCache {
   void Free(PageList page_list) {
     ktrace::Scope trace =
         KTRACE_BEGIN_SCOPE_ENABLE(kTraceEnabled, "kernel:sched", "PageCache::Free");
-    DEBUG_ASSERT(per_cpu_caches_ != nullptr);
+    DEBUG_ASSERT(per_cpu_caches_);
 
     if (!page_list.is_empty()) {
       // Note that preempt_disable is destroyed before page_list, intentionally
@@ -146,6 +146,8 @@ class PageCache {
 
   size_t reserve_pages() const { return reserve_pages_; }
 
+  void SeedRandomShouldWait();
+
  private:
   struct alignas(MAX_CACHE_LINE) CpuCache {
     DECLARE_MUTEX(CpuCache) fill_lock;
@@ -156,9 +158,12 @@ class PageCache {
 
     TA_GUARDED(cache_lock)
     PageList free_list;
+
+    TA_GUARDED(cache_lock)
+    ktl::optional<uintptr_t> random_should_wait_state = 0;
   };
 
-  explicit PageCache(size_t reserve_pages, ktl::unique_ptr<CpuCache[]> entries)
+  explicit PageCache(size_t reserve_pages, fbl::Array<CpuCache> entries)
       : reserve_pages_{reserve_pages}, per_cpu_caches_{ktl::move(entries)} {}
 
   static void CountHitPages(size_t page_count);
@@ -175,6 +180,12 @@ class PageCache {
       TA_EXCL(entry.fill_lock, entry.cache_lock) {
     if (requested_pages > 0) {
       Guard<Mutex> guard{&entry.cache_lock};
+      // If the allocation is waitable, check if user wants random should waits, and if so randomly
+      // error 10% of allocation requests.
+      if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && entry.random_should_wait_state.has_value() &&
+          rand_r(&*entry.random_should_wait_state) < (RAND_MAX / 10)) {
+        return zx::error{ZX_ERR_SHOULD_WAIT};
+      }
       if (requested_pages <= entry.available_pages) {
         return zx::ok(AllocateCachePages(entry, requested_pages));
       }
@@ -327,7 +338,7 @@ class PageCache {
   }
 
   size_t reserve_pages_{0};
-  ktl::unique_ptr<CpuCache[]> per_cpu_caches_{};
+  fbl::Array<CpuCache> per_cpu_caches_;
 };
 
 }  // namespace page_cache

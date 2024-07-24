@@ -11,6 +11,7 @@ zx_library("page_cache") {
   deps = [
     "tests",
     "//zircon/kernel/lib/counters",
+    "//zircon/kernel/lib/crypto",
   ]
   public_deps = [ "//zircon/kernel/lib/ktl:headers" ]
 }
