@@ -348,6 +348,8 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
 
     FX_CHECK(ZX_OK == zx_cache_flush(response_vmo_base, response_vmo_size,
                                      ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+    FX_CHECK(ZX_OK == zx::vmar::root_self()->unmap(reinterpret_cast<uintptr_t>(response_vmo_base),
+                                                   response_vmo_size));
   }
 
   return response_vmo;
