@@ -253,8 +253,9 @@ impl Config {
     }
 
     pub(crate) fn from_env(env: &Environment) -> Result<Self> {
-        let user_conf = env.get_user();
-        let build_conf = env.get_build();
+        let user_conf: Option<PathBuf> = env.get_user();
+        let build_conf: Option<PathBuf> = env.get_build();
+        let global_conf: Option<PathBuf> = env.get_global();
         let is_isolated = env.context().env_kind().is_isolated();
         if !is_isolated {
             tracing::debug!("Non isolated context {:?}", env.context().env_kind());
@@ -263,7 +264,7 @@ impl Config {
             if is_isolated { ConfigFile::from_nonflushing_file } else { ConfigFile::from_file };
         let user = user_conf.as_deref().map(from_file).transpose()?;
         let build = build_conf.as_deref().map(from_file).transpose()?;
-        let global = env.get_global().map(from_file).transpose()?;
+        let global = global_conf.as_deref().map(from_file).transpose()?;
 
         Ok(Self::new(
             global,

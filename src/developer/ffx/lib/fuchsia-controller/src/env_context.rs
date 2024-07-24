@@ -74,6 +74,7 @@ impl EnvContext {
                 runtime_args,
                 env_path,
                 Utf8PathBuf::try_from(current_dir).ok().as_deref(),
+                false,
             )
             .map_err(fxe)?,
             None => EnvironmentContext::detect(
@@ -81,6 +82,7 @@ impl EnvContext {
                 runtime_args,
                 &current_dir,
                 env_path,
+                false,
             )
             .map_err(fxe)?,
         };

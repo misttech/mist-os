@@ -68,7 +68,8 @@ fn get_tools_relpath() -> String {
 /// These objects need to exist for the duration of the test,
 /// since the underlying data is cleaned up when they are dropped.
 pub(crate) async fn new_ffx_isolate(name: &str, sdk_root_dir: PathBuf) -> Result<Isolate> {
-    let context = EnvironmentContext::no_context(ExecutableKind::Test, Default::default(), None);
+    let context =
+        EnvironmentContext::no_context(ExecutableKind::Test, Default::default(), None, false);
 
     let subtool_search_paths = Vec::<PathBuf>::new();
     let ffx_path = sdk_root_dir.join(get_tools_relpath()).join("ffx");

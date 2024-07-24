@@ -42,6 +42,8 @@ pub struct EnvironmentContext {
     env_file_path: Option<PathBuf>,
     pub(crate) cache: Arc<crate::cache::Cache<Config>>,
     self_path: PathBuf,
+    /// if true, do not read or write any environment files.
+    pub(crate) no_environment: bool,
 }
 
 impl std::cmp::PartialEq for EnvironmentContext {
@@ -72,6 +74,7 @@ impl EnvironmentContext {
         env_vars: Option<EnvVars>,
         runtime_args: ConfigMap,
         env_file_path: Option<PathBuf>,
+        no_environment: bool,
     ) -> Self {
         let cache = Arc::default();
         Self {
@@ -82,6 +85,7 @@ impl EnvironmentContext {
             env_file_path,
             cache,
             self_path: std::env::current_exe().unwrap(),
+            no_environment,
         }
     }
 
@@ -92,6 +96,7 @@ impl EnvironmentContext {
         domain: ConfigDomain,
         runtime_args: ConfigMap,
         isolate_root: Option<PathBuf>,
+        no_environment: bool,
     ) -> Self {
         Self::new(
             EnvironmentKind::ConfigDomain { domain, isolate_root },
@@ -99,6 +104,7 @@ impl EnvironmentContext {
             None,
             runtime_args,
             None,
+            no_environment,
         )
     }
 
@@ -109,6 +115,7 @@ impl EnvironmentContext {
         domain_root: Utf8PathBuf,
         runtime_args: ConfigMap,
         isolate_root: Option<PathBuf>,
+        no_environment: bool,
     ) -> Result<Self> {
         let domain_config = ConfigDomain::find_root(&domain_root).with_context(|| {
             ffx_error!("Could not find config domain root from '{domain_root}'")
@@ -116,7 +123,7 @@ impl EnvironmentContext {
         let domain = ConfigDomain::load_from(&domain_config).with_context(|| {
             ffx_error!("Could not load config domain file at '{domain_config}'")
         })?;
-        Ok(Self::config_domain(exe_kind, domain, runtime_args, isolate_root))
+        Ok(Self::config_domain(exe_kind, domain, runtime_args, isolate_root, no_environment))
     }
 
     /// Initialize an environment type for an in tree context, rooted at `tree_root` and if
@@ -127,6 +134,7 @@ impl EnvironmentContext {
         build_dir: Option<PathBuf>,
         runtime_args: ConfigMap,
         env_file_path: Option<PathBuf>,
+        no_environment: bool,
     ) -> Self {
         Self::new(
             EnvironmentKind::InTree { tree_root, build_dir },
@@ -134,6 +142,7 @@ impl EnvironmentContext {
             None,
             runtime_args,
             env_file_path,
+            no_environment,
         )
     }
 
@@ -145,10 +154,17 @@ impl EnvironmentContext {
         runtime_args: ConfigMap,
         env_file_path: Option<PathBuf>,
         current_dir: Option<&Utf8Path>,
+        no_environment: bool,
     ) -> Result<Self> {
         if let Some(domain_path) = current_dir.and_then(ConfigDomain::find_root) {
             let domain = ConfigDomain::load_from(&domain_path)?;
-            Ok(Self::config_domain(exe_kind, domain, runtime_args, Some(isolate_root)))
+            Ok(Self::config_domain(
+                exe_kind,
+                domain,
+                runtime_args,
+                Some(isolate_root),
+                no_environment,
+            ))
         } else {
             Ok(Self::new(
                 EnvironmentKind::Isolated { isolate_root },
@@ -156,6 +172,7 @@ impl EnvironmentContext {
                 Some(env_vars),
                 runtime_args,
                 env_file_path,
+                no_environment,
             ))
         }
     }
@@ -168,14 +185,26 @@ impl EnvironmentContext {
         }
     }
 
+    pub fn has_no_environment(&self) -> bool {
+        self.no_environment
+    }
+
     /// Initialize an environment type that has no meaningful context, using only global and
     /// user level configuration.
     pub fn no_context(
         exe_kind: ExecutableKind,
         runtime_args: ConfigMap,
         env_file_path: Option<PathBuf>,
+        no_environment: bool,
     ) -> Self {
-        Self::new(EnvironmentKind::NoContext, exe_kind, None, runtime_args, env_file_path)
+        Self::new(
+            EnvironmentKind::NoContext,
+            exe_kind,
+            None,
+            runtime_args,
+            env_file_path,
+            no_environment,
+        )
     }
 
     /// Detects what kind of environment we're in, based on the provided arguments,
@@ -187,21 +216,29 @@ impl EnvironmentContext {
         runtime_args: ConfigMap,
         current_dir: &Path,
         env_file_path: Option<PathBuf>,
+        no_environment: bool,
     ) -> Result<Self, EnvironmentDetectError> {
         // strong signals that we're running...
         if let Some(domain_path) = ConfigDomain::find_root(current_dir.try_into()?) {
             // - a config-domain: we found a fuchsia-env file
             let domain = ConfigDomain::load_from(&domain_path)?;
-            Ok(Self::config_domain(exe_kind, domain, runtime_args, None))
+            Ok(Self::config_domain(exe_kind, domain, runtime_args, None, no_environment))
         } else if let Some(tree_root) = Self::find_jiri_root(current_dir)? {
             // - in-tree: we found a jiri root, and...
             // look for a .fx-build-dir file and use that instead.
             let build_dir = Self::load_fx_build_dir(&tree_root)?;
 
-            Ok(Self::in_tree(exe_kind, tree_root, build_dir, runtime_args, env_file_path))
+            Ok(Self::in_tree(
+                exe_kind,
+                tree_root,
+                build_dir,
+                runtime_args,
+                env_file_path,
+                no_environment,
+            ))
         } else {
             // - no particular context: any other situation
-            Ok(Self::no_context(exe_kind, runtime_args, env_file_path))
+            Ok(Self::no_context(exe_kind, runtime_args, env_file_path, no_environment))
         }
     }
 
@@ -599,6 +636,7 @@ mod test {
                 env_file_path: Default::default(),
                 cache: Default::default(),
                 self_path: std::env::current_exe().unwrap(),
+                no_environment: false,
             }
         }
     }
@@ -644,6 +682,7 @@ mod test {
             domain_root.clone(),
             Default::default(),
             None,
+            false,
         )
         .expect("config domain context");
 
@@ -661,6 +700,7 @@ mod test {
             domain_root.clone(),
             Default::default(),
             Some(isolate_dir.path().to_owned()),
+            false,
         )
         .expect("isolated config domain context");
 
@@ -675,6 +715,7 @@ mod test {
             Default::default(),
             None,
             Some(&domain_root),
+            false,
         )
         .expect("Isolated context");
 
@@ -692,6 +733,7 @@ mod test {
             Default::default(),
             None,
             None,
+            false,
         )
         .expect("Isolated context");
 

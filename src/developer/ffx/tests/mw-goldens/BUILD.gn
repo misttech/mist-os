@@ -79,9 +79,6 @@ if (has_board) {
       ":sdk_exported_for_ffx",
       "//src/developer/ffx:ffx_bin",
     ]
-
-    # This accesses out/default.json, see https://fxbug.dev/352511300
-    hermetic_deps = false
   }
 
   golden_files("ffx-golden-mw-list") {

@@ -61,6 +61,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::String("$FFX_TEST_ENV_VAR_MAPPER".to_string());
@@ -76,6 +77,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::String(
@@ -93,6 +95,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::String("$ENVIRONMENT_VARIABLE_THAT_DOES_NOT_EXIST".to_string());
@@ -108,6 +111,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::String("$HOME/$ENVIRONMENT_VARIABLE_THAT_DOES_NOT_EXIST".to_string());
@@ -123,6 +127,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::String("$$HOME".to_string());
@@ -138,6 +143,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::Bool(false);

@@ -49,6 +49,7 @@ mod test {
             Some("/tmp/build".into()),
             Default::default(),
             Default::default(),
+            false,
         );
         let value = ctx.build_dir().expect("Getting build path").to_string_lossy().to_string();
         let test = Value::String("$BUILD_DIR".to_string());
@@ -63,6 +64,7 @@ mod test {
             Some("/tmp/build".into()),
             Default::default(),
             None,
+            false,
         );
         let value = ctx.build_dir().expect("Getting runtime path").to_string_lossy().to_string();
         let test = Value::String("$BUILD_DIR/$BUILD_DIR".to_string());
@@ -77,6 +79,7 @@ mod test {
             None,
             Default::default(),
             Default::default(),
+            false,
         );
         let test = Value::String("$BUILD_DIR".to_string());
         assert_eq!(build(&ctx, test), None);
@@ -90,6 +93,7 @@ mod test {
             Some("/tmp/build".into()),
             Default::default(),
             Default::default(),
+            false,
         );
         let test = Value::String("$WHATEVER".to_string());
         assert_eq!(build(&ctx, test), Some(Value::String("$WHATEVER".to_string())));

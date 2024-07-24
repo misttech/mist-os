@@ -124,6 +124,7 @@ mod test {
             ffx_config::environment::ExecutableKind::Test,
             Default::default(),
             None,
+            true,
         ));
         let connector = Connector::try_from_env(&env).await.expect("Could not make test connector");
 

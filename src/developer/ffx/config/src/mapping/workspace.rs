@@ -64,6 +64,7 @@ mod test {
             config_domain,
             Default::default(),
             Some(workspace_dir.path().to_owned()),
+            false,
         )
     }
 
