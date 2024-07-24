@@ -33,10 +33,12 @@ mod sync_impl {
     pub(crate) use loom::cell;
 
     pub(crate) mod atomic {
-        pub(crate) use core::sync::atomic::compiler_fence;
         pub(crate) use loom::sync::atomic::*;
     }
 
+    #[cfg(not(feature = "std"))]
+    pub(crate) use loom::hint::spin_loop;
+    #[cfg(feature = "std")]
     pub(crate) use loom::thread::yield_now;
 }
 
@@ -63,10 +65,6 @@ pub(crate) mod prelude {
     pub(crate) trait UnsafeCellExt {
         type Value;
 
-        fn with<R, F>(&self, f: F) -> R
-        where
-            F: FnOnce(*const Self::Value) -> R;
-
         fn with_mut<R, F>(&self, f: F) -> R
         where
             F: FnOnce(*mut Self::Value) -> R;
@@ -74,13 +72,6 @@ pub(crate) mod prelude {
 
     impl<T> UnsafeCellExt for cell::UnsafeCell<T> {
         type Value = T;
-
-        fn with<R, F>(&self, f: F) -> R
-        where
-            F: FnOnce(*const Self::Value) -> R,
-        {
-            f(self.get())
-        }
 
         fn with_mut<R, F>(&self, f: F) -> R
         where

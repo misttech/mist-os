@@ -1831,7 +1831,7 @@ rust_library("async-channel-v1_8_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":concurrent-queue-v2_1_0" ]
+  deps += [ ":concurrent-queue-v2_5_0" ]
   deps += [ ":event-listener-v2_5_1" ]
   deps += [ ":futures-core-v0_3_19" ]
 
@@ -1867,7 +1867,7 @@ rust_library("async-executor-v1_5_0") {
   deps = []
   deps += [ ":async-lock-v2_6_0" ]
   deps += [ ":async-task-v4_0_3" ]
-  deps += [ ":concurrent-queue-v2_1_0" ]
+  deps += [ ":concurrent-queue-v2_5_0" ]
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
   deps += [ ":slab-v0_4_7" ]
@@ -1935,7 +1935,7 @@ rust_library("async-io-v1_12_0") {
 
   deps = []
   deps += [ ":async-lock-v2_6_0" ]
-  deps += [ ":concurrent-queue-v2_1_0" ]
+  deps += [ ":concurrent-queue-v2_5_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":parking-v2_0_0" ]
@@ -3283,19 +3283,19 @@ rust_library("combine-v4_6_2") {
   applicable_licenses = [ ":combine-v4_6_2.license" ]
 }
 
-license("concurrent-queue-v2_1_0.license") {
+license("concurrent-queue-v2_5_0.license") {
   public_package_name = "concurrent_queue"
   license_files = [
-    "//third_party/rust_crates/vendor/concurrent-queue-2.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/concurrent-queue-2.1.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/concurrent-queue-2.5.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/concurrent-queue-2.5.0/LICENSE-MIT",
   ]
 }
 
-rust_library("concurrent-queue-v2_1_0") {
+rust_library("concurrent-queue-v2_5_0") {
   crate_name = "concurrent_queue"
   crate_root =
-      "//third_party/rust_crates/vendor/concurrent-queue-2.1.0/src/lib.rs"
-  output_name = "concurrent_queue-c9905697768476bb"
+      "//third_party/rust_crates/vendor/concurrent-queue-2.5.0/src/lib.rs"
+  output_name = "concurrent_queue-bf9b7fa618a60f34"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -3305,16 +3305,16 @@ rust_library("concurrent-queue-v2_1_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=c9905697768476bb",
-    "-Cextra-filename=-c9905697768476bb",
+    "--edition=2021",
+    "-Cmetadata=bf9b7fa618a60f34",
+    "-Cextra-filename=-bf9b7fa618a60f34",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":concurrent-queue-v2_1_0.license" ]
+  applicable_licenses = [ ":concurrent-queue-v2_5_0.license" ]
 }
 
 license("const-oid-v0_9_2.license") {

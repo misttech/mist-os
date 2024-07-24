@@ -1,3 +1,23 @@
+# Version 2.5.0
+
+- Add a `force_push` method that can be used to add an element to the queue by displacing another. (#58)
+- Make `ConcurrentQueue::unbounded()` into a `const` function. (#67)
+- Fix a compilation error in the Loom implementation. (#65)
+
+# Version 2.4.0
+
+- Remove unnecessary heap allocations from inside of the `ConcurrentQueue` type. (#53)
+
+# Version 2.3.0
+
+- Implement `UnwindSafe` without libstd. (#49)
+- Bump `fastrand` to `v2.0.0`. (#43)
+- Use inline assembly in the `full_fence` funtion. (#47)
+
+# Version 2.2.0
+
+- Add the try_iter method. (#36)
+
 # Version 2.1.0
 
 - Update `portable-atomic` to 1.0. (#33)

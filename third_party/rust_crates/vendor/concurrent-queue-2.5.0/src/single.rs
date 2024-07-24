@@ -1,10 +1,11 @@
 use core::mem::MaybeUninit;
+use core::ptr;
 
 use crate::sync::atomic::{AtomicUsize, Ordering};
 use crate::sync::cell::UnsafeCell;
 #[allow(unused_imports)]
 use crate::sync::prelude::*;
-use crate::{busy_wait, PopError, PushError};
+use crate::{busy_wait, ForcePushError, PopError, PushError};
 
 const LOCKED: usize = 1 << 0;
 const PUSHED: usize = 1 << 1;
@@ -44,6 +45,59 @@ impl<T> Single<T> {
             Err(PushError::Closed(value))
         } else {
             Err(PushError::Full(value))
+        }
+    }
+
+    /// Attempts to push an item into the queue, displacing another if necessary.
+    pub fn force_push(&self, value: T) -> Result<Option<T>, ForcePushError<T>> {
+        // Attempt to lock the slot.
+        let mut state = 0;
+
+        loop {
+            // Lock the slot.
+            let prev = self
+                .state
+                .compare_exchange(state, LOCKED | PUSHED, Ordering::SeqCst, Ordering::SeqCst)
+                .unwrap_or_else(|x| x);
+
+            if prev & CLOSED != 0 {
+                return Err(ForcePushError(value));
+            }
+
+            if prev == state {
+                // If the value was pushed, swap out the value.
+                let prev_value = if prev & PUSHED == 0 {
+                    // SAFETY: write is safe because we have locked the state.
+                    self.slot.with_mut(|slot| unsafe {
+                        slot.write(MaybeUninit::new(value));
+                    });
+                    None
+                } else {
+                    // SAFETY: replace is safe because we have locked the state, and
+                    // assume_init is safe because we have checked that the value was pushed.
+                    let prev_value = unsafe {
+                        self.slot.with_mut(move |slot| {
+                            ptr::replace(slot, MaybeUninit::new(value)).assume_init()
+                        })
+                    };
+                    Some(prev_value)
+                };
+
+                // We can unlock the slot now.
+                self.state.fetch_and(!LOCKED, Ordering::Release);
+
+                // Return the old value.
+                return Ok(prev_value);
+            }
+
+            // Try to go for the current (pushed) state.
+            if prev & LOCKED == 0 {
+                state = prev;
+            } else {
+                // State is locked.
+                busy_wait();
+                state = prev & !LOCKED;
+            }
         }
     }
 
