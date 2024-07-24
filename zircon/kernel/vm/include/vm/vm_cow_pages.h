@@ -1005,10 +1005,6 @@ class VmCowPages final : public VmHierarchyBase,
   void ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end, bool sibling_visible,
                                          BatchPQRemove* page_remover) TA_REQ(lock());
 
-  // Updates the parent limits of all children so that they will never be able to
-  // see above |new_size| in this vmo, even if the vmo is enlarged in the future.
-  void UpdateChildParentLimitsLocked(uint64_t new_size) TA_REQ(lock());
-
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
   void MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) TA_REQ(lock());

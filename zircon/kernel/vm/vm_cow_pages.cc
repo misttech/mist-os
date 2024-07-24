@@ -107,6 +107,17 @@ inline uint64_t CheckedAdd(uint64_t a, uint64_t b) {
   return result;
 }
 
+inline uint64_t ClampedLimit(uint64_t offset, uint64_t limit, uint64_t max_limit) {
+  // Return a clamped `limit` value such that `offset + clamped_limit <= max_limit`.
+  // If `offset > max_limit` to begin with, then clamp `limit` to 0 to avoid underflow.
+  //
+  // This is typically used to update a child node's parent limit when its parent is resized or the
+  // child moves to a new parent. This guaranatees that the child cannot see any ancestor content
+  // beyond what it could before the resize or move operation.
+  uint64_t offset_limit = CheckedAdd(offset, limit);
+  return ktl::max(ktl::min(offset_limit, max_limit), offset) - offset;
+}
+
 void FreeReference(VmPageOrMarker::ReferenceValue content) {
   VmCompression* compression = pmm_page_compression();
   DEBUG_ASSERT(compression);
@@ -802,12 +813,12 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
         cur->page_list_.AnyPagesOrIntervalsInRange(offset, offset + child_parent_limit)) {
       break;
     }
-    // To move to the parent we need to translate our window into |cur|.
-    if (offset >= cur->parent_limit_) {
-      child_parent_limit = 0;
-    } else {
-      child_parent_limit = ktl::min(child_parent_limit, cur->parent_limit_ - offset);
-    }
+
+    // To move to `cur`'s parent we need to translate the clone's window to be relative to it.
+    //
+    // The clone's last visible offset into `cur` cannot exceed `cur`'s parent limit, as it should
+    // not be able to see more pages than it could see if `cur` had been the parent.
+    child_parent_limit = ClampedLimit(offset, child_parent_limit, cur->parent_limit_);
     offset += cur->parent_offset_;
     cur = cur->parent_.get();
   }
@@ -899,7 +910,9 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
     return ZX_ERR_INVALID_ARGS;
   }
 
-  uint64_t child_parent_limit = offset >= size_ ? 0 : ktl::min(size, size_ - offset);
+  // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
+  // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
+  const uint64_t child_parent_limit = ClampedLimit(offset, size, size_);
 
   // Invalidate everything the clone will be able to see. They're COW pages now,
   // so any existing mappings can no longer directly write to the pages.
@@ -1085,15 +1098,14 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
                          VmPageList::MAX_SIZE);
 
   if (child.parent_offset_ + child.parent_limit_ > parent_limit_) {
-    // Update the child's parent limit to ensure that it won't be able to see more
-    // of its new parent than this hidden vmo was able to see.
-    if (parent_limit_ < child.parent_offset_) {
-      child.parent_limit_ = 0;
-      child.parent_start_limit_ = 0;
-    } else {
-      child.parent_limit_ = parent_limit_ - child.parent_offset_;
-      child.parent_start_limit_ = ktl::min(child.parent_start_limit_, child.parent_limit_);
-    }
+    // Update the child's parent limit to ensure that it won't be able to see more of its new parent
+    // than this hidden node was able to see.
+    //
+    // The start limit must never exceed the parent limit, so check this invariant and maintain it
+    // after updating the parent limit.
+    DEBUG_ASSERT(parent_start_limit_ <= parent_limit_);
+    child.parent_limit_ = ClampedLimit(child.parent_offset_, child.parent_limit_, parent_limit_);
+    child.parent_start_limit_ = ktl::min(child.parent_start_limit_, child.parent_limit_);
   } else {
     // The child will be able to see less of its new parent than this hidden vmo was
     // able to see, so release any parent pages in that range.
@@ -3512,13 +3524,17 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   // efficient, which is why we do it first.
   if (start < parent_limit_ && end >= parent_limit_) {
     if (is_parent_hidden_locked()) {
-      // This will also update the parent limit to `start`.
       __UNINITIALIZED BatchPQRemove page_remover(&ancestor_freed_list);
       ReleaseCowParentPagesLocked(start, parent_limit_, &page_remover);
       page_remover.Flush();
     } else {
       parent_limit_ = start;
     }
+
+    // The node's updated parent limit must now lie at the beginning of the range that we zeroed.
+    // As the node must be visible its start limit must be 0.
+    DEBUG_ASSERT(parent_start_limit_ == 0);
+    DEBUG_ASSERT(parent_limit_ == start);
   }
 
   // Helper lambda to determine if this VMO can see parent contents at offset, or if a length is
@@ -4338,6 +4354,9 @@ void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
     skip_split_bits = false;
   }
 
+  // The start limit must never exceed the parent limit, even after updating the limits.
+  DEBUG_ASSERT(parent_start_limit_ <= parent_limit_);
+
   // Free any pages that either aren't visible, or were already split into the other child. For
   // pages that haven't been split into the other child, we need to ensure they're univisible.
   // We are going to be inserting removed pages into a shared free list. So make sure the parent did
@@ -4680,9 +4699,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     DEBUG_ASSERT(parent_limit_ <= end);
     if (start < parent_limit_) {
       if (is_parent_hidden_locked()) {
-        // This will also update the parent limit to `start`.
         ReleaseCowParentPagesLocked(start, parent_limit_, &page_remover);
-
         // Flush the page remover and free the pages, so that we don't mix ownership of ancestor
         // pages with pages removed from this object below.
         page_remover.Flush();
@@ -4691,14 +4708,26 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
         parent_limit_ = start;
       }
 
-      // Validate that the parent limit was correctly updated as it should never remain larger than
-      // this node's actual size.
+      // The node's updated parent limit must now equal its new size.
+      // As the node must be visible its start limit must be 0.
+      DEBUG_ASSERT(parent_start_limit_ == 0);
       DEBUG_ASSERT(parent_limit_ == start);
     }
 
-    // If the tail of a parent disappears, the children shouldn't be able to see that region
-    // again, even if the parent is later reenlarged. So update the child parent limits.
-    UpdateChildParentLimitsLocked(s);
+    // If the tail of a parent disappears, the children shouldn't be able to see that region again,
+    // even if the parent is later reenlarged. So update the children's parent limits.
+    //
+    // A child's parent limit will also limit that child's descendants' views into this node, so
+    // this method only needs to touch the direct children.
+    for (auto& child : children_list_) {
+      AssertHeld(child.lock_ref());
+
+      // The start limit must never exceed the parent limit, so check this invariant and maintain it
+      // after updating the parent limit.
+      DEBUG_ASSERT(child.parent_start_limit_ <= child.parent_limit_);
+      child.parent_limit_ = ClampedLimit(child.parent_offset_, child.parent_limit_, start);
+      child.parent_start_limit_ = ktl::min(child.parent_start_limit_, child.parent_limit_);
+    }
 
     // We should not have any outstanding pages to free as we flushed ancestor pages already. So
     // this flush should be a no-op.
@@ -4745,19 +4774,6 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
-}
-
-void VmCowPages::UpdateChildParentLimitsLocked(uint64_t new_size) {
-  // Note that a child's parent_limit_ will limit that child's descendants' views into
-  // this vmo, so this method only needs to touch the direct children.
-  for (auto& child : children_list_) {
-    AssertHeld(child.lock_ref());
-    if (new_size < child.parent_offset_) {
-      child.parent_limit_ = 0;
-    } else {
-      child.parent_limit_ = ktl::min(child.parent_limit_, new_size - child.parent_offset_);
-    }
-  }
 }
 
 zx_status_t VmCowPages::LookupLocked(uint64_t offset, uint64_t len,
