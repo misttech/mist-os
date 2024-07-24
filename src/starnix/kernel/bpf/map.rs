@@ -7,7 +7,7 @@
 use crate::mm::memory::MemoryObject;
 use crate::mm::vmar::AllocatedVmar;
 use crate::mm::{MemoryAccessor, ProtectionFlags, PAGE_SIZE};
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use dense_map::DenseMap;
 use ebpf::MapSchema;
 use fuchsia_zircon as zx;
@@ -17,6 +17,7 @@ use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS,
     bpf_map_type_BPF_MAP_TYPE_BLOOM_FILTER, bpf_map_type_BPF_MAP_TYPE_CGROUP_ARRAY,
@@ -194,6 +195,30 @@ impl Map {
             .as_ringbuf()
             .ok_or_else(|| errno!(ENODEV))?
             .get_memory(length, prot)
+    }
+
+    pub fn wait_async<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        self.entries.lock(locked).as_ringbuf()?.wait_async(waiter, events, handler)
+    }
+
+    pub fn query_events<L>(&self, locked: &mut Locked<'_, L>) -> Result<FdEvents, Errno>
+    where
+        L: LockBefore<BpfMapEntries>,
+    {
+        let mut entries = self.entries.lock(locked);
+        match entries.deref_mut() {
+            MapStore::RingBuffer(ringbuf) => ringbuf.query_events(),
+            _ => Ok(FdEvents::empty()),
+        }
     }
 
     pub fn ringbuf_reserve<L>(
@@ -554,6 +579,8 @@ struct RingBufferStorage {
     producer_position: &'static AtomicU32,
     /// Pointer to the start of the data of the ring buffer.
     data: usize,
+    /// WaitQueue to notify userspace when new data is available.
+    wait_queue: WaitQueue,
     /// The specific memory address space used to map the ring buffer. This is the last field in
     /// the struct so that all the data that conceptually points to it is destroyed before the
     /// memory is unmapped.
@@ -644,6 +671,7 @@ impl RingBufferStorage {
             consumer_position,
             producer_position,
             data,
+            wait_queue: Default::default(),
             _vmar: vmar,
         });
         // Store the pointer to the storage to the start of the technical vmo. This is required to
@@ -694,7 +722,7 @@ impl RingBufferStorage {
     fn commit(
         &self,
         header: &RingBufferRecordHeader,
-        _flags: RingBufferWakeupPolicy,
+        flags: RingBufferWakeupPolicy,
         discard: bool,
     ) {
         let mut new_length = header.length.load(Ordering::Acquire) & !BPF_RINGBUF_BUSY_BIT;
@@ -702,12 +730,29 @@ impl RingBufferStorage {
             new_length |= BPF_RINGBUF_DISCARD_BIT;
         }
         header.length.store(new_length, Ordering::Release);
-        track_stub!(TODO("https://fxbug.dev/323847465"), "must signal ringbuffer fd");
+
+        // Send a signal either if it is forced, or it is the default and the committed entry is
+        // the next one the client will consume.
+        if flags == RingBufferWakeupPolicy::ForceWakeup
+            || (flags == RingBufferWakeupPolicy::DefaultWakeup
+                && self.is_consumer_position(header as *const RingBufferRecordHeader as usize))
+        {
+            self.wait_queue.notify_fd_events(FdEvents::POLLIN);
+        }
     }
 
     /// The pointer into `data` that corresponds to `position`.
     fn data_position(&self, position: u32) -> usize {
         self.data + ((position & self.mask) as usize)
+    }
+
+    fn is_consumer_position(&self, addr: usize) -> bool {
+        let Some(position) = addr.checked_sub(self.data) else {
+            return false;
+        };
+        let position = position as u32;
+        let consumer_position = self.consumer_position.load(Ordering::Acquire) & self.mask;
+        position == consumer_position
     }
 
     /// Access the memory at `position` as a `RingBufferRecordHeader`.
@@ -745,6 +790,28 @@ impl RingBufferStorage {
             return error!(EINVAL);
         }
         Ok(self.memory.clone())
+    }
+
+    pub fn wait_async(
+        &self,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        Some(self.wait_queue.wait_async_fd_events(waiter, events, handler))
+    }
+
+    pub fn query_events(&mut self) -> Result<FdEvents, Errno> {
+        let consumer_position = self.consumer_position.load(Ordering::Acquire);
+        let producer_position = self.producer_position.load(Ordering::Acquire);
+        if consumer_position < producer_position {
+            // Read the header at the consumer position, and check that the entry is not busy.
+            let header = self.header_mut(producer_position);
+            if *header.length.get_mut() & BPF_RINGBUF_BUSY_BIT == 0 {
+                return Ok(FdEvents::POLLIN);
+            }
+        }
+        Ok(FdEvents::empty())
     }
 }
 

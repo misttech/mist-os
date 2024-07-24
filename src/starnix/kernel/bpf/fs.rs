@@ -10,7 +10,7 @@ use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
 use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, Kernel, Task};
+use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir,
@@ -25,7 +25,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{errno, error, statfs, BPF_FS_MAGIC};
 use std::sync::Arc;
 
@@ -118,6 +118,31 @@ impl FileOps for BpfHandle {
         match self {
             Self::Map(map) => map.get_memory(locked, length, prot),
             _ => error!(ENODEV),
+        }
+    }
+    fn wait_async(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        match self {
+            Self::Map(map) => map.wait_async(locked, waiter, events, handler),
+            _ => None,
+        }
+    }
+    fn query_events(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        match self {
+            Self::Map(map) => map.query_events(locked),
+            _ => Ok(FdEvents::empty()),
         }
     }
 }
