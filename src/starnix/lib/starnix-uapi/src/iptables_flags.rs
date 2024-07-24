@@ -61,6 +61,22 @@ bitflags! {
     }
 }
 
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct NfNatRangeFlags: u32 {
+        const MAP_IPS = uapi::NF_NAT_RANGE_MAP_IPS;
+        const PROTO_SPECIFIED = uapi::NF_NAT_RANGE_PROTO_SPECIFIED;
+        const PROTO_RANDOM = uapi::NF_NAT_RANGE_PROTO_RANDOM;
+        const PERSISTENT = uapi::NF_NAT_RANGE_PERSISTENT;
+        const PROTO_RANDOM_FULLY = uapi::NF_NAT_RANGE_PROTO_RANDOM_FULLY;
+        const PROTO_OFFSET = uapi::NF_NAT_RANGE_PROTO_OFFSET;
+        const NET_MAP = uapi::NF_NAT_RANGE_NETMAP;
+
+        // Multi-bit flags
+        const PROTO_RANDOM_ALL = uapi::NF_NAT_RANGE_PROTO_RANDOM_ALL;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,5 +87,6 @@ mod tests {
         assert_eq!(IptIpFlagsV4::all().bits(), uapi::IPT_F_MASK);
         assert_eq!(IptIpFlagsV6::all().bits(), uapi::IP6T_F_MASK);
         assert_eq!(NfIpHooks::all().bits().count_ones(), uapi::NF_IP_NUMHOOKS);
+        assert_eq!(NfNatRangeFlags::all().bits(), uapi::NF_NAT_RANGE_MASK);
     }
 }

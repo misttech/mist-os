@@ -8,22 +8,25 @@
 use assert_matches::assert_matches;
 use starnix_logging::log_warn;
 use starnix_uapi::iptables_flags::{
-    IptIpFlags, IptIpFlagsV4, IptIpFlagsV6, IptIpInverseFlags, NfIpHooks,
+    IptIpFlags, IptIpFlagsV4, IptIpFlagsV6, IptIpInverseFlags, NfIpHooks, NfNatRangeFlags,
 };
 use starnix_uapi::{
     c_char, c_int, c_uchar, c_uint, in6_addr, in_addr, ip6t_entry, ip6t_ip6, ip6t_replace,
     ipt_entry, ipt_ip, ipt_replace, nf_ip_hook_priorities_NF_IP_PRI_FILTER,
     nf_ip_hook_priorities_NF_IP_PRI_MANGLE, nf_ip_hook_priorities_NF_IP_PRI_NAT_DST,
     nf_ip_hook_priorities_NF_IP_PRI_NAT_SRC, nf_ip_hook_priorities_NF_IP_PRI_RAW,
+    nf_nat_ipv4_multi_range_compat, nf_nat_range,
     xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
-    xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp, xt_udp, IPPROTO_IP,
-    IPPROTO_TCP, IPPROTO_UDP, IPT_RETURN, NF_ACCEPT, NF_DROP, NF_IP_FORWARD, NF_IP_LOCAL_IN,
-    NF_IP_LOCAL_OUT, NF_IP_NUMHOOKS, NF_IP_POST_ROUTING, NF_IP_PRE_ROUTING, NF_QUEUE,
+    xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp,
+    xt_tproxy_target_info_v1, xt_udp, IPPROTO_IP, IPPROTO_TCP, IPPROTO_UDP, IPT_RETURN, NF_ACCEPT,
+    NF_DROP, NF_IP_FORWARD, NF_IP_LOCAL_IN, NF_IP_LOCAL_OUT, NF_IP_NUMHOOKS, NF_IP_POST_ROUTING,
+    NF_IP_PRE_ROUTING, NF_QUEUE,
 };
 use std::any::type_name;
 use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString, NulError};
 use std::mem::size_of;
+use std::num::NonZeroU16;
 use std::ops::RangeInclusive;
 use std::str::Utf8Error;
 use thiserror::Error;
@@ -49,6 +52,11 @@ pub const VERDICT_DROP: i32 = -(NF_DROP as i32) - 1;
 pub const VERDICT_ACCEPT: i32 = -(NF_ACCEPT as i32) - 1;
 pub const VERDICT_QUEUE: i32 = -(NF_QUEUE as i32) - 1;
 pub const VERDICT_RETURN: i32 = IPT_RETURN;
+
+const TARGET_STANDARD: &str = "";
+const TARGET_ERROR: &str = "ERROR";
+const TARGET_REDIRECT: &str = "REDIRECT";
+const TARGET_TPROXY: &str = "TPROXY";
 
 #[derive(Debug, Error, PartialEq)]
 pub enum IpTableParseError {
@@ -102,6 +110,14 @@ pub enum IpTableParseError {
     InvalidJumpTarget { jump_target: usize },
     #[error("invalid valid_hooks field {hooks:#x}")]
     InvalidHookBits { hooks: u32 },
+    #[error("invalid redirect target range size {range_size}")]
+    InvalidRedirectTargetRangeSize { range_size: u32 },
+    #[error("invalid redirect target range [{start}, {end}]")]
+    InvalidRedirectTargetRange { start: u16, end: u16 },
+    #[error("invalid redirect target flags {flags}")]
+    InvalidRedirectTargetFlags { flags: u32 },
+    #[error("invalid tproxy target: one of address and port must be specified")]
+    InvalidTproxyZeroAddressAndPort,
     #[error("invalid hooks {hooks:#x} found for table {table_name}")]
     InvalidHooksForTable { hooks: u32, table_name: &'static str },
     #[error("hook ranges overlap at offset {offset}")]
@@ -411,13 +427,13 @@ pub enum Matcher {
 pub enum Target {
     Unknown { name: String, bytes: Vec<u8> },
 
-    // Translated from `xt_standard_target`, which contains a numerical verdict.
+    // Parsed from `xt_standard_target`, which contains a numerical verdict.
     //
     // A 0 or positive verdict is a JUMP to another chain or rule, and a negative verdict
     // is one of the builtin targets like ACCEPT, DROP or RETURN.
     Standard(c_int),
 
-    // Translated from `xt_error_target`, which contains a string.
+    // Parsed from `xt_error_target`, which contains a string.
     //
     // This misleading variant name does not indicate an error in parsing/translation, but rather
     // the start of a chain or the end of input. The inner string is either the name of a chain
@@ -425,6 +441,28 @@ pub enum Target {
     // list of entries. Note that "ERROR" does not necessarily indicate the last entry, as a chain
     // can be named "ERROR".
     Error(String),
+
+    // Parsed from `nf_nat_ipv4_multi_range_compat` for IPv4, and `nf_nat_range` for IPv6.
+    //
+    // The original Linux structs are also used for the DNAT target, and contains information about
+    // IP addresses which is ignored for REDIRECT.
+    Redirect(NfNatRange),
+
+    // Parsed from `xt_tproxy_target_info` for IPv4, and `xt_tproxy_target_info_v1` for IPv6.
+    Tproxy(TproxyInfo),
+}
+
+#[derive(Debug)]
+pub struct NfNatRange {
+    flags: NfNatRangeFlags,
+    start: u16,
+    end: u16,
+}
+
+#[derive(Debug)]
+pub struct TproxyInfo {
+    address: Option<fnet::IpAddress>,
+    port: Option<NonZeroU16>,
 }
 
 // `xt_standard_target` without the `target` field.
@@ -753,14 +791,13 @@ impl IptReplaceParser {
         }
         let remaining_size = target_size - size_of::<xt_entry_target>();
 
-        let target = match ascii_to_string(&target_info.name)
-            .map_err(IpTableParseError::AsciiConversion)?
-            .as_str()
-        {
-            "" => {
+        let target_name =
+            ascii_to_string(&target_info.name).map_err(IpTableParseError::AsciiConversion)?;
+        let target = match (target_name.as_str(), target_info.revision) {
+            (TARGET_STANDARD, 0) => {
                 if remaining_size < size_of::<VerdictWithPadding>() {
                     return Err(IpTableParseError::TargetSizeMismatch {
-                        size: target_size,
+                        size: remaining_size,
                         target_name: "standard",
                     });
                 }
@@ -768,10 +805,10 @@ impl IptReplaceParser {
                 Target::Standard(standard_target.verdict)
             }
 
-            "ERROR" => {
+            (TARGET_ERROR, 0) => {
                 if remaining_size < size_of::<ErrorNameWithPadding>() {
                     return Err(IpTableParseError::TargetSizeMismatch {
-                        size: target_size,
+                        size: remaining_size,
                         target_name: "error",
                     });
                 }
@@ -781,12 +818,19 @@ impl IptReplaceParser {
                 Target::Error(errorname)
             }
 
-            target_name => {
-                log_warn!("IpTables: ignored {target_name} target of size {target_size}");
+            (TARGET_REDIRECT, 0) => self.view_as_redirect_target(remaining_size)?,
+
+            (TARGET_TPROXY, 1) => self.view_as_tproxy_target(remaining_size)?,
+
+            (target_name, revision) => {
+                log_warn!(
+                    "IpTables: ignored {target_name} target (revision={revision}) of size \
+                    {target_size}"
+                );
                 let bytes = self
                     .get_next_bytes(remaining_size)
                     .ok_or_else(|| IpTableParseError::TargetSizeMismatch {
-                        size: target_size,
+                        size: remaining_size,
                         target_name: "unknown",
                     })?
                     .to_vec();
@@ -797,6 +841,86 @@ impl IptReplaceParser {
         // Advance by `remaining_size` to account for padding and unsupported target extensions.
         self.advance_parse_pos(remaining_size)?;
         Ok(target)
+    }
+
+    fn view_as_redirect_target(&self, remaining_size: usize) -> Result<Target, IpTableParseError> {
+        match self.protocol {
+            Ip::V4 => {
+                if remaining_size < size_of::<nf_nat_ipv4_multi_range_compat>() {
+                    return Err(IpTableParseError::TargetSizeMismatch {
+                        size: remaining_size,
+                        target_name: TARGET_REDIRECT,
+                    });
+                }
+                let redirect_target =
+                    self.view_next_bytes_as::<nf_nat_ipv4_multi_range_compat>()?;
+
+                // There is always 1 range.
+                if redirect_target.rangesize != 1 {
+                    return Err(IpTableParseError::InvalidRedirectTargetRangeSize {
+                        range_size: redirect_target.rangesize,
+                    });
+                }
+                let range = redirect_target.range[0];
+                let flags = NfNatRangeFlags::from_bits(range.flags).ok_or_else(|| {
+                    IpTableParseError::InvalidRedirectTargetFlags { flags: range.flags }
+                })?;
+
+                // SAFETY: This union object was created with FromBytes so it's safe to access any
+                // variant because all variants must be valid with all bit patterns. All variants of
+                // `nf_conntrack_man_proto` are `u16`.
+                Ok(Target::Redirect(NfNatRange {
+                    flags,
+                    start: u16::from_be(unsafe { range.min.all }),
+                    end: u16::from_be(unsafe { range.max.all }),
+                }))
+            }
+            Ip::V6 => {
+                if remaining_size < size_of::<nf_nat_range>() {
+                    return Err(IpTableParseError::TargetSizeMismatch {
+                        size: remaining_size,
+                        target_name: TARGET_REDIRECT,
+                    });
+                }
+                let range = self.view_next_bytes_as::<nf_nat_range>()?;
+                let flags = NfNatRangeFlags::from_bits(range.flags).ok_or_else(|| {
+                    IpTableParseError::InvalidRedirectTargetFlags { flags: range.flags }
+                })?;
+
+                // SAFETY: This union object was created with FromBytes so it's safe to access any
+                // variant because all variants must be valid with all bit patterns. All variants of
+                // `nf_conntrack_man_proto` are `u16`.
+                Ok(Target::Redirect(NfNatRange {
+                    flags,
+                    start: u16::from_be(unsafe { range.min_proto.all }),
+                    end: u16::from_be(unsafe { range.max_proto.all }),
+                }))
+            }
+        }
+    }
+
+    fn view_as_tproxy_target(&self, remaining_size: usize) -> Result<Target, IpTableParseError> {
+        if remaining_size < size_of::<xt_tproxy_target_info_v1>() {
+            return Err(IpTableParseError::TargetSizeMismatch {
+                size: remaining_size,
+                target_name: "tproxy",
+            });
+        }
+        let tproxy_target = self.view_next_bytes_as::<xt_tproxy_target_info_v1>()?;
+
+        // SAFETY: This union object was created with FromBytes so it's safe to access any variant
+        // because all variants must be valid with all bit patterns. `nf_inet_addr` is a IPv4 or
+        // or IPv6 address, depending on the protocol of the table.
+        let address = if unsafe { tproxy_target.laddr.all } != [0u32; 4] {
+            Some(match self.protocol {
+                Ip::V4 => ipv4_addr_to_ip_address(unsafe { tproxy_target.laddr.in_ }),
+                Ip::V6 => ipv6_addr_to_ip_address(unsafe { tproxy_target.laddr.in6 }),
+            })
+        } else {
+            None
+        };
+        let port = NonZeroU16::new(u16::from_be(tproxy_target.lport));
+        Ok(Target::Tproxy(TproxyInfo { address, port }))
     }
 }
 
@@ -904,16 +1028,14 @@ impl IpTable {
             .map(fnet_filter_ext::Resource::Routine)
             .map(fnet_filter_ext::Change::Create);
 
-        let rule_changes = self
-            .rule_specs
-            .into_iter()
-            .filter(|spec| matches!(spec, RuleSpec::Translated(_)))
-            .filter_map(|spec| match spec {
-                RuleSpec::Unsupported(_) => None,
-                RuleSpec::Translated(rule) => {
-                    Some(fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(rule)))
-                }
-            });
+        let rule_changes = self.rule_specs.into_iter().filter_map(|spec| match spec {
+            RuleSpec::Unsupported(_) => None,
+            RuleSpec::Translated(rule) => match rule.action {
+                fnet_filter_ext::Action::TransparentProxy(_) => None,
+                fnet_filter_ext::Action::Redirect { dst_port: _ } => None,
+                _ => Some(fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(rule))),
+            },
+        });
 
         namespace_changes.chain(routine_changes).chain(rule_changes)
     }
@@ -924,7 +1046,7 @@ impl IpTable {
             return Err(IpTableParseError::ErrorEntryHasMatchers);
         }
         if let Target::Error(chain_name) = &last_entry.target {
-            if chain_name.as_str() != "ERROR" {
+            if chain_name.as_str() != TARGET_ERROR {
                 return Err(IpTableParseError::NoTrailingErrorTarget);
             }
         } else {
@@ -1353,11 +1475,40 @@ impl Entry {
             Target::Unknown { name: _, bytes: _ } => Ok(None),
 
             // Error targets should already be translated into `Routine`s.
-            Target::Error(_) => {
-                unreachable!()
-            }
+            Target::Error(_) => unreachable!(),
 
             Target::Standard(verdict) => Self::translate_standard_target(verdict, routine_map),
+
+            Target::Redirect(ref range) => {
+                if !range.flags.contains(NfNatRangeFlags::PROTO_SPECIFIED) {
+                    Ok(Some(fnet_filter_ext::Action::Redirect { dst_port: None }))
+                } else {
+                    let invalid_range_fn = || IpTableParseError::InvalidRedirectTargetRange {
+                        start: range.start,
+                        end: range.end,
+                    };
+
+                    if range.start > range.end {
+                        return Err(invalid_range_fn());
+                    }
+                    let start = NonZeroU16::new(range.start).ok_or_else(invalid_range_fn)?;
+                    let end = NonZeroU16::new(range.end).ok_or_else(invalid_range_fn)?;
+                    Ok(Some(fnet_filter_ext::Action::Redirect { dst_port: Some(start..=end) }))
+                }
+            }
+
+            Target::Tproxy(ref tproxy_info) => {
+                let tproxy = match (tproxy_info.address, tproxy_info.port) {
+                    (None, None) => return Err(IpTableParseError::InvalidTproxyZeroAddressAndPort),
+                    (None, Some(port)) => fnet_filter_ext::TransparentProxy::LocalPort(port),
+                    (Some(address), None) => fnet_filter_ext::TransparentProxy::LocalAddr(address),
+                    (Some(address), Some(port)) => {
+                        fnet_filter_ext::TransparentProxy::LocalAddrAndPort(address, port)
+                    }
+                };
+
+                Ok(Some(fnet_filter_ext::Action::TransparentProxy(tproxy)))
+            }
         }
     }
 
@@ -1561,9 +1712,24 @@ pub fn write_string_to_ascii_buffer(
     write_bytes_to_ascii_buffer(bytes, chars)
 }
 
+// Assumes `addr` is big endian.
+fn ipv4_addr_to_ip_address(addr: in_addr) -> fnet::IpAddress {
+    fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: u32::from_be(addr.s_addr).to_be_bytes() })
+}
+
+// Assumes `addr` is big endian.
+fn ipv6_addr_to_ip_address(addr: in6_addr) -> fnet::IpAddress {
+    // SAFETY: This union object was created with FromBytes so it's safe to access any variant
+    // because all variants must be valid with all bit patterns. `in6_addr__bindgen_ty_1` is an IPv6
+    // address, represented as sixteen 8-bit octets, or eight 16-bit segments, or four 32-bit words.
+    // All variants have the same size and represent the same address.
+    let addr_bytes = unsafe { addr.in6_u.u6_addr8 };
+    fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: addr_bytes })
+}
+
 // Assumes `mask` is big endian.
-fn ipv4_mask_to_prefix_len(mask: u32) -> Result<u8, IpAddressConversionError> {
-    let mask = u32::from_be(mask);
+fn ipv4_mask_to_prefix_len(mask: in_addr) -> Result<u8, IpAddressConversionError> {
+    let mask = u32::from_be(mask.s_addr);
 
     // Check that all 1's in the mask are before all 0's.
     // To do this, we can simply find if its 2-complement is a power of 2.
@@ -1601,10 +1767,8 @@ pub fn ipv4_to_subnet(
         Ok(None)
     } else {
         Ok(Some(fnet::Subnet {
-            addr: fnet::IpAddress::Ipv4(fnet::Ipv4Address {
-                addr: u32::from_be(addr.s_addr).to_be_bytes(),
-            }),
-            prefix_len: ipv4_mask_to_prefix_len(mask.s_addr)?,
+            addr: ipv4_addr_to_ip_address(addr),
+            prefix_len: ipv4_mask_to_prefix_len(mask)?,
         }))
     }
 }
@@ -1613,14 +1777,17 @@ pub fn ipv6_to_subnet(
     addr: in6_addr,
     mask: in6_addr,
 ) -> Result<Option<fnet::Subnet>, IpAddressConversionError> {
-    let addr_bytes = unsafe { addr.in6_u.u6_addr8 };
+    // SAFETY: This union object was created with FromBytes so it's safe to access any variant
+    // because all variants must be valid with all bit patterns. `in6_addr__bindgen_ty_1` is an IPv6
+    // address, represented as sixteen 8-bit octets, or eight 16-bit segments, or four 32-bit words.
+    // All variants have the same size and represent the same address.
     let mask_bytes = unsafe { mask.in6_u.u6_addr8 };
 
     if mask_bytes == [0u8; 16] {
         Ok(None)
     } else {
         Ok(Some(fnet::Subnet {
-            addr: fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: addr_bytes }),
+            addr: ipv6_addr_to_ip_address(addr),
             prefix_len: ipv6_mask_to_prefix_len(mask_bytes)?,
         }))
     }
@@ -1629,14 +1796,28 @@ pub fn ipv6_to_subnet(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use const_unwrap::const_unwrap_option;
     use itertools::Itertools;
-    use net_declare::fidl_subnet;
+    use net_declare::{fidl_ip, fidl_subnet};
     use starnix_uapi::{
         c_char, in6_addr__bindgen_ty_1, in_addr, ipt_entry, ipt_ip, ipt_replace, xt_tcp, xt_udp,
         IP6T_F_PROTO, IPT_INV_SRCIP,
     };
     use test_case::test_case;
     use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
+
+    const IPV4_SUBNET: fnet::Subnet = fidl_subnet!("192.0.2.0/24");
+    const IPV4_ADDR: fnet::IpAddress = fidl_ip!("192.0.2.0");
+    const IPV6_SUBNET: fnet::Subnet = fidl_subnet!("2001:db8::/32");
+    const IPV6_ADDR: fnet::IpAddress = fidl_ip!("2001:db8::");
+    const PORT: u16 = 2345u16.to_be();
+    const PORT_RANGE_START: u16 = 2000u16.to_be();
+    const PORT_RANGE_END: u16 = 3000u16.to_be();
+    const NONZERO_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2345));
+    const NONZERO_PORT_RANGE: RangeInclusive<NonZeroU16> = RangeInclusive::new(
+        const_unwrap_option(NonZeroU16::new(2000)),
+        const_unwrap_option(NonZeroU16::new(3000)),
+    );
 
     fn string_to_16_chars(string: &str) -> [c_char; 16] {
         let mut buffer = [0; 16];
@@ -1671,8 +1852,12 @@ mod tests {
 
     fn extend_with_error_name(bytes: &mut Vec<u8>, error_name: &str) {
         bytes.extend_from_slice(
-            xt_entry_target { target_size: 64, name: string_to_29_chars("ERROR"), revision: 0 }
-                .as_bytes(),
+            xt_entry_target {
+                target_size: 64,
+                name: string_to_29_chars(TARGET_ERROR),
+                revision: 0,
+            }
+            .as_bytes(),
         );
         bytes.extend_from_slice(
             ErrorNameWithPadding {
@@ -1783,23 +1968,124 @@ mod tests {
         }
     }
 
+    fn nat_namespace_v4() -> fnet_filter_ext::Namespace {
+        fnet_filter_ext::Namespace {
+            id: fnet_filter_ext::NamespaceId("ipv4-nat".to_owned()),
+            domain: fnet_filter_ext::Domain::Ipv4,
+        }
+    }
+
+    fn nat_namespace_v6() -> fnet_filter_ext::Namespace {
+        fnet_filter_ext::Namespace {
+            id: fnet_filter_ext::NamespaceId("ipv6-nat".to_owned()),
+            domain: fnet_filter_ext::Domain::Ipv6,
+        }
+    }
+
+    fn nat_prerouting_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_PREROUTING.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                fnet_filter_ext::InstalledNatRoutine {
+                    hook: fnet_filter_ext::NatHook::Ingress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_DST,
+                },
+            )),
+        }
+    }
+
+    fn nat_input_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_INPUT.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                fnet_filter_ext::InstalledNatRoutine {
+                    hook: fnet_filter_ext::NatHook::LocalIngress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_SRC,
+                },
+            )),
+        }
+    }
+
+    fn nat_output_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_OUTPUT.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                fnet_filter_ext::InstalledNatRoutine {
+                    hook: fnet_filter_ext::NatHook::LocalEgress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_DST,
+                },
+            )),
+        }
+    }
+
+    fn nat_postrouting_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_POSTROUTING.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                fnet_filter_ext::InstalledNatRoutine {
+                    hook: fnet_filter_ext::NatHook::Egress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_SRC,
+                },
+            )),
+        }
+    }
+
+    fn ipv4_subnet_addr() -> in_addr {
+        let bytes = "192.0.2.0".parse::<std::net::Ipv4Addr>().unwrap().octets();
+        in_addr { s_addr: u32::from_be_bytes(bytes).to_be() }
+    }
+
+    fn ipv4_subnet_mask() -> in_addr {
+        let bytes = "255.255.255.0".parse::<std::net::Ipv4Addr>().unwrap().octets();
+        in_addr { s_addr: u32::from_be_bytes(bytes).to_be() }
+    }
+
+    #[fuchsia::test]
+    fn ipv4_subnet_test() {
+        assert_eq!(ipv4_addr_to_ip_address(ipv4_subnet_addr()), IPV4_ADDR);
+        assert_eq!(ipv4_to_subnet(ipv4_subnet_addr(), ipv4_subnet_mask()), Ok(Some(IPV4_SUBNET)));
+    }
+
+    fn ipv6_subnet_addr() -> in6_addr {
+        let bytes = "2001:db8::".parse::<std::net::Ipv6Addr>().unwrap().octets();
+        in6_addr { in6_u: in6_addr__bindgen_ty_1 { u6_addr8: bytes } }
+    }
+
+    fn ipv6_subnet_mask() -> in6_addr {
+        let bytes = "ffff:ffff::".parse::<std::net::Ipv6Addr>().unwrap().octets();
+        in6_addr { in6_u: in6_addr__bindgen_ty_1 { u6_addr8: bytes } }
+    }
+
+    #[fuchsia::test]
+    fn ipv6_subnet_test() {
+        assert_eq!(ipv6_addr_to_ip_address(ipv6_subnet_addr()), IPV6_ADDR);
+        assert_eq!(ipv6_to_subnet(ipv6_subnet_addr(), ipv6_subnet_mask()), Ok(Some(IPV6_SUBNET)));
+    }
+
     fn ipv4_table_with_ip_matchers() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
-
-        let ip_bytes = "10.0.0.1".parse::<std::net::Ipv4Addr>().unwrap().octets();
-        let ip_addr = in_addr { s_addr: u32::from_be_bytes(ip_bytes).to_be() };
-        let mask_bytes = "255.255.255.255".parse::<std::net::Ipv4Addr>().unwrap().octets();
-        let ip_mask = in_addr { s_addr: u32::from_be_bytes(mask_bytes).to_be() };
 
         // Start of INPUT built-in chain.
         let input_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 0: drop TCP packets other than from `ip_addr`.
+        // Entry 0: drop TCP packets other than from `IPV4_SUBNET`.
         entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
-                    src: ip_addr,
-                    smsk: ip_mask,
+                    src: ipv4_subnet_addr(),
+                    smsk: ipv4_subnet_mask(),
                     invflags: IPT_INV_SRCIP as u8,
                     proto: IPPROTO_TCP as u16,
                     ..Default::default()
@@ -1812,12 +2098,12 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 1: accept UDP packets from `ip_addr`.
+        // Entry 1: accept UDP packets from `IPV4_SUBNET`.
         entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
-                    src: ip_addr,
-                    smsk: ip_mask,
+                    src: ipv4_subnet_addr(),
+                    smsk: ipv4_subnet_mask(),
                     proto: IPPROTO_UDP as u16,
                     ..Default::default()
                 },
@@ -1881,7 +2167,7 @@ mod tests {
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_DROP);
 
         // Entry 7: end of input.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
@@ -1902,26 +2188,15 @@ mod tests {
     fn ipv6_table_with_ip_matchers() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
 
-        let ip_addr = in6_addr {
-            in6_u: in6_addr__bindgen_ty_1 {
-                u6_addr8: "2001:4860:4860::".parse::<std::net::Ipv6Addr>().unwrap().octets(),
-            },
-        };
-        let ip_mask = in6_addr {
-            in6_u: in6_addr__bindgen_ty_1 {
-                u6_addr8: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0],
-            },
-        };
-
         // Start of INPUT built-in chain.
         let input_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 0: drop TCP packets other than from `ip_addr`.
+        // Entry 0: drop TCP packets other than from `IPV6_SUBNET`.
         entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
-                    src: ip_addr,
-                    smsk: ip_mask,
+                    src: ipv6_subnet_addr(),
+                    smsk: ipv6_subnet_mask(),
                     invflags: IPT_INV_SRCIP as u8,
                     proto: IPPROTO_TCP as u16,
                     flags: IP6T_F_PROTO as u8,
@@ -1935,12 +2210,12 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 1: accept UDP packets from `ip_addr`.
+        // Entry 1: accept UDP packets from `IPV6_SUBNET`.
         entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
-                    src: ip_addr,
-                    smsk: ip_mask,
+                    src: ipv6_subnet_addr(),
+                    smsk: ipv6_subnet_mask(),
                     proto: IPPROTO_UDP as u16,
                     flags: IP6T_F_PROTO as u8,
                     ..Default::default()
@@ -2005,7 +2280,7 @@ mod tests {
         extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_DROP);
 
         // Entry 7: end of input.
-        extend_with_error_target_ipv6_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ip6t_replace {
             name: string_to_32_chars("filter"),
@@ -2026,13 +2301,13 @@ mod tests {
     #[test_case(
         IpTable::from_ipt_replace(ipv4_table_with_ip_matchers()).unwrap(),
         filter_namespace_v4(),
-        fidl_subnet!("10.0.0.1/32");
+        IPV4_SUBNET;
         "ipv4"
     )]
     #[test_case(
         IpTable::from_ip6t_replace(ipv6_table_with_ip_matchers()).unwrap(),
         filter_namespace_v6(),
-        fidl_subnet!("2001:4860:4860::/64");
+        IPV6_SUBNET;
         "ipv6"
     )]
     fn parse_ip_matchers_test(
@@ -2203,7 +2478,7 @@ mod tests {
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_DROP);
 
         // Entry 5: end of input.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
@@ -2335,7 +2610,7 @@ mod tests {
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
 
         // Entry 9 (byte 1416): end of input.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
@@ -2398,7 +2673,7 @@ mod tests {
         extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_RETURN);
 
         // Entry 9 (byte 1920): end of input.
-        extend_with_error_target_ipv6_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ip6t_replace {
             name: string_to_32_chars("filter"),
@@ -2509,6 +2784,663 @@ mod tests {
         }
     }
 
+    // Same layout as `nf_nat_ipv4_multi_range_compat`.
+    #[repr(C)]
+    #[derive(AsBytes, Debug, Default, FromBytes, FromZeros, NoCell)]
+    struct RedirectTargetV4 {
+        pub rangesize: u32,
+        pub flags: u32,
+        pub _min_ip: u32,
+        pub _max_ip: u32,
+        pub min: u16,
+        pub max: u16,
+    }
+
+    // Same layout as `xt_tproxy_target_info_v1` with an IPv4 address.
+    #[repr(C)]
+    #[derive(AsBytes, Default, FromBytes, FromZeros, NoCell)]
+    struct TproxyTargetV4 {
+        pub _mark_mask: u32,
+        pub _mark_value: u32,
+        pub laddr: in_addr,
+        pub _addr_padding: [u32; 3],
+        pub lport: u16,
+        pub _padding: [u8; 2],
+    }
+
+    fn ipv4_table_with_redirect_and_tproxy() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
+
+        // Start of PREROUTING built-in chain.
+        let prerouting_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 0: TPROXY TCP traffic to addr.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_TCP as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 172,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 60,
+                name: string_to_29_chars(TARGET_TPROXY),
+                revision: 1,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            TproxyTargetV4 { laddr: ipv4_subnet_addr(), ..Default::default() }.as_bytes(),
+        );
+
+        // Entry 1: TPROXY UDP traffic to port.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_UDP as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 172,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 60,
+                name: string_to_29_chars(TARGET_TPROXY),
+                revision: 1,
+            }
+            .as_bytes(),
+        );
+        entries_bytes
+            .extend_from_slice(TproxyTargetV4 { lport: PORT, ..Default::default() }.as_bytes());
+
+        // Entry 2: TPROXY TCP traffic to addr and port.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_TCP as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 172,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 60,
+                name: string_to_29_chars(TARGET_TPROXY),
+                revision: 1,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            TproxyTargetV4 { laddr: ipv4_subnet_addr(), lport: PORT, ..Default::default() }
+                .as_bytes(),
+        );
+
+        // Entry 3: policy of PREROUTING chain.
+        let prerouting_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 4: policy of INPUT chain.
+        // Note: INPUT chain has no other rules.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 5: REDIRECT TCP traffic without port change.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_TCP as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 164,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 52,
+                name: string_to_29_chars(TARGET_REDIRECT),
+                revision: 0,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            RedirectTargetV4 { rangesize: 1, flags: 0, ..Default::default() }.as_bytes(),
+        );
+
+        // Entry 6: REDIRECT UDP traffic to a single port.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_UDP as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 164,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 52,
+                name: string_to_29_chars(TARGET_REDIRECT),
+                revision: 0,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            RedirectTargetV4 {
+                rangesize: 1,
+                flags: NfNatRangeFlags::PROTO_SPECIFIED.bits(),
+                min: PORT,
+                max: PORT,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+
+        // Entry 7: REDIRECT TCP traffic to a port range.
+        entries_bytes.extend_from_slice(
+            ipt_entry {
+                ip: ipt_ip { proto: IPPROTO_TCP as u16, ..Default::default() },
+                target_offset: 112,
+                next_offset: 164,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 52,
+                name: string_to_29_chars(TARGET_REDIRECT),
+                revision: 0,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            RedirectTargetV4 {
+                rangesize: 1,
+                flags: NfNatRangeFlags::PROTO_SPECIFIED.bits(),
+                min: PORT_RANGE_START,
+                max: PORT_RANGE_END,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+
+        // Entry 8: policy of OUTPUT chain.
+        // Note: OUTPUT chain has no other rules.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of POSTROUTING built-in chain.
+        let postrouting_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 9: policy of POSTROUTING chain.
+        // Note: POSTROUTING chain has no other rules.
+        let postrouting_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 10: end of input.
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
+
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("nat"),
+            num_entries: 11,
+            size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::NAT.bits(),
+            hook_entry: [
+                prerouting_hook_entry,
+                input_hook_entry,
+                0,
+                output_hook_entry,
+                postrouting_hook_entry,
+            ],
+            underflow: [
+                prerouting_underflow,
+                input_underflow,
+                0,
+                output_underflow,
+                postrouting_underflow,
+            ],
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    // Same layout as `nf_nat_range`.
+    #[repr(C)]
+    #[derive(AsBytes, Default, FromBytes, FromZeros, NoCell)]
+    struct RedirectTargetV6 {
+        pub flags: u32,
+        pub _min_addr: [u32; 4],
+        pub _max_addr: [u32; 4],
+        pub min_proto: u16,
+        pub max_proto: u16,
+    }
+
+    // Same layout as `xt_tproxy_target_info_v1` with an IPv6 address.
+    #[repr(C)]
+    #[derive(AsBytes, Default, FromBytes, FromZeros, NoCell)]
+    struct TproxyTargetV6 {
+        pub _mark_mask: u32,
+        pub _mark_value: u32,
+        pub laddr: in6_addr,
+        pub lport: u16,
+        pub _padding: [u8; 2],
+    }
+
+    fn ipv6_table_with_redirect_and_tproxy() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
+
+        // Start of PREROUTING built-in chain.
+        let prerouting_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 0: TPROXY TCP traffic to addr.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_TCP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 228,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 60,
+                name: string_to_29_chars(TARGET_TPROXY),
+                revision: 1,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            TproxyTargetV6 { laddr: ipv6_subnet_addr(), ..Default::default() }.as_bytes(),
+        );
+
+        // Entry 1: TPROXY UDP traffic to port.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_UDP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 228,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 60,
+                name: string_to_29_chars(TARGET_TPROXY),
+                revision: 1,
+            }
+            .as_bytes(),
+        );
+        entries_bytes
+            .extend_from_slice(TproxyTargetV6 { lport: PORT, ..Default::default() }.as_bytes());
+
+        // Entry 2: TPROXY TCP traffic to addr and port.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_TCP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 228,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 60,
+                name: string_to_29_chars(TARGET_TPROXY),
+                revision: 1,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            TproxyTargetV6 { laddr: ipv6_subnet_addr(), lport: PORT, ..Default::default() }
+                .as_bytes(),
+        );
+
+        // Entry 3: policy of PREROUTING chain.
+        let prerouting_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 4: policy of INPUT chain.
+        // Note: INPUT chain has no other rules.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 5: REDIRECT TCP traffic without port change.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_TCP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 240,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 72,
+                name: string_to_29_chars(TARGET_REDIRECT),
+                revision: 0,
+            }
+            .as_bytes(),
+        );
+        entries_bytes
+            .extend_from_slice(RedirectTargetV6 { flags: 0, ..Default::default() }.as_bytes());
+
+        // Entry 6: REDIRECT UDP traffic to a single port.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_UDP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 240,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 72,
+                name: string_to_29_chars(TARGET_REDIRECT),
+                revision: 0,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            RedirectTargetV6 {
+                flags: NfNatRangeFlags::PROTO_SPECIFIED.bits(),
+                min_proto: PORT,
+                max_proto: PORT,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+
+        // Entry 7: REDIRECT TCP traffic to a port range.
+        entries_bytes.extend_from_slice(
+            ip6t_entry {
+                ipv6: ip6t_ip6 {
+                    proto: IPPROTO_TCP as u16,
+                    flags: IP6T_F_PROTO as u8,
+                    ..Default::default()
+                },
+                target_offset: 168,
+                next_offset: 240,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            xt_entry_target {
+                target_size: 72,
+                name: string_to_29_chars(TARGET_REDIRECT),
+                revision: 0,
+            }
+            .as_bytes(),
+        );
+        entries_bytes.extend_from_slice(
+            RedirectTargetV6 {
+                flags: NfNatRangeFlags::PROTO_SPECIFIED.bits(),
+                min_proto: PORT_RANGE_START,
+                max_proto: PORT_RANGE_END,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+
+        // Entry 8: policy of OUTPUT chain.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of POSTROUTING built-in chain.
+        let postrouting_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 9: policy of POSTROUTING chain.
+        // Note: POSTROUTING chain has no other rules.
+        let postrouting_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 10: end of input.
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, TARGET_ERROR);
+
+        let mut bytes = ip6t_replace {
+            name: string_to_32_chars("nat"),
+            num_entries: 11,
+            size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::NAT.bits(),
+            hook_entry: [
+                prerouting_hook_entry,
+                input_hook_entry,
+                0,
+                output_hook_entry,
+                postrouting_hook_entry,
+            ],
+            underflow: [
+                prerouting_underflow,
+                input_underflow,
+                0,
+                output_underflow,
+                postrouting_underflow,
+            ],
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    #[test_case(
+        IpTable::from_ipt_replace(ipv4_table_with_redirect_and_tproxy()).unwrap(),
+        nat_namespace_v4(),
+        IPV4_ADDR;
+        "ipv4"
+    )]
+    #[test_case(
+        IpTable::from_ip6t_replace(ipv6_table_with_redirect_and_tproxy()).unwrap(),
+        nat_namespace_v6(),
+        IPV6_ADDR;
+        "ipv6"
+    )]
+    fn parse_redirect_tproxy_test(
+        table: IpTable,
+        expected_namespace: fnet_filter_ext::Namespace,
+        expected_ip_addr: fnet::IpAddress,
+    ) {
+        assert_eq!(table.namespace, expected_namespace);
+
+        assert_eq!(
+            table
+                .routine_map
+                .into_values()
+                .sorted_by_key(|routine| routine.id.name.clone())
+                .collect::<Vec<_>>(),
+            [
+                nat_input_routine(&expected_namespace),
+                nat_output_routine(&expected_namespace),
+                nat_postrouting_routine(&expected_namespace),
+                nat_prerouting_routine(&expected_namespace),
+            ]
+        );
+
+        let expected_rules = [
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: nat_prerouting_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::TransparentProxy(
+                    fnet_filter_ext::TransparentProxy::LocalAddr(expected_ip_addr),
+                ),
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 1,
+                    routine: nat_prerouting_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::TransparentProxy(
+                    fnet_filter_ext::TransparentProxy::LocalPort(NONZERO_PORT),
+                ),
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 2,
+                    routine: nat_prerouting_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::TransparentProxy(
+                    fnet_filter_ext::TransparentProxy::LocalAddrAndPort(
+                        expected_ip_addr,
+                        NONZERO_PORT,
+                    ),
+                ),
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 3,
+                    routine: nat_prerouting_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 4,
+                    routine: nat_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 5,
+                    routine: nat_output_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Redirect { dst_port: None },
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 6,
+                    routine: nat_output_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Udp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Redirect {
+                    dst_port: Some(NONZERO_PORT..=NONZERO_PORT),
+                },
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 7,
+                    routine: nat_output_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers {
+                    transport_protocol: Some(fnet_filter_ext::TransportProtocolMatcher::Tcp {
+                        dst_port: None,
+                        src_port: None,
+                    }),
+                    ..Default::default()
+                },
+                action: fnet_filter_ext::Action::Redirect { dst_port: Some(NONZERO_PORT_RANGE) },
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 8,
+                    routine: nat_output_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 9,
+                    routine: nat_postrouting_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Drop,
+            },
+        ];
+
+        for (rule_spec, expected) in table.rule_specs.iter().zip_eq(expected_rules.into_iter()) {
+            let rule = assert_matches!(rule_spec, RuleSpec::Translated(rule) => rule);
+            assert_eq!(rule, &expected);
+        }
+    }
+
     fn table_with_wrong_size() -> Vec<u8> {
         let mut bytes = Vec::new();
 
@@ -2522,14 +3454,14 @@ mod tests {
             .as_bytes(),
         );
 
-        extend_with_error_target_ipv4_entry(&mut bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut bytes, TARGET_ERROR);
         bytes
     }
 
     fn table_with_wrong_num_entries() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
 
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
@@ -2558,7 +3490,7 @@ mod tests {
         let mut entries_bytes = Vec::new();
 
         // Entry 0: end of input.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
@@ -2578,7 +3510,7 @@ mod tests {
         let mut entries_bytes = Vec::new();
 
         // Entry 0: end of input.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
@@ -2631,7 +3563,7 @@ mod tests {
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
 
         // Entry 1: end of input.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
@@ -2663,7 +3595,7 @@ mod tests {
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
 
         // Entry 4: end of input.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, TARGET_ERROR);
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
