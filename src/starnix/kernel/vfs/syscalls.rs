@@ -2198,12 +2198,13 @@ pub fn sys_epoll_ctl(
     fd: FdNumber,
     event: UserRef<EpollEvent>,
 ) -> Result<(), Errno> {
-    if epfd == fd {
-        return error!(EINVAL);
-    }
-
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
+    let operand_file = current_task.files.get(fd)?;
+
+    if Arc::ptr_eq(&file, &operand_file) {
+        return error!(EINVAL);
+    }
 
     let epoll_event = match current_task.read_object(event) {
         Ok(mut epoll_event) => {
@@ -2220,18 +2221,17 @@ pub fn sys_epoll_ctl(
         result => result,
     };
 
-    let ctl_file = current_task.files.get(fd)?;
     match op {
         EPOLL_CTL_ADD => {
-            epoll_file.add(locked, current_task, &ctl_file, &file, epoll_event?)?;
-            ctl_file.register_epfd(epfd);
+            epoll_file.add(locked, current_task, &operand_file, &file, epoll_event?)?;
+            operand_file.register_epfd(epfd);
         }
         EPOLL_CTL_MOD => {
-            epoll_file.modify(locked, current_task, &ctl_file, epoll_event?)?;
+            epoll_file.modify(locked, current_task, &operand_file, epoll_event?)?;
         }
         EPOLL_CTL_DEL => {
-            epoll_file.delete(&ctl_file)?;
-            ctl_file.unregister_epfd(epfd);
+            epoll_file.delete(&operand_file)?;
+            operand_file.unregister_epfd(epfd);
         }
         _ => return error!(EINVAL),
     }

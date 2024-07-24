@@ -13,6 +13,7 @@
 #include <ctime>
 #include <thread>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
@@ -144,14 +145,14 @@ TEST(EpollTest, CloseAfterAdd) {
   int result = socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
   ASSERT_EQ(0, result);
 
-  int epfd = epoll_create(2);
-  ASSERT_GE(epfd, 0);
+  fbl::unique_fd epfd(epoll_create(2));
+  ASSERT_TRUE(epfd.is_valid());
 
   // Wait on socket[1] readable.
   struct epoll_event event;
   event.events = EPOLLIN;
   event.data.u64 = 1;
-  result = epoll_ctl(epfd, EPOLL_CTL_ADD, sockets[1], &event);
+  result = epoll_ctl(epfd.get(), EPOLL_CTL_ADD, sockets[1], &event);
   ASSERT_EQ(result, 0);
 
   // Write data in the "0" end so the "1" will be marked ready to read. Writing just one byte
@@ -163,7 +164,7 @@ TEST(EpollTest, CloseAfterAdd) {
 
   // Waiting on the (now empty) epoll object should timeout rather than report it's ready to read
   // or that there's a bad file descriptor.
-  result = epoll_wait(epfd, &event, 1, 1);
+  result = epoll_wait(epfd.get(), &event, 1, 1);
   EXPECT_EQ(0, result) << errno;
 }
 
@@ -212,12 +213,12 @@ TEST(EpollTest, EPOLLWAKEUPEvent) {
   int fd = timerfd_create(CLOCK_REALTIME, 0);
   ASSERT_NE(-1, fd) << errno;
 
-  int epoll_fd = epoll_create(1);
-  EXPECT_LE(0, epoll_fd);
+  fbl::unique_fd epoll_fd(epoll_create(1));
+  EXPECT_TRUE(epoll_fd.is_valid());
 
   struct epoll_event ev = epoll_event();
   ev.events = EPOLLIN | EPOLLWAKEUP;
-  EXPECT_EQ(0, epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev));
+  EXPECT_EQ(0, epoll_ctl(epoll_fd.get(), EPOLL_CTL_ADD, fd, &ev));
 
   timespec begin = {};
   ASSERT_EQ(0, clock_gettime(CLOCK_REALTIME, &begin));
@@ -232,11 +233,21 @@ TEST(EpollTest, EPOLLWAKEUPEvent) {
 
   int ret = 0;
   struct epoll_event out_ev;
-  ret = epoll_wait(epoll_fd, &out_ev, 1, -1);
+  ret = epoll_wait(epoll_fd.get(), &out_ev, 1, -1);
   EXPECT_EQ(1, ret);
 
-  EXPECT_EQ(0, epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &ev));
+  EXPECT_EQ(0, epoll_ctl(epoll_fd.get(), EPOLL_CTL_DEL, fd, &ev));
   close(fd);
-  ret = epoll_wait(epoll_fd, &out_ev, 1, 0);
+  ret = epoll_wait(epoll_fd.get(), &out_ev, 1, 0);
   EXPECT_EQ(0, ret);
+}
+
+TEST(EpollTest, AliasArgumentWithDup) {
+  fbl::unique_fd epoll_fd(epoll_create(1));
+  ASSERT_TRUE(epoll_fd.is_valid());
+  fbl::unique_fd another_fd(test_helper::MemFdCreate("memfd", 0));
+  SAFE_SYSCALL(dup2(epoll_fd.get(), another_fd.get()));
+  struct epoll_event event = {};
+  EXPECT_EQ(-1, epoll_ctl(epoll_fd.get(), 1, another_fd.get(), &event));
+  EXPECT_EQ(EINVAL, errno);
 }
