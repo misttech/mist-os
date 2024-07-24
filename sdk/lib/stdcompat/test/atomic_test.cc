@@ -15,7 +15,6 @@
 #include <utility>
 
 #include "gtest.h"
-
 namespace {
 
 using int128_t = __int128;
@@ -26,9 +25,10 @@ static constexpr bool kHasDifferenceType = false;
 
 template <typename T>
 static constexpr bool
-    kHasDifferenceType<T, std::enable_if_t<std::is_pointer_v<typename T::value_type> ||
-                                           std::is_integral_v<typename T::value_type> ||
-                                           std::is_floating_point_v<typename T::value_type>>> =
+    kHasDifferenceType<T, std::enable_if_t<!std::is_same_v<typename T::value_type, bool> &&
+                                           (std::is_pointer_v<typename T::value_type> ||
+                                            std::is_integral_v<typename T::value_type> ||
+                                            std::is_floating_point_v<typename T::value_type>)>> =
         true;
 
 // Workaround for libc++ not supporting qualified types for atomic ref.
@@ -418,6 +418,9 @@ static_assert(cpp17::is_trivially_copyable_v<TriviallyCopyable>, "");
 TEST(AtomicRefTest, NoSpecialization) {
   CheckAtomicOperations<TriviallyCopyable>();
   CheckNoSpecialization<TriviallyCopyable>();
+
+  CheckAtomicOperations<bool>();
+  CheckNoSpecialization<bool>();
 }
 
 TEST(AtomicRefTest, IntegerSpecialization) {
@@ -449,13 +452,6 @@ TEST(AtomicRefTest, IntegerSpecialization) {
 
   CheckAtomicOperations<const int>();
   CheckIntegerSpecialization<const int>();
-  // All operations fromt he specialization would attempt to mutate the underlying object, which
-  // would fail to compile.
-
-  // Both gcc and clang treat bool as int specialization, just certain functions will fail to
-  // compile.
-  CheckAtomicOperations<bool>();
-  CheckIntegerSpecialization<bool>();
 
   // 16 bytes -- if supported, to silence oversized atomic operations.
   if (!cpp20::atomic_ref<int128_t>::is_always_lock_free) {
