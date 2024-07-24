@@ -426,13 +426,11 @@ int ConverterMain(int argc, char** argv) {
       "  --bots STRING\n"
       "  --log-url URL\n"
       "\n"
-      "See README.md for the meanings of these parameters.\n"
-      "\n"
-      "The following may be specified to include the results' commit revision(s)\n"
-      "in the converted output\n"
+      "The following are optional and may be provided to include additional information:\n"
       "  --integration-internal-git-commit STRING\n"
-      "  --integration-public-git-commit STRING\n"
-      "  --smart-integration-git-commit STRING\n";
+      "  --public-internal-git-commit STRING\n"
+      "  --smart-integration-git-commit STRING\n"
+      "See README.md for the meanings of these parameters.\n";
 
   // Parse command line arguments.
   static const struct option opts[] = {

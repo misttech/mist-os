@@ -53,15 +53,11 @@ void main(List<String> args) {
         createFuchsiaPerfFile('test1-benchmark.fuchsiaperf.json');
     // With no buildbucket id env variable, it should do a local run.
     await performance
-        .convertResults('/bin/catapult_converter', fuchsiaPerfFile1, {
-      'INTEGRATION_INTERNAL_GIT_COMMIT':
-          '090619c7807325865e60b5b3422d5f4123851f4a',
-    });
+        .convertResults('/bin/catapult_converter', fuchsiaPerfFile1, {});
     var verifyMockRunProcessObserver = verify(mockRunProcessObserver.runProcess(
         argThat(endsWith('catapult_converter')), captureAny))
       ..called(1);
     var capturedArgs = verifyMockRunProcessObserver.captured.single;
-    expect(capturedArgs.length, 14);
     expect(capturedArgs[0], '--input');
     expect(capturedArgs[1], fuchsiaPerfFile1.path);
     expect(capturedArgs[2], '--output');
@@ -74,8 +70,6 @@ void main(List<String> args) {
     expect(capturedArgs[9], 'http://ci.example.com/build/300');
     expect(capturedArgs[10], '--bots');
     expect(capturedArgs[11], 'local-bot');
-    expect(capturedArgs[12], '--integration-internal-git-commit');
-    expect(capturedArgs[13], '090619c7807325865e60b5b3422d5f4123851f4a');
 
     // Otherwise, it should do a bot run.
     const environment = {
@@ -83,8 +77,6 @@ void main(List<String> args) {
       'CATAPULT_DASHBOARD_BOT': 'example-fuchsia-x64-nuc',
       'BUILDBUCKET_ID': '8abc123',
       'BUILD_CREATE_TIME': '1561234567890',
-      'INTEGRATION_INTERNAL_GIT_COMMIT':
-          '090619c7807325865e60b5b3422d5f4123851f4a',
     };
 
     final File fuchsiaPerfFile2 =
@@ -95,7 +87,6 @@ void main(List<String> args) {
         argThat(endsWith('catapult_converter')), captureAny))
       ..called(1);
     capturedArgs = verifyMockRunProcessObserver.captured.single;
-    expect(capturedArgs.length, 14);
     expect(capturedArgs[0], '--input');
     expect(capturedArgs[1], fuchsiaPerfFile2.path);
     expect(capturedArgs[2], '--output');
@@ -108,8 +99,6 @@ void main(List<String> args) {
     expect(capturedArgs[9], 'https://ci.chromium.org/b/8abc123');
     expect(capturedArgs[10], '--bots');
     expect(capturedArgs[11], 'example-fuchsia-x64-nuc');
-    expect(capturedArgs[12], '--integration-internal-git-commit');
-    expect(capturedArgs[13], '090619c7807325865e60b5b3422d5f4123851f4a');
 
     // If it is a bot run with release version, should have the product-versions arg.
     const environmentWithVersion = {
@@ -118,8 +107,6 @@ void main(List<String> args) {
       'BUILDBUCKET_ID': '8abc123',
       'BUILD_CREATE_TIME': '1561234567890',
       'RELEASE_VERSION': '0.001.20.3',
-      'INTEGRATION_INTERNAL_GIT_COMMIT':
-          '090619c7807325865e60b5b3422d5f4123851f4a',
     };
 
     final File fuchsiaPerfFile3 =
@@ -130,7 +117,6 @@ void main(List<String> args) {
         argThat(endsWith('catapult_converter')), captureAny))
       ..called(1);
     capturedArgs = verifyMockRunProcessObserver.captured.single;
-    expect(capturedArgs.length, 16);
     expect(capturedArgs[0], '--input');
     expect(capturedArgs[1], fuchsiaPerfFile3.path);
     expect(capturedArgs[2], '--output');
@@ -145,8 +131,6 @@ void main(List<String> args) {
     expect(capturedArgs[11], 'example-fuchsia-x64-nuc');
     expect(capturedArgs[12], '--product-versions');
     expect(capturedArgs[13], '0.001.20.3');
-    expect(capturedArgs[14], '--integration-internal-git-commit');
-    expect(capturedArgs[15], '090619c7807325865e60b5b3422d5f4123851f4a');
   });
 
   // convertResults() should raise an error if a non-empty subset of the
@@ -175,96 +159,9 @@ void main(List<String> args) {
     final File fuchsiaPerfFile =
         createFuchsiaPerfFile('results-fuchsiaperf.json');
     expect(
-        performance.convertResults('/bin/catapult_converter', fuchsiaPerfFile, {
-          'INTEGRATION_INTERNAL_GIT_COMMIT':
-              '090619c7807325865e60b5b3422d5f4123851f4a',
-        }),
+        performance
+            .convertResults('/bin/catapult_converter', fuchsiaPerfFile, {}),
         throwsA(TypeMatcher<ArgumentError>()));
-  });
-
-  // convertResults() should allow us to specify smart integration or public integration, but not
-  // both
-  test('convertResults check integration commits', () async {
-    final mockRunProcessObserver = MockRunProcessObserver();
-    final performance = FakePerformancePublishTools(mockRunProcessObserver);
-
-    {
-      const missingInternalIntegration = {
-        'CATAPULT_DASHBOARD_MASTER': 'example.fuchsia.global.ci',
-        'CATAPULT_DASHBOARD_BOT': 'example-fuchsia-x64-nuc',
-        'BUILDBUCKET_ID': '8abc123',
-        'BUILD_CREATE_TIME': '1561234567890',
-        'INTEGRATION_INTERNAL_GIT_COMMIT':
-            '090619c7807325865e60b5b3422d5f4123851f4a',
-        'INTEGRATION_PUBLIC_GIT_COMMIT':
-            '7071115c6fa019f8d7102623255db0bd6f5f3a2c',
-        'SMART_INTEGRATION_GIT_COMMIT':
-            '65c1b5bd28fe2ef610549efaacd6ea79f43fd8c1',
-      };
-
-      final File fuchsiaPerfFile =
-          createFuchsiaPerfFile('results.fuchsiaperf.json');
-      expect(
-          performance.convertResults('/bin/catapult_converter', fuchsiaPerfFile,
-              missingInternalIntegration),
-          throwsA(TypeMatcher<ArgumentError>()));
-    }
-
-    {
-      const both_smart_and_public = {
-        'CATAPULT_DASHBOARD_MASTER': 'example.fuchsia.global.ci',
-        'CATAPULT_DASHBOARD_BOT': 'example-fuchsia-x64-nuc',
-        'BUILDBUCKET_ID': '8abc123',
-        'BUILD_CREATE_TIME': '1561234567890',
-        'INTEGRATION_INTERNAL_GIT_COMMIT':
-            '090619c7807325865e60b5b3422d5f4123851f4a',
-        'INTEGRATION_PUBLIC_GIT_COMMIT':
-            '7071115c6fa019f8d7102623255db0bd6f5f3a2c',
-        'SMART_INTEGRATION_GIT_COMMIT':
-            '65c1b5bd28fe2ef610549efaacd6ea79f43fd8c1',
-      };
-
-      final File fuchsiaPerfFile =
-          createFuchsiaPerfFile('results.fuchsiaperf.json');
-      expect(
-          performance.convertResults('/bin/catapult_converter', fuchsiaPerfFile,
-              both_smart_and_public),
-          throwsA(TypeMatcher<ArgumentError>()));
-    }
-    {
-      const justSmart = {
-        'CATAPULT_DASHBOARD_MASTER': 'example.fuchsia.global.ci',
-        'CATAPULT_DASHBOARD_BOT': 'example-fuchsia-x64-nuc',
-        'BUILDBUCKET_ID': '8abc123',
-        'BUILD_CREATE_TIME': '1561234567890',
-        'INTEGRATION_INTERNAL_GIT_COMMIT':
-            '090619c7807325865e60b5b3422d5f4123851f4a',
-        'SMART_INTEGRATION_GIT_COMMIT':
-            '65c1b5bd28fe2ef610549efaacd6ea79f43fd8c1',
-      };
-
-      final File fuchsiaPerfFile =
-          createFuchsiaPerfFile('results.fuchsiaperf.json');
-      await performance.convertResults(
-          '/bin/catapult_converter', fuchsiaPerfFile, justSmart);
-    }
-    {
-      const justPublic = {
-        'CATAPULT_DASHBOARD_MASTER': 'example.fuchsia.global.ci',
-        'CATAPULT_DASHBOARD_BOT': 'example-fuchsia-x64-nuc',
-        'BUILDBUCKET_ID': '8abc123',
-        'BUILD_CREATE_TIME': '1561234567890',
-        'INTEGRATION_INTERNAL_GIT_COMMIT':
-            '090619c7807325865e60b5b3422d5f4123851f4a',
-        'INTEGRATION_PUBLIC_GIT_COMMIT':
-            '7071115c6fa019f8d7102623255db0bd6f5f3a2c',
-      };
-
-      final File fuchsiaPerfFile =
-          createFuchsiaPerfFile('results.fuchsiaperf.json');
-      await performance.convertResults(
-          '/bin/catapult_converter', fuchsiaPerfFile, justPublic);
-    }
   });
 
   // convertResults() should raise an error when given a fuchsiaperf
@@ -311,8 +208,6 @@ void main(List<String> args) {
     final destDir = createTempDir().path;
     final environment = {
       'FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR': destDir,
-      'INTEGRATION_INTERNAL_GIT_COMMIT':
-          '090619c7807325865e60b5b3422d5f4123851f4a',
     };
     // Use unsorted order to test that the output gets sorted.
     const fuchsiaPerfJson = [
