@@ -94,6 +94,15 @@ function styled-status {
   style::echo --bold --${color} ${metrics_status}
 }
 
+if metrics-is-internal-user; then
+  cat >&2 <<'EOF'
+You are identified as a Googler since your hostname ends with corp.google.com
+or c.googlers.com. Please use `ffx config analytics` to manage your analytics status. See
+`ffx config analytics --help` for more details.
+EOF
+  exit 1
+fi
+
 fx-standard-switches "$@"
 set -- "${FX_ARGV[@]}"
 

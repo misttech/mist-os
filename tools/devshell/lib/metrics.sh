@@ -190,6 +190,50 @@ INIT_WARNING+=$'You will receive this warning until an option is selected.\n'
 INIT_WARNING+=$'To check what data we collect, run `fx metrics`\n'
 INIT_WARNING+=$'To opt in or out, run `fx metrics <enable|disable>\n'
 
+INIT_WARNING_INTERNAL=$(
+cat <<'EOF'
+Enable enhanced analytics to help us improve Fuchsia tools!
+
+You are identified as a Googler since your hostname ends with corp.google.com
+or c.googlers.com. To better understand how Fuchsia tools are used, and help
+improve these tools and your workflow, Google already has an option, as you
+know, to collect basic, very redacted, analytics listed in
+https://fuchsia.dev/fuchsia-src/contribute/governance/policy/analytics_collected_fuchsia_tools.
+As a Googler, you can help us even more by opting in to enhanced analytics:
+
+ffx config analytics enable-enhanced
+
+Enabling enhanced analytics may collect the following additional information,
+in accordance with Google's employee privacy policy
+(go/employee-privacy-policy):
+
+• Full command line arguments
+• Product name (e.g. core, minimal, etc.)
+• Board type (e.g. vim3, x64, etc.)
+• Environment variables that affect behavior of the tools
+• User/Host/Target environment (e.g. tool/system versions, connection type
+  such as Network/USB/Remote, etc.)
+• Full stacktrace
+• Logs
+• Content of configuration files (e.g. args.gn)
+
+Before any data is sent, we will replace the value of $USER with the literal
+string "$USER" and also redact $HOSTNAME in a similar way.
+
+To collect basic analytics only, enter
+  ffx config analytics enable
+If you want to disable all analytics, enter
+  ffx config analytics disable
+To display the current setting and what is collected, type
+  ffx config analytics show
+
+You will continue to receive this notice until you select an option.
+
+See Google's employee privacy policy:
+go/employee-privacy-policy
+EOF
+)
+
 # Each Analytics batch call can send at most this many hits.
 declare -r BATCH_SIZE=25
 # Keep track of how many hits have accumulated.
@@ -221,7 +265,7 @@ function __is_in_regex {
   return 1
 }
 
-function _read-other-tools-analytics-uuid {
+function _get-metrics-config-dir {
   local base_dir
   case "${HOST_OS}" in
     linux)
@@ -234,13 +278,26 @@ function _read-other-tools-analytics-uuid {
       base_dir="${HOME}/Library/Application Support"
       ;;
   esac
-  base_dir="${base_dir}/Fuchsia/metrics"
-  if [[ "$(cat "${base_dir}/analytics-status" 2>/dev/null)" == 1 ]]; then
-    echo "$(cat "${base_dir}/uuid" 2>/dev/null)"
-  fi
+  echo "${base_dir}/Fuchsia/metrics"
 }
 
-function metrics-read-config {
+function _read-other-tools-analytics-uuid {
+  local base_dir="$(_get-metrics-config-dir)"
+  echo "$(cat "${base_dir}/uuid" 2>/dev/null)"
+}
+
+function metrics-is-internal-user {
+  # Due to old bash versions on mac, we don't support internal analytics on mac.
+  [[ "$HOSTNAME" =~ (".c.googlers.com"$)|(".corp.google.com"$)  && "${HOST_OS}" != "mac" ]]
+}
+
+function metrics-sanitize-string {
+  local sanitized="${1//$USER/\$USER}"
+  sanitized="${sanitized//$HOSTNAME/\$HOSTNAME}"
+  echo "$sanitized"
+}
+
+function metrics-read-config-external {
   METRICS_UUID=""
   METRICS_ENABLED=0
   _METRICS_DEBUG_LOG_FILE=""
@@ -254,6 +311,64 @@ function metrics-read-config {
   fi
   OTHER_TOOLS_ANALYTICS_UUID="$(_read-other-tools-analytics-uuid)"
   return 0
+}
+
+function metrics-read-config-internal {
+  local base_dir="$(_get-metrics-config-dir)"
+  local metrics_config_internal="${base_dir}/analytics-status-internal"
+  METRICS_LEVEL=0
+
+  # Non-migrated user
+  if [[ ! -f "${metrics_config_internal}" ]]; then
+    if [[ -f "${METRICS_CONFIG}" ]]; then
+      metrics-read-config-external
+      metrics-set-level-from-enabled
+    fi
+    return
+  fi
+
+  # Migrated user
+  METRICS_UUID=""
+  _METRICS_DEBUG_LOG_FILE=""
+  if [[ -f "${METRICS_CONFIG}" ]]; then
+    source "${METRICS_CONFIG}"
+  fi
+
+  METRICS_LEVEL="$(cat "${metrics_config_internal}" 2>/dev/null)"
+  if [[ "$METRICS_LEVEL" -ne 1 && "$METRICS_LEVEL" -ne 2  ]]; then
+    METRICS_LEVEL=0
+  fi
+
+  if [[ "${METRICS_LEVEL}" -gt 0 ]]; then
+    OTHER_TOOLS_ANALYTICS_UUID="$(_read-other-tools-analytics-uuid)"
+    if [[ -z "${METRICS_UUID}" ]]; then
+      uuidgen_cmd=uuidgen
+      if ! command -v "$uuidgen_cmd" >/dev/null 2>&1 ; then
+        fx-error "Command '$uuidgen_cmd' cannot be found, please add it to your PATH."\
+                "(On Ubuntu/Debian systems, try \`sudo apt install uuid-runtime\`.)"
+        exit 1
+      fi
+      METRICS_UUID="$($uuidgen_cmd)"
+      metrics-write-config-internal "${METRICS_UUID}" "${_METRICS_DEBUG_LOG_FILE}"
+      return
+    fi
+
+    if [[ -n "${ENABLED}" ]]; then
+      metrics-write-config-internal "${METRICS_UUID}" "${_METRICS_DEBUG_LOG_FILE}"
+    fi
+  fi
+
+}
+
+
+
+function metrics-read-config {
+  if metrics-is-internal-user; then
+    metrics-read-config-internal
+  else
+    metrics-read-config-external
+    metrics-set-level-from-enabled
+  fi
 }
 
 function metrics-write-config {
@@ -283,15 +398,86 @@ function metrics-write-config {
   fi
 }
 
-function metrics-read-and-validate {
+function metrics-write-config-internal {
+  local uuid="$1"
+  if [[ $# -gt 1 ]]; then
+    local debug_logfile="$2"
+  fi
+
+  local -r tempfile="$(mktemp)"
+
+  # Exit trap to clean up temp file
+  trap "[[ -f \"${tempfile}\" ]] && rm -f \"${tempfile}\"" EXIT
+
+  {
+    echo "# Autogenerated config file for fx metrics."
+    echo "METRICS_UUID=\"${uuid}\""
+    if [[ -n "${debug_logfile}" ]]; then
+      echo "_METRICS_DEBUG_LOG_FILE=${debug_logfile}"
+    fi
+  } >> "${tempfile}"
+  # Only rewrite the config file if content has changed
+  if ! cmp --silent "${tempfile}" "${METRICS_CONFIG}" ; then
+    mv -f "${tempfile}" "${METRICS_CONFIG}"
+  fi
+}
+
+function metrics-set-level-from-enabled {
+  if [[ "${METRICS_ENABLED}" -eq 1 ]]; then
+      METRICS_LEVEL=1
+    else
+      METRICS_LEVEL=0
+  fi
+}
+
+function metrics-read-and-validate-external {
   local hide_init_warning=$1
-  if ! metrics-read-config; then
-    if [[ $hide_init_warning -ne 1 ]]; then
+  if ! metrics-read-config-external; then
+    if [[ "${hide_init_warning}" -ne 1 ]]; then
       fx-warn "${INIT_WARNING}"
     fi
-    return 1
   fi
-  return 0
+  metrics-set-level-from-enabled
+}
+
+function metrics-migrate-internal-users {
+  local base_dir="$(_get-metrics-config-dir)"
+  local metrics_config_internal="${base_dir}/analytics-status-internal"
+  local hide_init_warning="$1"
+
+  if [[ ! -f "${metrics_config_internal}" ]]; then
+    local metrics_config_external="${base_dir}/analytics-status"
+    if [[ ! -f "${metrics_config_external}" ]]; then
+      # New user
+      if [[ "${hide_init_warning}" -ne 1 ]]; then
+        fx-warn "$INIT_WARNING_INTERNAL"
+      fi
+      return
+    fi
+
+    # Existing user
+    METRICS_LEVEL_EXISTING=$(cat "${metrics_config_external}" 2>/dev/null)
+    if [[ "${METRICS_LEVEL_EXISTING}" -eq 1 ]]; then
+      # Existing user opted-in
+      if [[ "${hide_init_warning}" -ne 1 ]]; then
+        fx-warn "$INIT_WARNING_INTERNAL"
+      fi
+    else
+      # Existing user opted-out
+      mkdir -p "${base_dir}"
+      echo 0 >"${metrics_config_internal}"
+    fi
+    return
+  fi
+}
+
+function metrics-read-and-validate {
+  if metrics-is-internal-user; then
+    metrics-migrate-internal-users "$1"
+    metrics-read-config-internal
+  else
+    metrics-read-and-validate-external "$1"
+  fi
 }
 
 function metrics-set-debug-logfile {
@@ -350,9 +536,8 @@ function track-subcommand-custom-event {
   # what we want to track.
   event_label=${event_label:0:100}
 
-  local hide_init_warning=1
-  metrics-read-and-validate $hide_init_warning
-  if [[ $METRICS_ENABLED == 0 ]]; then
+  metrics-read-config
+  if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
     return 0
   fi
 
@@ -382,12 +567,8 @@ function track-command-execution {
     subcommand_op=${subcommand_arr[0]}
   fi
 
-  local hide_init_warning=0
-  if [[ "$subcommand" == "metrics" ]]; then
-    hide_init_warning=1
-  fi
-  metrics-read-and-validate $hide_init_warning
-  if [[ $METRICS_ENABLED == 0 ]]; then
+  metrics-read-config
+  if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
     return 0
   fi
 
@@ -396,10 +577,10 @@ function track-command-execution {
     _process-fx-set-command "$@"
   fi
 
-  if __is_in_regex "${subcommand} ${args}" "${_METRICS_TRACK_REGEX[@]}"; then
-    # Limit to the first 100 characters of arguments.
-    # The GA4 API supports up to 100 characters for parameter values
-    args="${BASH_REMATCH[1]:0:100}"
+  if [[ "${METRICS_LEVEL}" -eq 2 ]]; then
+    args="$(metrics-sanitize-string "${args}")"
+  elif __is_in_regex "${subcommand} ${args}" "${_METRICS_TRACK_REGEX[@]}"; then
+    args="${BASH_REMATCH[1]}"
   elif [ -n "${subcommand_op}" ]; then
     if __is_in "${subcommand} ${subcommand_op}" \
         "${_METRICS_TRACK_COMMAND_OPS[@]}"; then
@@ -417,9 +598,18 @@ function track-command-execution {
     args=""
   fi
 
+  # Limit to the first 100 characters of arguments.
+  # The GA4 API supports up to 100 characters for parameter values
+  local args_truncated=0
+  if [[ "${#args}" -gt 100 ]]; then
+    args="${args:0:100}"
+    args_truncated=1
+  fi
+
   event_params=$(fx-command-run jq -c -n \
     --arg subcommand "${subcommand}" \
     --arg args "${args}" \
+    --arg args_truncated "${args_truncated}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "invoke" "${event_params}"
@@ -482,24 +672,28 @@ function track-command-finished {
   args="$*"
 
   metrics-read-config
-  if [[ $METRICS_ENABLED == 0 ]]; then
+  if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
     return 0
   fi
 
   # Only track arguments to the subcommands in $_METRICS_TRACK_ALL_ARGS
-  if ! __is_in "$subcommand" "${_METRICS_TRACK_ALL_ARGS[@]}"; then
+  if [[ "${METRICS_LEVEL}" -eq 2 ]]; then
+    args="$(metrics-sanitize-string "${args}")"
+  elif ! __is_in "$subcommand" "${_METRICS_TRACK_ALL_ARGS[@]}"; then
     args=""
-  else
-    # Limit to the first 100 characters of arguments.
-    # The Analytics API supports up to 500 bytes, but it is likely that
-    # anything larger than 100 characters is an invalid execution and/or not
-    # what we want to track.
-    args=${args:0:100}
   fi
+
+  local args_truncated=0
+  if [[ "${#args}" -gt 100 ]]; then
+    args="${args:0:100}"
+    args_truncated=1
+  fi
+
 
   event_params=$(fx-command-run jq -c -n \
     --arg subcommand "${subcommand}" \
     --arg args "${args}" \
+    --arg args_truncated "${args_truncated}" \
     --arg exit_status "${exit_status}" \
     --arg is_remote "${is_remote}" \
     --argjson timing "${timing}" \
@@ -520,8 +714,14 @@ function track-feature-status {
   if [[ "${HOST_OS}" == "mac" ]]; then
     return
   fi
+
   exec 1>/dev/null
   exec 2>/dev/null
+
+  metrics-read-config
+  if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
+    return 0
+  fi
 
   local feature=$1
   local is_disabled=$2
@@ -596,6 +796,13 @@ function __send-analytics-batch {
     return 0
   fi
 
+  local internal
+  if metrics-is-internal-user; then
+    internal=1
+  else
+    internal=0
+  fi
+
   # Construct the measuremnt data
   local user_properties="{\"os\":{\"value\":\"$(uname -s)\"},\
   \"arch\":{\"value\":\"$(uname -m)\"},\
@@ -603,7 +810,9 @@ function __send-analytics-batch {
   \"shell_version\":{\"value\":\"$(_app_version)\"},\
   \"kernel_release\":{\"value\":\"$(uname -rs)\"},\
   \"ninja_persistent\":{\"value\":\"$(_get_ninja_persistent_mode)\"},\
-  \"other_uuid\":{\"value\":\"${OTHER_TOOLS_ANALYTICS_UUID}\"}\
+  \"other_uuid\":{\"value\":\"${OTHER_TOOLS_ANALYTICS_UUID}\"},\
+  \"internal\":{\"value\":${internal}},\
+  \"metrics_level\":{\"value\":${METRICS_LEVEL}}\
   }"
   local events_json=$(fx-command-run jq -n -c '$ARGS.positional' \
     --jsonargs "${events[@]}")
@@ -659,7 +868,18 @@ function _metrics-service {
 # Init metrics service by redirecting file descriptor 10 to the process
 # substitution of metrics service.
 function metrics-init {
-  exec 10> >(_metrics-service)
+  local subcommand="$1"
+  local hide_init_warning=0
+  if [[ "$subcommand" == "metrics" ]]; then
+    hide_init_warning=1
+  fi
+  metrics-read-and-validate "${hide_init_warning}"
+
+  if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
+    exec 10> /dev/null
+  else
+    exec 10> >(_metrics-service)
+  fi
 }
 
 # Calls __add-to-analytics-batch asynchronously, via metrics service
