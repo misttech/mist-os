@@ -21,12 +21,14 @@ class IdentifiedSnippet:
     UNIDENTIFIED_IDENTIFICATION: ClassVar[str] = "[UNIDENTIFIED]"
     IGNORABLE_IDENTIFICATION: ClassVar[str] = "[IGNORABLE]"
     COPYRIGHT_IDENTIFICATION: ClassVar[str] = "[COPYRIGHT]"
+    ANY_STARTS_WITH_BSD_IDENTIFICATION: ClassVar[str] = "[NOTICE]"
 
     # Condition for build-in identified_as
     DEFAULT_CONDITION_BY_IDENTIFICATION: ClassVar[dict[str, str]] = {
         UNIDENTIFIED_IDENTIFICATION: "unidentified",
         IGNORABLE_IDENTIFICATION: "ignorable",
         COPYRIGHT_IDENTIFICATION: "copyright",
+        ANY_STARTS_WITH_BSD_IDENTIFICATION: "notice",
     }
 
     identified_as: str
@@ -93,6 +95,10 @@ class IdentifiedSnippet:
                 identified_as = IdentifiedSnippet.IGNORABLE_IDENTIFICATION
             case "Copyright":
                 identified_as = IdentifiedSnippet.COPYRIGHT_IDENTIFICATION
+            case "anyStartsWith-BSD-":
+                identified_as = (
+                    IdentifiedSnippet.ANY_STARTS_WITH_BSD_IDENTIFICATION
+                )
 
         # Confidence could be an int or a float. Convert to a float.
         try:
