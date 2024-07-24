@@ -44,6 +44,9 @@ ENV_RELEASE_VERSION: str = "RELEASE_VERSION"
 ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR: str = (
     "FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR"
 )
+ENV_INTEGRATION_INTERNAL_GIT_COMMIT: str = "INTEGRATION_INTERNAL_GIT_COMMIT"
+ENV_INTEGRATION_PUBLIC_GIT_COMMIT: str = "INTEGRATION_PUBLIC_GIT_COMMIT"
+ENV_SMART_INTEGRATION_GIT_COMMIT: str = "SMART_INTEGRATION_GIT_COMMIT"
 
 
 def publish_fuchsiaperf(
@@ -82,6 +85,9 @@ class CatapultConverter:
         build_bucket_id: str | None = None,
         build_create_time: str | None = None,
         release_version: str | None = None,
+        integration_internal_git_commit: str | None = None,
+        integration_public_git_commit: str | None = None,
+        smart_integration_git_commit: str | None = None,
         fuchsia_expected_metric_names_dest_dir: str | None = None,
         current_time: int | None = None,
         subprocess_check_call: Any = subprocess.check_call,
@@ -90,20 +96,44 @@ class CatapultConverter:
         """Creates a new catapult converter.
 
         Args:
-            fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
+            fuchsia_perf_file_paths:
+                Paths to the fuchsiaperf.json files containing the metrics.
                 These will be summarized into a single fuchsiaperf.json file.
-            expected_metric_names_filename: file name or path to file containing
-            expected metric names to validate the actual metrics against.
-            fuchsia_expected_metric_names_dest_dir: directory to which expected metrics are written.
-            current_time: the current time, useful for testing. Defaults to time.time.
-            subprocess_check_call: allows to execute a process raising an exception on error.
+
+            expected_metric_names_filename:
+                File name or path to file containing expected metric names to
+                validate the actual metrics against.
+
+            integration_internal_git_commit:
+                The internal integration.git revision which produced these data
+
+            integration_public_git_commit:
+                The public integration.git revision which produced these data
+
+            smart_integration_git_commit:
+                The smart-integration.git revision which produced these data
+
+            fuchsia_expected_metric_names_dest_dir:
+                Directory to which expected metrics are written.
+
+            current_time:
+                The current time, useful for testing. Defaults to time.time.
+
+            subprocess_check_call:
+                Allows to execute a process raising an exception on error.
                 Useful for testing. Defaults to subprocess.check_call.
-            runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
-                metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
+
+            runtime_deps_dir:
+                Directory in which to look for necessary dependencies such as
+                the expected metric names file, catapult converter, etc.
+                Defaults to the test runtime_deps dir.
 
         See //src/testing/catapult_converter/README.md for the rest of args.
         """
         self._release_version = release_version
+        self._integration_internal_git_commit = integration_internal_git_commit
+        self._integration_public_git_commit = integration_public_git_commit
+        self._smart_integration_git_commit = smart_integration_git_commit
         self._subprocess_check_call = subprocess_check_call
         self._fuchsia_expected_metric_names_dest_dir = (
             fuchsia_expected_metric_names_dest_dir
@@ -142,6 +172,17 @@ class CatapultConverter:
         else:
             raise ValueError(
                 "Catapult-related infra env vars are not set consistently"
+            )
+
+        # These data may be produced from either the public integration, or smart integration, but
+        # not both.
+        if (
+            integration_public_git_commit is not None
+            and smart_integration_git_commit is not None
+        ):
+            raise ValueError(
+                "Data should be optionally produced from either public "
+                "integration or smart integration, but not both"
             )
 
         fuchsia_perf_file_paths = self._check_extension_and_relocate(
@@ -248,6 +289,15 @@ class CatapultConverter:
             build_bucket_id=env.get(ENV_BUILDBUCKET_ID),
             build_create_time=env.get(ENV_BUILD_CREATE_TIME),
             release_version=env.get(ENV_RELEASE_VERSION),
+            integration_internal_git_commit=env.get(
+                ENV_INTEGRATION_INTERNAL_GIT_COMMIT
+            ),
+            integration_public_git_commit=env.get(
+                ENV_INTEGRATION_PUBLIC_GIT_COMMIT
+            ),
+            smart_integration_git_commit=env.get(
+                ENV_SMART_INTEGRATION_GIT_COMMIT
+            ),
             fuchsia_expected_metric_names_dest_dir=env.get(
                 ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR
             ),
@@ -364,6 +414,26 @@ class CatapultConverter:
             "--bots",
             self._bot,
         ]
+
         if self._release_version is not None:
             args += ["--product-versions", self._release_version]
+
+        if self._integration_internal_git_commit is not None:
+            args += [
+                "--integration-internal-git-commit",
+                self._integration_internal_git_commit,
+            ]
+
+        if self._integration_public_git_commit is not None:
+            args += [
+                "--integration-public-git-commit",
+                self._integration_public_git_commit,
+            ]
+
+        if self._smart_integration_git_commit is not None:
+            args += [
+                "--smart-integration-git-commit",
+                self._smart_integration_git_commit,
+            ]
+
         return args

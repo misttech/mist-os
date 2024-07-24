@@ -31,6 +31,12 @@ class PerformancePublish {
   static const String _buildCreateTimeVarName = 'BUILD_CREATE_TIME';
   static const String _releaseVersion = 'RELEASE_VERSION';
   static const String _catapultDashboardBotVarName = 'CATAPULT_DASHBOARD_BOT';
+  static const String _integrationInternalGitCommit =
+      'INTEGRATION_INTERNAL_GIT_COMMIT';
+  static const String _integrationPublicGitCommit =
+      'INTEGRATION_PUBLIC_GIT_COMMIT';
+  static const String _smartIntegrationGitCommit =
+      'SMART_INTEGRATION_GIT_COMMIT';
 
   PerformancePublish();
 
@@ -53,6 +59,10 @@ class PerformancePublish {
     final buildbucketId = environment[_buildbucketIdVarName];
     final buildCreateTime = environment[_buildCreateTimeVarName];
     var releaseVersion = environment[_releaseVersion];
+    final integrationInternalGitCommit =
+        environment[_integrationInternalGitCommit];
+    final integrationPublicGitCommit = environment[_integrationPublicGitCommit];
+    final smartIntegrationGitCommit = environment[_smartIntegrationGitCommit];
 
     bool uploadEnabled = true;
     String logurl;
@@ -76,6 +86,13 @@ class PerformancePublish {
     } else {
       throw ArgumentError(
           'Catapult-related infra env vars are not set consistently');
+    }
+
+    if (integrationPublicGitCommit != null &&
+        smartIntegrationGitCommit != null) {
+      throw ArgumentError(
+          'Data should be optionally produced from either public '
+          'integration or smart integration, but not both');
     }
 
     final resultsPath = result.absolute.path;
@@ -103,6 +120,21 @@ class PerformancePublish {
     ];
     if (releaseVersion != null) {
       args.addAll(['--product-versions', releaseVersion]);
+    }
+
+    if (integrationInternalGitCommit != null) {
+      args.addAll(
+          ['--integration-internal-git-commit', integrationInternalGitCommit]);
+    }
+
+    if (integrationPublicGitCommit != null) {
+      args.addAll(
+          ['--integration-public-git-commit', integrationPublicGitCommit]);
+    }
+
+    if (smartIntegrationGitCommit != null) {
+      args.addAll(
+          ['--smart-integration-git-commit', smartIntegrationGitCommit]);
     }
 
     final converter = Platform.script.resolve(converterPath).toFilePath();
