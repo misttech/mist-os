@@ -106,8 +106,6 @@
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.Pairing",
                 "fuchsia.camera3.DeviceWatcher",
-                "fuchsia.castauth.CastCertificateRetriever",
-                "fuchsia.castauth.CastKeySigner",
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
@@ -190,6 +188,8 @@
         {
             // Routed to session-manager via trusted-apps.core_shard.cml
             protocol: [
+                "fuchsia.castauth.CastCertificateRetriever",
+                "fuchsia.castauth.CastKeySigner",
                 "fuchsia.weave.FactoryDataManager",
                 "fuchsia.weave.Provisioner",
                 "fuchsia.weave.Signer",
