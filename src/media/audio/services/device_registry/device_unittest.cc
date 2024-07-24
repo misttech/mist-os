@@ -599,6 +599,7 @@ TEST_F(CodecTest, Reset) {
   // Element, and observe that both of these changes are reverted by the call to Reset.
 
   RunLoopUntilIdle();
+  ASSERT_FALSE(notify()->device_is_reset());
   EXPECT_TRUE(notify()->codec_is_started());
   // Verify that the signalprocessing Topology has in fact changed.
   // Verify that the signalprocessing Element has in fact changed.
@@ -613,8 +614,11 @@ TEST_F(CodecTest, Reset) {
   // We were notified that the Codec reset its DaiFormat (none is now set).
   EXPECT_FALSE(notify()->dai_format());
   EXPECT_FALSE(notify()->codec_format_info(dai_id()));
+
   // Observe the signalprocessing Elements - were they reset?
   // Observe the signalprocessing Topology - was it reset?
+
+  EXPECT_TRUE(notify()->device_is_reset());
 }
 
 /////////////////////
@@ -1071,6 +1075,7 @@ TEST_F(CompositeTest, Reset) {
     ASSERT_TRUE(callback_received);
   }
   EXPECT_EQ(FakeCompositeRingBuffer::count(), device->ring_buffer_ids().size());
+  ASSERT_FALSE(notify()->device_is_reset());
 
   EXPECT_TRUE(device->Reset());
 
@@ -1090,6 +1095,8 @@ TEST_F(CompositeTest, Reset) {
   // Expect TopologyIsChanged if revert-to-default represents a topology change.
 
   // Expect ElementStateIsChanged for any element where revert-to-default represents a state change.
+
+  EXPECT_TRUE(notify()->device_is_reset());
 }
 
 // RingBuffer test cases

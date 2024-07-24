@@ -604,13 +604,33 @@ void ControlServer::Reset(ResetCompleter::Sync& completer) {
     return;
   }
 
-  if (!device_->Reset()) {
-    ADR_WARN_METHOD() << "device had an error during Device::Reset";
-    completer.Reply(fit::error(fad::ControlResetError::kDeviceError));
+  if (reset_completer_.has_value()) {
+    ADR_WARN_METHOD() << "previous `Reset` request has not yet completed";
+    completer.Reply(fit::error(fad::ControlResetError::kAlreadyPending));
     return;
   }
+  reset_completer_ = completer.ToAsync();
 
-  completer.Reply(fit::success(fad::ControlResetResponse{}));
+  // If Device::Reset returns false, then it will not subsequently call DeviceIsReset().
+  if (!device_->Reset()) {
+    ADR_WARN_METHOD() << "device had an error during Device::Reset";
+    auto error_completer = std::move(*reset_completer_);
+    reset_completer_.reset();
+    error_completer.Reply(fit::error(fad::ControlResetError::kDeviceError));
+    return;
+  }
+}
+
+void ControlServer::DeviceIsReset() {
+  if (reset_completer_.has_value()) {
+    ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods) << "completing";
+    auto completer = std::move(*reset_completer_);
+    reset_completer_.reset();
+    completer.Reply(fit::success(fad::ControlResetResponse{}));
+  } else {
+    // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
+    ADR_WARN_METHOD() << "reset_completer_ gone by the time DeviceIsReset ran";
+  }
 }
 
 // fuchsia.hardware.audio.signalprocessing.SignalProcessing support

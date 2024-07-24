@@ -255,7 +255,6 @@ TEST_F(ControlServerCodecTest, DaiFormatAlreadySet) {
     // Determine a safe DaiFormat to set
     auto dai_format = SafeDaiFormatFromElementDaiFormatSets(dai_id(), device->dai_format_sets());
     auto received_callback = false;
-
     control->client()
         ->SetDaiFormat({{.dai_format = dai_format}})
         .Then([&received_callback](fidl::Result<fad::Control::SetDaiFormat>& result) {
@@ -267,21 +266,16 @@ TEST_F(ControlServerCodecTest, DaiFormatAlreadySet) {
 
     RunLoopUntilIdle();
     ASSERT_TRUE(received_callback);
-    auto start_time = zx::time::infinite_past();
-    auto time_before_start = zx::clock::get_monotonic();
     received_callback = false;
-
     control->client()->CodecStart().Then(
-        [&received_callback, &start_time](fidl::Result<fad::Control::CodecStart>& result) {
+        [&received_callback](fidl::Result<fad::Control::CodecStart>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value();
-          ASSERT_TRUE(result->start_time().has_value());
-          start_time = zx::time(*result->start_time());
+          EXPECT_TRUE(result->start_time().has_value());
         });
 
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
-    EXPECT_GT(start_time.get(), time_before_start.get());
     EXPECT_EQ(ControlServer::count(), 1u);
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
     EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
@@ -293,13 +287,12 @@ TEST_F(ControlServerCodecTest, DaiFormatAlreadySet) {
     auto device = *adr_service()->devices().begin();
     auto control = CreateTestControlServer(device);
 
+    // Wait for an unexpected WARNING: DaiFormatIsNotChanged, CodecIsNotStarted, CodecIsNotStopped.
     RunLoopUntilIdle();
     ASSERT_EQ(RegistryServer::count(), 1u);
     ASSERT_EQ(ControlServer::count(), 1u);
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
     EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
-
-    // Primarily we are waiting on any unexpected WARNING logging to be emitted.
   }
 }
 

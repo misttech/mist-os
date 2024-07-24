@@ -55,7 +55,6 @@ class FakeCompositeRingBuffer : public fidl::testing::TestBase<fuchsia_hardware_
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override;
 
   void AllocateRingBuffer(ElementId element_id, size_t size);
-  void Drop();
   void InjectDelayUpdate(std::optional<zx::duration> internal_delay,
                          std::optional<zx::duration> external_delay);
   void MaybeCompleteWatchDelayInfo();

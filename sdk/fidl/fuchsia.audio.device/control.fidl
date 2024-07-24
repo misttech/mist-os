@@ -332,13 +332,16 @@ type ControlCodecStopError = flexible enum {
     OTHER = 6;
 };
 
-/// Errors returned by `Control/CodecReset`.
+/// Errors returned by `Control/Reset`.
 type ControlResetError = flexible enum {
     /// This device has encountered an error and can no longer be controlled.
     DEVICE_ERROR = 1;
 
     /// This device type does not support the method that was called.
     WRONG_DEVICE_TYPE = 2;
+
+    /// The previous `Reset` call has not yet completed.
+    ALREADY_PENDING = 3;
 };
 
 /// A `RingBuffer` instance controls data flow for the associated audio stream.

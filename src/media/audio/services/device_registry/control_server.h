@@ -68,6 +68,7 @@ class ControlServer
   void CodecIsStopped(const zx::time& stop_time) final;
   // A call to `CodecStop` did not succeed.
   void CodecIsNotStopped() final;
+  void DeviceIsReset() final;
 
   // fuchsia.audio.device.Control
   //

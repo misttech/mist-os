@@ -198,6 +198,10 @@ class DeviceTestBase : public gtest::TestLoopFixture {
       ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
       codec_stop_failed_ = true;
     }
+    void DeviceIsReset() final {
+      ADR_LOG_OBJECT(kLogDeviceTestNotifyResponses);
+      device_is_reset_ = true;
+    }
 
     // control and access internal state, for validating that correct responses were received.
     //
@@ -282,6 +286,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     bool codec_start_failed() const { return codec_start_failed_; }
     std::optional<zx::time>& codec_stop_time() { return codec_stop_time_; }
     bool codec_stop_failed() const { return codec_stop_failed_; }
+    bool device_is_reset() const { return device_is_reset_; }
 
     const std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>&
     element_states() const {
@@ -307,6 +312,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<zx::time> codec_stop_time_{zx::time::infinite_past()};
     bool codec_start_failed_ = false;
     bool codec_stop_failed_ = false;
+    bool device_is_reset_ = false;
 
     std::optional<TopologyId> topology_id_;
     std::unordered_map<ElementId, fuchsia_hardware_audio_signalprocessing::ElementState>

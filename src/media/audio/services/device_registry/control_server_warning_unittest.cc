@@ -1073,6 +1073,43 @@ TEST_F(ControlServerCompositeWarningTest, SetDaiFormatUnknownElementId) {
   EXPECT_FALSE(control_fidl_error_status().has_value()) << *control_fidl_error_status();
 }
 
+TEST_F(ControlServerCompositeWarningTest, ResetWhilePending) {
+  auto fake_driver = CreateAndEnableDriverWithDefaults();
+  auto registry = CreateTestRegistryServer();
+
+  auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
+  ASSERT_TRUE(added_device_id);
+  auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
+  ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
+  auto control = CreateTestControlServer(device);
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  auto received_callback_1 = false, received_callback_2 = false;
+
+  control->client()->Reset().Then(
+      [&received_callback_1](fidl::Result<fad::Control::Reset>& result) {
+        received_callback_1 = true;
+        EXPECT_TRUE(result.is_ok()) << result.error_value();
+      });
+  control->client()->Reset().Then(
+      [&received_callback_2](fidl::Result<fad::Control::Reset>& result) {
+        received_callback_2 = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_TRUE(result.error_value().domain_error() ==
+                    fuchsia_audio_device::ControlResetError::kAlreadyPending);
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback_1);
+  EXPECT_TRUE(received_callback_2);
+
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+  EXPECT_FALSE(control_fidl_error_status().has_value());
+}
+
 TEST_F(ControlServerCompositeWarningTest, SetGainWrongDeviceType) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   auto registry = CreateTestRegistryServer();

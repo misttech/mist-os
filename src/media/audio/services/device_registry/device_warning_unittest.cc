@@ -183,7 +183,7 @@ TEST_F(CodecWarningTest, CannotDropCodecControlTwice) {
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
-TEST_F(CodecWarningTest, WithoutControlFailsCodecCalls) {
+TEST_F(CodecWarningTest, WithoutControlFailsCallsThatRequireControl) {
   auto fake_driver = MakeFakeCodecInput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
@@ -425,7 +425,7 @@ TEST_F(CompositeWarningTest, AddObserverUnhealthy) {
   EXPECT_FALSE(AddObserver(device));
 }
 
-TEST_F(CompositeWarningTest, SetControlAlreadyControlled) {
+TEST_F(CompositeWarningTest, AlreadyControlledFailsSetControl) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
   ASSERT_TRUE(IsInitialized(device));
@@ -496,7 +496,7 @@ TEST_F(CompositeWarningTest, DropControlTwice) {
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 
-TEST_F(CompositeWarningTest, MakeControlCallsWithoutControl) {
+TEST_F(CompositeWarningTest, WithoutControlFailsCallsThatRequireControl) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
   ASSERT_TRUE(IsInitialized(device));

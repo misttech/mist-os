@@ -2068,9 +2068,9 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
   }
 }
 
-// If true is returned, then we guarantee to call the ControlNotify (maybe CodecIsStopped and
-// DaiFormatIsChanged), if this changes the Start/Stop and DaiFormat.
-// If false is returned, then these notifications will not be called.
+// If true is returned, then we guarantee to call ControlNotify::DeviceIsReset (and CodecIsStopped
+// if the Start/Stop state is changed, and DaiFormatIsChanged if the DaiFormat is changed).
+// If false is returned, then no change occurs and these notifications will not be called.
 bool Device::Reset() {
   if (!is_codec() && !is_composite()) {
     ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot Reset";
@@ -2120,6 +2120,11 @@ bool Device::Reset() {
 
       // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology,
       // gain). When implemented, reset the signalprocessing topology and all elements, here.
+
+      // If a ControlNotify is listening, notify it that the Reset has now completed.
+      if (notify) {
+        notify->DeviceIsReset();
+      }
     });
   }
   if (is_composite()) {
@@ -2155,6 +2160,11 @@ bool Device::Reset() {
       // TopologyIsChanged and ElementStateIsChanged).
       // We shouldn't need to expressly touch the hardware in any way; the client will receive
       // these notifications and re-establish the Topology and ElementStates.
+
+      // If a ControlNotify is listening, notify it that the Reset has now completed.
+      if (notify) {
+        notify->DeviceIsReset();
+      }
     });
   }
 

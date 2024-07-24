@@ -35,6 +35,7 @@ class ControlNotify : public ObserverNotify {
   virtual void CodecIsNotStarted() = 0;
   virtual void CodecIsStopped(const zx::time& stop_time) = 0;
   virtual void CodecIsNotStopped() = 0;
+  virtual void DeviceIsReset() = 0;
 };
 
 }  // namespace media_audio
