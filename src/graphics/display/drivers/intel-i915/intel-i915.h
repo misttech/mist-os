@@ -105,9 +105,9 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                                          fdf::PrepareStopCompleter completer);
 
   // display controller protocol ops
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol* intf);
-  void DisplayControllerImplResetDisplayControllerInterface();
+  void DisplayControllerImplRegisterDisplayEngineListener(
+      const display_engine_listener_protocol* engine_listener);
+  void DisplayControllerImplDeregisterDisplayEngineListener();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -305,7 +305,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                      fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);
+  ddk::DisplayEngineListenerProtocolClient engine_listener_ __TA_GUARDED(display_lock_);
 
   // True iff the driver initialization (Bind() and DdkInit()) is fully
   // completed.

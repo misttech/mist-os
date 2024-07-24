@@ -108,8 +108,8 @@ zx::result<> DisplayEngine::Initialize() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* interface) {
+void DisplayEngine::DisplayControllerImplRegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* engine_listener) {
   const int32_t width = primary_display_device_.width_px;
   const int32_t height = primary_display_device_.height_px;
   const int32_t refresh_rate_hz = primary_display_device_.refresh_rate_hz;
@@ -150,14 +150,14 @@ void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
 
   {
     fbl::AutoLock lock(&flush_lock_);
-    dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(interface);
-    dc_intf_.OnDisplayAdded(&banjo_display_info);
+    engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
+    engine_listener_.OnDisplayAdded(&banjo_display_info);
   }
 }
 
-void DisplayEngine::DisplayControllerImplResetDisplayControllerInterface() {
+void DisplayEngine::DisplayControllerImplDeregisterDisplayEngineListener() {
   fbl::AutoLock lock(&flush_lock_);
-  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
 namespace {
@@ -744,12 +744,12 @@ void DisplayEngine::FlushPrimaryDisplay(async_dispatcher_t* dispatcher) {
   {
     fbl::AutoLock lock(&flush_lock_);
 
-    if (dc_intf_.is_valid()) {
+    if (engine_listener_.is_valid()) {
       zx::time now = async::Now(dispatcher);
       const uint64_t banjo_display_id = display::ToBanjoDisplayId(kPrimaryDisplayId);
       const config_stamp_t banjo_config_stamp =
           display::ToBanjoConfigStamp(primary_display_device_.latest_config_stamp);
-      dc_intf_.OnDisplayVsync(banjo_display_id, now.get(), &banjo_config_stamp);
+      engine_listener_.OnDisplayVsync(banjo_display_id, now.get(), &banjo_config_stamp);
     }
   }
 

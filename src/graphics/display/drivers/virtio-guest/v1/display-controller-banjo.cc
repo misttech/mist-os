@@ -39,17 +39,17 @@ DisplayControllerBanjo::DisplayControllerBanjo(DisplayEngine* engine,
 
 DisplayControllerBanjo::~DisplayControllerBanjo() = default;
 
-void DisplayControllerBanjo::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* display_controller_interface) {
-  ZX_DEBUG_ASSERT(display_controller_interface);
-  coordinator_events_.SetDisplayControllerInterface(display_controller_interface);
-  if (display_controller_interface != nullptr) {
+void DisplayControllerBanjo::DisplayControllerImplRegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* display_engine_listener) {
+  ZX_DEBUG_ASSERT(display_engine_listener);
+  coordinator_events_.RegisterDisplayEngineListener(display_engine_listener);
+  if (display_engine_listener != nullptr) {
     engine_.OnCoordinatorConnected();
   }
 }
 
-void DisplayControllerBanjo::DisplayControllerImplResetDisplayControllerInterface() {
-  coordinator_events_.SetDisplayControllerInterface(nullptr);
+void DisplayControllerBanjo::DisplayControllerImplDeregisterDisplayEngineListener() {
+  coordinator_events_.RegisterDisplayEngineListener(nullptr);
 }
 
 zx_status_t DisplayControllerBanjo::DisplayControllerImplImportBufferCollection(

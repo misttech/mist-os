@@ -72,9 +72,9 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   void Deinitialize();
 
   // DisplayControllerImplProtocol implementation:
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* intf);
-  void DisplayControllerImplResetDisplayControllerInterface();
+  void DisplayControllerImplRegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* engine_listener);
+  void DisplayControllerImplDeregisterDisplayEngineListener();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -178,7 +178,7 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   thrd_t capture_thread_;
 
   // Guards display coordinator interface.
-  mutable fbl::Mutex interface_mutex_;
+  mutable fbl::Mutex engine_listener_mutex_;
 
   // Guards imported images and references to imported images.
   mutable fbl::Mutex image_mutex_;
@@ -241,8 +241,8 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   uint8_t clamp_rgb_value_ TA_GUARDED(capture_mutex_) = 0;
 
   // Display controller related data
-  ddk::DisplayControllerInterfaceProtocolClient controller_interface_client_
-      TA_GUARDED(interface_mutex_);
+  ddk::DisplayEngineListenerProtocolClient engine_listener_client_
+      TA_GUARDED(engine_listener_mutex_);
 
   inspect::Inspector inspector_;
 

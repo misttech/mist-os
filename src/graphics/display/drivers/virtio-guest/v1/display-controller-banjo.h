@@ -34,9 +34,9 @@ class DisplayControllerBanjo : public ddk::DisplayControllerImplProtocol<Display
   ~DisplayControllerBanjo();
 
   // ddk::DisplayControllerImplProtocol
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* display_controller_interface);
-  void DisplayControllerImplResetDisplayControllerInterface();
+  void DisplayControllerImplRegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* display_engine_listener);
+  void DisplayControllerImplDeregisterDisplayEngineListener();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel buffer_collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(

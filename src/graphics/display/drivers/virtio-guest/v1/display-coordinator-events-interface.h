@@ -24,7 +24,7 @@ namespace virtio_display {
 // The methods are represented by `DisplayEngineInterface`.
 //
 // This abstract base class also represents the
-// [`fuchsia.hardware.display.controller/DisplayControllerInterface`] Banjo
+// [`fuchsia.hardware.display.controller/DisplayEngineListener`] Banjo
 // interface.
 class DisplayCoordinatorEventsInterface {
  public:

@@ -204,21 +204,21 @@ zx::result<> DisplayEngine::ResetDisplayEngine() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* intf) {
+void DisplayEngine::DisplayControllerImplRegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock display_lock(&display_mutex_);
-  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
   if (display_attached_) {
     const raw_display_info_t added_display_info =
         vout_->CreateRawDisplayInfo(display_id_, kSupportedBanjoPixelFormats);
-    dc_intf_.OnDisplayAdded(&added_display_info);
+    engine_listener_.OnDisplayAdded(&added_display_info);
   }
 }
 
-void DisplayEngine::DisplayControllerImplResetDisplayControllerInterface() {
+void DisplayEngine::DisplayControllerImplDeregisterDisplayEngineListener() {
   fbl::AutoLock lock(&display_mutex_);
-  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
 zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
@@ -575,11 +575,11 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
   // If bootloader does not enable any of the display hardware, no vsync will be generated.
   // This fakes a vsync to let clients know we are ready until we actually initialize hardware
   if (!fully_initialized()) {
-    if (dc_intf_.is_valid()) {
+    if (engine_listener_.is_valid()) {
       if (display_count == 0 || display_configs[0].layer_count == 0) {
         const config_stamp_t banjo_config_stamp_out = display::ToBanjoConfigStamp(config_stamp);
-        dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), zx_clock_get_monotonic(),
-                                &banjo_config_stamp_out);
+        engine_listener_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_),
+                                        zx_clock_get_monotonic(), &banjo_config_stamp_out);
       }
     }
   }
@@ -990,10 +990,10 @@ void DisplayEngine::OnVsync(zx::time timestamp) {
     current_config_stamp = video_input_unit_->GetLastConfigStampApplied();
   }
   fbl::AutoLock lock(&display_mutex_);
-  if (dc_intf_.is_valid() && display_attached_) {
+  if (engine_listener_.is_valid() && display_attached_) {
     const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(current_config_stamp);
-    dc_intf_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
-                            &banjo_config_stamp);
+    engine_listener_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_), timestamp.get(),
+                                    &banjo_config_stamp);
   }
 }
 
@@ -1006,8 +1006,8 @@ void DisplayEngine::OnCaptureComplete() {
   vpu_->CaptureDone();
   {
     fbl::AutoLock display_lock(&display_mutex_);
-    if (dc_intf_.is_valid()) {
-      dc_intf_.OnCaptureComplete();
+    if (engine_listener_.is_valid()) {
+      engine_listener_.OnCaptureComplete();
     }
   }
   {
@@ -1034,8 +1034,8 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
 
     const raw_display_info_t banjo_display_info =
         vout_->CreateRawDisplayInfo(display_id_, kSupportedBanjoPixelFormats);
-    if (dc_intf_.is_valid()) {
-      dc_intf_.OnDisplayAdded(&banjo_display_info);
+    if (engine_listener_.is_valid()) {
+      engine_listener_.OnDisplayAdded(&banjo_display_info);
     }
     return;
   }
@@ -1048,8 +1048,8 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
     display_id_++;
     display_attached_ = false;
 
-    if (dc_intf_.is_valid()) {
-      dc_intf_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
+    if (engine_listener_.is_valid()) {
+      engine_listener_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
     }
     return;
   }

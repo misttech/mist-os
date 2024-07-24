@@ -145,19 +145,19 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
   return ZX_OK;
 }
 
-void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* intf) {
-  fbl::AutoLock interface_lock(&interface_mutex_);
-  controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
+void FakeDisplay::DisplayControllerImplRegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* engine_listener) {
+  fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
+  engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
   const display_mode_t banjo_display_mode = CreateBanjoDisplayMode();
   const raw_display_info_t banjo_display_info = CreateRawDisplayInfo(&banjo_display_mode);
-  controller_interface_client_.OnDisplayAdded(&banjo_display_info);
+  engine_listener_client_.OnDisplayAdded(&banjo_display_info);
 }
 
-void FakeDisplay::DisplayControllerImplResetDisplayControllerInterface() {
-  fbl::AutoLock interface_lock(&interface_mutex_);
-  controller_interface_client_ = ddk::DisplayControllerInterfaceProtocolClient();
+void FakeDisplay::DisplayControllerImplDeregisterDisplayEngineListener() {
+  fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
+  engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
 zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo vmo,
@@ -683,12 +683,12 @@ int FakeDisplay::CaptureThread() {
       break;
     }
     {
-      fbl::AutoLock interface_lock_(&interface_mutex_);
+      fbl::AutoLock engine_listene(&engine_listener_mutex_);
       // `current_capture_target_image_` is a pointer to DisplayImageInfo stored in
       // `imported_captures_` (guarded by `capture_mutex_`). So `capture_mutex_`
       // must be locked while the capture image is being used.
       fbl::AutoLock capture_lock(&capture_mutex_);
-      if (controller_interface_client_.is_valid() &&
+      if (engine_listener_client_.is_valid() &&
           (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
           ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
         {
@@ -772,7 +772,7 @@ int FakeDisplay::CaptureThread() {
             }
           }
         }
-        controller_interface_client_.OnCaptureComplete();
+        engine_listener_client_.OnCaptureComplete();
         current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
         capture_complete_signal_count_ = 0;
       }
@@ -793,16 +793,16 @@ int FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
-  fbl::AutoLock interface_lock(&interface_mutex_);
-  if (controller_interface_client_.is_valid()) {
+  fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
+  if (engine_listener_client_.is_valid()) {
     // See the discussion in `DisplayControllerImplApplyConfiguration()` about
     // the reason we use relaxed memory order here.
     const display::ConfigStamp current_config_stamp =
         current_config_stamp_.load(std::memory_order_relaxed);
     const config_stamp_t banjo_current_config_stamp =
         display::ToBanjoConfigStamp(current_config_stamp);
-    controller_interface_client_.OnDisplayVsync(
-        ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(), &banjo_current_config_stamp);
+    engine_listener_client_.OnDisplayVsync(ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(),
+                                           &banjo_current_config_stamp);
   }
 }
 

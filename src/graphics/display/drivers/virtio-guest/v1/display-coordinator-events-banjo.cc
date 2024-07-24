@@ -21,34 +21,33 @@ namespace virtio_display {
 DisplayCoordinatorEventsBanjo::DisplayCoordinatorEventsBanjo() = default;
 DisplayCoordinatorEventsBanjo::~DisplayCoordinatorEventsBanjo() = default;
 
-void DisplayCoordinatorEventsBanjo::SetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* display_controller_interface) {
+void DisplayCoordinatorEventsBanjo::RegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* display_engine_listener) {
   fbl::AutoLock event_lock(&event_mutex_);
-  if (display_controller_interface == nullptr) {
-    display_controller_interface = {};
+  if (display_engine_listener == nullptr) {
+    display_engine_listener = {};
     return;
   }
 
-  display_controller_interface_ = *display_controller_interface;
+  display_engine_listener_ = *display_engine_listener;
 }
 
 void DisplayCoordinatorEventsBanjo::OnDisplayAdded(const raw_display_info_t& added_display_args) {
   fbl::AutoLock event_lock(&event_mutex_);
-  if (display_controller_interface_.ops == nullptr) {
+  if (display_engine_listener_.ops == nullptr) {
     return;
   }
-  display_controller_interface_on_display_added(&display_controller_interface_,
-                                                &added_display_args);
+  display_engine_listener_on_display_added(&display_engine_listener_, &added_display_args);
 }
 
 void DisplayCoordinatorEventsBanjo::OnDisplayRemoved(display::DisplayId display_id) {
   const uint64_t banjo_display_id = display::ToBanjoDisplayId(display_id);
 
   fbl::AutoLock event_lock(&event_mutex_);
-  if (display_controller_interface_.ops == nullptr) {
+  if (display_engine_listener_.ops == nullptr) {
     return;
   }
-  display_controller_interface_on_display_removed(&display_controller_interface_, banjo_display_id);
+  display_engine_listener_on_display_removed(&display_engine_listener_, banjo_display_id);
 }
 
 void DisplayCoordinatorEventsBanjo::OnDisplayVsync(display::DisplayId display_id,
@@ -59,19 +58,19 @@ void DisplayCoordinatorEventsBanjo::OnDisplayVsync(display::DisplayId display_id
   const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp);
 
   fbl::AutoLock event_lock(&event_mutex_);
-  if (display_controller_interface_.ops == nullptr) {
+  if (display_engine_listener_.ops == nullptr) {
     return;
   }
-  display_controller_interface_on_display_vsync(&display_controller_interface_, banjo_display_id,
-                                                banjo_timestamp, &banjo_config_stamp);
+  display_engine_listener_on_display_vsync(&display_engine_listener_, banjo_display_id,
+                                           banjo_timestamp, &banjo_config_stamp);
 }
 
 void DisplayCoordinatorEventsBanjo::OnCaptureComplete() {
   fbl::AutoLock event_lock(&event_mutex_);
-  if (display_controller_interface_.ops == nullptr) {
+  if (display_engine_listener_.ops == nullptr) {
     return;
   }
-  display_controller_interface_on_capture_complete(&display_controller_interface_);
+  display_engine_listener_on_capture_complete(&display_engine_listener_);
 }
 
 }  // namespace virtio_display

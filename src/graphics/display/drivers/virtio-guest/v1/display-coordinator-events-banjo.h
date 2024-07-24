@@ -29,9 +29,9 @@ class DisplayCoordinatorEventsBanjo final : public DisplayCoordinatorEventsInter
 
   ~DisplayCoordinatorEventsBanjo();
 
-  // `display_controller_interface` may be null.
-  void SetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* display_controller_interface);
+  // `display_engine_listener` may be null.
+  void RegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* display_engine_listener);
 
   // DisplayCoordinatorEventsInterface:
   void OnDisplayAdded(const raw_display_info_t& display_info) override;
@@ -42,8 +42,7 @@ class DisplayCoordinatorEventsBanjo final : public DisplayCoordinatorEventsInter
 
  private:
   fbl::Mutex event_mutex_;
-  display_controller_interface_protocol_t display_controller_interface_
-      __TA_GUARDED(event_mutex_) = {};
+  display_engine_listener_protocol_t display_engine_listener_ __TA_GUARDED(event_mutex_) = {};
 };
 
 }  // namespace virtio_display

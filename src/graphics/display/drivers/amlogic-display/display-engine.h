@@ -78,9 +78,9 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
 
   // Implements the `fuchsia.hardware.display.controller/DisplayControllerImpl`
   // banjo protocol.
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* intf);
-  void DisplayControllerImplResetDisplayControllerInterface();
+  void DisplayControllerImplRegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* engine_listener);
+  void DisplayControllerImplDeregisterDisplayEngineListener();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -237,7 +237,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   std::atomic<bool> full_init_done_ = false;
 
   // Display controller related data
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_mutex_);
+  ddk::DisplayEngineListenerProtocolClient engine_listener_ __TA_GUARDED(display_mutex_);
 
   // Points to the next capture target image to capture displayed contents into.
   // Stores nullptr if capture is not going to be performed.

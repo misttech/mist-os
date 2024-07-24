@@ -247,8 +247,7 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
   return post_task_result;
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayAdded(
-    const raw_display_info_t* banjo_display_info) {
+void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info) {
   ZX_DEBUG_ASSERT(banjo_display_info != nullptr);
   zx::result<> added_display_result = AddDisplay(*banjo_display_info);
   if (added_display_result.is_error()) {
@@ -257,7 +256,7 @@ void Controller::DisplayControllerInterfaceOnDisplayAdded(
   }
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayRemoved(uint64_t banjo_display_id) {
+void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
   DisplayId display_id = ToDisplayId(banjo_display_id);
   zx::result<> remove_display_result = RemoveDisplay(display_id);
   if (remove_display_result.is_error()) {
@@ -265,7 +264,7 @@ void Controller::DisplayControllerInterfaceOnDisplayRemoved(uint64_t banjo_displ
   }
 }
 
-void Controller::DisplayControllerInterfaceOnCaptureComplete() {
+void Controller::DisplayEngineListenerOnCaptureComplete() {
   if (!supports_capture_) {
     zxlogf(ERROR,
            "OnCaptureComplete(): the display engine doesn't support "
@@ -296,9 +295,9 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
   }
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayVsync(
-    uint64_t banjo_display_id, zx_time_t banjo_timestamp,
-    const config_stamp_t* banjo_config_stamp_ptr) {
+void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
+                                                     zx_time_t banjo_timestamp,
+                                                     const config_stamp_t* banjo_config_stamp_ptr) {
   // Emit an event called "VSYNC", which is by convention the event
   // that Trace Viewer looks for in its "Highlight VSync" feature.
   TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
@@ -867,8 +866,8 @@ zx::result<> Controller::Initialize() {
     return vsync_monitor_init_result.take_error();
   }
 
-  engine_driver_client_->SetDisplayControllerInterface({
-      .ops = &display_controller_interface_protocol_ops_,
+  engine_driver_client_->RegisterDisplayEngineListener({
+      .ops = &display_engine_listener_protocol_ops_,
       .ctx = this,
   });
 
@@ -929,7 +928,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
 
 Controller::~Controller() {
   zxlogf(INFO, "Controller::~Controller");
-  engine_driver_client_->ResetDisplayControllerInterface();
+  engine_driver_client_->DeregisterDisplayEngineListener();
 }
 
 size_t Controller::TEST_imported_images_count() const {

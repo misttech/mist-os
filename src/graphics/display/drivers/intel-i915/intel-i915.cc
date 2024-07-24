@@ -168,8 +168,8 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
     display::DisplayId removed_display_id = device->id();
     RemoveDisplay(std::move(device));
 
-    if (dc_intf_.is_valid()) {
-      dc_intf_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
+    if (engine_listener_.is_valid()) {
+      engine_listener_.OnDisplayRemoved(display::ToBanjoDisplayId(removed_display_id));
     }
     return;
   }
@@ -188,16 +188,16 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
     return;
   }
 
-  if (dc_intf_.is_valid()) {
+  if (engine_listener_.is_valid()) {
     const raw_display_info_t banjo_display_info = new_device_ptr->CreateRawDisplayInfo();
-    dc_intf_.OnDisplayAdded(&banjo_display_info);
+    engine_listener_.OnDisplayAdded(&banjo_display_info);
   }
 }
 
 void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
   fbl::AutoLock lock(&display_lock_);
 
-  if (!dc_intf_.is_valid()) {
+  if (!engine_listener_.is_valid()) {
     return;
   }
 
@@ -233,7 +233,7 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
   if (pipe_attached_display_id != display::kInvalidDisplayId) {
     const uint64_t banjo_display_id = display::ToBanjoDisplayId(pipe_attached_display_id);
     const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(vsync_config_stamp);
-    dc_intf_.OnDisplayVsync(banjo_display_id, timestamp, &banjo_config_stamp);
+    engine_listener_.OnDisplayVsync(banjo_display_id, timestamp, &banjo_config_stamp);
   }
 }
 
@@ -775,13 +775,13 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
 
 // DisplayControllerImpl methods
 
-void Controller::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* intf) {
+void Controller::DisplayControllerImplRegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock lock(&display_lock_);
-  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
-  // If `SetDisplayControllerInterface` occurs **after** driver initialization
-  // (i.e. `driver_initialized_` is true), `SetDisplayControllerInterface`
+  // If `RegisterDisplayEngineListener` occurs **after** driver initialization
+  // (i.e. `driver_initialized_` is true), `RegisterDisplayEngineListener`
   // should be responsible for notifying the coordinator of existing display
   // devices.
   //
@@ -790,14 +790,14 @@ void Controller::DisplayControllerImplSetDisplayControllerInterface(
   if (driver_initialized_ && !display_devices_.is_empty()) {
     for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
       const raw_display_info_t banjo_display_info = display_device->CreateRawDisplayInfo();
-      dc_intf_.OnDisplayAdded(&banjo_display_info);
+      engine_listener_.OnDisplayAdded(&banjo_display_info);
     }
   }
 }
 
-void Controller::DisplayControllerImplResetDisplayControllerInterface() {
+void Controller::DisplayControllerImplDeregisterDisplayEngineListener() {
   fbl::AutoLock lock(&display_lock_);
-  dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
 static bool ConvertPixelFormatToTilingType(
@@ -1862,11 +1862,11 @@ void Controller::DisplayControllerImplApplyConfiguration(
     }
   }
 
-  if (dc_intf_.is_valid()) {
+  if (engine_listener_.is_valid()) {
     zx_time_t now = (fake_vsync_size > 0) ? zx_clock_get_monotonic() : 0;
     for (size_t i = 0; i < fake_vsync_size; i++) {
       const uint64_t banjo_display_id = display::ToBanjoDisplayId(fake_vsync_display_ids[i]);
-      dc_intf_.OnDisplayVsync(banjo_display_id, now, banjo_config_stamp);
+      engine_listener_.OnDisplayVsync(banjo_display_id, now, banjo_config_stamp);
     }
   }
 }
@@ -2101,16 +2101,16 @@ void Controller::Start(fdf::StartCompleter completer) {
   {
     fbl::AutoLock lock(&display_lock_);
 
-    // If `SetDisplayControllerInterface` occurs **before** driver
-    // initialization (i.e. `dc_intf_` is valid), `DdkInit()` should be
+    // If `RegisterDisplayEngineListener` occurs **before** driver
+    // initialization (i.e. `engine_listener_` is valid), `DdkInit()` should be
     // responsible for notifying the coordinator of existing display devices.
     //
-    // Otherwise, `SetDisplayControllerInterface` should be responsible for
+    // Otherwise, `RegisterDisplayEngineListener` should be responsible for
     // notifying the coordinator of existing display devices.
-    if ((!display_devices_.is_empty()) && dc_intf_.is_valid()) {
+    if ((!display_devices_.is_empty()) && engine_listener_.is_valid()) {
       for (const std::unique_ptr<DisplayDevice>& display_device : display_devices_) {
         const raw_display_info_t banjo_display_info = display_device->CreateRawDisplayInfo();
-        dc_intf_.OnDisplayAdded(&banjo_display_info);
+        engine_listener_.OnDisplayAdded(&banjo_display_info);
       }
     }
 

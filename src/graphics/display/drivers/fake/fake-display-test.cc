@@ -230,20 +230,19 @@ class DisplayCaptureCompletion {
  public:
   // Tests can import the display controller interface protocol to set up the
   // callback to trigger the semaphore.
-  display_controller_interface_protocol_t GetDisplayControllerInterfaceProtocol() {
-    static constexpr display_controller_interface_protocol_ops_t
-        kDisplayControllerInterfaceProtocolOps = {
-            .on_display_added = [](void* ctx, const raw_display_info_t* display_info) {},
-            .on_display_removed = [](void* ctx, uint64_t display_id) {},
-            .on_display_vsync = [](void* ctx, uint64_t display_id, zx_time_t timestamp,
-                                   const config_stamp_t* config_stamp) {},
-            .on_capture_complete =
-                [](void* ctx) {
-                  reinterpret_cast<DisplayCaptureCompletion*>(ctx)->OnCaptureComplete();
-                },
-        };
-    return display_controller_interface_protocol_t{
-        .ops = &kDisplayControllerInterfaceProtocolOps,
+  display_engine_listener_protocol_t GetDisplayEngineListenerProtocol() {
+    static constexpr display_engine_listener_protocol_ops_t kDisplayEngineListenerProtocolOps = {
+        .on_display_added = [](void* ctx, const raw_display_info_t* display_info) {},
+        .on_display_removed = [](void* ctx, uint64_t display_id) {},
+        .on_display_vsync = [](void* ctx, uint64_t display_id, zx_time_t timestamp,
+                               const config_stamp_t* config_stamp) {},
+        .on_capture_complete =
+            [](void* ctx) {
+              reinterpret_cast<DisplayCaptureCompletion*>(ctx)->OnCaptureComplete();
+            },
+    };
+    return display_engine_listener_protocol_t{
+        .ops = &kDisplayEngineListenerProtocolOps,
         .ctx = this,
     };
   }
@@ -585,9 +584,9 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
       std::move(new_framebuffer_buffer_collection_result.value());
 
   DisplayCaptureCompletion display_capture_completion = {};
-  const display_controller_interface_protocol_t& controller_protocol =
-      display_capture_completion.GetDisplayControllerInterfaceProtocol();
-  display()->DisplayControllerImplSetDisplayControllerInterface(&controller_protocol);
+  const display_engine_listener_protocol_t& controller_protocol =
+      display_capture_completion.GetDisplayEngineListenerProtocol();
+  display()->DisplayControllerImplRegisterDisplayEngineListener(&controller_protocol);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
   constexpr uint64_t kBanjoCaptureBufferCollectionId =

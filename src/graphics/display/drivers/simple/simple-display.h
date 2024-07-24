@@ -54,9 +54,9 @@ class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtoc
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
   void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
 
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* intf);
-  void DisplayControllerImplResetDisplayControllerInterface();
+  void DisplayControllerImplRegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* engine_listener);
+  void DisplayControllerImplDeregisterDisplayEngineListener();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -139,7 +139,7 @@ class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtoc
 
   // Only used on the vsync thread.
   zx::time next_vsync_time_;
-  ddk::DisplayControllerInterfaceProtocolClient intf_;
+  ddk::DisplayEngineListenerProtocolClient engine_listener_;
 };
 
 }  // namespace simple_display

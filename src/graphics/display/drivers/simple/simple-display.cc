@@ -91,9 +91,9 @@ zx_koid_t GetCurrentProcessKoid() {
 
 // implement display controller protocol:
 
-void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* intf) {
-  intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
+void SimpleDisplay::DisplayControllerImplRegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* engine_listener) {
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
   const int64_t pixel_clock_hz =
       int64_t{properties_.width_px} * properties_.height_px * kRefreshRateHz;
@@ -131,11 +131,11 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
       .pixel_formats_list = &pixel_format,
       .pixel_formats_count = 1,
   };
-  intf_.OnDisplayAdded(&banjo_display_info);
+  engine_listener_.OnDisplayAdded(&banjo_display_info);
 }
 
-void SimpleDisplay::DisplayControllerImplResetDisplayControllerInterface() {
-  intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+void SimpleDisplay::DisplayControllerImplDeregisterDisplayEngineListener() {
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
 zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
@@ -572,11 +572,11 @@ SimpleDisplay::SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysme
 }
 
 void SimpleDisplay::OnPeriodicVSync() {
-  if (intf_.is_valid()) {
+  if (engine_listener_.is_valid()) {
     fbl::AutoLock lock(&mtx_);
     const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
     const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp_);
-    intf_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
+    engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
   }
   next_vsync_time_ += kVSyncInterval;
   async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);

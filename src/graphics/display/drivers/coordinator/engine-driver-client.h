@@ -56,8 +56,8 @@ class EngineDriverClient {
 
   // TODO(https://fxbug.dev/314126494): These methods are only used in the
   // banjo transport. Remove when all drivers are migrated to FIDL transport.
-  void SetDisplayControllerInterface(const display_controller_interface_protocol_t& protocol);
-  void ResetDisplayControllerInterface();
+  void RegisterDisplayEngineListener(const display_engine_listener_protocol_t& protocol);
+  void DeregisterDisplayEngineListener();
 
   zx::result<DriverImageId> ImportImage(const ImageMetadata& image_metadata,
                                         DriverBufferCollectionId collection_id, uint32_t index);

@@ -57,7 +57,7 @@ class DisplayConfig;
 class IntegrationTest;
 
 // Multiplexes between display controller clients and display engine drivers.
-class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
+class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
                    public fidl::WireServer<fuchsia_hardware_display::Provider> {
  public:
   // Factory method for production use.
@@ -104,12 +104,12 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   // Must be called after `client_dispatcher_` is shut down.
   void Stop();
 
-  // fuchsia.hardware.display.controller/DisplayControllerInterface:
-  void DisplayControllerInterfaceOnDisplayAdded(const raw_display_info_t* banjo_display_info);
-  void DisplayControllerInterfaceOnDisplayRemoved(uint64_t display_id);
-  void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
-                                                const config_stamp_t* config_stamp);
-  void DisplayControllerInterfaceOnCaptureComplete();
+  // fuchsia.hardware.display.controller/DisplayEngineListener:
+  void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
+  void DisplayEngineListenerOnDisplayRemoved(uint64_t display_id);
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
+                                           const config_stamp_t* config_stamp);
+  void DisplayEngineListenerOnCaptureComplete();
 
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);

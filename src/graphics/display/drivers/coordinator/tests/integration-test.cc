@@ -212,8 +212,8 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
 
   // Empty vsync for last client. Nothing should be sent to the new client.
   const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(empty_config_stamp);
-  controller()->DisplayControllerInterfaceOnDisplayVsync(
-      ToBanjoDisplayId(primary_client->display_id()), 0u, &banjo_config_stamp);
+  controller()->DisplayEngineListenerOnDisplayVsync(ToBanjoDisplayId(primary_client->display_id()),
+                                                    0u, &banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   count = primary_client->vsync_count();
@@ -248,8 +248,8 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   // Send the controller a vsync for an image / a config it won't recognize anymore.
   ConfigStamp invalid_config_stamp = controller()->TEST_controller_stamp() - ConfigStamp{1};
   const config_stamp_t invalid_banjo_config_stamp = ToBanjoConfigStamp(invalid_config_stamp);
-  controller()->DisplayControllerInterfaceOnDisplayVsync(
-      ToBanjoDisplayId(primary_client->display_id()), 0u, &invalid_banjo_config_stamp);
+  controller()->DisplayEngineListenerOnDisplayVsync(ToBanjoDisplayId(primary_client->display_id()),
+                                                    0u, &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
   SendDisplayVsync();

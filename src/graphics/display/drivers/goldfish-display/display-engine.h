@@ -51,9 +51,9 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   zx::result<> Initialize();
 
   // Display controller protocol implementation.
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* interface);
-  void DisplayControllerImplResetDisplayControllerInterface();
+  void DisplayControllerImplRegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* engine_listener);
+  void DisplayControllerImplDeregisterDisplayEngineListener();
   zx_status_t DisplayControllerImplImportBufferCollection(
       uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
   zx_status_t DisplayControllerImplReleaseBufferCollection(
@@ -185,7 +185,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   std::unique_ptr<RenderControl> rc_;
   DisplayState primary_display_device_ = {};
   fbl::Mutex flush_lock_;
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);
+  ddk::DisplayEngineListenerProtocolClient engine_listener_ TA_GUARDED(flush_lock_);
 
   async_dispatcher_t* const display_event_dispatcher_;
 };

@@ -141,12 +141,17 @@ type RawDisplayInfo = resource struct {
     pixel_formats vector<FuchsiaImages2PixelFormatEnumValue>:MAX_COUNT_DISPLAY_PIXEL_FORMATS;
 };
 
+/// Receives and acknowledges events on a display engine.
+///
+/// A [`DisplayEngineListener`] may be registered to the engine through the
+/// [`DisplayCoordinatorImpl`] protocol before it receives any events.
+///
 /// The client will not make any `ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL` calls into the device
 /// during these callbacks.
 @transport("Banjo")
 @banjo_layout("ddk-interface")
-closed protocol DisplayControllerInterface {
-    /// Emitted when a display is connected.
+closed protocol DisplayEngineListener {
+    /// Called when a display is connected.
     ///
     /// Display Engine drivers must emit this event for all displays connected
     /// prior to initialization.
@@ -154,7 +159,7 @@ closed protocol DisplayControllerInterface {
         display_info RawDisplayInfo;
     });
 
-    /// Emitted when a display is removed.
+    /// Called when a display is removed.
     ///
     /// `display_id` must be a valid display ID that occurred in a previous
     /// `OnDisplayAdded()` event.
@@ -166,7 +171,9 @@ closed protocol DisplayControllerInterface {
         display_id uint64;
     });
 
-    /// Events which are invoked when display vsync occurs.
+    /// Called at the start of each display device's vertical synchronization
+    /// (Vsync) period, regardless of whether the display has applied any
+    /// configuration.
     ///
     /// Arguments
     /// - |timestamp|
@@ -179,10 +186,6 @@ closed protocol DisplayControllerInterface {
     ///        Note that an `ApplyConfiguration()` call may contain multiple
     ///      configurations with a certain `config_stamp`; Only the application
     ///      status of the configuration with ID `display_id` is related.
-    ///
-    /// The driver must call this function as close as possible to the start of
-    /// every display's VSync period, even if the display has no images
-    /// displayed.
     strict OnDisplayVsync(struct {
         display_id uint64;
         timestamp zx.Time;
@@ -409,15 +412,18 @@ type ClientCompositionOpcode = strict bits : uint32 {
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 closed protocol DisplayControllerImpl {
-    /// The function will only be called once, and it will be called before any other
-    /// functions are called.
-    strict SetDisplayControllerInterface(resource struct {
-        intf client_end:DisplayControllerInterface;
+    /// Registers a `DisplayEngineListener` that listens to display events
+    /// on this display engine.
+    ///
+    /// There must be exactly one `DisplayEngineListener` registered to
+    /// the display engine before any other functions are called.
+    strict RegisterDisplayEngineListener(resource struct {
+        engine_listener client_end:DisplayEngineListener;
     }) -> ();
 
-    /// Resets the DisplayControllerInterface client (if set) and will not call
-    /// DisplayControllerInterface callback methods anymore.
-    strict ResetDisplayControllerInterface() -> ();
+    /// Deregisters the `DisplayEngineListener` connection previously
+    /// registered to the Engine if there is any. No-op otherwise.
+    strict DeregisterDisplayEngineListener() -> ();
 
     /// Import a sysmem buffer collection token.
     ///
