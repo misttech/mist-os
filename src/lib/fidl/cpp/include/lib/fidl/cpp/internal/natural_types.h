@@ -365,7 +365,7 @@ struct NaturalTableCodingTraits {
     static void VisitPrevAndCurOrdinals(U value, Fn&& func) {
       static_assert(std::is_same_v<T*, U> || std::is_same_v<const T*, U>);
       constexpr size_t N = std::tuple_size_v<decltype(T::kMembers)>;
-      Base::template Fold(
+      Base::Fold(
           [func = std::forward<Fn>(func), value](const auto& integral) {
             constexpr size_t I = cpp20::remove_cvref_t<decltype(integral)>::value;
             auto& member_info = std::get<I>(Base::kMembers);
