@@ -381,7 +381,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			// LINT.IfChange(blob_header_timeout)
 			String: "timed out waiting for http response header while downloading blob",
 			// LINT.ThenChange(/src/sys/pkg/bin/pkg-resolver/src/cache.rs:blob_header_timeout)
-			Type: syslogType,
+			Type:               syslogType,
+			SkipAllPassedTests: true,
 		},
 		&stringInLogCheck{
 			String: "Got no package for fuchsia-pkg://",
