@@ -7,20 +7,40 @@ use async_net as net;
 use futures::io;
 use http::uri::{Scheme, Uri};
 use hyper::service::Service;
-use rustls::ClientConfig;
+use rustls::RootCertStore;
 use std::net::ToSocketAddrs;
+use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use tracing::warn;
 
-pub(crate) fn configure_cert_store(tls: &mut ClientConfig) {
-    tls.root_store = rustls_native_certs::load_native_certs().unwrap_or_else(|(certs, err)| {
-        if certs.is_some() {
-            warn!("One or more TLS certificates in root store failed to load: {}", err);
+pub fn new_root_cert_store() -> Arc<RootCertStore> {
+    // It can be expensive to parse the certs, so cache them
+    static ROOT_STORE: OnceLock<Arc<RootCertStore>> = OnceLock::new();
+
+    let root_store = ROOT_STORE.get_or_init(|| {
+        let mut root_store = rustls::RootCertStore::empty();
+
+        let certs = match rustls_native_certs::load_native_certs() {
+            Ok(certs) => certs,
+            Err(err) => {
+                panic!("Could not load TLS CA certificates from platform root store: {err}")
+            }
+        };
+
+        let (added, ignored) = root_store.add_parsable_certificates(&certs);
+
+        if ignored != 0 {
+            warn!("Failed to load {ignored} certificates into the root store");
         }
-        certs.unwrap_or_else(|| {
-            panic!("Unable to load any TLS CA certificates from platform root store: {}", err)
-        })
-    })
+
+        if added == 0 {
+            panic!("Unable to load any TLS CA certificates from platform root store")
+        }
+
+        Arc::new(root_store)
+    });
+
+    Arc::clone(&root_store)
 }
 
 /// A Async-std-compatible implementation of hyper's `Connect` trait which allows

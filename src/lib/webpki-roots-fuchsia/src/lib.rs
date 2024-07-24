@@ -7,7 +7,6 @@ extern crate lazy_static;
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
-use webpki::trust_anchor_util::cert_der_as_trust_anchor;
 
 static CERT_PATH: &'static str = "/config/ssl/cert.pem";
 
@@ -47,23 +46,18 @@ lazy_static! {
         }
         cert_ders
     };
-    static ref ROOTS: Vec<webpki::TrustAnchor<'static>> = {
+    pub static ref TLS_SERVER_ROOTS: Vec<webpki::TrustAnchor<'static>> = {
         CERT_DERS.iter().map(|cert_bytes| {
-            cert_der_as_trust_anchor(&cert_bytes)
+            webpki::TrustAnchor::try_from_cert_der(cert_bytes)
                 .expect("Parsing root certificate failed")
         }).collect()
     };
-
-    pub static ref TLS_SERVER_ROOTS: webpki::TLSServerTrustAnchors<'static> =
-        webpki::TLSServerTrustAnchors(&ROOTS);
 }
 
 #[cfg(test)]
 mod test {
     #[test]
     fn test_load() {
-        let webpki::TLSServerTrustAnchors(roots) =
-            &crate::TLS_SERVER_ROOTS as &webpki::TLSServerTrustAnchors<'static>;
-        assert_ne!(roots.len(), 0);
+        assert_ne!(crate::TLS_SERVER_ROOTS.len(), 0);
     }
 }

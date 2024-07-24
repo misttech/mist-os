@@ -184,7 +184,9 @@ regex = "1.7.3"
 regex-syntax = "0.8.3"
 ring = "0.16.20"
 rustc-hash = "1.0.1"
-rustls = { version = "0.19.1", features = ["dangerous_configuration"] }
+rustls = { version = "=0.21.7", features = ["dangerous_configuration"] }
+rustls-pemfile = "1.0.4"
+rustls-webpki = "0.101.6"
 rustyline = "2.1.0"
 rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
@@ -214,7 +216,7 @@ termion = "1.5.3"
 test-case = "3.2.1"
 textwrap = "0.11.0"
 thiserror = "1.0.57"
-tokio-rustls = "0.22.0"
+tokio-rustls = "0.24.1"
 toml = "0.5"
 toml_edit = "0.2.1"
 tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes"] }
@@ -228,7 +230,6 @@ url = "2.3"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
 valico = "2.4.2"
 vte = "0.3"
-webpki = "0.21"
 xml-rs = "0.8"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
@@ -253,7 +254,7 @@ features = ["env-filter", "fmt", "registry", "std", "tracing-log"]
 # ct-logs = "0.6"
 euclid = { version = "0.22.1", features = [ "serde" ] }
 getopts = "0.2"
-hyper-rustls = { version = "0.22.1", default-features = false }
+hyper-rustls = { version = "0.24.2", default-features = false }
 lipsum = "0.6.0"
 openat = "0.1.17"
 pretty = "0.5.2"
@@ -286,7 +287,7 @@ easy-parallel = "3.1"
 fs_extra = "1.2.0"
 fuse3 = { version = "0.6.1", features = ["tokio-runtime", "unprivileged"] }
 home = "0.5.9"
-hyper-rustls = { version = "0.22.1", default-features = false, features = ["rustls-native-certs"] }
+hyper-rustls = { version = "0.24.2", default-features = false, features = ["rustls-native-certs"] }
 indoc = "1.0.3"
 loom = "0.7.1"
 # TODO(https://fxbug.dev/106164) Remove this explicit mio dependency when it can be
@@ -300,7 +301,7 @@ proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
 quote = "1.0.35"
 rustfix = "0.6.1"
-rustls-native-certs = "0.5.0"
+rustls-native-certs = "0.6.3"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
 serial_test = "0.5.1" # Not for use on Fuchsia, only for a single process.
 shared_child = "1.0.0"
@@ -384,9 +385,6 @@ notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 #pulldown-cmark = { path = "forks/pulldown-cmark" }
-# FIXME(87798): We can unfork to 0.19.1 once we've updated hyper to 0.14.x, and
-# tokio to 1.x.
-rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
 netlink-packet-route = { path="forks/netlink-packet-route" }
 netlink-packet-utils = { path="forks/netlink-packet-utils-0.5.2" }
@@ -734,11 +732,11 @@ rustflags = []
 # Thank you!
 visibility = [
   ":ring",
-  ":rustls-v0_19_1",
-  ":sct-v0_6_0",
+  ":rustls-v0_21_7",
+  ":rustls-webpki-v0_101_6",
+  ":sct-v0_7_0",
   ":trust-dns-proto-v0_21_2",
   ":tuf-v0_3_0-beta12",
-  ":webpki-v0_21_0",
 ]
 deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 
@@ -774,6 +772,9 @@ target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "ic
 [gn.package.rust_icu_ustring."5.0.0"]
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
+
+[gn.package.rustls."0.21.7"]
+rustflags = []
 
 [gn.package.rutabaga_gfx."0.1.3"]
 # Has build script but no config needed.

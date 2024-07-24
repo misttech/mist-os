@@ -391,13 +391,13 @@ group("hyper") {
 
 if (!(current_os == "fuchsia")) {
   group("hyper-rustls") {
-    public_deps = [ ":hyper-rustls-v0_22_1" ]
+    public_deps = [ ":hyper-rustls-v0_24_2" ]
   }
 }
 
 if (current_os == "fuchsia") {
   group("hyper-rustls") {
-    public_deps = [ ":hyper-rustls-v0_22_1" ]
+    public_deps = [ ":hyper-rustls-v0_24_2" ]
   }
 }
 
@@ -795,13 +795,21 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("rustls") {
-  public_deps = [ ":rustls-v0_19_1" ]
+  public_deps = [ ":rustls-v0_21_7" ]
 }
 
 if (!(current_os == "fuchsia")) {
   group("rustls-native-certs") {
-    public_deps = [ ":rustls-native-certs-v0_5_0" ]
+    public_deps = [ ":rustls-native-certs-v0_6_3" ]
   }
+}
+
+group("rustls-pemfile") {
+  public_deps = [ ":rustls-pemfile-v1_0_4" ]
+}
+
+group("rustls-webpki") {
+  public_deps = [ ":rustls-webpki-v0_101_6" ]
 }
 
 group("rustyline") {
@@ -1013,7 +1021,7 @@ if (current_os == "fuchsia") {
 }
 
 group("tokio-rustls") {
-  public_deps = [ ":tokio-rustls-v0_22_0" ]
+  public_deps = [ ":tokio-rustls-v0_24_1" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -1142,10 +1150,6 @@ group("vte") {
 
 group("walkdir") {
   public_deps = [ ":walkdir-v2_3_1" ]
-}
-
-group("webpki") {
-  public_deps = [ ":webpki-v0_21_0" ]
 }
 
 group("which") {
@@ -6751,45 +6755,44 @@ rust_library("hyper-v0_14_19") {
   applicable_licenses = [ ":hyper-v0_14_19.license" ]
 }
 
-license("hyper-rustls-v0_22_1.license") {
+license("hyper-rustls-v0_24_2.license") {
   public_package_name = "hyper_rustls"
   license_files = [
-    "//third_party/rust_crates/vendor/hyper-rustls-0.22.1/LICENSE",
-    "//third_party/rust_crates/vendor/hyper-rustls-0.22.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/hyper-rustls-0.22.1/LICENSE-ISC",
-    "//third_party/rust_crates/vendor/hyper-rustls-0.22.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/hyper-rustls-0.24.2/LICENSE",
+    "//third_party/rust_crates/vendor/hyper-rustls-0.24.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/hyper-rustls-0.24.2/LICENSE-ISC",
+    "//third_party/rust_crates/vendor/hyper-rustls-0.24.2/LICENSE-MIT",
   ]
 }
 
-rust_library("hyper-rustls-v0_22_1") {
+rust_library("hyper-rustls-v0_24_2") {
   crate_name = "hyper_rustls"
-  crate_root = "//third_party/rust_crates/vendor/hyper-rustls-0.22.1/src/lib.rs"
-  output_name = "hyper_rustls-383db729aca6b09e"
+  crate_root = "//third_party/rust_crates/vendor/hyper-rustls-0.24.2/src/lib.rs"
+  output_name = "hyper_rustls-d34ced21928c752e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rustls-v0_19_1" ]
   deps += [ ":futures-util-v0_3_19" ]
+  deps += [ ":http-v0_2_4" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":log-v0_4_20" ]
-  deps += [ ":rustls-native-certs-v0_5_0" ]
-  deps += [ ":tokio-rustls-v0_22_0" ]
+  deps += [ ":rustls-native-certs-v0_6_3" ]
+  deps += [ ":rustls-v0_21_7" ]
+  deps += [ ":tokio-rustls-v0_24_1" ]
   deps += [ ":tokio-v1_32_1" ]
-  deps += [ ":webpki-v0_21_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=383db729aca6b09e",
-    "-Cextra-filename=-383db729aca6b09e",
+    "--edition=2021",
+    "-Cmetadata=d34ced21928c752e",
+    "-Cextra-filename=-d34ced21928c752e",
     "--cfg=feature=\"rustls-native-certs\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":hyper-rustls-v0_22_1.license" ]
+  applicable_licenses = [ ":hyper-rustls-v0_24_2.license" ]
 }
 
 license("iana-time-zone-v0_1_60.license") {
@@ -12559,11 +12562,11 @@ rust_library("ring-v0_16_20") {
 
   visibility = []
   visibility += [ ":ring" ]
-  visibility += [ ":rustls-v0_19_1" ]
-  visibility += [ ":sct-v0_6_0" ]
+  visibility += [ ":rustls-v0_21_7" ]
+  visibility += [ ":rustls-webpki-v0_101_6" ]
+  visibility += [ ":sct-v0_7_0" ]
   visibility += [ ":trust-dns-proto-v0_21_2" ]
   visibility += [ ":tuf-v0_3_0-beta12" ]
-  visibility += [ ":webpki-v0_21_0" ]
 
   applicable_licenses = [ ":ring-v0_16_20.license" ]
 }
@@ -13006,61 +13009,68 @@ rust_library("rustfix-v0_6_1") {
   applicable_licenses = [ ":rustfix-v0_6_1.license" ]
 }
 
-license("rustls-v0_19_1.license") {
+license("rustls-v0_21_7.license") {
   public_package_name = "rustls"
-  license_files = [ "//third_party/rust_crates/forks/rustls/LICENSE" ]
+  license_files = [
+    "//third_party/rust_crates/vendor/rustls-0.21.7/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/rustls-0.21.7/LICENSE-ISC",
+    "//third_party/rust_crates/vendor/rustls-0.21.7/LICENSE-MIT",
+  ]
 }
 
-rust_library("rustls-v0_19_1") {
+rust_library("rustls-v0_21_7") {
   crate_name = "rustls"
-  crate_root = "//third_party/rust_crates/forks/rustls/src/lib.rs"
-  output_name = "rustls-72f8bc3d6c17ed51"
+  crate_root = "//third_party/rust_crates/vendor/rustls-0.21.7/src/lib.rs"
+  output_name = "rustls-5a9b9d6fa643306c"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":base64-v0_13_0" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":ring-v0_16_20" ]
-  deps += [ ":sct-v0_6_0" ]
-  deps += [ ":webpki-v0_21_0" ]
+  deps += [ ":rustls-webpki-v0_101_6" ]
+  deps += [ ":sct-v0_7_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=72f8bc3d6c17ed51",
-    "-Cextra-filename=-72f8bc3d6c17ed51",
+    "--edition=2021",
+    "-Cmetadata=5a9b9d6fa643306c",
+    "-Cextra-filename=-5a9b9d6fa643306c",
     "--cfg=feature=\"dangerous_configuration\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"log\"",
     "--cfg=feature=\"logging\"",
+    "--cfg=feature=\"tls12\"",
   ]
 
+  aliased_deps = {
+    webpki = ":rustls-webpki-v0_101_6"
+  }
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":rustls-v0_19_1.license" ]
+  applicable_licenses = [ ":rustls-v0_21_7.license" ]
 }
 
-license("rustls-native-certs-v0_5_0.license") {
+license("rustls-native-certs-v0_6_3.license") {
   public_package_name = "rustls_native_certs"
   license_files = [
-    "//third_party/rust_crates/vendor/rustls-native-certs-0.5.0/LICENSE",
-    "//third_party/rust_crates/vendor/rustls-native-certs-0.5.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/rustls-native-certs-0.5.0/LICENSE-ISC",
-    "//third_party/rust_crates/vendor/rustls-native-certs-0.5.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/rustls-native-certs-0.6.3/LICENSE",
+    "//third_party/rust_crates/vendor/rustls-native-certs-0.6.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/rustls-native-certs-0.6.3/LICENSE-ISC",
+    "//third_party/rust_crates/vendor/rustls-native-certs-0.6.3/LICENSE-MIT",
   ]
 }
 
-rust_library("rustls-native-certs-v0_5_0") {
+rust_library("rustls-native-certs-v0_6_3") {
   crate_name = "rustls_native_certs"
   crate_root =
-      "//third_party/rust_crates/vendor/rustls-native-certs-0.5.0/src/lib.rs"
-  output_name = "rustls_native_certs-be3004a9b1f3e746"
+      "//third_party/rust_crates/vendor/rustls-native-certs-0.6.3/src/lib.rs"
+  output_name = "rustls_native_certs-1658d89f86b1309b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rustls-v0_19_1" ]
+  deps += [ ":rustls-pemfile-v1_0_4" ]
   if (true && !(current_os == "mac")) {
     deps += [ ":openssl-probe-v0_1_2" ]
   }
@@ -13075,16 +13085,48 @@ rust_library("rustls-native-certs-v0_5_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=be3004a9b1f3e746",
-    "-Cextra-filename=-be3004a9b1f3e746",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"rustls\"",
+    "--edition=2021",
+    "-Cmetadata=1658d89f86b1309b",
+    "-Cextra-filename=-1658d89f86b1309b",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":rustls-native-certs-v0_5_0.license" ]
+  applicable_licenses = [ ":rustls-native-certs-v0_6_3.license" ]
+}
+
+license("rustls-pemfile-v1_0_4.license") {
+  public_package_name = "rustls_pemfile"
+  license_files = [
+    "//third_party/rust_crates/vendor/rustls-pemfile-1.0.4/LICENSE",
+    "//third_party/rust_crates/vendor/rustls-pemfile-1.0.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/rustls-pemfile-1.0.4/LICENSE-ISC",
+    "//third_party/rust_crates/vendor/rustls-pemfile-1.0.4/LICENSE-MIT",
+  ]
+}
+
+rust_library("rustls-pemfile-v1_0_4") {
+  crate_name = "rustls_pemfile"
+  crate_root =
+      "//third_party/rust_crates/vendor/rustls-pemfile-1.0.4/src/lib.rs"
+  output_name = "rustls_pemfile-cb6220b67240380"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":base64-v0_21_7" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=cb6220b67240380",
+    "-Cextra-filename=-cb6220b67240380",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":rustls-pemfile-v1_0_4.license" ]
 }
 
 rust_proc_macro("rustversion-v1_0_12") {
@@ -13554,20 +13596,20 @@ rust_library("scrypt-v0_10_0") {
   applicable_licenses = [ ":scrypt-v0_10_0.license" ]
 }
 
-license("sct-v0_6_0.license") {
+license("sct-v0_7_0.license") {
   public_package_name = "sct"
   license_files = [
-    "//third_party/rust_crates/vendor/sct-0.6.0/LICENSE",
-    "//third_party/rust_crates/vendor/sct-0.6.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/sct-0.6.0/LICENSE-ISC",
-    "//third_party/rust_crates/vendor/sct-0.6.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/sct-0.7.0/LICENSE",
+    "//third_party/rust_crates/vendor/sct-0.7.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/sct-0.7.0/LICENSE-ISC",
+    "//third_party/rust_crates/vendor/sct-0.7.0/LICENSE-MIT",
   ]
 }
 
-rust_library("sct-v0_6_0") {
+rust_library("sct-v0_7_0") {
   crate_name = "sct"
-  crate_root = "//third_party/rust_crates/vendor/sct-0.6.0/src/lib.rs"
-  output_name = "sct-879ad9017e22db73"
+  crate_root = "//third_party/rust_crates/vendor/sct-0.7.0/src/lib.rs"
+  output_name = "sct-84f1ece5b2f1dd9b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -13579,13 +13621,13 @@ rust_library("sct-v0_6_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=879ad9017e22db73",
-    "-Cextra-filename=-879ad9017e22db73",
+    "-Cmetadata=84f1ece5b2f1dd9b",
+    "-Cextra-filename=-84f1ece5b2f1dd9b",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":sct-v0_6_0.license" ]
+  applicable_licenses = [ ":sct-v0_7_0.license" ]
 }
 
 license("sec1-v0_3_0.license") {
@@ -15903,37 +15945,39 @@ rust_library("tokio-v1_32_1") {
   applicable_licenses = [ ":tokio-v1_32_1.license" ]
 }
 
-license("tokio-rustls-v0_22_0.license") {
+license("tokio-rustls-v0_24_1.license") {
   public_package_name = "tokio_rustls"
   license_files = [
-    "//third_party/rust_crates/vendor/tokio-rustls-0.22.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/tokio-rustls-0.22.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/tokio-rustls-0.24.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/tokio-rustls-0.24.1/LICENSE-MIT",
   ]
 }
 
-rust_library("tokio-rustls-v0_22_0") {
+rust_library("tokio-rustls-v0_24_1") {
   crate_name = "tokio_rustls"
-  crate_root = "//third_party/rust_crates/vendor/tokio-rustls-0.22.0/src/lib.rs"
-  output_name = "tokio_rustls-16584d9dad632eb3"
+  crate_root = "//third_party/rust_crates/vendor/tokio-rustls-0.24.1/src/lib.rs"
+  output_name = "tokio_rustls-b108e415b7612dd1"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rustls-v0_19_1" ]
+  deps += [ ":rustls-v0_21_7" ]
   deps += [ ":tokio-v1_32_1" ]
-  deps += [ ":webpki-v0_21_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=16584d9dad632eb3",
-    "-Cextra-filename=-16584d9dad632eb3",
+    "-Cmetadata=b108e415b7612dd1",
+    "-Cextra-filename=-b108e415b7612dd1",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"logging\"",
+    "--cfg=feature=\"tls12\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":tokio-rustls-v0_22_0.license" ]
+  applicable_licenses = [ ":tokio-rustls-v0_24_1.license" ]
 }
 
 license("tokio-stream-v0_1_14.license") {
@@ -17823,18 +17867,17 @@ rust_library("web-sys-v0_3_40") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
-license("webpki-v0_21_0.license") {
+license("rustls-webpki-v0_101_6.license") {
   public_package_name = "webpki"
-  license_files = [
-    "//third_party/rust_crates/vendor/webpki-0.21.0/LICENSE",
-    "//third_party/rust_crates/vendor/webpki-0.21.0/third-party/chromium/LICENSE",
-  ]
+  license_files =
+      [ "//third_party/rust_crates/vendor/rustls-webpki-0.101.6/LICENSE" ]
 }
 
-rust_library("webpki-v0_21_0") {
+rust_library("rustls-webpki-v0_101_6") {
   crate_name = "webpki"
-  crate_root = "//third_party/rust_crates/vendor/webpki-0.21.0/src/webpki.rs"
-  output_name = "webpki-cf5d3581502ba661"
+  crate_root =
+      "//third_party/rust_crates/vendor/rustls-webpki-0.101.6/src/lib.rs"
+  output_name = "webpki-8b53ec5c62ae9cec"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -17845,17 +17888,17 @@ rust_library("webpki-v0_21_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=cf5d3581502ba661",
-    "-Cextra-filename=-cf5d3581502ba661",
+    "--edition=2021",
+    "-Cmetadata=8b53ec5c62ae9cec",
+    "-Cextra-filename=-8b53ec5c62ae9cec",
+    "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
-    "--cfg=feature=\"trust_anchor_util\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":webpki-v0_21_0.license" ]
+  applicable_licenses = [ ":rustls-webpki-v0_101_6.license" ]
 }
 
 rust_library("wepoll-ffi-v0_1_2") {

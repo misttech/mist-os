@@ -23,8 +23,8 @@ rustc_library("httpdate-hyper") {
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:hyper",
     "//third_party/rust_crates:rustls",
+    "//third_party/rust_crates:rustls-webpki",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:webpki",
   ]
 
   sources = [ "src/lib.rs" ]
