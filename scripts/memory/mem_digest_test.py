@@ -5,12 +5,13 @@
 # found in the LICENSE file.
 
 import argparse
-import mem_digest
-import os
-import unittest
-import sys
-from contextlib import redirect_stdout
 import io
+import os
+import sys
+import unittest
+from contextlib import redirect_stdout
+
+import mem_digest
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

@@ -10,6 +10,7 @@ import sys
 import typing
 
 import termout
+
 import selection_action
 
 LOG_TO_STDOUT_OPTION = "-"

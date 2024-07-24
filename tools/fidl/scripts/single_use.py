@@ -11,7 +11,7 @@ another type.
 import sys
 from collections import defaultdict
 
-from ir import Libraries, Enum, Struct, DeclState
+from ir import DeclState, Enum, Libraries, Struct
 
 fidl_libraries = Libraries()
 

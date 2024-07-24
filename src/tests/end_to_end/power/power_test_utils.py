@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Fuchsia power test utility library."""
 
-# keep-sorted start
 import abc
 import csv
 import dataclasses
@@ -17,18 +16,12 @@ import signal
 import struct
 import subprocess
 import time
-
-# keep-sorted end
-
-# keep-sorted start
 from collections import deque
 from collections.abc import Iterable, Mapping
-from trace_processing import trace_metrics, trace_model, trace_time
-from trace_processing.metrics import power as power_metrics
 from typing import Any, Sequence
 
-# keep-sorted end
-
+from trace_processing import trace_metrics, trace_model, trace_time
+from trace_processing.metrics import power as power_metrics
 
 SAMPLE_INTERVAL_NS = 200000
 

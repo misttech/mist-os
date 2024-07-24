@@ -4,6 +4,7 @@
 """Tests for classification_types.py"""
 
 import unittest
+
 from fuchsia.tools.licenses.classification_types import *
 
 

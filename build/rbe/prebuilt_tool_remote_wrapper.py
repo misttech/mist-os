@@ -14,13 +14,12 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
+from typing import Any, Iterable, Optional, Sequence
 
 import cl_utils
 import fuchsia
 import remote_action
-
-from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent

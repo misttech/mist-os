@@ -9,11 +9,10 @@ import os
 import random
 from importlib.resources import as_file, files
 
-from mobly import test_runner
-
-import test_data
 import perf_publish.publish as publish
+import test_data
 from fuchsia_base_test import fuchsia_base_test
+from mobly import test_runner
 
 
 class ExampleMetricPublishing(fuchsia_base_test.FuchsiaBaseTest):

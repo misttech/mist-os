@@ -7,13 +7,13 @@
 ### Query and calculate test stats.
 
 import argparse
-import sys
-import os
-import subprocess
 import json
-from collections import defaultdict
+import os
 import random
+import subprocess
+import sys
 import time
+from collections import defaultdict
 
 
 # Retrieve stats on test execution.

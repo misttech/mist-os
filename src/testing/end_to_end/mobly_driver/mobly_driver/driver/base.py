@@ -11,7 +11,6 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-
 TEST_OUTDIR_ENV = "FUCHSIA_TEST_OUTDIR"
 
 

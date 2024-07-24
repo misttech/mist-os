@@ -6,11 +6,10 @@
 
 import json
 import unittest
-from unittest.mock import patch
 from typing import Any
+from unittest.mock import patch
 
 import yaml
-
 from mobly_driver.driver import common
 
 

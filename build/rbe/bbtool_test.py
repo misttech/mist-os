@@ -5,9 +5,9 @@
 
 import contextlib
 import io
-from typing import Any
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 import bbtool

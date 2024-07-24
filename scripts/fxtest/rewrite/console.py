@@ -11,10 +11,11 @@ import os
 import time
 import typing
 
-import args
-import event
 import statusinfo
 import termout
+
+import args
+import event
 
 
 @dataclass

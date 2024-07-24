@@ -8,11 +8,11 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 from typing import Any
+from unittest import mock
 
-import remotetool
 import cl_utils
+import remotetool
 
 
 class DictionaryDiffTests(unittest.TestCase):

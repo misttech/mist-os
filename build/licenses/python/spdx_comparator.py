@@ -3,15 +3,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from collections import defaultdict
 import dataclasses
+import hashlib
 import json
 import logging
-from pathlib import Path
 import re
+from collections import defaultdict
+from pathlib import Path
 from typing import Any, Dict, List, Set
 from typing.re import Pattern as re_Pattern
-import hashlib
+
 from gn_label import GnLabel
 
 

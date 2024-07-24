@@ -9,9 +9,8 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
-from parameterized import parameterized
-
 from mobly_driver.driver import base
+from parameterized import parameterized
 
 
 class BaseMoblyDriverTest(unittest.TestCase):

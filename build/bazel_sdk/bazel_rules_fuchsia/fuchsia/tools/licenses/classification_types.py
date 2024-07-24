@@ -3,14 +3,15 @@
 # found in the LICENSE file.
 """Types for classifying licenses"""
 
-from collections import defaultdict
 import csv
 import dataclasses
 import json
+from collections import defaultdict
+from hashlib import md5
+from typing import Any, Callable, ClassVar, Collection, Dict, List, Pattern
+
 from fuchsia.tools.licenses.common_types import *
 from fuchsia.tools.licenses.spdx_types import *
-from hashlib import md5
-from typing import Any, Callable, ClassVar, Collection, Dict, Pattern, List
 
 
 @dataclasses.dataclass(frozen=True)

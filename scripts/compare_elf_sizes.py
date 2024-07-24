@@ -16,7 +16,6 @@ import sys
 
 from tabulate import tabulate
 
-
 FIELDS = [
     "blob",
     "bss",

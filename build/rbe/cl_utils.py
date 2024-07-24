@@ -15,13 +15,12 @@ import fcntl
 import filecmp
 import io
 import os
+import platform
 import re
 import shlex
 import shutil
 import subprocess
 import sys
-import platform
-
 from pathlib import Path
 from typing import (
     IO,

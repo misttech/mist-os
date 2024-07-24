@@ -5,13 +5,13 @@
 # found in the LICENSE file.
 """The code is to provide a reference of how test_images.h is generated"""
 
-import os
 import hashlib
+import os
 import pathlib
-import tempfile
-from typing import List
 import struct
 import subprocess
+import tempfile
+from typing import List
 
 MY_DIR = os.path.dirname(__file__)
 FUCHSIA_DIR = os.environ.get("FUCHSIA_DIR")

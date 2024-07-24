@@ -7,8 +7,8 @@ import argparse
 import os
 import subprocess
 import sys
-from pathlib import Path
 from multiprocessing.dummy import Pool
+from pathlib import Path
 
 FUCHSIA_DIR = Path(os.environ["FUCHSIA_DIR"])
 

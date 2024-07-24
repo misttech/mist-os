@@ -7,12 +7,12 @@
 
 import argparse
 import difflib
+import json
 import marshal
 import sqlite3
-import json
 import sys
-from typing import Dict, List, Sequence
 from pathlib import Path
+from typing import Dict, List, Sequence
 
 
 def levenshtein_distance(str1: str, str2: str) -> int:

@@ -5,9 +5,9 @@
 # found in the LICENSE file.
 
 import argparse
+import inspect
 import os
 import sys
-import inspect
 
 # Check our environment variables.  We may need to extend our path in order to
 # find all of the libraries we will need for our imports.
@@ -139,14 +139,15 @@ def ParseArgs():
 ARGS = ParseArgs()
 sys.path.extend(ARGS.syspath)
 
+import enum
+import pprint as pp
+import signal
+import struct
+import time
+
 import Monsoon.HVPM as HVPM
 import Monsoon.Operations as op
 import Monsoon.pmapi as pmapi
-import time
-import struct
-import signal
-import pprint as pp
-import enum
 
 
 class SampleHandling(enum.Enum):

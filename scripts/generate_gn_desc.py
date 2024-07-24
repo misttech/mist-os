@@ -5,10 +5,10 @@
 # found in the LICENSE file.
 
 import argparse
-from os import path
 import os
 import subprocess
 import sys
+from os import path
 
 
 def extract_build_graph(gn_binary, out_dir):

@@ -2,18 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import unittest
 import os
 import tempfile
+import unittest
 
+from execution_params import ExecutionParams
 from params import (
-    Params,
-    SDK_TOOL_PATH_KEY,
     EXECUTION_JSON_KEY,
     OUTPUT_DIRECTORY_KEY,
+    SDK_TOOL_PATH_KEY,
     TARGETS_KEY,
+    Params,
 )
-from execution_params import ExecutionParams
 
 
 class TestParams(unittest.TestCase):

@@ -3,16 +3,14 @@
 # found in the LICENSE file.
 import asyncio
 import logging
-from typing import Dict, Set, Any
-
-from fidl_codec import decode_fidl_response
-from fidl_codec import encode_fidl_message
 from inspect import getframeinfo, stack
+from typing import Any, Dict, Set
+
 import fuchsia_controller_py as fc
+from fidl_codec import decode_fidl_response, encode_fidl_message
 
 from ._fidl_common import *
-from ._ipc import GlobalHandleWaker
-from ._ipc import EventWrapper
+from ._ipc import EventWrapper, GlobalHandleWaker
 
 TXID: TXID_Type = 0
 # Simple client ID. Monotonically increasing for each client.

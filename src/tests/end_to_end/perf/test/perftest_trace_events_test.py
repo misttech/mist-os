@@ -7,7 +7,7 @@ import os
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
-from trace_processing import trace_importing, trace_utils, trace_model
+from trace_processing import trace_importing, trace_model, trace_utils
 
 
 class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):

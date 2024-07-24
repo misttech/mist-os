@@ -6,20 +6,28 @@
 import io
 import os
 import tempfile
-from typing import List, Optional
 import unittest
+from typing import List, Optional
 
-from assembly import AssemblyInputBundle, AIBCreator, BlobEntry, SubpackageEntry
-from assembly import FileEntry, FilePath, PackageManifest, PackageMetaData
+import assembly
+import serialization
+from assembly import (
+    AIBCreator,
+    AssemblyInputBundle,
+    BlobEntry,
+    FileEntry,
+    FilePath,
+    PackageManifest,
+    PackageMetaData,
+    SubpackageEntry,
+)
 from assembly.assembly_input_bundle import (
+    CompiledComponentDefinition,
     CompiledPackageDefinition,
     CompiledPackageDefinitionFromGN,
-    CompiledComponentDefinition,
     DriverDetails,
     PackageDetails,
 )
-import assembly
-import serialization
 from fast_copy_mock import mock_fast_copy_in
 
 raw_package_manifest_json = """{

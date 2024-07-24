@@ -18,7 +18,6 @@ import re
 import shlex
 import subprocess
 import sys
-
 from typing import (
     AbstractSet,
     Any,

@@ -9,12 +9,11 @@ import os
 import shutil
 import sys
 import unittest
-
 from collections import defaultdict
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Iterator, Any
+from typing import Any, Iterator
 from unittest.mock import patch
 
 # Import the real devshell `fx publish` python implementation.

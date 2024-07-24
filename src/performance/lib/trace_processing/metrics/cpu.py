@@ -5,9 +5,9 @@
 """CPU trace metrics."""
 
 import logging
+import statistics
 from typing import Iterable, Iterator, Sequence
 
-import statistics
 from trace_processing import trace_metrics, trace_model, trace_utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

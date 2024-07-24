@@ -9,11 +9,12 @@ the golden directory. Run this after making changes to generator code and
 include the updated files in your commit.
 """
 
-import generate
 import os
 import shutil
 import sys
 import tempfile
+
+import generate
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 GOLDEN_DIR = os.path.join(SCRIPT_DIR, "golden")

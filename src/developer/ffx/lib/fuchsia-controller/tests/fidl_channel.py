@@ -4,11 +4,7 @@
 
 import unittest
 
-from fuchsia_controller_py import Channel
-from fuchsia_controller_py import Event
-from fuchsia_controller_py import Handle
-from fuchsia_controller_py import Socket
-from fuchsia_controller_py import ZxStatus
+from fuchsia_controller_py import Channel, Event, Handle, Socket, ZxStatus
 
 
 class ChannelTests(unittest.TestCase):

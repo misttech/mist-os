@@ -3,16 +3,16 @@
 # found in the LICENSE file.
 
 import argparse
-from collections import deque
-from io import BufferedReader, StringIO, TextIOWrapper
 import itertools
 import json
 import os
 import subprocess
 import sys
+import zipfile
+from collections import deque
+from io import BufferedReader, StringIO, TextIOWrapper
 from tempfile import TemporaryDirectory
 from typing import Any
-import zipfile
 
 
 # Obtain inspect.json, try a few ways.

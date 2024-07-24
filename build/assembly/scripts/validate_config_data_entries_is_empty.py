@@ -4,14 +4,15 @@
 # found in the LICENSE file.
 
 import argparse
-from dataclasses import dataclass, field
 import json
-from logging import warn
 import os
 import sys
+from dataclasses import dataclass, field
+from logging import warn
+from typing import Any
+
 import serialization
 from serialization import instance_from_dict
-from typing import Any
 
 
 @dataclass

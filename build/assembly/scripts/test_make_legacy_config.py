@@ -3,37 +3,37 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from collections import namedtuple
-from contextlib import contextmanager
-from functools import partial
 import hashlib
 import json
 import os
 import tempfile
 import unittest
+from collections import namedtuple
+from contextlib import contextmanager
+from functools import partial
 from typing import Any, Generator
 from unittest import mock
 
+import assembly
+import make_legacy_config
+import serialization
 from assembly import (
     AIBCreator,
+    BlobEntry,
     FileEntry,
     ImageAssemblyConfig,
-    PackageManifest,
-    BlobEntry,
-    PackageMetaData,
     KernelInfo,
+    PackageManifest,
+    PackageMetaData,
 )
 from assembly.assembly_input_bundle import (
-    CompiledPackageDefinition,
     CompiledComponentDefinition,
+    CompiledPackageDefinition,
     DriverDetails,
-    PackageDetails,
     DuplicatePackageException,
+    PackageDetails,
 )
 from fast_copy_mock import mock_fast_copy_in
-import make_legacy_config
-import assembly
-import serialization
 
 
 def make_merkle(blob_name: str) -> str:

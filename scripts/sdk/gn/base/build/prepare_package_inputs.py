@@ -9,12 +9,12 @@
 """Creates a archive manifest used for Fuchsia package generation."""
 
 import argparse
-from fnmatch import fnmatch
 import json
 import os
 import shutil
 import subprocess
 import sys
+from fnmatch import fnmatch
 
 
 def make_package_path(file_path, roots):

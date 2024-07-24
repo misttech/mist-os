@@ -7,8 +7,6 @@ The script for running LLVM Unit Test running for Fuchsia.
 """
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 import glob
 import hashlib
 import io
@@ -20,6 +18,8 @@ import shlex
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar, List, Optional
 

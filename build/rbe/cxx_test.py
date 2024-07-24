@@ -3,11 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import unittest
 import sys
+import unittest
 from pathlib import Path
-from unittest import mock
 from typing import Any, Sequence
+from unittest import mock
 
 import cxx
 

@@ -6,7 +6,6 @@
 import argparse
 import re
 import subprocess
-
 from enum import Enum
 from typing import Iterable
 

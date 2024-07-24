@@ -17,7 +17,7 @@ from typing import (
     TypeVar,
 )
 
-from trace_processing import trace_model, trace_metrics, trace_time
+from trace_processing import trace_metrics, trace_model, trace_time
 
 
 # Compute the linear interpolated [percentile]th percentile

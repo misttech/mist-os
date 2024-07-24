@@ -4,10 +4,14 @@
 # found in the LICENSE file.
 """Generates licenses SPDX from GN metadata."""
 
-import json
-import hashlib
 import dataclasses
+import hashlib
+import json
 import os
+from typing import List, Tuple, Union
+
+from file_access import FileAccess
+from gn_label import GnLabel
 from spdx_types.spdx_types import (
     SpdxDocument,
     SpdxDocumentBuilder,
@@ -15,10 +19,6 @@ from spdx_types.spdx_types import (
     SpdxLicenseExpression,
     SpdxPackage,
 )
-from typing import List, Tuple, Union
-
-from file_access import FileAccess
-from gn_label import GnLabel
 
 
 @dataclasses.dataclass(frozen=False)

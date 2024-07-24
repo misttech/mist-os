@@ -10,7 +10,6 @@ from typing import Iterator, Sequence, Tuple
 
 from trace_processing import trace_metrics, trace_model, trace_utils
 
-
 _LOGGER: logging.Logger = logging.getLogger("ScenicMetricsProcessor")
 _EVENT_CATEGORY: str = "gfx"
 _SCENIC_START_EVENT_NAME: str = "ApplyScheduledSessionUpdates"

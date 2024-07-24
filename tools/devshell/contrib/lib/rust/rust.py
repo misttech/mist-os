@@ -4,12 +4,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from functools import lru_cache
 import hashlib
 import os
-from pathlib import Path
 import platform
 import re
+from functools import lru_cache
+from pathlib import Path
 
 ROOT_PATH = Path(os.environ.get("FUCHSIA_DIR", ""))
 FX_PATH = ROOT_PATH / "scripts" / "fx"

@@ -4,12 +4,13 @@
 # found in the LICENSE file.
 
 import json
-import move_source
 import os
 import shutil
 import subprocess
 import tempfile
 import unittest
+
+import move_source
 
 
 class TestMoveSources(unittest.TestCase):

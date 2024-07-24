@@ -11,11 +11,8 @@ import typing
 import unittest
 
 import fidl.fuchsia_developer_ffx as ffx_fidl
-from fidl_codec import encode_fidl_message
-from fidl_codec import method_ordinal
-from fuchsia_controller_py import Channel
-from fuchsia_controller_py import Context
-from fuchsia_controller_py import IsolateDir
+from fidl_codec import encode_fidl_message, method_ordinal
+from fuchsia_controller_py import Channel, Context, IsolateDir
 
 SDK_ROOT = "./sdk/exported/core"
 # For Linux this handles the gamut of options.

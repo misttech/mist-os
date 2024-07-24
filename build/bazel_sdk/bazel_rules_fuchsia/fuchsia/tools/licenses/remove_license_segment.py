@@ -6,8 +6,8 @@
 
 import argparse
 import json
-import sys
 import re
+import sys
 
 
 def main():

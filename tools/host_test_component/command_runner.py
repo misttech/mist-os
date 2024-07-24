@@ -2,11 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import threading
 import subprocess
-
-from typing import List, Callable, IO
-
+import threading
+from typing import IO, Callable, List
 
 Handler = Callable[[bytes], None]
 

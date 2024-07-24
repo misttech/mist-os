@@ -9,12 +9,19 @@ from __future__ import annotations
 
 import dataclasses
 import filecmp
-import json
 import itertools
+import json
 import pathlib
-from typing import Any, Callable, Sequence, TypeVar, Literal, Mapping, Optional
-
-from typing import TypedDict
+from typing import (
+    Any,
+    Callable,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    TypedDict,
+    TypeVar,
+)
 
 # version_history.json doesn't follow the same schema as other IDK metadata
 # files, so we treat it specially in a few places.

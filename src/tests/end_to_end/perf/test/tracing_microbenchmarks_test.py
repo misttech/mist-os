@@ -12,8 +12,7 @@ from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
 from perf_test_utils import utils
-from trace_processing import trace_importing, trace_utils, trace_model
-
+from trace_processing import trace_importing, trace_model, trace_utils
 
 TEST_URL: str = (
     "fuchsia-pkg://fuchsia.com/fuchsia_microbenchmarks#meta/"

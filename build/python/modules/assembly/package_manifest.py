@@ -4,6 +4,7 @@
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+
 from serialization import serialize_fields_as
 
 __all__ = ["PackageManifest", "PackageMetaData", "BlobEntry", "SubpackageEntry"]

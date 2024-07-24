@@ -11,7 +11,6 @@ from mobly import keys, records
 
 from . import api_infra
 
-
 LATEST_RES_SYMLINK_NAME: str = "latest"
 
 # Fuchsia-specific keys and values used in Mobly configs.

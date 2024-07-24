@@ -16,15 +16,15 @@ facilitate easier Product Assembly development.
 """
 
 import argparse
-import subprocess
-from pathlib import Path
 import json
-import sys
-from types import SimpleNamespace
-from pprint import pformat, pprint
 import logging
-from contextlib import contextmanager
+import subprocess
+import sys
 import textwrap
+from contextlib import contextmanager
+from pathlib import Path
+from pprint import pformat, pprint
+from types import SimpleNamespace
 
 logger = logging.getLogger()
 UNSTAGED = "unstaged"

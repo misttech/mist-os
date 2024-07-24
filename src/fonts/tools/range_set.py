@@ -4,7 +4,7 @@
 
 
 from functools import reduce
-from typing import List, Iterable
+from typing import Iterable, List
 
 
 class RangeSet:

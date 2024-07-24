@@ -8,11 +8,11 @@ import logging
 from typing import Any
 
 import honeydew
-from honeydew.typing import custom_types
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 from honeydew.transports import ffx
+from honeydew.typing import custom_types
 from honeydew.utils import properties
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"

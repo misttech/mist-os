@@ -5,8 +5,8 @@
 """Unit tests for mobly_driver/driver/infra.py."""
 
 import unittest
-from unittest.mock import ANY, call, mock_open, patch
 from typing import Any
+from unittest.mock import ANY, call, mock_open, patch
 
 from mobly_driver.driver import common, infra
 

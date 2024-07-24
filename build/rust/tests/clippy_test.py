@@ -3,9 +3,9 @@
 # found in the LICENSE file.
 
 import json
-import unittest
 import subprocess
 import sys
+import unittest
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import Any

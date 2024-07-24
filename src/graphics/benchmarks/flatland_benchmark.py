@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Flatland Benchmark."""
 
-import os
 import itertools
+import os
 import time
 from importlib.resources import as_file, files
 from pathlib import Path
@@ -13,11 +13,10 @@ from pathlib import Path
 import test_data
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
-from mobly import test_runner
-from mobly import asserts
+from mobly import asserts, test_runner
+from perf_publish import publish
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import app_render, cpu
-from perf_publish import publish
 
 TILE_URL = (
     "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"

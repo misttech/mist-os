@@ -2,10 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import generate_pipeline_test_cml
 import os
 import tempfile
 import unittest
+
+import generate_pipeline_test_cml
 
 EXPECTED_CML = """{
     include: [ "//src/sys/test_runners/inspect/default.shard.cml" ],

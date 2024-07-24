@@ -19,17 +19,9 @@ import hashlib
 import multiprocessing
 import os
 import re
-import subprocess
 import stat
+import subprocess
 import sys
-
-import fuchsia
-import cl_utils
-import depfile
-import output_leak_scanner
-import remotetool
-import textpb
-
 from pathlib import Path
 from typing import (
     AbstractSet,
@@ -42,6 +34,13 @@ from typing import (
     Sequence,
     Tuple,
 )
+
+import cl_utils
+import depfile
+import fuchsia
+import output_leak_scanner
+import remotetool
+import textpb
 
 _SCRIPT_BASENAME = Path(__file__).name
 

@@ -4,12 +4,12 @@
 import unittest
 
 from fuchsia_controller_py import (
-    ZxStatus,
     Channel,
-    Handle,
     Event,
-    Socket,
+    Handle,
     HandleTypeError,
+    Socket,
+    ZxStatus,
 )
 
 

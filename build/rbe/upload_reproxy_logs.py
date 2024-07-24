@@ -15,14 +15,14 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from pathlib import Path
+from typing import Any, Callable, Dict, Sequence, Tuple
 
 import pb_message_util
+import rbe_metrics_pb2
 import reproxy_logs
 from api.log import log_pb2
 from api.stats import stats_pb2
-import rbe_metrics_pb2
-from pathlib import Path
-from typing import Any, Callable, Dict, Sequence, Tuple
 
 _SCRIPT_BASENAME = os.path.basename(__file__)
 # This script lives at _PROJECT_ROOT/build/rbe/{__file__}.

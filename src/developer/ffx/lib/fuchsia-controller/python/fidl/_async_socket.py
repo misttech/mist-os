@@ -4,8 +4,7 @@
 
 import fuchsia_controller_py as fc
 
-from ._ipc import GlobalHandleWaker
-from ._ipc import HandleWaker
+from ._ipc import GlobalHandleWaker, HandleWaker
 
 
 class AsyncSocket:

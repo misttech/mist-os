@@ -7,10 +7,7 @@
 Test that Mobly driver's Mobly config interfaces with Honeydew correctly.
 """
 
-from mobly import asserts
-from mobly import base_test
-from mobly import test_runner
-
+from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
 
 

@@ -4,10 +4,11 @@
 # found in the LICENSE file.
 
 import argparse
-import merge_policies
 import pathlib
 import tempfile
 import unittest
+
+import merge_policies
 
 
 class FastbootTests(unittest.TestCase):

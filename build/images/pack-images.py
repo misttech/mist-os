@@ -20,9 +20,9 @@ pave.sh, pave_zedboot.sh and netboot.sh scripts, as well
 as an images.json file describing its content.
 """
 
-import io
 import argparse
 import functools
+import io
 import json
 import operator
 import os

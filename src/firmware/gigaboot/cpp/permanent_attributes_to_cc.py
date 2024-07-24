@@ -9,9 +9,9 @@ Usage: <script> <path to permanent attributes files> <output source file>
 """
 
 import argparse
+import hashlib
 import sys
 import textwrap
-import hashlib
 
 PERMANENT_ATTRIBUTE_ARRAY_NAME = "kPermanentAttributes"
 PERMANENT_ATTRIBUTE_HASH_ARRAY_NAME = "kPermanentAttributesHash"

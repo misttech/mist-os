@@ -6,9 +6,8 @@
 import argparse
 import os.path
 import subprocess
-import xml.etree.ElementTree
 import sys
-
+import xml.etree.ElementTree
 
 FUCHSIA_DIR = os.path.normpath(
     os.path.join(

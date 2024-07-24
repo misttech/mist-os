@@ -20,10 +20,10 @@
 # on infra builders.
 
 import argparse
-from datetime import datetime, timezone
 import os
-import sys
 import subprocess
+import sys
+from datetime import datetime, timezone
 
 _SCRIPT_DIR = os.path.dirname(__file__)
 

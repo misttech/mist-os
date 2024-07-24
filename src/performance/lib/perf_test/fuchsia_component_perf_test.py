@@ -15,9 +15,9 @@ import test_data
 # LINT.ThenChange(//build/testing/perf/test.gni)
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
+from mobly import test_runner
 from perf_publish import publish
 from perf_test_utils import utils
-from mobly import test_runner
 
 
 class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):

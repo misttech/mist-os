@@ -6,8 +6,8 @@
 
 import argparse
 import os
-import sys
 import signal
+import sys
 
 import mobly_driver
 from mobly_driver import driver_factory

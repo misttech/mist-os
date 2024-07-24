@@ -6,13 +6,12 @@
 
 import ipaddress
 import unittest
+from ipaddress import ip_address
 from typing import Any
 from unittest.mock import patch
 
 from mobly_driver.api import api_ffx
 from mobly_driver.driver import common, local
-
-from ipaddress import ip_address
 from parameterized import parameterized
 
 

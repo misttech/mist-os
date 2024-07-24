@@ -8,10 +8,10 @@ This script calls fx helpdoc and generates reference docs for fx
 commands and subcommands.
 """
 
-import sys
 import argparse
 import os
 import subprocess
+import sys
 
 
 def run_fx_helpdoc(

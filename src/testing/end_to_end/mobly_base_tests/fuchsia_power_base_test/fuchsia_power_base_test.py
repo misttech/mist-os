@@ -16,7 +16,6 @@ import time
 from typing import Any
 
 from fuchsia_base_test import fuchsia_base_test
-
 from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

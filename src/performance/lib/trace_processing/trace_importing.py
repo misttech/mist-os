@@ -7,12 +7,12 @@ import json
 import logging
 import math
 import os
-import stat
 import pathlib
+import stat
 import subprocess
 import types
-from importlib.resources import as_file, files
 from collections import defaultdict
+from importlib.resources import as_file, files
 from typing import Any, Dict, List, Optional, Self, TextIO, Tuple
 
 from perf_test_utils import utils

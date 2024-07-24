@@ -2,13 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Module for handling encoding and decoding FIDL messages, as well as for handling async I/O."""
-from abc import ABC
-from abc import abstractmethod
 import asyncio
 import logging
 import os
 import sys
 import typing
+from abc import ABC, abstractmethod
 
 import fuchsia_controller_py as fc
 

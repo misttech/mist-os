@@ -14,14 +14,13 @@ import multiprocessing
 import os
 import subprocess
 import sys
+from pathlib import Path
+from typing import Dict, Iterable, Sequence, Tuple
 
 import cl_utils
 import fuchsia
 import remote_action
 import remotetool
-
-from pathlib import Path
-from typing import Dict, Iterable, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 

@@ -6,15 +6,15 @@
 
 # Checks how out of date our third-party rust deps are
 
-import os
-from pathlib import Path
-import subprocess
 import json
-from urllib import request, error
+import os
+import subprocess
 from datetime import datetime
+from pathlib import Path
 from typing import List, Tuple
+from urllib import error, request
 
-from rust import ROOT_PATH, PREBUILT_THIRD_PARTY_DIR
+from rust import PREBUILT_THIRD_PARTY_DIR, ROOT_PATH
 
 manifest = ROOT_PATH / "third_party/rust_crates/Cargo.toml"
 cargo_binary = PREBUILT_THIRD_PARTY_DIR / "cargo"

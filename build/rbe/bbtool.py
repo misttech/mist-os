@@ -13,12 +13,11 @@ import json
 import os
 import sys
 import tempfile
+from pathlib import Path
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 import cl_utils
 import fuchsia
-
-from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent

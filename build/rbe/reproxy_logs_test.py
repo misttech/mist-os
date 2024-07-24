@@ -11,16 +11,13 @@ import subprocess
 import tempfile
 import textwrap
 import unittest
-
+from pathlib import Path
 from unittest import mock
 
+import reproxy_logs
 from api.log import log_pb2
 from go.api.command import command_pb2
 from google.protobuf import timestamp_pb2
-
-import reproxy_logs
-
-from pathlib import Path
 
 
 def _write_file_contents(path: Path, contents: str):

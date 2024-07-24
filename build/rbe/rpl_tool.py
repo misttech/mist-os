@@ -12,6 +12,8 @@ import argparse
 import contextlib
 import os
 import sys
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence
 
 import cl_utils
 import fuchsia
@@ -20,9 +22,6 @@ import reproxy_logs
 
 # This requires python pb2 in build/rbe/proto (generated).
 from api.log import log_pb2
-
-from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional, Sequence
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent

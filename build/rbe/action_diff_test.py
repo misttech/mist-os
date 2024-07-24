@@ -3,18 +3,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import io
 import contextlib
+import io
 import unittest
 from pathlib import Path
+from typing import Dict
 from unittest import mock
 
-from api.log import log_pb2
-from typing import Dict
-
 import action_diff
-import reproxy_logs
 import remotetool
+import reproxy_logs
+from api.log import log_pb2
 
 
 def add_output_file_digests_to_record(

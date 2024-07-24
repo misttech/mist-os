@@ -4,12 +4,12 @@
 # found in the LICENSE file.
 import argparse
 import glob
-import pathlib
-import os
-import sys
 import json
+import os
+import pathlib
 import shutil
 import subprocess
+import sys
 import tarfile
 import zipfile
 

@@ -4,13 +4,13 @@
 # found in the LICENSE file.
 """Unit tests for the perf metric publishing code."""
 
-from typing import Any, Callable, Iterable
 import json
 import os
 import random
 import tempfile
 import unittest
 import unittest.mock as mock
+from typing import Any, Callable, Iterable
 
 import perf_publish.publish as publish
 

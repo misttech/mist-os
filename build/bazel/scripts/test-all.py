@@ -23,6 +23,7 @@ being used (to be fixed in the future, of course).
 """
 
 import argparse
+import json
 import os
 import shlex
 import shutil
@@ -30,7 +31,6 @@ import stat
 import subprocess
 import sys
 import tempfile
-import json
 
 _SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 

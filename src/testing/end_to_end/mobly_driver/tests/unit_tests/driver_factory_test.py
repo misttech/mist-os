@@ -8,11 +8,10 @@ import os
 import unittest
 from unittest import mock
 
-from parameterized import parameterized
-
 from mobly_driver import driver_factory
 from mobly_driver.api import api_infra
 from mobly_driver.driver import base, common, infra, local
+from parameterized import parameterized
 
 
 class DriverFactoryTest(unittest.TestCase):

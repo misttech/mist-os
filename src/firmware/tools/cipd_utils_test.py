@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 import textwrap
 import unittest
-from typing import Callable, Any
+from typing import Any, Callable
 from unittest import mock
 
 import cipd_utils

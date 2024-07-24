@@ -23,8 +23,8 @@ A budget has the following fields:
 """
 import argparse
 import json
-import sys
 import os
+import sys
 
 
 def main():

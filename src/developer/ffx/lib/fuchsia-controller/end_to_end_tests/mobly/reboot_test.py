@@ -7,8 +7,7 @@ import typing
 
 import fidl.fuchsia_hardware_power_statecontrol as power_statecontrol
 from fuchsia_controller_py import ZxStatus
-from mobly import base_test
-from mobly import test_runner
+from mobly import base_test, test_runner
 from mobly_controller import fuchsia_device
 from mobly_controller.fuchsia_device import asynctest
 

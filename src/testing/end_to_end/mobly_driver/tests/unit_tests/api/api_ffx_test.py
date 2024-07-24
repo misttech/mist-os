@@ -10,9 +10,8 @@ import unittest
 from typing import Any
 from unittest.mock import patch
 
-from parameterized import parameterized
-
 from mobly_driver.api import api_ffx
+from parameterized import parameterized
 
 
 class FfxClientTest(unittest.TestCase):

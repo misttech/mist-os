@@ -10,8 +10,7 @@ import platform
 import re
 import subprocess
 import sys
-
-from typing import List, Callable
+from typing import Callable, List
 
 from common import *
 from identifiers import IDENTIFIERS

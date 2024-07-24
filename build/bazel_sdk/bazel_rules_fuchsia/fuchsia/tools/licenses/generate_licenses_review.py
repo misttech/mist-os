@@ -8,12 +8,12 @@ import argparse
 import csv
 import os
 import shutil
-from sys import stderr
-from typing import Set, List
 import zipfile
+from sys import stderr
+from typing import List, Set
+
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
-
 
 _VERBOSE = True
 

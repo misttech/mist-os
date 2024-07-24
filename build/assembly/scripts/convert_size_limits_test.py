@@ -1,14 +1,15 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import unittest
-import tempfile
-import convert_size_limits
+import json
 import os
 import sys
-import json
+import tempfile
+import unittest
 from typing import Any
-from parameterized import parameterized, param
+
+import convert_size_limits
+from parameterized import param, parameterized
 
 
 class ConvertTest(unittest.TestCase):

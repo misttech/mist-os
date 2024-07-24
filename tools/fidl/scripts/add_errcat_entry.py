@@ -10,7 +10,7 @@ import os
 import re
 import sys
 import textwrap
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from string import Template
 

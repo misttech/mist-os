@@ -4,13 +4,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import json
 import optparse
 import os
 import re
+import subprocess
 import sys
 import urllib.request
-import subprocess
-import json
 
 SCRIPT_DIR = os.path.dirname(__file__)
 FUCHSIA_ROOT = os.path.normpath(

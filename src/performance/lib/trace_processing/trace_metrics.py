@@ -20,7 +20,6 @@ from typing import Any, Iterable, Sequence
 
 from trace_processing import trace_model
 
-
 _LOGGER: logging.Logger = logging.getLogger("Performance")
 
 

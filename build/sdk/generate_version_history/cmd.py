@@ -5,8 +5,8 @@
 """Preprocesses version_history.json before including it in the IDK."""
 
 import argparse
-import pathlib
 import json
+import pathlib
 from typing import Any
 
 import generate_version_history

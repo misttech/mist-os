@@ -22,11 +22,9 @@ import urllib
 import urllib.error
 import urllib.parse
 import urllib.request
-
-from typing import Tuple, Dict, Optional, List, Any, FrozenSet, Set, cast
+from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple, cast
 
 import util
-
 
 LOGGER = logging.getLogger()
 

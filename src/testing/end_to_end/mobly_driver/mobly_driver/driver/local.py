@@ -7,7 +7,6 @@
 from typing import Any, Dict, List, Optional
 
 import yaml
-
 from mobly_driver.api import api_ffx, api_infra, api_mobly
 from mobly_driver.driver import base, common
 

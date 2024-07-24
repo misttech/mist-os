@@ -5,12 +5,13 @@
 """Tests for FileAccess."""
 
 
-from file_access import FileAccess
-from gn_label import GnLabel
-from pathlib import Path
 import os
 import tempfile
 import unittest
+from pathlib import Path
+
+from file_access import FileAccess
+from gn_label import GnLabel
 
 
 class FileAccessTest(unittest.TestCase):

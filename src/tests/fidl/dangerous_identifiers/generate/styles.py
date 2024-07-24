@@ -5,7 +5,7 @@
 __all__ = ["STYLES"]
 
 from dataclasses import dataclass
-from typing import List, Callable, Tuple
+from typing import Callable, List, Tuple
 
 from common import *
 

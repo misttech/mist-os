@@ -6,12 +6,11 @@
 """
 
 import argparse
-import enum
 import collections
 import dataclasses
+import enum
 import re
 import sys
-
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 

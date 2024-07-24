@@ -10,9 +10,8 @@ import unittest
 from typing import Any
 from unittest import mock
 
-from parameterized import parameterized
-
 import mobly_driver
+from parameterized import parameterized
 
 
 class MoblyDriverLibTest(unittest.TestCase):

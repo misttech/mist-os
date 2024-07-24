@@ -8,8 +8,8 @@ Gets relevant supported and in development Fuchsia platform versions from main c
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any, Dict
 
 

@@ -9,10 +9,10 @@ things in-tree as if it lives in an OOT repository.
 """
 
 import argparse
-import sys
-import shutil
-import os
 import json
+import os
+import shutil
+import sys
 from pathlib import Path
 
 

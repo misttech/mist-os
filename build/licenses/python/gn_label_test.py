@@ -4,10 +4,10 @@
 # found in the LICENSE file.
 """Tests for GnLabel."""
 
+import unittest
 from pathlib import Path
 
 from gn_label import GnLabel
-import unittest
 
 
 class GnLabelTest(unittest.TestCase):

@@ -17,10 +17,11 @@ $ TEST=1 scripts/gn/gen_visibility_globs.py
 """
 
 import argparse
-import sys
-import gn_util
-import unittest
 import os
+import sys
+import unittest
+
+import gn_util
 
 
 def main():

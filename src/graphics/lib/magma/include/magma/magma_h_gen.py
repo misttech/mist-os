@@ -5,8 +5,8 @@
 
 import json
 import re
-import textwrap
 import sys
+import textwrap
 
 
 def usage():

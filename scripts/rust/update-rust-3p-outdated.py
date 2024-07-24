@@ -4,9 +4,9 @@
 # found in the LICENSE file.
 
 import argparse
+import os
 import subprocess
 import sys
-import os
 
 """
 usage: fx update-rust-3p-outdated

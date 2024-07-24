@@ -11,11 +11,6 @@ import subprocess
 import sys
 from typing import Any, TextIO
 
-from assembly.assembly_input_bundle import (
-    CompiledPackageDefinition,
-    CompiledPackageDefinitionFromGN,
-)
-from depfile import DepFile
 from assembly import (
     AIBCreator,
     AssemblyInputBundle,
@@ -25,10 +20,12 @@ from assembly import (
     PackageDetails,
     PackageManifest,
 )
-from serialization import (
-    instance_from_dict,
-    json_load,
+from assembly.assembly_input_bundle import (
+    CompiledPackageDefinition,
+    CompiledPackageDefinitionFromGN,
 )
+from depfile import DepFile
+from serialization import instance_from_dict, json_load
 
 logger = logging.getLogger()
 

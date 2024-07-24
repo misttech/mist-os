@@ -9,31 +9,31 @@ removing any other configuration sets from it.
 """
 
 import argparse
-from collections import defaultdict
-from dataclasses import dataclass
 import json
+import logging
 import os
 import sys
-import logging
+from collections import defaultdict
+from dataclasses import dataclass
 
+import serialization
 from assembly import (
+    AIBCreator,
     AssemblyInputBundle,
     AssemblyInputBundleCreationException,
-    AIBCreator,
     FileEntry,
     FilePath,
-    PackageManifest,
     KernelInfo,
+    PackageManifest,
 )
 from assembly.assembly_input_bundle import (
-    CompiledPackageDefinitionFromGN,
     CompiledComponentDefinition,
+    CompiledPackageDefinitionFromGN,
     DuplicatePackageException,
     PackageDetails,
     PackageManifestParsingException,
 )
 from depfile import DepFile
-import serialization
 from serialization import instance_from_dict, json_load
 
 logger = logging.getLogger()

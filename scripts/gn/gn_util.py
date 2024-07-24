@@ -2,12 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import re
-import itertools
-import unittest
-import json
-import subprocess
 import functools
+import itertools
+import json
+import re
+import subprocess
+import unittest
 
 # Group 1: directory
 # Group 2 (optional): target in dir

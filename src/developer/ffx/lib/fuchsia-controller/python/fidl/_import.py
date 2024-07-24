@@ -6,10 +6,8 @@ import importlib.abc
 import sys
 
 from ._async_socket import AsyncSocket
-from ._fidl_common import FrameworkError
-from ._fidl_common import EpitaphError
-from ._ipc import GlobalHandleWaker
-from ._ipc import HandleWaker
+from ._fidl_common import EpitaphError, FrameworkError
+from ._ipc import GlobalHandleWaker, HandleWaker
 from ._library import load_module
 
 

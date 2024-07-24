@@ -8,9 +8,10 @@ import argparse
 import difflib
 import hashlib
 import json
-import json5
 import os
 import sys
+
+import json5
 
 
 def file_sha1(path):

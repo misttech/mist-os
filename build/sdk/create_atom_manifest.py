@@ -10,11 +10,7 @@ import os
 import pathlib
 import sys
 
-from sdk_common import (
-    Atom,
-    Validator,
-    gather_dependencies,
-)
+from sdk_common import Atom, Validator, gather_dependencies
 
 
 def main() -> int:

@@ -5,9 +5,9 @@
 
 import argparse
 import json
-from json.decoder import JSONDecodeError
 import sys
 from collections import OrderedDict
+from json.decoder import JSONDecodeError
 
 
 def read_manifest_list(maybe_manifest_list_file_path):

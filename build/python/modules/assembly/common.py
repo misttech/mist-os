@@ -4,12 +4,12 @@
 """Python Types that are shared across different parts of the assembly types
 
 """
-from dataclasses import dataclass
-from functools import total_ordering
 import os
 import shutil
-from typing import Dict, Iterable, TextIO, Union
+from dataclasses import dataclass
+from functools import total_ordering
 from os import PathLike
+from typing import Dict, Iterable, TextIO, Union
 
 import serialization
 

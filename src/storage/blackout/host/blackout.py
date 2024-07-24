@@ -11,19 +11,17 @@ build target should specify what component it's running, what collection it shou
 the block device label (and optionally path) to run on.
 """
 
-import logging
 import asyncio
+import logging
 import time
 
 import fidl.fuchsia_blackout_test as blackout
-
-from test_case_revive import test_case_revive
-from mobly import asserts, test_runner
-
-from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing.custom_types import FidlEndpoint
 import honeydew.errors
 import honeydew.utils.common
+from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.typing.custom_types import FidlEndpoint
+from mobly import asserts, test_runner
+from test_case_revive import test_case_revive
 
 _LOGGER = logging.getLogger(__name__)
 

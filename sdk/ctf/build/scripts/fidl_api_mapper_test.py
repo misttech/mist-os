@@ -8,9 +8,9 @@ import os
 import sys
 import unittest
 from unittest import mock
-from parameterized import parameterized
 
 import fidl_api_mapper
+from parameterized import parameterized
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

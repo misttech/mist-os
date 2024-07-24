@@ -40,7 +40,7 @@ where = ["."] # list of folders that contain the packages (["."] by default)
 
 [tool.isort]
 # Reference at https://pycqa.github.io/isort/docs/configuration/config_files.html
-profile = "google"
+profile = "black"
 line_length = 80
 
 [tool.mypy]

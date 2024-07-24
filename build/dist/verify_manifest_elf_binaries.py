@@ -11,12 +11,11 @@ an empty stamp file.
 import argparse
 import os
 import sys
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # elfinfo is in //build/images/ while this script is in //build/dist/.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "images"))
 import elfinfo
-
-from typing import Any, Iterable, List, Set, Dict, Tuple, Optional
 
 # The general strategy for checking the ELF binaries within a package is
 # the following:

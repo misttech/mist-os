@@ -11,11 +11,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import rpl_tool
 import cl_utils
 import remotetool
 import reproxy_logs
-
+import rpl_tool
 from api.log import log_pb2
 
 

@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 
 import argparse
-import os.path
 import json
+import os.path
 import sys
 import tempfile
 

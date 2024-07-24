@@ -5,11 +5,11 @@
 
 import argparse
 import json
-import subprocess
 import os
-
+import subprocess
 from pathlib import Path
 from shutil import rmtree
+
 from fuchsia_task_lib import Terminal
 
 

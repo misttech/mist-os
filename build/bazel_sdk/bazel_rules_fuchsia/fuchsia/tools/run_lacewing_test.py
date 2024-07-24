@@ -5,14 +5,13 @@
 import argparse
 import json
 import os
-import shutil
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
-
 from pathlib import Path
-from typing import Tuple, List, Optional
+from typing import List, Optional, Tuple
 
 
 # `bazel test` incorrectly handles stdout, so logging to stderr will keep our

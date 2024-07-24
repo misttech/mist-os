@@ -9,20 +9,17 @@ import os
 import subprocess
 import sys
 import tempfile
-
-from pathlib import Path
 import unittest
+from pathlib import Path
+from typing import Any, Collection, Iterable, Sequence
 from unittest import mock
 
-import cxx_link_remote_wrapper
-
 import cl_utils
-import fuchsia
 import cxx
+import cxx_link_remote_wrapper
+import fuchsia
 import linker
 import remote_action
-
-from typing import Any, Iterable, Sequence, Collection
 
 
 class ImmediateExit(Exception):

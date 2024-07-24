@@ -5,8 +5,8 @@
 import asyncio
 import concurrent.futures
 import ipaddress
-import logging
 import json
+import logging
 import os
 import stat
 import statistics
@@ -16,17 +16,14 @@ from enum import Enum
 from importlib.resources import as_file, files
 from typing import Any
 
-
-import test_data
 import honeydew
+import test_data
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
 from perf_test_utils import utils
-from trace_processing import trace_importing
-from trace_processing import trace_metrics
-from trace_processing import trace_model
+from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import cpu
 
 # The first TCP/UDP port number that the Fuchsia side will listen on.

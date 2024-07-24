@@ -5,7 +5,6 @@
 
 import os
 import subprocess
-
 from shutil import which
 
 from fuchsia_task_lib import *

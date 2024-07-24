@@ -9,7 +9,6 @@ import os
 from typing import Any, Optional
 
 import yaml
-
 from mobly_driver.api import api_infra, api_mobly
 from mobly_driver.driver import base, common
 

@@ -2,11 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import unittest
 import os
-
-from unittest.mock import MagicMock
+import unittest
 from dataclasses import dataclass
+from unittest.mock import MagicMock
+
 from command_runner import run_command
 
 

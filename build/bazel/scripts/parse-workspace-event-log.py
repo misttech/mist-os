@@ -10,7 +10,6 @@ import platform
 import shlex
 import subprocess
 import sys
-
 from typing import Optional
 
 _SCRIPT_DIR = os.path.dirname(__file__)

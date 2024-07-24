@@ -8,14 +8,14 @@ If a meta/manifest.json is found, the arch target will be merged into that file
 
 import argparse
 import ast
+import difflib
 import filecmp
-import os
-import shutil
 import json
+import os
+import re
+import shutil
 import subprocess
 import sys
-import difflib
-import re
 
 GENERATED_CONTANTS_TEMPLATE = """# AUTO-GENERATED - DO NOT EDIT!
 

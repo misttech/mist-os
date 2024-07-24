@@ -16,7 +16,6 @@ import shutil
 import stat
 import subprocess
 import sys
-
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
 # Directory where to find Starlark input files.

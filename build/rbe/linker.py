@@ -10,17 +10,16 @@ https://sourceware.org/binutils/docs-2.40/ld/Simple-Commands.html
 
 import argparse
 import dataclasses
-import depfile
 import enum
 import os
 import re
 import subprocess
 import sys
-
-import cl_utils
-
 from pathlib import Path
 from typing import Iterable, Iterator, Optional, Sequence, Tuple, Union
+
+import cl_utils
+import depfile
 
 _SCRIPT_BASENAME = Path(__file__).name
 

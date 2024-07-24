@@ -5,9 +5,10 @@
 
 import dataclasses
 import logging
-from gn_label import GnLabel
+from typing import Any, ClassVar, Dict, List, Set, Tuple
+
 from file_access import FileAccess
-from typing import ClassVar, Dict, List, Tuple, Any, Set
+from gn_label import GnLabel
 
 
 @dataclasses.dataclass

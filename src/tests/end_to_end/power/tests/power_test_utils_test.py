@@ -3,7 +3,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Unit tests for the perf metric publishing code."""
-# keep-sorted start
 
 import dataclasses
 import signal
@@ -11,15 +10,10 @@ import tempfile
 import time
 import unittest
 import unittest.mock as mock
-
-# keep-sorted end
-
-# keep-sorted start
 from pathlib import Path
+
 from power_test_utils import power_test_utils
 from trace_processing import trace_model
-
-# keep-sorted end
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"

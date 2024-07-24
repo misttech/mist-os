@@ -8,7 +8,6 @@ For use in the template //build/packages:exported_fuchsia_package_archive."""
 import argparse
 import json
 import sys
-
 from pathlib import Path
 
 

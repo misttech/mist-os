@@ -8,16 +8,14 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
+import reproxy_logs
+import upload_reproxy_logs
 from api.log import log_pb2
 from api.stat import stat_pb2
 from api.stats import stats_pb2
-
-import upload_reproxy_logs
-import reproxy_logs
-
-from pathlib import Path
 
 # Most tests here are testing for python syntax/semantic errors.
 

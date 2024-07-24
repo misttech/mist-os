@@ -10,14 +10,14 @@ $ scripts/gn/suppress_errors.py --issue=-Wshorten-64-to-32 --issue=-Wimplicit-in
 
 import argparse
 import fileinput
+import functools
+import json
 import multiprocessing
 import os
 import re
 import subprocess
-import json
 import sys
-import functools
-from typing import List, Dict
+from typing import Dict, List
 
 
 def run_command(command):

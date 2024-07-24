@@ -6,15 +6,14 @@
 Demonstrates accessing custom input data as Python resource.
 """
 
-from importlib.resources import as_file, files
 import json
 import logging
 import subprocess
+from importlib.resources import as_file, files
 
-from mobly import asserts, test_runner
-
-from fuchsia_base_test import fuchsia_base_test
 import my_resources
+from fuchsia_base_test import fuchsia_base_test
+from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

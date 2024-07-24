@@ -4,12 +4,12 @@
 # found in the LICENSE file.
 """Unit tests for the metrics allowlist code."""
 
+import io
 import json
 import operator
 import os
 import tempfile
 import unittest
-import io
 
 import perf_publish.summarize as summarize
 

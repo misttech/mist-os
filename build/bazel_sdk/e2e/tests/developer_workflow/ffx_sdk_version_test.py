@@ -6,11 +6,11 @@
 """Verify that `ffx sdk version` returns the correct version string matching the current SDK.
 """
 
+import argparse
 import json
 import os
-import unittest
-import argparse
 import sys
+import unittest
 
 from _common import SDKCommands
 

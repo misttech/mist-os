@@ -5,6 +5,7 @@
 
 import argparse
 import json
+
 from assembly import PackageManifest
 from serialization import json_load
 

@@ -10,8 +10,8 @@ import unittest
 from unittest import mock
 
 from file_access import FileAccess
-from spdx_writer import SpdxWriter
 from gn_label import GnLabel
+from spdx_writer import SpdxWriter
 
 
 class SpdxWriterTest(unittest.TestCase):

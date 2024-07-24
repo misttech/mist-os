@@ -18,11 +18,8 @@ infra integration points:
 """
 import os
 
-from mobly import asserts
-from mobly import base_test
-from mobly import test_runner
-
 import fuchsia_device
+from mobly import asserts, base_test, test_runner
 
 
 class MoblyDriverSmokeTest(base_test.BaseTestClass):

@@ -5,6 +5,7 @@
 
 import json
 import unittest
+
 from verify_update_package_resources import verify_update_package_resources
 
 

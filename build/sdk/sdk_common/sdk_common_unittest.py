@@ -7,6 +7,7 @@
 # is available.
 
 import unittest
+
 from sdk_common import Atom, Validator, detect_category_violations
 
 

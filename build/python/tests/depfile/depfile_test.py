@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 
 import os
-import unittest
 import tempfile
+import unittest
 
 from depfile import DepFile
 

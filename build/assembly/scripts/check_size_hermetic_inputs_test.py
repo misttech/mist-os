@@ -2,12 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import unittest
-import tempfile
-import check_size_hermetic_inputs
 import os
 import sys
-from parameterized import parameterized, param
+import tempfile
+import unittest
+
+import check_size_hermetic_inputs
+from parameterized import param, parameterized
 
 
 class ConvertTest(unittest.TestCase):

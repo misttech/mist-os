@@ -5,8 +5,6 @@
 
 from __future__ import print_function
 
-from contextlib import contextmanager
-from collections import namedtuple
 import argparse
 import json
 import mmap
@@ -14,6 +12,8 @@ import os
 import struct
 import sys
 import uuid
+from collections import namedtuple
+from contextlib import contextmanager
 
 # Standard ELF constants.
 ELFMAG = b"\x7fELF"

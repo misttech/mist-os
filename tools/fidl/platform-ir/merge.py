@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import json
+import os
 import sys
 import typing
-import os
-import json
 
 # kinds of FIDL declaration
 KINDS = [

@@ -6,9 +6,8 @@
 import os
 import textwrap
 import unittest
-from unittest import mock
-
 from typing import AbstractSet, Iterable
+from unittest import mock
 
 import action_tracer
 

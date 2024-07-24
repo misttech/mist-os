@@ -4,8 +4,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from contextlib import contextmanager
-from collections import namedtuple
 import argparse
 import json
 import mmap
@@ -13,6 +11,8 @@ import os
 import struct
 import sys
 import uuid
+from collections import namedtuple
+from contextlib import contextmanager
 
 # Standard ELF constants.
 ELFMAG = b"\x7fELF"

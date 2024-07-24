@@ -4,9 +4,10 @@
 # found in the LICENSE file.
 """Tests for GnLicenseMetadataDB and friends."""
 
-from gn_label import GnLabel
-from gn_license_metadata import GnLicenseMetadataDB, GnLicenseMetadata
 import unittest
+
+from gn_label import GnLabel
+from gn_license_metadata import GnLicenseMetadata, GnLicenseMetadataDB
 
 
 class GnLicenseMetadataDBTest(unittest.TestCase):

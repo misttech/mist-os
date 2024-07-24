@@ -3,12 +3,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import dataclasses
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable, Set
+
 from gn_label import GnLabel
-import dataclasses
-import os
 
 
 @dataclasses.dataclass(frozen=False)

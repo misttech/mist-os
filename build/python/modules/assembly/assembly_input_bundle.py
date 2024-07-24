@@ -9,17 +9,17 @@ delivery system itself.
 
 """
 import functools
-from collections import defaultdict
-from dataclasses import dataclass, field
+import json
 import os
 import pathlib
 import shutil
-import json
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import (
     Any,
     Dict,
-    List,
     ItemsView,
+    List,
     Optional,
     Set,
     TextIO,
@@ -30,8 +30,8 @@ from typing import (
 import serialization
 from serialization import json_dump, json_dumps, json_load, serialize_json
 
-from .image_assembly_config import ImageAssemblyConfig, KernelInfo
 from .common import FileEntry, FilePath, fast_copy, fast_copy_makedirs
+from .image_assembly_config import ImageAssemblyConfig, KernelInfo
 from .package_manifest import BlobEntry, PackageManifest, SubpackageEntry
 
 __all__ = [

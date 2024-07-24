@@ -5,7 +5,6 @@
 
 import argparse
 import datetime
-from functools import total_ordering
 import json
 import logging
 import os
@@ -13,6 +12,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from functools import total_ordering
 
 tool_description = """Move directory to new location in source tree
 

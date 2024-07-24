@@ -8,12 +8,12 @@
 import argparse
 import json
 import os
-import stat
 import shutil
+import stat
 import subprocess
 import sys
-from pathlib import Path
 import typing as T
+from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).parent
 

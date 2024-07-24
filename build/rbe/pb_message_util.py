@@ -8,12 +8,10 @@ Similar to json_format.MessageToDict, but handles maps properly.
 This works on any proto Message subtype.
 """
 
-from google.protobuf import json_format
-from google.protobuf import descriptor
-from google.protobuf import message
-from google.protobuf import timestamp_pb2
-from google.protobuf.internal import containers as proto_containers
 from typing import Any, Callable, Dict, Sequence, Tuple
+
+from google.protobuf import descriptor, json_format, message, timestamp_pb2
+from google.protobuf.internal import containers as proto_containers
 
 
 def _dict_to_key_values(d: Dict[str, Any]) -> Sequence[Dict[str, Any]]:

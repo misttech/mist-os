@@ -14,6 +14,8 @@ import json
 import os
 import sys
 import tempfile
+from pathlib import Path
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 import bbtool
 import cl_utils
@@ -22,9 +24,6 @@ import remotetool
 import reproxy_logs
 
 # This requires python pb2 in build/rbe/proto (generated).
-
-from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent

@@ -4,9 +4,9 @@
 """Tool to check that the binary is not exporting restricted symbols."""
 
 import argparse
+import shutil
 import subprocess
 import sys
-import shutil
 
 
 def parse_args():

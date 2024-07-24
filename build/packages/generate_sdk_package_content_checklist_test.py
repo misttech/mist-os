@@ -3,13 +3,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import unittest
-import tempfile
-import generate_sdk_package_content_checklist
+import json
 import os
 import sys
-import json
-from parameterized import parameterized, param
+import tempfile
+import unittest
+
+import generate_sdk_package_content_checklist
+from parameterized import param, parameterized
 
 
 class ConvertTest(unittest.TestCase):

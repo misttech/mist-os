@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import unittest
+
 import generate_version_history
 
 

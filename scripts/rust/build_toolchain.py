@@ -8,7 +8,6 @@ import os
 import subprocess
 import sys
 
-
 FUCHSIA_ROOT = os.path.dirname(  # $root
     os.path.dirname(  # scripts
         os.path.dirname(os.path.abspath(__file__))  # rust

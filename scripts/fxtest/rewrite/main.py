@@ -21,9 +21,12 @@ import tempfile
 import textwrap
 import typing
 
-import args
 import async_utils.command as command
 import async_utils.signals as signals
+import statusinfo
+import termout
+
+import args
 import config
 import console
 import dataparse
@@ -34,8 +37,6 @@ import execution
 import log
 import selection
 import selection_types
-import statusinfo
-import termout
 import test_list_file
 import tests_json_file
 

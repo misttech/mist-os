@@ -2,11 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from pathlib import Path
 import os
-from shutil import rmtree
 import sys
 import time
+from pathlib import Path
+from shutil import rmtree
 
 # Import //build/images/elfinfo.py
 sys.path.insert(0, os.path.dirname(__file__) + "/../images")

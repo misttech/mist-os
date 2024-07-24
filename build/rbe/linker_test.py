@@ -7,13 +7,12 @@ import os
 import sys
 import tempfile
 import unittest
-
 from pathlib import Path
-from unittest import mock
 from typing import Iterable, Sequence
+from unittest import mock
 
-import linker
 import cl_utils
+import linker
 
 
 class TryLinkerScriptTextTests(unittest.TestCase):

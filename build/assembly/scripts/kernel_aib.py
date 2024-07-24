@@ -8,16 +8,16 @@
 """
 
 import argparse
-from collections import defaultdict
 import json
+import logging
 import os
 import sys
-import logging
+from collections import defaultdict
 
 from assembly import (
+    AIBCreator,
     AssemblyInputBundle,
     AssemblyInputBundleCreationException,
-    AIBCreator,
     KernelInfo,
 )
 

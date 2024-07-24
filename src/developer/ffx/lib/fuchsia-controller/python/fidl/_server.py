@@ -4,17 +4,18 @@
 import asyncio
 import logging
 import typing
-
-from fidl_codec import decode_fidl_request
-from fidl_codec import decode_fidl_response
-from fidl_codec import encode_fidl_message
 from inspect import getframeinfo, stack
-import fuchsia_controller_py as fc
 
+import fuchsia_controller_py as fc
+from fidl_codec import (
+    decode_fidl_request,
+    decode_fidl_response,
+    encode_fidl_message,
+)
+
+from ._client import FidlClient
 from ._fidl_common import *
 from ._ipc import GlobalHandleWaker
-from ._client import FidlClient
-
 
 # Rather than make a long server UUID, this will be a monotonically increasing
 # ID to differentiate servers for debugging purposes.

@@ -4,9 +4,9 @@
 # found in the LICENSE file.
 
 import os
-import tempfile
 import shutil
 import tarfile
+import tempfile
 import unittest
 from unittest import mock
 

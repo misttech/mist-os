@@ -13,10 +13,11 @@
 # of partial policy files into a predefined binary policy files.
 
 import argparse
-import merge_policies
 import os
 import pathlib
 import tempfile
+
+import merge_policies
 
 # Use the directory of this script to anchor paths. This logic would need to be
 # updated if/when this script is integrated into hermetic builds.

@@ -3,12 +3,10 @@
 # found in the LICENSE file.
 """Lacewing Test Case Reviver."""
 
-import importlib
 import dataclasses
-
 import enum
+import importlib
 import logging
-
 from collections.abc import Callable
 from typing import Any
 

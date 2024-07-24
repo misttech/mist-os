@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
 

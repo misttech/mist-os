@@ -7,10 +7,7 @@ import argparse
 import os
 from typing import TextIO
 
-from assembly import (
-    AssemblyInputBundle,
-    PackageManifest,
-)
+from assembly import AssemblyInputBundle, PackageManifest
 from depfile import DepFile
 from serialization.serialization import json_load
 
