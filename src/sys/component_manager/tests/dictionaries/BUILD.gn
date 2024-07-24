@@ -51,7 +51,10 @@ fuchsia_component("trigger_c") {
   testonly = true
   deps = [ ":dict_trigger_bin" ]
   manifest = "meta/trigger_c.cml"
-  restricted_features = [ "dictionaries" ]
+  restricted_features = [
+    "dictionaries",
+    "dynamic_dictionaries",
+  ]
 }
 
 group("tests") {

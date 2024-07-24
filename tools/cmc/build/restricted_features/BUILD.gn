@@ -18,6 +18,14 @@ group("dictionaries") {
   ]
 }
 
+# The allowlist of components that can define dynamic dictionaries in CML.
+group("dynamic_dictionaries") {
+  visibility = [
+    "//examples/components/dictionaries/*",
+    "//src/sys/component_manager/tests/*",
+  ]
+}
+
 # The allowlist of components that can customize timing of request delivery in CML.
 group("delivery_type") {
   visibility = [

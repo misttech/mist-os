@@ -411,6 +411,9 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
 
             // The dictionary capability may depend on a dictionary it extends.
             if let Some(extends) = capability.extends.as_ref() {
+                if matches!(extends.root, RootDictionaryRef::Program) {
+                    self.features.check(Feature::DynamicDictionaries)?;
+                }
                 RouteFromSelfChecker {
                     capability_name: Some(OneOrMany::One(name)),
                     from: OneOrMany::One(extends.into()),
@@ -7113,6 +7116,20 @@ mod tests {
     }}
 
     test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::Dictionaries]), {
+        test_cml_dictionary_dynamic_disabled(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "extends": "program/some/dir",
+                    },
+                ],
+            }),
+            Err(Error::RestrictedFeature(s)) if s == "dynamic_dictionaries"
+        ),
+    }}
+
+    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::Dictionaries, Feature::DynamicDictionaries]), {
         test_cml_dictionary_ref(
             json!({
                 "use": [

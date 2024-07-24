@@ -4862,7 +4862,7 @@ mod tests {
         },
 
         test_compile_capabilities => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
+            features = FeatureSet::from(vec![Feature::Dictionaries, Feature::DynamicDictionaries]),
             input = json!({
                 "capabilities": [
                     {
