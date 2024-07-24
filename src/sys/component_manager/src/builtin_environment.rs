@@ -7,6 +7,7 @@ use builtins::smc_resource::SmcResource;
 
 #[cfg(target_arch = "x86_64")]
 use builtins::ioport_resource::IoportResource;
+use fuchsia_boot::UserbootRequest;
 
 use crate::bootfs::BootfsSvc;
 use crate::builtin::builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME};
@@ -91,10 +92,10 @@ use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use fuchsia_zbi::{ZbiParser, ZbiType};
 use fuchsia_zircon::{self as zx, Clock, Resource};
 use futures::future::BoxFuture;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -104,6 +105,8 @@ use {
     fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
     fidl_fuchsia_time as ftime, fuchsia_async as fasync,
 };
+
+use fidl_fuchsia_boot as fuchsia_boot;
 
 #[cfg(test)]
 use crate::model::resolver::Resolver;
@@ -648,17 +651,39 @@ impl BuiltinEnvironment {
             ),
             None => None,
         };
-
-        // Set up fuchsia.boot.SvcStashProvider service.
-        let svc_stash_provider = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
+        // Drain messages from `fuchsia.boot.Userboot`, and expose appropriate capabilities.
+        let userboot = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
             .map(zx::Channel::from)
-            .map(SvcStashCapability::new);
-        if let Some(svc_stash_provider) = svc_stash_provider {
-            root_input_builder.add_builtin_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
-                move |stream| svc_stash_provider.clone().serve(stream).boxed(),
-            );
-        }
+            .map(fasync::Channel::from_channel)
+            .map(fuchsia_boot::UserbootRequestStream::from_channel);
 
+        if let Some(userboot) = userboot {
+            let mut svc_stash_provider = None;
+            let messages = userboot.try_collect::<Vec<UserbootRequest>>().await;
+
+            if let Ok(mut messages) = messages {
+                while let Some(request) = messages.pop() {
+                    match request {
+                        UserbootRequest::PostStashSvc { stash_svc_endpoint, control_handle: _ } => {
+                            if svc_stash_provider.is_some() {
+                                warn!("Expected at most a single SvcStash, but more were found. Last entry will be preserved.");
+                            }
+                            svc_stash_provider =
+                                Some(SvcStashCapability::new(stash_svc_endpoint.into_channel()));
+                        }
+                    }
+                }
+            } else if let Err(err) = messages {
+                error!("Error extracting 'fuchsia.boot.Userboot' messages:  {err}");
+            }
+
+            if let Some(svc_stash_provider) = svc_stash_provider {
+                root_input_builder
+                    .add_builtin_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
+                        move |stream| svc_stash_provider.clone().serve(stream).boxed(),
+                    );
+            }
+        }
         // Set up BootArguments service.
         let boot_args = BootArguments::new(&mut zbi_parser).await?;
         root_input_builder.add_builtin_protocol_if_enabled::<fboot::ArgumentsMarker>(

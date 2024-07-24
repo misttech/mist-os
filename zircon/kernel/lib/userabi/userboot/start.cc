@@ -42,6 +42,7 @@
 #include <utility>
 
 #include "bootfs.h"
+#include "fidl.h"
 #include "loader-service.h"
 #include "option.h"
 #include "userboot-elf.h"
@@ -49,17 +50,6 @@
 #include "zbi.h"
 
 namespace {
-
-// TODO(https://fxbug.dev/42072759): Replace copy & pasted FIDL C bindings with new C++ bindings
-// when that's allowed.
-
-struct fuchsia_boot_SvcStashStoreRequestMessage {
-  FIDL_ALIGNDECL
-  fidl_message_header_t hdr;
-  zx_handle_t svc_endpoint;
-};
-
-constexpr uint64_t fuchsia_boot_SvcStashStoreOrdinal = 0xC2648E356CA2870;
 
 constexpr const char kStackVmoName[] = "userboot-child-initial-stack";
 
@@ -129,8 +119,8 @@ constexpr uint32_t kDebugLog = kHandleCount + 2;
 constexpr uint32_t kSvcStub = kHandleCount + 3;
 constexpr uint32_t kSvcNameIndex = 0;
 
-// A channel containing all 'svc' stubs server ends.
-constexpr uint32_t kSvcStash = kHandleCount + 4;
+// A channel containing all the pipelined messages through `fuchsia.boot.Userboot` protocol.
+constexpr uint32_t kUserbootProtocol = kHandleCount + 4;
 
 constexpr uint32_t kChildHandleCount = kHandleCount + 5;
 
@@ -171,7 +161,7 @@ constexpr std::array<uint32_t, kChildHandleCount> HandleInfoTable() {
   }
   info[kDebugLog] = PA_HND(PA_FD, kFdioFlagUseForStdio);
   info[kSvcStub] = PA_HND(PA_NS_DIR, kSvcNameIndex);
-  info[kSvcStash] = PA_HND(PA_USER0, 0);
+  info[kUserbootProtocol] = PA_HND(PA_USER0, 0);
   return info;
 }
 
@@ -299,8 +289,8 @@ void SetChildHandles(const zx::debuglog& log, const zx::vmo& bootfs_vmo, ChildCo
 
   // Verify all child handles.
   for (size_t i = 0; i < child.handles.size(); ++i) {
-    // The stash handle is only passed to the last process launched by userboot.
-    if (i == kSvcStash) {
+    // The Userboot protocol handle is only passed to the last process launched by userboot.
+    if (i == kUserbootProtocol) {
       continue;
     }
     auto handle = child.handles[i];
@@ -312,29 +302,17 @@ void SetChildHandles(const zx::debuglog& log, const zx::vmo& bootfs_vmo, ChildCo
   }
 }
 
-void StashSvc(const zx::debuglog& log, const zx::channel& stash, std::string_view name,
-              zx::channel svc_end) {
-  zx_handle_t h = svc_end.release();
-  fuchsia_boot_SvcStashStoreRequestMessage request = {};
-  fidl_init_txn_header(&request.hdr, 0, fuchsia_boot_SvcStashStoreOrdinal, 0);
-  request.svc_endpoint = FIDL_HANDLE_PRESENT;
-
-  auto status = stash.write(0, &request, sizeof(request), &h, 1);
-  check(log, status, "Failed to stash svc handle from (%.*s)", static_cast<int>(name.length()),
-        name.data());
-}
-
-void SetStashHandle(const zx::debuglog& log, zx::channel stash,
-                    cpp20::span<zx_handle_t, kChildHandleCount> handles) {
-  handles[kSvcStash] = stash.release();
+void SetUserbootProtocolHandle(const zx::debuglog& log, zx::channel stash,
+                               cpp20::span<zx_handle_t, kChildHandleCount> handles) {
+  handles[kUserbootProtocol] = stash.release();
 
   // Check that the handle is valid/alive.
   zx_info_handle_basic_t info;
-  auto& handle = handles[kSvcStash];
+  auto& handle = handles[kUserbootProtocol];
   auto status =
       zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   check(log, status, "Failed to obtain handle information. Bad handle at %d with value %x",
-        static_cast<int>(kSvcStash), handle);
+        static_cast<int>(kUserbootProtocol), handle);
 }
 
 // Set of resources created in userboot.
@@ -486,9 +464,20 @@ struct TerminationInfo {
   handles[kProcSelf] = ZX_HANDLE_INVALID;
 
   auto [power, vmex] = CreateResources(log, handles);
+
+  // These channels will speak `fuchsia.boot.Userboot` protocol.
+  zx::channel userboot_server, userboot_client;
+  status = zx::channel::create(0, &userboot_server, &userboot_client);
+  check(log, status, "Failed to create fuchsia.boot.Userboot channel.");
+
+  // These channels will speak `fuchsia.boot.SvcStash` protocol.
   zx::channel svc_stash_server, svc_stash_client;
   status = zx::channel::create(0, &svc_stash_server, &svc_stash_client);
-  check(log, status, "Failed to create svc stash channel.");
+  check(log, status, "Failed to create fuchsia.boot.SvcStash channel.");
+
+  // Immediately stash the SvcStash server handle into the `fuchsia.boot.Userboot protocol` channel.
+  check(log, UserbootPostStashSvc(userboot_client, std::move(svc_stash_server)).status_value(),
+        "UserbootPost of SvcStash handle failed.");
 
   // Locate the ZBI_TYPE_STORAGE_BOOTFS item and decompress it. This will be used to load
   // the binary referenced by userboot.next, as well as libc. Bootfs will be fully parsed
@@ -507,15 +496,18 @@ struct TerminationInfo {
     auto borrowed_bootfs = bootfs_vmo.borrow();
     Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo), std::move(vmex), DuplicateOrDie(log)};
     auto launch_process = [&](auto& elf_entry,
-                              zx::channel svc_stash = zx::channel()) -> ChildContext {
+                              zx::channel userboot_protocol = zx::channel()) -> ChildContext {
       ChildMessageLayout child_message = CreateChildMessage();
       ChildContext child = CreateChildContext(log, elf_entry.filename(), handles);
       size_t handle_count = kChildHandleCount - 1;
 
-      StashSvc(log, svc_stash_client, elf_entry.filename(), std::move(child.svc_server));
+      check(log, SvcStashStore(svc_stash_client, std::move(child.svc_server)).status_value(),
+            "Failed to stash svc handle from (%.*s)",
+            static_cast<int>(elf_entry.filename().length()), elf_entry.filename().data());
+
       SetChildHandles(log, *borrowed_bootfs, child);
-      if (svc_stash) {
-        SetStashHandle(log, std::move(svc_stash), child.handles);
+      if (userboot_protocol) {
+        SetUserbootProtocolHandle(log, std::move(userboot_protocol), child.handles);
         handle_count++;
       }
 
@@ -549,7 +541,7 @@ struct TerminationInfo {
     }
 
     if (!opts.boot.next.empty()) {
-      [[maybe_unused]] auto boot_context = launch_process(opts.boot, std::move(svc_stash_server));
+      [[maybe_unused]] auto boot_context = launch_process(opts.boot, std::move(userboot_server));
     }
   }
   HandleTermination(log, info);

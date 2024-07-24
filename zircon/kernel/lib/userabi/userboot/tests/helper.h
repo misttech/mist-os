@@ -39,11 +39,16 @@ struct DebugDataMessageView {
 // Attempts to read a DebugDataMessage from |svc| this include dealing with the pipelined messages.
 void GetDebugDataMessage(zx::unowned_channel svc, Message& msg);
 
-// Given a |svc_stash| will attempt to read a stashed svc.
-void GetStashedSvc(zx::unowned_channel svc_stash, zx::channel& svc);
+// Given a `svc_stash` will attempt to read a stashed svc.
+void GetStashedSvc(zx::channel svc_stash, zx::channel& svc_0, zx::channel& svc_1);
 
-// Will sec |svc_stash| to the equivalent startup SvcStash handle.
-zx::channel GetSvcStash();
+inline void GetStashedSvc(zx::channel svc_stash, zx::channel& svc) {
+  zx::channel dropped = {};
+  GetStashedSvc(std::move(svc_stash), dropped, svc);
+}
+
+// Will sec `svc_stash` to the equivalent startup SvcStash handle.
+void GetSvcStash(zx::channel& svc_stash);
 
 // `T` is a callable that is given a readable channel and a token to determine whether the loop
 // should continue or not. It is important to leave the signature as non returning, such that

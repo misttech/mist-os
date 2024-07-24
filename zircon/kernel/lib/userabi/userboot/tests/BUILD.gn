@@ -24,8 +24,10 @@ if (is_fuchsia) {
     sources = [ "helper.cc" ]
     public = [ "helper.h" ]
     deps = [
+      "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
       "//sdk/lib/fit",
       "//src/zircon/testing/standalone-test:headers",
+      "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/zx",
       "//zircon/system/ulib/zxtest",
     ]
