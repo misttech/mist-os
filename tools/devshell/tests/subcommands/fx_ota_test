@@ -49,6 +49,7 @@ BT_SET_UP() {
   cat > "${updateslib}.mock_side_effects" <<EOF
     function check-for-package-server { $check_package_server ; }
 EOF
+
   cat > "${BT_TEMP_DIR}/tools/devshell/shell.mock_side_effects" <<EOF
    if [[ "\$1 \$2" == "update check-now" ]]; then
      $trigger_update "\$@"
@@ -56,6 +57,19 @@ EOF
    elif [[ "\$1 \$2" == "update wait-for-commit" ]]; then
      $commit_update "\$@"
      return
+  fi
+EOF
+}
+
+setup_ffx() {
+  local ffx="$(btf::make_installed_hosttools_mock ffx)"
+  cat > "${ffx}.mock_side_effects" <<EOF
+   if [[ "\$@" == "--config target_update=true target update check-now --monitor" ]]; then
+     $trigger_update "\$@"
+     return
+   else
+     echo "unknown command $@" 1>&2
+     exit 1
   fi
 EOF
 }
@@ -89,6 +103,7 @@ EOF
 TEST_ota_incr_noargs() {
   echo "0" > "${check_package_server}.mock_status" # package server is running
   setup_versions_after_update "1" "1"
+  setup_ffx
 
   local out="${BT_TEMP_DIR}/_fx_ota_output"
   BT_EXPECT ${fx} --enable=incremental ota > "$out" 2>&1
@@ -103,6 +118,7 @@ TEST_ota_incr_noargs() {
 TEST_ota_noincr_noargs() {
   echo "0" > "${check_package_server}.mock_status" # package server is running
   setup_versions_after_update "1" "1"
+  setup_ffx
 
   local out="${BT_TEMP_DIR}/_fx_ota_output"
   BT_EXPECT ${fx} --disable=incremental ota > "$out" 2>&1
@@ -117,6 +133,7 @@ TEST_ota_noincr_noargs() {
 TEST_ota_nobuild() {
   echo "0" > "${check_package_server}.mock_status" # package server is running
   setup_versions_after_update "1" "1"
+  setup_ffx
 
   local out="${BT_TEMP_DIR}/_fx_ota_output"
   BT_EXPECT ${fx} ota --no-build > "$out" 2>&1
@@ -133,11 +150,13 @@ TEST_ota_update_failed() {
   setup_versions_after_update "1" "2"
 
   local ffx="$(btf::make_installed_hosttools_mock ffx)"
-  cat > "${ffx}.mock_side_effects" << "EOF"
-if [[ "$@" == "ffx component select capability fuchsia.update.Manager" ]]; then
+  cat > "${ffx}.mock_side_effects" << EOF
+if [[ "\$@" == "--config target_update=true target update check-now --monitor" ]]; then
+ $trigger_update "\$@"
+elif [[ "\$@" == "ffx component select capability fuchsia.update.Manager" ]]; then
   echo "/core/system-update/omaha-client-service"
 else
-  echo "unknown command $@" 1>&2
+  echo "unknown command \$@" 1>&2
   exit 1
 fi
 EOF
@@ -152,6 +171,7 @@ EOF
 
 TEST_ota_nopackageserver() {
   echo "1" > "${check_package_server}.mock_status" # package server is not running
+  setup_ffx
 
   local out="${BT_TEMP_DIR}/_fx_ota_output"
   # ota fails because package server is not running
