@@ -9,13 +9,13 @@ bitflags! {
     // Used for both IPv4 and IPv6.
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct IptIpInverseFlags: u32 {
-        const InputInterface = uapi::IPT_INV_VIA_IN;
-        const OutputInterface = uapi::IPT_INV_VIA_OUT;
+        const INPUT_INTERFACE = uapi::IPT_INV_VIA_IN;
+        const OUTPUT_INTERFACE = uapi::IPT_INV_VIA_OUT;
         const TOS = uapi::IPT_INV_TOS;
-        const SourceIpAddress = uapi::IPT_INV_SRCIP;
-        const DestinationIpAddress = uapi::IPT_INV_DSTIP;
-        const Fragment = uapi::IPT_INV_FRAG;
-        const Protocol = uapi::IPT_INV_PROTO;
+        const SOURCE_IP_ADDRESS = uapi::IPT_INV_SRCIP;
+        const DESTINATION_IP_ADDRESS = uapi::IPT_INV_DSTIP;
+        const FRAGMENT = uapi::IPT_INV_FRAG;
+        const PROTOCOL = uapi::IPT_INV_PROTO;
     }
 }
 
@@ -28,17 +28,36 @@ pub enum IptIpFlags {
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct IptIpFlagsV4: u32 {
-        const Fragment = uapi::IPT_F_FRAG;
-        const Goto = uapi::IPT_F_GOTO;
+        const FRAGMENT = uapi::IPT_F_FRAG;
+        const GOTO = uapi::IPT_F_GOTO;
     }
 }
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct IptIpFlagsV6: u32 {
-        const Protocol = uapi::IP6T_F_PROTO;
+        const PROTOCOL = uapi::IP6T_F_PROTO;
         const TOS = uapi::IP6T_F_TOS;
-        const Goto = uapi::IP6T_F_GOTO;
+        const GOTO = uapi::IP6T_F_GOTO;
+    }
+}
+
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct NfIpHooks: u32 {
+        const PREROUTING = 1 << uapi::NF_IP_PRE_ROUTING;
+        const INPUT = 1 << uapi::NF_IP_LOCAL_IN;
+        const FORWARD = 1 << uapi::NF_IP_FORWARD;
+        const OUTPUT = 1 << uapi::NF_IP_LOCAL_OUT;
+        const POSTROUTING = 1 << uapi::NF_IP_POST_ROUTING;
+
+        const FILTER = Self::INPUT.bits() | Self::FORWARD.bits() | Self::OUTPUT.bits();
+        const MANGLE = Self::PREROUTING.bits() | Self::INPUT.bits() | Self::FORWARD.bits() |
+                       Self::OUTPUT.bits() | Self::POSTROUTING.bits();
+        const NAT = Self::PREROUTING.bits() | Self::INPUT.bits() | Self::OUTPUT.bits() |
+                    Self::POSTROUTING.bits();
+        const RAW = Self::PREROUTING.bits() | Self::OUTPUT.bits();
+
     }
 }
 
@@ -51,5 +70,6 @@ mod tests {
         assert_eq!(IptIpInverseFlags::all().bits(), uapi::IPT_INV_MASK);
         assert_eq!(IptIpFlagsV4::all().bits(), uapi::IPT_F_MASK);
         assert_eq!(IptIpFlagsV6::all().bits(), uapi::IP6T_F_MASK);
+        assert_eq!(NfIpHooks::all().bits().count_ones(), uapi::NF_IP_NUMHOOKS);
     }
 }

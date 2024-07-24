@@ -8,19 +8,22 @@ use crate::vfs::socket::iptables_utils::{self, write_string_to_ascii_buffer};
 use crate::vfs::socket::{SocketDomain, SocketHandle, SocketType};
 use fidl_fuchsia_net_filter_ext::sync::Controller;
 use fidl_fuchsia_net_filter_ext::{
-    CommitError, ControllerCreationError, ControllerId, PushChangesError,
+    Change, CommitError, ControllerCreationError, ControllerId, PushChangesError,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use itertools::Itertools;
 use starnix_logging::{log_debug, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::iptables_flags::NfIpHooks;
 use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{
-    c_char, errno, error, ip6t_get_entries, ip6t_getinfo, ip6t_replace, ipt_get_entries,
-    ipt_getinfo, nf_inet_hooks_NF_INET_NUMHOOKS, xt_counters, xt_counters_info, xt_get_revision,
+    c_char, errno, error, ip6t_get_entries, ip6t_getinfo, ip6t_replace, ipt_entry, ipt_get_entries,
+    ipt_getinfo, nf_inet_hooks_NF_INET_NUMHOOKS, xt_counters, xt_counters_info,
+    xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_get_revision,
     IP6T_SO_GET_ENTRIES, IP6T_SO_GET_INFO, IP6T_SO_GET_REVISION_MATCH, IP6T_SO_GET_REVISION_TARGET,
     IPT_SO_GET_ENTRIES, IPT_SO_GET_INFO, IPT_SO_GET_REVISION_MATCH, IPT_SO_GET_REVISION_TARGET,
-    IPT_SO_SET_ADD_COUNTERS, IPT_SO_SET_REPLACE, SOL_IP, SOL_IPV6,
+    IPT_SO_SET_ADD_COUNTERS, IPT_SO_SET_REPLACE, SOL_IP, SOL_IPV6, XT_EXTENSION_MAXNAMELEN,
+    XT_FUNCTION_MAXNAMELEN, XT_TABLE_MAXNAMELEN,
 };
 use std::collections::HashMap;
 use thiserror::Error;
@@ -28,6 +31,12 @@ use zerocopy::{AsBytes, FromBytes};
 use {fidl_fuchsia_net_filter as fnet_filter, fuchsia_zircon as zx};
 
 const NAMESPACE_ID_PREFIX: &str = "starnix";
+
+const TARGET_NAME_LEN: usize = XT_EXTENSION_MAXNAMELEN as usize;
+const ERROR_NAME_LEN: usize = XT_FUNCTION_MAXNAMELEN as usize;
+const TABLE_NAME_LEN: usize = XT_TABLE_MAXNAMELEN as usize;
+
+type IpTablesName = [c_char; TABLE_NAME_LEN];
 
 /// Stores information about IP packet filter rules. Used to return information for
 /// IPT_SO_GET_INFO and IPT_SO_GET_ENTRIES.
@@ -43,7 +52,148 @@ struct IpTable {
     pub counters: Vec<xt_counters>,
 }
 
-type IpTablesName = [c_char; 32usize];
+impl IpTable {
+    fn accept_policy_v4() -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(
+            ipt_entry { target_offset: 112, next_offset: 152, ..Default::default() }.as_bytes(),
+        );
+        bytes.extend_from_slice(
+            xt_entry_target { target_size: 40, ..Default::default() }.as_bytes(),
+        );
+        bytes.extend_from_slice(
+            iptables_utils::VerdictWithPadding {
+                verdict: iptables_utils::VERDICT_ACCEPT,
+                ..Default::default()
+            }
+            .as_bytes(),
+        );
+        bytes
+    }
+
+    fn end_of_input_v4() -> Vec<u8> {
+        let mut target_name = [0; TARGET_NAME_LEN];
+        write_string_to_ascii_buffer("ERROR".to_owned(), &mut target_name)
+            .expect("convert \"ERROR\" to ASCII");
+        let mut errorname = [0; ERROR_NAME_LEN];
+        write_string_to_ascii_buffer("ERROR".to_owned(), &mut errorname)
+            .expect("convert \"ERROR\" to ASCII");
+
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(
+            ipt_entry { target_offset: 112, next_offset: 176, ..Default::default() }.as_bytes(),
+        );
+        bytes.extend_from_slice(
+            xt_entry_target { target_size: 64, name: target_name, revision: 0 }.as_bytes(),
+        );
+        bytes.extend_from_slice(
+            iptables_utils::ErrorNameWithPadding { errorname, ..Default::default() }.as_bytes(),
+        );
+        bytes
+    }
+
+    fn default_ipv4_nat_table() -> (IpTablesName, Self) {
+        let mut table_name = [0; TABLE_NAME_LEN];
+        write_string_to_ascii_buffer("nat".to_owned(), &mut table_name)
+            .expect("convert \"nat\" to ASCII");
+
+        let mut entries = Vec::new();
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::end_of_input_v4());
+
+        (
+            table_name,
+            Self {
+                valid_hooks: NfIpHooks::NAT.bits(),
+                hook_entry: [0, 152, 0, 304, 456],
+                underflow: [0, 152, 0, 304, 456],
+                num_entries: 5,
+                size: 784,
+                entries,
+                ..Default::default()
+            },
+        )
+    }
+
+    fn default_ipv4_filter_table() -> (IpTablesName, Self) {
+        let mut table_name = [0; TABLE_NAME_LEN];
+        write_string_to_ascii_buffer("filter".to_owned(), &mut table_name)
+            .expect("convert \"filter\" to ASCII");
+
+        let mut entries = Vec::new();
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::end_of_input_v4());
+
+        (
+            table_name,
+            Self {
+                valid_hooks: NfIpHooks::FILTER.bits(),
+                hook_entry: [0, 0, 152, 304, 0],
+                underflow: [0, 0, 152, 304, 0],
+                num_entries: 4,
+                size: 632,
+                entries,
+                ..Default::default()
+            },
+        )
+    }
+
+    fn default_ipv4_mangle_table() -> (IpTablesName, Self) {
+        let mut table_name = [0; TABLE_NAME_LEN];
+        write_string_to_ascii_buffer("mangle".to_owned(), &mut table_name)
+            .expect("convert \"mangle\" to ASCII");
+
+        let mut entries = Vec::new();
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::end_of_input_v4());
+
+        (
+            table_name,
+            Self {
+                valid_hooks: NfIpHooks::MANGLE.bits(),
+                hook_entry: [0, 152, 304, 456, 608],
+                underflow: [0, 152, 304, 456, 608],
+                num_entries: 6,
+                size: 936,
+                entries,
+                ..Default::default()
+            },
+        )
+    }
+
+    fn default_ipv4_raw_table() -> (IpTablesName, Self) {
+        let mut table_name = [0; TABLE_NAME_LEN];
+        write_string_to_ascii_buffer("raw".to_owned(), &mut table_name)
+            .expect("convert \"raw\" to ASCII");
+
+        let mut entries = Vec::new();
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::accept_policy_v4());
+        entries.extend(Self::end_of_input_v4());
+
+        (
+            table_name,
+            Self {
+                valid_hooks: NfIpHooks::RAW.bits(),
+                hook_entry: [0, 0, 0, 152, 0],
+                underflow: [0, 0, 0, 152, 0],
+                num_entries: 3,
+                size: 480,
+                entries,
+                ..Default::default()
+            },
+        )
+    }
+}
 
 /// Stores [`IpTable`]s associated with each protocol.
 #[derive(Default)]
@@ -51,9 +201,9 @@ pub struct IpTables {
     ipv4: HashMap<IpTablesName, IpTable>,
     ipv6: HashMap<IpTablesName, IpTable>,
 
-    // Controller to configure net filtering state.
-    //
-    // Initialized lazily with `get_controller`.
+    /// Controller to configure net filtering state.
+    ///
+    /// Initialized lazily with `get_controller`.
     controller: Option<Controller>,
 }
 
@@ -67,7 +217,18 @@ enum GetControllerError {
 
 impl IpTables {
     pub fn new() -> Self {
-        Self::default()
+        // Install default chains and policies on supported tables. These chains are expected to be
+        // present on the system before `iptables` client is ran.
+        // TODO(https://fxbug.dev/354766238): Propagated default rules to fuchsia.net.filter.
+        Self {
+            ipv4: HashMap::from([
+                IpTable::default_ipv4_filter_table(),
+                IpTable::default_ipv4_mangle_table(),
+                IpTable::default_ipv4_nat_table(),
+                IpTable::default_ipv4_raw_table(),
+            ]),
+            ..Default::default()
+        }
     }
 
     fn get_controller(&mut self) -> Result<&mut Controller, GetControllerError> {
@@ -297,13 +458,22 @@ impl IpTables {
             size: replace_info.size as u32,
             entries,
             num_counters: replace_info.num_counters,
-            valid_hooks: replace_info.valid_hooks,
+            valid_hooks: replace_info.valid_hooks.bits(),
             hook_entry: replace_info.hook_entry,
             underflow: replace_info.underflow,
             counters: vec![],
         };
-        let changes = table.into_changes();
 
+        self.send_changes_to_net_filter(table.into_changes())?;
+        self.ipv4.insert(name, iptable_entry);
+
+        Ok(())
+    }
+
+    fn send_changes_to_net_filter(
+        &mut self,
+        changes: impl Iterator<Item = Change>,
+    ) -> Result<(), Errno> {
         match self.get_controller() {
             Err(e) => {
                 log_warn!(
@@ -361,9 +531,6 @@ impl IpTables {
                 }
             }
         };
-
-        self.ipv4.insert(name, iptable_entry);
-
         Ok(())
     }
 }

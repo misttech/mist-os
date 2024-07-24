@@ -389,7 +389,6 @@
                 // iptables_test
                 "IPTablesBasic.GetRevision",
                 "IPTablesBasic.GetInfoErrorPrecedence",
-                "IPTablesTest.InitialState",
                 "IPTablesBasic.OriginalDstErrors",
                 "IPTablesBasic.GetEntriesErrorPrecedence",
 

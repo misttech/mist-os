@@ -5,24 +5,36 @@
 // This file contains translation between fuchsia.net.filter data structures and Linux
 // iptables structures.
 
+use assert_matches::assert_matches;
 use starnix_logging::log_warn;
-use starnix_uapi::iptables_flags::{IptIpFlags, IptIpFlagsV4, IptIpFlagsV6, IptIpInverseFlags};
+use starnix_uapi::iptables_flags::{
+    IptIpFlags, IptIpFlagsV4, IptIpFlagsV6, IptIpInverseFlags, NfIpHooks,
+};
 use starnix_uapi::{
     c_char, c_int, c_uchar, c_uint, in6_addr, in_addr, ip6t_entry, ip6t_ip6, ip6t_replace,
-    ipt_entry, ipt_ip, ipt_replace, xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
+    ipt_entry, ipt_ip, ipt_replace, nf_ip_hook_priorities_NF_IP_PRI_FILTER,
+    nf_ip_hook_priorities_NF_IP_PRI_MANGLE, nf_ip_hook_priorities_NF_IP_PRI_NAT_DST,
+    nf_ip_hook_priorities_NF_IP_PRI_NAT_SRC, nf_ip_hook_priorities_NF_IP_PRI_RAW,
+    xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
     xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp, xt_udp, IPPROTO_IP,
-    IPPROTO_TCP, IPPROTO_UDP, IPT_RETURN, NF_ACCEPT, NF_DROP, NF_QUEUE,
+    IPPROTO_TCP, IPPROTO_UDP, IPT_RETURN, NF_ACCEPT, NF_DROP, NF_IP_FORWARD, NF_IP_LOCAL_IN,
+    NF_IP_LOCAL_OUT, NF_IP_NUMHOOKS, NF_IP_POST_ROUTING, NF_IP_PRE_ROUTING, NF_QUEUE,
 };
 use std::any::type_name;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString, NulError};
 use std::mem::size_of;
+use std::ops::RangeInclusive;
 use std::str::Utf8Error;
 use thiserror::Error;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext};
 
+const TABLE_FILTER: &str = "filter";
+const TABLE_MANGLE: &str = "mangle";
 const TABLE_NAT: &str = "nat";
+const TABLE_RAW: &str = "raw";
+
 const CHAIN_PREROUTING: &str = "PREROUTING";
 const CHAIN_INPUT: &str = "INPUT";
 const CHAIN_FORWARD: &str = "FORWARD";
@@ -33,10 +45,10 @@ const IPT_REPLACE_SIZE: usize = size_of::<ipt_replace>();
 const IP6T_REPLACE_SIZE: usize = size_of::<ip6t_replace>();
 
 // Verdict codes for Standard targets, calculated the same way as Linux.
-const VERDICT_DROP: i32 = -(NF_DROP as i32) - 1;
-const VERDICT_ACCEPT: i32 = -(NF_ACCEPT as i32) - 1;
-const VERDICT_QUEUE: i32 = -(NF_QUEUE as i32) - 1;
-const VERDICT_RETURN: i32 = IPT_RETURN;
+pub const VERDICT_DROP: i32 = -(NF_DROP as i32) - 1;
+pub const VERDICT_ACCEPT: i32 = -(NF_ACCEPT as i32) - 1;
+pub const VERDICT_QUEUE: i32 = -(NF_QUEUE as i32) - 1;
+pub const VERDICT_RETURN: i32 = IPT_RETURN;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum IpTableParseError {
@@ -88,6 +100,18 @@ pub enum IpTableParseError {
     InvalidVerdict { verdict: i32 },
     #[error("invalid jump target {jump_target}")]
     InvalidJumpTarget { jump_target: usize },
+    #[error("invalid valid_hooks field {hooks:#x}")]
+    InvalidHookBits { hooks: u32 },
+    #[error("invalid hooks {hooks:#x} found for table {table_name}")]
+    InvalidHooksForTable { hooks: u32, table_name: &'static str },
+    #[error("hook ranges overlap at offset {offset}")]
+    HookRangesOverlap { offset: usize },
+    #[error("unrecognized table name {table_name}")]
+    UnrecognizedTableName { table_name: String },
+    #[error("invalid hook entry or underflow values for index {index} [{start}, {end}]")]
+    InvalidHookEntryOrUnderflow { index: u32, start: usize, end: usize },
+    #[error("unexpected error target {error_name} found in installed routine")]
+    UnexpectedErrorTarget { error_name: String },
 }
 
 #[derive(Debug, Error, PartialEq)]
@@ -120,14 +144,25 @@ pub enum IpAddressConversionError {
 /// IPv4, and `ip6t_replace` for IPv6.
 #[derive(Clone, Debug)]
 pub struct ReplaceInfo {
+    /// Name of the table.
     pub name: String,
+
+    /// Number of entries defined on the table.
     pub num_entries: usize,
+
+    /// Size of entries in bytes.
     pub size: usize,
 
-    /// Unsupported fields, saved as the same type as `ipt_replace`.
-    pub valid_hooks: u32,
+    /// Bitmap of which installed chains are on the table.
+    pub valid_hooks: NfIpHooks,
+
+    /// Byte offsets of the first entry of each installed chain.
     pub hook_entry: [c_uint; 5usize],
+
+    /// Byte offsets of the policy of each installed chain.
     pub underflow: [c_uint; 5usize],
+
+    /// Unused field. Number of counters.
     pub num_counters: c_uint,
 }
 
@@ -136,11 +171,13 @@ impl TryFrom<ipt_replace> for ReplaceInfo {
 
     fn try_from(replace: ipt_replace) -> Result<Self, Self::Error> {
         let name = ascii_to_string(&replace.name).map_err(IpTableParseError::AsciiConversion)?;
+        let valid_hooks = NfIpHooks::from_bits(replace.valid_hooks)
+            .ok_or_else(|| IpTableParseError::InvalidHookBits { hooks: replace.valid_hooks })?;
         Ok(Self {
             name,
             num_entries: usize::try_from(replace.num_entries).expect("u32 fits in usize"),
             size: usize::try_from(replace.size).expect("u32 fits in usize"),
-            valid_hooks: replace.valid_hooks,
+            valid_hooks,
             hook_entry: replace.hook_entry,
             underflow: replace.underflow,
             num_counters: replace.num_counters,
@@ -153,11 +190,13 @@ impl TryFrom<ip6t_replace> for ReplaceInfo {
 
     fn try_from(replace: ip6t_replace) -> Result<Self, Self::Error> {
         let name = ascii_to_string(&replace.name).map_err(IpTableParseError::AsciiConversion)?;
+        let valid_hooks = NfIpHooks::from_bits(replace.valid_hooks)
+            .ok_or_else(|| IpTableParseError::InvalidHookBits { hooks: replace.valid_hooks })?;
         Ok(Self {
             name,
             num_entries: usize::try_from(replace.num_entries).expect("u32 fits in usize"),
             size: usize::try_from(replace.size).expect("u32 fits in usize"),
-            valid_hooks: replace.valid_hooks,
+            valid_hooks,
             hook_entry: replace.hook_entry,
             underflow: replace.underflow,
             num_counters: replace.num_counters,
@@ -337,7 +376,7 @@ impl IpInfo {
     fn should_match_protocol(&self) -> bool {
         match self.flags {
             IptIpFlags::V4(_) => true,
-            IptIpFlags::V6(flags) => flags.contains(IptIpFlagsV6::Protocol),
+            IptIpFlags::V6(flags) => flags.contains(IptIpFlagsV6::PROTOCOL),
         }
     }
 }
@@ -393,7 +432,7 @@ pub enum Target {
 // `target` of type `xt_entry_target` is parsed first to determine the target's variant.
 #[repr(C)]
 #[derive(AsBytes, Debug, Default, FromBytes, FromZeros, NoCell)]
-struct VerdictWithPadding {
+pub struct VerdictWithPadding {
     pub verdict: c_int,
     pub _padding: [u8; 4usize],
 }
@@ -403,7 +442,7 @@ struct VerdictWithPadding {
 // `target` of type `xt_entry_target` is parsed first to determine the target's variant.
 #[repr(C)]
 #[derive(AsBytes, Debug, Default, FromBytes, FromZeros, NoCell)]
-struct ErrorNameWithPadding {
+pub struct ErrorNameWithPadding {
     pub errorname: [c_char; 30usize],
     pub _padding: [u8; 2usize],
 }
@@ -417,8 +456,10 @@ enum Ip {
 /// A parser for both `ipt_replace` and `ip6t_replace`, and its subsequent entries.
 #[derive(Debug)]
 pub struct IptReplaceParser {
+    /// Determines which Linux structures the parser expects.
     protocol: Ip,
 
+    /// Table metadata passed through `ipt_replace` or `ip6t_replace`.
     pub replace_info: ReplaceInfo,
 
     // Linux bytes to parse.
@@ -439,9 +480,14 @@ pub struct IptReplaceParser {
     // 128-bit IP addresses.
     bytes: Vec<u8>,
 
+    /// Current parse position.
     parse_pos: usize,
 
+    /// Number of entries parsed so far, used to index the next entry.
     entry_index: u32,
+
+    /// Keeps track of byte offsets of entries parsed so far. Used to check for errors.
+    entry_offsets: HashSet<usize>,
 }
 
 impl IptReplaceParser {
@@ -465,6 +511,7 @@ impl IptReplaceParser {
             bytes,
             parse_pos: IPT_REPLACE_SIZE,
             entry_index: 0,
+            entry_offsets: HashSet::new(),
         })
     }
 
@@ -488,6 +535,7 @@ impl IptReplaceParser {
             bytes,
             parse_pos: IP6T_REPLACE_SIZE,
             entry_index: 0,
+            entry_offsets: HashSet::new(),
         })
     }
 
@@ -502,7 +550,7 @@ impl IptReplaceParser {
         }
     }
 
-    pub fn get_domain(&self) -> fnet_filter_ext::Domain {
+    fn get_domain(&self) -> fnet_filter_ext::Domain {
         match self.protocol {
             Ip::V4 => fnet_filter_ext::Domain::Ipv4,
             Ip::V6 => fnet_filter_ext::Domain::Ipv6,
@@ -514,6 +562,28 @@ impl IptReplaceParser {
             Ip::V4 => fnet_filter_ext::NamespaceId(format!("ipv4-{}", self.replace_info.name)),
             Ip::V6 => fnet_filter_ext::NamespaceId(format!("ipv6-{}", self.replace_info.name)),
         }
+    }
+
+    pub fn table_name(&self) -> &str {
+        self.replace_info.name.as_str()
+    }
+
+    pub fn get_namespace(&self) -> fnet_filter_ext::Namespace {
+        fnet_filter_ext::Namespace { id: self.get_namespace_id(), domain: self.get_domain() }
+    }
+
+    fn get_custom_routine_type(&self) -> fnet_filter_ext::RoutineType {
+        match self.table_name() {
+            TABLE_NAT => fnet_filter_ext::RoutineType::Nat(None),
+            _ => fnet_filter_ext::RoutineType::Ip(None),
+        }
+    }
+
+    /// Returns whether `offset` points to a valid entry. Parser can only know this after reading
+    /// all entries in `bytes`. Panics if the parser has not finished.
+    pub fn is_valid_offset(&self, offset: usize) -> bool {
+        assert!(self.finished());
+        self.entry_offsets.contains(&offset)
     }
 
     fn next_entry_index(&mut self) -> u32 {
@@ -591,7 +661,7 @@ impl IptReplaceParser {
         let target_pos = byte_pos + entry_info.target_offset;
         let next_pos = byte_pos + entry_info.next_offset;
 
-        let mut matchers: Vec<Matcher> = vec![];
+        let mut matchers = Vec::new();
 
         // Each entry has 0 or more matchers.
         while self.bytes_since_first_entry() < target_pos {
@@ -614,6 +684,8 @@ impl IptReplaceParser {
         }
 
         assert!(self.bytes_since_first_entry() > byte_pos, "parse_pos must advance");
+
+        assert!(self.entry_offsets.insert(byte_pos));
         Ok(Entry { index: self.next_entry_index(), byte_pos, entry_info, matchers, target })
     }
 
@@ -755,10 +827,7 @@ impl IpTable {
     }
 
     fn from_parser(mut parser: IptReplaceParser) -> Result<Self, IpTableParseError> {
-        let domain = parser.get_domain();
-        let namespace = parser.get_namespace_id();
-
-        let mut entries: Vec<Entry> = vec![];
+        let mut entries = Vec::new();
 
         // Pass 1: Parse all bytes into Linux structs as `Entry`s.
         while !parser.finished() {
@@ -772,10 +841,39 @@ impl IpTable {
             });
         }
 
+        // There must be at least 1 entry and the last entry must be an error target named "ERROR".
+        Self::truncate_last_entry(&mut entries)?;
+
         // Pass 2: Translate chain-definition entries into `Routine`s, and wrap rule-specification
         // entries in `RuleSpecs::Untranslated`.
-        let (routine_map, untranslated_rules) =
-            create_routine_map_and_rules(namespace.clone(), &parser.replace_info.name, entries)?;
+        let mut routine_map = HashMap::new();
+        let mut untranslated_rules = Vec::new();
+
+        // Translate installed routines first, and keep the rest of the entries in
+        // `remaining_entries`.
+        let installed_routines = InstalledRoutines::new(&parser)?;
+        let mut remaining_entries = Vec::new();
+        for entry in entries {
+            if let Some(routine_id) = installed_routines.is_installed(entry.byte_pos) {
+                // Entries on installed routines cannot define a new custom routine.
+                if let Target::Error(ref error_name) = entry.target {
+                    return Err(IpTableParseError::UnexpectedErrorTarget {
+                        error_name: error_name.to_owned(),
+                    });
+                }
+                untranslated_rules.push(UntranslatedRule { routine_id, entry });
+            } else {
+                remaining_entries.push(entry);
+            }
+        }
+        installed_routines.populate_routine_map(&mut routine_map)?;
+
+        Self::populate_with_custom_routines(
+            &mut routine_map,
+            &mut untranslated_rules,
+            &parser,
+            remaining_entries,
+        )?;
 
         // Pass 3: Translate `RuleSpecs` into `Rule`s.
         let rule_specs: Vec<_> = untranslated_rules
@@ -783,12 +881,8 @@ impl IpTable {
             .map(|untranslated| RuleSpec::try_translate(untranslated, &routine_map))
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(IpTable {
-            parser,
-            namespace: fnet_filter_ext::Namespace { id: namespace, domain },
-            routine_map,
-            rule_specs,
-        })
+        let namespace = parser.get_namespace();
+        Ok(IpTable { parser, namespace, routine_map, rule_specs })
     }
 
     pub fn into_changes(self) -> impl Iterator<Item = fnet_filter_ext::Change> {
@@ -823,66 +917,368 @@ impl IpTable {
 
         namespace_changes.chain(routine_changes).chain(rule_changes)
     }
+
+    fn truncate_last_entry(entries: &mut Vec<Entry>) -> Result<(), IpTableParseError> {
+        let last_entry = entries.last().ok_or_else(|| IpTableParseError::NoTrailingErrorTarget)?;
+        if !last_entry.matchers.is_empty() {
+            return Err(IpTableParseError::ErrorEntryHasMatchers);
+        }
+        if let Target::Error(chain_name) = &last_entry.target {
+            if chain_name.as_str() != "ERROR" {
+                return Err(IpTableParseError::NoTrailingErrorTarget);
+            }
+        } else {
+            return Err(IpTableParseError::NoTrailingErrorTarget);
+        }
+        entries.truncate(entries.len() - 1);
+        Ok(())
+    }
+
+    // Chain-definitions are returned as `Routine`s, stored in a HashMap keyed by the byte position
+    // of the chain's first rule/policy (there must be at least one).
+    // Rules are returned in a Vec as `UntranslatedRule`.
+    fn populate_with_custom_routines(
+        routine_map: &mut HashMap<usize, fnet_filter_ext::Routine>,
+        rules: &mut Vec<UntranslatedRule>,
+        parser: &IptReplaceParser,
+        entries: Vec<Entry>,
+    ) -> Result<(), IpTableParseError> {
+        // A new Routine is first added as a Pending routine, and then inserted into `routine_map`
+        // when its first rule or policy is processed. This implementation has 2 advantages:
+        //
+        // 1. JUMP targets reference the byte position of the first entry after a chain definition,
+        //    so we can insert the Routine with the correct byte position.
+        // 2. We can catch the translation error where a chain is defined without a policy.
+        #[derive(Debug)]
+        enum RoutineState {
+            // No chain definition has been read.
+            None,
+            // Routine is not inserted into `routine_map`.
+            Pending(fnet_filter_ext::Routine),
+            // Routine is inserted into `routine_map`.
+            Inserted(fnet_filter_ext::RoutineId),
+        }
+        let mut current_routine = RoutineState::None;
+
+        for entry in entries {
+            if let Target::Error(chain_name) = &entry.target {
+                if !entry.matchers.is_empty() {
+                    return Err(IpTableParseError::ErrorEntryHasMatchers);
+                }
+                if let RoutineState::Pending(routine) = current_routine {
+                    return Err(IpTableParseError::ChainHasNoPolicy {
+                        chain_name: routine.id.name,
+                    });
+                }
+
+                let routine_id = fnet_filter_ext::RoutineId {
+                    namespace: parser.get_namespace_id(),
+                    name: chain_name.clone(),
+                };
+                current_routine = RoutineState::Pending(fnet_filter_ext::Routine {
+                    id: routine_id,
+                    routine_type: parser.get_custom_routine_type(),
+                });
+            } else {
+                if let RoutineState::None = current_routine {
+                    return Err(IpTableParseError::RuleBeforeFirstChain);
+                }
+                if let RoutineState::Pending(routine) = current_routine {
+                    let routine_id = routine.id.clone();
+                    assert!(routine_map.insert(entry.byte_pos, routine).is_none());
+                    current_routine = RoutineState::Inserted(routine_id);
+                }
+
+                // At this stage, current_routine must be the `Inserted` variant.
+                let routine_id = assert_matches!(
+                    current_routine, RoutineState::Inserted(ref id) => id);
+                rules.push(UntranslatedRule { routine_id: routine_id.clone(), entry });
+            }
+        }
+
+        if let RoutineState::Pending(routine) = current_routine {
+            return Err(IpTableParseError::ChainHasNoPolicy { chain_name: routine.id.name });
+        }
+
+        Ok(())
+    }
 }
 
-fn get_routine_type(table_name: &str, chain_name: &str) -> fnet_filter_ext::RoutineType {
-    match (table_name, chain_name) {
-        (TABLE_NAT, CHAIN_PREROUTING) => {
-            fnet_filter_ext::RoutineType::Nat(Some(fnet_filter_ext::InstalledNatRoutine {
-                hook: fnet_filter_ext::NatHook::Ingress,
-                priority: 0,
-            }))
+/// Keeps track of byte ranges of installed routines.
+struct InstalledRoutine {
+    routine: fnet_filter_ext::Routine,
+    byte_range: RangeInclusive<usize>,
+}
+
+struct InstalledRoutines {
+    prerouting: Option<InstalledRoutine>,
+    input: Option<InstalledRoutine>,
+    forward: Option<InstalledRoutine>,
+    output: Option<InstalledRoutine>,
+    postrouting: Option<InstalledRoutine>,
+}
+
+impl InstalledRoutines {
+    fn new(parser: &IptReplaceParser) -> Result<Self, IpTableParseError> {
+        match parser.table_name() {
+            TABLE_NAT => {
+                if parser.replace_info.valid_hooks != NfIpHooks::NAT {
+                    return Err(IpTableParseError::InvalidHooksForTable {
+                        hooks: parser.replace_info.valid_hooks.bits(),
+                        table_name: TABLE_NAT,
+                    });
+                }
+                Self::new_nat(parser)
+            }
+            TABLE_MANGLE => {
+                if parser.replace_info.valid_hooks != NfIpHooks::MANGLE {
+                    return Err(IpTableParseError::InvalidHooksForTable {
+                        hooks: parser.replace_info.valid_hooks.bits(),
+                        table_name: TABLE_MANGLE,
+                    });
+                }
+                Self::new_ip(parser, nf_ip_hook_priorities_NF_IP_PRI_MANGLE)
+            }
+            TABLE_FILTER => {
+                if parser.replace_info.valid_hooks != NfIpHooks::FILTER {
+                    return Err(IpTableParseError::InvalidHooksForTable {
+                        hooks: parser.replace_info.valid_hooks.bits(),
+                        table_name: TABLE_FILTER,
+                    });
+                }
+                Self::new_ip(parser, nf_ip_hook_priorities_NF_IP_PRI_FILTER)
+            }
+            TABLE_RAW => {
+                if parser.replace_info.valid_hooks != NfIpHooks::RAW {
+                    return Err(IpTableParseError::InvalidHooksForTable {
+                        hooks: parser.replace_info.valid_hooks.bits(),
+                        table_name: TABLE_RAW,
+                    });
+                }
+                Self::new_ip(parser, nf_ip_hook_priorities_NF_IP_PRI_RAW)
+            }
+            table_name => {
+                Err(IpTableParseError::UnrecognizedTableName { table_name: table_name.to_owned() })
+            }
         }
-        (TABLE_NAT, CHAIN_INPUT) => {
-            fnet_filter_ext::RoutineType::Nat(Some(fnet_filter_ext::InstalledNatRoutine {
-                hook: fnet_filter_ext::NatHook::LocalIngress,
-                priority: 0,
-            }))
+    }
+
+    fn new_nat(parser: &IptReplaceParser) -> Result<Self, IpTableParseError> {
+        let prerouting = Some(InstalledRoutine {
+            routine: fnet_filter_ext::Routine {
+                id: fnet_filter_ext::RoutineId {
+                    namespace: parser.get_namespace_id(),
+                    name: CHAIN_PREROUTING.to_string(),
+                },
+                routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                    fnet_filter_ext::InstalledNatRoutine {
+                        hook: fnet_filter_ext::NatHook::Ingress,
+                        priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_DST,
+                    },
+                )),
+            },
+            byte_range: Self::make_byte_range(parser, NF_IP_PRE_ROUTING)?,
+        });
+        let input = Some(InstalledRoutine {
+            routine: fnet_filter_ext::Routine {
+                id: fnet_filter_ext::RoutineId {
+                    namespace: parser.get_namespace_id(),
+                    name: CHAIN_INPUT.to_string(),
+                },
+                routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                    fnet_filter_ext::InstalledNatRoutine {
+                        hook: fnet_filter_ext::NatHook::LocalIngress,
+                        priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_SRC,
+                    },
+                )),
+            },
+            byte_range: Self::make_byte_range(parser, NF_IP_LOCAL_IN)?,
+        });
+        let forward = None;
+        let output = Some(InstalledRoutine {
+            routine: fnet_filter_ext::Routine {
+                id: fnet_filter_ext::RoutineId {
+                    namespace: parser.get_namespace_id(),
+                    name: CHAIN_OUTPUT.to_string(),
+                },
+                routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                    fnet_filter_ext::InstalledNatRoutine {
+                        hook: fnet_filter_ext::NatHook::LocalEgress,
+                        priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_DST,
+                    },
+                )),
+            },
+            byte_range: Self::make_byte_range(parser, NF_IP_LOCAL_OUT)?,
+        });
+
+        let postrouting = Some(InstalledRoutine {
+            routine: fnet_filter_ext::Routine {
+                id: fnet_filter_ext::RoutineId {
+                    namespace: parser.get_namespace_id(),
+                    name: CHAIN_POSTROUTING.to_string(),
+                },
+                routine_type: fnet_filter_ext::RoutineType::Nat(Some(
+                    fnet_filter_ext::InstalledNatRoutine {
+                        hook: fnet_filter_ext::NatHook::Egress,
+                        priority: nf_ip_hook_priorities_NF_IP_PRI_NAT_SRC,
+                    },
+                )),
+            },
+            byte_range: Self::make_byte_range(parser, NF_IP_POST_ROUTING)?,
+        });
+
+        Ok(Self { prerouting, input, forward, output, postrouting })
+    }
+
+    fn new_ip(parser: &IptReplaceParser, priority: i32) -> Result<Self, IpTableParseError> {
+        let prerouting = if parser.replace_info.valid_hooks.contains(NfIpHooks::PREROUTING) {
+            Some(InstalledRoutine {
+                routine: fnet_filter_ext::Routine {
+                    id: fnet_filter_ext::RoutineId {
+                        namespace: parser.get_namespace_id(),
+                        name: CHAIN_PREROUTING.to_string(),
+                    },
+                    routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                        fnet_filter_ext::InstalledIpRoutine {
+                            hook: fnet_filter_ext::IpHook::Ingress,
+                            priority,
+                        },
+                    )),
+                },
+                byte_range: Self::make_byte_range(parser, NF_IP_PRE_ROUTING)?,
+            })
+        } else {
+            None
+        };
+        let input = if parser.replace_info.valid_hooks.contains(NfIpHooks::INPUT) {
+            Some(InstalledRoutine {
+                routine: fnet_filter_ext::Routine {
+                    id: fnet_filter_ext::RoutineId {
+                        namespace: parser.get_namespace_id(),
+                        name: CHAIN_INPUT.to_string(),
+                    },
+                    routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                        fnet_filter_ext::InstalledIpRoutine {
+                            hook: fnet_filter_ext::IpHook::LocalIngress,
+                            priority,
+                        },
+                    )),
+                },
+                byte_range: Self::make_byte_range(parser, NF_IP_LOCAL_IN)?,
+            })
+        } else {
+            None
+        };
+        let forward = if parser.replace_info.valid_hooks.contains(NfIpHooks::FORWARD) {
+            Some(InstalledRoutine {
+                routine: fnet_filter_ext::Routine {
+                    id: fnet_filter_ext::RoutineId {
+                        namespace: parser.get_namespace_id(),
+                        name: CHAIN_FORWARD.to_string(),
+                    },
+                    routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                        fnet_filter_ext::InstalledIpRoutine {
+                            hook: fnet_filter_ext::IpHook::Forwarding,
+                            priority,
+                        },
+                    )),
+                },
+                byte_range: Self::make_byte_range(parser, NF_IP_FORWARD)?,
+            })
+        } else {
+            None
+        };
+        let output = if parser.replace_info.valid_hooks.contains(NfIpHooks::OUTPUT) {
+            Some(InstalledRoutine {
+                routine: fnet_filter_ext::Routine {
+                    id: fnet_filter_ext::RoutineId {
+                        namespace: parser.get_namespace_id(),
+                        name: CHAIN_OUTPUT.to_string(),
+                    },
+                    routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                        fnet_filter_ext::InstalledIpRoutine {
+                            hook: fnet_filter_ext::IpHook::LocalEgress,
+                            priority,
+                        },
+                    )),
+                },
+                byte_range: Self::make_byte_range(parser, NF_IP_LOCAL_OUT)?,
+            })
+        } else {
+            None
+        };
+        let postrouting = if parser.replace_info.valid_hooks.contains(NfIpHooks::POSTROUTING) {
+            Some(InstalledRoutine {
+                routine: fnet_filter_ext::Routine {
+                    id: fnet_filter_ext::RoutineId {
+                        namespace: parser.get_namespace_id(),
+                        name: CHAIN_POSTROUTING.to_string(),
+                    },
+                    routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                        fnet_filter_ext::InstalledIpRoutine {
+                            hook: fnet_filter_ext::IpHook::Egress,
+                            priority,
+                        },
+                    )),
+                },
+                byte_range: Self::make_byte_range(parser, NF_IP_POST_ROUTING)?,
+            })
+        } else {
+            None
+        };
+
+        Ok(Self { prerouting, input, forward, output, postrouting })
+    }
+
+    /// Returns a new byte range for the i-th hook. `index` must be less than `NF_IP_NUMHOOKS`.
+    fn make_byte_range(
+        parser: &IptReplaceParser,
+        index: u32,
+    ) -> Result<RangeInclusive<usize>, IpTableParseError> {
+        assert!(index < NF_IP_NUMHOOKS);
+
+        let start = parser.replace_info.hook_entry[index as usize] as usize;
+        let end = parser.replace_info.underflow[index as usize] as usize;
+
+        // Both start and end must point to an Entry.
+        if start > end || !parser.is_valid_offset(start) || !parser.is_valid_offset(end) {
+            return Err(IpTableParseError::InvalidHookEntryOrUnderflow { index, start, end });
         }
-        (TABLE_NAT, CHAIN_OUTPUT) => {
-            fnet_filter_ext::RoutineType::Nat(Some(fnet_filter_ext::InstalledNatRoutine {
-                hook: fnet_filter_ext::NatHook::LocalEgress,
-                priority: 0,
-            }))
+
+        Ok(start..=end)
+    }
+
+    /// Given an `offset`, determine whether it belongs in an installed routine of the table, and
+    /// returns the `RoutineId` if it does.
+    fn is_installed(&self, offset: usize) -> Option<fnet_filter_ext::RoutineId> {
+        for installed_routine in
+            [&self.prerouting, &self.input, &self.forward, &self.output, &self.postrouting]
+        {
+            if let Some(routine) = installed_routine.as_ref() {
+                if routine.byte_range.contains(&offset) {
+                    return Some(routine.routine.id.clone());
+                }
+            }
         }
-        (TABLE_NAT, CHAIN_POSTROUTING) => {
-            fnet_filter_ext::RoutineType::Nat(Some(fnet_filter_ext::InstalledNatRoutine {
-                hook: fnet_filter_ext::NatHook::Egress,
-                priority: 0,
-            }))
+        None
+    }
+
+    /// Consumes `self` and inserts each installed routine into the `routine_map`.
+    fn populate_routine_map(
+        self,
+        routine_map: &mut HashMap<usize, fnet_filter_ext::Routine>,
+    ) -> Result<(), IpTableParseError> {
+        for installed_routine in
+            [self.prerouting, self.input, self.forward, self.output, self.postrouting]
+        {
+            if let Some(routine) = installed_routine {
+                let offset = *routine.byte_range.start();
+                if routine_map.insert(offset, routine.routine).is_some() {
+                    return Err(IpTableParseError::HookRangesOverlap { offset });
+                }
+            }
         }
-        (TABLE_NAT, _) => fnet_filter_ext::RoutineType::Nat(None),
-        (_, CHAIN_PREROUTING) => {
-            fnet_filter_ext::RoutineType::Ip(Some(fnet_filter_ext::InstalledIpRoutine {
-                hook: fnet_filter_ext::IpHook::Ingress,
-                priority: 0,
-            }))
-        }
-        (_, CHAIN_INPUT) => {
-            fnet_filter_ext::RoutineType::Ip(Some(fnet_filter_ext::InstalledIpRoutine {
-                hook: fnet_filter_ext::IpHook::LocalIngress,
-                priority: 0,
-            }))
-        }
-        (_, CHAIN_FORWARD) => {
-            fnet_filter_ext::RoutineType::Ip(Some(fnet_filter_ext::InstalledIpRoutine {
-                hook: fnet_filter_ext::IpHook::Forwarding,
-                priority: 0,
-            }))
-        }
-        (_, CHAIN_OUTPUT) => {
-            fnet_filter_ext::RoutineType::Ip(Some(fnet_filter_ext::InstalledIpRoutine {
-                hook: fnet_filter_ext::IpHook::LocalEgress,
-                priority: 0,
-            }))
-        }
-        (_, CHAIN_POSTROUTING) => {
-            fnet_filter_ext::RoutineType::Ip(Some(fnet_filter_ext::InstalledIpRoutine {
-                hook: fnet_filter_ext::IpHook::Egress,
-                priority: 0,
-            }))
-        }
-        (_, _) => fnet_filter_ext::RoutineType::Ip(None),
+        Ok(())
     }
 }
 
@@ -976,7 +1372,7 @@ impl Entry {
                 .map_err(IpTableParseError::FidlConversion)?;
             matchers.src_addr = Some(fnet_filter_ext::AddressMatcher {
                 matcher: fnet_filter_ext::AddressMatcherType::Subnet(subnet),
-                invert: ip_info.inverse_flags.contains(IptIpInverseFlags::SourceIpAddress),
+                invert: ip_info.inverse_flags.contains(IptIpInverseFlags::SOURCE_IP_ADDRESS),
             });
         }
 
@@ -985,12 +1381,12 @@ impl Entry {
                 .map_err(IpTableParseError::FidlConversion)?;
             matchers.dst_addr = Some(fnet_filter_ext::AddressMatcher {
                 matcher: fnet_filter_ext::AddressMatcherType::Subnet(subnet),
-                invert: ip_info.inverse_flags.contains(IptIpInverseFlags::DestinationIpAddress),
+                invert: ip_info.inverse_flags.contains(IptIpInverseFlags::DESTINATION_IP_ADDRESS),
             });
         }
 
         if let Some(ref interface) = ip_info.in_interface {
-            if ip_info.inverse_flags.contains(IptIpInverseFlags::InputInterface) {
+            if ip_info.inverse_flags.contains(IptIpInverseFlags::INPUT_INTERFACE) {
                 log_warn!("IpTables: ignored rule-specification with inversed input interface");
                 return Ok(None);
             }
@@ -998,7 +1394,7 @@ impl Entry {
         }
 
         if let Some(ref interface) = ip_info.out_interface {
-            if ip_info.inverse_flags.contains(IptIpInverseFlags::OutputInterface) {
+            if ip_info.inverse_flags.contains(IptIpInverseFlags::OUTPUT_INTERFACE) {
                 log_warn!("IpTables: ignored rule-specification with inversed output interface");
                 return Ok(None);
             }
@@ -1084,86 +1480,6 @@ impl Entry {
     }
 }
 
-// Chain-definitions are returned as `Routine`s, stored in a HashMap keyed by the byte position of
-// the chain's first rule/policy (there must be at least one).
-// Rules are returned in a Vec as `UntranslatedRule`.
-fn create_routine_map_and_rules(
-    namespace: fnet_filter_ext::NamespaceId,
-    table_name: &str,
-    mut entries: Vec<Entry>,
-) -> Result<(HashMap<usize, fnet_filter_ext::Routine>, Vec<UntranslatedRule>), IpTableParseError> {
-    // There must be at least 1 entry and the last entry must be an error target named "ERROR".
-    let last_entry = entries.last().ok_or_else(|| IpTableParseError::NoTrailingErrorTarget)?;
-    if !last_entry.matchers.is_empty() {
-        return Err(IpTableParseError::ErrorEntryHasMatchers);
-    }
-    if let Target::Error(chain_name) = &last_entry.target {
-        if chain_name.as_str() != "ERROR" {
-            return Err(IpTableParseError::NoTrailingErrorTarget);
-        }
-    } else {
-        return Err(IpTableParseError::NoTrailingErrorTarget);
-    }
-    entries.truncate(entries.len() - 1);
-
-    let mut routine_map: HashMap<usize, fnet_filter_ext::Routine> = HashMap::new();
-    let mut rules: Vec<UntranslatedRule> = Vec::new();
-
-    // A new Routine is first added as a Pending routine, and then inserted into `routine_map`
-    // when its first rule or policy is processed. This implementation has 2 advantages:
-    //
-    // 1. JUMP targets reference the byte position of the first entry after a chain definition,
-    //    so we can insert the Routine with the correct byte position.
-    // 2. We can catch the translation error where a chain is defined without a policy.
-    enum RoutineState {
-        // No chain definition has been read.
-        None,
-        // Routine is not inserted into `routine_map`.
-        Pending(fnet_filter_ext::Routine),
-        // Routine is inserted into `routine_map`.
-        Inserted(fnet_filter_ext::RoutineId),
-    }
-    let mut current_routine = RoutineState::None;
-
-    for entry in entries.into_iter() {
-        if let Target::Error(chain_name) = &entry.target {
-            if !entry.matchers.is_empty() {
-                return Err(IpTableParseError::ErrorEntryHasMatchers);
-            }
-            if let RoutineState::Pending(routine) = current_routine {
-                return Err(IpTableParseError::ChainHasNoPolicy { chain_name: routine.id.name });
-            }
-
-            let routine_id = fnet_filter_ext::RoutineId {
-                namespace: namespace.clone(),
-                name: chain_name.clone(),
-            };
-            let routine_type = get_routine_type(table_name, chain_name.as_str());
-            current_routine =
-                RoutineState::Pending(fnet_filter_ext::Routine { id: routine_id, routine_type });
-        } else {
-            if let RoutineState::None = current_routine {
-                return Err(IpTableParseError::RuleBeforeFirstChain);
-            }
-            if let RoutineState::Pending(routine) = current_routine {
-                let routine_id = routine.id.clone();
-                routine_map.insert(entry.byte_pos, routine);
-                current_routine = RoutineState::Inserted(routine_id);
-            }
-
-            // At this stage, current_routine must be the `Inserted` variant.
-            let RoutineState::Inserted(ref routine_id) = current_routine else { unreachable!() };
-            rules.push(UntranslatedRule { routine_id: routine_id.clone(), entry });
-        }
-    }
-
-    if let RoutineState::Pending(routine) = current_routine {
-        return Err(IpTableParseError::ChainHasNoPolicy { chain_name: routine.id.name });
-    }
-
-    Ok((routine_map, rules))
-}
-
 // On x86_64, `c_char` is `i8`; try to convert them to `u8`.
 // Errors if any character is not in ASCII range (0-127).
 #[cfg(target_arch = "x86_64")]
@@ -1234,6 +1550,8 @@ fn write_bytes_to_ascii_buffer(
     Ok(())
 }
 
+// TODO(https://fxbug.dev/307908515): Rewrite this method to take a CString to avoid double
+// allocation and copy.
 pub fn write_string_to_ascii_buffer(
     string: String,
     chars: &mut [c_char],
@@ -1311,13 +1629,10 @@ pub fn ipv6_to_subnet(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use itertools::Itertools;
     use net_declare::fidl_subnet;
     use starnix_uapi::{
-        c_char, in6_addr__bindgen_ty_1, in_addr, ipt_entry, ipt_ip, ipt_replace,
-        xt_entry_match__bindgen_ty_1__bindgen_ty_1 as xt_entry_match,
-        xt_entry_target__bindgen_ty_1__bindgen_ty_1 as xt_entry_target, xt_tcp, xt_udp,
+        c_char, in6_addr__bindgen_ty_1, in_addr, ipt_entry, ipt_ip, ipt_replace, xt_tcp, xt_udp,
         IP6T_F_PROTO, IPT_INV_SRCIP,
     };
     use test_case::test_case;
@@ -1396,18 +1711,90 @@ mod tests {
         extend_with_error_name(bytes, error_name);
     }
 
+    fn filter_namespace_v4() -> fnet_filter_ext::Namespace {
+        fnet_filter_ext::Namespace {
+            id: fnet_filter_ext::NamespaceId("ipv4-filter".to_owned()),
+            domain: fnet_filter_ext::Domain::Ipv4,
+        }
+    }
+
+    fn filter_namespace_v6() -> fnet_filter_ext::Namespace {
+        fnet_filter_ext::Namespace {
+            id: fnet_filter_ext::NamespaceId("ipv6-filter".to_owned()),
+            domain: fnet_filter_ext::Domain::Ipv6,
+        }
+    }
+
+    fn filter_input_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_INPUT.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::LocalIngress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_FILTER,
+                },
+            )),
+        }
+    }
+
+    fn filter_forward_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_FORWARD.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Forwarding,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_FILTER,
+                },
+            )),
+        }
+    }
+
+    fn filter_output_routine(namespace: &fnet_filter_ext::Namespace) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: CHAIN_OUTPUT.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::LocalEgress,
+                    priority: nf_ip_hook_priorities_NF_IP_PRI_FILTER,
+                },
+            )),
+        }
+    }
+
+    fn filter_custom_routine(
+        namespace: &fnet_filter_ext::Namespace,
+        chain_name: &str,
+    ) -> fnet_filter_ext::Routine {
+        fnet_filter_ext::Routine {
+            id: fnet_filter_ext::RoutineId {
+                namespace: namespace.id.clone(),
+                name: chain_name.to_owned(),
+            },
+            routine_type: fnet_filter_ext::RoutineType::Ip(None),
+        }
+    }
+
     fn ipv4_table_with_ip_matchers() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
-
-        // Entry 1: start of the chain.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
 
         let ip_bytes = "10.0.0.1".parse::<std::net::Ipv4Addr>().unwrap().octets();
         let ip_addr = in_addr { s_addr: u32::from_be_bytes(ip_bytes).to_be() };
         let mask_bytes = "255.255.255.255".parse::<std::net::Ipv4Addr>().unwrap().octets();
         let ip_mask = in_addr { s_addr: u32::from_be_bytes(mask_bytes).to_be() };
 
-        // Entry 2: drop TCP packets other than from ip_addr.
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 0: drop TCP packets other than from `ip_addr`.
         entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
@@ -1425,7 +1812,7 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 3: accept UDP packets from ip_addr.
+        // Entry 1: accept UDP packets from `ip_addr`.
         entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
@@ -1442,7 +1829,7 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
-        // Entry 4: drop all packets going to en0 interface.
+        // Entry 2: drop all packets going to en0 interface.
         entries_bytes.extend_from_slice(
             ipt_entry {
                 ip: ipt_ip {
@@ -1457,6 +1844,21 @@ mod tests {
             .as_bytes(),
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 3: policy of INPUT chain.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of FORWARD built-in chain.
+        let forward_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 4: policy of FORWARD chain.
+        // Note: FORWARD chain has no other rules.
+        let forward_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
 
         // Entry 5: accept all packets going from wifi1 interface.
         entries_bytes.extend_from_slice(
@@ -1474,29 +1876,31 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
-        // Entry 6: "policy" of the chain.
-        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
+        // Entry 6: policy of OUTPUT chain.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_DROP);
 
         // Entry 7: end of input.
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
-            num_entries: 7,
+            num_entries: 8,
             size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            hook_entry: [0, input_hook_entry, forward_hook_entry, output_hook_entry, 0],
+            underflow: [0, input_underflow, forward_underflow, output_underflow, 0],
             ..Default::default()
         }
         .as_bytes()
         .to_owned();
+
         bytes.extend(entries_bytes);
         bytes
     }
 
     fn ipv6_table_with_ip_matchers() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
-
-        // Entry 1: start of the chain.
-        extend_with_error_target_ipv6_entry(&mut entries_bytes, "mychain");
 
         let ip_addr = in6_addr {
             in6_u: in6_addr__bindgen_ty_1 {
@@ -1509,7 +1913,10 @@ mod tests {
             },
         };
 
-        // Entry 2: drop TCP packets other than from `ip_addr`.
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 0: drop TCP packets other than from `ip_addr`.
         entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
@@ -1528,7 +1935,7 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 3: accept UDP packets from `ip_addr`.
+        // Entry 1: accept UDP packets from `ip_addr`.
         entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
@@ -1546,7 +1953,7 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
-        // Entry 4: drop all packets going to en0 interface.
+        // Entry 2: drop all packets going to en0 interface.
         entries_bytes.extend_from_slice(
             ip6t_entry {
                 ipv6: ip6t_ip6 {
@@ -1561,6 +1968,21 @@ mod tests {
             .as_bytes(),
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 3: policy of INPUT chain.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of FORWARD built-in chain.
+        let forward_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 4: policy of FORWARD chain.
+        // Note: FORWARD chain has no other rules.
+        let forward_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
 
         // Entry 5: accept all packets going out from wifi1 interface.
         entries_bytes.extend_from_slice(
@@ -1578,41 +2000,67 @@ mod tests {
         );
         extend_with_standard_verdict(&mut entries_bytes, VERDICT_ACCEPT);
 
-        // Entry 6: "policy" of the chain.
-        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_RETURN);
+        // Entry 6: policy of OUTPUT chain.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_DROP);
 
         // Entry 7: end of input.
         extend_with_error_target_ipv6_entry(&mut entries_bytes, "ERROR");
 
         let mut bytes = ip6t_replace {
             name: string_to_32_chars("filter"),
-            num_entries: 7,
+            num_entries: 8,
             size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            hook_entry: [0, input_hook_entry, forward_hook_entry, output_hook_entry, 0],
+            underflow: [0, input_underflow, forward_underflow, output_underflow, 0],
             ..Default::default()
         }
         .as_bytes()
         .to_owned();
+
         bytes.append(&mut entries_bytes);
         bytes
     }
 
-    fn verify_table_with_ip_matchers(
+    #[test_case(
+        IpTable::from_ipt_replace(ipv4_table_with_ip_matchers()).unwrap(),
+        filter_namespace_v4(),
+        fidl_subnet!("10.0.0.1/32");
+        "ipv4"
+    )]
+    #[test_case(
+        IpTable::from_ip6t_replace(ipv6_table_with_ip_matchers()).unwrap(),
+        filter_namespace_v6(),
+        fidl_subnet!("2001:4860:4860::/64");
+        "ipv6"
+    )]
+    fn parse_ip_matchers_test(
         table: IpTable,
-        expected_table_name: &str,
+        expected_namespace: fnet_filter_ext::Namespace,
         expected_subnet: fnet::Subnet,
     ) {
-        assert_eq!(table.namespace.id.0, expected_table_name);
+        assert_eq!(table.namespace, expected_namespace);
 
-        let routines: Vec<_> = table.routine_map.into_values().collect();
-        assert_eq!(routines.len(), 1);
-
-        let routine_id = &routines.first().unwrap().id;
-        assert_eq!(routine_id.name, "mychain");
-        assert_eq!(routine_id.namespace.0, expected_table_name);
+        assert_eq!(
+            table
+                .routine_map
+                .into_values()
+                .sorted_by_key(|routine| routine.id.name.clone())
+                .collect::<Vec<_>>(),
+            [
+                filter_forward_routine(&expected_namespace),
+                filter_input_routine(&expected_namespace),
+                filter_output_routine(&expected_namespace),
+            ]
+        );
 
         let expected_rules = [
             fnet_filter_ext::Rule {
-                id: fnet_filter_ext::RuleId { index: 1, routine: routine_id.clone() },
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
                 matchers: fnet_filter_ext::Matchers {
                     src_addr: Some(fnet_filter_ext::AddressMatcher {
                         matcher: fnet_filter_ext::AddressMatcherType::Subnet(
@@ -1629,7 +2077,10 @@ mod tests {
                 action: fnet_filter_ext::Action::Drop,
             },
             fnet_filter_ext::Rule {
-                id: fnet_filter_ext::RuleId { index: 2, routine: routine_id.clone() },
+                id: fnet_filter_ext::RuleId {
+                    index: 1,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
                 matchers: fnet_filter_ext::Matchers {
                     src_addr: Some(fnet_filter_ext::AddressMatcher {
                         matcher: fnet_filter_ext::AddressMatcherType::Subnet(
@@ -1646,7 +2097,10 @@ mod tests {
                 action: fnet_filter_ext::Action::Accept,
             },
             fnet_filter_ext::Rule {
-                id: fnet_filter_ext::RuleId { index: 3, routine: routine_id.clone() },
+                id: fnet_filter_ext::RuleId {
+                    index: 2,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
                 matchers: fnet_filter_ext::Matchers {
                     in_interface: Some(fnet_filter_ext::InterfaceMatcher::Name("en0".to_string())),
                     ..Default::default()
@@ -1654,7 +2108,26 @@ mod tests {
                 action: fnet_filter_ext::Action::Drop,
             },
             fnet_filter_ext::Rule {
-                id: fnet_filter_ext::RuleId { index: 4, routine: routine_id.clone() },
+                id: fnet_filter_ext::RuleId {
+                    index: 3,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 4,
+                    routine: filter_forward_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 5,
+                    routine: filter_output_routine(&expected_namespace).id.clone(),
+                },
                 matchers: fnet_filter_ext::Matchers {
                     out_interface: Some(fnet_filter_ext::InterfaceMatcher::Name(
                         "wifi1".to_string(),
@@ -1664,13 +2137,14 @@ mod tests {
                 action: fnet_filter_ext::Action::Accept,
             },
             fnet_filter_ext::Rule {
-                id: fnet_filter_ext::RuleId { index: 5, routine: routine_id.clone() },
+                id: fnet_filter_ext::RuleId {
+                    index: 6,
+                    routine: filter_output_routine(&expected_namespace).id.clone(),
+                },
                 matchers: fnet_filter_ext::Matchers::default(),
-                action: fnet_filter_ext::Action::Return,
+                action: fnet_filter_ext::Action::Drop,
             },
         ];
-
-        assert_eq!(table.rule_specs.len(), expected_rules.len());
 
         for (rule_spec, expected) in table.rule_specs.iter().zip_eq(expected_rules.into_iter()) {
             let rule = assert_matches!(rule_spec, RuleSpec::Translated(rule) => rule);
@@ -1678,25 +2152,13 @@ mod tests {
         }
     }
 
-    #[fuchsia::test]
-    fn parse_ip_matchers_ipv4_test() {
-        let table = IpTable::from_ipt_replace(ipv4_table_with_ip_matchers()).unwrap();
-        verify_table_with_ip_matchers(table, "ipv4-filter", fidl_subnet!("10.0.0.1/32"));
-    }
-
-    #[fuchsia::test]
-    fn parse_ip_matchers_ipv6_test() {
-        let table = IpTable::from_ip6t_replace(ipv6_table_with_ip_matchers()).unwrap();
-        verify_table_with_ip_matchers(table, "ipv6-filter", fidl_subnet!("2001:4860:4860::/64"));
-    }
-
     fn table_with_match_extensions() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
 
-        // Entry 1: start of the chain.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
 
-        // Entry 2: a rule on the chain.
+        // Entry 0: rule with TCP match-extension.
         entries_bytes.extend_from_slice(
             ipt_entry { target_offset: 160, next_offset: 200, ..Default::default() }.as_bytes(),
         );
@@ -1705,10 +2167,10 @@ mod tests {
                 .as_bytes(),
         );
         entries_bytes.extend_from_slice(xt_tcp::default().as_bytes());
-        entries_bytes.extend_from_slice(&[0, 0, 0, 0]);
-        extend_with_standard_verdict(&mut entries_bytes, VERDICT_RETURN);
+        entries_bytes.extend_from_slice(&[0, 0, 0, 0]); // padding
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 3: another rule on the chain.
+        // Entry 1: rule with UDP match-extension.
         entries_bytes.extend_from_slice(
             ipt_entry { target_offset: 160, next_offset: 200, ..Default::default() }.as_bytes(),
         );
@@ -1718,18 +2180,38 @@ mod tests {
         );
         entries_bytes.extend_from_slice(xt_udp::default().as_bytes());
         entries_bytes.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
-        extend_with_standard_verdict(&mut entries_bytes, VERDICT_RETURN);
+        extend_with_standard_verdict(&mut entries_bytes, VERDICT_DROP);
 
-        // Entry 4: "policy" of the chain.
-        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
+        // Entry 2: policy of INPUT chain.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of FORWARD built-in chain.
+        let forward_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 3: policy of FORWARD chain.
+        // Note: FORWARD chain has no other rules.
+        let forward_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 4: policy of OUTPUT chain.
+        // Note: OUTPUT chain has no other rules.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_DROP);
 
         // Entry 5: end of input.
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
-            num_entries: 5,
+            num_entries: 6,
             size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            hook_entry: [0, input_hook_entry, forward_hook_entry, output_hook_entry, 0],
+            underflow: [0, input_underflow, forward_underflow, output_underflow, 0],
             ..Default::default()
         }
         .as_bytes()
@@ -1741,113 +2223,290 @@ mod tests {
     #[fuchsia::test]
     fn parse_match_extensions_test() {
         let table = IpTable::from_ipt_replace(table_with_match_extensions()).unwrap();
-        assert_eq!(table.namespace.id.0, "ipv4-filter");
 
-        let routines: Vec<_> = table.routine_map.into_values().collect();
-        assert_eq!(routines.len(), 1);
+        let expected_namespace = filter_namespace_v4();
+        assert_eq!(table.namespace, expected_namespace);
 
-        let routine_id = &routines.first().unwrap().id;
-        assert_eq!(routine_id.name, "mychain");
-        assert_eq!(routine_id.namespace.0, "ipv4-filter");
+        assert_eq!(
+            table
+                .routine_map
+                .into_values()
+                .sorted_by_key(|routine| routine.id.name.clone())
+                .collect::<Vec<_>>(),
+            [
+                filter_forward_routine(&expected_namespace),
+                filter_input_routine(&expected_namespace),
+                filter_output_routine(&expected_namespace),
+            ]
+        );
 
-        let mut rules = table.rule_specs.iter();
+        let mut rules = table.rule_specs.into_iter();
 
-        assert_matches!(rules.next(), Some(&RuleSpec::Unsupported(_)));
-        assert_matches!(rules.next(), Some(&RuleSpec::Unsupported(_)));
+        let rule = assert_matches!(rules.next(), Some(RuleSpec::Unsupported(rule)) => rule);
+        assert_eq!(rule.routine_id, filter_input_routine(&expected_namespace).id);
 
-        let RuleSpec::Translated(rule3) = rules.next().expect("rule 3 exists") else {
-            panic!("rule 3 should be translated");
-        };
-        let expected_rule3 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 3, routine: routine_id.clone() },
-            matchers: fnet_filter_ext::Matchers::default(),
-            action: fnet_filter_ext::Action::Return,
-        };
-        assert_eq!(rule3, &expected_rule3);
+        let rule = assert_matches!(rules.next(), Some(RuleSpec::Unsupported(rule)) => rule);
+        assert_eq!(rule.routine_id, filter_input_routine(&expected_namespace).id);
+
+        let rule = assert_matches!(rules.next(), Some(RuleSpec::Translated(rule)) => rule);
+        assert_eq!(
+            rule,
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 2,
+                    routine: filter_input_routine(&expected_namespace).id,
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            }
+        );
+
+        let rule = assert_matches!(rules.next(), Some(RuleSpec::Translated(rule)) => rule);
+        assert_eq!(
+            rule,
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 3,
+                    routine: filter_forward_routine(&expected_namespace).id,
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            }
+        );
+
+        let rule = assert_matches!(rules.next(), Some(RuleSpec::Translated(rule)) => rule);
+        assert_eq!(
+            rule,
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 4,
+                    routine: filter_output_routine(&expected_namespace).id,
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Drop,
+            }
+        );
 
         assert!(rules.next().is_none());
     }
 
-    fn table_with_jump_target() -> Vec<u8> {
+    fn ipv4_table_with_jump_target() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
 
-        // Entry 1: start of the chain1.
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 0 (byte 0): JUMP to chain1 for all packets.
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, 784);
+
+        // Entry 1 (byte 152): policy of INPUT chain.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of FORWARD built-in chain.
+        let forward_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 2 (byte 304): policy of FORWARD chain.
+        // Note: FORWARD chain has no other rules.
+        let forward_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 3 (byte 456): policy of OUTPUT chain.
+        // Note: OUTPUT chain has no other rules.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 4 (byte 608): start of the chain1.
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "chain1");
 
-        // Entry 2: jump to chain2 for all packets.
-        extend_with_standard_target_ipv4_entry(&mut entries_bytes, 656);
+        // Entry 5 (byte 784): jump to chain2 for all packets.
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, 1264);
 
-        // Entry 3: policy of chain1.
+        // Entry 6 (byte 936): policy of chain1.
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
 
-        // Entry 4: start of chain2.
+        // Entry 7 (byte 1088): start of chain2.
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "chain2");
 
-        // Entry 5: policy of chain2.
+        // Entry 8 (byte 1264): policy of chain2.
         extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_RETURN);
 
-        // Entry 6: end of input.
+        // Entry 9 (byte 1416): end of input.
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
-            num_entries: 6,
+            num_entries: 10,
             size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            hook_entry: [0, input_hook_entry, forward_hook_entry, output_hook_entry, 0],
+            underflow: [0, input_underflow, forward_underflow, output_underflow, 0],
             ..Default::default()
         }
         .as_bytes()
         .to_owned();
+
         bytes.extend(entries_bytes);
         bytes
     }
 
-    #[fuchsia::test]
-    fn parse_jump_target_test() {
-        let table = IpTable::from_ipt_replace(table_with_jump_target()).unwrap();
+    fn ipv6_table_with_jump_target() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
 
-        let mut routines: Vec<_> = table.routine_map.into_values().collect();
-        assert_eq!(routines.len(), 2);
-        routines.sort_by_key(|routine| routine.id.name.clone());
+        // Start of INPUT built-in chain.
+        let input_hook_entry = entries_bytes.len() as u32;
 
-        let routine1_id = &routines.first().unwrap().id;
-        assert_eq!(routine1_id.name, "chain1");
-        assert_eq!(routine1_id.namespace.0, "ipv4-filter");
+        // Entry 0 (byte 0): JUMP to chain1 for all packets.
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, 1064);
 
-        let routine2_id = &routines.last().unwrap().id;
-        assert_eq!(routine2_id.name, "chain2");
-        assert_eq!(routine2_id.namespace.0, "ipv4-filter");
+        // Entry 1 (byte 208): policy of INPUT chain.
+        let input_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
 
-        let mut rules = table.rule_specs.iter();
-        let RuleSpec::Translated(rule1) = rules.next().expect("rule 1 exists") else {
-            panic!("rule 1 should be translated");
-        };
-        let expected_rule1 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 1, routine: routine1_id.clone() },
-            matchers: fnet_filter_ext::Matchers::default(),
-            action: fnet_filter_ext::Action::Jump("chain2".to_string()),
-        };
-        assert_eq!(rule1, &expected_rule1);
+        // Start of FORWARD built-in chain.
+        let forward_hook_entry = entries_bytes.len() as u32;
 
-        let RuleSpec::Translated(rule2) = rules.next().expect("rule 2 exists") else {
-            panic!("rule 2 should be translated");
-        };
-        let expected_rule2 = fnet_filter_ext::Rule {
-            id: fnet_filter_ext::RuleId { index: 2, routine: routine1_id.clone() },
-            matchers: fnet_filter_ext::Matchers::default(),
-            action: fnet_filter_ext::Action::Return,
-        };
-        assert_eq!(rule2, &expected_rule2);
+        // Entry 2 (byte 416): policy of FORWARD chain.
+        // Note: FORWARD chain has no other rules.
+        let forward_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_ACCEPT);
 
-        let RuleSpec::Translated(rule3) = rules.next().expect("rule 3 exists") else {
-            panic!("rule 3 should be translated");
-        };
-        let expected_rule3 = fnet_filter_ext::Rule {
-            // entry at index 3 is the routine2's chain definition.
-            id: fnet_filter_ext::RuleId { index: 4, routine: routine2_id.clone() },
-            matchers: fnet_filter_ext::Matchers::default(),
-            action: fnet_filter_ext::Action::Return,
-        };
-        assert_eq!(rule3, &expected_rule3);
+        // Start of OUTPUT built-in chain.
+        let output_hook_entry = entries_bytes.len() as u32;
+
+        // Entry 3 (byte 624): policy of OUTPUT chain.
+        // Note: OUTPUT chain has no other rules.
+        let output_underflow = entries_bytes.len() as u32;
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_DROP);
+
+        // Entry 4 (byte 832): start of the chain1.
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, "chain1");
+
+        // Entry 5 (byte 1064): jump to chain2 for all packets.
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, 1712);
+
+        // Entry 6 (byte 1272): policy of chain1.
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_RETURN);
+
+        // Entry 7 (byte 1480): start of chain2.
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, "chain2");
+
+        // Entry 8 (byte 1712): policy of chain2.
+        extend_with_standard_target_ipv6_entry(&mut entries_bytes, VERDICT_RETURN);
+
+        // Entry 9 (byte 1920): end of input.
+        extend_with_error_target_ipv6_entry(&mut entries_bytes, "ERROR");
+
+        let mut bytes = ip6t_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 10,
+            size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            hook_entry: [0, input_hook_entry, forward_hook_entry, output_hook_entry, 0],
+            underflow: [0, input_underflow, forward_underflow, output_underflow, 0],
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    #[test_case(
+        IpTable::from_ipt_replace(ipv4_table_with_jump_target()).unwrap(),
+        filter_namespace_v4();
+        "ipv4"
+    )]
+    #[test_case(
+        IpTable::from_ip6t_replace(ipv6_table_with_jump_target()).unwrap(),
+        filter_namespace_v6();
+        "ipv6"
+    )]
+    fn parse_jump_target_test(table: IpTable, expected_namespace: fnet_filter_ext::Namespace) {
+        assert_eq!(table.namespace, expected_namespace);
+
+        assert_eq!(
+            table
+                .routine_map
+                .into_values()
+                .sorted_by_key(|routine| routine.id.name.clone())
+                .collect::<Vec<_>>(),
+            [
+                filter_forward_routine(&expected_namespace),
+                filter_input_routine(&expected_namespace),
+                filter_output_routine(&expected_namespace),
+                filter_custom_routine(&expected_namespace, "chain1"),
+                filter_custom_routine(&expected_namespace, "chain2")
+            ]
+        );
+
+        let expected_rules = [
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 0,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Jump("chain1".to_string()),
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 1,
+                    routine: filter_input_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 2,
+                    routine: filter_forward_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Accept,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 3,
+                    routine: filter_output_routine(&expected_namespace).id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Drop,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 5,
+                    routine: filter_custom_routine(&expected_namespace, "chain1").id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Jump("chain2".to_string()),
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 6,
+                    routine: filter_custom_routine(&expected_namespace, "chain1").id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Return,
+            },
+            fnet_filter_ext::Rule {
+                id: fnet_filter_ext::RuleId {
+                    index: 8,
+                    routine: filter_custom_routine(&expected_namespace, "chain2").id.clone(),
+                },
+                matchers: fnet_filter_ext::Matchers::default(),
+                action: fnet_filter_ext::Action::Return,
+            },
+        ];
+
+        for (rule_spec, expected) in table.rule_specs.iter().zip_eq(expected_rules.into_iter()) {
+            let rule = assert_matches!(rule_spec, RuleSpec::Translated(rule) => rule);
+            assert_eq!(rule, &expected);
+        }
     }
 
     fn table_with_wrong_size() -> Vec<u8> {
@@ -1895,41 +2554,141 @@ mod tests {
         .to_owned()
     }
 
-    fn table_with_chain_with_no_policy() -> Vec<u8> {
+    fn table_with_invalid_hook_bits() -> Vec<u8> {
         let mut entries_bytes = Vec::new();
 
-        // Entry 1: start of the chain.
-        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
+        // Entry 0: end of input.
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
-        // Entry 2: end of input.
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 1,
+            size: entries_bytes.len() as u32,
+            valid_hooks: 0b00011,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    fn table_with_invalid_hook_entry() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
+
+        // Entry 0: end of input.
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 1,
+            size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+
+            // 8 does not refer to a valid entry.
+            hook_entry: [0, 8, 0, 0, 0],
+            underflow: [0, 8, 0, 0, 0],
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    fn table_with_hook_ranges_overlap() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
+
+        // Entry 0: policy of INPUT, FORWARD, OUTPUT.
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 1: end of input.
         extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
 
         let mut bytes = ipt_replace {
             name: string_to_32_chars("filter"),
             num_entries: 2,
             size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            hook_entry: [0, 0, 0, 0, 0],
+            underflow: [0, 0, 0, 0, 0],
             ..Default::default()
         }
         .as_bytes()
         .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    fn table_with_unexpected_error_target() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
+
+        // Entry 0: start of "mychain".
+        // This is also referred by hook_entry's of the table.
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
+
+        // Entry 1: end of input.
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 2,
+            size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
+        bytes.extend(entries_bytes);
+        bytes
+    }
+
+    fn table_with_chain_with_no_policy() -> Vec<u8> {
+        let mut entries_bytes = Vec::new();
+
+        // Entry 0: policy of INPUT.
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 1: policy of FORWARD.
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 2: policy of OUTPUT.
+        extend_with_standard_target_ipv4_entry(&mut entries_bytes, VERDICT_ACCEPT);
+
+        // Entry 3: start of "mychain".
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "mychain");
+
+        // Entry 4: end of input.
+        extend_with_error_target_ipv4_entry(&mut entries_bytes, "ERROR");
+
+        let mut bytes = ipt_replace {
+            name: string_to_32_chars("filter"),
+            num_entries: 5,
+            size: entries_bytes.len() as u32,
+            valid_hooks: NfIpHooks::FILTER.bits(),
+            hook_entry: [0, 0, 152, 304, 0],
+            underflow: [0, 0, 152, 304, 0],
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_owned();
+
         bytes.extend(entries_bytes);
         bytes
     }
 
     #[test_case(
         table_with_wrong_size(),
-        IpTableParseError::SizeMismatch {
-            specified_size: 0,
-            entries_size: 176,
-        };
+        IpTableParseError::SizeMismatch { specified_size: 0, entries_size: 176 };
         "wrong size"
     )]
     #[test_case(
         table_with_wrong_num_entries(),
-        IpTableParseError::NumEntriesMismatch {
-            specified: 3,
-            found: 1,
-        };
+        IpTableParseError::NumEntriesMismatch { specified: 3, found: 1 };
         "wrong number of entries"
     )]
     #[test_case(
@@ -1938,10 +2697,28 @@ mod tests {
         "no trailing error target"
     )]
     #[test_case(
+        table_with_invalid_hook_bits(),
+        IpTableParseError::InvalidHooksForTable { hooks: 3, table_name: TABLE_FILTER };
+        "invalid hook bits"
+    )]
+    #[test_case(
+        table_with_invalid_hook_entry(),
+        IpTableParseError::InvalidHookEntryOrUnderflow { index: 1, start: 8, end: 8 };
+        "hook does not point to entry"
+    )]
+    #[test_case(
+        table_with_hook_ranges_overlap(),
+        IpTableParseError::HookRangesOverlap { offset: 0 };
+        "hook ranges overlap"
+    )]
+    #[test_case(
+        table_with_unexpected_error_target(),
+        IpTableParseError::UnexpectedErrorTarget { error_name: "mychain".to_owned() };
+        "unexpected error target"
+    )]
+    #[test_case(
         table_with_chain_with_no_policy(),
-        IpTableParseError::ChainHasNoPolicy {
-            chain_name: String::from("mychain"),
-        };
+        IpTableParseError::ChainHasNoPolicy { chain_name: String::from("mychain") };
         "chain with no policy"
     )]
     fn parse_table_error(bytes: Vec<u8>, expected_error: IpTableParseError) {
