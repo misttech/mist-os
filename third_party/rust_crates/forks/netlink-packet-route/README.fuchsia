@@ -12,13 +12,16 @@ No.
 
 # What differs from upstream?
 
-Pull requests https://github.com/rust-netlink/netlink-packet-route/pull/116
-and https://github.com/rust-netlink/netlink-packet-route/pull/117 have been merged into this patch
-until these patches are merged upstream.
-These are minor changes to add Ord, PartialOrd, and Hash to various types in this library
-as well as to make a previously private parsing function public.
+There are several PRs that have been merged into this fork, but are not yet
+included upstream:
+* Make RouteAddress::parse public: https://github.com/rust-netlink/netlink-packet-route/pull/116
+* Add back hash/Ord support: https://github.com/rust-netlink/netlink-packet-route/pull/117
+* Use thiserror for error types: https://github.com/rust-netlink/netlink-packet-route/pull/118
+* Avoid two panics during parsing: https://github.com/rust-netlink/netlink-packet-route/pull/128
+* Check NLA buffers on creation: https://github.com/rust-netlink/netlink-packet-route/pull/129
+* Check Map buffers on creation: https://github.com/rust-netlink/netlink-packet-route/pull/130
 
-This is tracked in b/336350529
+Merging these patches upstream and undoing this fork is tracked in b/336350529.
 
 # Are there any restrictions to how it should be rolled?
 
