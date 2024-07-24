@@ -9,7 +9,6 @@ rustc_library("vmo-blob") {
   version = "0.1.0"
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",

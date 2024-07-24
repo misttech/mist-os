@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl::AsHandleRef;
 use std::sync::{Arc, OnceLock};
 use tracing::error;
 use vfs::common::rights_to_posix_mode_bits;
@@ -150,12 +149,5 @@ impl File for VmoBlob {
 
     async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {
         Ok(())
-    }
-
-    fn event(&self) -> Result<Option<zx::Event>, zx::Status> {
-        let event = zx::Event::create();
-        // The file is immediately readable (see `fuchsia.io2.File.Describe`).
-        event.signal_handle(zx::Signals::empty(), zx::Signals::USER_0)?;
-        Ok(Some(event))
     }
 }
