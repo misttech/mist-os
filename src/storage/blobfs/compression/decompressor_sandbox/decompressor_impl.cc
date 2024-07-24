@@ -17,9 +17,12 @@
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
+#include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <threads.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
@@ -28,9 +31,10 @@
 #include <memory>
 #include <utility>
 
+#include <fbl/algorithm.h>
 #include <safemath/checked_math.h>
-#include <src/lib/chunked-compression/chunked-decompressor.h>
 
+#include "src/lib/chunked-compression/chunked-decompressor.h"
 #include "src/storage/blobfs/compression/decompressor.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
@@ -44,6 +48,22 @@ struct FifoInfo {
   fzl::OwnedVmoMapper decompressed_mapper;
 };
 
+void CommitPages(const fzl::OwnedVmoMapper& mapper,
+                 const fuchsia_blobfs_internal::wire::Range range, uint32_t op) {
+  const uint64_t page_size = zx_system_get_page_size();
+  const uint64_t aligned_start = fbl::round_down(range.offset, page_size);
+  const uint64_t aligned_end = fbl::round_up(range.offset + range.size, page_size);
+  const uint64_t aligned_length = aligned_end - aligned_start;
+
+  const uint8_t* aligned_address = static_cast<const uint8_t*>(mapper.start()) + aligned_start;
+  if (zx_status_t status = zx::vmar::root_self()->op_range(
+          op, reinterpret_cast<uint64_t>(aligned_address), aligned_length, nullptr, 0);
+      status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "Failed to commit pages";
+    ZX_DEBUG_ASSERT_MSG(false, "Failed to commit pages");
+  }
+}
+
 // This will only decompress a set of complete chunks, if the beginning or end
 // of the range are not chunk aligned this operation will fail.
 zx::result<uint64_t> DecompressChunkedPartial(
@@ -52,6 +72,18 @@ zx::result<uint64_t> DecompressChunkedPartial(
     const fuchsia_blobfs_internal::wire::Range compressed) {
   const uint8_t* src = static_cast<const uint8_t*>(compressed_mapper.start()) + compressed.offset;
   uint8_t* dst = static_cast<uint8_t*>(decompressed_mapper.start()) + decompressed.offset;
+
+  // The mappings are reused across requests but blobfs decommits all of the pages out of the
+  // compressed vmo and transfers the pages out of the decompressed vmo after each request. The
+  // pages in the compressed vmo will be repopulated but they need to be re-added to this process's
+  // page table. The decompressed vmo won't have any pages in it. Committing pages to the vmo
+  // through the vmar will also add the pages to this process's page table. Without these calls, the
+  // pages will be committed and added to the page table when they are accessed. Making the calls
+  // ensures that the entire range is committed and added to the page table at once which could
+  // avoid multiple page faults.
+  CommitPages(compressed_mapper, compressed, ZX_VMAR_OP_MAP_RANGE);
+  CommitPages(decompressed_mapper, decompressed, ZX_VMAR_OP_COMMIT);
+
   chunked_compression::ChunkedDecompressor decompressor;
   uint64_t bytes_decompressed = 0;
   if (zx_status_t status = decompressor.DecompressFrame(src, compressed.size, dst,
