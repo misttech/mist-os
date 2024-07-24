@@ -26,6 +26,18 @@ inline zx_time_t compute_monotonic_time(zx_vaddr_t time_values_addr) {
       *time_values);
 }
 
+inline zx_ticks_t compute_boot_ticks(zx_vaddr_t time_values_addr) {
+  const internal::TimeValues* time_values =
+      reinterpret_cast<internal::TimeValues*>(time_values_addr);
+  return internal::compute_boot_ticks<internal::FasttimeVerificationMode::kNormal>(*time_values);
+}
+
+inline zx_time_t compute_boot_time(zx_vaddr_t time_values_addr) {
+  const internal::TimeValues* time_values =
+      reinterpret_cast<internal::TimeValues*>(time_values_addr);
+  return internal::compute_boot_time<internal::FasttimeVerificationMode::kNormal>(*time_values);
+}
+
 }  // namespace fasttime
 
 #endif  // ZIRCON_KERNEL_LIB_FASTTIME_INCLUDE_LIB_FASTTIME_TIME_H_
