@@ -20,6 +20,7 @@ use fuchsia_zircon::{
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
+use magma_device::get_magma_params;
 use runner::{get_program_string, get_program_strvec};
 use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
@@ -346,6 +347,11 @@ async fn create_container(
             }
             Err(err) => log_warn!("could not get serial number: {err:?}"),
         }
+    }
+    if features.magma {
+        kernel_cmdline.extend(b" ");
+        let params = get_magma_params();
+        kernel_cmdline.extend(&*params);
     }
 
     // Check whether we actually have access to a role manager by trying to set our own

@@ -41,6 +41,7 @@ rustc_library("magma-device") {
     "//src/starnix/lib/magma",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:vk-sys",
     "//third_party/rust_crates:zerocopy",
   ]

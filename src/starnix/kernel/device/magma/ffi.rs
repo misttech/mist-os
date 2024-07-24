@@ -8,6 +8,7 @@ use crate::file::{
 };
 use crate::image_file::{ImageFile, ImageInfo};
 use crate::magma::create_drm_image;
+use bstr::BString;
 use fuchsia_zircon::{
     AsHandleRef, HandleBased, {self as zx},
 };
@@ -237,6 +238,45 @@ pub fn device_import(
     response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_IMPORT as u32;
 
     Ok(magma_device)
+}
+
+fn get_magma_vendor_id() -> Result<u64, Errno> {
+    let entries =
+        std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
+
+    let mut magma_devices = entries.filter_map(|entry| attempt_open_path(entry.path()).ok());
+    let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
+    let mut result_out = 0;
+    let mut result_buffer_out = 0;
+    let query_result = unsafe {
+        magma_device_query(
+            magma_device.handle,
+            MAGMA_QUERY_VENDOR_ID,
+            &mut result_buffer_out,
+            &mut result_out,
+        )
+    };
+    if query_result != MAGMA_STATUS_OK {
+        return Err(errno!(EINVAL));
+    }
+    return Ok(result_out);
+}
+
+/// Returns a command-line that helps Android select the correct GPU driver.
+pub fn get_magma_params() -> BString {
+    if let Some(magma_vendor_id) = get_magma_vendor_id().ok() {
+        const MAGMA_VENDOR_ID_MALI_U64: u64 = MAGMA_VENDOR_ID_MALI as u64;
+        const MAGMA_VENDOR_ID_INTEL_U64: u64 = MAGMA_VENDOR_ID_INTEL as u64;
+        let gpu_type = match magma_vendor_id {
+            MAGMA_VENDOR_ID_MALI_U64 => "mali",
+            MAGMA_VENDOR_ID_INTEL_U64 => "intel",
+            _ => "default",
+        };
+        return BString::from(
+            "androidboot.vendor.apex.com.fuchsia.vulkan=com.fuchsia.vulkan.".to_owned() + gpu_type,
+        );
+    }
+    return b"androidboot.vendor.apex.com.fuchsia.vulkan=com.fuchsia.vulkan.default".into();
 }
 
 /// Releases a magma device.
