@@ -5,7 +5,7 @@
 load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
 
 def _pyfmt(ctx):
-    """Runs python formatter black on a Python code base.
+    """Formats Python code using Black and sorts imports using isort on a Python code base.
 
     Args:
       ctx: A ctx instance.
@@ -18,21 +18,39 @@ def _pyfmt(ctx):
     if not py_files:
         return
 
-    procs = []
-    base_cmd = [
+    # Isort and black make conflicting code style changes. To ensure consistent formatting:
+    # 1. Run isort to sort imports and apply its formatting rules.
+    # 2. Run black on the formatted code to enforce its code style guidelines.
+    fuchsia_dir = get_fuchsia_dir(ctx)
+
+    isort_cmd = [
+        "%s/prebuilt/third_party/python3/%s/bin/python3" % (
+            fuchsia_dir,
+            cipd_platform_name(ctx),
+        ),
+        "%s/third_party/pylibs/isort/main.py" % fuchsia_dir,
+        "--stdout",
+    ]
+    isort_procs = [(f, os_exec(ctx, isort_cmd + [f])) for f in py_files]
+
+    black_cmd = [
         "%s/prebuilt/third_party/black/%s/black" % (
-            get_fuchsia_dir(ctx),
+            fuchsia_dir,
             cipd_platform_name(ctx),
         ),
         "--config",
-        "%s/pyproject.toml" % get_fuchsia_dir(ctx),
+        "%s/pyproject.toml" % fuchsia_dir,
+        "-",
     ]
-    for filepath in py_files:
-        original = str(ctx.io.read_file(filepath))
-        procs.append(
-            (filepath, original, os_exec(ctx, base_cmd + ["-"], stdin = original)),
+    black_procs = []
+    for filepath, proc in isort_procs:
+        isort_formatted = proc.wait().stdout
+        black_procs.append(
+            (filepath, os_exec(ctx, black_cmd, stdin = isort_formatted)),
         )
-    for filepath, original, proc in procs:
+
+    for filepath, proc in black_procs:
+        original = str(ctx.io.read_file(filepath))
         formatted = proc.wait().stdout
         if formatted != original:
             ctx.emit.finding(

@@ -22,6 +22,14 @@ exclude = '''
 )
 '''
 
+
+[tool.isort]
+profile = "black"
+line_length = 80
+default_section="FIRSTPARTY"
+skip_glob = ["**/.venvs/*", "**/third_party/*", "**/*.pyz", "out/*"]
+
+
 [tool.mypy]
 strict = true
 pretty = true
