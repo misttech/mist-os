@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/gpu-control-server.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/gpu-control-server.h"
 
 #include <fidl/fuchsia.gpu.virtio/cpp/wire.h>
 #include <lib/async/dispatcher.h>

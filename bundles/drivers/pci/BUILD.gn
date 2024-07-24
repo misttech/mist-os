@@ -20,7 +20,7 @@ group("pci") {
     "//src/graphics/display/drivers/intel-i915:intel-i915",
     "//src/graphics/display/drivers/simple:simple.bochs",
     "//src/graphics/display/drivers/simple:simple.intel",
-    "//src/graphics/display/drivers/virtio-guest:component",
+    "//src/graphics/display/drivers/virtio-gpu-display:component",
     "//src/graphics/drivers/misc/goldfish_address_space:address_space_driver",
     "//src/media/audio/drivers/intel-hda/controller:intel-hda",
     "//src/ui/input/drivers/virtio:virtio_input",

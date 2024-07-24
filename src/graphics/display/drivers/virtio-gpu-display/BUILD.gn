@@ -7,8 +7,8 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("virtio_gpu_bind") {
-  rules = "meta/virtio-guest.bind"
+driver_bind_rules("virtio-gpu-display-bind") {
+  rules = "meta/virtio-gpu-display.bind"
   tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
@@ -21,8 +21,8 @@ driver_bind_rules("virtio_gpu_bind") {
 group("tests") {
   testonly = true
   deps = [
-    ":virtio-gpu-test-package",
-    ":virtio_gpu_bind_test",
+    ":virtio-gpu-display-bind_test",
+    ":virtio-gpu-display-test-package",
   ]
 }
 
@@ -72,8 +72,8 @@ source_set("common_srcs") {
   ]
 }
 
-test("virtio-gpu-test") {
-  output_name = "virtio-gpu-test"
+test("virtio-gpu-display-test") {
+  output_name = "virtio-gpu-display-test"
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
     if (configs + fdio_config - fdio_config != configs) {
@@ -105,14 +105,14 @@ fuchsia_driver("driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  output_name = "virtio_gpu"
+  output_name = "virtio-gpu-display"
   sources = [
     "gpu-device-driver.cc",
     "gpu-device-driver.h",
   ]
   deps = [
     ":common_srcs",
-    ":virtio_gpu_bind",
+    ":virtio-gpu-display-bind",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/compat/cpp",
@@ -128,18 +128,18 @@ fuchsia_driver("driver") {
 }
 
 fuchsia_driver_component("component") {
-  component_name = "virtio_gpu"
-  info = "meta/virtio-guest-info.json"
-  manifest = "meta/virtio-guest.cml"
+  component_name = "virtio-gpu-display"
+  info = "meta/virtio-gpu-display-info.json"
+  manifest = "meta/virtio-gpu-display.cml"
   deps = [ ":driver" ]
 }
 
 fuchsia_driver_package("package") {
-  package_name = "virtio_gpu"
+  package_name = "virtio-gpu-display"
   driver_components = [ ":component" ]
 }
 
-fuchsia_unittest_package("virtio-gpu-test-package") {
-  package_name = "virtio-gpu-test"
-  deps = [ ":virtio-gpu-test" ]
+fuchsia_unittest_package("virtio-gpu-display-test-package") {
+  package_name = "virtio-gpu-display-test"
+  deps = [ ":virtio-gpu-display-test" ]
 }

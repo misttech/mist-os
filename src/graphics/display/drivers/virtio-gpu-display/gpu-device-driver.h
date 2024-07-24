@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_DEVICE_DRIVER_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_DEVICE_DRIVER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_DEVICE_DRIVER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_DEVICE_DRIVER_H_
 
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -14,10 +14,10 @@
 #include <memory>
 #include <thread>
 
-#include "src/graphics/display/drivers/virtio-guest/display-controller-banjo.h"
-#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-banjo.h"
-#include "src/graphics/display/drivers/virtio-guest/display-engine.h"
-#include "src/graphics/display/drivers/virtio-guest/gpu-control-server.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-controller-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/gpu-control-server.h"
 
 namespace virtio_display {
 
@@ -76,4 +76,4 @@ class GpuDeviceDriver : public fdf::DriverBase, public GpuControlServer::Owner {
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_DEVICE_DRIVER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_DEVICE_DRIVER_H_

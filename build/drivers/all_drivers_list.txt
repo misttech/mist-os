@@ -299,7 +299,7 @@
 //src/graphics/display/drivers/simple:simple.bochs-driver
 //src/graphics/display/drivers/simple:simple.intel-driver
 //src/graphics/display/drivers/vim3-display-detect:vim3-display-detect-driver
-//src/graphics/display/drivers/virtio-guest:driver
+//src/graphics/display/drivers/virtio-gpu-display:driver
 //src/graphics/drivers/aml-gpu:aml-gpu-driver
 //src/graphics/drivers/misc/goldfish:goldfish_driver-driver
 //src/graphics/drivers/misc/goldfish_address_space:address_space_driver-driver

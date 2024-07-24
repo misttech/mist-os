@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
 
 #include <zircon/assert.h>
 #include <zircon/time.h>

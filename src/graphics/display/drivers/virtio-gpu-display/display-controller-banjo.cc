@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/display-controller-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-controller-banjo.h"
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
@@ -20,7 +20,7 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 
-#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"

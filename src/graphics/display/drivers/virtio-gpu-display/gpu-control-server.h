@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_CONTROL_SERVER_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_CONTROL_SERVER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_CONTROL_SERVER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_CONTROL_SERVER_H_
 
 #include <fidl/fuchsia.gpu.virtio/cpp/wire.h>
 #include <lib/async/dispatcher.h>
@@ -53,4 +53,4 @@ class GpuControlServer : public fidl::WireServer<fuchsia_gpu_virtio::GpuControl>
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_GPU_CONTROL_SERVER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_CONTROL_SERVER_H_

@@ -82,9 +82,10 @@ board_input_bundle("virtio") {
       driver_components = [ "meta/goldfish_sensor.cm" ]
     },
     {
-      package_target = "//src/graphics/display/drivers/virtio-guest:package"
+      package_target =
+          "//src/graphics/display/drivers/virtio-gpu-display:package"
       package_set = "bootfs"
-      driver_components = [ "meta/virtio_gpu.cm" ]
+      driver_components = [ "meta/virtio-gpu-display.cm" ]
     },
   ]
 }

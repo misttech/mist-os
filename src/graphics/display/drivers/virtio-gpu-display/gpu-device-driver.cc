@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/gpu-device-driver.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/gpu-device-driver.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -24,9 +24,9 @@
 #include <bind/fuchsia/display/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/virtio-guest/display-controller-banjo.h"
-#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-banjo.h"
-#include "src/graphics/display/drivers/virtio-guest/display-engine.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-controller-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
 
 namespace virtio_display {
 
@@ -160,7 +160,7 @@ zx::result<> GpuDeviceDriver::InitGpuControlNode() {
 
 GpuDeviceDriver::GpuDeviceDriver(fdf::DriverStartArgs start_args,
                                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : fdf::DriverBase("virtio-gpu", std::move(start_args), std::move(driver_dispatcher)) {}
+    : fdf::DriverBase("virtio-gpu-display", std::move(start_args), std::move(driver_dispatcher)) {}
 
 GpuDeviceDriver::~GpuDeviceDriver() {}
 

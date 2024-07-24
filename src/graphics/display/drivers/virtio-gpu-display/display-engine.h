@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_ENGINE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_ENGINE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_H_
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
@@ -27,9 +27,9 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-interface.h"
-#include "src/graphics/display/drivers/virtio-guest/display-engine-interface.h"
-#include "src/graphics/display/drivers/virtio-guest/virtio-gpu-device.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-interface.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-interface.h"
+#include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
@@ -158,4 +158,4 @@ class DisplayEngine final : public DisplayEngineInterface {
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_ENGINE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_H_
