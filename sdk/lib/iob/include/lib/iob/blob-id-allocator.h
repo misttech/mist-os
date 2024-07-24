@@ -291,14 +291,14 @@ class BlobIdAllocator {
   IterableView iterable() { return IterableView(this); }
 
   // The next ID to be allocated.
-  uint32_t next_id() const { return header().load(std::memory_order_relaxed).next_id; }
+  uint32_t next_id() const { return self()->header().load(std::memory_order_relaxed).next_id; }
 
   // The remaining number of available bytes in the allocator (including those
   // that might be used for bookkeeping). fit::failed() is returned in the case
   // of an invalid header (see `AllocateError::kInvalidHeader` for more
   // detail).
   fit::result<fit::failed, size_t> RemainingBytes() const {
-    return header().load(std::memory_order_relaxed).RemainingBytes(bytes_.size());
+    return self()->header().load(std::memory_order_relaxed).RemainingBytes(bytes_.size());
   }
 
   // Attempts to store the provided blob and allocate its ID.
@@ -374,7 +374,7 @@ class BlobIdAllocator {
 
   // Returns the blob corresponding to a given ID.
   fit::result<BlobError, cpp20::span<const std::byte>> GetBlob(uint32_t id) const {
-    Header hdr = header().load(std::memory_order_relaxed);
+    Header hdr = self()->header().load(std::memory_order_relaxed);
     if (!hdr.IsValid(bytes_.size())) [[unlikely]] {
       return fit::error{BlobError::kInvalidHeader};
     }
@@ -387,7 +387,7 @@ class BlobIdAllocator {
     //     blob.
     // (2) The read of the index stays ordered after previous updates, which
     //     were written with release semantics.
-    Index index = GetIndex(id).load(std::memory_order_acquire);
+    Index index = self()->GetIndex(id).load(std::memory_order_acquire);
     if (index.size == 0 && index.offset == 0) [[unlikely]] {
       return fit::error{BlobError::kUncommittedIndex};
     }
@@ -435,6 +435,9 @@ class BlobIdAllocator {
     uint32_t size;
     uint32_t offset;
   };
+
+  // TODO(fxbug.dev/354716628): Remove workaround for const/volatile qualified atomic_ref.
+  BlobIdAllocator* self() const { return const_cast<BlobIdAllocator*>(this); }
 
   static_assert(cpp20::atomic_ref<Header>::is_always_lock_free);
   cpp20::atomic_ref<Header> header() {
