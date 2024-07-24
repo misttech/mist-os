@@ -4,13 +4,18 @@
 
 //! The definition of a TCP segment.
 
+use crate::alloc::borrow::ToOwned;
+use core::borrow::Borrow;
 use core::convert::TryFrom as _;
 use core::num::{NonZeroU16, TryFromIntError};
 use core::ops::Range;
 
 use log::info;
+use net_types::ip::IpAddress;
+use packet::records::options::OptionSequenceBuilder;
+use packet::InnerSerializer;
 use packet_formats::tcp::options::TcpOption;
-use packet_formats::tcp::TcpSegment;
+use packet_formats::tcp::{TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions};
 use thiserror::Error;
 
 use super::base::{Control, Mss, SendPayload};
@@ -255,6 +260,35 @@ impl<P: Payload> Segment<P> {
     }
 }
 
+impl SegmentHeader {
+    /// Create a `SegmentHeader` from the provided builder and data length.  The
+    /// options will be set to their default values.
+    pub fn from_builder<A: IpAddress>(
+        builder: &TcpSegmentBuilder<A>,
+    ) -> Result<Self, MalformedFlags> {
+        Self::from_builder_options(builder, Options::default())
+    }
+
+    /// Create a `SegmentHeader` from the provided builder, options, and data length.
+    pub fn from_builder_options<A: IpAddress>(
+        builder: &TcpSegmentBuilder<A>,
+        options: Options,
+    ) -> Result<Self, MalformedFlags> {
+        Ok(SegmentHeader {
+            seq: SeqNum::new(builder.seq_num()),
+            ack: builder.ack_num().map(SeqNum::new),
+            control: Flags {
+                syn: builder.syn_set(),
+                fin: builder.fin_set(),
+                rst: builder.rst_set(),
+            }
+            .control()?,
+            wnd: UnscaledWindowSize::from(builder.window_size()),
+            options: options,
+        })
+    }
+}
+
 impl Segment<()> {
     /// Creates a segment with no data.
     pub fn new(
@@ -386,6 +420,12 @@ impl Payload for () {
     }
 }
 
+impl<I: PayloadLen, B> PayloadLen for InnerSerializer<I, B> {
+    fn len(&self) -> usize {
+        PayloadLen::len(self.inner())
+    }
+}
+
 impl From<Segment<()>> for Segment<&'static [u8]> {
     fn from(
         Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: () }: Segment<()>,
@@ -402,22 +442,35 @@ pub struct MalformedFlags {
     rst: bool,
 }
 
+struct Flags {
+    syn: bool,
+    fin: bool,
+    rst: bool,
+}
+
+impl Flags {
+    fn control(&self) -> Result<Option<Control>, MalformedFlags> {
+        if usize::from(self.syn) + usize::from(self.fin) + usize::from(self.rst) > 1 {
+            return Err(MalformedFlags { syn: self.syn, fin: self.fin, rst: self.rst });
+        }
+
+        let syn = self.syn.then(|| Control::SYN);
+        let fin = self.fin.then(|| Control::FIN);
+        let rst = self.rst.then(|| Control::RST);
+
+        Ok(syn.or(fin).or(rst))
+    }
+}
+
 impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
     type Error = MalformedFlags;
 
     fn try_from(from: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
-        if usize::from(from.syn()) + usize::from(from.fin()) + usize::from(from.rst()) > 1 {
-            return Err(MalformedFlags { syn: from.syn(), fin: from.fin(), rst: from.rst() });
-        }
-        let syn = from.syn().then(|| Control::SYN);
-        let fin = from.fin().then(|| Control::FIN);
-        let rst = from.rst().then(|| Control::RST);
-        let control = syn.or(fin).or(rst);
         let options = Options::from_iter(from.iter_options());
         let (to, discarded) = Segment::with_data_options(
             from.seq_num().into(),
             from.ack_num().map(Into::into),
-            control,
+            Flags { syn: from.syn(), fin: from.fin(), rst: from.rst() }.control()?,
             UnscaledWindowSize::from(from.window_size()),
             from.into_body(),
             options,
@@ -435,6 +488,36 @@ impl From<Segment<()>> for Segment<SendPayload<'static>> {
             header: SegmentHeader { seq, ack, wnd, control, options },
             data: SendPayload::Contiguous(&[]),
         }
+    }
+}
+
+impl<A> TryFrom<&TcpSegmentBuilder<A>> for SegmentHeader
+where
+    A: IpAddress,
+{
+    type Error = MalformedFlags;
+
+    fn try_from(from: &TcpSegmentBuilder<A>) -> Result<Self, Self::Error> {
+        SegmentHeader::from_builder(from)
+    }
+}
+
+impl<'a, A, I> TryFrom<&TcpSegmentBuilderWithOptions<A, OptionSequenceBuilder<TcpOption<'a>, I>>>
+    for SegmentHeader
+where
+    A: IpAddress,
+    I: Iterator + Clone,
+    I::Item: Borrow<TcpOption<'a>>,
+{
+    type Error = MalformedFlags;
+
+    fn try_from(
+        from: &TcpSegmentBuilderWithOptions<A, OptionSequenceBuilder<TcpOption<'a>, I>>,
+    ) -> Result<Self, Self::Error> {
+        Self::from_builder_options(
+            from.prefix_builder(),
+            Options::from_iter(from.iter_options().map(|option| option.borrow().to_owned())),
+        )
     }
 }
 
@@ -495,6 +578,12 @@ mod testutils {
 
 #[cfg(test)]
 mod test {
+    use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
+    use ip_test_macro::ip_test;
+    use net_declare::{net_ip_v4, net_ip_v6};
+    use net_types::ip::{Ipv4, Ipv6};
+    use packet_formats::ip::IpExt;
     use test_case::test_case;
 
     use super::*;
@@ -801,5 +890,164 @@ mod test {
                 (seq, control, range)
             },
         )
+    }
+
+    pub trait TestIpExt: IpExt {
+        const SRC_IP: Self::Addr;
+        const DST_IP: Self::Addr;
+    }
+
+    impl TestIpExt for Ipv4 {
+        const SRC_IP: Self::Addr = net_ip_v4!("192.0.2.1");
+        const DST_IP: Self::Addr = net_ip_v4!("192.0.2.2");
+    }
+
+    impl TestIpExt for Ipv6 {
+        const SRC_IP: Self::Addr = net_ip_v6!("2001:db8::1");
+        const DST_IP: Self::Addr = net_ip_v6!("2001:db8::2");
+    }
+
+    const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1234));
+    const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(9876));
+
+    #[ip_test(I)]
+    fn from_segment_builder<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+
+        let converted_header =
+            SegmentHeader::try_from(&builder).expect("failed to convert serializer");
+
+        let expected_header = SegmentHeader {
+            seq: SeqNum::new(1),
+            ack: Some(SeqNum::new(2)),
+            wnd: UnscaledWindowSize::from(3u16),
+            control: Some(Control::SYN),
+            options: Options { mss: None, window_scale: None },
+        };
+
+        assert_eq!(converted_header, expected_header);
+    }
+
+    #[ip_test(I)]
+    fn from_segment_builder_failure<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+        builder.fin(true);
+
+        assert_matches!(
+            SegmentHeader::try_from(&builder),
+            Err(MalformedFlags { syn: true, fin: true, rst: false })
+        );
+    }
+
+    #[ip_test(I)]
+    fn from_segment_builder_with_options<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+
+        let builder = TcpSegmentBuilderWithOptions::new(
+            builder,
+            [TcpOption::Mss(1024), TcpOption::WindowScale(10)],
+        )
+        .expect("failed to create tcp segment builder");
+
+        let converted_header =
+            SegmentHeader::try_from(&builder).expect("failed to convert serializer");
+
+        let expected_header = SegmentHeader {
+            seq: SeqNum::new(1),
+            ack: Some(SeqNum::new(2)),
+            wnd: UnscaledWindowSize::from(3u16),
+            control: Some(Control::SYN),
+            options: Options {
+                mss: Some(Mss(NonZeroU16::new(1024).unwrap())),
+                window_scale: Some(WindowScale::new(10).unwrap()),
+            },
+        };
+
+        assert_eq!(converted_header, expected_header);
+    }
+
+    #[ip_test(I)]
+    fn from_segment_builder_with_options_failure<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+        builder.fin(true);
+
+        let builder = TcpSegmentBuilderWithOptions::new(
+            builder,
+            [TcpOption::Mss(1024), TcpOption::WindowScale(10)],
+        )
+        .expect("failed to create tcp segment builder");
+
+        assert_matches!(
+            SegmentHeader::try_from(&builder),
+            Err(MalformedFlags { syn: true, fin: true, rst: false })
+        );
+    }
+
+    #[test_case(Flags {
+            syn: false,
+            fin: false,
+            rst: false,
+        } => Ok(None))]
+    #[test_case(Flags {
+            syn: true,
+            fin: false,
+            rst: false,
+        } => Ok(Some(Control::SYN)))]
+    #[test_case(Flags {
+            syn: false,
+            fin: true,
+            rst: false,
+        } => Ok(Some(Control::FIN)))]
+    #[test_case(Flags {
+            syn: false,
+            fin: false,
+            rst: true,
+        } => Ok(Some(Control::RST)))]
+    #[test_case(Flags {
+            syn: true,
+            fin: true,
+            rst: false,
+        } => Err(MalformedFlags {
+            syn: true,
+            fin: true,
+            rst: false,
+        }))]
+    #[test_case(Flags {
+            syn: true,
+            fin: false,
+            rst: true,
+        } => Err(MalformedFlags {
+            syn: true,
+            fin: false,
+            rst: true,
+        }))]
+    #[test_case(Flags {
+            syn: false,
+            fin: true,
+            rst: true,
+        } => Err(MalformedFlags {
+            syn: false,
+            fin: true,
+            rst: true,
+        }))]
+    #[test_case(Flags {
+            syn: true,
+            fin: true,
+            rst: true,
+        } => Err(MalformedFlags {
+            syn: true,
+            fin: true,
+            rst: true,
+        }))]
+    fn flags_to_control(input: Flags) -> Result<Option<Control>, MalformedFlags> {
+        input.control()
     }
 }

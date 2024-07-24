@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::borrow::Borrow;
 use core::convert::Infallible as Never;
 use core::num::NonZeroU16;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use netstack3_base::{Options, PayloadLen, SegmentHeader};
+use packet::records::options::OptionSequenceBuilder;
 use packet::{
     Buf, BufferAlloc, BufferMut, BufferProvider, BufferViewMut, EitherSerializer, EmptyBuf,
     GrowBufferMut, InnerSerializer, Nested, PacketConstraints, ParsablePacket, ParseBuffer,
@@ -24,9 +27,10 @@ use packet_formats::igmp::{self, IgmpPacketBuilder};
 use packet_formats::ip::{IpExt, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4Packet, Ipv4PacketRaw};
 use packet_formats::ipv6::{Ipv6Packet, Ipv6PacketRaw};
+use packet_formats::tcp::options::TcpOption;
 use packet_formats::tcp::{TcpParseArgs, TcpSegment, TcpSegmentBuilderWithOptions, TcpSegmentRaw};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs};
-use zerocopy::ByteSliceMut;
+use zerocopy::{ByteSlice, ByteSliceMut};
 
 /// An IP packet that provides header inspection.
 pub trait IpPacket<I: IpExt> {
@@ -67,7 +71,7 @@ pub trait IpPacket<I: IpExt> {
     /// packet and materialize the results into a new type when this is called, but
     /// that type may also need to retain a reference to the backing buffer in order
     /// to modify the transport header.
-    fn transport_packet<'a>(&'a self) -> Self::TransportPacket<'a>;
+    fn maybe_transport_packet<'a>(&'a self) -> Self::TransportPacket<'a>;
 
     /// Returns a type that provides the ability to modify the transport-layer
     /// packet contained in the body of the IP packet, if one exists.
@@ -89,13 +93,9 @@ pub trait IpPacket<I: IpExt> {
 /// layers, where it can be implemented separately on each concrete packet type
 /// depending on whether it supports packet header inspection.
 pub trait MaybeTransportPacket {
-    /// The type that provides access to transport-layer header inspection, if this
-    /// is indeed a valid transport packet.
-    type TransportPacket: TransportPacket;
-
     /// Optionally returns a type that provides access to this transport-layer
     /// packet.
-    fn transport_packet(&self) -> Option<&Self::TransportPacket>;
+    fn transport_packet_data(&self) -> Option<TransportPacketData>;
 }
 
 /// A payload of an IP packet that may be a valid modifiable transport layer
@@ -134,10 +134,8 @@ impl<T: ?Sized> MaybeTransportPacket for &T
 where
     T: MaybeTransportPacket,
 {
-    type TransportPacket = T::TransportPacket;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        (**self).transport_packet()
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        (**self).transport_packet_data()
     }
 }
 
@@ -145,10 +143,8 @@ impl<T: ?Sized> MaybeTransportPacket for &mut T
 where
     T: MaybeTransportPacket,
 {
-    type TransportPacket = T::TransportPacket;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        (**self).transport_packet()
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        (**self).transport_packet_data()
     }
 }
 
@@ -163,14 +159,6 @@ where
     }
 }
 
-impl<T: TransportPacket> MaybeTransportPacket for Option<T> {
-    type TransportPacket = T;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        self.as_ref()
-    }
-}
-
 impl<I: IpExt, T: TransportPacketMut<I>> MaybeTransportPacketMut<I> for Option<T> {
     type TransportPacketMut<'a> = &'a mut T where Self: 'a;
 
@@ -179,13 +167,53 @@ impl<I: IpExt, T: TransportPacketMut<I>> MaybeTransportPacketMut<I> for Option<T
     }
 }
 
-/// A transport layer packet that provides header inspection.
-pub trait TransportPacket {
-    /// The source port or identifier of the packet.
-    fn src_port(&self) -> u16;
+/// A concrete enum to hold all of the transport packet data that could possibly be usefully
+/// extracted from a packet.
+#[derive(Debug, Clone, GenericOverIp, PartialEq, Eq)]
+#[generic_over_ip()]
+pub enum TransportPacketData {
+    Tcp { src_port: u16, dst_port: u16, segment: SegmentHeader, payload_len: usize },
+    Generic { src_port: u16, dst_port: u16 },
+}
 
-    /// The destination port or identifier of the packet.
-    fn dst_port(&self) -> u16;
+impl TransportPacketData {
+    pub fn src_port(&self) -> u16 {
+        match self {
+            TransportPacketData::Tcp { src_port, .. }
+            | TransportPacketData::Generic { src_port, .. } => *src_port,
+        }
+    }
+
+    pub fn dst_port(&self) -> u16 {
+        match self {
+            TransportPacketData::Tcp { dst_port, .. }
+            | TransportPacketData::Generic { dst_port, .. } => *dst_port,
+        }
+    }
+
+    pub fn tcp_segment_and_len(&self) -> Option<(&SegmentHeader, usize)> {
+        match self {
+            TransportPacketData::Tcp { segment, payload_len, .. } => Some((&segment, *payload_len)),
+            TransportPacketData::Generic { .. } => None,
+        }
+    }
+
+    fn parse_in_ip_packet<I: IpExt, B: ParseBuffer>(
+        src_ip: I::Addr,
+        dst_ip: I::Addr,
+        proto: I::Proto,
+        body: B,
+    ) -> Option<TransportPacketData> {
+        I::map_ip(
+            (src_ip, dst_ip, proto, IpInvariant(body)),
+            |(src_ip, dst_ip, proto, IpInvariant(body))| {
+                parse_transport_header_in_ipv4_packet(src_ip, dst_ip, proto, body)
+            },
+            |(src_ip, dst_ip, proto, IpInvariant(body))| {
+                parse_transport_header_in_ipv6_packet(src_ip, dst_ip, proto, body)
+            },
+        )
+    }
 }
 
 /// A transport layer packet that provides header modification.
@@ -207,7 +235,7 @@ pub trait TransportPacketMut<I: IpExt> {
 }
 
 impl<B: ByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
-    type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
+    type TransportPacket<'a> = &'a Self where Self: 'a;
     type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, Ipv4>> where B: 'a;
 
     fn src_addr(&self) -> Ipv4Addr {
@@ -255,8 +283,8 @@ impl<B: ByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
         self.proto()
     }
 
-    fn transport_packet(&self) -> Self::TransportPacket<'_> {
-        parse_transport_header_in_ipv4_packet(self.proto(), self.body())
+    fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
+        self
     }
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
@@ -269,8 +297,19 @@ impl<B: ByteSliceMut> IpPacket<Ipv4> for Ipv4Packet<B> {
     }
 }
 
+impl<B: ByteSlice> MaybeTransportPacket for Ipv4Packet<B> {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        parse_transport_header_in_ipv4_packet(
+            self.src_ip(),
+            self.dst_ip(),
+            self.proto(),
+            self.body(),
+        )
+    }
+}
+
 impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
-    type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
+    type TransportPacket<'a> = &'a Self where Self: 'a;
     type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, Ipv6>> where B: 'a;
 
     fn src_addr(&self) -> Ipv6Addr {
@@ -318,8 +357,8 @@ impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
         self.proto()
     }
 
-    fn transport_packet(&self) -> Self::TransportPacket<'_> {
-        parse_transport_header_in_ipv6_packet(self.proto(), self.body())
+    fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
+        self
     }
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
@@ -328,6 +367,17 @@ impl<B: ByteSliceMut> IpPacket<Ipv6> for Ipv6Packet<B> {
             self.dst_ip(),
             self.proto(),
             SliceBufViewMut::new(self.body_mut()),
+        )
+    }
+}
+
+impl<B: ByteSlice> MaybeTransportPacket for Ipv6Packet<B> {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        parse_transport_header_in_ipv6_packet(
+            self.src_ip(),
+            self.dst_ip(),
+            self.proto(),
+            self.body(),
         )
     }
 }
@@ -395,7 +445,7 @@ impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, 
         self.protocol
     }
 
-    fn transport_packet(&self) -> Self::TransportPacket<'_> {
+    fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
         self.serializer
     }
 
@@ -462,7 +512,7 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
 }
 
 impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
-    type TransportPacket<'a> = Option<ParsedTransportHeader> where Self: 'a;
+    type TransportPacket<'a> = &'a Self where Self: 'a;
     type TransportPacketMut<'a> = Option<ParsedTransportHeaderMut<'a, I>> where Self: 'a;
 
     fn src_addr(&self) -> I::Addr {
@@ -547,9 +597,8 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
         self.protocol
     }
 
-    fn transport_packet(&self) -> Self::TransportPacket<'_> {
-        let ForwardedPacket { protocol, body, .. } = self;
-        parse_transport_header_in_ip_packet::<I, _>(*protocol, Buf::new(body, ..))
+    fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
+        self
     }
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
@@ -559,6 +608,18 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
             *dst_addr,
             *protocol,
             SliceBufViewMut::new(body.as_mut()),
+        )
+    }
+}
+
+impl<I: IpExt, B: BufferMut> MaybeTransportPacket for ForwardedPacket<I, B> {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        let ForwardedPacket { protocol, body, src_addr, dst_addr, .. } = self;
+        TransportPacketData::parse_in_ip_packet::<I, _>(
+            *src_addr,
+            *dst_addr,
+            *protocol,
+            Buf::new(body, ..),
         )
     }
 }
@@ -597,7 +658,7 @@ impl<I: IpExt, S: TransportPacketSerializer<I>, B: IpPacketBuilder<I>> IpPacket<
         self.outer().proto()
     }
 
-    fn transport_packet(&self) -> Self::TransportPacket<'_> {
+    fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
         self.inner()
     }
 
@@ -690,38 +751,12 @@ impl<I: IpExt, Inner: IpPacket<I>, Outer> IpPacket<I> for NestedWithInnerIpPacke
         self.inner().protocol()
     }
 
-    fn transport_packet(&self) -> Self::TransportPacket<'_> {
-        self.inner().transport_packet()
+    fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
+        self.inner().maybe_transport_packet()
     }
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
         self.inner_mut().transport_packet_mut()
-    }
-}
-
-impl<T: ?Sized> TransportPacket for &T
-where
-    T: TransportPacket,
-{
-    fn src_port(&self) -> u16 {
-        (**self).src_port()
-    }
-
-    fn dst_port(&self) -> u16 {
-        (**self).dst_port()
-    }
-}
-
-impl<T: ?Sized> TransportPacket for &mut T
-where
-    T: TransportPacket,
-{
-    fn src_port(&self) -> u16 {
-        (**self).src_port()
-    }
-
-    fn dst_port(&self) -> u16 {
-        (**self).dst_port()
     }
 }
 
@@ -747,19 +782,7 @@ where
 }
 
 impl MaybeTransportPacket for Never {
-    type TransportPacket = Self;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        match *self {}
-    }
-}
-
-impl TransportPacket for Never {
-    fn src_port(&self) -> u16 {
-        match *self {}
-    }
-
-    fn dst_port(&self) -> u16 {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
         match *self {}
     }
 }
@@ -791,20 +814,11 @@ impl<I: IpExt> TransportPacketMut<I> for Never {
 }
 
 impl<A: IpAddress, Inner> MaybeTransportPacket for Nested<Inner, UdpPacketBuilder<A>> {
-    type TransportPacket = Self;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        Some(self)
-    }
-}
-
-impl<A: IpAddress, Inner> TransportPacket for Nested<Inner, UdpPacketBuilder<A>> {
-    fn src_port(&self) -> u16 {
-        self.outer().src_port().map_or(0, NonZeroU16::get)
-    }
-
-    fn dst_port(&self) -> u16 {
-        self.outer().dst_port().map_or(0, NonZeroU16::get)
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        Some(TransportPacketData::Generic {
+            src_port: self.outer().src_port().map_or(0, NonZeroU16::get),
+            dst_port: self.outer().dst_port().map_or(0, NonZeroU16::get),
+        })
     }
 }
 
@@ -834,25 +848,19 @@ impl<I: IpExt, Inner> TransportPacketMut<I> for Nested<Inner, UdpPacketBuilder<I
     }
 }
 
-impl<A: IpAddress, Outer, Inner> MaybeTransportPacket
-    for Nested<Inner, TcpSegmentBuilderWithOptions<A, Outer>>
+impl<'a, A: IpAddress, Inner: PayloadLen, I> MaybeTransportPacket
+    for Nested<Inner, TcpSegmentBuilderWithOptions<A, OptionSequenceBuilder<TcpOption<'a>, I>>>
+where
+    I: Iterator + Clone,
+    I::Item: Borrow<TcpOption<'a>>,
 {
-    type TransportPacket = Self;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        Some(self)
-    }
-}
-
-impl<A: IpAddress, Outer, Inner> TransportPacket
-    for Nested<Inner, TcpSegmentBuilderWithOptions<A, Outer>>
-{
-    fn src_port(&self) -> u16 {
-        TcpSegmentBuilderWithOptions::src_port(self.outer()).map_or(0, NonZeroU16::get)
-    }
-
-    fn dst_port(&self) -> u16 {
-        TcpSegmentBuilderWithOptions::dst_port(self.outer()).map_or(0, NonZeroU16::get)
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        Some(TransportPacketData::Tcp {
+            src_port: self.outer().src_port().map_or(0, NonZeroU16::get),
+            dst_port: self.outer().dst_port().map_or(0, NonZeroU16::get),
+            segment: self.outer().try_into().ok()?,
+            payload_len: self.inner().len(),
+        })
     }
 }
 
@@ -889,10 +897,8 @@ impl<I: IpExt, Outer, Inner> TransportPacketMut<I>
 impl<I: IpExt, Inner, M: IcmpMessage<I>> MaybeTransportPacket
     for Nested<Inner, IcmpPacketBuilder<I, M>>
 {
-    type TransportPacket = M::TransportPacket;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        self.outer().message().transport_packet()
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        self.outer().message().transport_packet_data()
     }
 }
 
@@ -947,25 +953,13 @@ pub trait IcmpMessage<I: IpExt>: icmp::IcmpMessage<I> + MaybeTransportPacket {
     fn set_dst_port(&mut self, id: u16);
 }
 
-impl MaybeTransportPacket for IcmpEchoReply {
-    type TransportPacket = Self;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        Some(self)
-    }
-}
-
 // TODO(https://fxbug.dev/341128580): connection tracking will probably want to
 // special case ICMP echo packets to ensure that a new connection is only ever
 // created from an echo request, and not an echo response. We need to provide a
 // way for conntrack to differentiate between the two.
-impl TransportPacket for IcmpEchoReply {
-    fn src_port(&self) -> u16 {
-        0
-    }
-
-    fn dst_port(&self) -> u16 {
-        self.id()
+impl MaybeTransportPacket for IcmpEchoReply {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        Some(TransportPacketData::Generic { src_port: 0, dst_port: self.id() })
     }
 }
 
@@ -979,25 +973,13 @@ impl<I: IpExt> IcmpMessage<I> for IcmpEchoReply {
     }
 }
 
-impl MaybeTransportPacket for IcmpEchoRequest {
-    type TransportPacket = Self;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        Some(self)
-    }
-}
-
 // TODO(https://fxbug.dev/341128580): connection tracking will probably want to
 // special case ICMP echo packets to ensure that a new connection is only ever
 // created from an echo request, and not an echo response. We need to provide a
 // way for conntrack to differentiate between the two.
-impl TransportPacket for IcmpEchoRequest {
-    fn src_port(&self) -> u16 {
-        self.id()
-    }
-
-    fn dst_port(&self) -> u16 {
-        0
+impl MaybeTransportPacket for IcmpEchoRequest {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        Some(TransportPacketData::Generic { src_port: self.id(), dst_port: 0 })
     }
 }
 
@@ -1014,9 +996,7 @@ impl<I: IpExt> IcmpMessage<I> for IcmpEchoRequest {
 macro_rules! unsupported_icmp_message_type {
     ($message:ty, $($ips:ty),+) => {
         impl MaybeTransportPacket for $message {
-            type TransportPacket = Never;
-
-            fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+            fn transport_packet_data(&self) -> Option<TransportPacketData> {
                 None
             }
         }
@@ -1062,9 +1042,7 @@ icmp_error_message!(Icmpv6PacketTooBig, Ipv6);
 impl<M: igmp::MessageType<EmptyBuf>> MaybeTransportPacket
     for InnerSerializer<IgmpPacketBuilder<EmptyBuf, M>, EmptyBuf>
 {
-    type TransportPacket = Never;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
         None
     }
 }
@@ -1085,9 +1063,7 @@ impl<I> MaybeTransportPacket
         InnerSerializer<packet::records::RecordSequenceBuilder<NdpOptionBuilder<'_>, I>, EmptyBuf>,
     >
 {
-    type TransportPacket = Never;
-
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
         None
     }
 }
@@ -1111,9 +1087,9 @@ pub struct RawIpBody<I: IpExt, B: ParseBuffer> {
     /// The body of the IP packet. The body is expected to be a message of type
     /// `protocol`, but is not guaranteed to be valid.
     body: B,
-    /// The parsed transport header contained within `body`. Only `Some` if body
+    /// The parsed transport data contained within `body`. Only `Some` if body
     /// is a valid transport header.
-    transport_header: Option<ParsedTransportHeader>,
+    transport_packet_data: Option<TransportPacketData>,
 }
 
 impl<I: IpExt, B: ParseBuffer> RawIpBody<I, B> {
@@ -1124,16 +1100,19 @@ impl<I: IpExt, B: ParseBuffer> RawIpBody<I, B> {
         dst_addr: I::Addr,
         body: B,
     ) -> RawIpBody<I, B> {
-        let transport_header =
-            parse_transport_header_in_ip_packet::<I, _>(protocol, Buf::new(&body, ..));
-        RawIpBody { protocol, src_addr, dst_addr, body, transport_header }
+        let transport_packet_data = TransportPacketData::parse_in_ip_packet::<I, _>(
+            src_addr,
+            dst_addr,
+            protocol,
+            Buf::new(&body, ..),
+        );
+        RawIpBody { protocol, src_addr, dst_addr, body, transport_packet_data }
     }
 }
 
 impl<I: IpExt, B: ParseBuffer> MaybeTransportPacket for RawIpBody<I, B> {
-    type TransportPacket = ParsedTransportHeader;
-    fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-        self.transport_header.as_ref()
+    fn transport_packet_data(&self) -> Option<TransportPacketData> {
+        self.transport_packet_data.clone()
     }
 }
 
@@ -1141,7 +1120,7 @@ impl<I: IpExt, B: BufferMut> MaybeTransportPacketMut<I> for RawIpBody<I, B> {
     type TransportPacketMut<'a> = ParsedTransportHeaderMut<'a, I> where Self: 'a;
 
     fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
-        let RawIpBody { protocol, src_addr, dst_addr, body, transport_header: _ } = self;
+        let RawIpBody { protocol, src_addr, dst_addr, body, transport_packet_data: _ } = self;
         ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
             *src_addr,
             *dst_addr,
@@ -1159,9 +1138,9 @@ impl<I: IpExt, B: BufferMut> Serializer for RawIpBody<I, B> {
         outer: PacketConstraints,
         provider: P,
     ) -> Result<G, (SerializeError<P::Error>, Self)> {
-        let Self { protocol, src_addr, dst_addr, body, transport_header } = self;
+        let Self { protocol, src_addr, dst_addr, body, transport_packet_data } = self;
         body.serialize(outer, provider).map_err(|(err, body)| {
-            (err, Self { protocol, src_addr, dst_addr, body, transport_header })
+            (err, Self { protocol, src_addr, dst_addr, body, transport_packet_data })
         })
     }
 
@@ -1174,61 +1153,37 @@ impl<I: IpExt, B: BufferMut> Serializer for RawIpBody<I, B> {
     }
 }
 
-#[derive(GenericOverIp)]
-#[generic_over_ip()]
-pub struct ParsedTransportHeader {
-    src_port: u16,
-    dst_port: u16,
-}
-
-impl TransportPacket for ParsedTransportHeader {
-    fn src_port(&self) -> u16 {
-        self.src_port
-    }
-
-    fn dst_port(&self) -> u16 {
-        self.dst_port
-    }
-}
-
-fn parse_transport_header_in_ip_packet<I: IpExt, B: ParseBuffer>(
-    proto: I::Proto,
-    body: B,
-) -> Option<ParsedTransportHeader> {
-    I::map_ip(
-        (proto, IpInvariant(body)),
-        |(proto, IpInvariant(body))| parse_transport_header_in_ipv4_packet(proto, body),
-        |(proto, IpInvariant(body))| parse_transport_header_in_ipv6_packet(proto, body),
-    )
-}
-
 fn parse_transport_header_in_ipv4_packet<B: ParseBuffer>(
+    src_ip: Ipv4Addr,
+    dst_ip: Ipv4Addr,
     proto: Ipv4Proto,
     body: B,
-) -> Option<ParsedTransportHeader> {
+) -> Option<TransportPacketData> {
     match proto {
         Ipv4Proto::Proto(IpProto::Udp) => parse_udp_header::<_, Ipv4>(body),
-        Ipv4Proto::Proto(IpProto::Tcp) => parse_tcp_header(body),
+        Ipv4Proto::Proto(IpProto::Tcp) => parse_tcp_header::<_, Ipv4>(body, src_ip, dst_ip),
         Ipv4Proto::Icmp => parse_icmpv4_header(body),
         Ipv4Proto::Proto(IpProto::Reserved) | Ipv4Proto::Igmp | Ipv4Proto::Other(_) => None,
     }
 }
 
 fn parse_transport_header_in_ipv6_packet<B: ParseBuffer>(
+    src_ip: Ipv6Addr,
+    dst_ip: Ipv6Addr,
     proto: Ipv6Proto,
     body: B,
-) -> Option<ParsedTransportHeader> {
+) -> Option<TransportPacketData> {
     match proto {
         Ipv6Proto::Proto(IpProto::Udp) => parse_udp_header::<_, Ipv6>(body),
-        Ipv6Proto::Proto(IpProto::Tcp) => parse_tcp_header(body),
+        Ipv6Proto::Proto(IpProto::Tcp) => parse_tcp_header::<_, Ipv6>(body, src_ip, dst_ip),
         Ipv6Proto::Icmpv6 => parse_icmpv6_header(body),
         Ipv6Proto::Proto(IpProto::Reserved) | Ipv6Proto::NoNextHeader | Ipv6Proto::Other(_) => None,
     }
 }
 
-fn parse_udp_header<B: ParseBuffer, I: Ip>(mut body: B) -> Option<ParsedTransportHeader> {
+fn parse_udp_header<B: ParseBuffer, I: Ip>(mut body: B) -> Option<TransportPacketData> {
     let packet = body.parse_with::<_, UdpPacketRaw<_>>(I::VERSION_MARKER).ok()?;
-    Some(ParsedTransportHeader {
+    Some(TransportPacketData::Generic {
         src_port: packet.src_port().map(NonZeroU16::get).unwrap_or(0),
         // NB: UDP packets must have a specified (nonzero) destination port, so
         // if this packet has a destination port of 0, it is malformed.
@@ -1236,13 +1191,35 @@ fn parse_udp_header<B: ParseBuffer, I: Ip>(mut body: B) -> Option<ParsedTranspor
     })
 }
 
-fn parse_tcp_header<B: ParseBuffer>(mut body: B) -> Option<ParsedTransportHeader> {
+fn parse_tcp_header<B: ParseBuffer, I: IpExt>(
+    mut body: B,
+    src_ip: I::Addr,
+    dst_ip: I::Addr,
+) -> Option<TransportPacketData> {
+    // NOTE: By using TcpSegmentRaw here, we're opting into getting invalid data
+    // (for example, if the checksum isn't valid). As a team, we've decided
+    // that's okay for now, since the worst that happens is we filter or
+    // conntrack a packet incorrectly and the end host rejects it.
+    //
+    // This will be fixed at some point as part of a larger effort to ensure
+    // that checksums are validated exactly once (and hopefully via checksum
+    // offloading).
     let packet = body.parse::<TcpSegmentRaw<_>>().ok()?;
-    let (src_port, dst_port) = packet.flow_header().src_dst();
-    Some(ParsedTransportHeader { src_port, dst_port })
+
+    let (builder, options, body) = packet.into_builder_options(src_ip, dst_ip)?;
+    let options = Options::from_iter(options.iter());
+
+    let segment = SegmentHeader::from_builder_options(&builder, options).ok()?;
+
+    Some(TransportPacketData::Tcp {
+        src_port: builder.src_port().map(NonZeroU16::get).unwrap_or(0),
+        dst_port: builder.dst_port().map(NonZeroU16::get).unwrap_or(0),
+        segment,
+        payload_len: body.len(),
+    })
 }
 
-fn parse_icmpv4_header<B: ParseBuffer>(mut body: B) -> Option<ParsedTransportHeader> {
+fn parse_icmpv4_header<B: ParseBuffer>(mut body: B) -> Option<TransportPacketData> {
     let (src_port, dst_port) = match icmp::peek_message_type(body.as_ref()).ok()? {
         Icmpv4MessageType::EchoRequest => {
             let packet = body.parse::<IcmpPacketRaw<Ipv4, _, IcmpEchoRequest>>().ok()?;
@@ -1264,10 +1241,10 @@ fn parse_icmpv4_header<B: ParseBuffer>(mut body: B) -> Option<ParsedTransportHea
         | Icmpv4MessageType::TimestampRequest
         | Icmpv4MessageType::TimestampReply => None,
     }?;
-    Some(ParsedTransportHeader { src_port, dst_port })
+    Some(TransportPacketData::Generic { src_port, dst_port })
 }
 
-fn parse_icmpv6_header<B: ParseBuffer>(mut body: B) -> Option<ParsedTransportHeader> {
+fn parse_icmpv6_header<B: ParseBuffer>(mut body: B) -> Option<TransportPacketData> {
     let (src_port, dst_port) = match icmp::peek_message_type(body.as_ref()).ok()? {
         Icmpv6MessageType::EchoRequest => {
             let packet = body.parse::<IcmpPacketRaw<Ipv6, _, IcmpEchoRequest>>().ok()?;
@@ -1293,7 +1270,7 @@ fn parse_icmpv6_header<B: ParseBuffer>(mut body: B) -> Option<ParsedTransportHea
         | Icmpv6MessageType::MulticastListenerDone
         | Icmpv6MessageType::MulticastListenerReportV2 => None,
     }?;
-    Some(ParsedTransportHeader { src_port, dst_port })
+    Some(TransportPacketData::Generic { src_port, dst_port })
 }
 
 /// A transport header that has been parsed from a byte buffer and provides
@@ -1477,9 +1454,7 @@ pub mod testutil {
     // implementations.
 
     impl<B: BufferMut> MaybeTransportPacket for Nested<B, ()> {
-        type TransportPacket = Never;
-
-        fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        fn transport_packet_data(&self) -> Option<TransportPacketData> {
             unimplemented!()
         }
     }
@@ -1493,9 +1468,7 @@ pub mod testutil {
     }
 
     impl MaybeTransportPacket for InnerSerializer<&[u8], EmptyBuf> {
-        type TransportPacket = Never;
-
-        fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        fn transport_packet_data(&self) -> Option<TransportPacketData> {
             None
         }
     }
@@ -1512,6 +1485,7 @@ pub mod testutil {
     pub(crate) mod internal {
         use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};
         use net_types::ip::Subnet;
+        use netstack3_base::{SeqNum, UnscaledWindowSize};
 
         use super::*;
 
@@ -1552,7 +1526,7 @@ pub mod testutil {
             pub body: T,
         }
 
-        impl<I: IpExt> FakeIpPacket<I, FakeTcpSegment> {
+        impl<I: IpExt> FakeIpPacket<I, FakeUdpPacket> {
             pub(crate) fn reply(&self) -> Self {
                 Self { src_ip: self.dst_ip, dst_ip: self.src_ip, body: self.body.reply() }
             }
@@ -1590,7 +1564,7 @@ pub mod testutil {
                 <&T>::proto()
             }
 
-            fn transport_packet(&self) -> Self::TransportPacket<'_> {
+            fn maybe_transport_packet(&self) -> Self::TransportPacket<'_> {
                 &self.body
             }
 
@@ -1603,12 +1577,8 @@ pub mod testutil {
         pub struct FakeTcpSegment {
             pub src_port: u16,
             pub dst_port: u16,
-        }
-
-        impl FakeTcpSegment {
-            fn reply(&self) -> Self {
-                Self { src_port: self.dst_port, dst_port: self.src_port }
-            }
+            pub segment: SegmentHeader,
+            pub payload_len: usize,
         }
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeTcpSegment {
@@ -1622,20 +1592,13 @@ pub mod testutil {
         }
 
         impl MaybeTransportPacket for &FakeTcpSegment {
-            type TransportPacket = Self;
-
-            fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-                Some(self)
-            }
-        }
-
-        impl TransportPacket for &FakeTcpSegment {
-            fn src_port(&self) -> u16 {
-                self.src_port
-            }
-
-            fn dst_port(&self) -> u16 {
-                self.dst_port
+            fn transport_packet_data(&self) -> Option<TransportPacketData> {
+                Some(TransportPacketData::Tcp {
+                    src_port: self.src_port,
+                    dst_port: self.dst_port,
+                    segment: self.segment,
+                    payload_len: self.payload_len,
+                })
             }
         }
 
@@ -1661,9 +1624,16 @@ pub mod testutil {
             fn update_pseudo_header_dst_addr(&mut self, _: I::Addr, _: I::Addr) {}
         }
 
+        #[derive(Clone, Debug, PartialEq)]
         pub struct FakeUdpPacket {
             pub src_port: u16,
             pub dst_port: u16,
+        }
+
+        impl FakeUdpPacket {
+            fn reply(&self) -> Self {
+                Self { src_port: self.dst_port, dst_port: self.src_port }
+            }
         }
 
         impl<I: IpExt> TransportPacketExt<I> for &FakeUdpPacket {
@@ -1677,20 +1647,11 @@ pub mod testutil {
         }
 
         impl MaybeTransportPacket for &FakeUdpPacket {
-            type TransportPacket = Self;
-
-            fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-                Some(self)
-            }
-        }
-
-        impl TransportPacket for &FakeUdpPacket {
-            fn src_port(&self) -> u16 {
-                self.src_port
-            }
-
-            fn dst_port(&self) -> u16 {
-                self.dst_port
+            fn transport_packet_data(&self) -> Option<TransportPacketData> {
+                Some(TransportPacketData::Generic {
+                    src_port: self.src_port,
+                    dst_port: self.dst_port,
+                })
             }
         }
 
@@ -1727,20 +1688,8 @@ pub mod testutil {
         }
 
         impl MaybeTransportPacket for &FakeIcmpEchoRequest {
-            type TransportPacket = Self;
-
-            fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-                Some(self)
-            }
-        }
-
-        impl TransportPacket for &FakeIcmpEchoRequest {
-            fn src_port(&self) -> u16 {
-                self.id
-            }
-
-            fn dst_port(&self) -> u16 {
-                0
+            fn transport_packet_data(&self) -> Option<TransportPacketData> {
+                Some(TransportPacketData::Generic { src_port: self.id, dst_port: 0 })
             }
         }
 
@@ -1783,7 +1732,12 @@ pub mod testutil {
 
         impl ArbitraryValue for FakeTcpSegment {
             fn arbitrary_value() -> Self {
-                FakeTcpSegment { src_port: 33333, dst_port: 44444 }
+                FakeTcpSegment {
+                    src_port: 33333,
+                    dst_port: 44444,
+                    segment: SegmentHeader::arbitrary_value(),
+                    payload_len: 8888,
+                }
             }
         }
 
@@ -1798,6 +1752,18 @@ pub mod testutil {
                 FakeIcmpEchoRequest { id: 1 }
             }
         }
+
+        impl ArbitraryValue for SegmentHeader {
+            fn arbitrary_value() -> Self {
+                SegmentHeader {
+                    seq: SeqNum::new(55555),
+                    ack: None,
+                    control: None,
+                    wnd: UnscaledWindowSize::from(1234),
+                    options: Options::default(),
+                }
+            }
+        }
     }
 }
 
@@ -1805,6 +1771,7 @@ pub mod testutil {
 mod tests {
     use alloc::vec::Vec;
     use core::fmt::Debug;
+    use netstack3_base::{SeqNum, UnscaledWindowSize};
 
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
@@ -1820,6 +1787,10 @@ mod tests {
     const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
     const SRC_PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(44444));
     const DST_PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(55555));
+
+    const SEQ_NUM: u32 = 1;
+    const ACK_NUM: Option<u32> = Some(2);
+    const WINDOW_SIZE: u16 = 3u16;
 
     trait Protocol {
         type Serializer<'a, I: IpExt>: TransportPacketSerializer<I, Buffer: packet::ReusableBuffer>
@@ -1893,21 +1864,14 @@ mod tests {
     // TcpSegmentBuilder does not have this information. If a TcpSegmentBuilder
     // passes through filtering with options tracked separately, then these will
     // not be seen by conntrack and could lead to state desynchronization.
-    impl<A: IpAddress, Inner> MaybeTransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
-        type TransportPacket = Self;
-
-        fn transport_packet(&self) -> Option<&Self::TransportPacket> {
-            Some(self)
-        }
-    }
-
-    impl<A: IpAddress, Inner> TransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
-        fn src_port(&self) -> u16 {
-            TcpSegmentBuilder::src_port(self.outer()).map_or(0, NonZeroU16::get)
-        }
-
-        fn dst_port(&self) -> u16 {
-            TcpSegmentBuilder::dst_port(self.outer()).map_or(0, NonZeroU16::get)
+    impl<A: IpAddress, Inner: PayloadLen> MaybeTransportPacket for Nested<Inner, TcpSegmentBuilder<A>> {
+        fn transport_packet_data(&self) -> Option<TransportPacketData> {
+            Some(TransportPacketData::Tcp {
+                src_port: TcpSegmentBuilder::src_port(self.outer()).map_or(0, NonZeroU16::get),
+                dst_port: TcpSegmentBuilder::dst_port(self.outer()).map_or(0, NonZeroU16::get),
+                segment: self.outer().try_into().ok()?,
+                payload_len: self.inner().len(),
+            })
         }
     }
 
@@ -1953,9 +1917,14 @@ mod tests {
             src_port: NonZeroU16,
             dst_port: NonZeroU16,
         ) -> Self::Serializer<'a, I> {
-            [].into_serializer().encapsulate(TcpSegmentBuilder::new(
-                src_ip, dst_ip, src_port, dst_port, /* seq_num */ 0, /* ack_num */ None,
-                /* window_size */ 0,
+            [1, 2, 3].into_serializer().encapsulate(TcpSegmentBuilder::new(
+                src_ip,
+                dst_ip,
+                src_port,
+                dst_port,
+                SEQ_NUM,
+                ACK_NUM,
+                WINDOW_SIZE,
             ))
         }
     }
@@ -2010,6 +1979,70 @@ mod tests {
                 icmp::IcmpEchoReply::new(/* id */ dst_port.get(), /* seq */ 0),
             ))
         }
+    }
+
+    enum TransportPacketDataProtocol {
+        Tcp,
+        Udp,
+        IcmpEchoRequest,
+    }
+
+    impl TransportPacketDataProtocol {
+        fn make_packet<I: TestIpExt>(&self, src_ip: I::Addr, dst_ip: I::Addr) -> Vec<u8> {
+            match self {
+                TransportPacketDataProtocol::Tcp => Tcp::make_packet::<I>(src_ip, dst_ip),
+                TransportPacketDataProtocol::Udp => Udp::make_packet::<I>(src_ip, dst_ip),
+                TransportPacketDataProtocol::IcmpEchoRequest => {
+                    IcmpEchoRequest::make_packet::<I>(src_ip, dst_ip)
+                }
+            }
+        }
+
+        fn proto<I: TestIpExt>(&self) -> I::Proto {
+            match self {
+                TransportPacketDataProtocol::Tcp => Tcp::proto::<I>(),
+                TransportPacketDataProtocol::Udp => Udp::proto::<I>(),
+                TransportPacketDataProtocol::IcmpEchoRequest => IcmpEchoRequest::proto::<I>(),
+            }
+        }
+    }
+
+    #[ip_test(I)]
+    #[test_case(TransportPacketDataProtocol::Udp)]
+    #[test_case(TransportPacketDataProtocol::Tcp)]
+    #[test_case(TransportPacketDataProtocol::IcmpEchoRequest)]
+    fn transport_packet_data_from_serialized<I: TestIpExt>(proto: TransportPacketDataProtocol) {
+        let expected_data = match proto {
+            TransportPacketDataProtocol::Tcp => TransportPacketData::Tcp {
+                src_port: SRC_PORT.get(),
+                dst_port: DST_PORT.get(),
+                segment: SegmentHeader {
+                    seq: SeqNum::new(SEQ_NUM),
+                    ack: ACK_NUM.map(SeqNum::new),
+                    control: None,
+                    wnd: UnscaledWindowSize::from(WINDOW_SIZE),
+                    options: Options::default(),
+                },
+                payload_len: 3,
+            },
+            TransportPacketDataProtocol::Udp => {
+                TransportPacketData::Generic { src_port: SRC_PORT.get(), dst_port: DST_PORT.get() }
+            }
+            TransportPacketDataProtocol::IcmpEchoRequest => {
+                TransportPacketData::Generic { src_port: SRC_PORT.get(), dst_port: 0 }
+            }
+        };
+
+        let buf = proto.make_packet::<I>(I::SRC_IP, I::DST_IP);
+        let parsed_data = TransportPacketData::parse_in_ip_packet::<I, _>(
+            I::SRC_IP,
+            I::DST_IP,
+            proto.proto::<I>(),
+            buf.as_slice(),
+        )
+        .expect("failed to parse transport packet data");
+
+        assert_eq!(parsed_data, expected_data);
     }
 
     #[ip_test(I)]

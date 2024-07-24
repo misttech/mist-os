@@ -20,6 +20,7 @@ use arrayvec::ArrayVec;
 use explicit::ResultExt as _;
 use net_types::ip::IpAddress;
 use packet::records::options::OptionsRaw;
+use packet::records::Records;
 use packet::{
     BufferView, BufferViewMut, ByteSliceInnerPacketBuilder, EmptyBuf, FragmentedBytesMut, FromRaw,
     InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints, ParsablePacket,
@@ -93,6 +94,25 @@ impl HeaderPrefix {
             Some(self.ack.get())
         } else {
             None
+        }
+    }
+
+    fn builder<A: IpAddress>(&self, src_ip: A, dst_ip: A) -> TcpSegmentBuilder<A> {
+        TcpSegmentBuilder {
+            src_ip,
+            dst_ip,
+            // Might be zero, which is illegal.
+            src_port: NonZeroU16::new(self.src_port.get()),
+            // Might be zero, which is illegal.
+            dst_port: NonZeroU16::new(self.dst_port.get()),
+            // All values are valid.
+            seq_num: self.seq_num.get(),
+            // Might be nonzero even if the ACK flag is not set.
+            ack_num: self.ack.get(),
+            // Reserved zero bits may be set.
+            data_offset_reserved_flags: self.data_offset_reserved_flags,
+            // All values are valid.
+            window_size: self.window_size.get(),
         }
     }
 }
@@ -647,22 +667,7 @@ impl<B: ByteSlice> TcpSegmentRaw<B> {
             .ok_checked::<&PartialHeaderPrefix<B>>()
             .zip(self.options.as_ref().complete().ok_checked::<&B>())
             .map(|(hdr_prefix, options)| TcpSegmentBuilderWithOptions {
-                prefix_builder: TcpSegmentBuilder {
-                    src_ip,
-                    dst_ip,
-                    // Might be zero, which is illegal.
-                    src_port: NonZeroU16::new(hdr_prefix.src_port.get()),
-                    // Might be zero, which is illegal.
-                    dst_port: NonZeroU16::new(hdr_prefix.dst_port.get()),
-                    // All values are valid.
-                    seq_num: hdr_prefix.seq_num.get(),
-                    // Might be nonzero even if the ACK flag is not set.
-                    ack_num: hdr_prefix.ack.get(),
-                    // Reserved zero bits may be set.
-                    data_offset_reserved_flags: hdr_prefix.data_offset_reserved_flags,
-                    // All values are valid.
-                    window_size: hdr_prefix.window_size.get(),
-                },
+                prefix_builder: hdr_prefix.builder(src_ip, dst_ip),
                 options: {
                     let mut opts = ArrayVec::new();
                     // Safe because we validate that `self.options` is no longer
@@ -673,6 +678,24 @@ impl<B: ByteSlice> TcpSegmentRaw<B> {
                     opts
                 },
             })
+    }
+
+    /// Transform this `TcpSegmentRaw` into the equivalent builder, parsed options, and body.
+    pub fn into_builder_options<A: IpAddress>(
+        self,
+        src_ip: A,
+        dst_ip: A,
+    ) -> Option<(TcpSegmentBuilder<A>, Records<B, TcpOptionsImpl>, B)> {
+        let Self { hdr_prefix, options, body } = self;
+
+        let builder = hdr_prefix
+            .complete()
+            .ok_checked::<PartialHeaderPrefix<B>>()
+            .map(|hdr_prefix| hdr_prefix.builder(src_ip, dst_ip))?;
+
+        let options = Records::try_from_raw(options.complete().ok_checked::<B>()?).ok()?;
+
+        Some((builder, options, body))
     }
 
     /// Consumes this segment and constructs a [`Serializer`] with the same
@@ -757,6 +780,11 @@ where
         }
         Ok(TcpSegmentBuilderWithOptions { prefix_builder, options })
     }
+
+    /// Returns an iterator over the options set in this builder.
+    pub fn iter_options(&self) -> impl Iterator<Item = I::Item> {
+        self.options.records().clone().into_iter()
+    }
 }
 
 impl<A: IpAddress, O> TcpSegmentBuilderWithOptions<A, O> {
@@ -788,6 +816,11 @@ impl<A: IpAddress, O> TcpSegmentBuilderWithOptions<A, O> {
     /// Sets the destination port for the builder.
     pub fn set_dst_port(&mut self, port: NonZeroU16) {
         self.prefix_builder.dst_port = Some(port);
+    }
+
+    /// Returns a shared reference to the prefix builder of the segment.
+    pub fn prefix_builder(&self) -> &TcpSegmentBuilder<A> {
+        &self.prefix_builder
     }
 }
 
@@ -876,14 +909,29 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
         self.data_offset_reserved_flags.set_rst(rst);
     }
 
+    /// Returns the current value of the RST flag.
+    pub fn rst_set(&self) -> bool {
+        self.data_offset_reserved_flags.rst()
+    }
+
     /// Sets the SYN flag.
     pub fn syn(&mut self, syn: bool) {
         self.data_offset_reserved_flags.set_syn(syn);
     }
 
+    /// Returns the current value of the SYN flag.
+    pub fn syn_set(&self) -> bool {
+        self.data_offset_reserved_flags.syn()
+    }
+
     /// Sets the FIN flag.
     pub fn fin(&mut self, fin: bool) {
         self.data_offset_reserved_flags.set_fin(fin);
+    }
+
+    /// Returns the current value of the FIN flag.
+    pub fn fin_set(&self) -> bool {
+        self.data_offset_reserved_flags.fin()
     }
 
     /// Returns the source port for the builder.
@@ -894,6 +942,21 @@ impl<A: IpAddress> TcpSegmentBuilder<A> {
     /// Returns the destination port for the builder.
     pub fn dst_port(&self) -> Option<NonZeroU16> {
         self.dst_port
+    }
+
+    /// Returns the sequence number for the builder
+    pub fn seq_num(&self) -> u32 {
+        self.seq_num
+    }
+
+    /// Returns the ACK number, if present.
+    pub fn ack_num(&self) -> Option<u32> {
+        self.data_offset_reserved_flags.ack().then(|| self.ack_num)
+    }
+
+    /// Returns the unscaled window size
+    pub fn window_size(&self) -> u16 {
+        self.window_size
     }
 
     /// Sets the source IP address for the builder.

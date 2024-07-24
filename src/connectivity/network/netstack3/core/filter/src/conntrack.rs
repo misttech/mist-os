@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod tcp;
+
 use alloc::collections::HashMap;
 use alloc::fmt::Debug;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use assert_matches::assert_matches;
+use core::fmt::Display;
 use core::hash::Hash;
 use core::time::Duration;
 
@@ -15,26 +19,12 @@ use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
 use crate::context::{FilterBindingsContext, FilterBindingsTypes};
 use crate::logic::FilterTimerId;
-use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacket};
+use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacketData};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{CoreTimerContext, Inspectable, Inspector, Instant, TimerContext};
 
 /// The time from the end of one GC cycle to the beginning of the next.
 const GC_INTERVAL: Duration = Duration::from_secs(10);
-
-/// The time since the last seen packet after which an unestablished TCP
-/// connection is considered expired and is eligible for garbage collection.
-///
-/// This is small because it's just meant to be the time between the initial SYN
-/// and response SYN/ACK packet.
-const CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED: Duration = Duration::from_secs(30);
-
-/// The time since the last seen packet after which an established TCP
-/// connection is considered expired and is eligible for garbage collection.
-///
-/// Until we have TCP tracking, this is a large value to ensure that connections
-/// that are still valid aren't cleaned up prematurely.
-const CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// The time since the last seen packet after which an established UDP
 /// connection will be considered expired and is eligible for garbage
@@ -152,7 +142,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                 .table
                 .iter()
                 .filter_map(|(_, conn)| {
-                    if conn.state.lock().established {
+                    if conn.state.lock().is_established() {
                         None
                     } else {
                         Some((conn.inner.original_tuple.clone(), conn.inner.reply_tuple.clone()))
@@ -230,29 +220,23 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         bindings_ctx: &BC,
         packet: &P,
     ) -> Option<Connection<I, BC, E>> {
-        Tuple::from_packet(packet)
-            .map(|t| self.get_connection_for_tuple_and_update(bindings_ctx, t))
-    }
+        let packet = PacketMetadata::new(packet)?;
 
-    fn get_connection_for_tuple_and_update(
-        &self,
-        bindings_ctx: &BC,
-        tuple: Tuple<I>,
-    ) -> Connection<I, BC, E> {
-        let mut connection = match self.inner.lock().table.get(&tuple) {
+        let mut connection = match self.inner.lock().table.get(&packet.tuple) {
             Some(connection) => Connection::Shared(connection.clone()),
-            None => {
-                Connection::Exclusive(ConnectionExclusive::from_tuple(bindings_ctx, tuple.clone()))
-            }
+            None => Connection::Exclusive(ConnectionExclusive::from_deconstructed_packet(
+                bindings_ctx,
+                &packet,
+            )?),
         };
 
-        match connection.update(bindings_ctx, &tuple) {
-            Ok(()) => connection,
+        match connection.update(bindings_ctx, &packet) {
+            Ok(()) => Some(connection),
             Err(e) => match e {
                 ConnectionUpdateError::NonMatchingTuple => {
                     panic!(
                         "Tuple didn't match. tuple={:?}, conn.original={:?}, conn.reply={:?}",
-                        &tuple,
+                        &packet.tuple,
                         connection.original_tuple(),
                         connection.reply_tuple()
                     );
@@ -337,7 +321,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Table<I,
 #[generic_over_ip(I, Ip)]
 pub struct Tuple<I: IpExt> {
     /// The IP protocol number of the flow.
-    pub protocol: I::Proto,
+    pub protocol: TransportProtocol,
     /// The source IP address of the flow.
     pub src_addr: I::Addr,
     /// The destination IP address of the flow.
@@ -353,8 +337,6 @@ impl<I: IpExt> Tuple<I> {
     ///
     /// Returns `None` if the packet doesn't have an inner transport packet.
     pub(crate) fn from_packet<'a, P: IpPacket<I>>(packet: &'a P) -> Option<Self> {
-        let maybe_transport_packet = packet.transport_packet();
-
         // Subtlety: For ICMP packets, only request/response messages will have
         // a transport packet defined (and currently only ECHO messages do).
         // This gets us basic tracking for free, and lets us implicitly ignore
@@ -363,15 +345,28 @@ impl<I: IpExt> Tuple<I> {
         // If other message types eventually have TransportPacket impls, then
         // this would lead to confusing different message types that happen to
         // have the same ID.
-        let transport_packet = maybe_transport_packet.transport_packet()?;
+        let transport_packet_data = packet.maybe_transport_packet().transport_packet_data()?;
+        Some(Self::from_packet_and_transport_data(packet, &transport_packet_data))
+    }
 
-        Some(Self {
-            protocol: packet.protocol(),
+    fn from_packet_and_transport_data<'a, P: IpPacket<I>>(
+        packet: &'a P,
+        transport_packet_data: &TransportPacketData,
+    ) -> Self {
+        let protocol = I::map_ip(packet.protocol(), |proto| proto.into(), |proto| proto.into());
+
+        let (src_port, dst_port) = match transport_packet_data {
+            TransportPacketData::Tcp { src_port, dst_port, .. }
+            | TransportPacketData::Generic { src_port, dst_port } => (*src_port, *dst_port),
+        };
+
+        Self {
+            protocol: protocol,
             src_addr: packet.src_addr(),
             dst_addr: packet.dst_addr(),
-            src_port_or_id: transport_packet.src_port(),
-            dst_port_or_id: transport_packet.dst_port(),
-        })
+            src_port_or_id: src_port,
+            dst_port_or_id: dst_port,
+        }
     }
 
     /// Returns the inverted version of the tuple.
@@ -403,7 +398,7 @@ impl<I: IpExt> Inspectable for Tuple<I> {
 }
 
 /// The direction of a packet when compared to the given connection.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ConnectionDirection {
     /// The packet is traveling in the same direction as the first packet seen
     /// for the [`Connection`].
@@ -506,8 +501,12 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
 }
 
 impl<I: IpExt, BC: FilterBindingsContext, E> Connection<I, BC, E> {
-    fn update(&mut self, bindings_ctx: &BC, tuple: &Tuple<I>) -> Result<(), ConnectionUpdateError> {
-        let direction = match self.direction(tuple) {
+    fn update(
+        &mut self,
+        bindings_ctx: &BC,
+        packet: &PacketMetadata<I>,
+    ) -> Result<(), ConnectionUpdateError> {
+        let direction = match self.direction(&packet.tuple) {
             Some(d) => d,
             None => return Err(ConnectionUpdateError::NonMatchingTuple),
         };
@@ -515,8 +514,8 @@ impl<I: IpExt, BC: FilterBindingsContext, E> Connection<I, BC, E> {
         let now = bindings_ctx.now();
 
         match self {
-            Connection::Exclusive(c) => c.state.update(direction, now),
-            Connection::Shared(c) => c.state.lock().update(direction, now),
+            Connection::Exclusive(c) => c.state.update(direction, &packet.transport_data, now),
+            Connection::Shared(c) => c.state.lock().update(direction, &packet.transport_data, now),
         }
     }
 }
@@ -558,40 +557,80 @@ impl<I: IpExt, E: Inspectable> Inspectable for ConnectionCommon<I, E> {
     }
 }
 
+#[derive(Debug, Clone)]
+enum ProtocolState {
+    Tcp(tcp::Connection),
+    Udp {
+        /// Whether this connection has seen packets in both directions.
+        established: bool,
+    },
+    Other {
+        /// Whether this connection has seen packets in both directions.
+        established: bool,
+    },
+}
+
+impl ProtocolState {
+    fn update(&mut self, dir: ConnectionDirection, transport_data: &TransportPacketData) {
+        match self {
+            ProtocolState::Tcp(tcp_conn) => {
+                let (segment, payload_len) = assert_matches!(
+                    transport_data,
+                    TransportPacketData::Tcp { segment, payload_len, .. } => (segment, payload_len)
+                );
+                tcp_conn.update(&segment, *payload_len, dir);
+            }
+            ProtocolState::Udp { established } | ProtocolState::Other { established } => {
+                match dir {
+                    ConnectionDirection::Original => (),
+                    ConnectionDirection::Reply => *established = true,
+                }
+            }
+        }
+    }
+}
+
 /// Dynamic per-connection state.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub(crate) struct ConnectionState<BT: FilterBindingsTypes> {
-    /// Whether this connection has seen packets in both directions.
-    established: bool,
-
     /// The time the last packet was seen for this connection (in either of the
     /// original or reply directions).
     last_packet_time: BT::Instant,
+
+    /// State that is specific to a given protocol (e.g. TCP or UDP).
+    protocol_state: ProtocolState,
 }
 
 impl<BT: FilterBindingsTypes> ConnectionState<BT> {
     fn update(
         &mut self,
         dir: ConnectionDirection,
+        transport_data: &TransportPacketData,
         now: BT::Instant,
     ) -> Result<(), ConnectionUpdateError> {
-        match dir {
-            ConnectionDirection::Original => (),
-            ConnectionDirection::Reply => self.established = true,
-        };
-
         if self.last_packet_time < now {
             self.last_packet_time = now;
         }
 
+        self.protocol_state.update(dir, transport_data);
+
         Ok(())
+    }
+
+    fn is_established(&self) -> bool {
+        match &self.protocol_state {
+            ProtocolState::Tcp(tcp_state) => tcp_state.is_established(),
+            ProtocolState::Udp { established } | ProtocolState::Other { established } => {
+                *established
+            }
+        }
     }
 }
 
 impl<BT: FilterBindingsTypes> Inspectable for ConnectionState<BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
-        inspector.record_bool("established", self.established);
+        inspector.record_bool("established", self.is_established());
         inspector.record_inspectable_value("last_packet_time", &self.last_packet_time);
     }
 }
@@ -623,13 +662,35 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
 }
 
 impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC, E> {
-    fn from_tuple(bindings_ctx: &BC, original_tuple: Tuple<I>) -> Self {
-        let reply_tuple = original_tuple.clone().invert();
+    fn from_deconstructed_packet(
+        bindings_ctx: &BC,
+        PacketMetadata { tuple, transport_data }: &PacketMetadata<I>,
+    ) -> Option<Self> {
+        let reply_tuple = tuple.clone().invert();
 
-        Self {
-            inner: ConnectionCommon { original_tuple, reply_tuple, external_data: E::default() },
-            state: ConnectionState { established: false, last_packet_time: bindings_ctx.now() },
-        }
+        Some(Self {
+            inner: ConnectionCommon {
+                original_tuple: tuple.clone(),
+                reply_tuple,
+                external_data: E::default(),
+            },
+            state: ConnectionState {
+                last_packet_time: bindings_ctx.now(),
+                protocol_state: match tuple.protocol {
+                    TransportProtocol::Tcp => {
+                        let (segment, payload_len) = transport_data
+                            .tcp_segment_and_len()
+                            .expect("protocol was TCP, so transport data should have TCP info");
+
+                        ProtocolState::Tcp(tcp::Connection::new(segment, payload_len)?)
+                    }
+                    TransportProtocol::Udp => ProtocolState::Udp { established: false },
+                    TransportProtocol::Icmp | TransportProtocol::Other(_) => {
+                        ProtocolState::Other { established: false }
+                    }
+                },
+            },
+        })
     }
 }
 
@@ -652,34 +713,61 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
     }
 }
 
-#[derive(GenericOverIp)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, GenericOverIp)]
 #[generic_over_ip()]
-enum IpAgnosticTransportProtocol {
+pub enum TransportProtocol {
     Tcp,
     Udp,
     Icmp,
-    Other,
+    Other(u8),
 }
 
-impl From<Ipv4Proto> for IpAgnosticTransportProtocol {
+impl From<Ipv4Proto> for TransportProtocol {
     fn from(value: Ipv4Proto) -> Self {
         match value {
-            Ipv4Proto::Proto(IpProto::Tcp) => IpAgnosticTransportProtocol::Tcp,
-            Ipv4Proto::Proto(IpProto::Udp) => IpAgnosticTransportProtocol::Udp,
-            Ipv4Proto::Icmp => IpAgnosticTransportProtocol::Icmp,
-            _ => IpAgnosticTransportProtocol::Other,
+            Ipv4Proto::Proto(IpProto::Tcp) => TransportProtocol::Tcp,
+            Ipv4Proto::Proto(IpProto::Udp) => TransportProtocol::Udp,
+            Ipv4Proto::Icmp => TransportProtocol::Icmp,
+            v => TransportProtocol::Other(v.into()),
         }
     }
 }
 
-impl From<Ipv6Proto> for IpAgnosticTransportProtocol {
+impl From<Ipv6Proto> for TransportProtocol {
     fn from(value: Ipv6Proto) -> Self {
         match value {
-            Ipv6Proto::Proto(IpProto::Tcp) => IpAgnosticTransportProtocol::Tcp,
-            Ipv6Proto::Proto(IpProto::Udp) => IpAgnosticTransportProtocol::Udp,
-            Ipv6Proto::Icmpv6 => IpAgnosticTransportProtocol::Icmp,
-            _ => IpAgnosticTransportProtocol::Other,
+            Ipv6Proto::Proto(IpProto::Tcp) => TransportProtocol::Tcp,
+            Ipv6Proto::Proto(IpProto::Udp) => TransportProtocol::Udp,
+            Ipv6Proto::Icmpv6 => TransportProtocol::Icmp,
+            v => TransportProtocol::Other(v.into()),
         }
+    }
+}
+
+impl From<IpProto> for TransportProtocol {
+    fn from(value: IpProto) -> Self {
+        match value {
+            IpProto::Tcp => TransportProtocol::Tcp,
+            IpProto::Udp => TransportProtocol::Udp,
+            v @ IpProto::Reserved => TransportProtocol::Other(v.into()),
+        }
+    }
+}
+
+impl Display for TransportProtocol {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TransportProtocol::Tcp => write!(f, "TCP"),
+            TransportProtocol::Udp => write!(f, "UDP"),
+            TransportProtocol::Icmp => write!(f, "ICMP"),
+            TransportProtocol::Other(n) => write!(f, "Other({n})"),
+        }
+    }
+}
+
+impl Debug for TransportProtocol {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Display::fmt(&self, f)
     }
 }
 
@@ -688,28 +776,14 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
         let state = self.state.lock().clone();
         let duration = now.saturating_duration_since(state.last_packet_time);
 
-        let protocol = I::map_ip(
-            &self.inner.original_tuple,
-            |tuple| tuple.protocol.into(),
-            |tuple| tuple.protocol.into(),
-        );
-
-        let expiry_duration = match protocol {
-            IpAgnosticTransportProtocol::Tcp => {
-                if state.established {
-                    CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED
-                } else {
-                    CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED
-                }
-            }
-            IpAgnosticTransportProtocol::Udp => CONNECTION_EXPIRY_TIME_UDP,
-            // The ICMP messages we track are simple request/response
-            // protocols, so we always expect to get a response quickly
-            // (within 2 RTT).  Any followup messages (e.g. if making
-            // periodic ECHO requests) should reuse this existing
-            // connection.
-            IpAgnosticTransportProtocol::Icmp => CONNECTION_EXPIRY_OTHER,
-            IpAgnosticTransportProtocol::Other => CONNECTION_EXPIRY_OTHER,
+        let expiry_duration = match state.protocol_state {
+            ProtocolState::Tcp(tcp_conn) => tcp_conn.expiry_duration(),
+            ProtocolState::Udp { .. } => CONNECTION_EXPIRY_TIME_UDP,
+            // ICMP ends up here. The ICMP messages we track are simple
+            // request/response protocols, so we always expect to get a response
+            // quickly (within 2 RTT). Any followup messages (e.g. if making
+            // periodic ECHO requests) should reuse this existing connection.
+            ProtocolState::Other { .. } => CONNECTION_EXPIRY_OTHER,
         };
 
         duration >= expiry_duration
@@ -723,6 +797,34 @@ impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Connecti
     }
 }
 
+/// A struct containing relevant fields extracted from the IP and transport
+/// headers that means we only have to touch the incoming IpPacket once. Also
+/// acts as a witness type that the tuple and transport data have the same
+/// transport protocol.
+struct PacketMetadata<I: IpExt> {
+    tuple: Tuple<I>,
+    transport_data: TransportPacketData,
+}
+
+impl<I: IpExt> PacketMetadata<I> {
+    fn new<P: IpPacket<I>>(packet: &P) -> Option<Self> {
+        let transport_packet_data = packet.maybe_transport_packet().transport_packet_data()?;
+
+        let tuple = Tuple::from_packet_and_transport_data(packet, &transport_packet_data);
+
+        match tuple.protocol {
+            TransportProtocol::Tcp => {
+                assert_matches!(transport_packet_data, TransportPacketData::Tcp { .. })
+            }
+            TransportProtocol::Udp | TransportProtocol::Icmp | TransportProtocol::Other(_) => {
+                assert_matches!(transport_packet_data, TransportPacketData::Generic { .. })
+            }
+        }
+
+        Some(Self { tuple, transport_data: transport_packet_data })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::convert::Infallible as Never;
@@ -732,13 +834,15 @@ mod tests {
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4, Ipv6};
     use netstack3_base::testutil::FakeTimerCtxExt;
-    use netstack3_base::IntoCoreTimerCtx;
+    use netstack3_base::{IntoCoreTimerCtx, SegmentHeader};
     use packet_formats::ip::IpProto;
     use test_case::test_case;
 
     use super::*;
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx};
-    use crate::packets::testutil::internal::{FakeIpPacket, FakeTcpSegment, TransportPacketExt};
+    use crate::packets::testutil::internal::{
+        ArbitraryValue, FakeIpPacket, FakeTcpSegment, FakeUdpPacket, TransportPacketExt,
+    };
     use crate::packets::MaybeTransportPacketMut;
     use crate::state::IpRoutines;
 
@@ -762,9 +866,7 @@ mod tests {
     struct NoTransportPacket;
 
     impl MaybeTransportPacket for &NoTransportPacket {
-        type TransportPacket = Never;
-
-        fn transport_packet(&self) -> Option<&Self::TransportPacket> {
+        fn transport_packet_data(&self) -> Option<TransportPacketData> {
             None
         }
     }
@@ -784,11 +886,11 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(IpProto::Udp)]
-    #[test_case(IpProto::Tcp)]
-    fn tuple_invert_udp_tcp<I: IpExt + TestIpExt>(protocol: IpProto) {
+    #[test_case(TransportProtocol::Udp)]
+    #[test_case(TransportProtocol::Tcp)]
+    fn tuple_invert_udp_tcp<I: IpExt + TestIpExt>(protocol: TransportProtocol) {
         let orig_tuple = Tuple::<I> {
-            protocol: protocol.into(),
+            protocol: protocol,
             src_addr: I::SRC_ADDR,
             dst_addr: I::DST_ADDR,
             src_port_or_id: I::SRC_PORT,
@@ -796,7 +898,7 @@ mod tests {
         };
 
         let expected = Tuple::<I> {
-            protocol: protocol.into(),
+            protocol: protocol,
             src_addr: I::DST_ADDR,
             dst_addr: I::SRC_ADDR,
             src_port_or_id: I::DST_PORT,
@@ -811,7 +913,7 @@ mod tests {
     #[ip_test(I)]
     fn tuple_from_tcp_packet<I: IpExt + TestIpExt>() {
         let expected = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
+            protocol: TransportProtocol::Tcp,
             src_addr: I::SRC_ADDR,
             dst_addr: I::DST_ADDR,
             src_port_or_id: I::SRC_PORT,
@@ -821,7 +923,12 @@ mod tests {
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
             dst_ip: I::DST_ADDR,
-            body: FakeTcpSegment { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+            body: FakeTcpSegment {
+                src_port: I::SRC_PORT,
+                dst_port: I::DST_PORT,
+                segment: SegmentHeader::arbitrary_value(),
+                payload_len: 4,
+            },
         };
 
         let tuple = Tuple::from_packet(&packet).expect("valid TCP packet should return a tuple");
@@ -841,22 +948,21 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(IpProto::Udp)]
-    #[test_case(IpProto::Tcp)]
-    fn connection_from_tuple<I: IpExt + TestIpExt>(protocol: IpProto) {
+    fn connection_from_tuple<I: IpExt + TestIpExt>() {
         let bindings_ctx = FakeBindingsCtx::<I>::new();
 
-        let original_tuple = Tuple::<I> {
-            protocol: protocol.into(),
-            src_addr: I::SRC_ADDR,
-            dst_addr: I::DST_ADDR,
-            src_port_or_id: I::SRC_PORT,
-            dst_port_or_id: I::DST_PORT,
-        };
+        let packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        })
+        .unwrap();
+        let original_tuple = packet.tuple.clone();
         let reply_tuple = original_tuple.clone().invert();
 
         let connection =
-            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
+            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(&bindings_ctx, &packet)
+                .unwrap();
 
         assert_eq!(&connection.inner.original_tuple, &original_tuple);
         assert_eq!(&connection.inner.reply_tuple, &reply_tuple);
@@ -866,16 +972,17 @@ mod tests {
     fn connection_make_shared_has_same_underlying_info<I: IpExt + TestIpExt>() {
         let bindings_ctx = FakeBindingsCtx::<I>::new();
 
-        let original_tuple = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
-            src_addr: I::SRC_ADDR,
-            dst_addr: I::DST_ADDR,
-            src_port_or_id: I::SRC_PORT,
-            dst_port_or_id: I::DST_PORT,
-        };
+        let packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        })
+        .unwrap();
+        let original_tuple = packet.tuple.clone();
         let reply_tuple = original_tuple.clone().invert();
 
-        let mut connection = ConnectionExclusive::from_tuple(&bindings_ctx, original_tuple.clone());
+        let mut connection =
+            ConnectionExclusive::from_deconstructed_packet(&bindings_ctx, &packet).unwrap();
         connection.inner.external_data = 1234;
         let shared = connection.make_shared();
 
@@ -895,16 +1002,17 @@ mod tests {
     fn connection_getters<I: IpExt + TestIpExt>(connection_kind: ConnectionKind) {
         let bindings_ctx = FakeBindingsCtx::<I>::new();
 
-        let original_tuple = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
-            src_addr: I::SRC_ADDR,
-            dst_addr: I::DST_ADDR,
-            src_port_or_id: I::SRC_PORT,
-            dst_port_or_id: I::DST_PORT,
-        };
+        let packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        })
+        .unwrap();
+        let original_tuple = packet.tuple.clone();
         let reply_tuple = original_tuple.clone().invert();
 
-        let mut connection = ConnectionExclusive::from_tuple(&bindings_ctx, original_tuple.clone());
+        let mut connection =
+            ConnectionExclusive::from_deconstructed_packet(&bindings_ctx, &packet).unwrap();
         connection.inner.external_data = 1234;
 
         let connection = match connection_kind {
@@ -923,20 +1031,20 @@ mod tests {
     fn connection_direction<I: IpExt + TestIpExt>(connection_kind: ConnectionKind) {
         let bindings_ctx = FakeBindingsCtx::<I>::new();
 
-        let original_tuple = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
-            src_addr: I::SRC_ADDR,
-            dst_addr: I::DST_ADDR,
-            src_port_or_id: I::SRC_PORT,
-            dst_port_or_id: I::DST_PORT,
-        };
+        let packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        })
+        .unwrap();
+        let original_tuple = packet.tuple.clone();
         let reply_tuple = original_tuple.clone().invert();
 
         let mut other_tuple = original_tuple.clone();
         other_tuple.src_port_or_id += 1;
 
-        let connection =
-            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
+        let connection: ConnectionExclusive<_, _, ()> =
+            ConnectionExclusive::from_deconstructed_packet(&bindings_ctx, &packet).unwrap();
         let connection = match connection_kind {
             ConnectionKind::Exclusive => Connection::Exclusive(connection),
             ConnectionKind::Shared => Connection::Shared(connection.make_shared()),
@@ -954,46 +1062,56 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
         bindings_ctx.sleep(Duration::from_secs(1));
 
-        let original_tuple = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
-            src_addr: I::SRC_ADDR,
-            dst_addr: I::DST_ADDR,
-            src_port_or_id: I::SRC_PORT,
-            dst_port_or_id: I::DST_PORT,
-        };
-        let reply_tuple = original_tuple.clone().invert();
+        let packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        })
+        .unwrap();
 
-        let mut other_tuple = original_tuple.clone();
-        other_tuple.src_port_or_id += 1;
+        let reply_packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::DST_ADDR,
+            dst_ip: I::SRC_ADDR,
+            body: FakeUdpPacket { src_port: I::DST_PORT, dst_port: I::SRC_PORT },
+        })
+        .unwrap();
+
+        let other_packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::DST_ADDR,
+            dst_ip: I::SRC_ADDR,
+            body: FakeUdpPacket { src_port: I::DST_PORT, dst_port: I::SRC_PORT + 1 },
+        })
+        .unwrap();
 
         let connection =
-            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
+            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(&bindings_ctx, &packet)
+                .unwrap();
         let mut connection = match connection_kind {
             ConnectionKind::Exclusive => Connection::Exclusive(connection),
             ConnectionKind::Shared => Connection::Shared(connection.make_shared()),
         };
 
-        assert_matches!(connection.update(&bindings_ctx, &original_tuple), Ok(()));
+        assert_matches!(connection.update(&bindings_ctx, &packet), Ok(()));
         let state = connection.state();
-        assert!(!state.established);
+        assert!(!state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(1));
 
         // Tuple in reply direction should set established to true and obviously
         // update last packet time.
         bindings_ctx.sleep(Duration::from_secs(1));
-        assert_matches!(connection.update(&bindings_ctx, &reply_tuple), Ok(()));
+        assert_matches!(connection.update(&bindings_ctx, &reply_packet), Ok(()));
         let state = connection.state();
-        assert!(state.established);
+        assert!(state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
 
         // Unrelated connection should return an error and otherwise not touch
         // anything.
         bindings_ctx.sleep(Duration::from_secs(100));
         assert_matches!(
-            connection.update(&bindings_ctx, &other_tuple),
+            connection.update(&bindings_ctx, &other_packet),
             Err(ConnectionUpdateError::NonMatchingTuple)
         );
-        assert!(state.established);
+        assert!(state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
     }
 
@@ -1006,13 +1124,13 @@ mod tests {
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
             dst_ip: I::DST_ADDR,
-            body: FakeTcpSegment { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
         };
 
         let reply_packet = FakeIpPacket::<I, _> {
             src_ip: I::DST_ADDR,
             dst_ip: I::SRC_ADDR,
-            body: FakeTcpSegment { src_port: I::DST_PORT, dst_port: I::SRC_PORT },
+            body: FakeUdpPacket { src_port: I::DST_PORT, dst_port: I::SRC_PORT },
         };
 
         let original_tuple = Tuple::from_packet(&packet).expect("packet should be valid");
@@ -1022,7 +1140,7 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid");
         let state = conn.state();
-        assert!(!state.established);
+        assert!(!state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(1));
 
         // Since the connection isn't present in the map, we should get a
@@ -1043,7 +1161,7 @@ mod tests {
         let conn = table.get_connection_for_packet_and_update(&bindings_ctx, &packet);
         let conn = assert_matches!(conn, Some(conn) => conn);
         let state = conn.state();
-        assert!(!state.established);
+        assert!(!state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
         let conn = assert_matches!(conn, Connection::Shared(conn) => conn);
 
@@ -1051,7 +1169,7 @@ mod tests {
         let reply_conn = table.get_connection_for_packet_and_update(&bindings_ctx, &reply_packet);
         let reply_conn = assert_matches!(reply_conn, Some(conn) => conn);
         let state = reply_conn.state();
-        assert!(state.established);
+        assert!(state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(3));
         let reply_conn = assert_matches!(reply_conn, Connection::Shared(conn) => conn);
 
@@ -1070,47 +1188,46 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::new();
         let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
 
-        let original_tuple = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
-            src_addr: I::SRC_ADDR,
-            dst_addr: I::DST_ADDR,
-            src_port_or_id: I::SRC_PORT,
-            dst_port_or_id: I::DST_PORT,
-        };
+        let original_packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        })
+        .unwrap();
 
-        let nated_original_tuple = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
-            src_addr: I::SRC_ADDR,
-            dst_addr: I::DST_ADDR,
-            src_port_or_id: I::SRC_PORT + 1,
-            dst_port_or_id: I::DST_PORT + 1,
-        };
+        let nated_original_packet = PacketMetadata::new(&FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT + 1, dst_port: I::DST_PORT + 1 },
+        })
+        .unwrap();
 
-        let nated_reply_tuple = Tuple::<I> {
-            protocol: I::Proto::from(IpProto::Tcp),
-            src_addr: I::DST_ADDR,
-            dst_addr: I::SRC_ADDR,
-            src_port_or_id: I::DST_PORT + 1,
-            dst_port_or_id: I::SRC_PORT + 1,
-        };
-
-        let conn1 = Connection::Exclusive(ConnectionExclusive::<_, _, ()>::from_tuple(
-            &bindings_ctx,
-            original_tuple.clone(),
-        ));
+        let conn1 = Connection::Exclusive(
+            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+                &bindings_ctx,
+                &original_packet,
+            )
+            .unwrap(),
+        );
 
         // Fake NAT that ends up allocating the same reply tuple as an existing
         // connection.
-        let mut conn2 =
-            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
-        conn2.inner.original_tuple = nated_original_tuple.clone();
+        let mut conn2 = ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+            &bindings_ctx,
+            &original_packet,
+        )
+        .unwrap();
+        conn2.inner.original_tuple = nated_original_packet.tuple.clone();
         let conn2 = Connection::Exclusive(conn2);
 
         // Fake NAT that ends up allocating the same original tuple as an
         // existing connection.
-        let mut conn3 =
-            ConnectionExclusive::<_, _, ()>::from_tuple(&bindings_ctx, original_tuple.clone());
-        conn3.inner.reply_tuple = nated_reply_tuple.clone();
+        let mut conn3 = ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+            &bindings_ctx,
+            &original_packet,
+        )
+        .unwrap();
+        conn3.inner.reply_tuple = nated_original_packet.tuple.clone().invert();
         let conn3 = Connection::Exclusive(conn3);
 
         assert_matches!(table.finalize_connection(&mut bindings_ctx, conn1), Ok(true));
@@ -1159,18 +1276,18 @@ mod tests {
         let first_packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
             dst_ip: I::DST_ADDR,
-            body: FakeTcpSegment { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
         };
 
         let second_packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
             dst_ip: I::DST_ADDR,
-            body: FakeTcpSegment { src_port: I::SRC_PORT + 1, dst_port: I::DST_PORT },
+            body: FakeUdpPacket { src_port: I::SRC_PORT + 1, dst_port: I::DST_PORT },
         };
         let second_packet_reply = FakeIpPacket::<I, _> {
             src_ip: I::DST_ADDR,
             dst_ip: I::SRC_ADDR,
-            body: FakeTcpSegment { src_port: I::DST_PORT, dst_port: I::SRC_PORT + 1 },
+            body: FakeUdpPacket { src_port: I::DST_PORT, dst_port: I::SRC_PORT + 1 },
         };
 
         let first_tuple = Tuple::from_packet(&first_packet).expect("packet should be valid");
@@ -1217,7 +1334,7 @@ mod tests {
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet_reply)
             .expect("packet should be valid");
-        assert!(conn.state().established);
+        assert!(conn.state().is_established());
         assert!(!core_ctx
             .conntrack()
             .finalize_connection(&mut bindings_ctx, conn)
@@ -1232,11 +1349,11 @@ mod tests {
         // Connection 1
         //   - Not established
         //   - Last packet seen at T=0
-        //   - Expires at T=CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED+GC_INTERVAL
+        //   - Expires at T=CONNECTION_EXPIRY_TIME_UDP + GC_INTERVAL
         // Connection 2:
         //   - Established
         //   - Last packet seen at T=GC_INTERVAL
-        //   - Expires at CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED + GC_INTERVAL
+        //   - Expires at CONNECTION_EXPIRY_TIME_UDP + 2*GC_INTERVAL
 
         // T=2*GC_INTERVAL: Triggering a GC does not clean up any connections.
         bindings_ctx.sleep(GC_INTERVAL);
@@ -1250,7 +1367,7 @@ mod tests {
         // Time advances to expiry for the first packet
         // (T=CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED + GC_INTERVAL) trigger gc and
         // note that the first connection was cleaned up
-        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED - GC_INTERVAL);
+        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_UDP - 2 * GC_INTERVAL);
         perform_gc(&mut core_ctx, &mut bindings_ctx, gc_trigger);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
@@ -1260,9 +1377,7 @@ mod tests {
 
         // Advance time past the expiry time for the second connection and see
         // that it is cleaned up.
-        bindings_ctx.sleep(
-            CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED - CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED,
-        );
+        bindings_ctx.sleep(GC_INTERVAL);
         perform_gc(&mut core_ctx, &mut bindings_ctx, gc_trigger);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple), false);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), false);
@@ -1273,7 +1388,7 @@ mod tests {
 
     fn make_packets<I: IpExt + TestIpExt>(
         index: usize,
-    ) -> (FakeIpPacket<I, FakeTcpSegment>, FakeIpPacket<I, FakeTcpSegment>) {
+    ) -> (FakeIpPacket<I, FakeUdpPacket>, FakeIpPacket<I, FakeUdpPacket>) {
         // This ensures that, no matter what size MAXIMUM_CONNECTIONS is
         // (under 2^32, at least), we'll always have unique src and dst
         // ports, and thus unique connections.
@@ -1284,12 +1399,12 @@ mod tests {
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
             dst_ip: I::DST_ADDR,
-            body: FakeTcpSegment { src_port: src, dst_port: dst },
+            body: FakeUdpPacket { src_port: src, dst_port: dst },
         };
         let reply_packet = FakeIpPacket::<I, _> {
             src_ip: I::DST_ADDR,
             dst_ip: I::SRC_ADDR,
-            body: FakeTcpSegment { src_port: dst, dst_port: src },
+            body: FakeUdpPacket { src_port: dst, dst_port: src },
         };
 
         (packet, reply_packet)
@@ -1390,7 +1505,7 @@ mod tests {
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid");
-        assert!(!conn.state().established);
+        assert!(!conn.state().is_established());
         assert!(table
             .finalize_connection(&mut bindings_ctx, conn)
             .expect("connection finalize should succeed"));
@@ -1407,14 +1522,14 @@ mod tests {
                 "connections": {
                     "0": {
                         "original_tuple": {
-                            "protocol": "TCP",
+                            "protocol": "UDP",
                             "src_addr": I::SRC_ADDR.to_string(),
                             "dst_addr": I::DST_ADDR.to_string(),
                             "src_port_or_id": 0u64,
                             "dst_port_or_id": 0u64,
                         },
                         "reply_tuple": {
-                            "protocol": "TCP",
+                            "protocol": "UDP",
                             "src_addr": I::DST_ADDR.to_string(),
                             "dst_addr": I::SRC_ADDR.to_string(),
                             "src_port_or_id": 0u64,
@@ -1496,7 +1611,7 @@ mod tests {
         let packet = FakeIpPacket::<I, _> {
             src_ip: I::SRC_ADDR,
             dst_ip: I::SRC_ADDR,
-            body: FakeTcpSegment { src_port: I::SRC_PORT, dst_port: I::SRC_PORT },
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::SRC_PORT },
         };
 
         let tuple = Tuple::from_packet(&packet).expect("packet should be valid");
@@ -1510,7 +1625,7 @@ mod tests {
         let state = conn.state();
         // Since we can't differentiate between the original and reply tuple,
         // the connection ends up being marked established immediately.
-        assert!(state.established);
+        assert!(state.is_established());
 
         assert_matches!(conn, Connection::Exclusive(_));
         assert!(!table.contains_tuple(&tuple));
@@ -1524,7 +1639,7 @@ mod tests {
         assert_eq!(table.inner.lock().table.len(), 1);
         assert_eq!(table.inner.lock().num_connections, 1);
 
-        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED);
+        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_UDP);
         table.perform_gc(&mut bindings_ctx);
 
         assert_eq!(table.inner.lock().table.len(), 0);
