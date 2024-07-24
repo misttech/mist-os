@@ -14,11 +14,6 @@
     ],
     offer: [
         {
-            service: "fuchsia.hardware.suspend.SuspendService",
-            from: "#fake-suspend",
-            to: "#system-activity-governor",
-        },
-        {
             protocol: "test.suspendcontrol.Device",
             from: "#fake-suspend",
             to: "#system-activity-governor",

@@ -47,6 +47,11 @@
             from: "parent",
             to: [ "#system-activity-governor" ],
         },
+        {
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "parent",
+            to: [ "#system-activity-governor" ],
+        },
     ],
     expose: [
         {
