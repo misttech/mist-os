@@ -38,7 +38,9 @@ fi
 
 # Call git directly, as Python is not available when Jiri hooks run on infra bots.
 # LINT.IfChange
+export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_OPTIONAL_LOCKS=0
+export GIT_CONFIG_NOSYSTEM=1
 git -C "${FUCHSIA_DIR}/integration" rev-parse HEAD > "${OUTPUT_DIR}/integration_commit_hash.txt"
 git -C "${FUCHSIA_DIR}/integration" log -n1 --date=unix --format=%cd > "${OUTPUT_DIR}/integration_commit_stamp.txt"
 # LINT.ThenChange(//build/info/BUILD.gn)
