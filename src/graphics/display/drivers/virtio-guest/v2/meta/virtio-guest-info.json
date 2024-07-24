@@ -1,9 +1,0 @@
-{
-    "short_description": "Virtio emulation GPU driver",
-    "manufacturer": "",
-    "families": [],
-    "models": [],
-    "areas": [
-        "Graphics"
-    ]
-}

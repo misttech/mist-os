@@ -21,7 +21,6 @@ group("pci") {
     "//src/graphics/display/drivers/simple:simple.bochs",
     "//src/graphics/display/drivers/simple:simple.intel",
     "//src/graphics/display/drivers/virtio-guest:virtio-gpu-component-v1",
-    "//src/graphics/display/drivers/virtio-guest:virtio-gpu-component-v2",
     "//src/graphics/drivers/misc/goldfish_address_space:address_space_driver",
     "//src/media/audio/drivers/intel-hda/controller:intel-hda",
     "//src/ui/input/drivers/virtio:virtio_input",

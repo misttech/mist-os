@@ -4,45 +4,19 @@
 
 import("//build/drivers.gni")
 
-declare_args() {
-  use_virtio_gpu_v2 = false
-}
-
 group("tests") {
   testonly = true
-  deps = [
-    "v1:tests",
-    "v2:tests",
-  ]
+  deps = [ "v1:tests" ]
 }
 
 fuchsia_driver_component("virtio-gpu-component-v1") {
-  if (use_virtio_gpu_v2) {
-    component_name = "virtio_gpu_v1_unused"
-  } else {
-    component_name = "virtio_gpu"
-  }
+  component_name = "virtio_gpu"
   info = "v1/meta/virtio-guest-info.json"
   manifest = "v1/meta/virtio-guest.cml"
   deps = [ "v1:driver" ]
 }
 
-fuchsia_driver_component("virtio-gpu-component-v2") {
-  if (use_virtio_gpu_v2) {
-    component_name = "virtio_gpu"
-  } else {
-    component_name = "virtio_gpu_v2_unused"
-  }
-  info = "v2/meta/virtio-guest-info.json"
-  manifest = "v2/meta/virtio-guest.cml"
-  deps = [ "v2:driver" ]
-}
-
 fuchsia_driver_package("package") {
   package_name = "virtio_gpu"
-  if (use_virtio_gpu_v2) {
-    driver_components = [ ":virtio-gpu-component-v2" ]
-  } else {
-    driver_components = [ ":virtio-gpu-component-v1" ]
-  }
+  driver_components = [ ":virtio-gpu-component-v1" ]
 }
