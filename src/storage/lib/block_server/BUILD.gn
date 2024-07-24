@@ -5,9 +5,11 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_staticlib.gni")
+import("//build/test.gni")
 
 block_server_sources = [
   "src/async_interface.rs",
+  "src/c_interface.rs",
   "src/lib.rs",
 ]
 
@@ -16,6 +18,7 @@ block_server_deps = [
   "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_rust",
   "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
   "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+  "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-async",
   "//src/lib/zircon/rust:fuchsia-zircon",
   "//src/storage/lib/block_protocol",
@@ -28,17 +31,50 @@ rustc_library("block_server") {
   edition = "2021"
   sources = block_server_sources
   deps = block_server_deps
-  test_deps = [
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 }
 
 fuchsia_unittest_package("block_server_tests") {
   deps = [ ":block_server_test" ]
 }
 
+rustc_staticlib("block_server_c") {
+  visibility = [ ":*" ]
+  edition = "2021"
+  public = [ "block_server.h" ]
+  sources = block_server_sources
+  deps = block_server_deps
+}
+
+source_set("block_server_cc") {
+  sources = [ "block_server.cc" ]
+  public = [ "block_server.h" ]
+  public_deps = [
+    ":block_server_c",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+test("block_server_cc_tests") {
+  sources = [ "block_server_cc_tests.cc" ]
+  deps = [
+    ":block_server_cc",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/storage/lib/block_client/cpp",
+    "//zircon/system/ulib/storage/buffer",
+  ]
+}
+
+fuchsia_unittest_package("block_server_cc_tests_package") {
+  package_name = "block-server-cc-tests"
+  deps = [ ":block_server_cc_tests" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":block_server_tests" ]
+  deps = [
+    ":block_server_cc_tests_package",
+    ":block_server_tests",
+  ]
 }
