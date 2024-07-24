@@ -146,19 +146,19 @@ impl vfs::directory::entry_container::Directory for Validation {
         object_request.shutdown(zx::Status::NOT_FOUND);
     }
 
-    fn open2(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: VfsPath,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
         if path.is_empty() {
-            if protocols.creation_mode() != vfs::CreationMode::Never {
+            if flags.creation_mode() != vfs::CreationMode::Never {
                 return Err(zx::Status::NOT_SUPPORTED);
             }
 
-            if let Some(rights) = protocols.rights() {
+            if let Some(rights) = flags.rights() {
                 if rights.intersects(fio::Operations::WRITE_BYTES)
                     | rights.intersects(fio::Operations::EXECUTE)
                 {
@@ -166,12 +166,11 @@ impl vfs::directory::entry_container::Directory for Validation {
                 }
             }
 
-            // Note that `ImmutableConnection::create` will check that protocols contain
-            // directory-only protocols.
+            // `ImmutableConnection::create` checks that only directory flags are specified.
             return object_request.spawn_connection(
                 scope,
                 self,
-                protocols,
+                flags,
                 ImmutableConnection::create,
             );
         }
@@ -184,7 +183,7 @@ impl vfs::directory::entry_container::Directory for Validation {
                     vfs::file::serve(
                         vfs::file::vmo::read_only(missing_contents),
                         scope,
-                        &protocols,
+                        &flags,
                         object_request,
                     )
                 });
@@ -234,6 +233,7 @@ mod tests {
     use vfs::directory::entry::GetEntryInfo;
     use vfs::directory::entry_container::Directory;
     use vfs::node::Node;
+    use vfs::ObjectRequest;
 
     struct TestEnv {
         _blobfs: BlobfsRamdisk,
@@ -564,17 +564,12 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_self() {
+    async fn directory_entry_open3_self() {
         let (_env, validation) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            ..Default::default()
-        });
-        protocols
-            .to_object_request(server_end)
-            .handle(|req| validation.open2(ExecutionScope::new(), VfsPath::dot(), protocols, req));
+        let flags = fio::Flags::PERM_READ;
+        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            .handle(|req| validation.open3(ExecutionScope::new(), VfsPath::dot(), flags, req));
 
         assert_eq!(
             fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
@@ -586,82 +581,66 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_rejects_forbidden_open_modes() {
+    async fn directory_entry_open3_rejects_invalid_flags() {
         let (_env, validation) = TestEnv::new().await;
 
-        for forbidden_open_mode in [vfs::CreationMode::Always, vfs::CreationMode::AllowExisting] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            let scope = ExecutionScope::new();
-            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                mode: Some(forbidden_open_mode.into()),
-                rights: Some(fio::Operations::READ_BYTES),
-                ..Default::default()
-            });
-            protocols
-                .to_object_request(server_end)
-                .handle(|req| validation.clone().open2(scope, VfsPath::dot(), protocols, req));
-            assert_matches!(
-                proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
-            );
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_rejects_forbidden_rights() {
-        let (_env, validation) = TestEnv::new().await;
-
-        for forbidden_rights in [fio::Operations::WRITE_BYTES, fio::Operations::EXECUTE] {
-            let (proxy, server_end) =
-                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            let scope = ExecutionScope::new();
-            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                rights: Some(forbidden_rights),
-                ..Default::default()
-            });
-            protocols
-                .to_object_request(server_end)
-                .handle(|req| validation.clone().open2(scope, VfsPath::dot(), protocols, req));
-            assert_matches!(
-                proxy.take_event_stream().try_next().await,
-                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
-            );
-        }
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_rejects_file_protocols() {
-        let (_env, validation) = TestEnv::new().await;
-
-        for file_protocols in [
-            fio::FileProtocolFlags::default(),
-            fio::FileProtocolFlags::APPEND,
-            fio::FileProtocolFlags::TRUNCATE,
+        for invalid_flags in [
+            fio::Flags::FLAG_MUST_CREATE,
+            fio::Flags::FLAG_MAYBE_CREATE,
+            fio::Flags::PERM_WRITE,
+            fio::Flags::PERM_EXECUTE,
         ] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             let scope = ExecutionScope::new();
-            let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                rights: Some(fio::Operations::READ_BYTES),
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(file_protocols),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            });
-            protocols
-                .to_object_request(server_end)
-                .handle(|req| validation.clone().open2(scope, VfsPath::dot(), protocols, req));
+            let flags = fio::Flags::PERM_READ | invalid_flags;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+                .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
+
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+            );
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn directory_entry_open3_rejects_file_flags() {
+        let (_env, validation) = TestEnv::new().await;
+
+        // Requesting to open with `PROTOCOL_FILE` should return a `NOT_FILE` error.
+        {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let flags = fio::Flags::PROTOCOL_FILE;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+                .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
+
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
             );
         }
+
+        // Opening with file flags is also invalid.
+        for file_flags in [fio::Flags::FILE_APPEND, fio::Flags::FILE_TRUNCATE] {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
+            let flags = fio::Flags::PERM_READ | file_flags;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+                .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
+
+            assert_matches!(
+                proxy.take_event_stream().try_next().await,
+                Err(fidl::Error::ClientChannelClosed { status: zx::Status::INVALID_ARGS, .. })
+            );
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_entry_open2_missing() {
+    async fn directory_entry_open3_missing() {
         let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
             HashSet::from([[0; 32].into()]),
             std::iter::empty(),
@@ -669,15 +648,12 @@ mod tests {
         .await;
 
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            ..Default::default()
-        });
-        protocols.to_object_request(server_end).handle(|req| {
-            validation.clone().open2(
+        let flags = fio::Flags::PERM_READ;
+        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|req| {
+            validation.clone().open3(
                 ExecutionScope::new(),
                 VfsPath::validate_and_split("missing").unwrap(),
-                protocols,
+                flags,
                 req,
             )
         });
