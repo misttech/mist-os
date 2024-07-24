@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_ENGINE_INTERFACE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_ENGINE_INTERFACE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_ENGINE_INTERFACE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_ENGINE_INTERFACE_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 // TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
@@ -84,4 +84,4 @@ class DisplayEngineInterface {
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_ENGINE_INTERFACE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_ENGINE_INTERFACE_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_CONTROLLER_BANJO_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_CONTROLLER_BANJO_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_CONTROLLER_BANJO_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_CONTROLLER_BANJO_H_
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/stdcompat/span.h>
@@ -12,8 +12,8 @@
 
 #include <cstdint>
 
-#include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-banjo.h"
-#include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
+#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-guest/display-engine.h"
 
 namespace virtio_display {
 
@@ -75,4 +75,4 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_CONTROLLER_BANJO_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_CONTROLLER_BANJO_H_

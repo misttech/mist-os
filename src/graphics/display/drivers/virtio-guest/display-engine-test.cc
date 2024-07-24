@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/v1/display-engine.h"
+#include "src/graphics/display/drivers/virtio-guest/display-engine.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
@@ -24,9 +24,9 @@
 
 #include <virtio/virtio.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v1/display-controller-banjo.h"
-#include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-banjo.h"
-#include "src/graphics/display/drivers/virtio-guest/v1/virtio-pci-device.h"
+#include "src/graphics/display/drivers/virtio-guest/display-controller-banjo.h"
+#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-banjo.h"
+#include "src/graphics/display/drivers/virtio-guest/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"

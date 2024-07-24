@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/stdcompat/span.h>
@@ -12,7 +12,7 @@
 #include <ddktl/device.h>
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v1/display-coordinator-events-interface.h"
+#include "src/graphics/display/drivers/virtio-guest/display-coordinator-events-interface.h"
 
 namespace virtio_display {
 
@@ -47,4 +47,4 @@ class DisplayCoordinatorEventsBanjo final : public DisplayCoordinatorEventsInter
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_DISPLAY_COORDINATOR_EVENTS_BANJO_H_
