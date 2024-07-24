@@ -7,8 +7,8 @@
 
 #include <lib/ddk/io-buffer.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/scsi/block-device-dfv1.h>
 #include <lib/scsi/controller-dfv1.h>
-#include <lib/scsi/disk-dfv1.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
@@ -55,12 +55,13 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   // scsi::Controller overrides
   size_t BlockOpSize() override {
     // No additional metadata required for each command transaction.
-    return sizeof(scsi::DiskOp);
+    return sizeof(scsi::DeviceOp);
   }
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) override;
+                           uint32_t block_size_bytes, scsi::DeviceOp* device_op,
+                           iovec data) override;
 
   const char* tag() const override { return "virtio-scsi"; }
 

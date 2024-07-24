@@ -56,11 +56,11 @@ TEST_F(InitTest, LogicalUnitBlockInfo) {
   ASSERT_NO_FATAL_FAILURE(StartDriver());
 
   const auto& block_devs = dut_->block_devs();
-  scsi::Disk* disk = block_devs.at(0).at(0).get();
+  scsi::BlockDevice* block_device = block_devs.at(0).at(0).get();
 
   block_info_t info;
   uint64_t op_size;
-  disk->BlockImplQuery(&info, &op_size);
+  block_device->BlockImplQuery(&info, &op_size);
 
   ASSERT_EQ(info.block_size, kMockBlockSize);
   ASSERT_EQ(info.block_count, kMockTotalDeviceCapacity / kMockBlockSize);

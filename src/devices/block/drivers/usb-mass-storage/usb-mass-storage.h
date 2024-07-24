@@ -11,8 +11,8 @@
 #include <inttypes.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/scsi/block-device.h>
 #include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
 #include <lib/sync/completion.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/assert.h>
@@ -43,7 +43,7 @@ class WaiterInterface : public fbl::RefCounted<WaiterInterface> {
 
 // struct representing a block device for a logical unit
 struct Transaction {
-  scsi::DiskOp disk_op;
+  scsi::DeviceOp device_op;
 
   // UsbMassStorageDevice::ExecuteCommandAsync() checks that the incoming CDB's size does not exceed
   // this buffer's.
@@ -87,13 +87,14 @@ class UsbMassStorageDevice : public fdf::DriverBase, public scsi::Controller {
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) override;
+                           uint32_t block_size_bytes, scsi::DeviceOp* device_op,
+                           iovec data) override;
 
   // Performs the object initialization.
   zx_status_t Init();
 
   // Visible for testing.
-  const std::vector<std::unique_ptr<scsi::Disk>>& block_devs() const { return block_devs_; }
+  const std::vector<std::unique_ptr<scsi::BlockDevice>>& block_devs() const { return block_devs_; }
   void set_waiter(fbl::RefPtr<WaiterInterface> waiter) { waiter_ = std::move(waiter); }
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbMassStorageDevice);
@@ -183,7 +184,7 @@ class UsbMassStorageDevice : public fdf::DriverBase, public scsi::Controller {
   fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 
-  std::vector<std::unique_ptr<scsi::Disk>> block_devs_;
+  std::vector<std::unique_ptr<scsi::BlockDevice>> block_devs_;
 };
 
 }  // namespace ums

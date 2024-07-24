@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_DFV1_H_
-#define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_DFV1_H_
+#ifndef SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_BLOCK_DEVICE_DFV1_H_
+#define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_BLOCK_DEVICE_DFV1_H_
 
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
@@ -19,7 +19,7 @@
 
 namespace scsi {
 
-struct DiskOp {
+struct DeviceOp {
   void Complete(zx_status_t status) { completion_cb(cookie, status, &op); }
 
   block_op_t op;
@@ -27,54 +27,57 @@ struct DiskOp {
   void* cookie;
 };
 
-struct DiskOptions {
-  static DiskOptions Default() {
-    return DiskOptions(/*check_unmap_support=*/false, /*use_mode_sense_6*/ true,
-                       /*use_read_write_12*/ false);
+struct DeviceOptions {
+  static DeviceOptions Default() {
+    return DeviceOptions(/*check_unmap_support=*/false, /*use_mode_sense_6*/ true,
+                         /*use_read_write_12*/ false);
   }
 
-  explicit DiskOptions(bool check_unmap_support, bool use_mode_sense_6, bool use_read_write_12)
+  explicit DeviceOptions(bool check_unmap_support, bool use_mode_sense_6, bool use_read_write_12)
       : check_unmap_support(check_unmap_support),
         use_mode_sense_6(use_mode_sense_6),
         use_read_write_12(use_read_write_12) {}
-  DiskOptions() = delete;
+  DeviceOptions() = delete;
 
   bool check_unmap_support;
   bool use_mode_sense_6;
   bool use_read_write_12;
 };
 
-class Disk;
-using DeviceType = ddk::Device<Disk>;
+class BlockDevice;
+using DeviceType = ddk::Device<BlockDevice>;
 
-// |Disk| represents a single SCSI direct access block device.
-// |Disk| bridges between the Zircon block protocol and SCSI commands/responses.
-class Disk : public DeviceType,
-             public ddk::BlockImplProtocol<Disk, ddk::base_protocol>,
-             public fbl::RefCounted<Disk> {
+// |BlockDevice| represents a single SCSI direct access block device.
+// |BlockDevice| bridges between the Zircon block protocol and SCSI commands/responses.
+class BlockDevice : public DeviceType,
+                    public ddk::BlockImplProtocol<BlockDevice, ddk::base_protocol>,
+                    public fbl::RefCounted<BlockDevice> {
  public:
   // Public so that we can use make_unique.
-  // Clients should use Disk::Bind().
-  Disk(zx_device_t* parent, Controller* controller, uint8_t target, uint16_t lun,
-       DiskOptions disk_options)
+  // Clients should use BlockDevice::Bind().
+  BlockDevice(zx_device_t* parent, Controller* controller, uint8_t target, uint16_t lun,
+              DeviceOptions device_options)
       : DeviceType(parent),
         controller_(controller),
         target_(target),
         lun_(lun),
-        disk_options_(disk_options) {}
+        device_options_(device_options) {}
 
-  // Create a Disk at a specific target/lun.
-  // |controller| is a pointer to the scsi::Controller this disk is attached to.
-  // |controller| must outlast Disk.
-  // This disk does not take ownership of or any references on |controller|.
+  // Create a BlockDevice at a specific target/lun.
+  // |controller| is a pointer to the scsi::Controller this block device is attached to.
+  // |controller| must outlast BlockDevice.
+  // This block device does not take ownership of or any references on |controller|.
   // A |max_transfer_bytes| value of fuchsia_hardware_block::wire::kMaxTransferUnbounded implies
   // there is no limit on the transfer size.
-  // Returns a Disk* to allow for removal of removable media disks.
-  static zx::result<fbl::RefPtr<Disk>> Bind(zx_device_t* parent, Controller* controller,
-                                            uint8_t target, uint16_t lun,
-                                            uint32_t max_transfer_bytes, DiskOptions disk_options);
+  // Returns a BlockDevice* to allow for removal of removable media disks.
+  static zx::result<fbl::RefPtr<BlockDevice>> Bind(zx_device_t* parent, Controller* controller,
+                                                   uint8_t target, uint16_t lun,
+                                                   uint32_t max_transfer_bytes,
+                                                   DeviceOptions device_options);
 
-  fbl::String DiskName() const { return fbl::StringPrintf("scsi-disk-%u-%u", target_, lun_); }
+  fbl::String DeviceName() const {
+    return fbl::StringPrintf("scsi-block-device-%u-%u", target_, lun_);
+  }
 
   // DeviceType functions.
   void DdkRelease();
@@ -94,14 +97,14 @@ class Disk : public DeviceType,
   uint32_t block_size_bytes() const { return block_size_bytes_; }
   uint32_t max_transfer_bytes() const { return max_transfer_bytes_; }
 
-  Disk(const Disk&) = delete;
-  Disk& operator=(const Disk&) = delete;
+  BlockDevice(const BlockDevice&) = delete;
+  BlockDevice& operator=(const BlockDevice&) = delete;
 
   // for test
-  DiskOptions& GetDiskOptions() { return disk_options_; }
+  DeviceOptions& GetDeviceOptions() { return device_options_; }
 
  private:
-  zx_status_t AddDisk(uint32_t max_transfer_bytes);
+  zx_status_t AddDevice(uint32_t max_transfer_bytes);
 
   Controller* const controller_;
   const uint8_t target_;
@@ -119,9 +122,9 @@ class Disk : public DeviceType,
   uint64_t block_count_;
   uint32_t block_size_bytes_;
 
-  DiskOptions disk_options_;
+  DeviceOptions device_options_;
 };
 
 }  // namespace scsi
 
-#endif  // SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_DISK_DFV1_H_
+#endif  // SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_BLOCK_DEVICE_DFV1_H_

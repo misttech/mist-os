@@ -13,7 +13,7 @@ The USB mass storage driver is used to communicate with mass storage devices
 such as flash drives, external hard drives, and other types of removable media
 connected through USB. The USB mass storage driver is split into two parts.
 
-* [SCSI block device](/src/devices/block/lib/scsi/disk.cc)
+* [SCSI block device](/src/devices/block/lib/scsi/block-device.cc)
 Uses the [block](/sdk/fidl/fuchsia.hardware.block.driver/block.fidl) protocol.
 * [Core](/src/devices/block/drivers/usb-mass-storage/usb-mass-storage.cc) device
 Interfaces with the USB stack.

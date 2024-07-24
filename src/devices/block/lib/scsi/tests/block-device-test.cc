@@ -4,8 +4,8 @@
 
 #include <endian.h>
 #include <lib/fit/function.h>
+#include <lib/scsi/block-device-dfv1.h>
 #include <lib/scsi/controller-dfv1.h>
-#include <lib/scsi/disk-dfv1.h>
 #include <sys/types.h>
 #include <zircon/listnode.h>
 
@@ -61,27 +61,27 @@ class ControllerForTest : public Controller {
 
   size_t BlockOpSize() override {
     // No additional metadata required for each command transaction.
-    return sizeof(DiskOp);
+    return sizeof(DeviceOp);
   }
 
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, DiskOp* disk_op, iovec data) override {
+                           uint32_t block_size_bytes, DeviceOp* device_op, iovec data) override {
     // In the caller, enqueue the request for the worker thread,
     // poke the worker thread and return. The worker thread, on
     // waking up, will do the actual IO and call the callback.
     auto* io = reinterpret_cast<struct queued_io*>(new queued_io);
     io->target = target;
     io->lun = lun;
-    // The cdb is allocated on the stack in the scsi::Disk's BlockImplQueue.
+    // The cdb is allocated on the stack in the scsi::BlockDevice's BlockImplQueue.
     // So make a copy of that locally, and point to that instead
     memcpy(reinterpret_cast<void*>(&io->cdbptr), cdb.iov_base, cdb.iov_len);
     io->cdb.iov_base = &io->cdbptr;
     io->cdb.iov_len = cdb.iov_len;
     io->is_write = is_write;
-    io->data_vmo = zx::unowned_vmo(disk_op->op.rw.vmo);
-    io->vmo_offset_bytes = disk_op->op.rw.offset_vmo * block_size_bytes;
-    io->transfer_bytes = disk_op->op.rw.length * block_size_bytes;
-    io->disk_op = disk_op;
+    io->data_vmo = zx::unowned_vmo(device_op->op.rw.vmo);
+    io->vmo_offset_bytes = device_op->op.rw.offset_vmo * block_size_bytes;
+    io->transfer_bytes = device_op->op.rw.length * block_size_bytes;
+    io->device_op = device_op;
     fbl::AutoLock lock(&lock_);
     list_add_tail(&queued_ios_, &io->node);
     cv_.Signal();
@@ -134,7 +134,7 @@ class ControllerForTest : public Controller {
             status = zx_vmo_read(io->data_vmo->get(), temp_buffer.get(), io->vmo_offset_bytes,
                                  io->transfer_bytes);
             if (status != ZX_OK) {
-              io->disk_op->Complete(status);
+              io->device_op->Complete(status);
               delete io;
               continue;
             }
@@ -150,7 +150,7 @@ class ControllerForTest : public Controller {
                                 io->transfer_bytes);
         }
 
-        io->disk_op->Complete(status);
+        io->device_op->Complete(status);
         delete io;
       }
       cv_.Wait(&lock_);
@@ -172,7 +172,7 @@ class ControllerForTest : public Controller {
     zx::unowned_vmo data_vmo;
     zx_off_t vmo_offset_bytes;
     size_t transfer_bytes;
-    DiskOp* disk_op;
+    DeviceOp* device_op;
   };
 
   // These are the state for testing Async IOs.
@@ -185,7 +185,7 @@ class ControllerForTest : public Controller {
   list_node_t queued_ios_ __TA_GUARDED(lock_);
 };
 
-class DiskTest : public zxtest::Test {
+class BlockDeviceTest : public zxtest::Test {
  public:
   static constexpr uint8_t kTarget = 5;
   static constexpr uint16_t kLun = 1;
@@ -369,38 +369,39 @@ class DiskTest : public zxtest::Test {
   int default_seq_ = 0;
 };
 
-// Test that we can create a disk when the underlying controller successfully executes CDBs.
-TEST_F(DiskTest, TestCreateDestroy) {
+// Test that we can create a block device when the underlying controller successfully executes CDBs.
+TEST_F(BlockDeviceTest, TestCreateDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
-                                   /*use_read_write_12*/ true)));
+  ASSERT_OK(BlockDevice::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
+                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
+                                            /*use_read_write_12*/ true)));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
-// Test that we can create a disk when the underlying controller successfully executes CDBs.
-TEST_F(DiskTest, TestCreateDestroyWithModeSense10) {
+// Test that we can create a block device when the underlying controller successfully executes CDBs.
+TEST_F(BlockDeviceTest, TestCreateDestroyWithModeSense10) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false,
-                                   /*use_read_write_12*/ true)));
+  ASSERT_OK(
+      BlockDevice::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
+                        DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false,
+                                      /*use_read_write_12*/ true)));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
-// Test creating a disk and executing read commands.
-TEST_F(DiskTest, TestCreateReadDestroy) {
+// Test creating a block device and executing read commands.
+TEST_F(BlockDeviceTest, TestCreateReadDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
-                                   /*use_read_write_12*/ true)));
+  ASSERT_OK(BlockDevice::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
+                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
+                                            /*use_read_write_12*/ true)));
   ASSERT_EQ(1, fake_parent->child_count());
-  auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<Disk>();
+  auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<BlockDevice>();
   block_info_t info;
   size_t op_size;
   dev->BlockImplQuery(&info, &op_size);
 
-  // To test SCSI Read functionality, create a fake "disk" backing store in memory and service
-  // reads from it. Fill block 1 with a test pattern of 0x01.
+  // To test SCSI Read functionality, create a fake "block device" backing store in memory and
+  // service reads from it. Fill block 1 with a test pattern of 0x01.
   std::map<uint64_t, DiskBlock> blocks;
   DiskBlock& test_block_1 = blocks[1];
   memset(test_block_1, 0x01, sizeof(DiskBlock));
@@ -445,7 +446,7 @@ TEST_F(DiskTest, TestCreateReadDestroy) {
   controller_.AsyncIoInit();
   {
     fbl::AutoLock lock(&iowait_.lock_);
-    auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<Disk>();
+    auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<BlockDevice>();
     dev->BlockImplQueue(&read, done, &iowait_);  // NOTE: Assumes asynchronous controller
     iowait_.cv_.Wait(&iowait_.lock_);
   }

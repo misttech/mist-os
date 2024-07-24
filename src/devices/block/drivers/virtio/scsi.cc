@@ -7,8 +7,8 @@
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
+#include <lib/scsi/block-device-dfv1.h>
 #include <lib/scsi/controller-dfv1.h>
-#include <lib/scsi/disk-dfv1.h>
 #include <netinet/in.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -163,9 +163,9 @@ zx_status_t ScsiDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec c
   return cookie.status;
 }
 
-static void DiskOpCompletionCb(void* cookie, zx_status_t status) {
-  auto disk_op = static_cast<scsi::DiskOp*>(cookie);
-  disk_op->Complete(status);
+static void DeviceOpCompletionCb(void* cookie, zx_status_t status) {
+  auto device_op = static_cast<scsi::DeviceOp*>(cookie);
+  device_op->Complete(status);
 }
 
 zx::result<> ScsiDevice::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t size) {
@@ -183,13 +183,14 @@ zx::result<> ScsiDevice::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, siz
 }
 
 void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                                     uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) {
+                                     uint32_t block_size_bytes, scsi::DeviceOp* device_op,
+                                     iovec data) {
   zx_handle_t data_vmo;
   zx_off_t vmo_offset_bytes;
   size_t transfer_bytes;
   std::optional<zx::vmo> trim_data_vmo;
 
-  if (disk_op->op.command.opcode == BLOCK_OPCODE_TRIM) {
+  if (device_op->op.command.opcode == BLOCK_OPCODE_TRIM) {
     zx::vmo vmo;
     trim_data_vmo = std::move(vmo);
     fzl::VmoMapper mapper;
@@ -204,7 +205,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
     vmo_offset_bytes = 0;
     transfer_bytes = data.iov_len;
   } else {
-    const block_read_write_t& rw = disk_op->op.rw;
+    const block_read_write_t& rw = device_op->op.rw;
     data_vmo = rw.vmo;
     vmo_offset_bytes = rw.offset_vmo * block_size_bytes;
     transfer_bytes = rw.length * block_size_bytes;
@@ -225,7 +226,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
       status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, data_vmo,
                            vmo_offset_bytes, transfer_bytes, &mapped_addr);
       if (status != ZX_OK) {
-        disk_op->Complete(status);
+        device_op->Complete(status);
         return;
       }
       rw_data = reinterpret_cast<void*>(mapped_addr);
@@ -236,7 +237,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
         status = zx_vmo_read(data_vmo, rw_data, vmo_offset_bytes, transfer_bytes);
         if (status != ZX_OK) {
           free(rw_data);
-          disk_op->Complete(status);
+          device_op->Complete(status);
           return;
         }
       }
@@ -244,7 +245,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
   }
 
   return QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo), vmo_offset_bytes,
-                      transfer_bytes, DiskOpCompletionCb, static_cast<void*>(disk_op), rw_data,
+                      transfer_bytes, DeviceOpCompletionCb, static_cast<void*>(device_op), rw_data,
                       vmar_mapped, std::move(trim_data_vmo));
 }
 
@@ -399,8 +400,8 @@ zx_status_t ScsiDevice::WorkerThread() {
     max_sectors = std::min(config_.max_sectors, SCSI_MAX_XFER_SECTORS);
   }
 
-  scsi::DiskOptions options(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
-                            /*use_read_write_12=*/false);
+  scsi::DeviceOptions options(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
+                              /*use_read_write_12=*/false);
 
   // virtio-scsi nominally supports multiple channels, but the device support is not
   // complete. The device encoding for targets in commands does not allow encoding the

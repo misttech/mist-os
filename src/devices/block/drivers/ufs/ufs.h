@@ -11,7 +11,7 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/scsi/disk.h>
+#include <lib/scsi/block-device.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
@@ -62,7 +62,7 @@ enum NotifyEvent {
 };
 
 struct IoCommand {
-  scsi::DiskOp disk_op;
+  scsi::DeviceOp device_op;
 
   // Ufs::ExecuteCommandAsync() checks that the incoming CDB's size does not exceed
   // this buffer's.
@@ -106,7 +106,8 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::DiskOp *disk_op, iovec data) override;
+                           uint32_t block_size_bytes, scsi::DeviceOp *device_op,
+                           iovec data) override;
 
   const fdf::MmioBuffer &GetMmio() const {
     ZX_ASSERT(mmio_.has_value());

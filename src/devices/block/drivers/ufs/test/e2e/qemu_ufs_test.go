@@ -52,7 +52,7 @@ func TestQemuWithUFSDisk(t *testing.T) {
 
 	// Check that the ufs disk is listed by fuchsia.
 	emu.RunCommand("lsblk")
-	emu.WaitForLogMessage("/00:02.0/00_02_0/ufs/scsi-disk-0-0/block")
+	emu.WaitForLogMessage("/00:02.0/00_02_0/ufs/scsi-block-device-0-0/block")
 }
 
 func TestQemuWithUFSDiskAndRunBlktest(t *testing.T) {
@@ -108,11 +108,11 @@ func TestQemuWithUFSDiskAndRunBlktest(t *testing.T) {
 
 	// Check that the emulated disk is there.
 	emu.RunCommand("lsblk")
-	emu.WaitForLogMessage("/00:02.0/00_02_0/ufs/scsi-disk-0-0/block")
+	emu.WaitForLogMessage("/00:02.0/00_02_0/ufs/scsi-block-device-0-0/block")
 	emu.RunCommand("lsblk")
-	emu.WaitForLogMessage("/00:03.0/00_03_0/ufs/scsi-disk-0-0/block")
+	emu.WaitForLogMessage("/00:03.0/00_03_0/ufs/scsi-block-device-0-0/block")
 
 	// Run blktest
-	emu.RunCommand("blktest -d /dev/sys/platform/pt/PCI0/bus/00:03.0/00_03_0/ufs/scsi-disk-0-0/block")
+	emu.RunCommand("blktest -d /dev/sys/platform/pt/PCI0/bus/00:03.0/00_03_0/ufs/scsi-block-device-0-0/block")
 	emu.WaitForLogMessage("[  PASSED  ]")
 }

@@ -17,12 +17,12 @@ class BlockOpTest : public UfsTest {
     }
 
     const auto& block_devs = dut_->block_devs();
-    disk_ = block_devs.at(0).at(0).get();
-    disk_->BlockImplQuery(&info_, &op_size_);
+    block_device_ = block_devs.at(0).at(0).get();
+    block_device_->BlockImplQuery(&info_, &op_size_);
   }
 
  protected:
-  scsi::Disk* disk_;
+  scsi::BlockDevice* block_device_;
   block_info_t info_;
   uint64_t op_size_;
 };
@@ -63,7 +63,7 @@ TEST_F(BlockOpTest, ReadTest) {
               .offset_vmo = 0,
           },
   };
-  disk_->BlockImplQueue(op, callback, &done);
+  block_device_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   zx_vaddr_t vaddr;
@@ -107,7 +107,7 @@ TEST_F(BlockOpTest, WriteTest) {
               .offset_vmo = 0,
           },
   };
-  disk_->BlockImplQueue(op, callback, &done);
+  block_device_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   char buf[ufs_mock_device::kMockBlockSize];
@@ -151,7 +151,7 @@ TEST_F(BlockOpTest, FuaWriteTest) {
               .offset_vmo = 0,
           },
   };
-  disk_->BlockImplQueue(op, callback, &done);
+  block_device_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   // Check that the FUA bit is set.
@@ -179,7 +179,7 @@ TEST_F(BlockOpTest, FlushTest) {
   auto block_op = std::make_unique<uint8_t[]>(op_size_);
   auto op = reinterpret_cast<block_op_t*>(block_op.get());
   op->rw.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
-  disk_->BlockImplQueue(op, callback, &done);
+  block_device_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   // Check that the FLUSH operation is correctly converted to a SYNCHRONIZE CACHE 10 command.
@@ -223,7 +223,7 @@ TEST_F(BlockOpTest, TrimTest) {
               .offset_vmo = 0,
           },
   };
-  disk_->BlockImplQueue(op, callback, &done);
+  block_device_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -245,7 +245,7 @@ TEST_F(BlockOpTest, TrimTest) {
               .offset_dev = 0,
           },
   };
-  disk_->BlockImplQueue(trim_op, callback, &done);
+  block_device_->BlockImplQueue(trim_op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -291,7 +291,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_vmo = 0,
           },
   };
-  disk_->BlockImplQueue(op, callback, &done);
+  block_device_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -308,7 +308,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = 0,
           },
   };
-  disk_->BlockImplQueue(op, exception_callback, &done);
+  block_device_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -325,7 +325,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = 0,
           },
   };
-  disk_->BlockImplQueue(op, exception_callback, &done);
+  block_device_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -342,7 +342,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = static_cast<uint32_t>(info_.block_count),
           },
   };
-  disk_->BlockImplQueue(op, exception_callback, &done);
+  block_device_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -360,7 +360,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = static_cast<uint32_t>(info_.block_count) - 1,
           },
   };
-  disk_->BlockImplQueue(op, exception_callback, &done);
+  block_device_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 }
@@ -405,7 +405,7 @@ TEST_F(BlockOpTest, TransferSizeTest) {
                 .offset_vmo = 0,
             },
     };
-    disk_->BlockImplQueue(op, callback, &done);
+    block_device_->BlockImplQueue(op, callback, &done);
     sync_completion_wait(&done, ZX_TIME_INFINITE);
     sync_completion_reset(&done);
 
@@ -461,7 +461,7 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
                   .offset_vmo = i,
               },
       };
-      disk_->BlockImplQueue(op, callback, &done[i]);
+      block_device_->BlockImplQueue(op, callback, &done[i]);
     }
 
     // Wait until the slot is used up to the desired queue depth.

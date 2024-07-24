@@ -118,14 +118,14 @@ void Ufs::ProcessIoSubmissions() {
     DataDirection data_direction = DataDirection::kNone;
     if (io_cmd->is_write) {
       data_direction = DataDirection::kHostToDevice;
-    } else if (io_cmd->disk_op.op.command.opcode == BLOCK_OPCODE_READ) {
+    } else if (io_cmd->device_op.op.command.opcode == BLOCK_OPCODE_READ) {
       data_direction = DataDirection::kDeviceToHost;
     }
 
     std::optional<zx::unowned_vmo> vmo_optional = std::nullopt;
     uint32_t transfer_bytes = 0;
     if (data_direction != DataDirection::kNone) {
-      if (io_cmd->disk_op.op.command.opcode == BLOCK_OPCODE_TRIM) {
+      if (io_cmd->device_op.op.command.opcode == BLOCK_OPCODE_TRIM) {
         // For the UNMAP command, a data buffer is required for the parameter list.
         zx::vmo data_vmo;
         fzl::VmoMapper mapper;
@@ -141,9 +141,9 @@ void Ufs::ProcessIoSubmissions() {
 
         transfer_bytes = io_cmd->data_length;
       } else {
-        vmo_optional = zx::unowned_vmo(io_cmd->disk_op.op.rw.vmo);
+        vmo_optional = zx::unowned_vmo(io_cmd->device_op.op.rw.vmo);
 
-        transfer_bytes = io_cmd->disk_op.op.rw.length * io_cmd->block_size_bytes;
+        transfer_bytes = io_cmd->device_op.op.rw.length * io_cmd->block_size_bytes;
       }
     }
 
@@ -151,7 +151,7 @@ void Ufs::ProcessIoSubmissions() {
       FDF_LOG(ERROR,
               "Request exceeding max transfer size. transfer_bytes=%d, max_transfer_bytes_=%d",
               transfer_bytes, max_transfer_bytes_);
-      io_cmd->disk_op.Complete(ZX_ERR_INVALID_ARGS);
+      io_cmd->device_op.Complete(ZX_ERR_INVALID_ARGS);
       continue;
     }
 
@@ -166,7 +166,7 @@ void Ufs::ProcessIoSubmissions() {
       }
       FDF_LOG(ERROR, "Failed to submit SCSI command (command %p): %s", io_cmd,
               response.status_string());
-      io_cmd->disk_op.Complete(response.error_value());
+      io_cmd->device_op.Complete(response.error_value());
       io_cmd->data_vmo.reset();
     }
   }
@@ -310,16 +310,16 @@ int Ufs::IoLoop() {
 }
 
 void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                              uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) {
-  IoCommand* io_cmd = containerof(disk_op, IoCommand, disk_op);
+                              uint32_t block_size_bytes, scsi::DeviceOp* device_op, iovec data) {
+  IoCommand* io_cmd = containerof(device_op, IoCommand, device_op);
   if (cdb.iov_len > sizeof(io_cmd->cdb_buffer)) {
-    disk_op->Complete(ZX_ERR_NOT_SUPPORTED);
+    device_op->Complete(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
   auto lun_id = TranslateScsiLunToUfsLun(lun);
   if (lun_id.is_error()) {
-    disk_op->Complete(lun_id.status_value());
+    device_op->Complete(lun_id.status_value());
     return;
   }
 
@@ -330,12 +330,12 @@ void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   io_cmd->is_write = is_write;
 
   // Currently, data is only used in the UNMAP command.
-  if (disk_op->op.command.opcode == BLOCK_OPCODE_TRIM && data.iov_len != 0) {
+  if (device_op->op.command.opcode == BLOCK_OPCODE_TRIM && data.iov_len != 0) {
     if (sizeof(io_cmd->data_buffer) != data.iov_len) {
       FDF_LOG(ERROR,
               "The size of the requested data buffer(%zu) and data_buffer(%lu) are different.",
               data.iov_len, sizeof(io_cmd->data_buffer));
-      disk_op->Complete(ZX_ERR_INVALID_ARGS);
+      device_op->Complete(ZX_ERR_INVALID_ARGS);
       return;
     }
     memcpy(io_cmd->data_buffer, data.iov_base, data.iov_len);
@@ -813,8 +813,8 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
 
   // UFS does not support the MODE SENSE(6) command. We should use the MODE SENSE(10) command.
   // UFS does not support the READ(12)/WRITE(12) commands.
-  scsi::DiskOptions options(/*check_unmap_support*/ true, /*use_mode_sense_6*/ false,
-                            /*use_read_write_12*/ false);
+  scsi::DeviceOptions options(/*check_unmap_support*/ true, /*use_mode_sense_6*/ false,
+                              /*use_read_write_12*/ false);
 
   zx::result<uint32_t> lun_count = ScanAndBindLogicalUnits(kPlaceholderTarget, max_transfer_bytes_,
                                                            max_luns, read_unit_descriptor, options);

@@ -6,7 +6,7 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/scsi/disk-dfv1.h>
+#include <lib/scsi/block-device-dfv1.h>
 #include <netinet/in.h>
 #include <zircon/process.h>
 
@@ -16,22 +16,24 @@
 
 namespace scsi {
 
-zx::result<fbl::RefPtr<Disk>> Disk::Bind(zx_device_t* parent, Controller* controller,
-                                         uint8_t target, uint16_t lun, uint32_t max_transfer_bytes,
-                                         DiskOptions disk_options) {
+zx::result<fbl::RefPtr<BlockDevice>> BlockDevice::Bind(zx_device_t* parent, Controller* controller,
+                                                       uint8_t target, uint16_t lun,
+                                                       uint32_t max_transfer_bytes,
+                                                       DeviceOptions device_options) {
   fbl::AllocChecker ac;
-  auto disk = fbl::MakeRefCountedChecked<Disk>(&ac, parent, controller, target, lun, disk_options);
+  auto block_device =
+      fbl::MakeRefCountedChecked<BlockDevice>(&ac, parent, controller, target, lun, device_options);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  auto status = disk->AddDisk(max_transfer_bytes);
+  auto status = block_device->AddDevice(max_transfer_bytes);
   if (status != ZX_OK) {
     return zx::error(status);
   }
-  return zx::ok(disk);
+  return zx::ok(block_device);
 }
 
-zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
+zx_status_t BlockDevice::AddDevice(uint32_t max_transfer_bytes) {
   zx::result inquiry_data = controller_->Inquiry(target_, lun_);
   if (inquiry_data.is_error()) {
     return inquiry_data.status_value();
@@ -90,7 +92,7 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
 
   zx::result<std::tuple<bool, bool>> parameter =
       controller_->ModeSenseDpoFuaAndWriteProtectedEnabled(target_, lun_,
-                                                           disk_options_.use_mode_sense_6);
+                                                           device_options_.use_mode_sense_6);
   if (parameter.is_error()) {
     zxlogf(WARNING,
            "Failed to get DPO FUA and write protected parameter for target %u, lun %u: %s.",
@@ -100,7 +102,7 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
   std::tie(dpo_fua_available_, write_protected_) = parameter.value();
 
   zx::result write_cache_enabled =
-      controller_->ModeSenseWriteCacheEnabled(target_, lun_, disk_options_.use_mode_sense_6);
+      controller_->ModeSenseWriteCacheEnabled(target_, lun_, device_options_.use_mode_sense_6);
   if (write_cache_enabled.is_error()) {
     zxlogf(WARNING, "Failed to get write cache status for target %u, lun %u: %s.", target_, lun_,
            zx_status_get_string(write_cache_enabled.status_value()));
@@ -143,13 +145,13 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
 
   // If we only need to use the read(10)/write(10) commands, then limit max_transfer_blocks_ and
   // max_transfer_bytes_.
-  if (block_count_ <= UINT32_MAX && !disk_options_.use_read_write_12 &&
+  if (block_count_ <= UINT32_MAX && !device_options_.use_read_write_12 &&
       max_transfer_blocks_ > UINT16_MAX) {
     max_transfer_blocks_ = UINT16_MAX;
     max_transfer_bytes_ = max_transfer_blocks_ * block_size_bytes_;
   }
 
-  if (disk_options_.check_unmap_support && block_limits.is_ok()) {
+  if (device_options_.check_unmap_support && block_limits.is_ok()) {
     zx::result unmap_command_supported = controller_->InquirySupportUnmapCommand(target_, lun_);
     if (unmap_command_supported.is_ok()) {
       unmap_command_supported_ =
@@ -157,20 +159,20 @@ zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
     }
   }
 
-  status = DdkAdd(DiskName().c_str());
+  status = DdkAdd(DeviceName().c_str());
   if (status == ZX_OK) {
     AddRef();
   }
   return status;
 }
 
-void Disk::DdkRelease() {
+void BlockDevice::DdkRelease() {
   if (Release()) {
     delete this;
   }
 }
 
-void Disk::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
+void BlockDevice::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
   info_out->block_size = block_size_bytes_;
   info_out->block_count = block_count_;
   info_out->max_transfer_size = max_transfer_bytes_;
@@ -179,10 +181,11 @@ void Disk::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
   *block_op_size_out = controller_->BlockOpSize();
 }
 
-void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_cb, void* cookie) {
-  DiskOp* disk_op = containerof(op, DiskOp, op);
-  disk_op->completion_cb = completion_cb;
-  disk_op->cookie = cookie;
+void BlockDevice::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_cb,
+                                 void* cookie) {
+  DeviceOp* device_op = containerof(op, DeviceOp, op);
+  device_op->completion_cb = completion_cb;
+  device_op->cookie = cookie;
 
   switch (op->command.opcode) {
     case BLOCK_OPCODE_READ:
@@ -208,7 +211,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
         cdb->logical_block_address = htobe64(op->rw.offset_dev);
         cdb->transfer_length = htobe32(op->rw.length);
         cdb->set_force_unit_access(is_fua);
-      } else if (disk_options_.use_read_write_12) {
+      } else if (device_options_.use_read_write_12) {
         auto cdb = reinterpret_cast<Read12CDB*>(cdb_buffer);  // Struct-wise equiv. to Write12CDB.
         cdb_length = 12;
         cdb->opcode = is_write ? Opcode::WRITE_12 : Opcode::READ_12;
@@ -225,7 +228,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       }
       ZX_ASSERT(cdb_length <= sizeof(cdb_buffer));
       controller_->ExecuteCommandAsync(target_, lun_, {cdb_buffer, cdb_length}, is_write,
-                                       block_size_bytes_, disk_op, {nullptr, 0});
+                                       block_size_bytes_, device_op, {nullptr, 0});
       return;
     }
     case BLOCK_OPCODE_FLUSH: {
@@ -243,11 +246,11 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       // after completion of operation.
       cdb.reserved_and_immed = 0;
       // Ideally this would flush specific blocks, but several platforms don't
-      // support this functionality, so just synchronize the whole disk.
+      // support this functionality, so just synchronize the whole block device.
       cdb.logical_block_address = 0;
       cdb.number_of_logical_blocks = 0;
       controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)},
-                                       /*is_write=*/false, block_size_bytes_, disk_op,
+                                       /*is_write=*/false, block_size_bytes_, device_op,
                                        {nullptr, 0});
       return;
     }
@@ -284,7 +287,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       block_descriptor->blocks = htobe32(op->trim.length);
 
       controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)}, /*is_write=*/true,
-                                       block_size_bytes_, disk_op, {&data, sizeof(data)});
+                                       block_size_bytes_, device_op, {&data, sizeof(data)});
       return;
     }
     default:
