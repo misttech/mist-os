@@ -54,7 +54,7 @@ impl FxSymlink {
             .tree()
             .find(&ObjectKey::object(self.object_id()))
             .await?
-            .expect("Unable to find object record");
+            .ok_or(FxfsError::NotFound)?;
         match item.value {
             ObjectValue::Object {
                 kind: ObjectKind::Symlink { refs, .. },
