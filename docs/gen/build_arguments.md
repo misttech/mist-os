@@ -8615,12 +8615,6 @@ Use vboot images
 
 From //build/images/args.gni:11
 
-### use_virtio_gpu_v2
-
-**Current value (from the default):** `false`
-
-From //src/graphics/display/drivers/virtio-guest/BUILD.gn:8
-
 ### using_fuchsia_sdk
 
 Only set in buildroots where targets configure themselves for use with the
