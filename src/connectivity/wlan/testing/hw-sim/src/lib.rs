@@ -137,7 +137,7 @@ pub fn send_sae_authentication_frame(
     bssid: &Bssid,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
-    let (buffer, _written) = write_frame_with_dynamic_buffer!(vec![], {
+    let buffer = write_frame_with_dynamic_buffer!(vec![], {
         headers: {
             mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                 mac::FrameControl(0)
@@ -165,7 +165,7 @@ pub fn send_open_authentication(
     status_code: impl Into<mac::StatusCode>,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
-    let (buffer, _written) = write_frame_with_dynamic_buffer!(vec![], {
+    let buffer = write_frame_with_dynamic_buffer!(vec![], {
         headers: {
             mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                 mac::FrameControl(0)
@@ -192,7 +192,7 @@ pub fn send_association_response(
     status_code: impl Into<mac::StatusCode>,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
-    let (buffer, _written) = write_frame_with_dynamic_buffer!(vec![], {
+    let buffer = write_frame_with_dynamic_buffer!(vec![], {
         headers: {
             mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                 mac::FrameControl(0)
@@ -227,7 +227,7 @@ pub fn send_disassociate(
     reason_code: impl Into<mac::ReasonCode>,
     proxy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
-    let (buffer, _written) = write_frame_with_dynamic_buffer!(vec![], {
+    let buffer = write_frame_with_dynamic_buffer!(vec![], {
         headers: {
             mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                 mac::FrameControl(0)
@@ -405,7 +405,7 @@ pub trait ApAdvertisement {
             _ => None,
         };
 
-        let (buffer, _written) = write_frame_with_dynamic_buffer!(vec![], {
+        let buffer = write_frame_with_dynamic_buffer!(vec![], {
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -669,7 +669,7 @@ pub fn rx_wlan_data_frame(
     ether_type: u16,
     phy: &WlantapPhyProxy,
 ) -> Result<(), anyhow::Error> {
-    let (mut buffer, written) = write_frame_with_dynamic_buffer!(vec![], {
+    let buffer = write_frame_with_dynamic_buffer!(vec![], {
         headers: {
             mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                 frame_ctrl: mac::FrameControl(0)
@@ -686,7 +686,6 @@ pub fn rx_wlan_data_frame(
         },
         payload: payload,
     })?;
-    buffer.truncate(written);
 
     phy.rx(&buffer, &rx_info_with_valid_rssi(channel, 0))?;
     Ok(())

@@ -107,11 +107,11 @@ mod tests {
 
     #[test]
     fn write_buf_empty_vec() {
-        let (buffer, written) = write_frame_with_dynamic_buffer!(vec![], {
+        let buffer = write_frame_with_dynamic_buffer!(vec![], {
             ies: { ssid: &b"foobar"[..] }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 8);
+        assert_eq!(buffer.len(), 8);
         assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114,][..], &buffer[..]);
     }
 
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn write_tim() {
-        let (buffer, written) = write_frame_with_dynamic_buffer!(vec![], {
+        let buffer = write_frame_with_dynamic_buffer!(vec![], {
             ies: {
                 tim: ie::TimView {
                     header: ie::TimHeader {
@@ -189,7 +189,7 @@ mod tests {
             }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 8);
+        assert_eq!(buffer.len(), 8);
         assert_eq!(&[5, 6, 1, 2, 3, 4, 5, 6][..], &buffer[..]);
     }
 

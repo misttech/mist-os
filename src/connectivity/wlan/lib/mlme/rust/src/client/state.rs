@@ -2078,7 +2078,7 @@ mod tests {
         let frame = {
             let mut buffer = [0u8; ADDBA_REQ_FRAME_LEN];
             let writer = BufferWriter::new(&mut buffer[..]);
-            let (mut writer, _) = write_frame_with_dynamic_buffer!(
+            let mut writer = write_frame_with_dynamic_buffer!(
                 writer,
                 {
                     headers: {

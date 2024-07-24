@@ -492,7 +492,7 @@ mod tests {
         protocol_id: u16,
         body: &[u8],
     ) -> Vec<u8> {
-        let (mut buffer, written) = write_frame_with_dynamic_buffer!(vec![], {
+        write_frame_with_dynamic_buffer!(vec![], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -502,9 +502,7 @@ mod tests {
             },
             payload: body,
         })
-        .expect("writing to vec always succeeds");
-        buffer.truncate(written);
-        buffer
+        .expect("writing to vec always succeeds")
     }
 
     // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will

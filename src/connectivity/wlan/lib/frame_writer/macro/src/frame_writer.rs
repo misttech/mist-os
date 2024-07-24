@@ -275,10 +275,7 @@ pub fn process_with_dynamic_buffer(input: TokenStream) -> TokenStream {
     let buf_tokens = quote!(
         let mut w = #buffer_source;
     );
-    let return_buf_tokens = quote!(
-        let written = w.bytes_written();
-        Ok((w, written))
-    );
+    let return_buf_tokens = quote!(Ok(w));
     process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens)
 }
 

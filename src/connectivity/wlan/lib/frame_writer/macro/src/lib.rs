@@ -155,6 +155,13 @@ pub fn write_frame_with_fixed_buffer(input: proc_macro::TokenStream) -> proc_mac
     frame_writer::process_with_fixed_buffer(input)
 }
 
+/// Appends a frame to a dynamically sized buffer.
+///
+/// This macro mutates the dynamically sized buffer in the first
+/// argument and returns a `Result<B, Error>` where `B` is the type of
+/// the dynamically sized buffer. The second argument of this macro is
+/// the specification of the frame defined in the documentation for
+/// `write_frame`.
 #[proc_macro]
 pub fn write_frame_with_dynamic_buffer(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     frame_writer::process_with_dynamic_buffer(input)

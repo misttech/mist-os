@@ -1279,7 +1279,7 @@ fn write_block_ack_hdr<B: Appendable>(
     bssid: Bssid,
     addr: MacAddr,
     seq_mgr: &mut SequenceManager,
-) -> Result<usize, Error> {
+) -> Result<(), Error> {
     // The management header differs for APs and clients. The frame control and management header
     // are constructed here, but AP and client STAs share the code that constructs the body. See
     // the `block_ack` module.
@@ -1299,7 +1299,7 @@ fn write_block_ack_hdr<B: Appendable>(
             },
         }
     )
-    .map(|(_, n)| n)
+    .map(|_buffer| {})
 }
 
 #[cfg(test)]
