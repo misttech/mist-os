@@ -354,6 +354,11 @@ impl OverlayNode {
         })
     }
 
+    /// Checks if this node exists in the lower FS.
+    fn has_lower(&self) -> bool {
+        self.lower.is_some()
+    }
+
     /// Check that an item isn't present in the lower FS.
     fn lower_entry_exists(&self, current_task: &CurrentTask, name: &FsStr) -> Result<bool, Errno> {
         match &self.lower {
@@ -1110,7 +1115,7 @@ impl FileSystemOps for Arc<OverlayFs> {
     ) -> Result<(), Errno> {
         let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461648): Propagate Locked through FileSystemOps; needs to be before FileOpsCore
         let renamed = OverlayNode::from_fs_node(renamed)?;
-        if renamed.main_entry().entry().node.is_dir() {
+        if renamed.has_lower() && renamed.main_entry().entry().node.is_dir() {
             // Return EXDEV for directory renames. Potentially they may be handled with the
             // `redirect_dir` feature, but it's not implemented here yet.
             // See https://docs.kernel.org/filesystems/overlayfs.html#renaming-directories

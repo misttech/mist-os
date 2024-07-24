@@ -664,4 +664,12 @@ TEST_P(FsMountTest, OpenWithTruncAndCreatWithNoPermsReturnsEACCES) {
   EXPECT_TRUE(helper.WaitForChildren());
 }
 
+TEST_P(FsMountTest, CreateAndRenameDirectory) {
+  std::string old_name = mount_path_ + "/old";
+  std::string new_name = mount_path_ + "/new";
+
+  ASSERT_THAT(mkdir(old_name.c_str(), 0700), SyscallSucceeds());
+  EXPECT_THAT(rename(old_name.c_str(), new_name.c_str()), SyscallSucceeds());
+}
+
 }  // namespace
