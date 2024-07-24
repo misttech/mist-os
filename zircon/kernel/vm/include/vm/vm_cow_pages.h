@@ -85,7 +85,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx_status_t CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
-                                fbl::RefPtr<VmCowPages>* child_cow) TA_REQ(lock());
+                                fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
   // Creates a child that looks back to this VmCowPages for all operations. Once a child slice is
   // created this node should not ever be Resized.
@@ -976,16 +976,12 @@ class VmCowPages final : public VmHierarchyBase,
   // transitions into being a hidden node and two children are created. This VMO is cloned into the
   // left child and the right child becomes the snapshot.
   zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
-                                       fbl::RefPtr<VmCowPages>* cow_child,
-                                       uint64_t new_root_parent_offset, uint64_t child_parent_limit)
-      TA_REQ(lock());
+                                       fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
   // Helper function for CreateCloneLocked. Performs unidirectional clone operation where this VMO
   // is cloned and the child clone is then hung in an appropriate position of the COW pages chain.
   zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
-                                        fbl::RefPtr<VmCowPages>* cow_child,
-                                        uint64_t new_root_parent_offset,
-                                        uint64_t child_parent_limit) TA_REQ(lock());
+                                        fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
   // Returns true if |page| (located at |offset| in this vmo) is only accessible by one
   // child, where 'accessible' is defined by ::CloneCowPageLocked.
@@ -1054,8 +1050,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Inserts a newly created VmCowPages into this hierarchy as a child of this VmCowPages.
   // Initializes child members based on the passed in values that only have meaning when an object
   // is a child. This updates the parent_ field in child to hold a refptr to |this|.
-  void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t root_parent_offset,
-                      uint64_t parent_limit) TA_REQ(lock());
+  void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) TA_REQ(lock());
 
   // Outside of initialization/destruction, hidden vmos always have two children. For
   // clarity, whichever child is first in the list is the 'left' child, and whichever

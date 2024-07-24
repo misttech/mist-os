@@ -611,18 +611,18 @@ void VmCowPages::DropChildLocked(VmCowPages* child) {
   --children_list_len_;
 }
 
-void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t root_parent_offset,
-                                uint64_t parent_limit) {
+void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) {
   canary_.Assert();
 
-  // As we do not want to have to return failure from this function we require root_parent_offset to
-  // be calculated and validated that it does not overflow externally, but we can still assert that
-  // it has been calculated correctly to prevent accidents.
+  // This function must succeed, as failure here requires the caller to roll back allocations.
   AssertHeld(child->lock_ref());
-  DEBUG_ASSERT(CheckedAdd(root_parent_offset_, offset) == root_parent_offset);
 
   // The child should definitely stop seeing into the parent at the limit of its size.
   DEBUG_ASSERT(parent_limit <= child->size_);
+  // The child's offsets must not overflow when projected onto the root.
+  // Callers should validate this externally and report errors as appropriate.
+  const uint64_t root_parent_offset = CheckedAdd(offset, root_parent_offset_);
+  CheckedAdd(root_parent_offset, child->size_);
 
   // Write in the parent view values.
   child->root_parent_offset_ = root_parent_offset;
@@ -633,6 +633,9 @@ void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t roo
   DEBUG_ASSERT(!child->partial_cow_release_);
   DEBUG_ASSERT(child->parent_start_limit_ == 0);
 
+  // The child's page list should skew by the child's offset relative to the parent. This allows
+  // fast copies of page list entries when merging the lists later (entire blocks of entries can be
+  // copied at once).
   child->page_list_.InitializeSkew(page_list_.GetSkew(), offset);
 
   // If the child has a non-zero high priority count, then it is counting as an incoming edge to our
@@ -654,6 +657,9 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  // The new slice must lie completely in range of its parent.
+  // As offsets within the parent do not overflow when projected onto the root, this check implies
+  // that the slice's offsets cannot either.
   DEBUG_ASSERT(CheckedAdd(offset, size) <= size_);
 
   // If this is a slice re-home this on our parent. Due to this logic we can guarantee that any
@@ -674,18 +680,9 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  // At this point slice must *not* be destructed in this function, as doing so would cause a
-  // deadlock. That means from this point on we *must* succeed and any future error checking needs
-  // to be added prior to creation.
-
   AssertHeld(slice->lock_ref());
 
-  // As our slice must be in range of the parent it is impossible to have the accumulated parent
-  // offset overflow.
-  uint64_t root_parent_offset = CheckedAdd(offset, root_parent_offset_);
-  CheckedAdd(root_parent_offset, size);
-
-  AddChildLocked(slice.get(), offset, root_parent_offset, size);
+  AddChildLocked(slice.get(), offset, size);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   // It will not check the child's hierarchy, so check that independently.
@@ -695,6 +692,7 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   VMO_FRUGAL_VALIDATION_ASSERT(slice->DebugValidateVmoPageBorrowingLocked());
 
   *cow_slice = slice;
+
   return ZX_OK;
 }
 
@@ -719,7 +717,7 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
   child->page_attribution_user_id_ = page_attribution_user_id_;
   child->high_priority_count_ = high_priority_count_;
   high_priority_count_ = 0;
-  AddChildLocked(child.get(), 0, root_parent_offset_, size_);
+  AddChildLocked(child.get(), 0, size_);
 
   // Time to change the VmCowPages that our paged_ref_ is pointing to.
   // We could only have gotten here from a valid VmObjectPaged since we're trying to create a child.
@@ -739,10 +737,12 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
 }
 
 zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
-                                                 fbl::RefPtr<VmCowPages>* cow_child,
-                                                 uint64_t new_root_parent_offset,
-                                                 uint64_t child_parent_limit) {
+                                                 fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
+
+  // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
+  // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
+  const uint64_t child_parent_limit = ClampedLimit(offset, size, size_);
 
   // We need two new VmCowPages for our two children.
   fbl::AllocChecker ac;
@@ -762,10 +762,8 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   // The left child becomes a full clone of us, inheriting our children, paged backref etc.
   CloneParentIntoChildLocked(left_child);
 
-  // The right child is the, potential, subset view into the parent so has a variable offset. If
-  // this view would extend beyond us then we need to clip the parent_limit to our size_, which
-  // will ensure any pages in that range just get initialized from zeroes.
-  AddChildLocked(right_child.get(), offset, new_root_parent_offset, child_parent_limit);
+  // The right child is the, potential, subset view into the parent so has a variable offset.
+  AddChildLocked(right_child.get(), offset, child_parent_limit);
 
   // Transition into being the hidden node.
   options_ |= VmCowPagesOptions::kHidden;
@@ -784,13 +782,12 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   }
 
   *cow_child = ktl::move(right_child);
+
   return ZX_OK;
 }
 
 zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
-                                                  fbl::RefPtr<VmCowPages>* cow_child,
-                                                  uint64_t new_root_parent_offset,
-                                                  uint64_t child_parent_limit) {
+                                                  fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
 
   fbl::AllocChecker ac;
@@ -799,6 +796,10 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
+
+  // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
+  // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
+  uint64_t child_parent_limit = ClampedLimit(offset, size, size_);
 
   // Walk up the parent chain until we find a good place to hang this new cow clone. A good
   // place here means the first place that has committed pages that we actually need to
@@ -814,17 +815,28 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
       break;
     }
 
+    VmCowPages* parent = cur->parent_.get();
+    AssertHeld(parent->lock_ref());
+    // Before the loop the caller validated that the clone's offsets cannot overflow when projected
+    // onto the root. Verify this will remain true.
+    //
+    // Each iteration of this loop should leave the clone's ultimate `root_parent_offset_` unchanged
+    // - we will increase the clone's `offset` by the current parent's `parent_offset_` but the new
+    // parent node's `root_parent_offset_` is smaller by the same amount.
+    DEBUG_ASSERT(CheckedAdd(parent->root_parent_offset_, cur->parent_offset_) ==
+                 cur->root_parent_offset_);
+
     // To move to `cur`'s parent we need to translate the clone's window to be relative to it.
     //
     // The clone's last visible offset into `cur` cannot exceed `cur`'s parent limit, as it should
     // not be able to see more pages than it could see if `cur` had been the parent.
     child_parent_limit = ClampedLimit(offset, child_parent_limit, cur->parent_limit_);
     offset += cur->parent_offset_;
-    cur = cur->parent_.get();
+
+    cur = parent;
   }
 
-  new_root_parent_offset = CheckedAdd(offset, cur->root_parent_offset_);
-  cur->AddChildLocked(cow_pages.get(), offset, new_root_parent_offset, child_parent_limit);
+  cur->AddChildLocked(cow_pages.get(), offset, child_parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   // It will not check the child's hierarchy, so check that independently.
@@ -835,6 +847,7 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
   VMO_FRUGAL_VALIDATION_ASSERT(cow_pages->DebugValidateVmoPageBorrowingLocked());
 
   *cow_child = ktl::move(cow_pages);
+
   return ZX_OK;
 }
 
@@ -898,21 +911,20 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
     }
   }
 
-  uint64_t new_root_parent_offset;
-  bool overflow;
-  overflow = add_overflow(offset, root_parent_offset_, &new_root_parent_offset);
-  if (overflow) {
-    return ZX_ERR_INVALID_ARGS;
+  // Offsets within the new clone must not overflow when projected onto the root.
+  {
+    uint64_t child_root_parent_offset;
+    bool overflow;
+    overflow = add_overflow(root_parent_offset_, offset, &child_root_parent_offset);
+    if (overflow) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    uint64_t child_root_parent_end;
+    overflow = add_overflow(child_root_parent_offset, size, &child_root_parent_end);
+    if (overflow) {
+      return ZX_ERR_INVALID_ARGS;
+    }
   }
-  uint64_t temp;
-  overflow = add_overflow(new_root_parent_offset, size, &temp);
-  if (overflow) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
-  // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
-  const uint64_t child_parent_limit = ClampedLimit(offset, size, size_);
 
   // Invalidate everything the clone will be able to see. They're COW pages now,
   // so any existing mappings can no longer directly write to the pages.
@@ -920,12 +932,10 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
 
   switch (type) {
     case CloneType::Snapshot: {
-      return CloneBidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
-                                      child_parent_limit);
+      return CloneBidirectionalLocked(offset, size, cow_child);
     }
     case CloneType::SnapshotAtLeastOnWrite: {
-      return CloneUnidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
-                                       child_parent_limit);
+      return CloneUnidirectionalLocked(offset, size, cow_child);
     }
     case CloneType::SnapshotModified: {
       // If at the root of vmo hierarchy or the slice of the root VMO, create a unidirectional clone
@@ -938,15 +948,14 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
           AssertHeld(parent_->lock_ref());
           DEBUG_ASSERT(!parent_->parent_);
         }
-        return CloneUnidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
-                                         child_parent_limit);
+        return CloneUnidirectionalLocked(offset, size, cow_child);
         // Else, take a snapshot.
       } else {
-        return CloneBidirectionalLocked(offset, size, cow_child, new_root_parent_offset,
-                                        child_parent_limit);
+        return CloneBidirectionalLocked(offset, size, cow_child);
       }
     }
   }
+
   return ZX_ERR_NOT_SUPPORTED;
 }
 
