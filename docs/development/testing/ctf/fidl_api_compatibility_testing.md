@@ -75,10 +75,10 @@ declarations.
 Below are some good guidelines to follow when changing FIDL APIs.
 
 1. Annotate new, not-yet-stable APIs with `@available(added=HEAD)`.
-1. Annotate newly stable APIs which are ready to go to partners
+1. Annotate newly stable APIs that are ready to go to partners and will not change
    with `@available(added=NEXT)`.
-1. When removing an API, first make sure no parters are still using the API, then
-   annotate the old API with `@available(removed={{ in_development_api_level+1 }})`.
+1. When removing an API, first make sure no partners are still using the API, then
+   annotate the old API with `@available(..., removed=NEXT)`.
 
 For more examples, see the [API evolution guide] and the [FIDL compatibility guide].
 
