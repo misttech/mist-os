@@ -32,7 +32,7 @@ use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt,
     IpDeviceStateContext as _,
 };
-use crate::internal::forwarding::IpForwardingDeviceContext;
+use crate::internal::routing::IpRoutingDeviceContext;
 use crate::internal::types::RawMetric;
 
 /// Provides an API for dealing with devices at the IP layer, aka interfaces.
@@ -51,7 +51,7 @@ where
     C: ContextPair,
     C::CoreContext: IpDeviceConfigurationContext<I, C::BindingsContext>
         + IpDeviceConfigurationHandler<I, C::BindingsContext>
-        + IpForwardingDeviceContext<I>,
+        + IpRoutingDeviceContext<I>,
     C::BindingsContext:
         IpDeviceBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
@@ -332,10 +332,10 @@ where
     C: ContextPair,
     C::CoreContext: IpDeviceConfigurationContext<Ipv4, C::BindingsContext>
         + IpDeviceConfigurationHandler<Ipv4, C::BindingsContext>
-        + IpForwardingDeviceContext<Ipv4>
+        + IpRoutingDeviceContext<Ipv4>
         + IpDeviceConfigurationContext<Ipv6, C::BindingsContext>
         + IpDeviceConfigurationHandler<Ipv6, C::BindingsContext>
-        + IpForwardingDeviceContext<Ipv6>,
+        + IpRoutingDeviceContext<Ipv6>,
     C::BindingsContext: IpDeviceBindingsContext<Ipv4, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
         + IpDeviceBindingsContext<Ipv6, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {

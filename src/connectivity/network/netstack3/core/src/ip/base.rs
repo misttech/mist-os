@@ -30,10 +30,10 @@ use netstack3_ip::icmp::{
 use netstack3_ip::multicast_forwarding::MulticastForwardingState;
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
-    self as ip, ForwardingTable, ForwardingTableId, FragmentContext, IpCounters,
-    IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpPacketFragmentCache, IpStateContext,
-    IpStateInner, IpTransportContext, IpTransportDispatchContext, MulticastMembershipHandler,
-    PmtuCache, PmtuContext, ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute,
+    self as ip, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
+    IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
+    IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
+    ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId,
     TransportReceiveError,
 };
 use netstack3_tcp::TcpIpTransportContext;
@@ -213,8 +213,8 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
 impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::IpMainTableId<I>>
     for StackState<BT>
 {
-    type Data = ForwardingTableId<I, DeviceId<BT>>;
-    type Guard<'l> = &'l ForwardingTableId<I, DeviceId<BT>>;
+    type Data = RoutingTableId<I, DeviceId<BT>>;
+    type Guard<'l> = &'l RoutingTableId<I, DeviceId<BT>>;
 
     fn access(&self) -> Self::Guard<'_> {
         self.inner_ip_state::<I>().main_table_id()
@@ -231,16 +231,16 @@ where
     type IpDeviceIdCtx<'a> =
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTable<I>>>;
 
-    fn main_table_id(&self) -> ForwardingTableId<I, Self::DeviceId> {
+    fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId> {
         self.unlocked_access::<crate::lock_ordering::IpMainTableId<I>>().clone()
     }
 
     fn with_ip_routing_table<
         O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &RoutingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
-        table_id: &ForwardingTableId<I, Self::DeviceId>,
+        table_id: &RoutingTableId<I, Self::DeviceId>,
         cb: F,
     ) -> O {
         let mut table = self.adopt(table_id);
@@ -252,10 +252,10 @@ where
 
     fn with_ip_routing_table_mut<
         O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut RoutingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
-        table_id: &ForwardingTableId<I, Self::DeviceId>,
+        table_id: &RoutingTableId<I, Self::DeviceId>,
         cb: F,
     ) -> O {
         let mut table = self.adopt(table_id);
@@ -683,13 +683,13 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
 impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::IpStateRoutingTable<I>
 {
-    type Data = ForwardingTable<I, DeviceId<BT>>;
+    type Data = RoutingTable<I, DeviceId<BT>>;
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<ForwardingTableId<I, DeviceId<BT>>>
+impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<RoutingTableId<I, DeviceId<BT>>>
     for crate::lock_ordering::IpStateRoutingTable<I>
 {
-    type Data = ForwardingTable<I, DeviceId<BT>>;
+    type Data = RoutingTable<I, DeviceId<BT>>;
 }
 
 impl<I: IpLayerIpExt, BT: BindingsTypes>

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! IP forwarding definitions.
+//! IP routing definitions.
 
 use alloc::vec::Vec;
 use core::fmt::Debug;
@@ -18,8 +18,8 @@ use crate::internal::types::{
     AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
 };
 
-/// Provides access to a device for the purposes of IP forwarding.
-pub trait IpForwardingDeviceContext<I: Ip>: DeviceIdContext<AnyDevice> {
+/// Provides access to a device for the purposes of IP routing.
+pub trait IpRoutingDeviceContext<I: Ip>: DeviceIdContext<AnyDevice> {
     /// Returns the routing metric for the device.
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric;
 
@@ -27,7 +27,7 @@ pub trait IpForwardingDeviceContext<I: Ip>: DeviceIdContext<AnyDevice> {
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 }
 
-/// An error encountered when adding a forwarding entry.
+/// An error encountered when adding a routing entry.
 #[derive(Error, Debug, PartialEq)]
 pub enum AddRouteError {
     /// Indicates that the route already exists.
@@ -45,7 +45,7 @@ impl From<ExistsError> for AddRouteError {
     }
 }
 
-/// Requests that a route be added to the forwarding table.
+/// Requests that a route be added to the routing table.
 pub fn request_context_add_route<
     I: IpLayerIpExt,
     DeviceId,
@@ -58,7 +58,7 @@ pub fn request_context_add_route<
 }
 
 /// Requests that routes matching these specifiers be removed from the
-/// forwarding table.
+/// routing table.
 pub fn request_context_del_routes<
     I: IpLayerIpExt,
     DeviceId,
@@ -76,14 +76,14 @@ pub fn request_context_del_routes<
     })
 }
 
-/// An IP forwarding table.
+/// An IP routing table.
 ///
-/// `ForwardingTable` maps destination subnets to the nearest IP hosts (on the
+/// `RoutingTable` maps destination subnets to the nearest IP hosts (on the
 /// local network) able to route IP packets to those subnets.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-pub struct ForwardingTable<I: Ip, D> {
-    /// All the routes available to forward a packet.
+pub struct RoutingTable<I: Ip, D> {
+    /// All the routes available to route a packet.
     ///
     /// `table` may have redundant, but unique, paths to the same
     /// destination.
@@ -95,14 +95,14 @@ pub struct ForwardingTable<I: Ip, D> {
     pub(super) table: Vec<EntryAndGeneration<I::Addr, D>>,
 }
 
-impl<I: Ip, D> Default for ForwardingTable<I, D> {
-    fn default() -> ForwardingTable<I, D> {
-        ForwardingTable { table: Vec::default() }
+impl<I: Ip, D> Default for RoutingTable<I, D> {
+    fn default() -> RoutingTable<I, D> {
+        RoutingTable { table: Vec::default() }
     }
 }
 
-impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
-    /// Adds `entry` to the forwarding table if it does not already exist.
+impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> RoutingTable<I, D> {
+    /// Adds `entry` to the routing table if it does not already exist.
     ///
     /// On success, a reference to the inserted entry is returned.
     pub fn add_entry(
@@ -130,7 +130,7 @@ impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         Ok(&table[index])
     }
 
-    // Applies the given predicate to the entries in the forwarding table,
+    // Applies the given predicate to the entries in the routing table,
     // removing (and returning) those that yield `true` while retaining those
     // that yield `false`.
     #[cfg(any(test, feature = "testutils"))]
@@ -148,23 +148,23 @@ impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         removed.into_iter().map(|entry| entry.entry).collect()
     }
 
-    /// Get an iterator over all of the forwarding entries ([`Entry`]) this
-    /// `ForwardingTable` knows about.
+    /// Get an iterator over all of the routing entries ([`Entry`]) this
+    /// `RoutingTable` knows about.
     pub fn iter_table(&self) -> impl Iterator<Item = &Entry<I::Addr, D>> {
         self.table.iter().map(|entry| &entry.entry)
     }
 
-    /// Look up the forwarding entry for an address in the table.
+    /// Look up the routing entry for an address in the table.
     ///
-    /// Look up the forwarding entry for an address in the table, returning the
+    /// Look up the routing entry for an address in the table, returning the
     /// next hop and device over which the address is reachable.
     ///
     /// If `device` is specified, the available routes are limited to those that
     /// egress over the device.
     ///
     /// If multiple entries match `address` or the first entry will be selected.
-    /// See [`ForwardingTable`] for more details of how entries are sorted.
-    pub(crate) fn lookup<CC: IpForwardingDeviceContext<I, DeviceId = D>>(
+    /// See [`RoutingTable`] for more details of how entries are sorted.
+    pub(crate) fn lookup<CC: IpRoutingDeviceContext<I, DeviceId = D>>(
         &self,
         core_ctx: &mut CC,
         local_device: Option<&D>,
@@ -178,7 +178,7 @@ impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
             .next()
     }
 
-    pub(crate) fn lookup_filter_map<'a, CC: IpForwardingDeviceContext<I, DeviceId = D>, R>(
+    pub(crate) fn lookup_filter_map<'a, CC: IpRoutingDeviceContext<I, DeviceId = D>, R>(
         &'a self,
         core_ctx: &'a mut CC,
         local_device: Option<&'a D>,
@@ -298,7 +298,7 @@ pub(crate) mod testutil {
 
     // Converts the given [`AddableMetric`] into the corresponding [`Metric`],
     // observing the device's metric, if applicable.
-    fn observe_metric<I: Ip, CC: IpForwardingDeviceContext<I>>(
+    fn observe_metric<I: Ip, CC: IpRoutingDeviceContext<I>>(
         core_ctx: &mut CC,
         device: &CC::DeviceId,
         metric: AddableMetric,
@@ -311,7 +311,7 @@ pub(crate) mod testutil {
         }
     }
 
-    /// Add a route directly to the forwarding table, instead of merely
+    /// Add a route directly to the routing table, instead of merely
     /// dispatching an event requesting that the route be added.
     pub fn add_route<
         I: IpLayerIpExt,
@@ -385,9 +385,9 @@ pub(crate) mod testutil {
         });
     }
 
-    /// Adds an on-link forwarding entry for the specified address and device.
-    pub(crate) fn add_on_link_forwarding_entry<A: IpAddress, D: Clone + Debug + PartialEq + Ord>(
-        table: &mut ForwardingTable<A::Version, D>,
+    /// Adds an on-link routing entry for the specified address and device.
+    pub(crate) fn add_on_link_routing_entry<A: IpAddress, D: Clone + Debug + PartialEq + Ord>(
+        table: &mut RoutingTable<A::Version, D>,
         ip: SpecifiedAddr<A>,
         device: D,
     ) where
@@ -399,9 +399,9 @@ pub(crate) mod testutil {
         assert_eq!(add_entry(table, entry.clone()), Ok(&entry));
     }
 
-    // Provide tests with access to the private `ForwardingTable.add_entry` fn.
+    // Provide tests with access to the private `RoutingTable.add_entry` fn.
     pub(crate) fn add_entry<I: BroadcastIpExt, D: Clone + Debug + PartialEq + Ord>(
-        table: &mut ForwardingTable<I, D>,
+        table: &mut RoutingTable<I, D>,
         entry: Entry<I::Addr, D>,
     ) -> Result<&Entry<I::Addr, D>, ExistsError> {
         table
@@ -411,20 +411,20 @@ pub(crate) mod testutil {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpForwardingContext<D> {
+    pub(crate) struct FakeIpRoutingContext<D> {
         disabled_devices: HashSet<D>,
     }
 
-    impl<D> FakeIpForwardingContext<D> {
+    impl<D> FakeIpRoutingContext<D> {
         #[cfg(test)]
         pub(crate) fn disabled_devices_mut(&mut self) -> &mut HashSet<D> {
             &mut self.disabled_devices
         }
     }
 
-    pub(crate) type FakeIpForwardingCtx<D> = FakeCoreCtx<FakeIpForwardingContext<D>, (), D>;
+    pub(crate) type FakeIpRoutingCtx<D> = FakeCoreCtx<FakeIpRoutingContext<D>, (), D>;
 
-    impl<I: Ip, D: StrongDeviceIdentifier> IpForwardingDeviceContext<I> for FakeIpForwardingCtx<D>
+    impl<I: Ip, D: StrongDeviceIdentifier> IpRoutingDeviceContext<I> for FakeIpRoutingCtx<D>
     where
         Self: DeviceIdContext<AnyDevice, DeviceId = D>,
     {
@@ -451,12 +451,12 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::internal::forwarding::testutil::FakeIpForwardingCtx;
+    use crate::internal::routing::testutil::FakeIpRoutingCtx;
     use crate::internal::types::Metric;
 
-    type FakeCtx = FakeIpForwardingCtx<MultipleDevicesId>;
+    type FakeCtx = FakeIpRoutingCtx<MultipleDevicesId>;
 
-    impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
+    impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> RoutingTable<I, D> {
         /// Print the table.
         fn print_table(&self) {
             trace!("Installed Routing table:");
@@ -512,14 +512,14 @@ mod tests {
     }
 
     fn simple_setup<I: TestIpExt>() -> (
-        ForwardingTable<I, MultipleDevicesId>,
+        RoutingTable<I, MultipleDevicesId>,
         TestAddrs<I::Addr>,
         SpecifiedAddr<I::Addr>,
         Subnet<I::Addr>,
         MultipleDevicesId,
         Metric,
     ) {
-        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<I, MultipleDevicesId>::default();
 
         let config = I::TEST_ADDRS;
         let subnet = config.subnet;
@@ -802,7 +802,7 @@ mod tests {
             }
         };
 
-        let mut table = ForwardingTable::<Ipv4, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<Ipv4, MultipleDevicesId>::default();
         if let Some(next_hop) = default_route {
             let entry = Entry {
                 subnet: Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
@@ -879,7 +879,7 @@ mod tests {
         let subnet = net_declare::net_subnet_v4!("192.168.0.0/24");
         let gateway = SpecifiedAddr::new(net_ip_v4!("192.168.0.1")).unwrap();
 
-        let mut table = ForwardingTable::<Ipv4, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<Ipv4, MultipleDevicesId>::default();
         if let Some(next_hop) = default_route {
             let entry = Entry {
                 subnet: Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0).expect("default subnet"),
@@ -923,7 +923,7 @@ mod tests {
     #[ip_test(I)]
     fn test_default_route_ip<I: TestIpExt>() {
         let mut core_ctx = FakeCtx::default();
-        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<I, MultipleDevicesId>::default();
         let device0 = MultipleDevicesId::A;
         let (addr1, sub1) = I::next_hop_addr_sub(1, 24);
         let (addr2, _) = I::next_hop_addr_sub(2, 24);
@@ -933,7 +933,7 @@ mod tests {
         // Add the following routes:
         //  sub1 -> device0
         //
-        // Our expected forwarding table should look like:
+        // Our expected routing table should look like:
         //  sub1 -> device0
 
         let entry = Entry { subnet: sub1, device: device0.clone(), gateway: None, metric };
@@ -947,7 +947,7 @@ mod tests {
 
         // Add a default route.
         //
-        // Our expected forwarding table should look like:
+        // Our expected routing table should look like:
         //  sub1 -> device0
         //  default -> addr1 w/ device0
 
@@ -983,7 +983,7 @@ mod tests {
         const LESS_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::B;
 
         let mut core_ctx = FakeCtx::default();
-        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<I, MultipleDevicesId>::default();
         // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
         // 1 we end up constructing the broadcast address instead).
         let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 2);
@@ -1064,7 +1064,7 @@ mod tests {
     #[ip_test(I)]
     fn test_lookup_filter_map<I: TestIpExt>() {
         let mut core_ctx = FakeCtx::default();
-        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<I, MultipleDevicesId>::default();
 
         // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
         // 1 we end up constructing the broadcast address instead).
@@ -1100,7 +1100,7 @@ mod tests {
         }
 
         fn lookup_with_devices<I: BroadcastIpExt>(
-            table: &ForwardingTable<I, MultipleDevicesId>,
+            table: &RoutingTable<I, MultipleDevicesId>,
             next_hop: SpecifiedAddr<I::Addr>,
             core_ctx: &mut FakeCtx,
             devices: &[MultipleDevicesId],
@@ -1159,7 +1159,7 @@ mod tests {
         const DEVICE2: MultipleDevicesId = MultipleDevicesId::B;
 
         let mut core_ctx = FakeCtx::default();
-        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<I, MultipleDevicesId>::default();
         // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
         // 1 we end up constructing the broadcast address instead).
         let (remote, sub) = I::next_hop_addr_sub(1, 2);
@@ -1203,7 +1203,7 @@ mod tests {
         const LESS_SPECIFIC_SUB_DEVICE: MultipleDevicesId = MultipleDevicesId::B;
 
         let mut core_ctx = FakeCtx::default();
-        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+        let mut table = RoutingTable::<I, MultipleDevicesId>::default();
         // `neg_prefix` passed here must be at least 2 (as with a neg_prefix of
         // 1 we end up constructing the broadcast address instead).
         let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 2);
@@ -1314,7 +1314,7 @@ mod tests {
             Entry { device: d, subnet: s, metric: m, gateway: g }
         }
 
-        // Expect the forwarding table to be sorted by longest matching prefix,
+        // Expect the routing table to be sorted by longest matching prefix,
         // followed by metric, followed by on/off link, followed by insertion
         // order.
         // Note that the test adds entries for `DEVICE_B` after `DEVICE_A`.
@@ -1351,7 +1351,7 @@ mod tests {
         // they always yield the expected order. Add `DEVICE_B` routes after
         // `DEVICE_A` routes.
         for insertion_order in device_a_routes.iter().permutations(device_a_routes.len()) {
-            let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+            let mut table = RoutingTable::<I, MultipleDevicesId>::default();
             for entry in insertion_order.into_iter().chain(device_b_routes.iter()) {
                 assert_eq!(super::testutil::add_entry(&mut table, entry.clone()), Ok(entry));
             }

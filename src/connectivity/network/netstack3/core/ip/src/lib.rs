@@ -20,13 +20,13 @@ mod internal {
     pub(super) mod api;
     pub(super) mod base;
     pub(super) mod device;
-    pub(super) mod forwarding;
     pub(super) mod gmp;
     pub(super) mod icmp;
     pub(super) mod ipv6;
     pub(super) mod multicast_forwarding;
     pub(super) mod raw;
     pub(super) mod reassembly;
+    pub(super) mod routing;
     pub(super) mod socket;
     pub(super) mod types;
     pub(super) mod uninstantiable;
@@ -210,22 +210,22 @@ pub use internal::api::{RoutesAnyApi, RoutesApi};
 pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus,
-    BaseTransportIpContext, DropReason, FilterHandlerProvider, ForwardingTableId, HopLimits,
-    IpCounters, IpDeviceContext, IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext,
-    IpLayerEvent, IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination,
-    IpSendFrameError, IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
+    BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
+    IpDeviceContext, IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext, IpLayerEvent,
+    IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination, IpSendFrameError,
+    IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
     IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder,
     Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder, MulticastMembershipHandler,
-    ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError, SendIpPacketMeta,
+    ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError, RoutingTableId, SendIpPacketMeta,
     TransparentLocalDelivery, TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS,
     DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
-pub use internal::forwarding::{
-    request_context_add_route, request_context_del_routes, AddRouteError, ForwardingTable,
-    IpForwardingDeviceContext,
-};
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
+pub use internal::routing::{
+    request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
+    RoutingTable,
+};
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,
     Metric, NextHop, RawMetric, ResolvedRoute, RoutableIpAddr,
@@ -235,7 +235,7 @@ pub use internal::types::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::base::testutil::DualStackSendIpPacketMeta;
-    pub use crate::internal::forwarding::testutil::{
+    pub use crate::internal::routing::testutil::{
         add_route, del_device_routes, del_routes_to_subnet,
     };
 }

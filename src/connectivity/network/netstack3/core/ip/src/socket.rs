@@ -1159,8 +1159,8 @@ pub(crate) mod testutil {
     use crate::internal::base::{
         BaseTransportIpContext, HopLimits, MulticastMembershipHandler, DEFAULT_HOP_LIMITS,
     };
-    use crate::internal::forwarding::testutil::FakeIpForwardingCtx;
-    use crate::internal::forwarding::{self, ForwardingTable};
+    use crate::internal::routing::testutil::FakeIpRoutingCtx;
+    use crate::internal::routing::{self, RoutingTable};
     use crate::internal::types::{Destination, Entry, Metric, RawMetric};
 
     /// A fake implementation of the traits required by the transport layer from
@@ -1169,8 +1169,8 @@ pub(crate) mod testutil {
     #[generic_over_ip(I, Ip)]
     #[derivative(Default(bound = ""))]
     pub struct FakeIpSocketCtx<I: Ip, D> {
-        pub(crate) table: ForwardingTable<I, D>,
-        forwarding: FakeIpForwardingCtx<D>,
+        pub(crate) table: RoutingTable<I, D>,
+        forwarding: FakeIpRoutingCtx<D>,
         devices: HashMap<D, FakeDeviceState<I>>,
     }
 
@@ -1411,16 +1411,12 @@ pub(crate) mod testutil {
         /// Adds a fake direct route to `ip` through `device`.
         pub fn add_route(&mut self, device: D, ip: SpecifiedAddr<IpAddr>) {
             match IpAddr::from(ip) {
-                IpAddr::V4(ip) => forwarding::testutil::add_on_link_forwarding_entry(
-                    &mut self.v4.table,
-                    ip,
-                    device,
-                ),
-                IpAddr::V6(ip) => forwarding::testutil::add_on_link_forwarding_entry(
-                    &mut self.v6.table,
-                    ip,
-                    device,
-                ),
+                IpAddr::V4(ip) => {
+                    routing::testutil::add_on_link_routing_entry(&mut self.v4.table, ip, device)
+                }
+                IpAddr::V6(ip) => {
+                    routing::testutil::add_on_link_routing_entry(&mut self.v6.table, ip, device)
+                }
             }
         }
 
@@ -1435,11 +1431,11 @@ pub(crate) mod testutil {
             A::Version::map_ip::<_, ()>(
                 entry,
                 |entry_v4| {
-                    let _ = forwarding::testutil::add_entry(&mut self.v4.table, entry_v4)
+                    let _ = routing::testutil::add_entry(&mut self.v4.table, entry_v4)
                         .expect("Failed to add route");
                 },
                 |entry_v6| {
-                    let _ = forwarding::testutil::add_entry(&mut self.v6.table, entry_v6)
+                    let _ = routing::testutil::add_entry(&mut self.v6.table, entry_v6)
                         .expect("Failed to add route");
                 },
             );
@@ -1549,15 +1545,11 @@ pub(crate) mod testutil {
         pub fn new(
             device_configs: impl IntoIterator<Item = FakeDeviceConfig<D, SpecifiedAddr<I::Addr>>>,
         ) -> Self {
-            let mut table = ForwardingTable::default();
+            let mut table = RoutingTable::default();
             let mut devices = HashMap::default();
             for FakeDeviceConfig { device, local_ips, remote_ips } in device_configs {
                 for addr in remote_ips {
-                    forwarding::testutil::add_on_link_forwarding_entry(
-                        &mut table,
-                        addr,
-                        device.clone(),
-                    )
+                    routing::testutil::add_on_link_routing_entry(&mut table, addr, device.clone())
                 }
                 let state = FakeDeviceState {
                     default_hop_limit: DEFAULT_HOP_LIMITS.unicast,
