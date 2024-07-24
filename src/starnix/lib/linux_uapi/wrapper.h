@@ -36,6 +36,7 @@
 #include <linux/fib_rules.h>
 #include <linux/filter.h>
 #include <linux/fs.h>
+#include <linux/fscrypt.h>
 #include <linux/fsverity.h>
 #include <linux/fuse.h>
 #include <linux/futex.h>

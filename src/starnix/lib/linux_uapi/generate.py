@@ -121,6 +121,13 @@ AUTO_DERIVE_TRAITS = [
         r"fsverity_digest",
         ["Clone", "AsBytes", "NoCell", "FromBytes", "FromZeros"],
     ),
+    (r"fscrypt_add_key_arg", ["FromBytes", "FromZeros", "NoCell"]),
+    (r"fscrypt_remove_key_arg", ["FromBytes", "FromZeros", "NoCell"]),
+    (r"fscrypt_key_specifier", ["FromBytes", "FromZeros", "NoCell"]),
+    (
+        r"fscrypt_key_specifier__bindgen_ty_1",
+        ["FromBytes", "FromZeros", "NoCell"],
+    ),
     (
         r"input_event",
         ["AsBytes", "FromBytes", "NoCell", "FromZeros", "PartialEq"],

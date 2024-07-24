@@ -6150,14 +6150,14 @@ impl Default for fscrypt_get_policy_ex_arg {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeros, NoCell)]
 pub struct fscrypt_key_specifier {
     pub type_: __u32,
     pub __reserved: __u32,
     pub u: fscrypt_key_specifier__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeros, NoCell)]
 pub union fscrypt_key_specifier__bindgen_ty_1 {
     pub __reserved: [__u8; 32usize],
     pub descriptor: [__u8; 8usize],
@@ -6189,6 +6189,7 @@ pub struct fscrypt_provisioning_key_payload {
     pub raw: __IncompleteArrayField<__u8>,
 }
 #[repr(C)]
+#[derive(FromBytes, FromZeros, NoCell)]
 pub struct fscrypt_add_key_arg {
     pub key_spec: fscrypt_key_specifier,
     pub raw_size: __u32,
@@ -6207,7 +6208,7 @@ impl Default for fscrypt_add_key_arg {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, FromBytes, FromZeros, NoCell)]
 pub struct fscrypt_remove_key_arg {
     pub key_spec: fscrypt_key_specifier,
     pub removal_status_flags: __u32,
@@ -17893,6 +17894,10 @@ pub const DM_TARGET_MSG: __u32 = 3241737486;
 pub const DM_DEV_SET_GEOMETRY: __u32 = 3241737487;
 pub const DM_DEV_ARM_POLL: __u32 = 3241737488;
 pub const DM_GET_TARGET_VERSION: __u32 = 3241737489;
+pub const FS_IOC_ADD_ENCRYPTION_KEY: __u32 = 3226494487;
+pub const FS_IOC_SET_ENCRYPTION_POLICY: __u32 = 2148296211;
+pub const FS_IOC_GET_ENCRYPTION_POLICY: __u32 = 1074554389;
+pub const FS_IOC_REMOVE_ENCRYPTION_KEY: __u32 = 3225445912;
 pub const UI_DEV_CREATE: __u32 = 21761;
 pub const UI_DEV_DESTROY: __u32 = 21762;
 pub const UI_DEV_SETUP: __u32 = 1079792899;
