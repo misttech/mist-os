@@ -26,11 +26,11 @@ zx::result<std::optional<uint32_t>> UicCommand::SendCommand() {
 }
 
 zx::result<> UicCommand::SendUicCommand() {
-  fdf::MmioBuffer &mmio = GetController().GetMmio();
+  const fdf::MmioBuffer &mmio = GetController().GetMmio();
 
   // Clear 'UIC command completion status' if set
   if (InterruptStatusReg::Get().ReadFrom(&mmio).uic_command_completion_status()) {
-    zxlogf(ERROR, "The previously set uic_command_completion_state was not cleared. \n");
+    FDF_LOG(ERROR, "The previously set uic_command_completion_state was not cleared. \n");
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -80,8 +80,9 @@ zx::result<> UicCommand::UicPostProcess() {
     auto opcode = UicCommandReg::Get().ReadFrom(&GetController().GetMmio()).command_opcode();
     auto mib_attribute =
         UicCommandArgument1Reg::Get().ReadFrom(&GetController().GetMmio()).mib_attribute();
-    zxlogf(ERROR, "Failed to send UIC command, opcode=0x%x, mib_attribute=0x%x, result_code = %u\n",
-           static_cast<uint32_t>(opcode), mib_attribute, result_code);
+    FDF_LOG(ERROR,
+            "Failed to send UIC command, opcode=0x%x, mib_attribute=0x%x, result_code = %u\n",
+            static_cast<uint32_t>(opcode), mib_attribute, result_code);
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -149,7 +150,7 @@ zx::result<> DmeHibernateCommand::UicPostProcess() {
     return result.take_error();
   }
 
-  fdf::MmioBuffer &mmio = GetController().GetMmio();
+  const fdf::MmioBuffer &mmio = GetController().GetMmio();
   uint32_t flag = GetFlag();
   uint32_t timeout = GetTimeoutUsec();
 
@@ -167,7 +168,7 @@ zx::result<> DmeHibernateCommand::UicPostProcess() {
   if (power_mode_state != HostControllerStatusReg::PowerModeStatus::kPowerOk &&
       power_mode_state != HostControllerStatusReg::PowerModeStatus::kPowerLocal &&
       power_mode_state != HostControllerStatusReg::PowerModeStatus::kPowerRemote) {
-    zxlogf(ERROR, "Failed to change power mode, UPMCRS = 0x%x\n", power_mode_state);
+    FDF_LOG(ERROR, "Failed to change power mode, UPMCRS = 0x%x\n", power_mode_state);
     return zx::error(ZX_ERR_BAD_STATE);
   }
 

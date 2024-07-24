@@ -4,11 +4,9 @@
 
 #include "ufs.h"
 
-#include <lib/ddk/binding_driver.h>
 #include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
-#include <zircon/threads.h>
 
 #include <array>
 #include <mutex>
@@ -51,7 +49,7 @@ zx_status_t Ufs::WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t
       return ZX_OK;
     }
     if (time_left == 0) {
-      zxlogf(ERROR, "%s after %u usecs", timeout_message.begin(), timeout_us);
+      FDF_LOG(ERROR, "%s after %u usecs", timeout_message.begin(), timeout_us);
       return ZX_ERR_TIMED_OUT;
     }
     usleep(1);
@@ -67,7 +65,7 @@ zx::result<> Ufs::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t siz
   }
 
   if (zx_status_t status = mapper.Map(vmo, 0, data_size); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok();
@@ -96,7 +94,7 @@ zx::result<uint8_t> Ufs::TranslateScsiLunToUfsLun(uint16_t scsi_lun) {
 
   // Logical unit
   if ((scsi_lun & kScsiWellKownLunIndicatorField) != 0) {
-    zxlogf(ERROR, "Invalid scsi lun: 0x%x", scsi_lun);
+    FDF_LOG(ERROR, "Invalid scsi lun: 0x%x", scsi_lun);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if ((scsi_lun & kMaxLunId) > kMaxLunIndex) {
@@ -133,8 +131,8 @@ void Ufs::ProcessIoSubmissions() {
         fzl::VmoMapper mapper;
         if (zx::result<> result = AllocatePages(data_vmo, mapper, io_cmd->data_length);
             result.is_error()) {
-          zxlogf(ERROR, "Failed to allocate data buffer (command %p): %s", io_cmd,
-                 result.status_string());
+          FDF_LOG(ERROR, "Failed to allocate data buffer (command %p): %s", io_cmd,
+                  result.status_string());
           return;
         }
         memcpy(mapper.start(), io_cmd->data_buffer, io_cmd->data_length);
@@ -150,9 +148,9 @@ void Ufs::ProcessIoSubmissions() {
     }
 
     if (transfer_bytes > max_transfer_bytes_) {
-      zxlogf(ERROR,
-             "Request exceeding max transfer size. transfer_bytes=%d, max_transfer_bytes_=%d",
-             transfer_bytes, max_transfer_bytes_);
+      FDF_LOG(ERROR,
+              "Request exceeding max transfer size. transfer_bytes=%d, max_transfer_bytes_=%d",
+              transfer_bytes, max_transfer_bytes_);
       io_cmd->disk_op.Complete(ZX_ERR_INVALID_ARGS);
       continue;
     }
@@ -166,8 +164,8 @@ void Ufs::ProcessIoSubmissions() {
         list_add_head(&pending_commands_, &io_cmd->node);
         return;
       }
-      zxlogf(ERROR, "Failed to submit SCSI command (command %p): %s", io_cmd,
-             response.status_string());
+      FDF_LOG(ERROR, "Failed to submit SCSI command (command %p): %s", io_cmd,
+              response.status_string());
       io_cmd->disk_op.Complete(response.error_value());
       io_cmd->data_vmo.reset();
     }
@@ -177,82 +175,82 @@ void Ufs::ProcessIoSubmissions() {
 void Ufs::ProcessCompletions() { transfer_request_processor_->RequestCompletion(); }
 
 zx::result<> Ufs::Isr() {
-  auto interrupt_status = InterruptStatusReg::Get().ReadFrom(&mmio_);
+  const fdf::MmioBuffer& mmio = mmio_.value();
+  auto interrupt_status = InterruptStatusReg::Get().ReadFrom(&mmio);
 
   // TODO(https://fxbug.dev/42075643): implement error handlers
   if (interrupt_status.uic_error()) {
-    zxlogf(ERROR, "UFS: UIC error on ISR");
-    InterruptStatusReg::Get().FromValue(0).set_uic_error(true).WriteTo(&mmio_);
+    FDF_LOG(ERROR, "UFS: UIC error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_uic_error(true).WriteTo(&mmio);
 
     // UECPA for Host UIC Error Code within PHY Adapter Layer.
-    if (HostUicErrorCodePhyAdapterLayerReg::Get().ReadFrom(&mmio_).uic_phy_adapter_layer_error()) {
-      zxlogf(ERROR, "UECPA error code: 0x%x",
-             HostUicErrorCodePhyAdapterLayerReg::Get()
-                 .ReadFrom(&mmio_)
-                 .uic_phy_adapter_layer_error_code());
+    if (HostUicErrorCodePhyAdapterLayerReg::Get().ReadFrom(&mmio).uic_phy_adapter_layer_error()) {
+      FDF_LOG(ERROR, "UECPA error code: 0x%x",
+              HostUicErrorCodePhyAdapterLayerReg::Get()
+                  .ReadFrom(&mmio)
+                  .uic_phy_adapter_layer_error_code());
     }
     // UECDL for Host UIC Error Code within Data Link Layer.
-    if (HostUicErrorCodeDataLinkLayerReg::Get().ReadFrom(&mmio_).uic_data_link_layer_error()) {
-      zxlogf(ERROR, "UECDL error code: 0x%x",
-             HostUicErrorCodeDataLinkLayerReg::Get()
-                 .ReadFrom(&mmio_)
-                 .uic_data_link_layer_error_code());
+    if (HostUicErrorCodeDataLinkLayerReg::Get().ReadFrom(&mmio).uic_data_link_layer_error()) {
+      FDF_LOG(
+          ERROR, "UECDL error code: 0x%x",
+          HostUicErrorCodeDataLinkLayerReg::Get().ReadFrom(&mmio).uic_data_link_layer_error_code());
     }
     // UECN for Host UIC Error Code within Network Layer.
-    if (HostUicErrorCodeNetworkLayerReg::Get().ReadFrom(&mmio_).uic_network_layer_error()) {
-      zxlogf(
+    if (HostUicErrorCodeNetworkLayerReg::Get().ReadFrom(&mmio).uic_network_layer_error()) {
+      FDF_LOG(
           ERROR, "UECN error code: 0x%x",
-          HostUicErrorCodeNetworkLayerReg::Get().ReadFrom(&mmio_).uic_network_layer_error_code());
+          HostUicErrorCodeNetworkLayerReg::Get().ReadFrom(&mmio).uic_network_layer_error_code());
     }
     // UECT for Host UIC Error Code within Transport Layer.
-    if (HostUicErrorCodeTransportLayerReg::Get().ReadFrom(&mmio_).uic_transport_layer_error()) {
-      zxlogf(ERROR, "UECT error code: 0x%x",
-             HostUicErrorCodeTransportLayerReg::Get()
-                 .ReadFrom(&mmio_)
-                 .uic_transport_layer_error_code());
+    if (HostUicErrorCodeTransportLayerReg::Get().ReadFrom(&mmio).uic_transport_layer_error()) {
+      FDF_LOG(ERROR, "UECT error code: 0x%x",
+              HostUicErrorCodeTransportLayerReg::Get()
+                  .ReadFrom(&mmio)
+                  .uic_transport_layer_error_code());
     }
     // UECDME for Host UIC Error Code within DME subcomponent.
-    if (HostUicErrorCodeReg::Get().ReadFrom(&mmio_).uic_dme_error()) {
-      zxlogf(ERROR, "UECDME error code: 0x%x",
-             HostUicErrorCodeReg::Get().ReadFrom(&mmio_).uic_dme_error_code());
+    if (HostUicErrorCodeReg::Get().ReadFrom(&mmio).uic_dme_error()) {
+      FDF_LOG(ERROR, "UECDME error code: 0x%x",
+              HostUicErrorCodeReg::Get().ReadFrom(&mmio).uic_dme_error_code());
     }
   }
   if (interrupt_status.device_fatal_error_status()) {
-    zxlogf(ERROR, "UFS: Device fatal error on ISR");
-    InterruptStatusReg::Get().FromValue(0).set_device_fatal_error_status(true).WriteTo(&mmio_);
+    FDF_LOG(ERROR, "UFS: Device fatal error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_device_fatal_error_status(true).WriteTo(&mmio);
   }
   if (interrupt_status.host_controller_fatal_error_status()) {
-    zxlogf(ERROR, "UFS: Host controller fatal error on ISR");
+    FDF_LOG(ERROR, "UFS: Host controller fatal error on ISR");
     InterruptStatusReg::Get().FromValue(0).set_host_controller_fatal_error_status(true).WriteTo(
-        &mmio_);
+        &mmio);
   }
   if (interrupt_status.system_bus_fatal_error_status()) {
-    zxlogf(ERROR, "UFS: System bus fatal error on ISR");
-    InterruptStatusReg::Get().FromValue(0).set_system_bus_fatal_error_status(true).WriteTo(&mmio_);
+    FDF_LOG(ERROR, "UFS: System bus fatal error on ISR");
+    InterruptStatusReg::Get().FromValue(0).set_system_bus_fatal_error_status(true).WriteTo(&mmio);
   }
   if (interrupt_status.crypto_engine_fatal_error_status()) {
-    zxlogf(ERROR, "UFS: Crypto engine fatal error on ISR");
+    FDF_LOG(ERROR, "UFS: Crypto engine fatal error on ISR");
     InterruptStatusReg::Get().FromValue(0).set_crypto_engine_fatal_error_status(true).WriteTo(
-        &mmio_);
+        &mmio);
   }
 
   // Handle command completion interrupts.
   if (interrupt_status.utp_transfer_request_completion_status()) {
     InterruptStatusReg::Get().FromValue(0).set_utp_transfer_request_completion_status(true).WriteTo(
-        &mmio_);
+        &mmio);
     sync_completion_signal(&io_signal_);
   }
   if (interrupt_status.utp_task_management_request_completion_status()) {
     // TODO(https://fxbug.dev/42075643): Handle UTMR completion
-    zxlogf(ERROR, "UFS: UTMR completion not yet implemented");
+    FDF_LOG(ERROR, "UFS: UTMR completion not yet implemented");
     InterruptStatusReg::Get()
         .FromValue(0)
         .set_utp_task_management_request_completion_status(true)
-        .WriteTo(&mmio_);
+        .WriteTo(&mmio);
   }
   if (interrupt_status.uic_command_completion_status()) {
     // TODO(https://fxbug.dev/42075643): Handle UIC completion
-    zxlogf(ERROR, "UFS: UIC completion not yet implemented");
+    FDF_LOG(ERROR, "UFS: UIC completion not yet implemented");
   }
 
   return zx::ok();
@@ -262,21 +260,26 @@ int Ufs::IrqLoop() {
   while (true) {
     if (zx_status_t status = irq_.wait(nullptr); status != ZX_OK) {
       if (status == ZX_ERR_CANCELED) {
-        zxlogf(DEBUG, "Interrupt cancelled. Exiting IRQ loop.");
+        FDF_LOG(DEBUG, "Interrupt cancelled. Exiting IRQ loop.");
       } else {
-        zxlogf(ERROR, "Failed to wait for interrupt: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Failed to wait for interrupt: %s", zx_status_get_string(status));
       }
       break;
     }
 
     if (zx::result<> result = Isr(); result.is_error()) {
-      zxlogf(ERROR, "Failed to run interrupt service routine: %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to run interrupt service routine: %s", result.status_string());
     }
 
     if (irq_mode_ == fuchsia_hardware_pci::InterruptMode::kLegacy) {
-      if (zx_status_t status = pci_.AckInterrupt(); status != ZX_OK) {
-        zxlogf(ERROR, "Failed to ack interrupt: %s", zx_status_get_string(status));
+      const fidl::WireResult result = pci_->AckInterrupt();
+      if (!result.ok()) {
+        FDF_LOG(ERROR, "Call to AckInterrupt failed: %s", result.status_string());
         break;
+      }
+      if (result->is_error()) {
+        FDF_LOG(ERROR, "AckInterrupt failed: %s", zx_status_get_string(result->error_value()));
+        return result->error_value();
       }
     }
   }
@@ -286,12 +289,12 @@ int Ufs::IrqLoop() {
 int Ufs::IoLoop() {
   while (true) {
     if (IsDriverShutdown()) {
-      zxlogf(DEBUG, "IO thread exiting.");
+      FDF_LOG(DEBUG, "IO thread exiting.");
       break;
     }
 
     if (zx_status_t status = sync_completion_wait(&io_signal_, ZX_TIME_INFINITE); status != ZX_OK) {
-      zxlogf(ERROR, "Failed to wait for sync completion: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "Failed to wait for sync completion: %s", zx_status_get_string(status));
       break;
     }
     sync_completion_reset(&io_signal_);
@@ -329,9 +332,9 @@ void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   // Currently, data is only used in the UNMAP command.
   if (disk_op->op.command.opcode == BLOCK_OPCODE_TRIM && data.iov_len != 0) {
     if (sizeof(io_cmd->data_buffer) != data.iov_len) {
-      zxlogf(ERROR,
-             "The size of the requested data buffer(%zu) and data_buffer(%lu) are different.",
-             data.iov_len, sizeof(io_cmd->data_buffer));
+      FDF_LOG(ERROR,
+              "The size of the requested data buffer(%zu) and data_buffer(%lu) are different.",
+              data.iov_len, sizeof(io_cmd->data_buffer));
       disk_op->Complete(ZX_ERR_INVALID_ARGS);
       return;
     }
@@ -355,8 +358,9 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
   }
 
   if (data.iov_len > max_transfer_bytes_) {
-    zxlogf(ERROR, "Request exceeding max transfer size. transfer_bytes=%zu, max_transfer_bytes_=%d",
-           data.iov_len, max_transfer_bytes_);
+    FDF_LOG(ERROR,
+            "Request exceeding max transfer size. transfer_bytes=%zu, max_transfer_bytes_=%d",
+            data.iov_len, max_transfer_bytes_);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -396,7 +400,7 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
     auto* response_data =
         reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(response_upiu->GetSenseData());
     if (response_data->sense_key() != scsi::SenseKey::UNIT_ATTENTION) {
-      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+      FDF_LOG(ERROR, "Failed to send SCSI command: %s", response.status_string());
       return response.error_value();
     }
     // Returns ZX_ERR_UNAVAILABLE if a unit attention error.
@@ -417,8 +421,8 @@ static void PopulateVersionInspect(const VersionReg& version_reg, inspect::Node*
   version.RecordUint("version_suffix", version_reg.version_suffix());
   inspector->emplace(std::move(version));
 
-  zxlogf(INFO, "Controller version %u.%u found", version_reg.major_version_number(),
-         version_reg.minor_version_number());
+  FDF_LOG(INFO, "Controller version %u.%u found", version_reg.major_version_number(),
+          version_reg.minor_version_number());
 }
 
 static void PopulateCapabilitiesInspect(const CapabilityReg& caps_reg, inspect::Node* inspect_node,
@@ -440,43 +444,58 @@ static void PopulateCapabilitiesInspect(const CapabilityReg& caps_reg, inspect::
   inspector->emplace(std::move(caps));
 }
 
+zx::result<> Ufs::InitMmioBuffer() {
+  auto mmio = CreateMmioBuffer(0, mmio_buffer_size_, std::move(mmio_buffer_vmo_));
+  if (mmio.is_error()) {
+    return zx::error(mmio.status_value());
+  }
+  mmio_ = std::move(mmio.value());
+  return zx::ok();
+}
+
 zx_status_t Ufs::Init() {
   list_initialize(&pending_commands_);
 
-  VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio_);
-  CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio_);
+  if (zx::result<> result = InitMmioBuffer(); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize MMIO buffer: %s", result.status_string());
+    return result.error_value();
+  }
 
-  inspect_node_ = inspector_.GetRoot().CreateChild("ufs");
-  PopulateVersionInspect(version_reg, &inspect_node_, &inspector_);
-  PopulateCapabilitiesInspect(caps_reg, &inspect_node_, &inspector_);
+  const fdf::MmioBuffer& mmio = mmio_.value();
+  VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio);
+  CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio);
+
+  inspect_node_ = inspector().root().CreateChild("ufs");
+  PopulateVersionInspect(version_reg, &inspect_node_, &inspector().inspector());
+  PopulateCapabilitiesInspect(caps_reg, &inspect_node_, &inspector().inspector());
 
   auto controller_node = inspect_node_.CreateChild("controller");
   auto wb_node = controller_node.CreateChild("writebooster");
 
   if (zx::result<> result = InitQuirk(); result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize quirk: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize quirk: %s", result.status_string());
     return result.error_value();
   }
   if (zx::result<> result = InitController(); result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize UFS controller: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize UFS controller: %s", result.status_string());
     return result.error_value();
   }
 
   if (zx::result<> result = InitDeviceInterface(controller_node); result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize device interface: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize device interface: %s", result.status_string());
     return result.error_value();
   }
 
   if (zx::result<> result = device_manager_->GetControllerDescriptor(); result.is_error()) {
-    zxlogf(ERROR, "Failed to get controller descriptor: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to get controller descriptor: %s", result.status_string());
     return result.error_value();
   }
 
   if (zx::result<> result = device_manager_->ConfigureWriteBooster(wb_node); result.is_error()) {
     if (result.status_value() == ZX_ERR_NOT_SUPPORTED) {
-      zxlogf(WARNING, "This device does not support WriteBooster");
+      FDF_LOG(WARNING, "This device does not support WriteBooster");
     } else {
-      zxlogf(ERROR, "Failed to configure WriteBooster %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to configure WriteBooster %s", result.status_string());
       return result.error_value();
     }
   }
@@ -488,20 +507,20 @@ zx_status_t Ufs::Init() {
 
   zx::result<uint32_t> lun_count;
   if (lun_count = AddLogicalUnits(); lun_count.is_error()) {
-    zxlogf(ERROR, "Failed to scan logical units: %s", lun_count.status_string());
+    FDF_LOG(ERROR, "Failed to scan logical units: %s", lun_count.status_string());
     return lun_count.error_value();
   }
 
   if (lun_count.value() == 0) {
-    zxlogf(ERROR, "Bind Error. There is no available LUN(lun_count = 0).");
+    FDF_LOG(ERROR, "Bind Error. There is no available LUN(lun_count = 0).");
     return ZX_ERR_BAD_STATE;
   }
   logical_unit_count_ = lun_count.value();
   controller_node.RecordUint("logical_unit_count", logical_unit_count_);
 
-  inspector_.emplace(std::move(controller_node));
-  inspector_.emplace(std::move(wb_node));
-  zxlogf(INFO, "Bind Success");
+  inspector().inspector().emplace(std::move(controller_node));
+  inspector().inspector().emplace(std::move(wb_node));
+  FDF_LOG(INFO, "Bind Success");
 
   return ZX_OK;
 }
@@ -510,10 +529,12 @@ zx::result<> Ufs::InitQuirk() {
   // Check PCI device quirk.
   if (pci_.is_valid()) {
     fuchsia_hardware_pci::wire::DeviceInfo info;
-    if (zx_status_t status = pci_.GetDeviceInfo(&info); status != ZX_OK) {
-      zxlogf(ERROR, "Failed to get PCI device info: %s", zx_status_get_string(status));
-      return zx::error(status);
+    const auto result = pci_->GetDeviceInfo();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Failed to get PCI device info: %s", result.status_string());
+      return zx::error(result.status());
     }
+    info = result->info;
 
     // Check that the current environment is QEMU.
     // Vendor ID = 0x1b36: Red Hat, Inc
@@ -523,38 +544,49 @@ zx::result<> Ufs::InitQuirk() {
     if ((info.vendor_id == kRedHatVendorId) && (info.device_id == kQemuUfsHostController)) {
       qemu_quirk_ = true;
     }
-    zxlogf(INFO, "PCI device info: Vendor ID = 0x%x, Device ID = 0x%x", info.vendor_id,
-           info.device_id);
+    FDF_LOG(INFO, "PCI device info: Vendor ID = 0x%x, Device ID = 0x%x", info.vendor_id,
+            info.device_id);
   }
 
   return zx::ok();
 }
 
 zx::result<> Ufs::InitController() {
+  const fdf::MmioBuffer& mmio = mmio_.value();
   // Disable all interrupts.
-  InterruptEnableReg::Get().FromValue(0).WriteTo(&mmio_);
+  InterruptEnableReg::Get().FromValue(0).WriteTo(&mmio);
 
   if (zx::result<> result = Notify(NotifyEvent::kReset, 0); result.is_error()) {
     return result.take_error();
   }
   // If UFS host controller is already enabled, disable it.
-  if (HostControllerEnableReg::Get().ReadFrom(&mmio_).host_controller_enable()) {
+  if (HostControllerEnableReg::Get().ReadFrom(&mmio).host_controller_enable()) {
     DisableHostController();
   }
   if (zx_status_t status = EnableHostController(); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to enable host controller %d", status);
+    FDF_LOG(ERROR, "Failed to enable host controller %d", status);
     return zx::error(status);
   }
 
-  if (int thrd_status = thrd_create_with_name(
-          &irq_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->IrqLoop(); }, this,
-          "ufs-irq-thread");
-      thrd_status) {
-    zx_status_t status = thrd_status_to_zx_status(thrd_status);
-    zxlogf(ERROR, " Failed to create IRQ thread: %s", zx_status_get_string(status));
-    return zx::error(status);
+  // Create and post IRQ worker
+  {
+    auto irq_dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "ufs-irq-worker",
+        [&](fdf_dispatcher_t*) { irq_worker_shutdown_completion_.Signal(); });
+    if (irq_dispatcher.is_error()) {
+      FDF_LOG(ERROR, "Failed to create IRQ dispatcher: %s",
+              zx_status_get_string(irq_dispatcher.status_value()));
+      return zx::error(irq_dispatcher.status_value());
+    }
+    irq_worker_dispatcher_ = *std::move(irq_dispatcher);
+
+    zx_status_t status =
+        async::PostTask(irq_worker_dispatcher_.async_dispatcher(), [this] { IrqLoop(); });
+    if (status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to start IRQ worker loop: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
   }
-  irq_thread_started_ = true;
 
   // Notify platform UFS that we are going to init the UFS host controller.
   if (zx::result<> result = Notify(NotifyEvent::kInit, 0); result.is_error()) {
@@ -562,46 +594,58 @@ zx::result<> Ufs::InitController() {
   }
 
   uint8_t number_of_task_management_request_slots = safemath::checked_cast<uint8_t>(
-      CapabilityReg::Get().ReadFrom(&mmio_).number_of_utp_task_management_request_slots() + 1);
-  zxlogf(DEBUG, "number_of_task_management_request_slots=%d",
-         number_of_task_management_request_slots);
+      CapabilityReg::Get().ReadFrom(&mmio).number_of_utp_task_management_request_slots() + 1);
+  FDF_LOG(DEBUG, "number_of_task_management_request_slots=%d",
+          number_of_task_management_request_slots);
   // TODO(https://fxbug.dev/42075643): Create TaskManagementRequestProcessor
 
   uint8_t number_of_transfer_request_slots = safemath::checked_cast<uint8_t>(
-      CapabilityReg::Get().ReadFrom(&mmio_).number_of_utp_transfer_request_slots() + 1);
-  zxlogf(DEBUG, "number_of_transfer_request_slots=%d", number_of_transfer_request_slots);
+      CapabilityReg::Get().ReadFrom(&mmio).number_of_utp_transfer_request_slots() + 1);
+  FDF_LOG(DEBUG, "number_of_transfer_request_slots=%d", number_of_transfer_request_slots);
 
   auto transfer_request_processor = TransferRequestProcessor::Create(
-      *this, bti_.borrow(), mmio_,
+      *this, bti_.borrow(), mmio,
       safemath::checked_cast<uint8_t>(number_of_transfer_request_slots));
   if (transfer_request_processor.is_error()) {
-    zxlogf(ERROR, "Failed to create transfer request processor %s",
-           transfer_request_processor.status_string());
+    FDF_LOG(ERROR, "Failed to create transfer request processor %s",
+            transfer_request_processor.status_string());
     return transfer_request_processor.take_error();
   }
   transfer_request_processor_ = std::move(*transfer_request_processor);
 
   auto device_manager = DeviceManager::Create(*this, *transfer_request_processor_);
   if (device_manager.is_error()) {
-    zxlogf(ERROR, "Failed to create device manager %s", device_manager.status_string());
+    FDF_LOG(ERROR, "Failed to create device manager %s", device_manager.status_string());
     return device_manager.take_error();
   }
   device_manager_ = std::move(*device_manager);
 
-  if (int thrd_status = thrd_create_with_name(
-          &io_thread_, [](void* ctx) { return static_cast<Ufs*>(ctx)->IoLoop(); }, this,
-          "ufs-io-thread");
-      thrd_status) {
-    zx_status_t status = thrd_status_to_zx_status(thrd_status);
-    zxlogf(ERROR, " Failed to create IO thread: %s", zx_status_get_string(status));
-    return zx::error(status);
+  // Create and post IO worker
+  {
+    auto io_dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "ufs-io-worker",
+        [&](fdf_dispatcher_t*) { io_worker_shutdown_completion_.Signal(); });
+    if (io_dispatcher.is_error()) {
+      FDF_LOG(ERROR, "Failed to create IO dispatcher: %s",
+              zx_status_get_string(io_dispatcher.status_value()));
+      return zx::error(io_dispatcher.status_value());
+    }
+    io_worker_dispatcher_ = *std::move(io_dispatcher);
+
+    zx_status_t status =
+        async::PostTask(io_worker_dispatcher_.async_dispatcher(), [this] { IoLoop(); });
+    if (status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to start IO worker loop: %s", zx_status_get_string(status));
+      return zx::error(status);
+    }
   }
-  io_thread_started_ = true;
 
   return zx::ok();
 }
 
 zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
+  const fdf::MmioBuffer& mmio = mmio_.value();
+
   // Enable error and UIC/UTP related interrupts.
   InterruptEnableReg::Get()
       .FromValue(0)
@@ -621,31 +665,31 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
       .set_uic_error_enable(true)
       .set_uic_dme_endpointreset(true)
       .set_utp_transfer_request_completion_enable(true)
-      .WriteTo(&mmio_);
+      .WriteTo(&mmio);
 
-  if (!HostControllerStatusReg::Get().ReadFrom(&mmio_).uic_command_ready()) {
-    zxlogf(ERROR, "UIC command is not ready\n");
+  if (!HostControllerStatusReg::Get().ReadFrom(&mmio).uic_command_ready()) {
+    FDF_LOG(ERROR, "UIC command is not ready\n");
     return zx::error(ZX_ERR_INTERNAL);
   }
 
   // Send Link Startup UIC command to start the link startup procedure.
   if (zx::result<> result = device_manager_->SendLinkStartUp(); result.is_error()) {
-    zxlogf(ERROR, "Failed to send Link Startup UIC command %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to send Link Startup UIC command %s", result.status_string());
     return result.take_error();
   }
 
   // The |device_present| bit becomes true if the host controller has successfully received a Link
   // Startup UIC command response and the UFS device has found a physical link to the controller.
-  if (!HostControllerStatusReg::Get().ReadFrom(&mmio_).device_present()) {
-    zxlogf(ERROR, "UFS device not found");
+  if (!HostControllerStatusReg::Get().ReadFrom(&mmio).device_present()) {
+    FDF_LOG(ERROR, "UFS device not found");
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-  zxlogf(INFO, "UFS device found");
+  FDF_LOG(INFO, "UFS device found");
 
   // TODO(https://fxbug.dev/42075643): Init task management request processor
 
   if (zx::result<> result = transfer_request_processor_->Init(); result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize transfer request processor %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize transfer request processor %s", result.status_string());
     return result.take_error();
   }
 
@@ -654,12 +698,12 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
   NopOutUpiu nop_upiu;
   auto nop_response = transfer_request_processor_->SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_upiu);
   if (nop_response.is_error()) {
-    zxlogf(ERROR, "Failed to send NopInUpiu %s", nop_response.status_string());
+    FDF_LOG(ERROR, "Failed to send NopInUpiu %s", nop_response.status_string());
     return nop_response.take_error();
   }
 
   if (zx::result<> result = device_manager_->DeviceInit(); result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize device %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize device %s", result.status_string());
     return result.take_error();
   }
 
@@ -669,7 +713,7 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
 
   if (zx::result<> result = device_manager_->InitReferenceClock(controller_node);
       result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize reference clock %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize reference clock %s", result.status_string());
     return result.take_error();
   }
 
@@ -681,33 +725,33 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
   } else {
     if (zx::result<> result = device_manager_->InitUniproAttributes(unipro_node);
         result.is_error()) {
-      zxlogf(ERROR, "Failed to initialize Unipro attributes %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to initialize Unipro attributes %s", result.status_string());
       return result.take_error();
     }
 
     if (zx::result<> result = device_manager_->InitUicPowerMode(unipro_node); result.is_error()) {
-      zxlogf(ERROR, "Failed to initialize UIC power mode %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to initialize UIC power mode %s", result.status_string());
       return result.take_error();
     }
 
     if (zx::result<> result = device_manager_->InitUfsPowerMode(controller_node, attributes_node);
         result.is_error()) {
-      zxlogf(ERROR, "Failed to initialize UFS power mode %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to initialize UFS power mode %s", result.status_string());
       return result.take_error();
     }
   }
 
   zx::result<uint32_t> result = device_manager_->GetBootLunEnabled();
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to check Boot LUN enabled %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to check Boot LUN enabled %s", result.status_string());
     return result.take_error();
   }
   attributes_node.RecordUint("bBootLunEn", result.value());
 
   // TODO(https://fxbug.dev/42075643): Set bMaxNumOfRTT (Read-to-transfer)
 
-  inspector_.emplace(std::move(unipro_node));
-  inspector_.emplace(std::move(attributes_node));
+  inspector().inspector().emplace(std::move(unipro_node));
+  inspector().inspector().emplace(std::move(attributes_node));
 
   return zx::ok();
 }
@@ -733,8 +777,8 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
     }
 
     if (unit_descriptor->bLogicalBlockSize >= sizeof(size_t) * 8) {
-      zxlogf(ERROR, "Cannot handle the unit descriptor bLogicalBlockSize = %d.",
-             unit_descriptor->bLogicalBlockSize);
+      FDF_LOG(ERROR, "Cannot handle the unit descriptor bLogicalBlockSize = %d.",
+              unit_descriptor->bLogicalBlockSize);
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
 
@@ -751,18 +795,18 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
         desc_block_size >
             static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMaxOutBufferSize) *
                 kSectorSize) {
-      zxlogf(ERROR, "Cannot handle logical block size of %zu.", desc_block_size);
+      FDF_LOG(ERROR, "Cannot handle logical block size of %zu.", desc_block_size);
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
     ZX_ASSERT_MSG(desc_block_size == kBlockSize, "Currently, it only supports a 4KB block size.");
 
     if (desc_block_size != block_size || desc_block_count != block_count) {
-      zxlogf(INFO,
-             "Failed to check for disk consistency. (block_size=%zu/%zu, block_count=%ld/%ld)",
-             desc_block_size, block_size, desc_block_count, block_count);
+      FDF_LOG(INFO,
+              "Failed to check for disk consistency. (block_size=%zu/%zu, block_count=%ld/%ld)",
+              desc_block_size, block_size, desc_block_count, block_count);
       return zx::error(ZX_ERR_BAD_STATE);
     }
-    zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", lun, desc_block_size, desc_block_count);
+    FDF_LOG(INFO, "LUN-%d block_size=%zu, block_count=%ld", lun, desc_block_size, desc_block_count);
 
     return zx::ok();
   };
@@ -772,10 +816,10 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
   scsi::DiskOptions options(/*check_unmap_support*/ true, /*use_mode_sense_6*/ false,
                             /*use_read_write_12*/ false);
 
-  zx::result<uint32_t> lun_count = ScanAndBindLogicalUnits(
-      zxdev(), kPlaceholderTarget, max_transfer_bytes_, max_luns, read_unit_descriptor, options);
+  zx::result<uint32_t> lun_count = ScanAndBindLogicalUnits(kPlaceholderTarget, max_transfer_bytes_,
+                                                           max_luns, read_unit_descriptor, options);
   if (lun_count.is_error()) {
-    zxlogf(ERROR, "Failed to scan logical units: %s", lun_count.status_string());
+    FDF_LOG(ERROR, "Failed to scan logical units: %s", lun_count.status_string());
     return lun_count.take_error();
   }
 
@@ -793,203 +837,263 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
       continue;
     }
     well_known_lun_set_.insert(lun);
-    zxlogf(INFO, "Well known LUN-0x%x", static_cast<uint8_t>(lun));
+    FDF_LOG(INFO, "Well known LUN-0x%x", static_cast<uint8_t>(lun));
   }
 
   return zx::ok(lun_count.value());
 }
 
 void Ufs::DumpRegisters() {
-  CapabilityReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "CapabilityReg::%s", arg); });
-  VersionReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "VersionReg::%s", arg); });
+  const fdf::MmioBuffer& mmio = mmio_.value();
+  CapabilityReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "CapabilityReg::%s", arg); });
+  VersionReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "VersionReg::%s", arg); });
 
-  InterruptStatusReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "InterruptStatusReg::%s", arg); });
-  InterruptEnableReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "InterruptEnableReg::%s", arg); });
+  InterruptStatusReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "InterruptStatusReg::%s", arg); });
+  InterruptEnableReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "InterruptEnableReg::%s", arg); });
 
-  HostControllerStatusReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "HostControllerStatusReg::%s", arg); });
-  HostControllerEnableReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "HostControllerEnableReg::%s", arg); });
+  HostControllerStatusReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "HostControllerStatusReg::%s", arg); });
+  HostControllerEnableReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "HostControllerEnableReg::%s", arg); });
 
-  UtrListBaseAddressReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtrListBaseAddressReg::%s", arg); });
-  UtrListBaseAddressUpperReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtrListBaseAddressUpperReg::%s", arg); });
-  UtrListDoorBellReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtrListDoorBellReg::%s", arg); });
-  UtrListClearReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtrListClearReg::%s", arg); });
-  UtrListRunStopReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtrListRunStopReg::%s", arg); });
-  UtrListCompletionNotificationReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtrListCompletionNotificationReg::%s", arg); });
+  UtrListBaseAddressReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtrListBaseAddressReg::%s", arg); });
+  UtrListBaseAddressUpperReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtrListBaseAddressUpperReg::%s", arg); });
+  UtrListDoorBellReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtrListDoorBellReg::%s", arg); });
+  UtrListClearReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtrListClearReg::%s", arg); });
+  UtrListRunStopReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtrListRunStopReg::%s", arg); });
+  UtrListCompletionNotificationReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtrListCompletionNotificationReg::%s", arg); });
 
-  UtmrListBaseAddressReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtmrListBaseAddressReg::%s", arg); });
-  UtmrListBaseAddressUpperReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtmrListBaseAddressUpperReg::%s", arg); });
-  UtmrListDoorBellReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtmrListDoorBellReg::%s", arg); });
-  UtmrListRunStopReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UtmrListRunStopReg::%s", arg); });
+  UtmrListBaseAddressReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtmrListBaseAddressReg::%s", arg); });
+  UtmrListBaseAddressUpperReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtmrListBaseAddressUpperReg::%s", arg); });
+  UtmrListDoorBellReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtmrListDoorBellReg::%s", arg); });
+  UtmrListRunStopReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UtmrListRunStopReg::%s", arg); });
 
-  UicCommandReg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UicCommandReg::%s", arg); });
-  UicCommandArgument1Reg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UicCommandArgument1Reg::%s", arg); });
-  UicCommandArgument2Reg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UicCommandArgument2Reg::%s", arg); });
-  UicCommandArgument3Reg::Get().ReadFrom(&mmio_).Print(
-      [](const char* arg) { zxlogf(DEBUG, "UicCommandArgument3Reg::%s", arg); });
+  UicCommandReg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UicCommandReg::%s", arg); });
+  UicCommandArgument1Reg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UicCommandArgument1Reg::%s", arg); });
+  UicCommandArgument2Reg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UicCommandArgument2Reg::%s", arg); });
+  UicCommandArgument3Reg::Get().ReadFrom(&mmio).Print(
+      [](const char* arg) { FDF_LOG(DEBUG, "UicCommandArgument3Reg::%s", arg); });
 }
 
 zx_status_t Ufs::EnableHostController() {
-  HostControllerEnableReg::Get().FromValue(0).set_host_controller_enable(true).WriteTo(&mmio_);
+  const fdf::MmioBuffer& mmio = mmio_.value();
+  HostControllerEnableReg::Get().FromValue(0).set_host_controller_enable(true).WriteTo(&mmio);
 
   auto wait_for = [&]() -> bool {
-    return HostControllerEnableReg::Get().ReadFrom(&mmio_).host_controller_enable();
+    return HostControllerEnableReg::Get().ReadFrom(&mmio).host_controller_enable();
   };
   fbl::String timeout_message = "Timeout waiting for EnableHostController";
   return WaitWithTimeout(wait_for, kHostControllerTimeoutUs, timeout_message);
 }
 
 zx_status_t Ufs::DisableHostController() {
-  HostControllerEnableReg::Get().FromValue(0).set_host_controller_enable(false).WriteTo(&mmio_);
+  const fdf::MmioBuffer& mmio = mmio_.value();
+  HostControllerEnableReg::Get().FromValue(0).set_host_controller_enable(false).WriteTo(&mmio);
 
   auto wait_for = [&]() -> bool {
-    return !HostControllerEnableReg::Get().ReadFrom(&mmio_).host_controller_enable();
+    return !HostControllerEnableReg::Get().ReadFrom(&mmio).host_controller_enable();
   };
   fbl::String timeout_message = "Timeout waiting for DisableHostController";
   return WaitWithTimeout(wait_for, kHostControllerTimeoutUs, timeout_message);
 }
 
-zx_status_t Ufs::AddDevice() {
-  if (zx_status_t status = DdkAdd(ddk::DeviceAddArgs(kDriverName)
-                                      .set_flags(DEVICE_ADD_NON_BINDABLE)
-                                      .set_inspect_vmo(inspector_.DuplicateVmo()));
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to run DdkAdd: %s", zx_status_get_string(status));
-    return status;
+zx::result<> Ufs::ConnectToPciService() {
+  auto pci_client_end = incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
+  if (!pci_client_end.is_ok()) {
+    FDF_LOG(ERROR, "Failed to connect to PCI device service: %s", pci_client_end.status_string());
+    return pci_client_end.take_error();
   }
+  pci_ = fidl::WireSyncClient<fuchsia_hardware_pci::Device>(*std::move(pci_client_end));
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-zx_status_t Ufs::Bind(void* ctx, zx_device_t* parent) {
-  ddk::Pci pci(parent, "pci");
-  if (!pci.is_valid()) {
-    zxlogf(ERROR, "Failed to find PCI fragment");
-    return ZX_ERR_NOT_SUPPORTED;
+zx::result<> Ufs::ConfigResources() {
+  // Map register window.
+  {
+    const auto result = pci_->GetBar(0);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to GetBar failed: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "GetBar failed: %s", zx_status_get_string(result->error_value()));
+      return zx::error(result->error_value());
+    }
+
+    if (!result->value()->result.result.is_vmo()) {
+      FDF_LOG(ERROR, "PCI BAR is not an MMIO BAR.");
+      return zx::error(ZX_ERR_WRONG_TYPE);
+    }
+    mmio_buffer_vmo_ = std::move(result->value()->result.result.vmo());
+    mmio_buffer_size_ = result->value()->result.size;
   }
 
-  std::optional<fdf::MmioBuffer> mmio;
-  if (zx_status_t status = pci.MapMmio(0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio);
-      status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map registers: %s", zx_status_get_string(status));
-    return status;
+  // UFS host controller is bus master
+  {
+    const auto result = pci_->SetBusMastering(true);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to SetBusMastering failed: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "SetBusMastering failed: %s", zx_status_get_string(result->error_value()));
+      return zx::error(result->error_value());
+    }
   }
 
-  fuchsia_hardware_pci::InterruptMode irq_mode;
-  if (zx_status_t status = pci.ConfigureInterruptMode(1, &irq_mode); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to configure interrupt: %s", zx_status_get_string(status));
-    return status;
+  // Request 1 interrupt of any mode.
+  {
+    const auto result = pci_->GetInterruptModes();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to GetInterruptModes failed: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    if (result->modes.msix_count > 0) {
+      irq_mode_ = fuchsia_hardware_pci::InterruptMode::kMsiX;
+    } else if (result->modes.msi_count > 0) {
+      irq_mode_ = fuchsia_hardware_pci::InterruptMode::kMsi;
+    } else if (result->modes.has_legacy) {
+      irq_mode_ = fuchsia_hardware_pci::InterruptMode::kLegacy;
+    } else {
+      FDF_LOG(ERROR, "No interrupt modes are supported.");
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
+    FDF_LOG(DEBUG, "Interrupt mode: %u", static_cast<uint8_t>(irq_mode_));
   }
-  zxlogf(DEBUG, "Interrupt mode: %u", static_cast<uint8_t>(irq_mode));
-
-  zx::interrupt irq;
-  if (zx_status_t status = pci.MapInterrupt(0, &irq); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map interrupt: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  if (zx_status_t status = pci.SetBusMastering(true); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to enable bus mastering: %s", zx_status_get_string(status));
-    return status;
-  }
-  auto cleanup = fit::defer([&] { pci.SetBusMastering(false); });
-
-  zx::bti bti;
-  if (zx_status_t status = pci.GetBti(0, &bti); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get BTI handle: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  fbl::AllocChecker ac;
-  auto driver = fbl::make_unique_checked<Ufs>(&ac, parent, std::move(pci), std::move(*mmio),
-                                              irq_mode, std::move(irq), std::move(bti));
-  if (!ac.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for UFS driver.");
-    return ZX_ERR_NO_MEMORY;
-  }
-  driver->SetHostControllerCallback(NotifyEventCallback);
-
-  if (zx_status_t status = driver->AddDevice(); status != ZX_OK) {
-    return status;
+  {
+    const auto result = pci_->SetInterruptMode(irq_mode_, 1);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to SetInterruptMode failed: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "SetInterruptMode failed: %s", zx_status_get_string(result->error_value()));
+      return zx::error(result->error_value());
+    }
   }
 
-  // The DriverFramework now owns driver.
-  [[maybe_unused]] auto placeholder = driver.release();
-  cleanup.cancel();
-  return ZX_OK;
+  // Get irq handle.
+  {
+    const auto result = pci_->MapInterrupt(0);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to MapInterrupt failed: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "MapInterrupt failed: %s", zx_status_get_string(result->error_value()));
+      return zx::error(result->error_value());
+    }
+    irq_ = std::move(result->value()->interrupt);
+  }
+
+  // Get bti handle.
+  {
+    const auto result = pci_->GetBti(0);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to GetBti failed: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "GetBti failed: %s", zx_status_get_string(result->error_value()));
+      return zx::error(result->error_value());
+    }
+    bti_ = std::move(result->value()->bti);
+  }
+
+  return zx::ok();
 }
 
-void Ufs::DdkInit(ddk::InitTxn txn) {
-  zx_status_t status = Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Driver initialization failed: %s", zx_status_get_string(status));
-    DumpRegisters();
+zx::result<> Ufs::Start() {
+  parent_node_.Bind(std::move(node()));
+
+  if (zx::result status = ConnectToPciService(); status.is_error()) {
+    return status.take_error();
   }
-  txn.Reply(status);
+
+  if (zx::result status = ConfigResources(); status.is_error()) {
+    return status.take_error();
+  }
+
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+  auto [node_client_end, node_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
+
+  node_controller_.Bind(std::move(controller_client_end));
+  root_node_.Bind(std::move(node_client_end));
+
+  fidl::Arena arena;
+
+  const auto args =
+      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, name()).Build();
+
+  // Add root device, which will contain block devices for logical units
+  auto result =
+      parent_node_->AddChild(args, std::move(controller_server_end), std::move(node_server_end));
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(result.status());
+  }
+
+  SetHostControllerCallback(NotifyEventCallback);
+
+  if (zx_status_t status = Init(); status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok();
 }
 
-void Ufs::DdkRelease() {
-  zxlogf(DEBUG, "Releasing driver.");
+void Ufs::PrepareStop(fdf::PrepareStopCompleter completer) {
   driver_shutdown_ = true;
+
   if (pci_.is_valid()) {
-    pci_.SetBusMastering(false);
+    const auto result = pci_->SetBusMastering(false);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Call to SetBusMastering failed: %s", result.status_string());
+      completer(zx::error(result.status()));
+      return;
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "SetBusMastering failed: %s", zx_status_get_string(result->error_value()));
+      completer(zx::error(result->error_value()));
+      return;
+    }
   }
+
+  // TODO(https://fxbug.dev/42075643): We should flush pending_commands_.
+
   irq_.destroy();  // Make irq_.wait() in IrqLoop() return ZX_ERR_CANCELED.
-  if (irq_thread_started_) {
-    thrd_join(irq_thread_, nullptr);
+  // wait for worker loop to finish before removing devices
+  if (irq_worker_dispatcher_.get()) {
+    irq_worker_dispatcher_.ShutdownAsync();
+    irq_worker_shutdown_completion_.Wait();
   }
-  if (io_thread_started_) {
+
+  if (io_worker_dispatcher_.get()) {
     sync_completion_signal(&io_signal_);
-    thrd_join(io_thread_, nullptr);
+    io_worker_dispatcher_.ShutdownAsync();
+    io_worker_shutdown_completion_.Wait();
   }
 
-  delete this;
+  completer(zx::ok());
 }
-
-void Ufs::DdkSuspend(ddk::SuspendTxn txn) {
-  zxlogf(INFO, "Ufs DdkSuspend, suspend_reason = %d, requested_state = %d", txn.suspend_reason(),
-         txn.requested_state());
-
-  if (auto result = device_manager_->Suspend(); result.is_error()) {
-    txn.Reply(result.error_value(), txn.requested_state());
-    return;
-  }
-  txn.Reply(ZX_OK, txn.requested_state());
-}
-
-void Ufs::DdkResume(ddk::ResumeTxn txn) {
-  zxlogf(INFO, "Ufs DdkResume, requested_state = %d", txn.requested_state());
-
-  if (auto result = device_manager_->Resume(); result.is_error()) {
-    txn.Reply(result.error_value(), DEV_POWER_STATE_D1, txn.requested_state());
-    return;
-  }
-  txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
-}
-
-static zx_driver_ops_t driver_ops = {
-    .version = DRIVER_OPS_VERSION,
-    .bind = Ufs::Bind,
-};
 
 }  // namespace ufs
-
-ZIRCON_DRIVER(Ufs, ufs::driver_ops, "zircon", "0.1");

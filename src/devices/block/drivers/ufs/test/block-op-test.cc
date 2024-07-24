@@ -12,19 +12,17 @@ class BlockOpTest : public UfsTest {
   void SetUp() override {
     UfsTest::SetUp();
 
-    ASSERT_NO_FATAL_FAILURE(RunInit());
-    while (device_->child_count() == 0) {
+    while (dut_->block_devs().empty()) {
       zx::nanosleep(zx::deadline_after(zx::msec(1)));
     }
 
-    zx_device* lu_dev = device_->GetLatestChild();
-
-    ddk::BlockImplProtocolClient::CreateFromDevice(lu_dev, &client_);
-    client_.Query(&info_, &op_size_);
+    const auto& block_devs = dut_->block_devs();
+    disk_ = block_devs.at(0).at(0).get();
+    disk_->BlockImplQuery(&info_, &op_size_);
   }
 
  protected:
-  ddk::BlockImplProtocolClient client_;
+  scsi::Disk* disk_;
   block_info_t info_;
   uint64_t op_size_;
 };
@@ -40,7 +38,7 @@ TEST_F(BlockOpTest, ReadTest) {
 
   char buf[ufs_mock_device::kMockBlockSize];
   std::strncpy(buf, "test", sizeof(buf));
-  ASSERT_OK(mock_device_->BufferWrite(kTestLun, buf, 1, 0));
+  ASSERT_OK(mock_device_.BufferWrite(kTestLun, buf, 1, 0));
 
   sync_completion_t done;
   auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
@@ -65,7 +63,7 @@ TEST_F(BlockOpTest, ReadTest) {
               .offset_vmo = 0,
           },
   };
-  client_.Queue(op, callback, &done);
+  disk_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   zx_vaddr_t vaddr;
@@ -109,11 +107,11 @@ TEST_F(BlockOpTest, WriteTest) {
               .offset_vmo = 0,
           },
   };
-  client_.Queue(op, callback, &done);
+  disk_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   char buf[ufs_mock_device::kMockBlockSize];
-  ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, 1, 0));
+  ASSERT_OK(mock_device_.BufferRead(kTestLun, buf, 1, 0));
 
   ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
   ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, ufs_mock_device::kMockBlockSize));
@@ -153,19 +151,19 @@ TEST_F(BlockOpTest, FuaWriteTest) {
               .offset_vmo = 0,
           },
   };
-  client_.Queue(op, callback, &done);
+  disk_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   // Check that the FUA bit is set.
   ScsiCommandUpiu scsi_upiu(
-      *ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer<CommandUpiuData>(
+      *dut_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer<CommandUpiuData>(
           0));
   scsi::Write10CDB* scsi_cdb =
       reinterpret_cast<scsi::Write10CDB*>(scsi_upiu.GetData<CommandUpiuData>()->cdb);
   ASSERT_EQ(scsi_cdb->force_unit_access(), true);
 
   char buf[ufs_mock_device::kMockBlockSize];
-  ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, 1, 0));
+  ASSERT_OK(mock_device_.BufferRead(kTestLun, buf, 1, 0));
 
   ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
   ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, ufs_mock_device::kMockBlockSize));
@@ -181,12 +179,12 @@ TEST_F(BlockOpTest, FlushTest) {
   auto block_op = std::make_unique<uint8_t[]>(op_size_);
   auto op = reinterpret_cast<block_op_t*>(block_op.get());
   op->rw.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
-  client_.Queue(op, callback, &done);
+  disk_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 
   // Check that the FLUSH operation is correctly converted to a SYNCHRONIZE CACHE 10 command.
   ScsiCommandUpiu scsi_upiu(
-      *ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer<CommandUpiuData>(
+      *dut_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer<CommandUpiuData>(
           0));
   ASSERT_EQ(scsi_upiu.GetOpcode(), scsi::Opcode::SYNCHRONIZE_CACHE_10);
 }
@@ -225,12 +223,12 @@ TEST_F(BlockOpTest, TrimTest) {
               .offset_vmo = 0,
           },
   };
-  client_.Queue(op, callback, &done);
+  disk_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
   char buf[ufs_mock_device::kMockBlockSize];
-  ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, 1, 0));
+  ASSERT_OK(mock_device_.BufferRead(kTestLun, buf, 1, 0));
   ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
 
   // Send TRIM operation.
@@ -247,12 +245,12 @@ TEST_F(BlockOpTest, TrimTest) {
               .offset_dev = 0,
           },
   };
-  client_.Queue(trim_op, callback, &done);
+  disk_->BlockImplQueue(trim_op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
   // Check that the trimmed block is zero.
-  ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, 1, 0));
+  ASSERT_OK(mock_device_.BufferRead(kTestLun, buf, 1, 0));
 
   char zero_buf[ufs_mock_device::kMockBlockSize];
   std::memset(zero_buf, 0, ufs_mock_device::kMockBlockSize);
@@ -293,7 +291,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_vmo = 0,
           },
   };
-  client_.Queue(op, callback, &done);
+  disk_->BlockImplQueue(op, callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -310,7 +308,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = 0,
           },
   };
-  client_.Queue(op, exception_callback, &done);
+  disk_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -327,7 +325,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = 0,
           },
   };
-  client_.Queue(op, exception_callback, &done);
+  disk_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -344,7 +342,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = static_cast<uint32_t>(info_.block_count),
           },
   };
-  client_.Queue(op, exception_callback, &done);
+  disk_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 
@@ -362,7 +360,7 @@ TEST_F(BlockOpTest, IoRangeExceptionTest) {
               .offset_dev = static_cast<uint32_t>(info_.block_count) - 1,
           },
   };
-  client_.Queue(op, exception_callback, &done);
+  disk_->BlockImplQueue(op, exception_callback, &done);
   sync_completion_wait(&done, ZX_TIME_INFINITE);
   sync_completion_reset(&done);
 }
@@ -407,12 +405,12 @@ TEST_F(BlockOpTest, TransferSizeTest) {
                 .offset_vmo = 0,
             },
     };
-    client_.Queue(op, callback, &done);
+    disk_->BlockImplQueue(op, callback, &done);
     sync_completion_wait(&done, ZX_TIME_INFINITE);
     sync_completion_reset(&done);
 
     std::memset(buffer.get(), 0, kMaxTransferSize1MiB);
-    EXPECT_OK(mock_device_->BufferRead(kTestLun, buffer.get(), block_count, 0));
+    EXPECT_OK(mock_device_.BufferRead(kTestLun, buffer.get(), block_count, 0));
 
     EXPECT_EQ(
         std::memcmp(buffer.get(), mapped_vaddr, block_count * ufs_mock_device::kMockBlockSize), 0);
@@ -425,7 +423,7 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
   const uint8_t kTestLun = 0;
 
   // Disable IoLoop completion
-  ufs_->DisableCompletion();
+  dut_->DisableCompletion();
 
   auto callback = [](void* ctx, zx_status_t status, block_op_t* op) {
     EXPECT_OK(status, "op->rw.command.offset_vmo = %lu", op->rw.offset_vmo);
@@ -463,7 +461,7 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
                   .offset_vmo = i,
               },
       };
-      client_.Queue(op, callback, &done[i]);
+      disk_->BlockImplQueue(op, callback, &done[i]);
     }
 
     // Wait until the slot is used up to the desired queue depth.
@@ -472,22 +470,22 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
       return GetSlotStateCount(SlotState::kScheduled) == queue_depth;
     };
     fbl::String submission_timeout_message = "Timeout waiting for submission";
-    ASSERT_OK(ufs_->WaitWithTimeout(wait_for_scheduled, kMultiQueueTimeoutUs,
+    ASSERT_OK(dut_->WaitWithTimeout(wait_for_scheduled, kMultiQueueTimeoutUs,
                                     submission_timeout_message));
 
     // Wait for mock device write I/O is completed.
     auto wait_for_completion = [&]() -> bool {
       std::bitset<32> notification =
-          UtrListCompletionNotificationReg::Get().ReadFrom(&ufs_->GetMmio()).notification();
+          UtrListCompletionNotificationReg::Get().ReadFrom(&dut_->GetMmio()).notification();
       return notification.count() == queue_depth;
     };
     fbl::String completion_timeout_message = "Timeout waiting for completion";
-    ASSERT_OK(ufs_->WaitWithTimeout(wait_for_completion, kMultiQueueTimeoutUs,
+    ASSERT_OK(dut_->WaitWithTimeout(wait_for_completion, kMultiQueueTimeoutUs,
                                     completion_timeout_message));
 
-    ufs_->ProcessCompletions();
+    dut_->ProcessCompletions();
     ASSERT_EQ(GetSlotStateCount(SlotState::kFree),
-              ufs_->GetTransferRequestProcessor().GetRequestList().GetSlotCount());
+              dut_->GetTransferRequestProcessor().GetRequestList().GetSlotCount());
 
     for (uint32_t i = 0; i < queue_depth; ++i) {
       sync_completion_wait(&done[i], ZX_TIME_INFINITE);
@@ -495,7 +493,7 @@ TEST_F(BlockOpTest, MultiQueueDepthWriteTest) {
     }
 
     char buf[ufs_mock_device::kMockBlockSize * queue_depth];
-    ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, queue_depth, 0));
+    ASSERT_OK(mock_device_.BufferRead(kTestLun, buf, queue_depth, 0));
 
     ASSERT_EQ(std::memcmp(buf, mapped_vaddr, ufs_mock_device::kMockBlockSize), 0);
     ASSERT_OK(zx::vmar::root_self()->unmap(vaddr, ufs_mock_device::kMockBlockSize));

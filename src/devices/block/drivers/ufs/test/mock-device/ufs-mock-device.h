@@ -62,12 +62,14 @@ class FakeRegisters final {
   template <typename T>
   T Read(zx_off_t offs) const {
     ZX_ASSERT(offs + sizeof(T) <= RegisterMap::kRegisterSize);
+    ZX_ASSERT(registers_ != nullptr);
     return *reinterpret_cast<const T *>(registers_ + offs);
   }
 
   template <typename T>
   void Write(T val, zx_off_t offs) {
     ZX_ASSERT(offs + sizeof(T) <= RegisterMap::kRegisterSize);
+    ZX_ASSERT(registers_ != nullptr);
     *reinterpret_cast<T *>(registers_ + offs) = val;
   }
 
@@ -105,24 +107,33 @@ class UfsMockDevice {
   static constexpr uint32_t kNutrs = 32;
   static constexpr uint32_t kNutmrs = 8;
 
-  explicit UfsMockDevice(zx::interrupt irq);
+  UfsMockDevice()
+      : register_mmio_processor_(*this),
+        uiccmd_processor_(*this),
+        transfer_request_processor_(*this),
+        query_request_processor_(*this),
+        scsi_command_processor_(*this) {}
   UfsMockDevice(const UfsMockDevice &) = delete;
   UfsMockDevice &operator=(const UfsMockDevice &) = delete;
   UfsMockDevice(const UfsMockDevice &&) = delete;
   UfsMockDevice &operator=(const UfsMockDevice &&) = delete;
   ~UfsMockDevice() = default;
 
-  fdf::MmioBuffer GetMmioBuffer() {
-    return fdf_testing::CreateMmioBuffer(registers_.GetRegistersVmo(), ZX_CACHE_POLICY_UNCACHED,
+  void Init(std::unique_ptr<zx::interrupt> irq);
+
+  fdf::MmioBuffer GetMmioBuffer(zx::vmo vmo) {
+    return fdf_testing::CreateMmioBuffer(std::move(vmo), ZX_CACHE_POLICY_UNCACHED,
                                          &RegisterMmioProcessor::GetMmioOps(), this);
   }
 
-  zx_status_t AddLun(uint8_t lun);
-
+  zx::vmo GetVmo() { return registers_.GetRegistersVmo(); }
+  zx::interrupt GetIrq();
   zx::bti GetFakeBti() { return dma_handler_.DuplicateFakeBti(); }
   zx::result<zx_vaddr_t> MapDmaPaddr(zx_paddr_t paddr) { return dma_handler_.PhysToVirt(paddr); }
 
-  void TriggerInterrupt() { irq_.trigger(0, zx::clock::get_monotonic()); }
+  zx_status_t AddLun(uint8_t lun);
+
+  void TriggerInterrupt() { irq_->trigger(0, zx::clock::get_monotonic()); }
 
   zx_status_t BufferWrite(uint8_t lun, const void *buf, size_t block_count, off_t block_offset);
   zx_status_t BufferRead(uint8_t lun, void *buf, size_t block_count, off_t block_offset);
@@ -156,7 +167,7 @@ class UfsMockDevice {
   std::array<uint32_t, static_cast<size_t>(Attributes::kAttributeCount)> attributes_;
   std::array<bool, static_cast<size_t>(Flags::kFlagCount)> flags_;
 
-  zx::interrupt irq_;
+  std::unique_ptr<zx::interrupt> irq_;
   FakeDmaHandler dma_handler_;
   FakeRegisters registers_;
   RegisterMmioProcessor register_mmio_processor_;

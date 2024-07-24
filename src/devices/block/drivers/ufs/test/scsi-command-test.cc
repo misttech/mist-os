@@ -22,8 +22,6 @@ class ScsiCommandTest : public UfsTest {
  public:
   void SetUp() override {
     UfsTest::SetUp();
-    ASSERT_NO_FATAL_FAILURE(RunInit());
-
     // Create a mapped and pinned vmo.
     ASSERT_OK(zx::vmo::create(kMockBlockSize, 0, &vmo_));
     zx::unowned_vmo unowned_vmo(vmo_);
@@ -55,7 +53,7 @@ TEST_F(ScsiCommandTest, Read10) {
   char buf[kMockBlockSize];
   constexpr char kTestString[] = "test";
   std::strncpy(buf, kTestString, sizeof(buf));
-  ASSERT_OK(mock_device_->BufferWrite(kTestLun, buf, GetBlockCount(), block_offset));
+  ASSERT_OK(mock_device_.BufferWrite(kTestLun, buf, GetBlockCount(), block_offset));
 
   // Make READ 10 CDB
   uint8_t cdb_buffer[10] = {};
@@ -69,7 +67,7 @@ TEST_F(ScsiCommandTest, Read10) {
                        GetBlockCount() * GetBlockSize());
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_10);
   ASSERT_OK(
-      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
+      dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   // Check the read data
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
@@ -83,7 +81,7 @@ TEST_F(ScsiCommandTest, Read10Exception) {
   char buf[kMockBlockSize];
   std::memset(buf, 0xf0, sizeof(buf));
 
-  ASSERT_OK(mock_device_->BufferWrite(kTestLun, buf, GetBlockCount(), block_offset));
+  ASSERT_OK(mock_device_.BufferWrite(kTestLun, buf, GetBlockCount(), block_offset));
 
   {
     // Make READ 10 CDB
@@ -101,7 +99,7 @@ TEST_F(ScsiCommandTest, Read10Exception) {
 
     // The command should be failed with not-created vmo.
     zx::vmo not_created_vmo;
-    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(
+    auto response = dut_->GetTransferRequestProcessor().SendScsiUpiu(
         upiu, kTestLun, zx::unowned_vmo(not_created_vmo));
     ASSERT_EQ(response.status_value(), ZX_ERR_BAD_HANDLE);
   }
@@ -122,7 +120,7 @@ TEST_F(ScsiCommandTest, Read10Exception) {
 
     // The command should be failed with not-exist LUN.
     const uint8_t kTestFailureLun = 1;
-    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestFailureLun,
+    auto response = dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestFailureLun,
                                                                      zx::unowned_vmo(GetVmo()));
     ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
   }
@@ -144,7 +142,7 @@ TEST_F(ScsiCommandTest, Read10Exception) {
 
     // The command should be failed with address exceeding device size.
     auto response =
-        ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo()));
+        dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo()));
     // TODO(https://fxbug.dev/42075643): Modify status code after
     // |TransferRequestProcessor::GetResponseStatus()| is refactored.
     ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
@@ -170,11 +168,11 @@ TEST_F(ScsiCommandTest, Write10) {
                        GetBlockCount() * GetBlockSize());
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::WRITE_10);
   ASSERT_OK(
-      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
+      dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   // Read test data form the mock device
   char buf[kMockBlockSize];
-  ASSERT_OK(mock_device_->BufferRead(kTestLun, buf, GetBlockCount(), block_offset));
+  ASSERT_OK(mock_device_.BufferRead(kTestLun, buf, GetBlockCount(), block_offset));
 
   // Check the written data
   ASSERT_EQ(memcmp(GetVirtualAddress(), buf, kMockBlockSize), 0);
@@ -202,7 +200,7 @@ TEST_F(ScsiCommandTest, Write10Exception) {
 
     // The command should be failed with not-created vmo.
     zx::vmo not_created_vmo;
-    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(
+    auto response = dut_->GetTransferRequestProcessor().SendScsiUpiu(
         upiu, kTestLun, zx::unowned_vmo(not_created_vmo));
     ASSERT_EQ(response.status_value(), ZX_ERR_BAD_HANDLE);
   }
@@ -223,7 +221,7 @@ TEST_F(ScsiCommandTest, Write10Exception) {
 
     // The command should be failed with not-exist LUN.
     const uint8_t kTestFailureLun = 1;
-    auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestFailureLun,
+    auto response = dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestFailureLun,
                                                                      zx::unowned_vmo(GetVmo()));
     // TODO(https://fxbug.dev/42075643): Modify status code after
     // |TransferRequestProcessor::GetResponseStatus()| is refactored.
@@ -247,7 +245,7 @@ TEST_F(ScsiCommandTest, Write10Exception) {
 
     // The command should be failed with address exceeding device size.
     auto response =
-        ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo()));
+        dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo()));
     ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
   }
 }
@@ -261,7 +259,7 @@ TEST_F(ScsiCommandTest, TestUnitReady) {
 
   ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::TEST_UNIT_READY);
-  auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
+  auto response = dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_OK(response);
 
   auto *response_sense_data =
@@ -291,7 +289,7 @@ TEST_F(ScsiCommandTest, ReadCapacity10) {
                        sizeof(scsi::ReadCapacity10ParameterData));
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::READ_CAPACITY_10);
   ASSERT_OK(
-      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
+      dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   auto *read_capacity_data =
       reinterpret_cast<scsi::ReadCapacity10ParameterData *>(GetVirtualAddress());
@@ -315,7 +313,7 @@ TEST_F(ScsiCommandTest, RequestSense) {
                        cdb->allocation_length);
   ASSERT_EQ(upiu.GetOpcode(), scsi::Opcode::REQUEST_SENSE);
   ASSERT_OK(
-      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
+      dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(GetVirtualAddress());
   ASSERT_EQ(sense_data->response_code(), 0x70);  // 0x70 is the fixed format sense data response.
@@ -336,15 +334,15 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
 
   ScsiCommandUpiu cache_upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   ASSERT_EQ(cache_upiu.GetOpcode(), scsi::Opcode::SYNCHRONIZE_CACHE_10);
-  ASSERT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(cache_upiu, kTestLun,
+  ASSERT_OK(dut_->GetTransferRequestProcessor().SendScsiUpiu(cache_upiu, kTestLun,
                                                              zx::unowned_vmo(GetVmo())));
 }
 
 TEST_F(ScsiCommandTest, WellKnownLuns) {
-  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kReportLuns));
-  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kUfsDevice));
-  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kBoot));
-  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kRpmb));
+  EXPECT_TRUE(dut_->HasWellKnownLun(WellKnownLuns::kReportLuns));
+  EXPECT_TRUE(dut_->HasWellKnownLun(WellKnownLuns::kUfsDevice));
+  EXPECT_TRUE(dut_->HasWellKnownLun(WellKnownLuns::kBoot));
+  EXPECT_TRUE(dut_->HasWellKnownLun(WellKnownLuns::kRpmb));
 
   // Make TEST UNIT READY CDB
   uint8_t cdb_buffer[6] = {};
@@ -359,7 +357,7 @@ TEST_F(ScsiCommandTest, WellKnownLuns) {
   for (auto lun : well_known_luns) {
     ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
     EXPECT_EQ(upiu.GetOpcode(), scsi::Opcode::TEST_UNIT_READY);
-    EXPECT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, static_cast<uint8_t>(lun),
+    EXPECT_OK(dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, static_cast<uint8_t>(lun),
                                                                zx::unowned_vmo(GetVmo())));
   }
 }

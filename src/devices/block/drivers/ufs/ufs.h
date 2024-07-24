@@ -5,15 +5,18 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_UFS_UFS_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_UFS_H_
 
+#include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
-#include <lib/device-protocol/pci.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/scsi/disk-dfv1.h>
+#include <lib/scsi/disk.h>
+#include <lib/sync/cpp/completion.h>
+#include <lib/zircon-internal/thread_annotations.h>
 
 #include <unordered_set>
 
-#include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/condition_variable.h>
 #include <fbl/intrusive_double_list.h>
@@ -77,44 +80,38 @@ struct IoCommand {
   list_node_t node;
 };
 
-class Ufs;
-
 using HostControllerCallback = fit::function<zx::result<>(NotifyEvent, uint64_t data)>;
 
-using UfsDeviceType = ddk::Device<Ufs, ddk::Suspendable, ddk::Resumable, ddk::Initializable>;
-class Ufs : public scsi::Controller, public UfsDeviceType {
+class Ufs : public fdf::DriverBase, public scsi::Controller {
  public:
   static constexpr char kDriverName[] = "ufs";
 
-  explicit Ufs(zx_device_t *parent, ddk::Pci pci, fdf::MmioBuffer mmio,
-               fuchsia_hardware_pci::InterruptMode irq_mode, zx::interrupt irq, zx::bti bti)
-      : UfsDeviceType(parent),
-        pci_(std::move(pci)),
-        mmio_(std::move(mmio)),
-        irq_mode_(irq_mode),
-        irq_(std::move(irq)),
-        bti_(std::move(bti)) {}
+  Ufs(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
   ~Ufs() override = default;
 
-  static zx_status_t Bind(void *ctx, zx_device_t *parent);
-  zx_status_t AddDevice();
+  zx::result<> Start() override;
 
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
-  void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkResume(ddk::ResumeTxn txn);
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // scsi::Controller
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> &root_node() override { return root_node_; }
+  std::string_view driver_name() const override { return name(); }
+  const std::shared_ptr<fdf::Namespace> &driver_incoming() const override { return incoming(); }
+  std::shared_ptr<fdf::OutgoingDirectory> &driver_outgoing() override { return outgoing(); }
+  const std::optional<std::string> &driver_node_name() const override { return node_name(); }
+  fdf::Logger &driver_logger() override { return logger(); }
+
   size_t BlockOpSize() override { return sizeof(IoCommand); }
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                            uint32_t block_size_bytes, scsi::DiskOp *disk_op, iovec data) override;
 
-  inspect::Inspector &inspector() { return inspector_; }
-  inspect::Node &inspect_node() { return inspect_node_; }
-
-  fdf::MmioBuffer &GetMmio() { return mmio_; }
+  const fdf::MmioBuffer &GetMmio() const {
+    ZX_ASSERT(mmio_.has_value());
+    return mmio_.value();
+  }
 
   DeviceManager &GetDeviceManager() const {
     ZX_DEBUG_ASSERT(device_manager_ != nullptr);
@@ -154,7 +151,6 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
 
   // for test
   uint32_t GetLogicalUnitCount() const { return logical_unit_count_; }
-  thrd_t &GetIoThread() { return io_thread_; }
 
   void DisableCompletion() { disable_completion_ = true; }
   void DumpRegisters();
@@ -165,6 +161,15 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
 
   bool IsSuspended() const { return device_manager_->IsSuspended(); }
 
+ protected:
+  // Initialize the UFS controller and bind the logical units.
+  // Declare this as virtual to delay driver initialization in tests.
+  virtual zx_status_t Init();
+
+  virtual zx::result<fdf::MmioBuffer> CreateMmioBuffer(zx_off_t offset, size_t size, zx::vmo vmo) {
+    return fdf::MmioBuffer::Create(offset, size, std::move(vmo), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+  }
+
  private:
   friend class UfsTest;
   int IrqLoop();
@@ -173,8 +178,10 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   // Interrupt service routine. Check that the request is complete.
   zx::result<> Isr();
 
-  // Initialize the UFS controller and bind the logical units.
-  zx_status_t Init();
+  zx::result<> ConnectToPciService();
+  zx::result<> ConfigResources();
+
+  zx::result<> InitMmioBuffer();
   zx::result<> InitQuirk();
   zx::result<> InitController();
   zx::result<> InitDeviceInterface(inspect::Node &controller_node);
@@ -186,12 +193,14 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
 
   zx::result<> AllocatePages(zx::vmo &vmo, fzl::VmoMapper &mapper, size_t size);
 
-  ddk::Pci pci_;
-  fdf::MmioBuffer mmio_;
+  fidl::WireSyncClient<fuchsia_hardware_pci::Device> pci_;
+  zx::vmo mmio_buffer_vmo_;
+  uint64_t mmio_buffer_size_ = 0;
+  std::optional<fdf::MmioBuffer> mmio_;
   fuchsia_hardware_pci::InterruptMode irq_mode_;
   zx::interrupt irq_;
   zx::bti bti_;
-  inspect::Inspector inspector_;
+
   inspect::Node inspect_node_;
 
   std::mutex commands_lock_;
@@ -202,11 +211,12 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   // Notifies IoThread() that it has work to do. Signaled from QueueIoCommand() or the IRQ handler.
   sync_completion_t io_signal_;
 
-  thrd_t irq_thread_ = 0;
-  thrd_t io_thread_ = 0;
-  bool irq_thread_started_ = false;
-
-  bool io_thread_started_ = false;
+  // Dispatcher for processing queued block requests.
+  fdf::Dispatcher irq_worker_dispatcher_;
+  fdf::Dispatcher io_worker_dispatcher_;
+  // Signaled when worker_dispatcher_ is shut down.
+  libsync::Completion irq_worker_shutdown_completion_;
+  libsync::Completion io_worker_shutdown_completion_;
 
   std::unique_ptr<DeviceManager> device_manager_;
   std::unique_ptr<TransferRequestProcessor> transfer_request_processor_;
@@ -228,6 +238,10 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   uint32_t max_transfer_bytes_ = kMaxTransferSize1MiB;
 
   bool qemu_quirk_ = false;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
 }  // namespace ufs

@@ -18,7 +18,7 @@ using RequestProcessorTest = UfsTest;
 
 TEST_F(RequestProcessorTest, RequestListCreate) {
   auto request_list =
-      RequestList::Create(mock_device_->GetFakeBti().borrow(), kMaxTransferRequestListSize,
+      RequestList::Create(mock_device_.GetFakeBti().borrow(), kMaxTransferRequestListSize,
                           sizeof(TransferRequestDescriptor));
 
   // Check list size
@@ -33,42 +33,38 @@ TEST_F(RequestProcessorTest, RequestListCreate) {
 }
 
 TEST_F(RequestProcessorTest, TransferRequestProcessorRingRequestDoorbell) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-
   // Disable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(false)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
   // Reuse the command descriptor in admin slot.
-  auto slot_num = ufs_->GetTransferRequestProcessor().ReserveAdminSlot();
+  auto slot_num = dut_->GetTransferRequestProcessor().ReserveAdminSlot();
   ASSERT_TRUE(slot_num.is_ok());
 
-  auto &slot = ufs_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
+  auto &slot = dut_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
   ASSERT_EQ(slot.state, SlotState::kReserved);
 
   ASSERT_EQ(
-      ufs_->GetTransferRequestProcessor().RingRequestDoorbell(slot_num.value()).status_value(),
+      dut_->GetTransferRequestProcessor().RingRequestDoorbell(slot_num.value()).status_value(),
       ZX_OK);
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(ufs_->GetTransferRequestProcessor().RequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTransferRequestProcessor().RequestCompletion(), 1);
   ASSERT_EQ(slot.state, SlotState::kFree);
 }
 
 TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-
   // Disable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(false)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
-  auto slot_num = ufs_->GetTransferRequestProcessor().ReserveSlot();
+  auto slot_num = dut_->GetTransferRequestProcessor().ReserveSlot();
   ASSERT_TRUE(slot_num.is_ok());
 
-  auto &slot = ufs_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
+  auto &slot = dut_->GetTransferRequestProcessor().GetRequestList().GetSlot(slot_num.value());
   ASSERT_EQ(slot.state, SlotState::kReserved);
 
   DataDirection data_dir = DataDirection::kHostToDevice;
@@ -82,11 +78,11 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
             ZX_OK);
 
   ASSERT_EQ(slot.state, SlotState::kScheduled);
-  ASSERT_EQ(ufs_->GetTransferRequestProcessor().RequestCompletion(), 1);
+  ASSERT_EQ(dut_->GetTransferRequestProcessor().RequestCompletion(), 1);
   ASSERT_EQ(slot.state, SlotState::kFree);
 
   // Check Utp Transfer Request Descriptor
-  auto descriptor = ufs_->GetTransferRequestProcessor()
+  auto descriptor = dut_->GetTransferRequestProcessor()
                         .GetRequestList()
                         .GetRequestDescriptor<TransferRequestDescriptor>(slot_num.value());
   EXPECT_EQ(descriptor->command_type(), kCommandTypeUfsStorage);
@@ -97,7 +93,7 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
   EXPECT_EQ(descriptor->data_unit_number_lower(), 0);  // Crypto is not supported
   EXPECT_EQ(descriptor->data_unit_number_upper(), 0);  // Crypto is not supported
 
-  zx_paddr_t paddr = ufs_->GetTransferRequestProcessor()
+  zx_paddr_t paddr = dut_->GetTransferRequestProcessor()
                          .GetRequestList()
                          .GetSlot(slot_num.value())
                          .command_descriptor_io->phys();
@@ -112,16 +108,14 @@ TEST_F(RequestProcessorTest, FillDescriptorAndSendRequest) {
 }
 
 TEST_F(RequestProcessorTest, SendQueryUpiu) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-
   ReadAttributeUpiu request(Attributes::bBootLunEn);
-  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
+  auto response = dut_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_OK(response);
 
   // Check that the Request UPIU is copied into the command descriptor.
   constexpr uint8_t slot_num = kAdminCommandSlotNumber;
   AbstractUpiu command_descriptor(
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num));
+      dut_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num));
   ASSERT_EQ(memcmp(request.GetData(), command_descriptor.GetData(), sizeof(QueryRequestUpiuData)),
             0);
 
@@ -138,28 +132,26 @@ TEST_F(RequestProcessorTest, SendQueryUpiu) {
 }
 
 TEST_F(RequestProcessorTest, SendQueryUpiuException) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-
   // Disable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(false)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
   ReadAttributeUpiu request(Attributes::bBootLunEn);
-  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
-  auto response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
+  dut_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
+  auto response = dut_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_EQ(response.status_value(), ZX_ERR_TIMED_OUT);
-  ufs_->ProcessCompletions();
+  dut_->ProcessCompletions();
 
   // Enable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(true)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
   // Hook the query request handler to set a response error
-  mock_device_->GetTransferRequestProcessor().SetHook(
+  mock_device_.GetTransferRequestProcessor().SetHook(
       UpiuTransactionCodes::kQueryRequest,
       [](UfsMockDevice &mock_device, CommandDescriptorData command_descriptor_data) {
         QueryRequestUpiuData *request_upiu = reinterpret_cast<QueryRequestUpiuData *>(
@@ -179,23 +171,21 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
                                                                          *response_upiu);
       });
 
-  ufs_->GetTransferRequestProcessor().SetTimeout(kCommandTimeout);
-  response = ufs_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
+  dut_->GetTransferRequestProcessor().SetTimeout(kCommandTimeout);
+  response = dut_->GetTransferRequestProcessor().SendQueryRequestUpiu(request);
   ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
 }
 
 TEST_F(RequestProcessorTest, SendNopUpiu) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-
   NopOutUpiu nop_out_upiu;
   auto nop_in =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
+      dut_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_OK(nop_in);
 
   // Check that the nop out UPIU is copied into the command descriptor.
   constexpr uint8_t slot_num = kAdminCommandSlotNumber;
   AbstractUpiu command_descriptor(
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num));
+      dut_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot_num));
   ASSERT_EQ(memcmp(nop_out_upiu.GetData(), command_descriptor.GetData(), sizeof(NopOutUpiuData)),
             0);
 
@@ -208,29 +198,27 @@ TEST_F(RequestProcessorTest, SendNopUpiu) {
 }
 
 TEST_F(RequestProcessorTest, SendNopUpiuException) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-
   // Disable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(false)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
   NopOutUpiu nop_out_upiu;
-  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
+  dut_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
   auto nop_in =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
+      dut_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_TIMED_OUT);
-  ufs_->ProcessCompletions();
+  dut_->ProcessCompletions();
 
   // Enable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(true)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
   // Hook the nop out handler to set a response error
-  mock_device_->GetTransferRequestProcessor().SetHook(
+  mock_device_.GetTransferRequestProcessor().SetHook(
       UpiuTransactionCodes::kNopOut,
       [](UfsMockDevice &mock_device, CommandDescriptorData command_descriptor_data) {
         NopInUpiuData *nop_in_upiu =
@@ -241,29 +229,26 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
         return ZX_OK;
       });
 
-  ufs_->GetTransferRequestProcessor().SetTimeout(kCommandTimeout);
-  nop_in = ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
+  dut_->GetTransferRequestProcessor().SetTimeout(kCommandTimeout);
+  nop_in = dut_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_BAD_STATE);
 }
 
 TEST_F(RequestProcessorTest, SendRequestUpiuWithAdminSlotIsFull) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
-
   // Reserve admin slot.
-  ASSERT_OK(ufs_->GetTransferRequestProcessor().ReserveAdminSlot());
+  ASSERT_OK(dut_->GetTransferRequestProcessor().ReserveAdminSlot());
 
   // Make request UPIU
   NopOutUpiu nop_out_upiu;
   auto nop_in =
-      ufs_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
+      dut_->GetTransferRequestProcessor().SendRequestUpiu<NopOutUpiu, NopInUpiu>(nop_out_upiu);
   ASSERT_EQ(nop_in.status_value(), ZX_ERR_NO_RESOURCES);
 }
 
 TEST_F(RequestProcessorTest, SendRequestUsingSlot) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
   constexpr uint8_t kTestLun = 0;
 
-  auto slot = ufs_->GetTransferRequestProcessor().ReserveSlot();
+  auto slot = dut_->GetTransferRequestProcessor().ReserveSlot();
   ASSERT_OK(slot);
 
   // Send scsi command with SendRequestUsingSlot()
@@ -272,13 +257,13 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlot) {
   cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
 
   ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
-  auto response_or = ufs_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
+  auto response_or = dut_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
       upiu, kTestLun, slot.value(), std::nullopt, nullptr, /*is_sync*/ true);
   ASSERT_OK(response_or);
 
   // Check that the SCSI UPIU is copied into the command descriptor.
   AbstractUpiu command_descriptor(
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot.value()));
+      dut_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(slot.value()));
 
   ASSERT_EQ(memcmp(upiu.GetData(), command_descriptor.GetData(), sizeof(CommandUpiuData)), 0);
 
@@ -290,18 +275,17 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlot) {
 }
 
 TEST_F(RequestProcessorTest, SendRequestUsingSlotTimeout) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
   constexpr uint8_t kTestLun = 0;
 
   // Disable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(false)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
-  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
+  dut_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
 
-  auto slot = ufs_->GetTransferRequestProcessor().ReserveSlot();
+  auto slot = dut_->GetTransferRequestProcessor().ReserveSlot();
   ASSERT_OK(slot);
 
   // Send scsi command with SendRequestUsingSlot()
@@ -310,13 +294,12 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlotTimeout) {
   cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
 
   ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
-  auto response_or = ufs_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
+  auto response_or = dut_->GetTransferRequestProcessor().SendRequestUsingSlot<ScsiCommandUpiu>(
       upiu, kTestLun, slot.value(), std::nullopt, nullptr, /*is_sync*/ true);
   ASSERT_EQ(response_or.status_value(), ZX_ERR_TIMED_OUT);
 }
 
 TEST_F(RequestProcessorTest, SendScsiUpiu) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
   constexpr uint8_t kTestLun = 0;
 
   // Send scsi command with SendScsiUpiu()
@@ -325,12 +308,12 @@ TEST_F(RequestProcessorTest, SendScsiUpiu) {
   cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
 
   ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
-  auto response_or = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
+  auto response_or = dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_OK(response_or);
 
   // Check that the SCSI UPIU is copied into the command descriptor.
   AbstractUpiu command_descriptor(
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(
+      dut_->GetTransferRequestProcessor().GetRequestList().GetDescriptorBuffer(
           kAdminCommandSlotNumber));
   ASSERT_EQ(memcmp(upiu.GetData(), command_descriptor.GetData(), sizeof(CommandUpiuData)), 0);
 
@@ -342,16 +325,15 @@ TEST_F(RequestProcessorTest, SendScsiUpiu) {
 }
 
 TEST_F(RequestProcessorTest, SendScsiUpiuTimeout) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
   constexpr uint8_t kTestLun = 0;
 
   // Disable completion interrupt
   InterruptEnableReg::Get()
-      .ReadFrom(mock_device_->GetRegisters())
+      .ReadFrom(mock_device_.GetRegisters())
       .set_utp_transfer_request_completion_enable(false)
-      .WriteTo(mock_device_->GetRegisters());
+      .WriteTo(mock_device_.GetRegisters());
 
-  ufs_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
+  dut_->GetTransferRequestProcessor().SetTimeout(zx::msec(100));
 
   // Send scsi command with SendScsiUpiu()
   uint8_t cdb_buffer[6] = {};
@@ -359,34 +341,32 @@ TEST_F(RequestProcessorTest, SendScsiUpiuTimeout) {
   cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
 
   ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
-  auto response_or = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
+  auto response_or = dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_EQ(response_or.status_value(), ZX_ERR_TIMED_OUT);
 }
 
 TEST_F(RequestProcessorTest, SendScsiUpiuWithAdminSlotIsFull) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
   constexpr uint8_t kTestLun = 0;
 
-  ASSERT_OK(ufs_->GetTransferRequestProcessor().ReserveAdminSlot());
+  ASSERT_OK(dut_->GetTransferRequestProcessor().ReserveAdminSlot());
 
   uint8_t cdb_buffer[6] = {};
   auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
   cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
 
   ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
-  auto response = ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
+  auto response = dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun);
   ASSERT_EQ(response.status_value(), ZX_ERR_NO_RESOURCES);
 }
 
 TEST_F(RequestProcessorTest, SendScsiUpiuWithSlotIsFull) {
-  ASSERT_NO_FATAL_FAILURE(RunInit());
   constexpr uint8_t kTestLun = 0;
   const uint8_t kMaxSlotCount =
-      ufs_->GetTransferRequestProcessor().GetRequestList().GetSlotCount() - kAdminCommandSlotCount;
+      dut_->GetTransferRequestProcessor().GetRequestList().GetSlotCount() - kAdminCommandSlotCount;
 
   // Reserve all slots.
   for (uint32_t slot_num = 0; slot_num < kMaxSlotCount; ++slot_num) {
-    ASSERT_OK(ufs_->GetTransferRequestProcessor().ReserveSlot());
+    ASSERT_OK(dut_->GetTransferRequestProcessor().ReserveSlot());
   }
 
   IoCommand empty_io_cmd;
@@ -397,7 +377,7 @@ TEST_F(RequestProcessorTest, SendScsiUpiuWithSlotIsFull) {
 
   ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
   auto response =
-      ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, std::nullopt, &empty_io_cmd);
+      dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, std::nullopt, &empty_io_cmd);
   ASSERT_EQ(response.status_value(), ZX_ERR_NO_RESOURCES);
 }
 

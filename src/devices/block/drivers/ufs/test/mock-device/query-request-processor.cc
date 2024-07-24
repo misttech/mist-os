@@ -16,7 +16,7 @@ zx_status_t QueryRequestProcessor::HandleQueryRequest(QueryRequestUpiuData &req_
     status = (it->second)(mock_device_, req_upiu, rsp_upiu);
   } else {
     status = ZX_ERR_NOT_SUPPORTED;
-    zxlogf(ERROR, "UFS MOCK: query request opcode: 0x%x is not supported", req_upiu.opcode);
+    FDF_LOG(ERROR, "UFS MOCK: query request opcode: 0x%x is not supported", req_upiu.opcode);
   }
   return status;
 }
@@ -42,7 +42,7 @@ zx_status_t QueryRequestProcessor::DefaultReadDescriptorHandler(UfsMockDevice &m
     std::memcpy(rsp_upiu.command_data.data(), &mock_device.GetPowerDesc(),
                 sizeof(PowerParametersDescriptor));
   } else {
-    zxlogf(ERROR, "UFS MOCK: read descriptor idn: 0x%x is not supported", req_upiu.idn);
+    FDF_LOG(ERROR, "UFS MOCK: read descriptor idn: 0x%x is not supported", req_upiu.idn);
     return ZX_ERR_NOT_SUPPORTED;
   }
   rsp_upiu.length = htobe16(rsp_upiu.command_data[0]);

@@ -16,5 +16,6 @@
         {
             protocol: [ "fuchsia.process.Launcher" ],
         },
+        { service: "fuchsia.hardware.pci.Service" },
     ],
 }

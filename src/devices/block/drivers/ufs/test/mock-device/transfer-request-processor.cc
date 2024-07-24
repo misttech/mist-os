@@ -42,13 +42,13 @@ void TransferRequestProcessor::HandleTransferRequest(TransferRequestDescriptor &
     status = (it->second)(mock_device_, command_descriptor_data);
   } else {
     status = ZX_ERR_NOT_SUPPORTED;
-    zxlogf(ERROR, "UFS MOCK: transfer request opcode: 0x%x is not supported", opcode);
+    FDF_LOG(ERROR, "UFS MOCK: transfer request opcode: 0x%x is not supported", opcode);
   }
 
   if (status == ZX_OK) {
     descriptor.set_overall_command_status(OverallCommandStatus::kSuccess);
   } else {
-    zxlogf(ERROR, "UFS MOCK: Failed to handle transfer request: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "UFS MOCK: Failed to handle transfer request: %s", zx_status_get_string(status));
     descriptor.set_overall_command_status(OverallCommandStatus::kInvalid);
   }
 

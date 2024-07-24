@@ -26,10 +26,10 @@ constexpr uint8_t kAdminCommandSlotNumber = kMaxTransferRequestListSize - kAdmin
 class TransferRequestProcessor : public RequestProcessor {
  public:
   static zx::result<std::unique_ptr<TransferRequestProcessor>> Create(Ufs &ufs, zx::unowned_bti bti,
-                                                                      fdf::MmioBuffer &mmio,
+                                                                      const fdf::MmioBuffer &mmio,
                                                                       uint8_t entry_count);
   explicit TransferRequestProcessor(RequestList request_list, Ufs &ufs, zx::unowned_bti bti,
-                                    fdf::MmioBuffer &mmio, uint32_t slot_count)
+                                    const fdf::MmioBuffer &mmio, uint32_t slot_count)
       : RequestProcessor(std::move(request_list), ufs, std::move(bti), mmio, slot_count) {}
   ~TransferRequestProcessor() override = default;
 

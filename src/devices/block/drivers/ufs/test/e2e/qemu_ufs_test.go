@@ -48,7 +48,7 @@ func TestQemuWithUFSDisk(t *testing.T) {
 	emu.Start()
 
 	// This message indicates that the ufs disk was detected.
-	emu.WaitForLogMessage("[driver, Ufs] INFO: Bind Success")
+	emu.WaitForLogMessage("[driver, ufs] INFO: Bind Success")
 
 	// Check that the ufs disk is listed by fuchsia.
 	emu.RunCommand("lsblk")
@@ -104,7 +104,7 @@ func TestQemuWithUFSDiskAndRunBlktest(t *testing.T) {
 	emu.Start()
 
 	// This message indicates that the ufs disk was detected.
-	emu.WaitForLogMessage("[driver, Ufs] INFO: Bind Success")
+	emu.WaitForLogMessage("[driver, ufs] INFO: Bind Success")
 
 	// Check that the emulated disk is there.
 	emu.RunCommand("lsblk")
