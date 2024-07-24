@@ -138,12 +138,19 @@ void BtHciBroadcom::OpenHci(OpenHciCompleter::Sync& completer) {
 }
 
 void BtHciBroadcom::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {
-  if (!hci_transport_client_end_.is_valid()) {
-    FDF_LOG(ERROR, "HciTransport client end is not avaliable after driver initialization.");
-    completer.ReplyError(ZX_ERR_BAD_STATE);
+  if (hci_transport_client_end_.is_valid()) {
+    completer.ReplySuccess(std::move(hci_transport_client_end_));
     return;
   }
-  completer.ReplySuccess(std::move(hci_transport_client_end_));
+  // We need a new client end, because we already gave away the initialization one.
+  zx::result<fidl::ClientEnd<fhbt::HciTransport>> client_end =
+      incoming()->Connect<fhbt::HciService::HciTransport>();
+  if (client_end.is_error()) {
+    FDF_LOG(ERROR, "Connect to fhbt::HciTransport protocol failed: %s", client_end.status_string());
+    completer.ReplyError(client_end.status_value());
+    return;
+  }
+  completer.ReplySuccess(std::move(*client_end));
 }
 
 void BtHciBroadcom::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Vendor> metadata,

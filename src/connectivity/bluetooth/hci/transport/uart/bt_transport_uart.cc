@@ -1054,11 +1054,19 @@ void BtTransportUart::QueueUartRead() {
 zx_status_t BtTransportUart::ServeProtocols() {
   // Add HCI services to the outgoing directory.
   auto hci_protocol = [this](fidl::ServerEnd<fhbt::Hci> server_end) mutable {
-    ZX_DEBUG_ASSERT(hci_transport_binding_.size() == 0);
+    if (hci_transport_binding_.size() != 0) {
+      FDF_LOG(ERROR,
+              "Hci protocol connect when we have already started HciTransport. "
+              "Only one type of transport should be used");
+    }
     hci_binding_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
   };
   auto hci_transport_protocol = [this](fidl::ServerEnd<fhbt::HciTransport> server_end) mutable {
-    ZX_DEBUG_ASSERT(hci_binding_.size() == 0);
+    if (hci_binding_.size() != 0) {
+      FDF_LOG(ERROR,
+              "HciTransport protocol connect with Hci transport active. "
+              "Only one type of transport should be used.");
+    }
     hci_transport_binding_.AddBinding(dispatcher_, std::move(server_end), this,
                                       fidl::kIgnoreBindingClosure);
   };

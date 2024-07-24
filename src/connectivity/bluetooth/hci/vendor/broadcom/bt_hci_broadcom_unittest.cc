@@ -304,6 +304,17 @@ class BtHciBroadcomInitializedTest : public BtHciBroadcomTest {
 
 TEST_F(BtHciBroadcomInitializedTest, Lifecycle) {}
 
+TEST_F(BtHciBroadcomInitializedTest, HciTransportOpenTwice) {
+  // Should be able to open two copies of HciTransport.
+  auto result = vendor_client_->OpenHciTransport();
+  ASSERT_TRUE(result.ok());
+  ASSERT_FALSE(result->is_error());
+
+  auto result_second = vendor_client_->OpenHciTransport();
+  ASSERT_TRUE(result_second.ok());
+  ASSERT_FALSE(result_second->is_error());
+}
+
 TEST_F(BtHciBroadcomTest, ReportLoadFirmwareError) {
   // Ensure reading metadata succeeds.
   SetMetadata();
