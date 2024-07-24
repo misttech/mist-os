@@ -295,7 +295,7 @@ enum ReferenceInitialSid {
     _Security = 2,
     Unlabeled = 3,
     _Fs = 4,
-    _File = 5,
+    File = 5,
     _AnySocket = 6,
     _Port = 7,
     _Netif = 8,
@@ -341,6 +341,7 @@ initial_sid_enum! {
 /// These must be present in the policy, for it to be valid.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     InitialSid {
+        File("file"),
         Kernel("kernel"),
         Unlabeled("unlabeled"),
     }

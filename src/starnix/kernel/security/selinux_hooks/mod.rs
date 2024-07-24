@@ -354,14 +354,24 @@ pub fn set_procattr(
     Ok(())
 }
 
-/// Returns a security id that should be used for SELinux access control checks on `fs_node`. This
-/// computation will attempt to load the security id associated with an extended attribute value. If
-/// a meaningful security id cannot be determined, then the `unlabeled` security id is returned.
+/// Determines the effective Security Context to use in access control checks on the supplied `fs_node`.
 ///
-/// This `unlabeled` case includes situations such as:
+/// This logic is a work-in-progress but will involve (at least) the following:
 ///
-/// 1. The `get_xattr("security.selinux")` computation fails to return a `context_string`;
-/// 2. The subsequent `context_string => security_id` computation fails.
+/// 1. If the filesystem has a "context=" mount option, then cache that SID in the node.
+// TODO(b/334091674): Implement the "context=" override.
+/// 2. If the filesystem has "fs_use_xattr" then:
+///    a. If the file has a "security.selinux" valid with the current policy then obtain the SID
+///       and cache it.
+///    b. If the file has a "security.selinux" invalid with the current policy then return the
+///       "unlabeled" SID without caching.
+///    c. If the file lacks a "security.selinux" attribute then check the filesystem's
+///       "defcontext=" mount option; if set then return that SID, without caching.
+// TODO(b/334091674): Implement the "defcontext=" override.
+/// 3. If the policy defines security context(s) for the filesystem type on which `fs_node` resides
+///    then use those to determine a SID, and cache it.
+// TODO(b/334091674): Implement use of policy-defined contexts (e.g. via `genfscon`).
+/// 4. Return the policy's "file" initial context.
 fn compute_fs_node_security_id(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -391,9 +401,11 @@ fn compute_fs_node_security_id(
                 _ => SecurityId::initial(InitialSid::Unlabeled),
             }
         }
-        // TODO(b/330875626): What is the correct behaviour when no extended attribute value is
-        // found to label this file-like object?
-        _ => SecurityId::initial(InitialSid::Unlabeled),
+        _ => {
+            // TODO(b/334091674): Complete the fallback implementation (e.g. using the file system's "context",
+            // "defcontext", etc, if specified).
+            SecurityId::initial(InitialSid::File)
+        }
     }
 }
 
@@ -1135,7 +1147,7 @@ mod tests {
         assert_eq!(None, get_cached_sid(node));
 
         assert_eq!(
-            SecurityId::initial(InitialSid::Unlabeled),
+            SecurityId::initial(InitialSid::File),
             compute_fs_node_security_id(&security_server, &current_task, node)
         );
         assert_eq!(None, get_cached_sid(node));

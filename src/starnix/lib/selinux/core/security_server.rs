@@ -565,6 +565,7 @@ mod tests {
     use super::*;
 
     use fuchsia_zircon::AsHandleRef as _;
+    use selinux_common::ProcessPermission;
     use std::mem::size_of;
     use zerocopy::{FromBytes, FromZeroes};
 
@@ -825,23 +826,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn compute_new_file_sid_unknown_sids() {
-        let security_server = security_server_with_tests_policy();
-
-        // Synthesize two SIDs having been created, and subsequently invalidated.
-        let source_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 1).unwrap());
-        let target_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 2).unwrap());
-
-        // Both source and target will fall-back to the "unlabeled" Context,
-        // so that the new file Context will be identical to "unlabeled", and the
-        // same SID will be returned.
-        let sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
-            .expect("new sid computed");
-        assert_eq!(sid, SecurityId::initial(InitialSid::Unlabeled));
-    }
-
-    #[fuchsia::test]
     fn compute_new_file_sid_no_defaults() {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
@@ -1068,5 +1052,44 @@ mod tests {
 
         // User copied from source, high security level from target, role and type as default.
         assert_eq!(computed_context, b"user_u:object_r:file_t:s1:c0");
+    }
+
+    #[fuchsia::test]
+    fn unknown_sids_are_effectively_unlabeled() {
+        let security_server = security_server_with_tests_policy();
+
+        let valid_sid =
+            security_server.security_context_to_sid(b"user1:object_r:type0:s0:c0".into()).unwrap();
+
+        // Synthesize a SID with no Security Context in the SID table, which would be the case if the
+        // SID had been allocated, but then removed because a policy load invalidated the Context.
+        let unlabeled_sid =
+            SecurityId(NonZeroU32::new(security_server.state.lock().next_sid.into()).unwrap());
+
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy allows "type0" the process getsched capability to "unlabeled_t".
+        assert!(permission_check.has_permissions(
+            valid_sid,
+            unlabeled_sid,
+            &[ProcessPermission::GetSched]
+        ));
+        assert!(!permission_check.has_permissions(
+            valid_sid,
+            unlabeled_sid,
+            &[ProcessPermission::SetSched]
+        ));
+
+        // Test policy allows "unlabeled_t" the process setsched capability to "type0".
+        assert!(!permission_check.has_permissions(
+            unlabeled_sid,
+            valid_sid,
+            &[ProcessPermission::GetSched]
+        ));
+        assert!(permission_check.has_permissions(
+            unlabeled_sid,
+            valid_sid,
+            &[ProcessPermission::SetSched]
+        ));
     }
 }
