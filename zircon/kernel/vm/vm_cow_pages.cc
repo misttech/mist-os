@@ -3511,13 +3511,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   // not actually zero the range in question, it makes future zeroing of the range far more
   // efficient, which is why we do it first.
   if (start < parent_limit_ && end >= parent_limit_) {
-    bool hidden_parent = false;
-    if (parent_) {
-      hidden_parent = parent_locked().is_hidden_locked();
-    }
-    if (hidden_parent) {
-      // Release any COW pages that are no longer necessary. This will also
-      // update the parent limit.
+    if (is_parent_hidden_locked()) {
+      // This will also update the parent limit to `start`.
       __UNINITIALIZED BatchPQRemove page_remover(&ancestor_freed_list);
       ReleaseCowParentPagesLocked(start, parent_limit_, &page_remover);
       page_remover.Flush();
@@ -4661,11 +4656,11 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
             // We found the first populated slot. Stop the traversal.
             return ZX_ERR_STOP;
           },
-          s, size_);
+          start, size_);
       DEBUG_ASSERT(status == ZX_OK);
 
       if (interval_end != UINT64_MAX) {
-        status = page_list_.ClipIntervalEnd(interval_end, interval_end - s + PAGE_SIZE);
+        status = page_list_.ClipIntervalEnd(interval_end, interval_end - start + PAGE_SIZE);
         if (status != ZX_OK) {
           DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
           return status;
@@ -4678,26 +4673,29 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     list_initialize(&freed_list);
     __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
 
-    bool hidden_parent = false;
-    if (parent_) {
-      hidden_parent = parent_locked().is_hidden_locked();
-    }
-    if (hidden_parent) {
-      // Release any COW pages that are no longer necessary. This will also
-      // update the parent limit.
-      ReleaseCowParentPagesLocked(start, end, &page_remover);
+    // Clip the parent limit and release any unreferenced ancestor pages, if any.
+    //
+    // It should never exceed this node's size, either the current size (which is `end`) or the new
+    // size (which is `start`).
+    DEBUG_ASSERT(parent_limit_ <= end);
+    if (start < parent_limit_) {
+      if (is_parent_hidden_locked()) {
+        // This will also update the parent limit to `start`.
+        ReleaseCowParentPagesLocked(start, parent_limit_, &page_remover);
 
-      // Flush the page remover and free the pages, so that we don't mix ownership of ancestor pages
-      // with pages removed from this object below.
-      page_remover.Flush();
-      FreePagesLocked(&freed_list, /*freeing_owned_pages=*/false);
+        // Flush the page remover and free the pages, so that we don't mix ownership of ancestor
+        // pages with pages removed from this object below.
+        page_remover.Flush();
+        FreePagesLocked(&freed_list, /*freeing_owned_pages=*/false);
+      } else {
+        parent_limit_ = start;
+      }
 
       // Validate that the parent limit was correctly updated as it should never remain larger than
-      // our actual size.
-      DEBUG_ASSERT(parent_limit_ <= s);
-    } else {
-      parent_limit_ = ktl::min(parent_limit_, s);
+      // this node's actual size.
+      DEBUG_ASSERT(parent_limit_ == start);
     }
+
     // If the tail of a parent disappears, the children shouldn't be able to see that region
     // again, even if the parent is later reenlarged. So update the child parent limits.
     UpdateChildParentLimitsLocked(s);
@@ -4711,7 +4709,6 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     page_list_.RemovePages(page_remover.RemovePagesCallback(), start, end);
     page_remover.Flush();
     FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
-
   } else if (s > size_) {
     uint64_t temp;
     // Check that this VMOs new size would not cause it to overflow if projected onto the root.
