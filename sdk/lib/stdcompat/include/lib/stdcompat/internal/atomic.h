@@ -84,6 +84,15 @@ LIB_STDCOMPAT_INLINE_LINKAGE inline bool compare_exchange(T* ptr,
                                    to_builtin_memory_order(failure));
 }
 
+// TODO(https://github.com/llvm/llvm-project/issues/94879): Clean up when atomic_ref<T> interface
+// is cleaned up.
+#pragma GCC diagnostic push
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wdeprecated-volatile"
+#elif defined(__GNUG__)
+#pragma GCC diagnostic ignored "-Wvolatile"
+#endif
+
 // Provide atomic operations based on compiler builtins.
 template <typename Derived, typename T>
 class atomic_ops {
@@ -352,6 +361,10 @@ class bitwise_ops<Derived, T, std::enable_if_t<cpp17::is_integral_v<T>>> {
     return static_cast<const Derived*>(this)->ptr_;
   }
 };
+
+// TODO(https://github.com/llvm/llvm-project/issues/94879): Clean up when atomic_ref<T> interface
+// is cleaned up.
+#pragma GCC diagnostic pop
 
 }  // namespace atomic_internal
 }  // namespace cpp20
