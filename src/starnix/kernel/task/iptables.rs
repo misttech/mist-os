@@ -12,7 +12,7 @@ use fidl_fuchsia_net_filter_ext::{
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use itertools::Itertools;
-use starnix_logging::{log_debug, log_warn, track_stub};
+use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::iptables_flags::NfIpHooks;
 use starnix_uapi::user_buffer::UserBuffer;
@@ -489,14 +489,14 @@ impl IpTables {
                             | PushChangesError::TooManyChanges
                             | PushChangesError::FidlConversion(_)),
                         ) => {
-                            log_debug!(
+                            log_warn!(
                                 "IpTables: failed to call \
                                 fuchsia.net.filter.NamespaceController/PushChanges: {e}"
                             );
                             return error!(ECOMM);
                         }
                         Err(e @ PushChangesError::ErrorOnChange(_)) => {
-                            log_debug!(
+                            log_warn!(
                                 "IpTables: fuchsia.net.filter.NamespaceController/PushChanges \
                                 returned error: {e}"
                             );
@@ -508,7 +508,7 @@ impl IpTables {
                 match controller.commit_idempotent(zx::Time::INFINITE) {
                     Ok(()) => {}
                     Err(e @ (CommitError::CallMethod(_) | CommitError::FidlConversion(_))) => {
-                        log_debug!(
+                        log_warn!(
                             "IpTables: failed to call \
                             fuchsia.net.filter.NamespaceController/Commit: {e}"
                         );
@@ -522,7 +522,7 @@ impl IpTables {
                         | CommitError::RedirectWithInvalidMatcher(_)
                         | CommitError::ErrorOnChange(_)),
                     ) => {
-                        log_debug!(
+                        log_warn!(
                             "IpTables: fuchsia.net.filter.NamespaceController/Commit \
                             returned error: {e}"
                         );
