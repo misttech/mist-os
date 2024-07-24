@@ -392,8 +392,7 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
 
   if (info.settings().buffer_settings().coherency_domain() ==
       fuchsia::sysmem2::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK, info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes,
-                                                      nullptr, 0));
+    EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_base, image_vmo_bytes, ZX_CACHE_FLUSH_DATA));
   }
 
   // Create the image in the Flatland instance.
@@ -656,8 +655,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
 
   if (info.settings().buffer_settings().coherency_domain() ==
       fuchsia::sysmem2::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK, info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes,
-                                                      nullptr, 0));
+    EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_base, image_vmo_bytes, ZX_CACHE_FLUSH_DATA));
   }
 
   fuc::ImageProperties image_properties = {};

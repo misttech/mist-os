@@ -289,10 +289,6 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
   // which is not a multiple of 64. The next multiple would be 2432, which would mean the buffer
   // is actually a 608x1024 "pixel" buffer, since 2432/4=608. We must account for that 8 byte
   // padding when copying the bytes over to be inspected.
-  FX_CHECK(ZX_OK == buffer_collection_info_.buffers()[kBufferIndex].vmo().op_range(
-                        ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
-                        buffer_collection_info_.settings().buffer_settings().size_bytes(), nullptr,
-                        0));
 
   FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info_.settings()));
   const uint32_t pixels_per_row =
@@ -307,7 +303,26 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
 
   zx::vmo response_vmo;
   if (vmo_is_readable && bytes_per_row == valid_bytes_per_row) {
-    zx_status_t status = buffer_collection_info_.buffers()[kBufferIndex].vmo().duplicate(
+    // Do not need to map the buffer in this case so cannot use zx_cache_flush on the mapping.
+    // Attempt to use the ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, falling back to creating a temporary
+    // mapping if the operation fails due to being a physical vmo.
+    zx_status_t status = buffer_collection_info_.buffers()[kBufferIndex].vmo().op_range(
+        ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
+        buffer_collection_info_.settings().buffer_settings().size_bytes(), nullptr, 0);
+    if (status == ZX_ERR_NOT_SUPPORTED) {
+      // Receiving ZX_ERR_NOT_SUPPORTED from ZX_VMO_OP_CACHE_CLEAN_INVALIDATE indicates it is a
+      // physical VMO that does not support cache operations. In this case map it in to use
+      // zx_cache_flush.
+      flatland::MapHostPointer(
+          buffer_collection_info_, kBufferIndex, flatland::HostPointerAccessMode::kReadOnly,
+          [](uint8_t* vmo_host, uint32_t num_bytes) {
+            FX_DCHECK(ZX_OK == zx_cache_flush(vmo_host, num_bytes,
+                                              ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+          });
+    } else {
+      FX_DCHECK(status == ZX_OK);
+    }
+    status = buffer_collection_info_.buffers()[kBufferIndex].vmo().duplicate(
         ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER | ZX_RIGHT_GET_PROPERTY, &response_vmo);
     FX_DCHECK(status == ZX_OK);
   } else {
@@ -321,6 +336,9 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
         buffer_collection_info_, kBufferIndex, flatland::HostPointerAccessMode::kReadOnly,
         [&response_vmo_base, bytes_per_row, display_size = display_size_, valid_bytes_per_row,
          response_vmo_size](uint8_t* vmo_host, uint32_t num_bytes) {
+          FX_CHECK(ZX_OK == zx_cache_flush(vmo_host,
+                                           static_cast<size_t>(display_size.height) * bytes_per_row,
+                                           ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
           for (size_t i = 0; i < display_size.height; ++i) {
             FX_DCHECK(i * display_size.width * kBytesPerPixel < response_vmo_size);
             memcpy(&response_vmo_base[i * display_size.width * kBytesPerPixel],
