@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 use crate::dict::Key;
+use crate::fidl::registry;
 use crate::{Capability, Dict};
-use fidl_fuchsia_component_sandbox as fsandbox;
-use futures::TryStreamExt;
+use fidl::handle::Signals;
+use fidl::AsHandleRef;
+use futures::{FutureExt, TryStreamExt};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use tracing::warn;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 type Store = HashMap<u64, Capability>;
 
@@ -58,15 +61,40 @@ pub async fn serve_capability_store(
                 let result = insert_capability(&mut store, id, Capability::Dictionary(Dict::new()));
                 responder.send(result)?;
             }
-            fsandbox::CapabilityStoreRequest::DictionaryOpen {
+            fsandbox::CapabilityStoreRequest::DictionaryLegacyImport {
+                id,
+                client_end,
+                responder,
+            } => {
+                let result = (|| {
+                    let capability = Dict::try_from(client_end)
+                        .map_err(|_| fsandbox::CapabilityStoreError::BadCapability)?
+                        .into();
+                    insert_capability(&mut store, id, capability)
+                })();
+                responder.send(result)?;
+            }
+            fsandbox::CapabilityStoreRequest::DictionaryLegacyExport {
                 id,
                 server_end,
-                control_handle: _,
+                responder,
             } => {
-                let Some(Capability::Dictionary(dict)) = store.get(&id) else {
-                    continue;
-                };
-                dict.serve(server_end.into_stream().unwrap());
+                let result = (|| {
+                    let cap = store
+                        .remove(&id)
+                        .ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+                    let Capability::Dictionary(_) = &cap else {
+                        return Err(fsandbox::CapabilityStoreError::WrongType);
+                    };
+                    let koid = server_end.basic_info().unwrap().related_koid;
+                    registry::insert(
+                        cap,
+                        koid,
+                        fasync::OnSignals::new(server_end, Signals::OBJECT_PEER_CLOSED).map(|_| ()),
+                    );
+                    Ok(())
+                })();
+                responder.send(result)?
             }
             fsandbox::CapabilityStoreRequest::DictionaryInsert { id, item, responder } => {
                 let result = (|| {

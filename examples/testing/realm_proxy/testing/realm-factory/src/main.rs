@@ -82,7 +82,11 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                         .await?
                         .unwrap();
                     let (dictionary, server) = endpoints::create_endpoints();
-                    store.dictionary_open(dict_id, server).unwrap();
+                    store
+                        .dictionary_legacy_export(dict_id, server.into_channel())
+                        .await
+                        .unwrap()
+                        .unwrap();
 
                     // Serve the mixed-in capability.
                     task_group.spawn(async move {

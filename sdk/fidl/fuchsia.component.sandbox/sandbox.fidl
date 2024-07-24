@@ -64,15 +64,16 @@ const MAX_NAME_LENGTH uint64 = fuchsia.io.MAX_NAME_LENGTH;
 @available(added=HEAD)
 alias DictionaryKey = string:MAX_NAME_LENGTH;
 
-/// A key-value pair in a [`Dictionary`].
+/// A key-value pair in a [`DictionaryRef`].
 @available(added=HEAD)
 type DictionaryItem = struct {
     key DictionaryKey;
     value CapabilityId;
 };
 
-/// A key-value pair in a [`Dictionary`], where the value may be an error. This is useful for APIs
-/// that wish to selectively report errors for particular items.
+/// A key-value pair in a [`DictionaryRef`], where the value may be an error.
+/// This is useful for APIs that wish to selectively report errors for
+/// particular items.
 @available(added=HEAD)
 type DictionaryFallibleItem = resource struct {
     key DictionaryKey;
@@ -82,7 +83,7 @@ type DictionaryFallibleItem = resource struct {
     };
 };
 
-/// Error returned from methods in [`Dictionary`].
+/// Error returned from [CapabilityStore/Dictionary*] methods.
 @available(added=HEAD)
 type DictionaryError = flexible enum {
     /// The Dictionary does not contain an item with the given key.
@@ -109,16 +110,7 @@ type DictionaryError = flexible enum {
 
 @discoverable
 @available(added=20)
-open protocol Dictionary {
-    /// Enumerates the items in this dictionary.
-    ///
-    /// Creates a clone of each item during enumeration. If a capability was not cloneable,
-    /// the value will be null.
-    @available(added=HEAD)
-    flexible Enumerate(resource struct {
-        iterator server_end:DictionaryEnumerateIterator;
-    });
-};
+open protocol Dictionary {};
 
 /// A client-assigned id of a [Capability] in a [CapabilityStore].
 ///
@@ -160,7 +152,7 @@ alias WrappedNewCapabilityId = WrappedCapabilityId;
 /// scoped to the [CapabilityStore] in which it resides; i.e. to drop the [CapabilityStore]
 /// connections to release the capabilities instead it. In addition, [CapabilityStore] supports a
 /// [Drop] API to drop an individual [Capability] reference. (Note that it is possible for a
-/// some capabilities, like [Dictionary], to have multiple references, in which case all of
+/// some capabilities, like [DictionaryRef], to have multiple references, in which case all of
 /// the references must be dropped for the underlying resource to be released.)
 ///
 /// A note about semantics: the [CapabilityStore] APIs do not return [CapabilityId]s, because
@@ -216,7 +208,6 @@ open protocol CapabilityStore {
 
     /// Creates a new empty dictionary in this [`CapabilityStore`] with client-assigned `id`.
     ///
-    ///
     /// Errors:
     ///
     /// - `ID_ALREADY_EXISTS` if a capability with `id` already exists in this store.
@@ -224,12 +215,24 @@ open protocol CapabilityStore {
         id CapabilityId;
     }) -> () error CapabilityStoreError;
 
-    /// Binds a [Dictionary] channel to the dictionary with `id`. Legacy API for
-    /// compatibilty with [Dictionary].
-    flexible DictionaryOpen(resource struct {
+    /// Imports a dictionary in the form of a channel.
+    ///
+    /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
+    /// channel.
+    flexible DictionaryLegacyImport(resource struct {
+        id NewCapabilityId;
+        client_end zx.Handle:CHANNEL;
+    }) -> () error CapabilityStoreError;
+
+    /// Binds a channel to the dictionary with `id`. The channel can
+    /// be re-imported into a [CapabilityStore] with [DictionaryImportLegacy].
+    ///
+    /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
+    /// channel.
+    flexible DictionaryLegacyExport(resource struct {
         id CapabilityId;
-        server_end server_end:Dictionary;
-    });
+        server_end zx.Handle:CHANNEL;
+    }) -> () error CapabilityStoreError;
 
     /// Inserts `item` into the dictionary with `id`. `item.value` is moved into the dictionary and
     /// its id is released if this call succeeds.
@@ -339,13 +342,6 @@ type CapabilityStoreError = flexible enum {
     /// The key is invalid. The constraints for valid keys are documented at
     /// https://fuchsia.dev/reference/cml#names.
     INVALID_KEY = 8;
-};
-
-@available(added=HEAD)
-open protocol DictionaryEnumerateIterator {
-    flexible GetNext() -> (resource struct {
-        items vector<DictionaryFallibleItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
-    });
 };
 
 @available(added=HEAD)

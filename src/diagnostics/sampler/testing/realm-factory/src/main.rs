@@ -38,7 +38,11 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                         .await
                         .unwrap()
                         .unwrap();
-                    store.dictionary_open(dict_id, dictionary).unwrap();
+                    store
+                        .dictionary_legacy_export(dict_id, dictionary.into_channel())
+                        .await
+                        .unwrap()
+                        .unwrap();
                     dict_id += 1;
                     realms.push(realm);
                     responder.send(Ok(()))?;

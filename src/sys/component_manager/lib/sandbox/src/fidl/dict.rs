@@ -15,37 +15,6 @@ use vfs::directory::helper::{AlreadyExists, DirectlyMutable};
 use vfs::directory::immutable::simple as pfs;
 use vfs::name::Name;
 
-impl Dict {
-    /// Serve the `fuchsia.component.sandbox/Dictionary` protocol for this [Dict].
-    pub fn serve(&self, stream: fsandbox::DictionaryRequestStream) {
-        let mut clone = self.clone();
-        let mut this = self.lock();
-        this.tasks().spawn(async move {
-            let _ = clone.do_serve(stream).await;
-        });
-    }
-
-    async fn do_serve(
-        &mut self,
-        mut stream: fsandbox::DictionaryRequestStream,
-    ) -> Result<(), fidl::Error> {
-        while let Some(request) = stream.try_next().await? {
-            match request {
-                fsandbox::DictionaryRequest::Enumerate { iterator: server_end, .. } => {
-                    let items = self.enumerate();
-                    let stream = server_end.into_stream().unwrap();
-                    let mut this = self.lock();
-                    this.tasks().spawn(serve_enumerate_iterator(items, stream));
-                }
-                fsandbox::DictionaryRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!("Received unknown Dict request with ordinal {ordinal}");
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
 impl From<Dict> for fsandbox::DictionaryRef {
     fn from(dict: Dict) -> Self {
         fsandbox::DictionaryRef { token: registry::insert_token(dict.into()) }
@@ -63,6 +32,19 @@ impl TryFrom<fsandbox::DictionaryRef> for Dict {
 
     fn try_from(dict: fsandbox::DictionaryRef) -> Result<Self, Self::Error> {
         let any = try_from_handle_in_registry(dict.token.as_handle_ref())?;
+        let Capability::Dictionary(dict) = any else {
+            panic!("BUG: registry has a non-Dict capability under a Dict koid");
+        };
+        Ok(dict)
+    }
+}
+
+// Conversion from legacy channel type.
+impl TryFrom<fidl::Channel> for Dict {
+    type Error = RemoteError;
+
+    fn try_from(dict: fidl::Channel) -> Result<Self, Self::Error> {
+        let any = try_from_handle_in_registry(dict.as_handle_ref())?;
         let Capability::Dictionary(dict) = any else {
             panic!("BUG: registry has a non-Dict capability under a Dict koid");
         };
@@ -96,39 +78,6 @@ impl RemotableCapability for Dict {
             not_found(path);
         }));
         Ok(dir)
-    }
-}
-
-async fn serve_enumerate_iterator(
-    mut items: impl Iterator<Item = (Key, Result<Capability, ()>)>,
-    mut stream: fsandbox::DictionaryEnumerateIteratorRequestStream,
-) {
-    while let Ok(Some(request)) = stream.try_next().await {
-        match request {
-            fsandbox::DictionaryEnumerateIteratorRequest::GetNext { responder } => {
-                let mut chunk = vec![];
-                for _ in 0..fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
-                    match items.next() {
-                        Some((key, value)) => {
-                            chunk.push(fsandbox::DictionaryFallibleItem {
-                                key: key.into(),
-                                value: match value {
-                                    Ok(v) => fsandbox::DictionaryValueResult::Ok(v.into()),
-                                    Err(()) => fsandbox::DictionaryValueResult::Error(
-                                        fsandbox::DictionaryError::NotCloneable,
-                                    ),
-                                },
-                            });
-                        }
-                        None => break,
-                    }
-                }
-                let _ = responder.send(chunk);
-            }
-            fsandbox::DictionaryEnumerateIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryEnumerateIterator request");
-            }
-        }
     }
 }
 
@@ -187,24 +136,71 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn create_and_open_dictionary() {
+    async fn create() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
 
-        let dict_id = 42;
+        let dict_id = 1;
         assert_matches!(store.dictionary_create(dict_id).await.unwrap(), Ok(()));
         assert_matches!(
             store.dictionary_create(dict_id).await.unwrap(),
             Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
         );
-        let (dict, server) = create_proxy().unwrap();
-        store.dictionary_open(dict_id, server).unwrap();
 
-        // The dictionary is empty.
+        let value = 10;
+        store.import(value, Unit::default().into()).await.unwrap().unwrap();
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+
+        // The dictionary has one item.
         let (iterator, server_end) = create_proxy().unwrap();
-        dict.enumerate(server_end).unwrap();
-        let items = iterator.get_next().await.unwrap();
-        assert_eq!(items.len(), 0);
+        store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
+        let keys = iterator.get_next().await.unwrap();
+        assert!(iterator.get_next().await.unwrap().is_empty());
+        assert_eq!(keys, ["cap"]);
+    }
+
+    #[fuchsia::test]
+    async fn legacy_import() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let dict_id = 1;
+        assert_matches!(store.dictionary_create(dict_id).await.unwrap(), Ok(()));
+        assert_matches!(
+            store.dictionary_create(dict_id).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+
+        let value = 10;
+        store.import(value, Unit::default().into()).await.unwrap().unwrap();
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+
+        // Export and re-import the capability using the legacy import/export APIs.
+        let (client, server) = fidl::Channel::create();
+        store.dictionary_legacy_export(dict_id, server).await.unwrap().unwrap();
+        let dict_id = 2;
+        store.dictionary_legacy_import(dict_id, client).await.unwrap().unwrap();
+
+        // The dictionary has one item.
+        let (iterator, server_end) = create_proxy().unwrap();
+        store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
+        let keys = iterator.get_next().await.unwrap();
+        assert!(iterator.get_next().await.unwrap().is_empty());
+        assert_eq!(keys, ["cap"]);
     }
 
     /// Tests that the `Dict` contains an entry for a capability inserted via `Dict.Insert`,

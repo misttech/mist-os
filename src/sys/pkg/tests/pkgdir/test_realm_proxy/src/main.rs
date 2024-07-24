@@ -104,7 +104,7 @@ async fn serve_factory(
 
                 store.dictionary_create(dict_id).await?.unwrap();
                 let (my_dictionary, server) = endpoints::create_endpoints();
-                store.dictionary_open(dict_id, server).unwrap();
+                store.dictionary_legacy_export(dict_id, server.into()).await.unwrap().unwrap();
                 dict_id += 1;
 
                 responder.send(Ok(my_dictionary))?;
