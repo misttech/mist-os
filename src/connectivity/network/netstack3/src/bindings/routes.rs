@@ -20,6 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use assert_matches::assert_matches;
+use derivative::Derivative;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::{InstalledRule, RuleSetPriority};
 use futures::channel::{mpsc, oneshot};
@@ -70,12 +71,13 @@ pub(crate) enum TableOp<I: Ip> {
     AddTable(IpVersionMarker<I>),
 }
 
-#[derive(GenericOverIp, Debug)]
+#[derive(GenericOverIp, Derivative)]
 #[generic_over_ip(A, IpAddress)]
 #[derive(Clone)]
+#[derivative(Debug)]
 pub(crate) enum Change<A: IpAddress> {
     RouteOp(RouteOp<A>, WeakSetMembership<A::Version>),
-    RemoveSet(WeakUserRouteSet<A::Version>),
+    RemoveSet(#[derivative(Debug = "ignore")] WeakUserRouteSet<A::Version>),
     RemoveMatchingDevice(WeakDeviceId),
     RemoveTable(TableId<A::Version>),
 }
@@ -330,7 +332,8 @@ impl<A: IpAddress> Table<A> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Derivative)]
+#[derivative(Debug)]
 pub(crate) enum SetMembership<T> {
     /// Indicates route changes that are applied globally -- routes added
     /// globally cannot be removed by other route sets, but removing a route
@@ -346,7 +349,7 @@ pub(crate) enum SetMembership<T> {
     /// Route sets created ephemerally (usually as part of serving FIDL
     /// protocols that involve managing route lifetimes) belong to this class
     /// of route sets.
-    User(T),
+    User(#[derivative(Debug = "ignore")] T),
 }
 
 type StrongSetMembership<I> = SetMembership<StrongUserRouteSet<I>>;
@@ -410,7 +413,7 @@ pub(crate) struct State<I: Ip> {
     dispatchers: Dispatchers<I>,
 }
 
-#[derive(derivative::Derivative)]
+#[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub(crate) struct Changes<A: IpAddress> {
     new_table_sink: mpsc::UnboundedSender<NewTable<A::Version>>,
