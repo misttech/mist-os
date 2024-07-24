@@ -5,7 +5,6 @@
 library fuchsia.display;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  CONTROLLER = 11,
   ENGINE = 12,
 };
 
