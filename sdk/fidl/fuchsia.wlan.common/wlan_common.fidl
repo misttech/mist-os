@@ -263,6 +263,10 @@ type WlanKeyConfig = table {
     /// Index for rotating keys, e.g. group keys.
     /// This value is always 0 for key types which aren't rotating, e.g. pairwise keys.
     /// Required.
+    ///
+    /// TODO(https://fxbug.dev/301104836): This is a uint8, but SetKeyDescriptor in MLME FIDL and
+    /// DeleteKeysDescriptor in Fullmac FIDL use a uint16 for key_id/key_idx. We should consider
+    /// making all these use the same type.
     6: key_idx uint8;
     /// They key's actual bytes.
     /// Required.
