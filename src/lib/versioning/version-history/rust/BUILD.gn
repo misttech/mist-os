@@ -24,8 +24,8 @@ group("tests") {
   testonly = true
   deps = [
     ":rust_test($host_toolchain)",
+    "data:tests",
     "proc-macro:tests",
     "shared:tests",
-    "static:tests",
   ]
 }
