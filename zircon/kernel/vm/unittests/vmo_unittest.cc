@@ -115,8 +115,6 @@ static bool vmo_commit_compressed_pages_test() {
     END_TEST;
   }
 
-  auto compressor = compression->AcquireCompressor();
-
   // Create a VMO and commit some real pages.
   constexpr size_t kPages = 8;
   fbl::RefPtr<VmObjectPaged> vmo;
@@ -134,10 +132,12 @@ static bool vmo_commit_compressed_pages_test() {
   for (size_t i = 0; i < kPages; i++) {
     // Write some data (possibly zero) to the page.
     EXPECT_OK(vmo->Write(&i, i * PAGE_SIZE, sizeof(i)));
-    ASSERT_OK(compressor.get().Arm());
     vm_page_t* page;
     status = vmo->GetPageBlocking(i * PAGE_SIZE, 0, nullptr, &page, nullptr);
     ASSERT_OK(status);
+    auto compressor = compression->AcquireCompressor();
+    ASSERT_OK(compressor.get().Arm());
+
     uint64_t reclaimed = reclaim_page(vmo, page, i * PAGE_SIZE,
                                       VmCowPages::EvictionHintAction::Follow, &compressor.get());
     EXPECT_EQ(reclaimed, 1u);
@@ -1439,8 +1439,6 @@ static bool vmo_clones_of_compressed_pages_test() {
     END_TEST;
   }
 
-  auto compressor = compression->AcquireCompressor();
-
   AutoVmScannerDisable scanner_disable;
 
   // Create a VMO and make one of its pages compressed.
@@ -1464,10 +1462,13 @@ static bool vmo_clones_of_compressed_pages_test() {
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
   ASSERT_NONNULL(page);
-  ASSERT_OK(compressor.get().Arm());
-  uint64_t reclaimed =
-      reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
-  EXPECT_EQ(reclaimed, 1u);
+  {
+    auto compressor = compression->AcquireCompressor();
+    ASSERT_OK(compressor.get().Arm());
+    uint64_t reclaimed =
+        reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
+    EXPECT_EQ(reclaimed, 1u);
+  }
   page = nullptr;
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
@@ -1495,10 +1496,14 @@ static bool vmo_clones_of_compressed_pages_test() {
   ASSERT_NONNULL(hidden_root);
   page = hidden_root->DebugGetPage(0);
   ASSERT_NONNULL(page);
-  ASSERT_OK(compressor.get().Arm());
-  reclaimed =
-      reclaim_page(hidden_root, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
-  EXPECT_EQ(reclaimed, 1u);
+  {
+    auto compressor = compression->AcquireCompressor();
+
+    ASSERT_OK(compressor.get().Arm());
+    uint64_t reclaimed = reclaim_page(hidden_root, page, 0, VmCowPages::EvictionHintAction::Follow,
+                                      &compressor.get());
+    EXPECT_EQ(reclaimed, 1u);
+  }
   page = nullptr;
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
@@ -1523,8 +1528,6 @@ static bool vmo_clone_kernel_mapped_compressed_test() {
   if (!compression) {
     END_TEST;
   }
-
-  auto compressor = compression->AcquireCompressor();
 
   AutoVmScannerDisable scanner_disable;
 
@@ -1564,14 +1567,17 @@ static bool vmo_clone_kernel_mapped_compressed_test() {
   ASSERT_NONNULL(hidden_root);
   vm_page_t* page = hidden_root->DebugGetPage(0);
   ASSERT_NONNULL(page);
-  ASSERT_OK(compressor.get().Arm());
-  // Attempt to reclaim the page in the hidden parent. As the clone is a fully committed and mapped
-  // VMO this should *not* cause any of its pages to be unmapped. If it did this violate the
-  // requirement that kernel mappings are always pinned and mapped.
-  uint64_t reclaimed =
-      reclaim_page(hidden_root, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get());
-  EXPECT_EQ(reclaimed, 1u);
-  page = nullptr;
+  {
+    auto compressor = compression->AcquireCompressor();
+    ASSERT_OK(compressor.get().Arm());
+    // Attempt to reclaim the page in the hidden parent. As the clone is a fully committed and
+    // mapped VMO this should *not* cause any of its pages to be unmapped. If it did this violate
+    // the requirement that kernel mappings are always pinned and mapped.
+    uint64_t reclaimed = reclaim_page(hidden_root, page, 0, VmCowPages::EvictionHintAction::Follow,
+                                      &compressor.get());
+    EXPECT_EQ(reclaimed, 1u);
+    page = nullptr;
+  }
 
   // Should still be able to touch the ptr;
   EXPECT_EQ(*ptr, 41u);
@@ -2591,8 +2597,6 @@ static bool vmo_attribution_compression_test() {
     END_TEST;
   }
 
-  auto compressor = compression->AcquireCompressor();
-
   AutoVmScannerDisable scanner_disable;
 
   using AttributionCounts = VmObject::AttributionCounts;
@@ -2625,9 +2629,12 @@ static bool vmo_attribution_compression_test() {
   vm_page_t* page = nullptr;
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_OK(compressor.get().Arm());
-  ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
-            1u);
+  {
+    auto compressor = compression->AcquireCompressor();
+    EXPECT_OK(compressor.get().Arm());
+    ASSERT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+              1u);
+  }
   expected_gen_count += 2;
   EXPECT_EQ(true,
             verify_object_memory_attribution(
@@ -2641,10 +2648,13 @@ static bool vmo_attribution_compression_test() {
   // Compress the second page, and ensure the gen count changed.
   status = vmo->GetPageBlocking(PAGE_SIZE, 0, nullptr, &page, nullptr);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_OK(compressor.get().Arm());
-  ASSERT_EQ(
-      reclaim_page(vmo, page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
-      1u);
+  {
+    auto compressor = compression->AcquireCompressor();
+    EXPECT_OK(compressor.get().Arm());
+    ASSERT_EQ(reclaim_page(vmo, page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow,
+                           &compressor.get()),
+              1u);
+  }
   expected_gen_count += 2;
   EXPECT_EQ(true,
             verify_object_memory_attribution(vmo.get(), expected_gen_count,
@@ -3179,8 +3189,6 @@ static bool vmo_lookup_compressed_pages_test() {
     END_TEST;
   }
 
-  auto compressor = compression->AcquireCompressor();
-
   // Create a VMO and commit a real non-zero page
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE, &vmo);
@@ -3191,12 +3199,15 @@ static bool vmo_lookup_compressed_pages_test() {
               vmo->GetAttributedMemory())
 
   // Compress the page.
-  EXPECT_OK(compressor.get().Arm());
   vm_page_t* page;
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
-            1u);
+  {
+    auto compressor = compression->AcquireCompressor();
+    EXPECT_OK(compressor.get().Arm());
+    EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+              1u);
+  }
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory())
 
@@ -3215,9 +3226,12 @@ static bool vmo_lookup_compressed_pages_test() {
               vmo->GetAttributedMemory())
   status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  EXPECT_OK(compressor.get().Arm());
-  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
-            1u);
+  {
+    auto compressor = compression->AcquireCompressor();
+    EXPECT_OK(compressor.get().Arm());
+    EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+              1u);
+  }
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory())
 
@@ -3734,8 +3748,6 @@ static bool vmo_supply_compressed_pages_test() {
     END_TEST;
   }
 
-  auto compressor = compression->AcquireCompressor();
-
   fbl::RefPtr<VmObjectPaged> vmop;
   ASSERT_OK(make_uncommitted_pager_vmo(1, false, false, &vmop));
 
@@ -3746,12 +3758,16 @@ static bool vmo_supply_compressed_pages_test() {
   uint64_t data = 42;
   EXPECT_OK(vmo->Write(&data, 0, sizeof(data)));
 
-  EXPECT_OK(compressor.get().Arm());
   vm_page_t* page;
   zx_status_t status = vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
-            1u);
+
+  {
+    auto compressor = compression->AcquireCompressor();
+    EXPECT_OK(compressor.get().Arm());
+    EXPECT_EQ(reclaim_page(vmo, page, 0, VmCowPages::EvictionHintAction::Follow, &compressor.get()),
+              1u);
+  }
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE}) ==
               vmo->GetAttributedMemory());
 
@@ -4307,8 +4323,6 @@ static bool vmo_prefetch_compressed_pages_test() {
     END_TEST;
   }
 
-  auto compressor = compression->AcquireCompressor();
-
   // Create a VMO and commit some pages to it, ensuring they have non-zero content.
   fbl::RefPtr<VmObjectPaged> vmo;
   zx_status_t status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, PAGE_SIZE * 2, &vmo);
@@ -4319,12 +4333,15 @@ static bool vmo_prefetch_compressed_pages_test() {
   EXPECT_TRUE((VmObject::AttributionCounts{2 * PAGE_SIZE, 0}) == vmo->GetAttributedMemory())
 
   // Compress the second page.
-  EXPECT_OK(compressor.get().Arm());
   vm_page_t* page;
   status = vmo->GetPageBlocking(PAGE_SIZE, 0, nullptr, &page, nullptr);
   ASSERT_OK(status);
-  ASSERT_TRUE(reclaim_page(vmo, page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow,
-                           &compressor.get()));
+  {
+    auto compressor = compression->AcquireCompressor();
+    EXPECT_OK(compressor.get().Arm());
+    ASSERT_TRUE(reclaim_page(vmo, page, PAGE_SIZE, VmCowPages::EvictionHintAction::Follow,
+                             &compressor.get()));
+  }
   EXPECT_TRUE((VmObject::AttributionCounts{1 * PAGE_SIZE, 1 * PAGE_SIZE}) ==
               vmo->GetAttributedMemory())
 
