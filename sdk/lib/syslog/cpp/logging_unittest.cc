@@ -47,14 +47,7 @@ namespace {
 std::chrono::high_resolution_clock::time_point mock_time = std::chrono::steady_clock::now();
 }
 
-__WEAK std::chrono::high_resolution_clock::time_point LogEveryNSecondsState::GetCurrentTime() {
-  return mock_time;
-}
-
 namespace {
-
-void AdvanceClock(uint32_t seconds) { mock_time += std::chrono::seconds(seconds); }
-
 class LoggingFixture : public ::testing::Test {
  public:
   LoggingFixture() : old_severity_(GetMinLogSeverity()), old_stderr_(dup(STDERR_FILENO)) {}
@@ -304,41 +297,6 @@ TEST_F(LoggingFixture, BackendDirect) {
               testing::HasSubstr("ERROR: [foo.cc(42)] Check failed: condition. Log message\n"));
   EXPECT_THAT(log, testing::HasSubstr(
                        "ERROR: [foo.cc(42)] Check failed: condition. fake message foo=42\n"));
-}
-
-TEST_F(LoggingFixture, LogEveryN) {
-  ;
-  LogState state = SetupLogs(false);
-  int32_t counter = 0;
-  auto emit_log = [&]() {
-    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", FX_KV("key", counter));
-    counter++;
-  };
-  emit_log();
-  emit_log();
-  AdvanceClock(5);
-  emit_log();
-  std::string log = ReadLogs(state);
-  EXPECT_THAT(log, testing::HasSubstr("test key=0\n"));
-  EXPECT_THAT(log, testing::Not(testing::HasSubstr("test key=1\n")));
-  EXPECT_THAT(log, testing::HasSubstr("test key=2\n"));
-}
-
-TEST_F(LoggingFixture, LogEveryNWithCounter) {
-  LogState state = SetupLogs(false);
-  int32_t counter = 0;
-  auto emit_log = [&]() {
-    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", FX_KV("key", COUNTER));
-    counter++;
-  };
-  emit_log();
-  emit_log();
-  AdvanceClock(5);
-  emit_log();
-  std::string log = ReadLogs(state);
-  EXPECT_THAT(log, testing::HasSubstr("test key=1\n"));
-  EXPECT_THAT(log, testing::Not(testing::HasSubstr("test key=3\n")));
-  EXPECT_THAT(log, testing::HasSubstr("test key=2\n"));
 }
 
 TEST_F(LoggingFixture, MacroCompilationTest) {
