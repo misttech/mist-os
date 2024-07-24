@@ -1,5 +1,5 @@
 {
-    "short_description": "Test driver that creates two nodes for the test parent drivers to bind to.",
+    "short_description": "Test driver that creates nodes for the metadata_sender driver variants to bind to.",
     "manufacturer": "",
     "families": [],
     "models": [],

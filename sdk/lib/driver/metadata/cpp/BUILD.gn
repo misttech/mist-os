@@ -16,11 +16,11 @@ group("tests") {
 group("drivers") {
   testonly = true
   deps = [
-    "tests/test_child:no_use_component",
-    "tests/test_child:use_component",
-    "tests/test_grandchild:component",
-    "tests/test_parent:expose_component",
-    "tests/test_parent:no_expose_component",
+    "tests/metadata_forwarder_test_driver:component",
+    "tests/metadata_retriever_test_driver:no_use_component",
+    "tests/metadata_retriever_test_driver:use_component",
+    "tests/metadata_sender_test_driver:expose_component",
+    "tests/metadata_sender_test_driver:no_expose_component",
     "tests/test_root:component",
   ]
 }

@@ -1,5 +1,5 @@
 {
-    "short_description": "Test driver that declares the usage of the metadata that it requests",
+    "short_description": "Test driver that forwards metadata using the //sdk/lib/driver/metadata/cpp library",
     "manufacturer": "",
     "families": [],
     "models": [],

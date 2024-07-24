@@ -8,8 +8,8 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/test_child_driver.so",
-        bind: "meta/bind/test_child_use.bindbc",
+        binary: "driver/metadata_forwarder_sdk_test_driver.so",
+        bind: "meta/bind/metadata_forwarder_sdk_test_driver.bindbc",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
     capabilities: [

@@ -5,9 +5,9 @@
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.test/cpp/fidl.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
-#include <lib/driver/metadata/cpp/tests/test_child/test_child.h>
-#include <lib/driver/metadata/cpp/tests/test_grandchild/test_grandchild.h>
-#include <lib/driver/metadata/cpp/tests/test_parent/test_parent.h>
+#include <lib/driver/metadata/cpp/tests/metadata_forwarder_test_driver/metadata_forwarder_test_driver.h>
+#include <lib/driver/metadata/cpp/tests/metadata_retriever_test_driver/metadata_retriever_test_driver.h>
+#include <lib/driver/metadata/cpp/tests/metadata_sender_test_driver/metadata_sender_test_driver.h>
 #include <lib/driver/metadata/cpp/tests/test_root/test_root.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/fd.h>
@@ -37,66 +37,103 @@ class MetadataTest : public gtest::TestLoopFixture {
     ASSERT_EQ(endpoints.status_value(), ZX_OK);
     ASSERT_EQ(realm_->component().Connect("dev-topological", endpoints->server.TakeChannel()),
               ZX_OK);
-
     ASSERT_EQ(fdio_fd_create(endpoints->client.TakeChannel().release(), &dev_fd_), ZX_OK);
+
+    root_.emplace(ConnectToNode<fuchsia_hardware_test::Root>(TestRootDriver::kControllerNodeName));
   }
 
  protected:
-  using ParentAndChild = std::pair<fidl::SyncClient<fuchsia_hardware_test::Parent>,
-                                   fidl::SyncClient<fuchsia_hardware_test::Child>>;
-
-  template <typename FidlProtocol>
-  fidl::SyncClient<FidlProtocol> ConnectToNode(std::string_view path) const {
-    zx::result channel = device_watcher::RecursiveWaitForFile(dev_fd_, std::string{path}.c_str());
-    EXPECT_EQ(channel.status_value(), ZX_OK) << path;
-    return fidl::SyncClient{fidl::ClientEnd<FidlProtocol>{std::move(channel.value())}};
+  fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever> ConnectToMetadataRetriever(
+      std::string_view metadata_retriever_devfs_path) const {
+    auto controller_path = std::string{metadata_retriever_devfs_path}.append("/").append(
+        MetadataRetrieverTestDriver::kControllerNodeName);
+    return ConnectToNode<fuchsia_hardware_test::MetadataRetriever>(controller_path);
   }
 
-  // Connect to the fuchsia.hardware.test/Parent protocol served by the driver that is bound to the
-  // |parent_node_name| node and connect to the fuchsia.hardware.test/Child protocol served by the
-  // driver that is bound to the |child_node_name| node.
-  ParentAndChild ConnectToParentAndChild(std::string_view parent_node_name,
-                                         std::string_view child_node_name) const {
-    auto path = std::string{parent_node_name}.append("/").append(child_node_name);
-    auto parent = ConnectToNode<fuchsia_hardware_test::Parent>(path);
-    path.append("/").append(TestChild::kChildNodeName);
-    auto child = ConnectToNode<fuchsia_hardware_test::Child>(path);
-    return {std::move(parent), std::move(child)};
+  fidl::SyncClient<fuchsia_hardware_test::MetadataForwarder> ConnectToMetadataForwarder(
+      std::string_view metadata_forwarder_devfs_path) const {
+    auto controller_path = std::string{metadata_forwarder_devfs_path}.append("/").append(
+        MetadataForwarderTestDriver::kControllerNodeName);
+    return ConnectToNode<fuchsia_hardware_test::MetadataForwarder>(controller_path);
   }
 
-  fidl::SyncClient<fuchsia_hardware_test::Grandchild> ConnectToGrandchild(
-      std::string_view parent_node_name, std::string_view child_node_name) const {
-    auto path = std::string{parent_node_name}
-                    .append("/")
-                    .append(child_node_name)
-                    .append("/")
-                    .append(TestChild::kChildNodeName)
-                    .append("/")
-                    .append(TestGrandchild::kChildNodeName);
-    return ConnectToNode<fuchsia_hardware_test::Grandchild>(path);
+  fidl::SyncClient<fuchsia_hardware_test::MetadataSender> ConnectToMetadataSender(
+      std::string_view metadata_sender_devfs_path) const {
+    auto controller_path = std::string{metadata_sender_devfs_path}.append("/").append(
+        MetadataSenderTestDriver::kControllerNodeName);
+    return ConnectToNode<fuchsia_hardware_test::MetadataSender>(controller_path);
+  }
+
+  fidl::SyncClient<fuchsia_hardware_test::Root>& root() { return root_.value(); }
+
+  // Create a metadata_sender driver instance and have it create a node for the metadata_retriever
+  // driver to bind to. |expose| determines if the metadata_sender driver will expose the metadata
+  // FIDL service in its component manifest. |use| determines if the metadata_retriever driver
+  // declares that it uses the metadata FIDL service in its component manifest. Return a client for
+  // the metadata_sender driver and metadata_retriever driver.
+  std::pair<fidl::SyncClient<fuchsia_hardware_test::MetadataSender>,
+            fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever>>
+  CreateMetadataSenderAndRetriever(bool expose, bool use) {
+    // Create metadata_sender driver instance.
+    std::string metadata_sender_node_path;
+    fidl::SyncClient<fuchsia_hardware_test::MetadataSender> metadata_sender;
+    {
+      fidl::Result result =
+          root()->AddMetadataSenderNode({{.exposes_metadata_fidl_service = expose}});
+      EXPECT_TRUE(result.is_ok());
+      metadata_sender_node_path = std::move(result.value().child_node_name());
+      metadata_sender = ConnectToMetadataSender(metadata_sender_node_path);
+    }
+
+    // Create a metadata_retriever driver instance as a child of the metadata_sender driver.
+    fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever> metadata_retriever;
+    {
+      fidl::Result result =
+          metadata_sender->AddMetadataRetrieverNode({{.uses_metadata_fidl_service = use}});
+      EXPECT_TRUE(result.is_ok());
+      std::string metadata_retriever_node_path =
+          metadata_sender_node_path.append("/").append(result.value().child_node_name());
+      metadata_retriever = ConnectToMetadataRetriever(metadata_retriever_node_path);
+    }
+
+    return std::pair<fidl::SyncClient<fuchsia_hardware_test::MetadataSender>,
+                     fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever>>(
+        std::move(metadata_sender), std::move(metadata_retriever));
   }
 
  private:
+  // Connect to the |FidlProtocol| FIDL protocol found at |devfs_path| within devfs.
+  template <typename FidlProtocol>
+  fidl::SyncClient<FidlProtocol> ConnectToNode(std::string_view devfs_path) const {
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(dev_fd_, std::string{devfs_path}.c_str());
+    EXPECT_EQ(channel.status_value(), ZX_OK) << devfs_path;
+    return fidl::SyncClient{fidl::ClientEnd<FidlProtocol>{std::move(channel.value())}};
+  }
+
   std::optional<component_testing::RealmRoot> realm_;
   int dev_fd_;
+  std::optional<fidl::SyncClient<fuchsia_hardware_test::Root>> root_;
 };
 
 // Verify that `fdf::MetadataServer` can serve metadata from a node and that one of the node's child
 // nodes can retrieve the metadata using `fdf::GetMetadata()`.
-TEST_F(MetadataTest, TransferMetadata) {
-  const char* kMetadataPropertyValue = "test property value";
+TEST_F(MetadataTest, SendAndRetrieveMetadata) {
+  static const std::string kMetadataPropertyValue = "arbitrary";
 
-  auto [parent, child] = ConnectToParentAndChild(TestRoot::kTestParentExposeNodeName,
-                                                 TestParent::kTestChildUseNodeName);
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(true, true);
 
+  // Set metadata_sender driver's metadata.
   {
     fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
-    fidl::Result result = parent->SetMetadata(std::move(metadata));
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
+    ASSERT_TRUE(result.is_ok());
   }
 
+  // Make the metadata_retriever get metadata from its parent (which is metadata_sender). Verify
+  // that the metadata is the same as the metadata assigned to the metadata_sender driver instance.
   {
-    fidl::Result result = child->GetMetadata();
+    fidl::Result result = metadata_retriever->GetMetadata();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     auto metadata = std::move(result.value().metadata());
     ASSERT_EQ(metadata.test_property(), kMetadataPropertyValue);
@@ -105,101 +142,130 @@ TEST_F(MetadataTest, TransferMetadata) {
 
 // Verify that a driver can forward metadata using `fdf::MetadataServer::ForwardMetadata()`.
 TEST_F(MetadataTest, ForwardMetadata) {
-  const char* kMetadataPropertyValue = "test property value";
+  static const std::string kMetadataPropertyValue = "arbitrary";
 
-  auto [parent, child] = ConnectToParentAndChild(TestRoot::kTestParentExposeNodeName,
-                                                 TestParent::kTestChildUseNodeName);
-  auto grandchild =
-      ConnectToGrandchild(TestRoot::kTestParentExposeNodeName, TestParent::kTestChildUseNodeName);
+  // Create a metadata_sender driver instance.
+  std::string metadata_sender_node_path;
+  fidl::SyncClient<fuchsia_hardware_test::MetadataSender> metadata_sender;
+  {
+    fidl::Result result = root()->AddMetadataSenderNode({{.exposes_metadata_fidl_service = true}});
+    ASSERT_TRUE(result.is_ok());
+    metadata_sender_node_path = std::move(result.value().child_node_name());
+    metadata_sender = ConnectToMetadataSender(metadata_sender_node_path);
+  }
 
+  // Set metadata_sender driver's metadata.
   {
     fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
-    fidl::Result result = parent->SetMetadata(std::move(metadata));
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
+    ASSERT_TRUE(result.is_ok());
   }
 
+  // Create a metadata_forwarder driver instance as a child of the metadata_sender driver. The
+  // metadata_forwarder driver will spawn a child node that the metadata_retriever driver binds
+  // to.
+  fidl::SyncClient<fuchsia_hardware_test::MetadataForwarder> metadata_forwarder;
+  fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever> metadata_retriever;
   {
-    fidl::Result result = child->ForwardMetadata();
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    fidl::Result result = metadata_sender->AddMetadataForwarderNode();
+    ASSERT_TRUE(result.is_ok());
+
+    std::string metadata_forwarder_node_path =
+        std::string{metadata_sender_node_path}.append("/").append(result.value().child_node_name());
+    metadata_forwarder = ConnectToMetadataForwarder(metadata_forwarder_node_path);
+
+    std::string metadata_retriever_node_path =
+        std::string{metadata_forwarder_node_path}.append("/").append(
+            MetadataForwarderTestDriver::kMetadataRetrieverNodeName);
+    metadata_retriever = ConnectToMetadataRetriever(metadata_retriever_node_path);
   }
 
+  // Make the metadata_forwarder driver forward the metadata from its parent driver (which is
+  // metadata_sender) to its child node (which is bound to metadata_retriever).
   {
-    fidl::Result result = grandchild->GetMetadata();
+    fidl::Result result = metadata_forwarder->ForwardMetadata();
+    ASSERT_TRUE(result.is_ok());
+  }
+
+  // Make the metadata_retriever get metadata from its parent which is a metadata_sender driver.
+  // Verify that the metadata is the same as the metadata assigned to the metadata_sender
+  // driver.
+  {
+    fidl::Result result = metadata_retriever->GetMetadata();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     auto metadata = std::move(result.value().metadata());
     ASSERT_EQ(metadata.test_property(), kMetadataPropertyValue);
   }
 }
 
-// Verify that a driver is unable to retrieve metadata offered to it by the node it is bound to via
-// `fdf::GetMetadata()` if the driver does not specify in its component manifest that it uses the
-// service associated with the metadata.
+// Verify that a driver is unable to retrieve metadata via `fdf::GetMetadata()` if the driver does
+// not specify in its component manifest that it uses the metadata FIDL service.
 TEST_F(MetadataTest, FailMetadataTransferWithExposeAndNoUse) {
-  const char* kMetadataPropertyValue = "test property value";
-  auto [parent, child] = ConnectToParentAndChild(TestRoot::kTestParentExposeNodeName,
-                                                 TestParent::kTestChildNoUseNodeName);
+  static const std::string kMetadataPropertyValue = "arbitrary";
 
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(true, false);
+
+  // Set metadata_sender driver's metadata.
   {
     fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
-    fidl::Result result = parent->SetMetadata(std::move(metadata));
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
+    ASSERT_TRUE(result.is_ok());
   }
 
+  // Make the metadata_retriever driver fail to retrieve metadata.
   {
-    fidl::Result result = child->GetMetadata();
+    fidl::Result result = metadata_retriever->GetMetadata();
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error());
     ASSERT_EQ(result.error_value().domain_error(), ZX_ERR_PEER_CLOSED);
   }
 }
 
-// Verify that a driver is unable to retrieve metadata offered to it by the node it is bound to via
-// `fdf::GetMetadata()` if the driver of the parent node does not specify in its component manifest
-// that it offers the service associated with the metadata.
+// Verify that a driver is unable to retrieve metadata via `fdf::GetMetadata()` if the parent driver
+// does not expose the metadata FIDL service in its component manifest.
 TEST_F(MetadataTest, FailMetadataTransferWithNoExposeButUse) {
-  const char* kMetadataPropertyValue = "test property value";
-  auto [parent, child] = ConnectToParentAndChild(TestRoot::kTestParentNoExposeNodeName,
-                                                 TestParent::kTestChildUseNodeName);
+  static const std::string kMetadataPropertyValue = "arbitrary";
 
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(false, true);
+
+  // Set metadata_sender driver's metadata.
   {
     fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
-    fidl::Result result = parent->SetMetadata(std::move(metadata));
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
+    ASSERT_TRUE(result.is_ok());
   }
 
+  // Make the metadata_retriever driver fail to retrieve metadata.
   {
-    fidl::Result result = child->GetMetadata();
+    fidl::Result result = metadata_retriever->GetMetadata();
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error());
     ASSERT_EQ(result.error_value().domain_error(), ZX_ERR_PEER_CLOSED);
   }
-
-  fidl::Result result = child->GetMetadata();
 }
 
-// Verify that a driver is unable to retrieve metadata offered to it by the node it is bound to via
-// `fdf::GetMetadata()` if the driver does not specify in its component manifest that it uses the
-// service associated with the metadata and the driver of the parent node does not specify in its
-// component manifest that is offers the service associated with the metadata.
+// Verify that a driver is unable to retrieve metadata via `fdf::GetMetadata()` if the driver does
+// not specify in its component manifest that it uses the metadata FIDL service and the parent
+// driver does not expose the metadata FIDL service in its component manifest.
 TEST_F(MetadataTest, FailMetadataTransferWithNoExposeAndNoUse) {
-  const char* kMetadataPropertyValue = "test property value";
-  auto [parent, child] = ConnectToParentAndChild(TestRoot::kTestParentNoExposeNodeName,
-                                                 TestParent::kTestChildNoUseNodeName);
+  static const std::string kMetadataPropertyValue = "arbitrary";
 
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(false, false);
+
+  // Set metadata_sender driver's metadata.
   {
     fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
-    fidl::Result result = parent->SetMetadata(std::move(metadata));
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
+    ASSERT_TRUE(result.is_ok());
   }
 
+  // Make the metadata_retriever driver fail to retrieve metadata.
   {
-    fidl::Result result = child->GetMetadata();
+    fidl::Result result = metadata_retriever->GetMetadata();
     ASSERT_TRUE(result.is_error());
     ASSERT_TRUE(result.error_value().is_domain_error());
     ASSERT_EQ(result.error_value().domain_error(), ZX_ERR_PEER_CLOSED);
   }
-
-  fidl::Result result = child->GetMetadata();
 }
 
 }  // namespace fdf_metadata::test

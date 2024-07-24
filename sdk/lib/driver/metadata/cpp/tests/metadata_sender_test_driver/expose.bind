@@ -4,4 +4,5 @@
 
 using fuchsia.driver.metadata.test;
 
-fuchsia.driver.metadata.test.TEST_CHILD == fuchsia.driver.metadata.test.TEST_CHILD.USE;
+fuchsia.driver.metadata.test.PURPOSE == fuchsia.driver.metadata.test.PURPOSE.SEND_METADATA;
+fuchsia.driver.metadata.test.EXPOSES_METADATA_FIDL_SERVICE == true;

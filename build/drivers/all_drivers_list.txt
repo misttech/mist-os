@@ -19,9 +19,9 @@
 //examples/drivers/transport/zircon/v2:child_driver
 //examples/drivers/transport/zircon/v2:parent_driver
 //sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build
-//sdk/lib/driver/metadata/cpp/tests/test_child:driver
-//sdk/lib/driver/metadata/cpp/tests/test_grandchild:driver
-//sdk/lib/driver/metadata/cpp/tests/test_parent:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_forwarder_test_driver:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_retriever_test_driver:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_sender_test_driver:driver
 //sdk/lib/driver/metadata/cpp/tests/test_root:driver
 //sdk/lib/driver_test_realm/fake_driver:driver
 //src/camera/drivers/bus/aml_mipicsi:aml_mipicsi_driver-driver

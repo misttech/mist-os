@@ -6,28 +6,59 @@ library fuchsia.hardware.test;
 
 using zx;
 
-const SERVICE string = "fuchsia.hardware.test.Metadata";
+const METADATA_SERVICE string = "fuchsia.hardware.test.Metadata";
 
 type Metadata = table {
     1: test_property string:MAX;
 };
 
-closed protocol Parent {
+closed protocol MetadataSender {
+    /// Use `fdf_metadata::MetadataServer::SetMetadata()` to serve |metadata| to the driver's child
+    /// nodes.
     strict SetMetadata(struct {
         metadata Metadata;
     }) -> () error zx.Status;
-};
 
-closed protocol Child {
-    strict GetMetadata() -> (struct {
-        metadata Metadata;
+    /// Add a child node that the metadata_retriever driver variants can bind to. The child node
+    /// will expose metadata offered by the parent driver.
+    strict AddMetadataRetrieverNode(struct {
+        /// Whether to match the new child node to the metadata_retriever_use driver or the
+        /// metadata_retriever_no_use driver.
+        uses_metadata_fidl_service bool;
+    }) -> (struct {
+        /// Name of the child node that the metadata_retriever driver variants can bind to.
+        child_node_name string:MAX;
     }) error zx.Status;
 
+    /// Add a child node that the metadata_forwarder driver can bind to. The child node will expose
+    /// metadata offered by the parent driver.
+    strict AddMetadataForwarderNode() -> (struct {
+        /// Name of the child node that the metadata_forwarder driver can bind to.
+        child_node_name string:MAX;
+    }) error zx.Status;
+};
+
+closed protocol MetadataForwarder {
+    /// Use `fdf_metadata::MetadataServer::ForwardMetadata()` to forward metadata from the driver's
+    /// parent driver to its child nodes.
     strict ForwardMetadata() -> () error zx.Status;
 };
 
-closed protocol Grandchild {
+closed protocol MetadataRetriever {
+    /// Use `fdf_metadata::GetMetadata()` to retrieve metadata from its parent driver and return it.
     strict GetMetadata() -> (struct {
         metadata Metadata;
+    }) error zx.Status;
+};
+
+closed protocol Root {
+    /// Add a child that the metadata_sender driver variants can bind to.
+    strict AddMetadataSenderNode(struct {
+        /// Whether to match the new child node to the metadata_sender_expose driver or the
+        /// metadata_sender_no_expose driver.
+        exposes_metadata_fidl_service bool;
+    }) -> (struct {
+        /// Name of the child node that the metadata_sender driver variants can bind to.
+        child_node_name string:MAX;
     }) error zx.Status;
 };
