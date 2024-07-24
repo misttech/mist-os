@@ -25,6 +25,7 @@ source_set("display") {
     "//sdk/fidl/fuchsia.ui.display.color:fuchsia.ui.display.color_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.internal:fuchsia.ui.display.internal_hlcpp",
     "//sdk/lib/fit",
+    "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
     "//sdk/lib/sys/cpp",
     "//src/lib/fidl/cpp:hlcpp_conversion",
     "//src/lib/fsl",

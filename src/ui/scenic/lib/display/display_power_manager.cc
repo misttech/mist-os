@@ -16,16 +16,18 @@ namespace {
 
 using SetDisplayPowerResult = fuchsia::ui::display::internal::DisplayPower_SetDisplayPower_Result;
 
-constexpr char kDisplayPower[] = "DisplayPower";
-constexpr char kDisplayPowerStatus[] = "display_power_is_on";
+constexpr char kDisplayPowerEvents[] = "display_power_events";
+constexpr char kDisplayPowerOnEvent[] = "on";
+constexpr char kDisplayPowerOffEvent[] = "off";
+constexpr uint64_t kInspectHistorySize = 64;
 
 }  // namespace
 
 DisplayPowerManager::DisplayPowerManager(DisplayManager& display_manager,
                                          inspect::Node& parent_node)
     : display_manager_(display_manager),
-      inspect_node_(parent_node.CreateChild(kDisplayPower)),
-      inspect_display_power_status_(inspect_node_.CreateBool(kDisplayPowerStatus, true)) {}
+      inspect_display_power_events_(parent_node.CreateChild(kDisplayPowerEvents),
+                                    kInspectHistorySize) {}
 
 void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback callback) {
   // No display
@@ -56,7 +58,9 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
     return;
   }
 
-  inspect_display_power_status_.Set(power_on);
+  inspect_display_power_events_.CreateEntry([power_on](inspect::Node& n) {
+    n.RecordInt(power_on ? kDisplayPowerOnEvent : kDisplayPowerOffEvent, zx_clock_get_monotonic());
+  });
   callback(SetDisplayPowerResult::WithResponse({}));
 }
 
