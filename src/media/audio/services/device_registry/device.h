@@ -143,6 +143,8 @@ class Device : public std::enable_shared_from_this<Device> {
   // Simple accessors
   // This is the const subset available to device observers.
   //
+  inline bool has_error() const { return (state_ == State::Error); }
+  inline bool is_operational() const { return (state_ == State::Initialized); }
   fuchsia_audio_device::DeviceType device_type() const { return device_type_; }
   bool is_codec() const { return (device_type_ == fuchsia_audio_device::DeviceType::kCodec); }
   bool is_composite() const {
@@ -265,11 +267,11 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCurrentElementStates();
   void RetrieveElementState(ElementId element_id);
 
-  bool IsFullyInitialized();
   void OnInitializationResponse();
+  bool IsInitializationComplete();
+  void OnInitializationComplete();
   void OnError(zx_status_t error);
-  // Otherwise-normal departure of a device, such as USB device unplug-removal.
-  void OnRemoval();
+  void OnRemoval();  // Non-error departure of a device, such as USB device unplug-removal.
 
   template <typename ResultT>
   bool LogResultError(const ResultT& result, const char* debug_context);
@@ -293,12 +295,12 @@ class Device : public std::enable_shared_from_this<Device> {
   //
   // ## "Forward" transitions
   //
-  // - On construction, state is DeviceInitializing.  Initialize() kicks off various commands.
+  // - On construction, state is Initializing.  Initialize() kicks off various commands.
   //   Each command then calls either OnInitializationResponse (when completing successfully) or
   //   OnError (if an error occurs at any time).
   //
-  // - OnInitializationResponse() changes state to DeviceInitialized if all commands are complete;
-  // else state remains DeviceInitializing until later OnInitializationResponse().
+  // - OnInitializationResponse() changes state to Initialized if all commands are complete;
+  //   else state remains Initializing until later OnInitializationResponse().
   //
   // ## "Backward" transitions
   //
@@ -308,14 +310,14 @@ class Device : public std::enable_shared_from_this<Device> {
   //
   // - Device health is automatically checked at initialization. This may result in OnError
   //   (detailed above). Note that a successful health check is one of the "graduation
-  //   requirements" for transitioning to the DeviceInitialized state. https://fxbug.dev/42068381
+  //   requirements" for transitioning to the Initialized state. https://fxbug.dev/42068381
   //   tracks the work to proactively call GetHealthState at some point. We will always surface this
   //   to the client by an error notification, rather than their calling GetHealthState directly.
   //
   enum class State : uint8_t {
     Error,
-    DeviceInitializing,
-    DeviceInitialized,
+    Initializing,
+    Initialized,
   };
   enum class RingBufferState : uint8_t {
     NotCreated,
@@ -326,7 +328,6 @@ class Device : public std::enable_shared_from_this<Device> {
   friend std::ostream& operator<<(std::ostream& out, State device_state);
   friend std::ostream& operator<<(std::ostream& out, RingBufferState ring_buffer_state);
   void SetError(zx_status_t error);
-  void SetState(State new_state);
   void SetRingBufferState(ElementId element_id, RingBufferState new_ring_buffer_state);
 
   // Start the ongoing process of device clock recovery from position notifications. Before this
@@ -384,7 +385,9 @@ class Device : public std::enable_shared_from_this<Device> {
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   const TokenId token_id_;
 
-  // Initialization is complete when these 5 optionals are populated.
+  State state_;
+
+  // Initialization is complete (state becomes Initialized) when these optionals have values.
   std::optional<fuchsia_hardware_audio::StreamProperties> stream_config_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::SupportedFormats>> ring_buffer_format_sets_;
   std::optional<fuchsia_hardware_audio::GainState> gain_state_;
@@ -431,8 +434,6 @@ class Device : public std::enable_shared_from_this<Device> {
     zx::time start_stop_time = zx::time::infinite_past();
   };
   CodecStartState codec_start_state_;
-
-  State state_{State::DeviceInitializing};
 
   std::optional<fuchsia_audio_device::Info> device_info_;
 
@@ -488,10 +489,10 @@ inline std::ostream& operator<<(std::ostream& out, Device::State device_state) {
   switch (device_state) {
     case Device::State::Error:
       return (out << "Error");
-    case Device::State::DeviceInitializing:
-      return (out << "DeviceInitializing");
-    case Device::State::DeviceInitialized:
-      return (out << "DeviceInitialized");
+    case Device::State::Initializing:
+      return (out << "Initializing");
+    case Device::State::Initialized:
+      return (out << "Initialized");
     default:
       return (out << "<unknown enum>");
   }

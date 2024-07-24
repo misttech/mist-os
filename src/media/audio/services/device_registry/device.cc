@@ -50,7 +50,7 @@ TokenId NextTokenId() {
 template <>
 void Device::RingBufferFidlErrorHandler<fha::RingBuffer>::on_fidl_error(fidl::UnbindInfo info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(RingBuffer)";
-  if (device()->state_ == State::Error) {
+  if (device()->has_error()) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
   } else if (info.is_peer_closed() || info.is_user_initiated()) {
     ADR_LOG_METHOD(kLogRingBufferFidlResponses) << name() << " disconnected: " << info;
@@ -69,7 +69,7 @@ template <>
 void Device::FidlErrorHandler<fhasp::SignalProcessing>::on_fidl_error(fidl::UnbindInfo info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(SignalProcessing)";
   // If a device already encountered some other error, disconnects like this are not unexpected.
-  if (device_->state_ == State::Error) {
+  if (device_->has_error()) {
     ADR_WARN_METHOD() << "(signalprocessing) device already has error; no state to unwind";
     return;
   }
@@ -130,7 +130,7 @@ std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> pres
                                           std::move(driver_client));
 }
 
-// Device notifies presence_watcher when it is available (DeviceInitialized), unhealthy (Error) or
+// Device notifies presence_watcher when it is available (Initialized), unhealthy (Error) or
 // removed. The dispatcher member is needed for Device to create client connections to protocols
 // such as fuchsia.hardware.audio.signalprocessing.Reader or fuchsia.hardware.audio.RingBuffer.
 Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
@@ -141,7 +141,8 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       name_(name.substr(0, name.find('\0'))),
       device_type_(device_type),
       driver_client_(std::move(driver_client)),
-      token_id_(NextTokenId()) {
+      token_id_(NextTokenId()),
+      state_(State::Initializing) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
@@ -202,10 +203,10 @@ void Device::SetSignalProcessingSupported(bool is_supported) {
 
 void Device::OnRemoval() {
   ADR_LOG_METHOD(kLogDeviceState);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
     --unhealthy_count_;
-  } else if (state_ != State::DeviceInitializing) {
+  } else if (is_operational()) {
     --initialized_count_;
 
     DropControl();  // Probably unneeded (the Device is going away) but makes unwind "complete".
@@ -238,14 +239,14 @@ void Device::ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)
 // Unwind any operational state or configuration the device might be in, and remove this device.
 void Device::OnError(zx_status_t error) {
   ADR_LOG_METHOD(kLogDeviceState);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring subsequent error (" << error << ")";
     return;
   }
 
   FX_PLOGS(WARNING, error) << __func__;
 
-  if (state_ != State::DeviceInitializing) {
+  if (is_operational()) {
     --initialized_count_;
 
     DropControl();
@@ -261,7 +262,7 @@ void Device::OnError(zx_status_t error) {
     pw->DeviceHasError(shared_from_this());
   }
 }
-bool Device::IsFullyInitialized() {
+bool Device::IsInitializationComplete() {
   switch (device_type_) {
     case fad::DeviceType::kCodec:
       return has_codec_properties() && has_health_state() && checked_for_signalprocessing() &&
@@ -285,12 +286,12 @@ bool Device::IsFullyInitialized() {
 
 // An initialization command returned a successful response. Is initialization complete?
 void Device::OnInitializationResponse() {
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device has already encountered a problem; ignoring this";
     return;
   }
 
-  if (state_ != State::DeviceInitializing) {
+  if (is_operational()) {
     ADR_WARN_METHOD() << "unexpected device initialization response when not Initializing";
   }
 
@@ -330,11 +331,11 @@ void Device::OnInitializationResponse() {
       return;
   }
 
-  if (IsFullyInitialized()) {
+  if (IsInitializationComplete()) {
     ++initialized_count_;
     SetDeviceInfo();
     LogDeviceAddition(*info());
-    SetState(State::DeviceInitialized);
+    OnInitializationComplete();
     LogObjectCounts();
 
     if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock(); pw) {
@@ -346,20 +347,15 @@ void Device::OnInitializationResponse() {
 // Returns true if the specified entity successfully asserts control of this device.
 bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify_to_set) {
   ADR_LOG_METHOD(kLogDeviceState || kLogNotifyMethods);
-  FX_CHECK(state_ != State::DeviceInitializing);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device has an error; cannot set control";
     return false;
   }
+  FX_CHECK(is_operational());
 
   if (GetControlNotify()) {
     ADR_WARN_METHOD() << "already controlled";
-    return false;
-  }
-
-  if (state_ != State::DeviceInitialized) {
-    ADR_WARN_METHOD() << "wrong state for this call (" << state_ << ")";
     return false;
   }
 
@@ -396,7 +392,6 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify_to_set) {
 // Returns true if this device previously had a controlling entity.
 bool Device::DropControl() {
   ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods);
-  FX_CHECK(state_ != State::DeviceInitializing);
 
   auto control_notify = GetControlNotify();
   if (!control_notify) {
@@ -415,12 +410,12 @@ bool Device::DropControl() {
 bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add) {
   ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods) << " (" << observer_to_add << ")";
 
-  FX_CHECK(state_ != State::DeviceInitializing);
-
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << ": unhealthy, cannot be observed";
     return false;
   }
+  FX_CHECK(is_operational());
+
   for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
     if (auto observer = weak_obs->lock(); observer) {
       if (observer == observer_to_add) {
@@ -467,7 +462,6 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
 
   LogObjectCounts();
 
-  // SetState(State::DeviceInitialized);
   return true;
 }
 
@@ -487,11 +481,12 @@ void Device::DeviceDroppedRingBuffer(ElementId element_id) {
 
 // Whether client- or device-originated, reset any state associated with an active RingBuffer.
 void Device::DropRingBuffer(ElementId element_id) {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogDeviceState);
-
-  // if (state_ != State::Error) {
-  //   SetState(State::DeviceInitialized);
-  // }
 
   auto rb_pair = ring_buffer_map_.find(element_id);
   if (rb_pair == ring_buffer_map_.end()) {
@@ -538,18 +533,18 @@ void Device::SetError(zx_status_t error) {
   state_ = State::Error;
 }
 
-void Device::SetState(State state) {
-  if (state_ == State::Error) {
+void Device::OnInitializationComplete() {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
 
-  ADR_LOG_METHOD(kLogDeviceState) << state;
-  state_ = state;
+  ADR_LOG_METHOD(kLogDeviceState);
+  state_ = State::Initialized;
 }
 
 void Device::SetRingBufferState(ElementId element_id, RingBufferState ring_buffer_state) {
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
@@ -566,6 +561,8 @@ void Device::SetRingBufferState(ElementId element_id, RingBufferState ring_buffe
 
 void Device::Initialize() {
   ADR_LOG_METHOD(kLogDeviceMethods);
+  FX_CHECK(!has_error());
+  FX_CHECK(!is_operational());
 
   if (is_codec()) {
     RetrieveCodecProperties();
@@ -593,7 +590,7 @@ void Device::Initialize() {
 // Use this when the Result might contain a domain_error or framework_error.
 template <typename ResultT>
 bool Device::LogResultError(const ResultT& result, const char* debug_context) {
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << debug_context << ": device already has an error";
     return true;
   }
@@ -620,7 +617,7 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
 // Use this when the Result error can only be a framework_error.
 template <typename ResultT>
 bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_context) {
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << debug_context << ": device already has an error";
     return true;
   }
@@ -641,7 +638,7 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
 void Device::RetrieveStreamProperties() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -694,11 +691,11 @@ void Device::SanitizeStreamPropertiesStrings(
 void Device::RetrieveCodecProperties() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*codec_client_)->GetProperties().Then([this](fidl::Result<fha::Codec::GetProperties>& result) {
     if (LogResultFrameworkError(result, "GetProperties response")) {
@@ -740,11 +737,11 @@ void Device::SanitizeCodecPropertiesStrings(std::optional<fha::CodecProperties>&
 void Device::RetrieveCompositeProperties() {
   ADR_LOG_METHOD(kLogCompositeFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*composite_client_)
       ->GetProperties()
@@ -796,7 +793,7 @@ void Device::RetrieveStreamRingBufferFormatSets() {
       fad::kDefaultRingBufferElementId,
       [this](ElementId element_id,
              const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
-        if (state_ == State::Error) {
+        if (has_error()) {
           ADR_WARN_OBJECT() << "device has an error while retrieving initial RingBuffer formats";
           return;
         }
@@ -831,7 +828,7 @@ void Device::RetrieveRingBufferFormatSets(
                               ring_buffer_format_sets_callback) {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -865,7 +862,7 @@ void Device::RetrieveRingBufferFormatSets(
 void Device::RetrieveSignalProcessingState() {
   ADR_LOG_METHOD(kLogDeviceMethods);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -873,7 +870,7 @@ void Device::RetrieveSignalProcessingState() {
   auto [sig_proc_client_end, sig_proc_server_end] =
       fidl::Endpoints<fhasp::SignalProcessing>::Create();
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   if (is_codec()) {
     ADR_LOG_METHOD(kLogCodecFidlCalls) << "calling SignalProcessingConnect";
@@ -944,10 +941,11 @@ void Device::RetrieveSignalProcessingState() {
 
 void Device::RetrieveSignalProcessingElements() {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
+  FX_CHECK(!is_operational());  // This is part of the initialization process
 
   (*sig_proc_client_)
       ->GetElements()
@@ -991,10 +989,11 @@ void Device::RetrieveSignalProcessingElements() {
 
 void Device::RetrieveSignalProcessingTopologies() {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error || (checked_for_signalprocessing() && !supports_signalprocessing())) {
+  if (has_error() || (checked_for_signalprocessing() && !supports_signalprocessing())) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
+  FX_CHECK(!is_operational());  // This is part of the initialization process
   FX_DCHECK(sig_proc_client_->is_valid());
 
   (*sig_proc_client_)
@@ -1037,7 +1036,7 @@ void Device::RetrieveSignalProcessingTopologies() {
 
 void Device::RetrieveCurrentTopology() {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -1076,10 +1075,11 @@ void Device::RetrieveCurrentTopology() {
 
 void Device::RetrieveCurrentElementStates() {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
+  FX_CHECK(!is_operational());  // This is part of the initialization process
   FX_DCHECK(sig_proc_client_->is_valid());
 
   for (auto& [element_id, _] : sig_proc_element_map_) {
@@ -1136,7 +1136,7 @@ void Device::RetrieveElementState(ElementId element_id) {
 // If the method does not return ZX_OK, then the driver was not called.
 zx_status_t Device::SetTopology(uint64_t topology_id) {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return ZX_ERR_IO;
   }
@@ -1150,6 +1150,7 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
     ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
     return ZX_ERR_ACCESS_DENIED;
   }
+  FX_CHECK(is_operational());
 
   FX_DCHECK(sig_proc_client_->is_valid());
   if (sig_proc_topology_map_.find(topology_id) == sig_proc_topology_map_.end()) {
@@ -1183,7 +1184,7 @@ zx_status_t Device::SetElementState(ElementId element_id,
                                     const fhasp::SettableElementState& element_state) {
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return ZX_ERR_IO;
   }
@@ -1195,6 +1196,7 @@ zx_status_t Device::SetElementState(ElementId element_id,
     ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
     return ZX_ERR_ACCESS_DENIED;
   }
+  FX_CHECK(is_operational());
 
   FX_DCHECK(sig_proc_client_->is_valid());
   if (sig_proc_element_map_.find(element_id) == sig_proc_element_map_.end()) {
@@ -1233,7 +1235,7 @@ void Device::RetrieveCodecDaiFormatSets() {
   RetrieveDaiFormatSets(
       fad::kDefaultDaiInterconnectElementId,
       [this](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
-        if (state_ == State::Error) {
+        if (has_error()) {
           ADR_WARN_OBJECT() << "device already has an error";
           return;
         }
@@ -1269,11 +1271,14 @@ void Device::RetrieveDaiFormatSets(
         dai_format_sets_callback) {
   ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // This is part of the initialization process, but might be called afterward as well,
+  // so we can't check is_operational().
+
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   if (is_codec()) {
     if (element_id != fad::kDefaultDaiInterconnectElementId) {
@@ -1286,6 +1291,10 @@ void Device::RetrieveDaiFormatSets(
         .Then([this, element_id, callback = std::move(dai_format_sets_callback)](
                   fidl::Result<fha::Codec::GetDaiFormats>& result) mutable {
           if (LogResultError(result, "GetDaiFormats response")) {
+            return;
+          }
+          if (has_error()) {
+            ADR_WARN_OBJECT() << "device already has an error";
             return;
           }
 
@@ -1306,7 +1315,7 @@ void Device::RetrieveDaiFormatSets(
           std::string str{"GetDaiFormats (element "};
           str.append(std::to_string(element_id)).append(") response");
           ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
-          if (state_ == State::Error) {
+          if (has_error()) {
             ADR_WARN_OBJECT() << "device already has error during " << str;
             return;
           }
@@ -1338,7 +1347,7 @@ void Device::RetrieveCompositeRingBufferFormatSets() {
           std::string str{"GetRingBufferFormats (element "};
           str.append(std::to_string(id)).append(") response");
           ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
-          if (state_ == State::Error) {
+          if (has_error()) {
             ADR_WARN_OBJECT() << "device already has error during " << str;
             return;
           }
@@ -1371,7 +1380,7 @@ void Device::RetrieveCompositeRingBufferFormatSets() {
 void Device::RetrieveGainState() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -1419,7 +1428,7 @@ void Device::RetrieveGainState() {
 void Device::RetrieveStreamPlugState() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -1468,12 +1477,12 @@ void Device::RetrieveStreamPlugState() {
 void Device::RetrieveCodecPlugState() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
   if (!has_plug_state()) {
-    // TODO(https://fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
+    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
   }
 
   (*codec_client_)->WatchPlugState().Then([this](fidl::Result<fha::Codec::WatchPlugState>& result) {
@@ -1515,8 +1524,8 @@ void Device::RetrieveCodecPlugState() {
 void Device::RetrieveStreamHealthState() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
   // TODO(https://fxbug.dev/42064765): handle command timeouts
@@ -1555,7 +1564,7 @@ void Device::RetrieveCodecHealthState() {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts, because that's the most likely
+  // TODO(https://fxbug.dev/42064765): handle command timeouts, because that's the most likely
   // indicator of an unhealthy driver/device.
 
   (*codec_client_)->GetHealthState().Then([this](fidl::Result<fha::Codec::GetHealthState>& result) {
@@ -1584,12 +1593,12 @@ void Device::RetrieveCodecHealthState() {
 void Device::RetrieveCompositeHealthState() {
   ADR_LOG_METHOD(kLogCompositeFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts, because that's the most likely
+  // TODO(https://fxbug.dev/42064765): handle command timeouts, because that's the most likely
   // indicator of an unhealthy driver/device.
 
   (*composite_client_)
@@ -1847,12 +1856,11 @@ std::optional<fha::Format> Device::SupportedDriverFormatForClientFormat(
 // Returns true if the gain was successfully changed.
 bool Device::SetGain(fha::GainState& gain_state) {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
-
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return false;
   }
+  FX_CHECK(is_operational());
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Device must be allocated before this method can be called";
     return false;
@@ -1915,14 +1923,13 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
     return;
   }
 
-  FX_CHECK(state_ != State::DeviceInitializing)
-      << "Device is not yet initialized: cannot SetDaiFormat";
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error: cannot SetDaiFormat";
     notify->DaiFormatIsNotChanged(element_id, dai_format,
                                   fad::ControlSetDaiFormatError::kDeviceError);
     return;
   }
+  FX_CHECK(is_operational());
 
   if (is_codec() ? (element_id != fad::kDefaultDaiInterconnectElementId)
                  : (dai_ids_.find(element_id) == dai_ids_.end())) {
@@ -1950,7 +1957,7 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
   // Check for no-change
 
   if (is_codec()) {
-    // TODO(https://fxbug.dev/113429): handle command timeouts
+    // TODO(https://fxbug.dev/42064765): handle command timeouts
 
     (*codec_client_)
         ->SetDaiFormat(dai_format)
@@ -1963,7 +1970,7 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
             return;
           }
 
-          if (state_ == State::Error) {
+          if (has_error()) {
             ADR_WARN_OBJECT() << context << "device already has an error";
             notify->DaiFormatIsNotChanged(element_id, dai_format,
                                           fad::ControlSetDaiFormatError::kDeviceError);
@@ -2014,7 +2021,7 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
                                      codec_format_->codec_format_info);
         });
   } else {
-    // TODO(https://fxbug.dev/113429): handle command timeouts
+    // TODO(https://fxbug.dev/42064765): handle command timeouts
 
     (*composite_client_)
         ->SetDaiFormat({element_id, dai_format})
@@ -2027,7 +2034,7 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
             return;
           }
 
-          if (state_ == State::Error) {
+          if (has_error()) {
             ADR_WARN_OBJECT() << context << "device already has an error";
             notify->DaiFormatIsNotChanged(element_id, dai_format,
                                           fad::ControlSetDaiFormatError::kDeviceError);
@@ -2078,18 +2085,17 @@ bool Device::Reset() {
   }
 
   ADR_LOG_METHOD(kLogCodecFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
-
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "Device already has an error: cannot Reset";
     return false;
   }
+  FX_CHECK(is_operational());
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Device is not yet controlled: cannot Reset";
     return false;
   }
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   if (is_codec()) {
     (*codec_client_)->Reset().Then([this](fidl::Result<fha::Codec::Reset>& result) {
@@ -2180,12 +2186,11 @@ bool Device::CodecStart() {
   }
 
   ADR_LOG_METHOD(kLogCodecFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
-
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error: cannot CodecStart";
     return false;
   }
+  FX_CHECK(is_operational());
 
   auto notify = GetControlNotify();
   if (!notify) {
@@ -2203,7 +2208,7 @@ bool Device::CodecStart() {
     return true;
   }
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*codec_client_)->Start().Then([this](fidl::Result<fha::Codec::Start>& result) {
     auto notify = GetControlNotify();
@@ -2239,12 +2244,11 @@ bool Device::CodecStop() {
   }
 
   ADR_LOG_METHOD(kLogCodecFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
-
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error: cannot CodecStop";
     return false;
   }
+  FX_CHECK(is_operational());
 
   auto notify = GetControlNotify();
   if (!notify) {
@@ -2262,7 +2266,7 @@ bool Device::CodecStop() {
     return true;
   }
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*codec_client_)->Stop().Then([this](fidl::Result<fha::Codec::Stop>& result) {
     auto notify = GetControlNotify();
@@ -2308,6 +2312,12 @@ bool Device::CreateRingBuffer(
     return false;
   }
 
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return false;
+  }
+  FX_CHECK(is_operational());
+
   if (ring_buffer_ids_.find(element_id) == ring_buffer_ids_.end()) {
     ADR_WARN_METHOD() << "No RingBuffer element found for id " << element_id
                       << ": cannot CreateRingBuffer";
@@ -2341,7 +2351,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
                                                                 fha::Format driver_format) {
   ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return fad::ControlCreateRingBufferError::kDeviceError;
   }
@@ -2541,7 +2551,7 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
 // RingBuffer FIDL successful-response handlers.
 void Device::CheckForRingBufferReady(ElementId element_id) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -2596,6 +2606,11 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
 bool Device::SetActiveChannels(
     ElementId element_id, uint64_t channel_bitmask,
     fit::callback<void(zx::result<zx::time>)> set_active_channels_callback) {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return false;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
@@ -2639,6 +2654,11 @@ bool Device::SetActiveChannels(
 
 void Device::StartRingBuffer(ElementId element_id,
                              fit::callback<void(zx::result<zx::time>)> start_callback) {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
@@ -2662,6 +2682,11 @@ void Device::StartRingBuffer(ElementId element_id,
 }
 
 void Device::StopRingBuffer(ElementId element_id, fit::callback<void(zx_status_t)> stop_callback) {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;

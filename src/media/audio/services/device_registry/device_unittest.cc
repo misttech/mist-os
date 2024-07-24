@@ -39,7 +39,7 @@ namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 TEST_F(CodecTest, Initialization) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  EXPECT_TRUE(IsInitialized(device));
+  EXPECT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -63,7 +63,7 @@ TEST_F(CodecTest, Initialization) {
 TEST_F(CodecTest, InitializationNoDirection) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  EXPECT_TRUE(IsInitialized(device));
+  EXPECT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -80,7 +80,7 @@ TEST_F(CodecTest, InitializationNoDirection) {
 TEST_F(CodecTest, DeviceInfo) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
@@ -134,7 +134,7 @@ TEST_F(CodecTest, DeviceInfo) {
 TEST_F(CodecTest, DistinctTokenIds) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   // Set up a second, entirely distinct fake device.
   auto [client, server] = fidl::Endpoints<fha::Codec>::Create();
@@ -144,7 +144,7 @@ TEST_F(CodecTest, DistinctTokenIds) {
   fake_driver2->set_is_input(true);
 
   auto device2 = InitializeDeviceForFakeCodec(fake_driver2);
-  EXPECT_TRUE(IsInitialized(device2));
+  EXPECT_TRUE(device2->is_operational());
 
   EXPECT_NE(device->token_id(), device2->token_id());
 
@@ -156,7 +156,7 @@ TEST_F(CodecTest, DistinctTokenIds) {
 TEST_F(CodecTest, Disconnect) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
@@ -181,7 +181,7 @@ TEST_F(CodecTest, EmptyHealthResponse) {
   auto fake_driver = MakeFakeCodecOutput();
   fake_driver->set_health_state(std::nullopt);
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  EXPECT_TRUE(IsInitialized(device));
+  EXPECT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -190,7 +190,7 @@ TEST_F(CodecTest, EmptyHealthResponse) {
 TEST_F(CodecTest, GetClock) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   auto clock = device->GetReadOnlyClock();
   ASSERT_TRUE(clock.is_error());
@@ -200,7 +200,7 @@ TEST_F(CodecTest, GetClock) {
 TEST_F(CodecTest, Observer) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   EXPECT_TRUE(AddObserver(device));
 }
@@ -208,7 +208,7 @@ TEST_F(CodecTest, Observer) {
 TEST_F(CodecTest, Control) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   EXPECT_TRUE(DropControl(device));
@@ -218,7 +218,7 @@ TEST_F(CodecTest, Control) {
 TEST_F(CodecTest, InitialGainState) {
   auto fake_driver = MakeFakeCodecInput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -230,7 +230,7 @@ TEST_F(CodecTest, InitialGainState) {
 TEST_F(CodecTest, InitialPlugState) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -245,7 +245,7 @@ TEST_F(CodecTest, InitialPlugState) {
 TEST_F(CodecTest, DynamicPlugUpdate) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
@@ -267,7 +267,7 @@ TEST_F(CodecTest, DynamicPlugUpdate) {
 TEST_F(CodecTest, GetDaiFormats) {
   auto fake_driver = MakeFakeCodecInput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_FALSE(IsControlled(device));
 
   ASSERT_TRUE(AddObserver(device));
@@ -298,7 +298,7 @@ TEST_F(CodecTest, GetDaiFormats) {
 TEST_F(CodecTest, SetDaiFormat) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   ASSERT_TRUE(SetControl(device));
   ASSERT_TRUE(IsControlled(device));
@@ -331,7 +331,7 @@ TEST_F(CodecTest, SetDaiFormat) {
 TEST_F(CodecTest, InitiallyStopped) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   ASSERT_TRUE(SetControl(device));
   ASSERT_TRUE(IsControlled(device));
@@ -368,7 +368,7 @@ TEST_F(CodecTest, InitiallyStopped) {
 TEST_F(CodecTest, Start) {
   auto fake_driver = MakeFakeCodecInput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
@@ -396,7 +396,7 @@ TEST_F(CodecTest, Start) {
 TEST_F(CodecTest, SetDaiFormatChange) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
@@ -433,7 +433,7 @@ TEST_F(CodecTest, SetDaiFormatChange) {
 TEST_F(CodecTest, SetDaiFormatNoChange) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
@@ -470,7 +470,7 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
 TEST_F(CodecTest, StartStop) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
@@ -502,7 +502,7 @@ TEST_F(CodecTest, StartStop) {
 TEST_F(CodecTest, StartStart) {
   auto fake_driver = MakeFakeCodecOutput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
@@ -535,7 +535,7 @@ TEST_F(CodecTest, StartStart) {
 TEST_F(CodecTest, StopStop) {
   auto fake_driver = MakeFakeCodecInput();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
@@ -575,7 +575,7 @@ TEST_F(CodecTest, StopStop) {
 TEST_F(CodecTest, Reset) {
   auto fake_driver = MakeFakeCodecNoDirection();
   auto device = InitializeDeviceForFakeCodec(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
   device->RetrieveDaiFormatSets(
@@ -628,7 +628,7 @@ TEST_F(CodecTest, Reset) {
 TEST_F(CompositeTest, Initialization) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  EXPECT_TRUE(IsInitialized(device));
+  EXPECT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -647,7 +647,7 @@ TEST_F(CompositeTest, Initialization) {
 TEST_F(CompositeTest, DeviceInfo) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
 
@@ -773,7 +773,7 @@ TEST_F(CompositeTest, DeviceInfo) {
 TEST_F(CompositeTest, DistinctTokenIds) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   // Set up a second, entirely distinct fake device.
   auto [client, server] = fidl::Endpoints<fha::Composite>::Create();
@@ -782,7 +782,7 @@ TEST_F(CompositeTest, DistinctTokenIds) {
       std::make_shared<FakeComposite>(server.TakeChannel(), client.TakeChannel(), dispatcher());
 
   auto device2 = InitializeDeviceForFakeComposite(fake_driver2);
-  EXPECT_TRUE(IsInitialized(device2));
+  EXPECT_TRUE(device2->is_operational());
 
   EXPECT_NE(device->token_id(), device2->token_id());
 
@@ -794,7 +794,7 @@ TEST_F(CompositeTest, DistinctTokenIds) {
 TEST_F(CompositeTest, Disconnect) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
@@ -819,7 +819,7 @@ TEST_F(CompositeTest, EmptyHealthResponse) {
   auto fake_driver = MakeFakeComposite();
   fake_driver->set_health_state(std::nullopt);
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  EXPECT_TRUE(IsInitialized(device));
+  EXPECT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -828,7 +828,7 @@ TEST_F(CompositeTest, EmptyHealthResponse) {
 TEST_F(CompositeTest, DefaultClock) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_clock(device)->domain(), fha::kClockDomainMonotonic);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
@@ -843,7 +843,7 @@ TEST_F(CompositeTest, ClockInOtherDomain) {
   auto fake_driver = MakeFakeComposite();
   fake_driver->set_clock_domain(kNonMonotonicClockDomain);
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_clock(device)->domain(), kNonMonotonicClockDomain);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
@@ -856,7 +856,7 @@ TEST_F(CompositeTest, ClockInOtherDomain) {
 TEST_F(CompositeTest, Observer) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   EXPECT_TRUE(AddObserver(device));
 }
@@ -865,7 +865,7 @@ TEST_F(CompositeTest, Observer) {
 TEST_F(CompositeTest, InitialSignalProcessingForObserver) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -883,7 +883,7 @@ TEST_F(CompositeTest, InitialSignalProcessingForObserver) {
 TEST_F(CompositeTest, Control) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   EXPECT_TRUE(DropControl(device));
@@ -893,7 +893,7 @@ TEST_F(CompositeTest, Control) {
 TEST_F(CompositeTest, InitialSignalProcessingForControl) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
@@ -912,7 +912,7 @@ TEST_F(CompositeTest, InitialSignalProcessingForControl) {
 TEST_F(CompositeTest, NoInitialGainState) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -924,7 +924,7 @@ TEST_F(CompositeTest, NoInitialGainState) {
 TEST_F(CompositeTest, NoInitialPlugState) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -936,7 +936,7 @@ TEST_F(CompositeTest, NoInitialPlugState) {
 TEST_F(CompositeTest, SetDaiFormat) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto dai_format_sets_by_element = device->dai_format_sets();
@@ -959,7 +959,7 @@ TEST_F(CompositeTest, SetDaiFormat) {
 TEST_F(CompositeTest, SetDaiFormatNoChange) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto dai_format_sets_by_element = device->dai_format_sets();
@@ -996,7 +996,7 @@ TEST_F(CompositeTest, SetDaiFormatNoChange) {
 TEST_F(CompositeTest, SetDaiFormatChange) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto dai_format_sets_by_element = device->dai_format_sets();
@@ -1032,7 +1032,7 @@ TEST_F(CompositeTest, SetDaiFormatChange) {
 TEST_F(CompositeTest, Reset) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   // Set DAI formats on every DAI element.
@@ -1167,7 +1167,7 @@ void CompositeTest::TestCreateRingBuffer(const std::shared_ptr<Device>& device,
 TEST_F(CompositeTest, CreateRingBuffers) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
@@ -1193,7 +1193,7 @@ TEST_F(CompositeTest, CreateRingBuffers) {
 TEST_F(CompositeTest, DeviceDroppedRingBuffer) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
@@ -1234,7 +1234,7 @@ TEST_F(CompositeTest, DeviceDroppedRingBuffer) {
 TEST_F(CompositeTest, RingBufferStartAndStop) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
@@ -1292,7 +1292,7 @@ TEST_F(CompositeTest, RingBufferStartAndStop) {
 TEST_F(CompositeTest, SetActiveChannelsSupported) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
@@ -1363,7 +1363,7 @@ TEST_F(CompositeTest, SetActiveChannelsSupported) {
 TEST_F(CompositeTest, SetActiveChannelsUnsupported) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
@@ -1413,7 +1413,7 @@ TEST_F(CompositeTest, SetActiveChannelsUnsupported) {
 TEST_F(CompositeTest, WatchDelayInfoInitial) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
@@ -1462,7 +1462,7 @@ TEST_F(CompositeTest, WatchDelayInfoInitial) {
 TEST_F(CompositeTest, WatchDelayInfoUpdate) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
   ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
@@ -1533,7 +1533,7 @@ TEST_F(CompositeTest, WatchDelayInfoUpdate) {
 TEST_F(CompositeTest, GetElements) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   ASSERT_TRUE(device->info().has_value());
   ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
@@ -1595,7 +1595,7 @@ TEST_F(CompositeTest, GetElements) {
 TEST_F(CompositeTest, GetTopologies) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   ASSERT_TRUE(device->info().has_value());
   ASSERT_TRUE(device->info()->signal_processing_elements().has_value());
@@ -1639,7 +1639,7 @@ TEST_F(CompositeTest, GetTopologies) {
 TEST_F(CompositeTest, WatchElementStateInitial) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   const auto& states = notify()->element_states();
@@ -1720,7 +1720,7 @@ TEST_F(CompositeTest, WatchElementStateInitial) {
 TEST_F(CompositeTest, WatchElementStateUpdate) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   auto& elements = *device->info()->signal_processing_elements();
@@ -1857,7 +1857,7 @@ TEST_F(CompositeTest, WatchTopologyInitial) {
   auto fake_driver = MakeFakeComposite();
   fake_driver->InjectTopologyChange(FakeComposite::kFullDuplexTopologyId);
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -1869,7 +1869,7 @@ TEST_F(CompositeTest, WatchTopologyUpdate) {
   auto fake_driver = MakeFakeComposite();
   fake_driver->InjectTopologyChange(FakeComposite::kFullDuplexTopologyId);
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -1890,7 +1890,7 @@ TEST_F(CompositeTest, WatchTopologyUpdate) {
 TEST_F(CompositeTest, SetTopology) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
@@ -1918,7 +1918,7 @@ TEST_F(CompositeTest, SetTopology) {
 TEST_F(CompositeTest, SetElementState) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
@@ -1952,7 +1952,7 @@ TEST_F(CompositeTest, SetElementState) {
 // Verify that a fake stream_config with default values is initialized successfully.
 TEST_F(StreamConfigTest, Initialization) {
   auto device = InitializeDeviceForFakeStreamConfig(MakeFakeStreamConfigOutput());
-  EXPECT_TRUE(IsInitialized(device));
+  EXPECT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -1977,7 +1977,7 @@ TEST_F(StreamConfigTest, Initialization) {
 TEST_F(StreamConfigTest, DeviceInfo) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   auto info = GetDeviceInfo(device);
 
   EXPECT_TRUE(info.token_id());
@@ -2015,7 +2015,7 @@ TEST_F(StreamConfigTest, DeviceInfo) {
 TEST_F(StreamConfigTest, DistinctTokenIds) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   // Set up a second, entirely distinct fake device.
   auto [client, server] = fidl::Endpoints<fha::StreamConfig>::Create();
@@ -2025,7 +2025,7 @@ TEST_F(StreamConfigTest, DistinctTokenIds) {
   fake_driver2->set_is_input(true);
 
   auto device2 = InitializeDeviceForFakeStreamConfig(fake_driver2);
-  EXPECT_TRUE(IsInitialized(device2));
+  EXPECT_TRUE(device2->is_operational());
 
   EXPECT_NE(device->token_id(), device2->token_id());
 
@@ -2037,7 +2037,7 @@ TEST_F(StreamConfigTest, DistinctTokenIds) {
 TEST_F(StreamConfigTest, Disconnect) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
 
@@ -2062,7 +2062,7 @@ TEST_F(StreamConfigTest, EmptyHealthResponse) {
   auto fake_driver = MakeFakeStreamConfigInput();
   fake_driver->set_health_state(std::nullopt);
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  EXPECT_TRUE(IsInitialized(device));
+  EXPECT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
   EXPECT_EQ(device_presence_watcher()->error_devices().size(), 0u);
@@ -2071,7 +2071,7 @@ TEST_F(StreamConfigTest, EmptyHealthResponse) {
 TEST_F(StreamConfigTest, DefaultClock) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_clock(device)->domain(), fha::kClockDomainMonotonic);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
@@ -2086,7 +2086,7 @@ TEST_F(StreamConfigTest, ClockInOtherDomain) {
   auto fake_driver = MakeFakeStreamConfigInput();
   fake_driver->set_clock_domain(kNonMonotonicClockDomain);
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   EXPECT_EQ(device_clock(device)->domain(), kNonMonotonicClockDomain);
   EXPECT_TRUE(device_clock(device)->IdenticalToMonotonicClock());
@@ -2102,7 +2102,7 @@ TEST_F(StreamConfigTest, SupportedDriverFormatForClientFormat) {
   fake_driver->set_valid_bits_per_sample(0, {12, 15, 20});
   fake_driver->set_bytes_per_sample(0, {2, 4});
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   auto valid_bits =
       ExpectFormatMatch(device, ring_buffer_id(), fuchsia_audio::SampleType::kInt16, 2, 48001);
@@ -2116,7 +2116,7 @@ TEST_F(StreamConfigTest, SupportedDriverFormatForClientFormat) {
 TEST_F(StreamConfigTest, Observer) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
 
   EXPECT_TRUE(AddObserver(device));
 }
@@ -2124,7 +2124,7 @@ TEST_F(StreamConfigTest, Observer) {
 TEST_F(StreamConfigTest, Control) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   EXPECT_TRUE(DropControl(device));
@@ -2134,7 +2134,7 @@ TEST_F(StreamConfigTest, Control) {
 TEST_F(StreamConfigTest, InitialGainState) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -2155,7 +2155,7 @@ TEST_F(StreamConfigTest, InitialGainState) {
 TEST_F(StreamConfigTest, DynamicGainUpdate) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
@@ -2194,7 +2194,7 @@ TEST_F(StreamConfigTest, DynamicGainUpdate) {
 TEST_F(StreamConfigTest, SetGain) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
@@ -2232,7 +2232,7 @@ TEST_F(StreamConfigTest, SetGain) {
 TEST_F(StreamConfigTest, InitialPlugState) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(AddObserver(device));
 
   RunLoopUntilIdle();
@@ -2245,7 +2245,7 @@ TEST_F(StreamConfigTest, InitialPlugState) {
 TEST_F(StreamConfigTest, DynamicPlugUpdate) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
 
   RunLoopUntilIdle();
@@ -2268,7 +2268,7 @@ TEST_F(StreamConfigTest, DynamicPlugUpdate) {
 TEST_F(StreamConfigTest, CreateRingBuffer) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
@@ -2291,7 +2291,7 @@ TEST_F(StreamConfigTest, CreateRingBuffer) {
 TEST_F(StreamConfigTest, RingBufferProperties) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
   ConnectToRingBufferAndExpectValidClient(device, ring_buffer_id());
@@ -2304,7 +2304,7 @@ TEST_F(StreamConfigTest, RingBufferProperties) {
 TEST_F(StreamConfigTest, RingBufferGetVmo) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
   ConnectToRingBufferAndExpectValidClient(device, ring_buffer_id());
@@ -2315,7 +2315,7 @@ TEST_F(StreamConfigTest, RingBufferGetVmo) {
 TEST_F(StreamConfigTest, BasicStartAndStop) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
@@ -2416,7 +2416,7 @@ TEST_F(StreamConfigTest, ReportsThatItSupportsSetActiveChannels) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
 
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
@@ -2443,7 +2443,7 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
   auto fake_driver = MakeFakeStreamConfigOutput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
   fake_driver->set_active_channels_supported(false);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   ASSERT_TRUE(SetControl(device));
 
@@ -2469,7 +2469,7 @@ TEST_F(StreamConfigTest, ReportsThatItDoesNotSupportSetActiveChannels) {
 TEST_F(StreamConfigTest, SetActiveChannels) {
   auto fake_driver = MakeFakeStreamConfigInput();
   auto device = InitializeDeviceForFakeStreamConfig(fake_driver);
-  ASSERT_TRUE(IsInitialized(device));
+  ASSERT_TRUE(device->is_operational());
   fake_driver->AllocateRingBuffer(8192);
   fake_driver->set_active_channels_supported(true);
   ASSERT_TRUE(SetControl(device));

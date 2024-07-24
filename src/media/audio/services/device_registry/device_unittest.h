@@ -52,15 +52,6 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return device->device_clock_;
   }
 
-  static bool HasError(const std::shared_ptr<Device>& device) {
-    return device->state_ == Device::State::Error;
-  }
-  static bool IsInitializing(const std::shared_ptr<Device>& device) {
-    return device->state_ == Device::State::DeviceInitializing;
-  }
-  static bool IsInitialized(const std::shared_ptr<Device>& device) {
-    return device->state_ == Device::State::DeviceInitialized;
-  }
   static bool IsControlled(const std::shared_ptr<Device>& device) {
     return (device->GetControlNotify() != nullptr);
   }
@@ -397,7 +388,7 @@ class CodecTest : public DeviceTestBase {
                        fuchsia_audio_device::DriverClient::WithCodec(std::move(codec_client_end)));
 
     RunLoopUntilIdle();
-    EXPECT_FALSE(IsInitializing(device)) << "Device is initializing";
+    EXPECT_TRUE(device->is_operational() || device->has_error()) << "device still initializing";
 
     return device;
   }
@@ -446,7 +437,7 @@ class CompositeTest : public DeviceTestBase {
         fuchsia_audio_device::DriverClient::WithComposite(std::move(composite_client_end)));
 
     RunLoopUntilIdle();
-    EXPECT_FALSE(IsInitializing(device)) << "Device is initializing";
+    EXPECT_TRUE(device->is_operational() || device->has_error()) << "device still initializing";
 
     return device;
   }
@@ -519,7 +510,7 @@ class StreamConfigTest : public DeviceTestBase {
         fuchsia_audio_device::DriverClient::WithStreamConfig(std::move(stream_config_client_end)));
 
     RunLoopUntilIdle();
-    EXPECT_FALSE(IsInitializing(device));
+    EXPECT_TRUE(device->is_operational() || device->has_error()) << "device still initializing";
 
     return device;
   }
@@ -621,12 +612,12 @@ class StreamConfigTest : public DeviceTestBase {
 
   void ExpectRingBufferReady(const std::shared_ptr<Device>& device, ElementId element_id) {
     RunLoopUntilIdle();
-    EXPECT_TRUE(IsInitialized(device));
+    EXPECT_TRUE(device->is_operational());
     EXPECT_TRUE(RingBufferIsStopped(device, element_id));
   }
 
   void StartAndExpectValid(const std::shared_ptr<Device>& device, ElementId element_id) {
-    ASSERT_TRUE(IsInitialized(device));
+    ASSERT_TRUE(device->is_operational());
     ASSERT_TRUE(RingBufferIsStopped(device, element_id));
     const auto now = zx::clock::get_monotonic().get();
     auto& ring_buffer = device->ring_buffer_map_.find(element_id)->second;
