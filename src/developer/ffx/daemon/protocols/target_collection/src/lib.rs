@@ -273,11 +273,16 @@ impl TargetCollectionProtocol {
                 addrs = [addr];
                 // Set the addresses, note that is transient, note that it is
                 // a network target, and enable it
-                let update = TargetUpdateBuilder::new()
+                let mut update = TargetUpdateBuilder::new()
                     .net_addresses(&addrs)
                     .transient_target()
                     .discovered(TargetProtocol::Ssh, TargetTransport::Network)
                     .enable();
+                let port = addr.port();
+                if port != 0 {
+                    update = update.ssh_port(Some(port));
+                }
+
                 let filter = [TargetUpdateFilter::NetAddrs(&addrs)];
                 (update, filter)
             }
