@@ -32,12 +32,12 @@ class EngineDriverClient {
       std::shared_ptr<fdf::Namespace> incoming);
 
   // Production code must use the Create() factory method.
-  // `dc` must be valid.
-  explicit EngineDriverClient(ddk::DisplayEngineProtocolClient dc);
+  // `banjo_engine` must be valid.
+  explicit EngineDriverClient(ddk::DisplayEngineProtocolClient banjo_engine);
 
   // Production code must use the Create() factory method.
-  // `engine` must be valid.
-  explicit EngineDriverClient(fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> engine);
+  // `fidl_engine` must be valid.
+  explicit EngineDriverClient(fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> fidl_engine);
 
   EngineDriverClient(const EngineDriverClient&) = delete;
   EngineDriverClient& operator=(const EngineDriverClient&) = delete;
@@ -80,10 +80,10 @@ class EngineDriverClient {
   bool use_engine_;
 
   // FIDL Client
-  fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> engine_;
+  fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> fidl_engine_;
 
   // Banjo Client
-  ddk::DisplayEngineProtocolClient dc_;
+  ddk::DisplayEngineProtocolClient banjo_engine_;
 };
 
 }  // namespace display
