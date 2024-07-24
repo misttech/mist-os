@@ -108,7 +108,8 @@ Now that you have a build recipe, you can move on to creating the [bind
 rules][driver-binding], which the driver manager uses to decide whether a driver
 can be used with a device.
 
-1. In `src/graphics/display/drivers/fancy-display`, create `fancy-display.bind`:
+1. In `src/graphics/display/drivers/fancy-display`, create
+   `meta/fancy-display.bind`:
 
 ```
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
@@ -289,5 +290,5 @@ basic bootloader driver. In most cases, your roadmap will be:
 [license-policies]: /docs/contribute/governance/policy/open-source-licensing-policies.md
 [sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem
 [tearing]: https://en.wikipedia.org/wiki/Screen_tearing
-[amlogic-display-bind]: /src/graphics/display/drivers/amlogic-display/amlogic-display.bind
+[amlogic-display-bind]: /src/graphics/display/drivers/amlogic-display/meta/amlogic-display.bind
 [vim3-board]: /boards/vim3.gni

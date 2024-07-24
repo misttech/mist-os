@@ -22,8 +22,8 @@ fuchsia_driver_component("virtio-gpu-component-v1") {
   } else {
     component_name = "virtio_gpu"
   }
-  info = "v1/virtio_gpu-info.json"
-  manifest = "v1/meta/virtio_gpu.cml"
+  info = "v1/meta/virtio-guest-info.json"
+  manifest = "v1/meta/virtio-guest.cml"
   deps = [ "v1:driver" ]
 }
 
@@ -33,8 +33,8 @@ fuchsia_driver_component("virtio-gpu-component-v2") {
   } else {
     component_name = "virtio_gpu_v2_unused"
   }
-  info = "v2/virtio_gpu-info.json"
-  manifest = "v2/meta/virtio_gpu.cml"
+  info = "v2/meta/virtio-guest-info.json"
+  manifest = "v2/meta/virtio-guest.cml"
   deps = [ "v2:driver" ]
 }
 
