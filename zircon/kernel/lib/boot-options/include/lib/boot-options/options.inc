@@ -391,10 +391,10 @@ syscall, even if the hardware cycle counter registers are accessible from
 user-mode.
 )""")
 
-DEFINE_OPTION("vdso.clock_get_monotonic_force_syscall", bool,
-              vdso_clock_get_monotonic_force_syscall, {false}, R"""(
-If this option is set, the `zx_clock_get_monotonic` vDSO call will be forced to
-be a true syscall, instead of simply performing a transformation of the tick
+DEFINE_OPTION("vdso.clock_get_force_syscall", bool,
+              vdso_clock_get_force_syscall, {false}, R"""(
+If this option is set, the `zx_clock_get_monotonic` and `zx_clock_get_boot` vDSO calls will be
+forced to be a true syscall, instead of simply performing a transformation of the tick
 counter in user-mode.
 )""")
 

@@ -309,7 +309,7 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
     REDIRECT_SYSCALL(mutator, zx_ticks_get, SYSCALL_zx_ticks_get_via_kernel);
   }
 
-  if (gBootOptions->vdso_clock_get_monotonic_force_syscall) {
+  if (gBootOptions->vdso_clock_get_force_syscall) {
     // Force a syscall for zx_clock_get_monotonic if instructed to do so by the
     // kernel command line arguments.  Make sure to swap out the implementation
     // of zx_deadline_after as well.
