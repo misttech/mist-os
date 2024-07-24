@@ -10,7 +10,13 @@
     a {
         compatible = "foo";
     };
+    b {
+        #interrupt-cells=<0x02>;
+        interrupt-controller;
+        phandle=<0x01>;
+    };
     qcom,wdt@f017000 {
+        interrupt-parent=<0x01>;
         compatible = "qcom,msm-watchdog";
         reg = <0xf017000 0x1000>;
         reg-names = "wdt-base";
